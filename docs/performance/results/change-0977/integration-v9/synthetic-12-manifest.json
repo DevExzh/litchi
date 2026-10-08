@@ -1,0 +1,28 @@
+{
+  "children_completed": 12,
+  "children_requested": 12,
+  "fixture_scope": "in-memory duplicate of one successfully decoded packet; analytics-only",
+  "no_retry": true,
+  "packets": [
+    "synthetic:01",
+    "synthetic:02",
+    "synthetic:03",
+    "synthetic:04",
+    "synthetic:05",
+    "synthetic:06",
+    "synthetic:07",
+    "synthetic:08",
+    "synthetic:09",
+    "synthetic:10",
+    "synthetic:11",
+    "synthetic:12"
+  ],
+  "plan": {
+    "bytes": 4384,
+    "path": "/home/zhuhe/litchi-performance-0977/integration-v9/plan-integration.json",
+    "sha256": "08894a5641918ee47f45f4e89f1a2283c9c88ebc60081d82c497c74cbb66fa77"
+  },
+  "schema": "litchi.performance.0977.capture_manifest.v1",
+  "serial": true,
+  "status": "complete"
+}

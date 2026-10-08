@@ -1,0 +1,111 @@
+{
+  "created_utc": "2026-10-08T07:03:51.185438+00:00",
+  "drift": {
+    "current": {
+      "build_id": "b4f63de1b71462b9d1d96aad18279b4a450ca84f",
+      "bytes": 25192472,
+      "path": "/usr/bin/perf",
+      "sha256": "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531",
+      "version": "perf version 7.0.14"
+    },
+    "package_transition": {
+      "actor_attribution": "not established",
+      "source": "/var/log/dpkg.log",
+      "timestamp": "2026-10-08 06:46:44",
+      "upgrade": "linux-perf:amd64 7.0.0-34.34 -> 7.0.0-38.38"
+    },
+    "previous_bound": {
+      "bytes": 25221960,
+      "path": "/usr/bin/perf",
+      "sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+      "version": "perf version 7.0.14"
+    }
+  },
+  "dynamic_compatibility": {
+    "current_perf_undefined": "dwfl_report_elf@ELFUTILS_0.156; dwfl_module_getelf@ELFUTILS_0.122; dwfl_getthread_frames@ELFUTILS_0.158; dwarf_getcfi_elf@ELFUTILS_0.142",
+    "final_shim_export": "dwfl_report_elf@@ELFUTILS_0.156",
+    "final_shim_resolver": "dwfl_report_elf ELFUTILS_0.156",
+    "finding": "current perf exposes the exact dwfl_report_elf symbol version required by the retained final shim; no symbol-version blocker observed"
+  },
+  "header_finding": {
+    "command": "/usr/bin/perf report --header-only --stdio --percent-limit 100 -i <0975 child-01 raw>",
+    "current_header": "omits the retained event descriptor line; retained old header contains instructions:u and sample contract",
+    "implication": "current perf can decode stock script/build IDs and final-shim translated output byte-exactly in tested offline cases, but the header parser warning must be retained and explicitly handled; do not silently call header validation equivalent",
+    "returncode": 0,
+    "stderr": "Invalid HEADER_EVENT_DESC: nre=1 sz=144 (min 64)"
+  },
+  "limits": [
+    "No original old perf executable was available for ELF-symbol side-by-side inspection; old identity is bound by retained receipts.",
+    "The translated corrected replay exercised current perf plus the retained final shim offline; it does not establish a native current-perf capture or performance equivalence."
+  ],
+  "minimum_requalification": [
+    "Bind current /usr/bin/perf SHA, byte count, Build ID, package version, and current dependency identity in a fresh offline-only plan; do not reuse the old perf SHA binding.",
+    "Run and retain four current-perf offline modes over the preserved original and translated perf.data: stock/original, stock/translated, final-v2 corrected/original, and final-v2 corrected/translated (plus the preregistered noop/original control if the decoder review requires it).",
+    "For every mode bind command, perf return code, stderr, header warning, buildid-list, raw-loss/lost-samples separation, sample/PID/CPU/period counts, and output/log hashes; compare corrected script conservation to retained translated evidence.",
+    "Require current perf header warning disposition explicitly; either validate the retained header contract from the sidecar/raw metadata or narrow the decoder header gate to accept this known parser warning while preserving stderr.",
+    "Keep temporal custody honest: the 0975 native capture was produced by the old perf hash; current-perf replay establishes offline decoder compatibility only and cannot retroactively reidentify the capture tool."
+  ],
+  "offline_replays": [
+    {
+      "cmp": "byte_exact",
+      "command": "/usr/bin/perf script --show-lost-events --no-inline -F cpu,pid,tid,time,event,period,ip,sym,symoff,dso -i <raw>",
+      "current_output": {
+        "bytes": 1169880,
+        "lines": 24072,
+        "sha256": "a41b5f6aa9ab569957746cb33137a31b1120be6685f4dbe7fad7d950a57202fb"
+      },
+      "input": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+      "mode": "stock_original_raw",
+      "retained_old_output": {
+        "bytes": 1169880,
+        "lines": 24072,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.stock.perf-script-no-inline.txt",
+        "sha256": "a41b5f6aa9ab569957746cb33137a31b1120be6685f4dbe7fad7d950a57202fb"
+      }
+    },
+    {
+      "cmp": "byte_exact",
+      "command": "/usr/bin/perf buildid-list -i <raw>",
+      "input": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+      "mode": "buildid_original_raw",
+      "retained_sidecar_sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925",
+      "returncode": 0
+    },
+    {
+      "command": "/usr/bin/perf script -D -i <raw>",
+      "input": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+      "mode": "raw_dump_prefix_original",
+      "prefix_bytes": 1000000,
+      "prefix_sha256": "5dd90806d1f698daf3e7b2b446c53fd9709472ff6fd8cb6a2df17d2eba12a508",
+      "retained_prefix_cmp": "byte_exact",
+      "returncode": "pipe_head_141_expected"
+    },
+    {
+      "cmp": "byte_exact_script_output",
+      "command": "/usr/bin/perf script --show-lost-events --no-inline -F cpu,pid,tid,time,event,period,ip,sym,symoff,dso -i <translated> with retained final-v2 shim LD_PRELOAD offline",
+      "current_output": {
+        "bytes": 2002059,
+        "lines": 13928,
+        "sha256": "e3694dc459e715fd925f22b3852fb9fb9db9f4f9a17b8b5bb667fd4bb1974302"
+      },
+      "input": "/home/zhuhe/litchi-performance-0973/aslr-translation-final-v6/child-01.translated.perf.data",
+      "input_sha256": "a8d6545adf7f4827a4e5d6c16ca14f39cbc5e4d7b8e83c1fda06bf8e7d40eb8e",
+      "mode": "corrected_translated_raw",
+      "retained_output": {
+        "bytes": 2002059,
+        "lines": 13928,
+        "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-v2/translated.corrected.script.txt",
+        "sha256": "e3694dc459e715fd925f22b3852b9fb9db9f4f9a17b8b5bb667fd4bb1974302"
+      },
+      "shim_log": {
+        "bytes": 37580955,
+        "rows": 66771,
+        "sha256": "97c2ed8574dc22e187eacf500ad0a8e0393fdd5a05cf1cc8ef381c56148f6a12",
+        "stderr_bytes": 0
+      }
+    }
+  ],
+  "schema": "litchi.performance.0977.perf_drift_review.v1",
+  "scope": "read-only installed perf identity and offline replay compatibility; no system replacement, build, native workload, or capture",
+  "status": "offline_requalification_required"
+}

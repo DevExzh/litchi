@@ -1,0 +1,76 @@
+{
+  "build_started": false,
+  "created_utc": "2026-10-08T07:19:47.755229+00:00",
+  "helpers": {
+    "bridge": {
+      "bytes": 13348,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+      "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+    },
+    "decoder": {
+      "bytes": 67772,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+      "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+    },
+    "launcher": {
+      "bytes": 3597,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5"
+    },
+    "plan_binding": {
+      "bytes": 24729,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/plan_binding_0977_v2.py",
+      "sha256": "acd82a2ac09037be84fd3f9ea8def808131d49203fd0748f6e6d9ea68574544b"
+    },
+    "plan_generator": {
+      "bytes": 13231,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/prepare_plan_0977_v2.py",
+      "sha256": "6e6acc54794b72286374a408557ec3dc19110ee7c24eb68fdd0924faaa4f3a57"
+    },
+    "reducer": {
+      "bytes": 41138,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/reduce_0977.py",
+      "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+    },
+    "runner": {
+      "bytes": 38108,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+      "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+    }
+  },
+  "retained_lineage": {
+    "affinity_bridge_0976": {
+      "bytes": 16721,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/affinity_bridge_0976_v2.py",
+      "scope": "handoff lineage; 0977 bridge is a fresh target-generic adaptation",
+      "sha256": "6b19f065d3a4183cad9d5ed6ae020628c7512c49e92b8a07dbdf338cc069270a"
+    },
+    "decoder_final_v2": {
+      "map": {
+        "bytes": 233,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.map",
+        "sha256": "173dd1902d46a378e713cd794ede6c4fdac2a184124e8aefecc0c2fda7494883"
+      },
+      "so": {
+        "bytes": 26296,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.so",
+        "sha256": "2acdc5c06ac672dca0e5a34bf204e0a45451b4bfe2d31c304f4c791f5b2a0a12"
+      },
+      "source": {
+        "bytes": 33461,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.c",
+        "sha256": "a30536989f1fcc3e28c5bbe5876b9f01159841ba0a6d6c3aa22706cdcfd23d1a"
+      },
+      "validator": {
+        "bytes": 15978,
+        "path": "/home/zhuhe/litchi-performance-0976/tools/validate_and_noop_final_v2_0973_v3.py",
+        "sha256": "2dabb747dbee8ae3a1152b6c553b9f25c2b0d5f76ad540358f6305152d906edb"
+      }
+    }
+  },
+  "schema": "litchi.performance.0977.helper_seal.v1",
+  "scope": "fresh serial Office capture bridge/runner/plan and decoder/reducer interface; no workload started",
+  "status": "sealed",
+  "version": "0977-v2",
+  "workload_started": false
+}

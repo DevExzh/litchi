@@ -1,0 +1,588 @@
+{
+  "authoritative_bindings": {
+    "child02_diagnostic": "dbfb076ec8010d82bb81125569dcc94907b8fcadd67035572a4e4b5532631a1b",
+    "cleanup": "405c8f7b6e17b804c02c18b99ea6eeadbe552afc0abf49e5e4e24785b84d79fe",
+    "cleanup_supplement": "0f8e9785bd83ad5e00fdcf10dea3b2acb0f0a693a4fe43c7fc079c5000a1667c",
+    "control_audit": "2d2f70cb800239201a941d9f78d55129be2344bb6887f8fe34fc6dc2187d7927",
+    "external_descriptor": "12cb620e141cea7c5332ce98dbe7d97b23bb93b10b4ffa15770c6791af54ffae",
+    "failed_reducer_receipt": "37a34fe0ccc0ad1502e54e5907571a5aacd529b591ccccdf5eb3d24237c1a60a",
+    "office_failed_cohort_audit": "050b5c6006122ce5ab5fb780971069196bcc03cc7a32ced93f262231d50c1e3d",
+    "office_readiness": "979bea121bdb5e4db5bdcd7a1d02ce212cc20390bfbca083f73bde555621032f"
+  },
+  "change": "0977",
+  "external_evidence": {
+    "descriptor_path": "docs/performance/results/change-0977/provenance/external-artifact-descriptor-final-v1.json",
+    "external_descriptor_in_payload": true,
+    "external_inventory_rows": 36,
+    "external_inventory_total_bytes": 5961696116,
+    "external_raw_and_derived_evidence_remains_outside_repo": true
+  },
+  "external_root": "/home/zhuhe/litchi-performance-0977",
+  "file_count": 110,
+  "files": [
+    {
+      "bytes": 4587,
+      "path": "docs/performance/results/change-0977/README.md",
+      "sha256": "829c712d7afc0999304559331105b234b4184f752a292ab43a976478fde51514"
+    },
+    {
+      "bytes": 9329,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-control-0977-v1.json",
+      "sha256": "49545df60784d616f1cea878c73d853cd91f208516cca2e694ca453f6038ae8d"
+    },
+    {
+      "bytes": 20251,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-control-audit-0977-v1.json",
+      "sha256": "608683db886cfff2b93b1292e312eed2d14eae683aebcc26c245b5ab5ca8b40b"
+    },
+    {
+      "bytes": 20771,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-control-audit-0977-v2.json",
+      "sha256": "2d2f70cb800239201a941d9f78d55129be2344bb6887f8fe34fc6dc2187d7927"
+    },
+    {
+      "bytes": 14676,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-office-failed-cohort-0977-v3.json",
+      "sha256": "050b5c6006122ce5ab5fb780971069196bcc03cc7a32ced93f262231d50c1e3d"
+    },
+    {
+      "bytes": 6535,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-office-readiness-0977-v2.json",
+      "sha256": "979bea121bdb5e4db5bdcd7a1d02ce212cc20390bfbca083f73bde555621032f"
+    },
+    {
+      "bytes": 6386,
+      "path": "docs/performance/results/change-0977/analysis/perf-drift-review-0977-v1.json",
+      "sha256": "e5175322be7194972afbf59454158c3e118d0b346b3544fa44cefda4269abdff"
+    },
+    {
+      "bytes": 3381,
+      "path": "docs/performance/results/change-0977/analysis/reduce-office-failed-0977-v1.json",
+      "sha256": "48f2dcc61e16dfe666eac4b0f6c87d30c430c6d8e26203c75b1a54d20d86906a"
+    },
+    {
+      "bytes": 62,
+      "path": "docs/performance/results/change-0977/analysis/reduce-office-failed-0977-v1.stderr",
+      "sha256": "bdd78defb8e687eb474d57770ca8896bf84bafe6b02d55cf3f374e6e74da67bc"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/analysis/reduce-office-failed-0977-v1.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 781,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/capture-manifest.json",
+      "sha256": "15e2a2e04f7263a61402cd846c94ea479c7db9034462537cd7baead68418074c"
+    },
+    {
+      "bytes": 31237,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.affinity-observations.json",
+      "sha256": "de4bb1ba6489e179caaa4fa4e0a600c3d6fc3ba73c7cece67aa14fb18ae4e0ab"
+    },
+    {
+      "bytes": 2268,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.bridge.json",
+      "sha256": "2e1723c824718ea4e9bfbace8fb8c0da83a5efd2acca085fd2884025af01c05c"
+    },
+    {
+      "bytes": 1980,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.command.json",
+      "sha256": "631302da21a8dca34f503fe5096ba589339b11959c7cdd9f98d5c16c2a3eb077"
+    },
+    {
+      "bytes": 215,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.control-summary.json",
+      "sha256": "beb3f5473c28fd1d49e52485a134a004bc5712a1751ee1fef29445dee1e6cde3"
+    },
+    {
+      "bytes": 7667,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.control-target.json",
+      "sha256": "bad01783312a80879f2fde98c71fc71939b61f91d0ba3ff084068b7ec3c901a0"
+    },
+    {
+      "bytes": 33400,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.packet.json",
+      "sha256": "63b8b1676a502bb18fafaa590c3c56e0a3b0aa358efeab4f94e54746651bfd69"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 499,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bytes": 49,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bytes": 1209,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-header.txt",
+      "sha256": "446f682ff5ff5144039d69098fef7bd09626479ee26f3eded84b0cf85c26d7fb"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 188,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf.stderr",
+      "sha256": "7299a576995ed3cec21bf06b26c5c46d57239eab511ee032c154ad1641726f53"
+    },
+    {
+      "bytes": 8449,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.raw-stack.json",
+      "sha256": "eb10e54f1473cdf2cef58b22a09751d7aa0452d66a1e5323d668483e723e7662"
+    },
+    {
+      "bytes": 4627,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.report.json",
+      "sha256": "93b38aab39fe2825acd2a498742152c0bba5fde1166da9e1e10d9b4052c38bd9"
+    },
+    {
+      "bytes": 1028,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.status.json",
+      "sha256": "d59063bfa372ef10dab7c8247dabc161ade631453a8591b66f5b57465c2028ff"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 479,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.terminal-report.txt",
+      "sha256": "21ee8c228fbbcbd1268a4864fb4e3850ec1e567d975753e46bb7cdaf35f25e64"
+    },
+    {
+      "bytes": 2236,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.terminal.json",
+      "sha256": "027276f6e0cba38c074a150f87dd4243b0265e2529fb7d7f2bbd846279ba7f72"
+    },
+    {
+      "bytes": 2219,
+      "path": "docs/performance/results/change-0977/design/design-0977-v1.md",
+      "sha256": "312e2d7963fc8f80eb26c10625bd1013c8dc9d3f5b1df93a951ad2236860049c"
+    },
+    {
+      "bytes": 6038,
+      "path": "docs/performance/results/change-0977/integration-v9/integration-receipt-v1.json",
+      "sha256": "44df985a91724aa1599410ead4751c43bde1997c2644fdfa52545c5d93fc4985"
+    },
+    {
+      "bytes": 4384,
+      "path": "docs/performance/results/change-0977/integration-v9/plan-integration.json",
+      "sha256": "08894a5641918ee47f45f4e89f1a2283c9c88ebc60081d82c497c74cbb66fa77"
+    },
+    {
+      "bytes": 737,
+      "path": "docs/performance/results/change-0977/integration-v9/synthetic-12-manifest.json",
+      "sha256": "0ee27da01bf8c66610c9f73afcc6dcde3377c36c75d9967f20e19624287e66ee"
+    },
+    {
+      "bytes": 1696,
+      "path": "docs/performance/results/change-0977/loader-gate-v1/capture-manifest-bad.json",
+      "sha256": "b4deb903a2e1ae49eb9fbf965eacee6a0f2c7adabb67f2ff3d035481de384a2f"
+    },
+    {
+      "bytes": 1695,
+      "path": "docs/performance/results/change-0977/loader-gate-v1/capture-manifest.json",
+      "sha256": "999676afd11bfa03aa91c27755d17c3b2f8da85d9f8e9ca3ccd35f9d6d1a3688"
+    },
+    {
+      "bytes": 1353,
+      "path": "docs/performance/results/change-0977/loader-gate-v1/loader-gate-receipt-v1.json",
+      "sha256": "fb016c49156835ffd925c5b5962336ba9749e09e1c0b892955de7cbe9c7f7c5d"
+    },
+    {
+      "bytes": 946,
+      "path": "docs/performance/results/change-0977/office/capture-manifest-v2.json",
+      "sha256": "19cd23533d78c09bfa460e74e2d4d215636c112c16efbd2e80e14e97e2afa933"
+    },
+    {
+      "bytes": 2056,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.bridge.json",
+      "sha256": "a9a90f6f1933788a18521cf3ca6ea6213541b7267683828fbce5611e90b4c470"
+    },
+    {
+      "bytes": 2379,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.command.json",
+      "sha256": "58c275585b1375b0f19e28000d46945372772222695dca1623efb41c35dbf313"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.corrected.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1106,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.launch.json",
+      "sha256": "6c5c25ff0dffd6ef3ea8055d3a89793818071761978f99e5405307dbd73c3b46"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-buildid.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 571,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 499,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bytes": 49,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bytes": 1209,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-header.txt",
+      "sha256": "e4049876541fa4ed24912febf8b7bd46e54b7e6e584afd9024e66d1418790457"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1279,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.status.json",
+      "sha256": "74d487b975dde0c5649bb5a240d4781a14a571adcbc1b9019daf85c7073ded31"
+    },
+    {
+      "bytes": 4489,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.target-layout.json",
+      "sha256": "2e9b8a2c7ff8e3a01fdf5289f99a6bc0f9ff33d5d08c0e5671a475004a465ee9"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1057,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.terminal-report.txt",
+      "sha256": "01dc6684f275cc5a49bc531994e81d2999126546ec00949fad42267961940a64"
+    },
+    {
+      "bytes": 2618,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.terminal.json",
+      "sha256": "0611c23bb7010fb468d0f2d58449456318548de76a14c2e90e122fc8d526e963"
+    },
+    {
+      "bytes": 2056,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.bridge.json",
+      "sha256": "8cb2f60778bc1b5e31ffed24f072a3a4a04c77d7f0343f502d4487bc780f7e9f"
+    },
+    {
+      "bytes": 2379,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.command.json",
+      "sha256": "265736f27d135a4420c2fc6a15e461e07ba367bae96ba925184d622f9cabcff6"
+    },
+    {
+      "bytes": 1106,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.launch.json",
+      "sha256": "96c6ffaab2a0100cd0f11aa2a065986fb6c9e3d6d44209c88a3cdc8d7833fb5a"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-buildid.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 571,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 499,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bytes": 49,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bytes": 1209,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-header.txt",
+      "sha256": "6aefd9dbf28e9e3dde996780eae9154676f59d1d973a13fbb8c929f5ab3ea6e1"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 210,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.status.json",
+      "sha256": "53df19f1359f0841ef5468bc5787dcf44b6bb22e2477cfbb8d8e9b353a69708d"
+    },
+    {
+      "bytes": 4484,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.target-layout.json",
+      "sha256": "aa0fc81aac8721b238fc8c31fb04bf040db895f84fca3d2961072e375ed3bbb1"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1383,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.terminal-report.txt",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    },
+    {
+      "bytes": 2618,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.terminal.json",
+      "sha256": "24d96015d18e117c3772045fc4f9b7b97cc9e60936988b3d6680f6f1e7ba91e5"
+    },
+    {
+      "bytes": 963,
+      "path": "docs/performance/results/change-0977/office/root-office-terminal-v1.json",
+      "sha256": "1b078a7408c0108f5456154649643e589056cb74f1b0aae33b3fd4be0312f834"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/root-office-terminal-v1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1320,
+      "path": "docs/performance/results/change-0977/office/root-office-terminal-v1.stdout",
+      "sha256": "a44f05bf618df7b9e5bbeaa6bc50a25a083f132cac8f32921a784b21bff21641"
+    },
+    {
+      "bytes": 17335,
+      "path": "docs/performance/results/change-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    {
+      "bytes": 42955,
+      "path": "docs/performance/results/change-0977/provenance/external-artifact-descriptor-final-v1.json",
+      "sha256": "12cb620e141cea7c5332ce98dbe7d97b23bb93b10b4ffa15770c6791af54ffae"
+    },
+    {
+      "bytes": 5059,
+      "path": "docs/performance/results/change-0977/provenance/reproduction-v1.md",
+      "sha256": "df0faed40bdb9858b6a357f9a1b3835045f8073ffaf2880a7e7455da5bd01d72"
+    },
+    {
+      "bytes": 7819,
+      "path": "docs/performance/results/change-0977/receipts/adr-goal-revalidation-0977-v1.json",
+      "sha256": "cb09d8c6331cde7f9ce44d6c5bb6fd984c8df97780a0e8c47fa0ee2edbdf27b9"
+    },
+    {
+      "bytes": 164,
+      "path": "docs/performance/results/change-0977/receipts/check-plan-0977-v2.stdout",
+      "sha256": "aa364eb935cdbdd854a9d3ecb251bb315f69db6a5f4b2fa471bb67aeb6a49b9f"
+    },
+    {
+      "bytes": 6565,
+      "path": "docs/performance/results/change-0977/receipts/child02-rawstack-diagnostic-0977-v3.json",
+      "sha256": "dbfb076ec8010d82bb81125569dcc94907b8fcadd67035572a4e4b5532631a1b"
+    },
+    {
+      "bytes": 9776,
+      "path": "docs/performance/results/change-0977/receipts/current-perf-requalification-0977-v1-posthoc-v2.json",
+      "sha256": "6735350c47ed5725189f4b91390f0274855068b3f0c20b2f2331bb5fcbc88be3"
+    },
+    {
+      "bytes": 13589,
+      "path": "docs/performance/results/change-0977/receipts/current-perf-requalification-0977-v1.json",
+      "sha256": "c335ce4b557cbc76f5097195272e93aae1bab9ae43bbce20713e7f32a3bf0fbc"
+    },
+    {
+      "bytes": 4287,
+      "path": "docs/performance/results/change-0977/receipts/focuseddecode-controls-0977-v4.json",
+      "sha256": "9ea0c4dc6c30373291060cacf2697be3918f5f6bc245cf0014fc3f396b8fd754"
+    },
+    {
+      "bytes": 3132,
+      "path": "docs/performance/results/change-0977/receipts/helper-seal-0977-v2.json",
+      "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+    },
+    {
+      "bytes": 6882,
+      "path": "docs/performance/results/change-0977/receipts/integration-v9-terminal-binding-correction-v1.json",
+      "sha256": "a9120eee26ca85fd99d2aa146153dec3e6e4b2b2090194e91ac11385eb3f588c"
+    },
+    {
+      "bytes": 1019,
+      "path": "docs/performance/results/change-0977/receipts/perf-tool-drift-0977-v1.json",
+      "sha256": "74e2672f81f15989c51be0359ffa0fe026c1ef7adb4a7bb77e969c20796c996b"
+    },
+    {
+      "bytes": 4276,
+      "path": "docs/performance/results/change-0977/receipts/reduce-office-failed-0977-v1.json",
+      "sha256": "37a34fe0ccc0ad1502e54e5907571a5aacd529b591ccccdf5eb3d24237c1a60a"
+    },
+    {
+      "bytes": 4652,
+      "path": "docs/performance/results/change-0977/receipts/reducer-reconciliation-0977-v3.json",
+      "sha256": "e3ecb9166a20a5f3a7d000579586f6973617065819ae552c628171f792c6fd61"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/receipts/root-control-0977-v1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 975,
+      "path": "docs/performance/results/change-0977/receipts/root-control-0977-v1.stdout",
+      "sha256": "d853256b008c28812f01c3071e7194fa9fd5e6bb908056d0079ba86ed55da5d1"
+    },
+    {
+      "bytes": 758,
+      "path": "docs/performance/results/change-0977/receipts/root-control-command-0977-v1.json",
+      "sha256": "2026f8cee03da3293212c5f5107b6dca33a7d69abf667f3d3ae6b1173f633812"
+    },
+    {
+      "bytes": 983,
+      "path": "docs/performance/results/change-0977/receipts/root-control-terminal-0977-v1.json",
+      "sha256": "31a4c044407adc4d4df4c95b3a156797c67ca08ea5503424855b64e2ce8078a9"
+    },
+    {
+      "bytes": 1498,
+      "path": "docs/performance/results/change-0977/receipts/root-go-0977-control-v1.json",
+      "sha256": "e428afc235f53d5e82b8e1552002cf10b671306cc7169ceb966a8c0ea6970f60"
+    },
+    {
+      "bytes": 1952,
+      "path": "docs/performance/results/change-0977/receipts/root-go-0977-office-v1.json",
+      "sha256": "ae2b92cc846d50c6e57c508cd2b0ea74421515b5310c516421e2b382a1e86193"
+    },
+    {
+      "bytes": 739,
+      "path": "docs/performance/results/change-0977/receipts/root-office-command-0977-v1.json",
+      "sha256": "fe13432f8656ed5f28c27358847091b57e334c8fac3be8a48b5c118b153a6930"
+    },
+    {
+      "bytes": 501,
+      "path": "docs/performance/results/change-0977/receipts/root-office-empty-directory-preflight-v1.json",
+      "sha256": "f2cdf2b257ff07b18edef4927f59f39d1decd300d50db1a625176d3665e9d246"
+    },
+    {
+      "bytes": 3549,
+      "path": "docs/performance/results/change-0977/receipts/temporary-cleanup-0977-supplement-v1.json",
+      "sha256": "0f8e9785bd83ad5e00fdcf10dea3b2acb0f0a693a4fe43c7fc079c5000a1667c"
+    },
+    {
+      "bytes": 63879,
+      "path": "docs/performance/results/change-0977/receipts/temporary-cleanup-0977-v1.json",
+      "sha256": "405c8f7b6e17b804c02c18b99ea6eeadbe552afc0abf49e5e4e24785b84d79fe"
+    },
+    {
+      "bytes": 13348,
+      "path": "docs/performance/results/change-0977/tools/affinity_bridge_0977.py",
+      "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+    },
+    {
+      "bytes": 10409,
+      "path": "docs/performance/results/change-0977/tools/diagnose_child02_rawstack_0977_v3.py",
+      "sha256": "dcf02c958f74d2c34859575a0223e88d01f3d7ebb4452ea2d3eab80094594a0b"
+    },
+    {
+      "bytes": 66864,
+      "path": "docs/performance/results/change-0977/tools/focuseddecode_0977.py",
+      "sha256": "0a34d1c6d54778dd16bd58dc0a09a00d9a6e276cf4051b97463557bd20730ef3"
+    },
+    {
+      "bytes": 67772,
+      "path": "docs/performance/results/change-0977/tools/focuseddecode_0977_v2.py",
+      "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+    },
+    {
+      "bytes": 18399,
+      "path": "docs/performance/results/change-0977/tools/integration_fixture_0977_v3.py",
+      "sha256": "0debafef8d9409d26430b6108e9afbfa49e35b6a711c21b29112683efa3cb498"
+    },
+    {
+      "bytes": 5587,
+      "path": "docs/performance/results/change-0977/tools/loader_gate_fixture_0977.py",
+      "sha256": "855b139418929f21e51427985f840370bd732213b8845a30ac7023b1d238974c"
+    },
+    {
+      "bytes": 24729,
+      "path": "docs/performance/results/change-0977/tools/plan_binding_0977_v2.py",
+      "sha256": "acd82a2ac09037be84fd3f9ea8def808131d49203fd0748f6e6d9ea68574544b"
+    },
+    {
+      "bytes": 6022,
+      "path": "docs/performance/results/change-0977/tools/posthoc_requalify_current_perf_0977_v2.py",
+      "sha256": "95336cf16368fab2dbd38aa99c146cbae2a79b693320130f23245dc985448d35"
+    },
+    {
+      "bytes": 13231,
+      "path": "docs/performance/results/change-0977/tools/prepare_plan_0977_v2.py",
+      "sha256": "6e6acc54794b72286374a408557ec3dc19110ee7c24eb68fdd0924faaa4f3a57"
+    },
+    {
+      "bytes": 41138,
+      "path": "docs/performance/results/change-0977/tools/reduce_0977.py",
+      "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+    },
+    {
+      "bytes": 11012,
+      "path": "docs/performance/results/change-0977/tools/requalify_current_perf_0977_v1.py",
+      "sha256": "b250a930d22aa162b37791d268482d2d2cac3c1abee8eb6baab39ff8bdec5ef5"
+    },
+    {
+      "bytes": 3415,
+      "path": "docs/performance/results/change-0977/tools/root-launch-office-v1.py",
+      "sha256": "c877e626c6e1a9e4614b73330cb814b5ae7c270aa02627f8147255c54a660c41"
+    },
+    {
+      "bytes": 38108,
+      "path": "docs/performance/results/change-0977/tools/run_0977_v2.py",
+      "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+    },
+    {
+      "bytes": 5572,
+      "path": "docs/performance/results/change-0977/tools/test_control_replay_0977_v2.py",
+      "sha256": "02a0e3ac34649801e451b6b043ab61b86976b554d5e4bc386ed949594738d417"
+    },
+    {
+      "bytes": 10468,
+      "path": "docs/performance/results/change-0977/tools/test_focuseddecode_0977.py",
+      "sha256": "40a397e1b4146adc07357e72cb404a73d772178da3a21644e85892b4aa1680de"
+    }
+  ],
+  "manifest_excludes_self": true,
+  "max_file_bytes": 67772,
+  "payload_constraints": {
+    "all_files_below_1_mib": true,
+    "binaries_directory_present": false,
+    "compiled_binaries_copied": false,
+    "mmap_dumps_copied": false,
+    "raw_perf_captures_copied": false
+  },
+  "regeneration_note": "See provenance/reproduction-v1.md and the sealed external descriptor. Historical output-producing commands require fresh external roots/versioned output paths; the recorded native Office attempt is not to be retried as a qualification run.",
+  "schema": "litchi.performance.0977.packet_manifest.final.v1",
+  "scope": "bounded control and failed Office-prefix evidence; no twelve-child qualification, performance, attribution, causal, production, or adoption claim",
+  "status": "sealed",
+  "total_bytes": 775935
+}

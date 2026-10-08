@@ -1,0 +1,158 @@
+{
+  "capture": {
+    "binary": {
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    "evlist": {
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    "launch": {
+      "bytes": 1106,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.launch.json",
+      "sha256": "96c6ffaab2a0100cd0f11aa2a065986fb6c9e3d6d44209c88a3cdc8d7833fb5a"
+    },
+    "perf_data": {
+      "bytes": 237904472,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf.data",
+      "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+    },
+    "perf_mmap_dump": {
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf-mmap-dump.txt",
+      "sha256": "7bc5c5d1710bc03c7b72b8962febfe5733e152516259ba7d94f7b5b3ad7f08bb"
+    },
+    "status": {
+      "bytes": 210,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.status.json",
+      "sha256": "53df19f1359f0841ef5468bc5787dcf44b6bb22e2477cfbb8d8e9b353a69708d"
+    },
+    "target_layout": {
+      "bytes": 4484,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.target-layout.json",
+      "sha256": "aa0fc81aac8721b238fc8c31fb04bf040db895f84fca3d2961072e375ed3bbb1"
+    },
+    "terminal": {
+      "bytes": 2618,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.terminal.json",
+      "sha256": "24d96015d18e117c3772045fc4f9b7b97cc9e60936988b3d6680f6f1e7ba91e5"
+    },
+    "terminal_report": {
+      "bytes": 1383,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.terminal-report.txt",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    }
+  },
+  "decoder": {
+    "bytes": 67772,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+    "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+  },
+  "evlist_line": "instructions:u: type: 4 (cpu), size: 144, config: 0xc0 (instructions), { sample_period, sample_freq }: 1000000, sample_type: IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER, read_format: ID|LOST, disabled: 1, exclude_kernel: 1, exclude_hv: 1, mmap: 1, comm: 1, enable_on_exec: 1, task: 1, mmap_data: 1, sample_id_all: 1, exclude_callchain_kernel: 1, exclude_callchain_user: 1, mmap2: 1, comm_exec: 1, ksymbol: 1, bpf_event: 1, build_id: 1, sample_regs_user: 0xff0fff, sample_stack_user: 32768",
+  "native_terminal": {
+    "decoder_status": {
+      "error": "raw_stack: retained raw STACK_USER scanner rejected child",
+      "no_retry": true,
+      "packet_id": "child-02",
+      "schema": "litchi.performance.0977.child_progress.v1",
+      "status": "decoder_failure"
+    },
+    "launch_error": false,
+    "process_group_cleanup_passed": true,
+    "returncode": 0,
+    "terminal_lost_samples_lines": [
+      "0"
+    ],
+    "timed_out": false
+  },
+  "offending_sample": {
+    "callchain_nr": 0,
+    "callchain_nr_at_offset_48": 0,
+    "event_ip": "0xffffffff920000a7",
+    "event_period": 1000000,
+    "event_pid": 3849325,
+    "event_tid": 3849325,
+    "event_time_ns": 310425464699693,
+    "perf_text_stack_offset": "0x40",
+    "perf_text_stack_size": 0,
+    "raw_bytes": 72,
+    "raw_cpu": 31,
+    "raw_event_hex": "0900000001004800a7000092ffffffff6dbc3a006dbc3a002d7b8d8f541a01001f0000000000000040420f0000000000000000000000000000000000000000000000000000000000",
+    "raw_event_line": 165383,
+    "raw_ip": "0xffffffff920000a7",
+    "raw_period": 1000000,
+    "raw_pid": 3849325,
+    "raw_tid": 3849325,
+    "record_misc": 1,
+    "record_size": 72,
+    "record_type": 9,
+    "regs_user_abi_at_offset_56": 0,
+    "sample_index": 78,
+    "sample_line": 165390,
+    "user_stack_size_at_offset_64": 0
+  },
+  "prior_diagnostic": {
+    "bytes": 5951,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/child02-rawstack-diagnostic-0977-v2.json",
+    "sha256": "53d63ac212d4e4fdc8a082c8303788b860103f20213a7b102b84b52e7eade668"
+  },
+  "raw_scanner_summary": {
+    "bounds_valid": true,
+    "missing": {
+      "sample_fields": 1
+    },
+    "period_valid": true,
+    "pf_x": {
+      "interval_count": 1,
+      "intervals": [
+        [
+          "0x5610fac049f0",
+          "0x5610fae8b960"
+        ]
+      ],
+      "sample_ip_in_interval_count": 4564,
+      "scope": "raw sample IP only; no STACK_USER ancestry claim"
+    },
+    "pid_tid_cpu_valid": true,
+    "raw_event_count": 9191,
+    "record_size_counts": {
+      "33008": 7200,
+      "72": 1
+    },
+    "record_type_counts": {
+      "9": 7201
+    },
+    "sample_count": 7201,
+    "sample_line_count": 7201,
+    "stack_size_counts": {
+      "32768": 7200
+    },
+    "status": "complete",
+    "unconsumed_raw_count": 1990,
+    "violations": [
+      {
+        "bytes": 72,
+        "reason": "sample_fields_truncated"
+      }
+    ]
+  },
+  "scanner_gate_explanation": {
+    "admission_effect": "frozen decoder correctly rejects the child and does not produce corrected attribution",
+    "classification": "unsupported variable sample shape for this fixed-offset STACK_USER scanner; no stack_bound violation was observed",
+    "mode_evidence": "record misc low bits are 0x1 (PERF_RECORD_MISC_KERNEL per linux/perf_event.h); sample IP is kernel-address-shaped and no user regs/stack payload is present",
+    "observed": "one PERF_RECORD_SAMPLE has a valid 72-byte record; callchain_nr at offset 48 is 0, regs-user ABI at offset 56 is 0, and stack size at offset 64 is 0",
+    "perf_text_evidence": "the retained dump prints ustack: size 0, offset 0x40 for this exact record",
+    "source_constants": {
+      "MIN_HEADER": 240,
+      "STACK_BYTES_OFFSET": 232,
+      "STACK_SIZE_OFFSET": 224
+    }
+  },
+  "schema": "litchi.performance.0977.child02_rawstack_diagnostic.v1",
+  "scope": "offline raw scanner diagnosis only; no native rerun, workload, build, or decoder mutation",
+  "sealed_raw_scanner_sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2",
+  "status": "decoder_rejection_confirmed"
+}

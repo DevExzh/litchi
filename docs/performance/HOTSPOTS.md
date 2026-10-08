@@ -1,5 +1,20 @@
 # Performance hotspot inventory
 
+## 0977 — decoder admission is the blocker, not a source hotspot
+
+[0977](0977-combined-profile-qualification.md) stops after child 01 passes and
+child 02 is rejected by the retained fixed-offset `STACK_USER` scanner. The
+rejected record is a valid 72-byte variable-layout kernel sample with no user
+register or stack payload; the scanner requires a 240-byte minimum and labels
+it `sample_fields_truncated`, although raw bounds and period checks pass. This
+diagnoses the gate's parser-shape limitation without identifying a capture,
+host, source, or performance cause. No corrected child-02 decode or all-12
+attribution cohort exists; no retry or adoption follows. A future run must
+preregister variable-layout handling and empty/kernel/startup semantics, rather
+than retroactively ignoring this record. The [v3 diagnostic](results/change-0977/receipts/child02-rawstack-diagnostic-0977-v3.json)
+and [independent review](results/change-0977/analysis/cpu-review-office-failed-cohort-0977-v3.json)
+are bounded evidence only.
+
 ## 0976 — decoder coverage and affinity remain diagnostic
 
 [0976](0976-decoder-cache-and-affinity-control.md) locates the immutable 0975

@@ -1,0 +1,93 @@
+{
+  "bridge_pid": 3848944,
+  "bridge_starttime": 31038167,
+  "created_utc": "2026-10-08T07:31:42Z",
+  "events": [
+    {
+      "monotonic_ns": 310381756029305,
+      "name": "bridge_started"
+    },
+    {
+      "monotonic_ns": 310381756060316,
+      "name": "parent_tasks_moved"
+    }
+  ],
+  "exec_preserves_pid_starttime_affinity": true,
+  "native_exec_same_pid": true,
+  "parent_after": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3848943,
+    "starttime": 31038165,
+    "uid": 1001
+  },
+  "parent_before": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3848943,
+    "starttime": 31038165,
+    "uid": 1001
+  },
+  "parent_final": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3848943,
+    "starttime": 31038165,
+    "uid": 1001
+  },
+  "raw_authority": "raw zero-loss perf task stream; bridge masks are bounded observations",
+  "recorder_cpu": 30,
+  "schema": "litchi.performance.0977.affinity_bridge.v1",
+  "startup_handoff_samples_retained": true,
+  "status": "ready_to_exec",
+  "target_argv": [
+    "/usr/bin/python3.14",
+    "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+    "--metadata",
+    "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.launch.json",
+    "--requested-affinity",
+    "[31]",
+    "--",
+    "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+    "--case",
+    "docfloat",
+    "--input",
+    "/home/zhuhe/code/litchi/test-data/ole/doc/FloatingPictures.doc",
+    "--edits",
+    "1",
+    "--retention",
+    "default",
+    "--warmup",
+    "5",
+    "--samples",
+    "80"
+  ],
+  "target_cpu": 31,
+  "tasks_after": [
+    {
+      "affinity": [
+        30
+      ],
+      "starttime": 31038165,
+      "tid": 3848943
+    }
+  ],
+  "tasks_before": [
+    {
+      "affinity": [
+        31
+      ],
+      "starttime": 31038165,
+      "tid": 3848943
+    }
+  ],
+  "tasks_final": [
+    {
+      "affinity": [
+        30
+      ],
+      "starttime": 31038165,
+      "tid": 3848943
+    }
+  ]
+}

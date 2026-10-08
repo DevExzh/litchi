@@ -1,0 +1,1290 @@
+{
+  "artifacts": {
+    "command": {
+      "bytes": 1980,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.command.json",
+      "sha256": "631302da21a8dca34f503fe5096ba589339b11959c7cdd9f98d5c16c2a3eb077"
+    },
+    "control_summary": {
+      "bytes": 215,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.control-summary.json",
+      "sha256": "beb3f5473c28fd1d49e52485a134a004bc5712a1751ee1fef29445dee1e6cde3"
+    },
+    "control_target": {
+      "bytes": 7667,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.control-target.json",
+      "sha256": "bad01783312a80879f2fde98c71fc71939b61f91d0ba3ff084068b7ec3c901a0"
+    },
+    "perf_data": {
+      "bytes": 153001888,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf.data",
+      "sha256": "0892a0a97a17cb5b9e84aaafeb302002969eb13ab9d573077326c4c33e3cfc3d"
+    },
+    "perf_evlist": {
+      "bytes": 499,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    "perf_evlist_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "perf_header": {
+      "bytes": 1209,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-header.txt",
+      "sha256": "446f682ff5ff5144039d69098fef7bd09626479ee26f3eded84b0cf85c26d7fb"
+    },
+    "perf_header_stderr": {
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    "perf_mmap_dump": {
+      "bytes": 735872412,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-mmap-dump.txt",
+      "sha256": "c092b74473b314fd4632a244d6f997a239f8ee7c19079a6132dd493579b585ea"
+    },
+    "perf_mmap_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "raw-task.txt": {
+      "bytes": 735872412,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-mmap-dump.txt",
+      "sha256": "c092b74473b314fd4632a244d6f997a239f8ee7c19079a6132dd493579b585ea"
+    },
+    "raw_stack": {
+      "bytes": 8449,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.raw-stack.json",
+      "sha256": "eb10e54f1473cdf2cef58b22a09751d7aa0452d66a1e5323d668483e723e7662"
+    },
+    "raw_task": {
+      "bytes": 735872412,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-mmap-dump.txt",
+      "sha256": "c092b74473b314fd4632a244d6f997a239f8ee7c19079a6132dd493579b585ea"
+    },
+    "terminal": {
+      "bytes": 2236,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.terminal.json",
+      "sha256": "027276f6e0cba38c074a150f87dd4243b0265e2529fb7d7f2bbd846279ba7f72"
+    },
+    "terminal-summary.json": {
+      "bytes": 215,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.control-summary.json",
+      "sha256": "beb3f5473c28fd1d49e52485a134a004bc5712a1751ee1fef29445dee1e6cde3"
+    },
+    "terminal_report": {
+      "bytes": 479,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.terminal-report.txt",
+      "sha256": "21ee8c228fbbcbd1268a4864fb4e3850ec1e567d975753e46bb7cdaf35f25e64"
+    },
+    "terminal_report_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "command": {
+    "argv": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "--per-thread",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf.data",
+      "--",
+      "/usr/bin/python3.14",
+      "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+      "--expected-perf-exe",
+      "/usr/bin/perf",
+      "--expected-perf-sha256",
+      "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531",
+      "--expected-target-exe",
+      "/usr/bin/python3.14",
+      "--expected-target-sha256",
+      "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "--expected-target-script",
+      "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+      "--expected-target-script-sha256",
+      "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670",
+      "--bridge-receipt",
+      "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.bridge.json",
+      "--target-cpu",
+      "31",
+      "--recorder-cpu",
+      "30",
+      "--control-target",
+      "--control-receipt",
+      "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.control-target.json",
+      "--control-seconds",
+      "0.25",
+      "--control-check-interval",
+      "0.02"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "LD_PRELOAD": "absent",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "TZ": "UTC",
+      "secret_environment_recorded": false
+    },
+    "native_ld_preload": "absent",
+    "packet_id": "child-01",
+    "same_pid_exec_chain": [
+      "perf",
+      "affinity_bridge_0977.py",
+      "stdlib_cpu_burn_0976_v2.py"
+    ],
+    "schema": "litchi.performance.0977.command.v1"
+  },
+  "control_only": true,
+  "control_receipt": {
+    "check_interval_seconds": 0.02,
+    "checksum_sha256": "1f467f3ce836dab0848ca8290f8bf595685359f36f0d3b47c241e1b63928ed16",
+    "control_only": true,
+    "elapsed_ns": 250135242,
+    "iterations": 750008,
+    "native_workload_started": false,
+    "parent_checks": [
+      {
+        "monotonic_ns": 309852098413871,
+        "name": "target_start",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852098458101,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852118481090,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852138469490,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852158468909,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852178473508,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852198512038,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852218515807,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852238518576,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852258527926,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852278531545,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852298523714,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852318525414,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852338520113,
+        "name": "periodic",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      {
+        "monotonic_ns": 309852348527433,
+        "name": "target_end",
+        "parent": {
+          "affinity": [
+            30
+          ],
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      }
+    ],
+    "parent_perf": {
+      "affinity": [
+        30
+      ],
+      "comm": "perf",
+      "exe": "/usr/bin/perf",
+      "pid": 3844956,
+      "starttime": 30985195,
+      "uid": 1001
+    },
+    "recorder_cpu": 30,
+    "schema": "litchi.performance.0976.stdlib_control_target.v2",
+    "seconds_requested": 0.25,
+    "status": "pass",
+    "target": {
+      "affinity": [
+        31
+      ],
+      "comm": "python3.14",
+      "exe": "/usr/bin/python3.14",
+      "pid": 3844957,
+      "starttime": 30985197,
+      "uid": 1001
+    },
+    "target_cpu": 31,
+    "target_executable": {
+      "observed": {
+        "affinity": [
+          31
+        ],
+        "comm": "python3.14",
+        "exe": "/usr/bin/python3.14",
+        "pid": 3844957,
+        "starttime": 30985197,
+        "uid": 1001
+      },
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    }
+  },
+  "evlist_contract": {
+    "authority": "perf evlist -v; report header descriptor is retained separately and is not admission authority",
+    "event": "instructions:u",
+    "inherit": 0,
+    "inherit_field_absent": true,
+    "line": "instructions:u: type: 4 (cpu), size: 144, config: 0xc0 (instructions), { sample_period, sample_freq }: 1000000, sample_type: IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER, read_format: ID|LOST, disabled: 1, exclude_kernel: 1, exclude_hv: 1, mmap: 1, comm: 1, enable_on_exec: 1, task: 1, mmap_data: 1, sample_id_all: 1, exclude_callchain_kernel: 1, exclude_callchain_user: 1, mmap2: 1, comm_exec: 1, ksymbol: 1, bpf_event: 1, build_id: 1, sample_regs_user: 0xff0fff, sample_stack_user: 32768",
+    "period": 1000000,
+    "required_attributes": [
+      "type: 4 (cpu)",
+      "size: 144",
+      "config: 0xc0 (instructions)",
+      "{ sample_period, sample_freq }: 1000000",
+      "sample_type: IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER",
+      "read_format: ID|LOST",
+      "disabled: 1",
+      "exclude_kernel: 1",
+      "exclude_hv: 1",
+      "mmap: 1",
+      "comm: 1",
+      "enable_on_exec: 1",
+      "task: 1",
+      "mmap_data: 1",
+      "sample_id_all: 1",
+      "exclude_callchain_kernel: 1",
+      "exclude_callchain_user: 1",
+      "mmap2: 1",
+      "comm_exec: 1",
+      "ksymbol: 1",
+      "bpf_event: 1",
+      "build_id: 1",
+      "sample_regs_user: 0xff0fff",
+      "sample_stack_user: 32768"
+    ],
+    "schema": "litchi.performance.0977.evlist_contract.v1",
+    "stack_cap": 32768,
+    "status": "pass"
+  },
+  "gate": {
+    "cpu_gate": true,
+    "passed": true,
+    "period": 1000000,
+    "raw_lost_sum": 0,
+    "reasons": [],
+    "sample_count": 4633,
+    "scope": "harmless control only; no Office marker/ELF/DWFL attribution",
+    "task_gate": true,
+    "terminal_lost_samples": 0
+  },
+  "header_contract": {
+    "authority": "evlist-v",
+    "error": "per-thread header must contain exactly one event line",
+    "schema": "litchi.performance.0977.header_contract.v1",
+    "status": "unavailable"
+  },
+  "header_metadata": {
+    "authority": "evlist-v; header warning is descriptive and not silently ignored",
+    "known_invalid_header_event_desc_warning": true,
+    "schema": "litchi.performance.0977.perf_header_metadata.v1",
+    "stderr": {
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    "warnings": [
+      "Invalid HEADER_EVENT_DESC: nre=1 sz=144 (min 64)"
+    ]
+  },
+  "native_workload_started": false,
+  "packet_id": "child-01",
+  "raw_stack": {
+    "binary": {
+      "bytes": 7468968,
+      "path": "/usr/bin/python3.14",
+      "sha256": "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd"
+    },
+    "bounds_rule": "0 <= dyn_size <= captured_stack_size <= 32768",
+    "bounds_valid": true,
+    "command_scope": "offline perf script -D text scan; no STACK_USER unwind or ancestry claim",
+    "dump": {
+      "bytes": 735872412,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-mmap-dump.txt",
+      "sha256": "c092b74473b314fd4632a244d6f997a239f8ee7c19079a6132dd493579b585ea"
+    },
+    "dyn_size_counts": {
+      "10016": 1,
+      "10080": 1,
+      "10144": 1,
+      "10208": 1,
+      "10240": 1,
+      "10304": 1,
+      "10336": 1,
+      "10448": 1,
+      "10480": 1,
+      "10528": 1,
+      "10648": 2,
+      "10656": 1,
+      "10672": 1,
+      "10680": 1,
+      "10688": 1,
+      "10704": 1,
+      "10712": 1,
+      "10824": 1,
+      "10864": 1,
+      "10880": 2,
+      "10912": 1,
+      "10928": 1,
+      "11040": 1,
+      "11192": 1,
+      "11200": 3,
+      "11256": 1,
+      "11264": 1,
+      "11344": 1,
+      "11360": 2,
+      "11392": 2,
+      "11424": 1,
+      "11536": 1,
+      "11552": 1,
+      "11648": 1,
+      "11712": 2,
+      "11856": 1,
+      "11904": 1,
+      "11936": 1,
+      "11952": 1,
+      "11992": 1,
+      "12016": 1,
+      "12024": 1,
+      "12064": 3,
+      "12160": 1,
+      "12192": 1,
+      "12272": 1,
+      "12304": 1,
+      "12320": 2,
+      "12328": 1,
+      "12352": 1,
+      "12400": 1,
+      "12416": 1,
+      "12640": 1,
+      "12656": 1,
+      "12672": 1,
+      "12784": 1,
+      "12816": 1,
+      "12864": 1,
+      "12912": 2,
+      "12960": 1,
+      "13072": 1,
+      "13120": 1,
+      "13136": 1,
+      "13152": 1,
+      "13200": 1,
+      "13232": 2,
+      "13344": 1,
+      "13520": 1,
+      "13536": 1,
+      "13608": 2,
+      "13632": 1,
+      "13664": 1,
+      "13680": 1,
+      "13696": 1,
+      "13744": 1,
+      "13808": 1,
+      "13824": 1,
+      "13840": 1,
+      "13920": 1,
+      "13968": 1,
+      "14016": 1,
+      "14032": 1,
+      "14048": 1,
+      "14080": 2,
+      "14160": 1,
+      "14176": 1,
+      "14216": 1,
+      "14400": 1,
+      "14408": 1,
+      "14448": 1,
+      "14512": 1,
+      "14544": 1,
+      "14560": 1,
+      "14608": 1,
+      "14640": 1,
+      "14680": 1,
+      "14784": 2,
+      "14816": 3,
+      "14832": 1,
+      "14864": 1,
+      "14880": 1,
+      "15008": 1,
+      "15040": 1,
+      "15048": 2,
+      "15064": 1,
+      "15088": 1,
+      "15104": 1,
+      "15152": 2,
+      "15160": 1,
+      "15184": 1,
+      "15200": 1,
+      "15288": 1,
+      "15360": 2,
+      "15392": 1,
+      "15456": 1,
+      "15488": 1,
+      "15520": 1,
+      "15544": 1,
+      "15600": 1,
+      "15616": 1,
+      "15776": 2,
+      "15856": 1,
+      "15920": 1,
+      "16000": 1,
+      "16032": 1,
+      "16080": 1,
+      "16112": 1,
+      "16144": 1,
+      "16176": 1,
+      "16272": 1,
+      "16384": 1,
+      "16496": 1,
+      "16576": 1,
+      "16584": 1,
+      "16592": 1,
+      "16688": 1,
+      "16752": 2,
+      "16784": 1,
+      "16816": 1,
+      "16960": 1,
+      "17040": 1,
+      "17376": 2,
+      "17424": 2,
+      "17528": 1,
+      "17600": 1,
+      "17616": 1,
+      "17632": 1,
+      "17664": 1,
+      "17696": 1,
+      "17728": 2,
+      "17744": 1,
+      "17760": 1,
+      "17776": 1,
+      "17792": 1,
+      "17888": 1,
+      "17904": 1,
+      "17968": 1,
+      "18032": 1,
+      "18080": 2,
+      "18088": 1,
+      "18176": 1,
+      "18256": 1,
+      "18272": 1,
+      "18288": 1,
+      "18368": 1,
+      "18400": 1,
+      "18528": 1,
+      "18592": 1,
+      "18616": 1,
+      "18680": 1,
+      "18704": 1,
+      "18712": 2,
+      "18800": 1,
+      "18848": 1,
+      "18976": 1,
+      "19312": 1,
+      "19408": 1,
+      "19488": 1,
+      "19664": 1,
+      "19696": 1,
+      "19744": 1,
+      "19792": 1,
+      "19984": 1,
+      "20032": 1,
+      "20160": 1,
+      "20272": 2,
+      "20480": 1,
+      "20488": 1,
+      "20512": 1,
+      "20608": 1,
+      "20704": 1,
+      "20800": 1,
+      "20896": 2,
+      "21216": 1,
+      "21264": 1,
+      "21272": 1,
+      "21328": 1,
+      "21504": 2,
+      "21568": 1,
+      "21792": 1,
+      "21920": 1,
+      "21968": 1,
+      "22416": 1,
+      "22480": 1,
+      "22624": 1,
+      "22800": 1,
+      "22880": 1,
+      "22992": 1,
+      "23040": 1,
+      "23248": 1,
+      "23288": 1,
+      "23400": 1,
+      "23488": 1,
+      "23616": 1,
+      "23984": 1,
+      "24080": 1,
+      "24128": 1,
+      "24240": 4,
+      "24384": 1,
+      "24512": 1,
+      "24696": 2,
+      "25600": 1,
+      "26312": 1,
+      "26656": 1,
+      "26944": 1,
+      "27552": 2,
+      "27568": 1,
+      "27608": 2,
+      "27712": 2,
+      "4144": 1,
+      "4208": 1,
+      "4320": 1,
+      "4328": 1,
+      "4416": 1,
+      "4432": 1,
+      "4464": 2,
+      "4472": 1,
+      "4528": 2,
+      "4568": 1,
+      "4608": 1,
+      "4640": 1,
+      "4672": 2,
+      "4696": 1,
+      "4704": 1,
+      "4736": 1,
+      "4744": 1,
+      "4752": 1,
+      "4800": 796,
+      "4808": 119,
+      "4816": 22,
+      "4824": 37,
+      "4832": 82,
+      "4840": 26,
+      "4848": 180,
+      "4856": 51,
+      "4864": 146,
+      "4872": 109,
+      "4880": 301,
+      "4888": 7,
+      "4896": 334,
+      "4904": 41,
+      "4912": 3,
+      "4920": 7,
+      "4928": 34,
+      "4936": 6,
+      "4944": 3,
+      "4952": 3,
+      "4960": 286,
+      "4968": 1,
+      "4976": 3,
+      "4992": 418,
+      "5000": 5,
+      "5008": 87,
+      "5016": 4,
+      "5024": 355,
+      "5032": 4,
+      "5040": 169,
+      "5048": 17,
+      "5072": 523,
+      "5080": 3,
+      "5136": 1,
+      "5160": 1,
+      "5208": 2,
+      "5360": 1,
+      "5392": 1,
+      "5504": 1,
+      "5792": 1,
+      "5840": 1,
+      "5848": 1,
+      "5912": 1,
+      "6144": 1,
+      "6208": 1,
+      "6304": 1,
+      "6336": 1,
+      "6448": 4,
+      "6496": 1,
+      "6816": 1,
+      "7264": 1,
+      "7456": 1,
+      "7504": 1,
+      "7648": 1,
+      "7664": 1,
+      "7760": 1,
+      "7984": 1,
+      "8000": 1,
+      "8008": 1,
+      "8272": 2,
+      "8288": 1,
+      "8304": 1,
+      "8432": 1,
+      "8448": 2,
+      "8480": 1,
+      "8520": 84,
+      "8552": 3,
+      "8576": 1,
+      "8592": 2,
+      "8760": 1,
+      "8784": 1,
+      "8800": 3,
+      "8816": 2,
+      "8936": 1,
+      "8992": 1,
+      "9040": 1,
+      "9152": 1,
+      "9168": 1,
+      "9184": 1,
+      "9232": 2,
+      "9248": 1,
+      "9280": 1,
+      "9288": 1,
+      "9328": 1,
+      "9392": 2,
+      "9408": 1,
+      "9424": 1,
+      "9432": 1,
+      "9504": 1,
+      "9512": 1,
+      "9680": 1,
+      "9712": 1,
+      "9792": 1,
+      "9856": 1,
+      "9912": 1,
+      "9920": 1,
+      "9952": 2,
+      "9976": 1,
+      "9984": 1
+    },
+    "missing": {},
+    "perf_data": {
+      "bytes": 153001888,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf.data",
+      "sha256": "0892a0a97a17cb5b9e84aaafeb302002969eb13ab9d573077326c4c33e3cfc3d"
+    },
+    "period": 1000000,
+    "period_valid": true,
+    "pf_x": {
+      "interval_count": 0,
+      "intervals": [],
+      "sample_ip_in_interval_count": 0,
+      "scope": "raw sample IP only; no STACK_USER ancestry claim"
+    },
+    "pid_tid_cpu_counts": {
+      "3844957/3844957@31": 4633
+    },
+    "pid_tid_cpu_valid": true,
+    "raw_event_count": 4974,
+    "raw_lost_record_count": 0,
+    "raw_lost_scope": "sum PERF_RECORD_LOST fields only; terminal LOST_SAMPLES is separate",
+    "raw_lost_sum": 0,
+    "record_size_counts": {
+      "33008": 4633
+    },
+    "record_type_counts": {
+      "9": 4633
+    },
+    "sample_count": 4633,
+    "sample_line_count": 4633,
+    "sample_type": "IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER",
+    "schema": "litchi.performance.0973.raw_stack.v2",
+    "scope": {
+      "all_perf_record_sample_records": true,
+      "misc_filter": null,
+      "no_live_ancestry_claim": true,
+      "stack_bytes_are_potential_values_only": true
+    },
+    "stack_cap": 32768,
+    "stack_size_counts": {
+      "32768": 4633
+    },
+    "status": "complete",
+    "task_stream": {
+      "authority": "zero-loss raw task stream is lifetime authority; /proc snapshots are bounded observations only",
+      "comm_records": [
+        {
+          "comm": "perf-exec",
+          "pid": 3844957,
+          "tid": 3844957
+        },
+        {
+          "comm": "python3.14",
+          "pid": 3844957,
+          "tid": 3844957
+        },
+        {
+          "comm": "python3.14",
+          "pid": 3844957,
+          "tid": 3844957
+        }
+      ],
+      "cpu_maps": [
+        "-1"
+      ],
+      "errors": [],
+      "event_counts": {
+        "COMM": 3,
+        "CPU_MAP": 1,
+        "EXIT": 1,
+        "THREAD_MAP": 1
+      },
+      "exit_records": [
+        {
+          "pid": 3844957,
+          "ppid": 3844956,
+          "ptid": 3844956,
+          "tid": 3844957
+        }
+      ],
+      "expected_pid": 3844957,
+      "main_exit_allowed": true,
+      "missing_required_comm_names": [],
+      "scope": "raw perf task/lifecycle records for target PID only; no unrelated process scan",
+      "status": "pass",
+      "thread_maps": [
+        {
+          "nr": 1,
+          "threads": [
+            3844957
+          ]
+        }
+      ]
+    },
+    "unconsumed_raw_count": 341,
+    "violations": []
+  },
+  "runner_bindings": {
+    "child-01.affinity-observations.json": {
+      "bytes": 31237,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.affinity-observations.json",
+      "sha256": "de4bb1ba6489e179caaa4fa4e0a600c3d6fc3ba73c7cece67aa14fb18ae4e0ab"
+    },
+    "child-01.bridge.json": {
+      "bytes": 2268,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.bridge.json",
+      "sha256": "2e1723c824718ea4e9bfbace8fb8c0da83a5efd2acca085fd2884025af01c05c"
+    },
+    "child-01.command.json": {
+      "bytes": 1980,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.command.json",
+      "sha256": "631302da21a8dca34f503fe5096ba589339b11959c7cdd9f98d5c16c2a3eb077"
+    },
+    "child-01.perf.data": {
+      "bytes": 153001888,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf.data",
+      "sha256": "0892a0a97a17cb5b9e84aaafeb302002969eb13ab9d573077326c4c33e3cfc3d"
+    },
+    "child-01.perf.stderr": {
+      "bytes": 188,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf.stderr",
+      "sha256": "7299a576995ed3cec21bf06b26c5c46d57239eab511ee032c154ad1641726f53"
+    },
+    "child-01.report.json": {
+      "bytes": 4627,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.report.json",
+      "sha256": "93b38aab39fe2825acd2a498742152c0bba5fde1166da9e1e10d9b4052c38bd9"
+    },
+    "child-01.terminal.json": {
+      "bytes": 2236,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.terminal.json",
+      "sha256": "027276f6e0cba38c074a150f87dd4243b0265e2529fb7d7f2bbd846279ba7f72"
+    },
+    "raw_task": {
+      "bytes": 735872412,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-mmap-dump.txt",
+      "sha256": "c092b74473b314fd4632a244d6f997a239f8ee7c19079a6132dd493579b585ea"
+    }
+  },
+  "runner_gate": {
+    "affinity": {
+      "active_target_rows": 14,
+      "parent_task_keys": [
+        [
+          3844956,
+          30985195
+        ]
+      ],
+      "passed": true,
+      "post_handoff_rows": 16,
+      "postexit_target_rows": 2,
+      "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+    },
+    "passed": true,
+    "process_group_cleanup": {
+      "checked": true,
+      "passed": true,
+      "status": "gone"
+    },
+    "reasons": []
+  },
+  "schema": "litchi.performance.0977.control_packet.v1",
+  "status": "complete",
+  "summary": {
+    "cpu_gate": true,
+    "period": 1000000,
+    "raw_lost_sum": 0,
+    "sample_count": 4633,
+    "scope": "harmless control only; no Office marker/ELF/DWFL attribution",
+    "task_gate": true,
+    "terminal_lost_samples": 0
+  },
+  "task_audit": {
+    "authority": "zero-loss raw task stream is lifetime authority; /proc snapshots are bounded observations only",
+    "comm_records": [
+      {
+        "comm": "perf-exec",
+        "pid": 3844957,
+        "tid": 3844957
+      },
+      {
+        "comm": "python3.14",
+        "pid": 3844957,
+        "tid": 3844957
+      },
+      {
+        "comm": "python3.14",
+        "pid": 3844957,
+        "tid": 3844957
+      }
+    ],
+    "cpu_maps": [
+      "-1"
+    ],
+    "errors": [],
+    "event_counts": {
+      "COMM": 3,
+      "CPU_MAP": 1,
+      "EXIT": 1,
+      "THREAD_MAP": 1
+    },
+    "exit_records": [
+      {
+        "pid": 3844957,
+        "ppid": 3844956,
+        "ptid": 3844956,
+        "tid": 3844957
+      }
+    ],
+    "expected_pid": 3844957,
+    "main_exit_allowed": true,
+    "missing_required_comm_names": [],
+    "scope": "raw perf task/lifecycle records for target PID only; no unrelated process scan",
+    "status": "pass",
+    "thread_maps": [
+      {
+        "nr": 1,
+        "threads": [
+          3844957
+        ]
+      }
+    ]
+  },
+  "terminal": {
+    "affinity_gate": {
+      "active_target_rows": 14,
+      "parent_task_keys": [
+        [
+          3844956,
+          30985195
+        ]
+      ],
+      "passed": true,
+      "post_handoff_rows": 16,
+      "postexit_target_rows": 2,
+      "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+    },
+    "command": [
+      "/usr/bin/taskset",
+      "--cpu-list",
+      "31",
+      "/usr/bin/perf",
+      "record",
+      "--per-thread",
+      "-e",
+      "instructions:u",
+      "-c",
+      "1000000",
+      "-m",
+      "16M",
+      "--call-graph",
+      "dwarf,32768",
+      "--period",
+      "--timestamp",
+      "--sample-cpu",
+      "--buildid-all",
+      "--no-buildid-cache",
+      "--user-callchains",
+      "-o",
+      "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf.data",
+      "--",
+      "/usr/bin/python3.14",
+      "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+      "--expected-perf-exe",
+      "/usr/bin/perf",
+      "--expected-perf-sha256",
+      "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531",
+      "--expected-target-exe",
+      "/usr/bin/python3.14",
+      "--expected-target-sha256",
+      "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+      "--expected-target-script",
+      "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+      "--expected-target-script-sha256",
+      "330eb4e14fb9d1a1504927cb369e28b495072beb775e2af21326bc63c7486670",
+      "--bridge-receipt",
+      "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.bridge.json",
+      "--target-cpu",
+      "31",
+      "--recorder-cpu",
+      "30",
+      "--control-target",
+      "--control-receipt",
+      "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.control-target.json",
+      "--control-seconds",
+      "0.25",
+      "--control-check-interval",
+      "0.02"
+    ],
+    "finished_utc": "2026-10-08T07:22:53Z",
+    "launch_error": false,
+    "native_ld_preload": "absent",
+    "packet_id": "child-01",
+    "process_group_cleanup": {
+      "checked": true,
+      "passed": true,
+      "status": "gone"
+    },
+    "process_pid": 3844956,
+    "returncode": 0,
+    "schema": "litchi.performance.0977.terminal.v1",
+    "started_utc": "2026-10-08T07:22:52Z",
+    "timed_out": false
+  }
+}

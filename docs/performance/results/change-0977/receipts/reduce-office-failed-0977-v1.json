@@ -1,0 +1,109 @@
+{
+  "admission": {
+    "all12_reduction": false,
+    "build_started": false,
+    "child01_or_partial_reduction": false,
+    "cohort_admitted": false,
+    "native_rerun": false,
+    "synthetic_substitution": false
+  },
+  "analysis_output": {
+    "bytes": 3381,
+    "path": "/home/zhuhe/litchi-performance-0977/analysis/reduce-office-failed-0977-v1.json",
+    "sha256": "48f2dcc61e16dfe666eac4b0f6c87d30c430c6d8e26203c75b1a54d20d86906a"
+  },
+  "bindings": {
+    "manifest": {
+      "bytes": 946,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/capture-manifest.json",
+      "sha256": "19cd23533d78c09bfa460e74e2d4d215636c112c16efbd2e80e14e97e2afa933"
+    },
+    "plan": {
+      "bytes": 17335,
+      "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    "reducer": {
+      "bytes": 41138,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/reduce_0977.py",
+      "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+    }
+  },
+  "command": {
+    "argv": [
+      "/usr/bin/python3.14",
+      "-B",
+      "/home/zhuhe/litchi-performance-0977/tools/reduce_0977.py",
+      "--plan",
+      "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "--manifest",
+      "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/capture-manifest.json",
+      "--output",
+      "/home/zhuhe/litchi-performance-0977/analysis/reduce-office-failed-0977-v1.reducer-output.json"
+    ],
+    "cwd": "/home/zhuhe/code/litchi",
+    "elapsed_ms": 37.363,
+    "environment": {
+      "LANG": "C",
+      "LC_ALL": "C",
+      "PATH": "/usr/bin:/bin",
+      "PYTHONDONTWRITEBYTECODE": "1",
+      "TZ": "UTC"
+    },
+    "finished_utc": "2026-10-08T07:34:27.630957+00:00",
+    "requested_output": "/home/zhuhe/litchi-performance-0977/analysis/reduce-office-failed-0977-v1.reducer-output.json",
+    "requested_output_written": false,
+    "returncode": 2,
+    "started_utc": "2026-10-08T07:34:27.593566+00:00",
+    "stderr": {
+      "bytes": 62,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/reduce-office-failed-0977-v1.stderr",
+      "sha256": "bdd78defb8e687eb474d57770ca8896bf84bafe6b02d55cf3f374e6e74da67bc"
+    },
+    "stdout": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/reduce-office-failed-0977-v1.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "created_utc": "2026-10-08T07:34:27.630957+00:00",
+  "limitations": [
+    "This result records fail-closed manifest rejection only; it contains no owner, phase, variance, or speedup analysis.",
+    "The live run stopped at child 2 raw_stack decoder rejection; the manifest is intentionally not complete and has no admitted all-12 cohort."
+  ],
+  "rejection": {
+    "children_completed": 1,
+    "children_requested": 12,
+    "expected": "0977 manifest is not complete/no-retry",
+    "manifest_failure": {
+      "child": 2,
+      "error": "child-02: decoder failed: raw_stack: retained raw STACK_USER scanner rejected child",
+      "no_retry": true,
+      "type": "RunnerError"
+    },
+    "manifest_status": "failed",
+    "no_retry": true,
+    "packet_count": 1,
+    "stderr_text": "0977 reducer rejected: 0977 manifest is not complete/no-retry"
+  },
+  "schema": "litchi.performance.0977.reducer_failed_manifest_receipt.v1",
+  "scope": "single sealed reducer invocation against the failed live Office manifest; no synthetic substitution",
+  "sealed_inputs_after": {
+    "manifest": {
+      "bytes": 946,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/capture-manifest.json",
+      "sha256": "19cd23533d78c09bfa460e74e2d4d215636c112c16efbd2e80e14e97e2afa933"
+    },
+    "plan": {
+      "bytes": 17335,
+      "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    "reducer": {
+      "bytes": 41138,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/reduce_0977.py",
+      "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+    }
+  },
+  "status": "pass_rejection_recorded"
+}

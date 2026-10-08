@@ -1,0 +1,30 @@
+{
+  "command": [
+    "/usr/bin/python3.14",
+    "-B",
+    "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+    "--run",
+    "--control",
+    "--plan",
+    "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+    "--go",
+    "/home/zhuhe/litchi-performance-0977/receipts/root-go-0977-control-v1.json"
+  ],
+  "finished_utc": "2026-10-08T07:23:18.001392+00:00",
+  "mode": "control",
+  "retry": false,
+  "returncode": 0,
+  "runner_pid": 3844955,
+  "schema": "litchi.performance.0977.root_terminal.v1",
+  "started_utc": "2026-10-08T07:22:52.805374+00:00",
+  "stderr": {
+    "bytes": 0,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/root-control-0977-v1.stderr",
+    "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+  },
+  "stdout": {
+    "bytes": 975,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/root-control-0977-v1.stdout",
+    "sha256": "d853256b008c28812f01c3071e7194fa9fd5e6bb908056d0079ba86ed55da5d1"
+  }
+}

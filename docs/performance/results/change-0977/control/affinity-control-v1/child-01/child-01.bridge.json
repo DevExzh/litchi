@@ -1,0 +1,103 @@
+{
+  "bridge_pid": 3844957,
+  "bridge_starttime": 30985197,
+  "created_utc": "2026-10-08T07:22:53Z",
+  "events": [
+    {
+      "monotonic_ns": 309852059043155,
+      "name": "bridge_started"
+    },
+    {
+      "monotonic_ns": 309852059074885,
+      "name": "parent_tasks_moved"
+    }
+  ],
+  "exec_preserves_pid_starttime_affinity": true,
+  "native_exec_same_pid": true,
+  "parent_after": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3844956,
+    "starttime": 30985195,
+    "uid": 1001
+  },
+  "parent_before": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3844956,
+    "starttime": 30985195,
+    "uid": 1001
+  },
+  "parent_final": {
+    "comm": "perf",
+    "exe": "/usr/bin/perf",
+    "pid": 3844956,
+    "starttime": 30985195,
+    "uid": 1001
+  },
+  "raw_authority": "raw zero-loss perf task stream; bridge masks are bounded observations",
+  "recorder_cpu": 30,
+  "schema": "litchi.performance.0977.affinity_bridge.v1",
+  "startup_handoff_samples_retained": true,
+  "status": "ready_to_exec",
+  "target_argv": [
+    "/usr/bin/python3.14",
+    "/home/zhuhe/litchi-performance-0976/tools/stdlib_cpu_burn_0976_v2.py",
+    "--receipt",
+    "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.control-target.json",
+    "--seconds",
+    "0.25",
+    "--check-interval",
+    "0.02",
+    "--cpu",
+    "31",
+    "--recorder-cpu",
+    "30",
+    "--expected-pid",
+    "3844957",
+    "--expected-starttime",
+    "30985197",
+    "--expected-parent-pid",
+    "3844956",
+    "--expected-parent-uid",
+    "1001",
+    "--expected-parent-starttime",
+    "30985195",
+    "--expected-parent-exe",
+    "/usr/bin/perf",
+    "--expected-exe",
+    "/usr/bin/python3.14",
+    "--expected-exe-sha256",
+    "be9a2a5eada8c89c1c399fdfb8397179e877c20d8db0739c802f726d4d0e69fd",
+    "--expected-task-keys",
+    "[[3844956,30985195]]"
+  ],
+  "target_cpu": 31,
+  "tasks_after": [
+    {
+      "affinity": [
+        30
+      ],
+      "starttime": 30985195,
+      "tid": 3844956
+    }
+  ],
+  "tasks_before": [
+    {
+      "affinity": [
+        31
+      ],
+      "starttime": 30985195,
+      "tid": 3844956
+    }
+  ],
+  "tasks_final": [
+    {
+      "affinity": [
+        30
+      ],
+      "starttime": 30985195,
+      "tid": 3844956
+    }
+  ]
+}

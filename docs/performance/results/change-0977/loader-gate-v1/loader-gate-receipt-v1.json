@@ -1,0 +1,32 @@
+{
+  "base_packet": {
+    "bytes": 687200,
+    "path": "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.packet.json",
+    "sha256": "2cefc364a5bbbfe747e29318fc25e941f5ecfb5cba0867d07c4dc86ce0898089"
+  },
+  "build_started": false,
+  "created_utc": "2026-10-08T07:13:26.531568+00:00",
+  "limitation": "This is manifest/loader custody and arithmetic validation; duplicated packets are not twelve native observations.",
+  "loaded_children": 12,
+  "manifest": {
+    "bytes": 1695,
+    "path": "/home/zhuhe/litchi-performance-0977/loader-gate-v1/capture-manifest.json",
+    "sha256": "999676afd11bfa03aa91c27755d17c3b2f8da85d9f8e9ca3ccd35f9d6d1a3688"
+  },
+  "negative_mutation": {
+    "exception": "ProtocolError",
+    "message": "child-01: packet schema/status/identity mismatch",
+    "status": "rejected"
+  },
+  "perf_commands_started": false,
+  "plan": {
+    "bytes": 4384,
+    "path": "/home/zhuhe/litchi-performance-0977/integration-v7/plan-integration.json",
+    "sha256": "3d06daaf03b3e092fd95b382e67c9e3767984397730315179385ed453c9d6faf"
+  },
+  "positive_scope": "twelve synthetic packet wrappers over one immutable decoded child; full reducer loader and aggregation gates exercised",
+  "reduced_children": 12,
+  "schema": "litchi.performance.0977.loader_gate_fixture.v1",
+  "status": "pass",
+  "workload_started": false
+}

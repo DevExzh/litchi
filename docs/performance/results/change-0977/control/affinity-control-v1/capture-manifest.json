@@ -1,0 +1,24 @@
+{
+  "children_completed": 1,
+  "children_requested": 1,
+  "created_utc": "2026-10-08T07:23:17Z",
+  "failure": null,
+  "mode": "control",
+  "no_retry": true,
+  "packets": [
+    "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.packet.json"
+  ],
+  "plan": {
+    "bytes": 17335,
+    "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+    "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+  },
+  "root_go": {
+    "bytes": 1498,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/root-go-0977-control-v1.json",
+    "sha256": "e428afc235f53d5e82b8e1552002cf10b671306cc7169ceb966a8c0ea6970f60"
+  },
+  "schema": "litchi.performance.0977.capture_manifest.v1",
+  "serial": true,
+  "status": "complete"
+}

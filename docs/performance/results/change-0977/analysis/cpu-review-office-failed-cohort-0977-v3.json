@@ -1,0 +1,412 @@
+{
+  "capture_disposition": "failed_no_retry",
+  "child01": {
+    "affinity": {
+      "live_history_claim": false,
+      "parent_masks": [
+        [
+          30
+        ]
+      ],
+      "parent_present_rows": 37,
+      "post_handoff_rows": 38,
+      "rows_total": 44,
+      "scope": "raw zero-loss perf task stream",
+      "target_absent_rows": 1,
+      "target_masks": [
+        [
+          31
+        ]
+      ],
+      "target_present_rows": 37
+    },
+    "decoder_gate": {
+      "empty_callchain_count": 0,
+      "explicit_stack_truncated_count": 0,
+      "minimum_marker_samples": 100,
+      "passed": true,
+      "raw_lost_sum": 0,
+      "reasons": [],
+      "shim_log": {
+        "adjusted": 0,
+        "cache_stored": 1,
+        "fallback": 0,
+        "infos": 301409,
+        "reports": 111415,
+        "result_module_null": 0,
+        "reused_existing": 111404,
+        "rows": 412824,
+        "target_infos": 222813,
+        "target_reports": 111405
+      },
+      "terminal_lost_samples": 0,
+      "unresolved_frames": 7700
+    },
+    "empty_callchain_count": 0,
+    "marker_sample_count": 946,
+    "packet_present": true,
+    "raw_stack": {
+      "binding": {
+        "bytes": 7693,
+        "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.raw-stack.json",
+        "sha256": "fdf3bf0e092a3c22c61173d901cb5bbbd4cec1562af05c73a88db3affa7aed93"
+      },
+      "bounds_valid": true,
+      "period_valid": true,
+      "pid_tid_cpu_counts": {
+        "3848944/3848944@31": 7200
+      },
+      "pid_tid_cpu_valid": true,
+      "raw_event_count": 8050,
+      "raw_lost_record_count": 0,
+      "raw_lost_sum": 0,
+      "sample_count": 7200,
+      "sample_line_count": 7200,
+      "violations": []
+    },
+    "report_contract": {
+      "case": "docfloat",
+      "edits": 1,
+      "exact_output_equal_reference": true,
+      "samples_requested": 80,
+      "warmups": 5
+    },
+    "status": "gated",
+    "target_cpu": 31,
+    "target_pid": 3848944,
+    "terminal": {
+      "binding": {
+        "bytes": 2618,
+        "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.terminal.json",
+        "sha256": "0611c23bb7010fb468d0f2d58449456318548de76a14c2e90e122fc8d526e963"
+      },
+      "cleanup": {
+        "checked": true,
+        "passed": true,
+        "status": "gone"
+      },
+      "returncode": 0,
+      "timed_out": false
+    },
+    "terminal_loss_from_report": 0,
+    "terminal_report_binding": {
+      "bytes": 1057,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.terminal-report.txt",
+      "sha256": "01dc6684f275cc5a49bc531994e81d2999126546ec00949fad42267961940a64"
+    },
+    "terminal_returncode": 0
+  },
+  "child02": {
+    "affinity": {
+      "live_history_claim": false,
+      "parent_masks": [
+        [
+          30
+        ]
+      ],
+      "parent_present_rows": 39,
+      "post_handoff_rows": 40,
+      "rows_total": 46,
+      "scope": "raw zero-loss perf task stream",
+      "target_absent_rows": 1,
+      "target_masks": [
+        [
+          31
+        ]
+      ],
+      "target_present_rows": 39
+    },
+    "decoder_error": "raw_stack: retained raw STACK_USER scanner rejected child",
+    "offending_record": {
+      "cpu": 31,
+      "decoded_text": "FP chain: nr:0; ustack: size 0, offset 0x40",
+      "dump_line": 165383,
+      "interpretation": "The exact retained record has no user STACK_USER payload and is tagged kernel context. This establishes the admission failure; it does not establish perf-data corruption or a causal PMU-skid mechanism.",
+      "ip": "0xffffffff920000a7",
+      "perf_data_offset": null,
+      "perf_data_offset_hex": "0x26f5b0",
+      "perf_script_text": "PERF_RECORD_SAMPLE(IP, 0x1): 3849325/3849325: 0xffffffff920000a7 period: 1000000 addr: 0; FP chain: nr:0; ustack: size 0, offset 0x40",
+      "period": 1000000,
+      "pid": 3849325,
+      "raw_event_line": ". ... raw event: size 72 bytes",
+      "raw_scanner_effect": "sample_fields_truncated at 72 bytes; 7200 records are 33008 bytes and one is 72 bytes",
+      "record_bytes": 72,
+      "record_header": {
+        "misc_hex": "0x1",
+        "misc_label": "PERF_RECORD_MISC_KERNEL",
+        "size": 72,
+        "type": 9
+      },
+      "record_hex": "0900000001004800a7000092ffffffff6dbc3a006dbc3a002d7b8d8f541a01001f0000000000000040420f0000000000000000000000000000000000000000000000000000000000",
+      "record_misc_hex": "0x1",
+      "record_misc_label": "PERF_RECORD_MISC_KERNEL",
+      "record_size_bytes": 72,
+      "record_type": 9,
+      "sample_fields": {
+        "callchain_nr": 0,
+        "callchain_nr_offset_hex": "0x30",
+        "cpu": 31,
+        "ip_hex": "0xffffffff920000a7",
+        "period": 1000000,
+        "pid": 3849325,
+        "regs_user_abi": 0,
+        "regs_user_abi_offset_hex": "0x38",
+        "reserved": 0,
+        "stack_data_offset_hex": "0x48",
+        "stack_dyn_size_field": "absent_record_ends_at_0x48",
+        "stack_size": 0,
+        "stack_size_field_offset_hex": "0x40",
+        "tid": 3849325,
+        "time": 310425464699693
+      },
+      "sample_line": "31 310425464699693 0x26f5b0 [0x48]: PERF_RECORD_SAMPLE(IP, 0x1): 3849325/3849325: 0xffffffff920000a7 period: 1000000 addr: 0",
+      "tid": 3849325
+    },
+    "packet_present": false,
+    "raw_scanner_replay": {
+      "bounds_valid": true,
+      "missing": {
+        "sample_fields": 1
+      },
+      "period_valid": true,
+      "pf_x": {
+        "interval_count": 1,
+        "intervals": [
+          [
+            "0x5610fac049f0",
+            "0x5610fae8b960"
+          ]
+        ],
+        "sample_ip_in_interval_count": 4564,
+        "scope": "raw sample IP only; no STACK_USER ancestry claim"
+      },
+      "pid_tid_cpu_counts": {
+        "3849325/3849325@31": 7200
+      },
+      "pid_tid_cpu_valid": true,
+      "raw_event_count": 9191,
+      "raw_lost_sum": "unavailable_from_failed_raw_stack_scan",
+      "record_size_counts": {
+        "33008": 7200,
+        "72": 1
+      },
+      "record_type_counts": {
+        "9": 7201
+      },
+      "sample_count": 7201,
+      "sample_line_count": 7201,
+      "scanner_binding": {
+        "bytes": 13746,
+        "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+        "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+      },
+      "stack_size_counts": {
+        "32768": 7200
+      },
+      "status": "complete",
+      "unconsumed_raw_count": 1990,
+      "violations": [
+        {
+          "bytes": 72,
+          "reason": "sample_fields_truncated"
+        }
+      ]
+    },
+    "report_contract": {
+      "case": "docfloat",
+      "edits": 1,
+      "exact_output_equal_reference": true,
+      "samples_requested": 80,
+      "warmups": 5
+    },
+    "status": "decoder_failure",
+    "target_cpu": 31,
+    "target_pid": 3849325,
+    "terminal": {
+      "binding": {
+        "bytes": 2618,
+        "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.terminal.json",
+        "sha256": "24d96015d18e117c3772045fc4f9b7b97cc9e60936988b3d6680f6f1e7ba91e5"
+      },
+      "cleanup": {
+        "checked": true,
+        "passed": true,
+        "status": "gone"
+      },
+      "returncode": 0,
+      "timed_out": false
+    },
+    "terminal_loss_from_report": 0,
+    "terminal_report_binding": {
+      "bytes": 1383,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.terminal-report.txt",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    },
+    "terminal_returncode": 0
+  },
+  "cohort_admitted": false,
+  "conclusion": "failed_cohort_preserved_and_rejected_no_retry",
+  "created_utc": "2026-10-08T07:38:16.696758+00:00",
+  "findings": {
+    "all12_cohort_available": false,
+    "capture_failure_blocker": "child02 one 72-byte PERF_RECORD_SAMPLE with zero user stack; sealed scanner rejected child and runner stopped without retry",
+    "native_capture_rejection_is_correct": true,
+    "optimization_or_attribution_claim_allowed": false,
+    "raw_preservation": true,
+    "raw_proof_correction": "v3 replaces the v1 missing offset with 0x26f5b0 and records the exact 72-byte little-endian event plus field offsets; no capture or evidence was mutated."
+  },
+  "frozen_inputs": {
+    "decoder": {
+      "bytes": 67772,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+      "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+    },
+    "empty_directory_preflight": {
+      "bytes": 501,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-office-empty-directory-preflight-v1.json",
+      "sha256": "f2cdf2b257ff07b18edef4927f59f39d1decd300d50db1a625176d3665e9d246"
+    },
+    "helper_seal": {
+      "bytes": 3132,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/helper-seal-0977-v2.json",
+      "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+    },
+    "plan": {
+      "bytes": 17335,
+      "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    "raw_scanner": {
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    },
+    "reducer_failed_manifest_analysis": {
+      "bytes": 3381,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/reduce-office-failed-0977-v1.json",
+      "sha256": "48f2dcc61e16dfe666eac4b0f6c87d30c430c6d8e26203c75b1a54d20d86906a"
+    },
+    "reducer_failed_manifest_receipt": {
+      "bytes": 4276,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/reduce-office-failed-0977-v1.json",
+      "sha256": "37a34fe0ccc0ad1502e54e5907571a5aacd529b591ccccdf5eb3d24237c1a60a"
+    },
+    "root_command": {
+      "bytes": 739,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-office-command-0977-v1.json",
+      "sha256": "fe13432f8656ed5f28c27358847091b57e334c8fac3be8a48b5c118b153a6930"
+    },
+    "root_go": {
+      "bytes": 1952,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-go-0977-office-v1.json",
+      "sha256": "ae2b92cc846d50c6e57c508cd2b0ea74421515b5310c516421e2b382a1e86193"
+    },
+    "root_terminal": {
+      "bytes": 963,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-office-terminal-0977-v1.json",
+      "sha256": "1b078a7408c0108f5456154649643e589056cb74f1b0aae33b3fd4be0312f834"
+    }
+  },
+  "host_quiescence_scope": {
+    "interpretation": "capture/target terminal evidence remains bound; no claim of idle-host or timing isolation is made",
+    "posthoc_observation": "unrelated stale grep/search shell PID 3835635 was observed during cleanup investigation",
+    "root_go_declared_status": "pass"
+  },
+  "manifest": {
+    "binding": {
+      "bytes": 946,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/capture-manifest.json",
+      "sha256": "19cd23533d78c09bfa460e74e2d4d215636c112c16efbd2e80e14e97e2afa933"
+    },
+    "children_completed": 1,
+    "children_requested": 12,
+    "failure": {
+      "child": 2,
+      "error": "child-02: decoder failed: raw_stack: retained raw STACK_USER scanner rejected child",
+      "no_retry": true,
+      "type": "RunnerError"
+    },
+    "mode": "office",
+    "no_retry": true,
+    "packets": [
+      "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.packet.json"
+    ],
+    "plan": {
+      "bytes": 17335,
+      "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    "root_go": {
+      "bytes": 1952,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-go-0977-office-v1.json",
+      "sha256": "ae2b92cc846d50c6e57c508cd2b0ea74421515b5310c516421e2b382a1e86193"
+    },
+    "serial": true,
+    "status": "failed"
+  },
+  "native_workload_started": true,
+  "raw_terminal_conservation": {
+    "child01_raw_lost_sum": 0,
+    "child01_terminal_loss": 0,
+    "child02_raw_lost_sum": "unavailable_after_raw_stack_rejection",
+    "child02_terminal_loss": 0,
+    "no_perf_record_lost_text_child01": true,
+    "no_perf_record_lost_text_child02": true,
+    "terminal_loss_is_not_added_to_raw_loss": true
+  },
+  "reduction": {
+    "all12_run": false,
+    "child01_or_partial_analysis": false,
+    "fail_closed_analysis": {
+      "bytes": 3381,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/reduce-office-failed-0977-v1.json",
+      "sha256": "48f2dcc61e16dfe666eac4b0f6c87d30c430c6d8e26203c75b1a54d20d86906a"
+    },
+    "fail_closed_receipt": {
+      "bytes": 4276,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/reduce-office-failed-0977-v1.json",
+      "sha256": "37a34fe0ccc0ad1502e54e5907571a5aacd529b591ccccdf5eb3d24237c1a60a"
+    },
+    "synthetic_substitution": false
+  },
+  "root_terminal": {
+    "binding": {
+      "bytes": 963,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-office-terminal-0977-v1.json",
+      "sha256": "1b078a7408c0108f5456154649643e589056cb74f1b0aae33b3fd4be0312f834"
+    },
+    "mode": "office",
+    "retry": false,
+    "returncode": 2,
+    "stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-office-0977-v1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    "stdout": {
+      "bytes": 1320,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-office-0977-v1.stdout",
+      "sha256": "a44f05bf618df7b9e5bbeaa6bc50a25a083f132cac8f32921a784b21bff21641"
+    }
+  },
+  "schema": "litchi.performance.0977.office_failed_cohort_audit.v1",
+  "scope": {
+    "all12_analysis_authorized": false,
+    "independent_action": "offline audit of sealed Office child-01/child-02 outputs and direct replay of the sealed raw scanner",
+    "no_build_or_rerun": true,
+    "no_native_command_by_reviewer": true
+  },
+  "status": "pass_rejection_recorded",
+  "supersedes": {
+    "bytes": 12762,
+    "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-office-failed-cohort-0977-v1.json",
+    "sha256": "8cb8d6af83ee6b0d3b74c372119cedfb4e24f0c745871b0697d39cda09600751"
+  },
+  "timestamp_correction": {
+    "field": "created_utc",
+    "prior_receipt_time_known": false,
+    "prior_receipt_unchanged": true,
+    "prior_value": "2026-10-08T00:00:00Z",
+    "reason": "v1 used a fixed placeholder; v3 records its own actual creation time"
+  }
+}

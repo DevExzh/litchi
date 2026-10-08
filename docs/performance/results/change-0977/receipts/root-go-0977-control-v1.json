@@ -1,0 +1,67 @@
+{
+  "authorized": true,
+  "created_utc": "2026-10-08T07:22:42.804625+00:00",
+  "head": "ba80617f7fe0025b8a850de459bc303efa4d6290",
+  "helper_seal": {
+    "bytes": 3132,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/helper-seal-0977-v2.json",
+    "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+  },
+  "independent_review": {
+    "bytes": 9329,
+    "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-control-0977-v1.json",
+    "sha256": "49545df60784d616f1cea878c73d853cd91f208516cca2e694ca453f6038ae8d"
+  },
+  "mode": "control",
+  "plan": {
+    "bytes": 17335,
+    "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+    "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+  },
+  "quiescence": {
+    "active_capture_or_target_processes": [],
+    "allowed_cpus": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5,
+      6,
+      7,
+      8,
+      9,
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16,
+      17,
+      18,
+      19,
+      20,
+      21,
+      22,
+      23,
+      24,
+      25,
+      26,
+      27,
+      28,
+      29,
+      30,
+      31
+    ],
+    "cooldown_seconds": 10,
+    "free_bytes": 353240907776,
+    "status": "pass"
+  },
+  "schema": "litchi.performance.0977.root_go.v1",
+  "scope": "One harmless stdlib control through the frozen runner; no Office authorization; no retry.",
+  "status": "authorized",
+  "synthetic_boundary": {
+    "enabled": false
+  }
+}

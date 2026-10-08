@@ -1,0 +1,111 @@
+{
+  "controls": {
+    "evlist_duplicate_attribute_rejected": true,
+    "evlist_exact_attributes": true,
+    "evlist_negative_period_10m_rejected": true,
+    "evlist_negative_stack_327680_rejected": true,
+    "evlist_negative_task_rejected": true,
+    "final_v2_store_reuse_log_pass": true,
+    "mutated_admission_rejected": true,
+    "sealed_parser_differential": true,
+    "synthetic_marker_unknown_conservation": true,
+    "terminal_nonzero_zero_loss_rejected": true,
+    "terminal_zero_accepted": true,
+    "wrong_cpu_rejected": true,
+    "wrong_dso_not_overmatched": true
+  },
+  "current_perf": {
+    "bytes": 25192472,
+    "path": "/usr/bin/perf",
+    "sha256": "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531"
+  },
+  "current_perf_sha256": "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531",
+  "decoder": {
+    "bytes": 67772,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+    "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+  },
+  "historical_snapshots": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977.py",
+      "role": "sealed pre-controlfix helper; preserved immutable",
+      "sha256": "0a34d1c6d54778dd16bd58dc0a09a00d9a6e276cf4051b97463557bd20730ef3"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0977/archive/focuseddecode_0977-pre-controlfix-0a34d1c6.py",
+      "role": "independent byte snapshot",
+      "sha256": "0a34d1c6d54778dd16bd58dc0a09a00d9a6e276cf4051b97463557bd20730ef3"
+    }
+  ],
+  "native_workload_started": false,
+  "offline_replay_history": [
+    {
+      "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2",
+      "reason": "current perf report rejects script-only --show-lost-events option",
+      "status": "failed"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2b",
+      "reason": "known current header event descriptor warning was still treated as admission",
+      "status": "failed"
+    },
+    {
+      "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2d",
+      "status": "pass"
+    }
+  ],
+  "replay": {
+    "cpu_gate": true,
+    "evlist_status": "pass",
+    "header_authority": "evlist-v",
+    "header_contract_status": "unavailable",
+    "header_warning": [
+      "Invalid HEADER_EVENT_DESC: nre=1 sz=144 (min 64)"
+    ],
+    "raw_lost_sum": 0,
+    "sample_count": 4685,
+    "status": "complete",
+    "task_gate": true,
+    "terminal_lost_samples": 0,
+    "terminal_report_stderr": {
+      "bytes": 0,
+      "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2d/child-01/child-01.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    }
+  },
+  "replay_output": {
+    "bytes": 30663,
+    "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2d/control-packet.json",
+    "sha256": "8038060764e8a0e900530cc28476b41c13fdd2fb520f4b39c31cd0569dcd1c7b"
+  },
+  "retained_control_test": {
+    "bytes": 5572,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/test_control_replay_0977_v2.py",
+    "sha256": "02a0e3ac34649801e451b6b043ab61b86976b554d5e4bc386ed949594738d417"
+  },
+  "retained_office_control": {
+    "empty_callchain_count": 0,
+    "marker_period": 951000000,
+    "marker_sample_count": 951,
+    "sample_count": 6940,
+    "total_period": 6940000000,
+    "unresolved_frames": 3289
+  },
+  "retained_raw": {
+    "bytes": 154718360,
+    "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+    "sha256": "7bbd06c5293915f2d01a8bf756d296fbd55a1ea40fa36cda8dbec9c8a2bb6970"
+  },
+  "schema": "litchi.performance.0977.focuseddecode_controls_receipt.v4",
+  "scope": "offline parser/local gates plus one retained harmless-control replay; no perf record, workload, build, or native capture",
+  "status": "pass",
+  "supersedes": {
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/focuseddecode-controls-0977-v3.json",
+    "sha256": "acc995b40209d562b590e8fd24f514a2132c6bcb512ce9523a2abccf8580522a"
+  },
+  "synthetic_controls": {
+    "bytes": 10468,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/test_focuseddecode_0977.py",
+    "sha256": "40a397e1b4146adc07357e72cb404a73d772178da3a21644e85892b4aa1680de"
+  }
+}

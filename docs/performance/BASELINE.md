@@ -1,5 +1,24 @@
 # ZIP, OPC, and CFB substrate baseline
 
+## 0977 — combined profile stops at variable-layout scanner admission
+
+[0977](0977-combined-profile-qualification.md) is a failed, stop-on-first-
+rejection Office packet, not a timing baseline. Child 01 passes with 946 marker
+samples, zero empty callchains, and zero raw/terminal loss. Child 02 returns
+zero and reports terminal `LOST_SAMPLES=0`, but its 7,201 retained sample
+records include 7,200 records of 33,008 bytes and one valid 72-byte variable-
+layout record at sample 78. That record has `callchain_nr=0`, `REGS_USER` ABI 0
+(`NONE`), `STACK_USER` size 0, kernel `misc=1`, and a kernel-shaped IP. The
+fixed scanner's `MIN_HEADER=240` and offsets 224/232 classify it as
+`sample_fields_truncated`; bounds and period remain valid, so this is scanner
+admission behavior rather than record corruption. There is no corrected
+child-02 decode, all-12 cohort, retry, timing, source-owner, or adoption claim.
+The [diagnostic v3](results/change-0977/receipts/child02-rawstack-diagnostic-0977-v3.json)
+and [independent review](results/change-0977/analysis/cpu-review-office-failed-cohort-0977-v3.json)
+bound this disposition. A stale broad read-only grep overlapped the historical
+capture window; no write or perf handle was observed, but no idle-host or
+read-contention conclusion follows.
+
 ## 0976 — decoder cache transition and affinity control
 
 [0976](0976-decoder-cache-and-affinity-control.md) is an offline replay and

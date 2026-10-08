@@ -1,0 +1,31 @@
+{"child": 1, "empty_callchain_count": 0, "marker_sample_count": 946, "raw_lost_sum": 0, "schema": "litchi.performance.0977.child_progress.v1", "status": "gated", "terminal_lost_samples": 0}
+{"child": 2, "error": "child-02: decoder failed: raw_stack: retained raw STACK_USER scanner rejected child", "schema": "litchi.performance.0977.child_progress.v1", "status": "failed"}
+{
+  "children_completed": 1,
+  "children_requested": 12,
+  "created_utc": "2026-10-08T07:33:08Z",
+  "failure": {
+    "child": 2,
+    "error": "child-02: decoder failed: raw_stack: retained raw STACK_USER scanner rejected child",
+    "no_retry": true,
+    "type": "RunnerError"
+  },
+  "mode": "office",
+  "no_retry": true,
+  "packets": [
+    "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.packet.json"
+  ],
+  "plan": {
+    "bytes": 17335,
+    "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+    "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+  },
+  "root_go": {
+    "bytes": 1952,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/root-go-0977-office-v1.json",
+    "sha256": "ae2b92cc846d50c6e57c508cd2b0ea74421515b5310c516421e2b382a1e86193"
+  },
+  "schema": "litchi.performance.0977.capture_manifest.v1",
+  "serial": true,
+  "status": "failed"
+}

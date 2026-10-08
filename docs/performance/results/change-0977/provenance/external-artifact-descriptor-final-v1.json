@@ -1,0 +1,928 @@
+{
+  "cleanup_receipts": [
+    {
+      "bytes": 63879,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/temporary-cleanup-0977-v1.json",
+      "sha256": "405c8f7b6e17b804c02c18b99ea6eeadbe552afc0abf49e5e4e24785b84d79fe",
+      "status": "completed"
+    },
+    {
+      "bytes": 3549,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/temporary-cleanup-0977-supplement-v1.json",
+      "sha256": "0f8e9785bd83ad5e00fdcf10dea3b2acb0f0a693a4fe43c7fc079c5000a1667c",
+      "status": "completed"
+    }
+  ],
+  "descriptor_excludes_self": true,
+  "external_artifacts": [
+    {
+      "bound_by": "root control terminal + cpu-review-control-audit-0977-v2",
+      "bytes": 153001888,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf.data",
+      "repository_copy": false,
+      "role": "completed harmless control raw perf.data",
+      "sha256": "0892a0a97a17cb5b9e84aaafeb302002969eb13ab9d573077326c4c33e3cfc3d"
+    },
+    {
+      "bound_by": "cpu-review-control-audit-0977-v2",
+      "bytes": 735872412,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/affinity-control-v1/child-01/child-01.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "completed harmless control mmap/task stream",
+      "sha256": "c092b74473b314fd4632a244d6f997a239f8ee7c19079a6132dd493579b585ea"
+    },
+    {
+      "bound_by": "cpu-review-control-0977-v1 + focuseddecode-controls-0977-v4",
+      "bytes": 154718360,
+      "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2d/child-01/child-01.perf.data",
+      "repository_copy": false,
+      "role": "retained offline control replay raw perf.data",
+      "sha256": "7bbd06c5293915f2d01a8bf756d296fbd55a1ea40fa36cda8dbec9c8a2bb6970"
+    },
+    {
+      "bound_by": "focuseddecode-controls-0977-v4",
+      "bytes": 154718360,
+      "path": "/home/zhuhe/litchi-performance-0976/control/affinity-control-v6/control.perf.data",
+      "repository_copy": false,
+      "role": "same retained control raw input under sealed 0976 custody",
+      "sha256": "7bbd06c5293915f2d01a8bf756d296fbd55a1ea40fa36cda8dbec9c8a2bb6970"
+    },
+    {
+      "bound_by": "current-perf-requalification-0977-v1",
+      "bytes": 229215080,
+      "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+      "repository_copy": false,
+      "role": "retained original raw input for offline requalification",
+      "sha256": "51b16775fd0f72e154a74acad963c99e2169284ad1e31f78bcabab2bc6d75368"
+    },
+    {
+      "bound_by": "current-perf-requalification-0977-v1",
+      "bytes": 229215080,
+      "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/child-01.translated.perf.data",
+      "repository_copy": false,
+      "role": "retained translated raw input for offline requalification",
+      "sha256": "7a77198252c22786fef42530f8716f0c62fdf7d61b869be5bc9aad0a955834b0"
+    },
+    {
+      "bound_by": "requalify_current_perf_0977_v1.py",
+      "bytes": 213543177,
+      "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/original-corrected.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "offline requalification DWFL output",
+      "sha256": "d0d31cdd95415443c318d0a8167aa9dd13f0a979b0d91aa69130fea95ff4ff19"
+    },
+    {
+      "bound_by": "requalify_current_perf_0977_v1.py",
+      "bytes": 213543177,
+      "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/translated-corrected.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "offline translated requalification DWFL output",
+      "sha256": "09fc56db71f5cf6d02831eb01bcb9f2702951b0d0db6c70af7bdc604c53e6e0e"
+    },
+    {
+      "bound_by": "requalify_current_perf_0977_v1.py",
+      "bytes": 11346285,
+      "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/original-corrected.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "offline original corrected perf-script output",
+      "sha256": "532faee13c26d6a3790e7ffc81e64ab72ef2138faa2e7ded6e75864ad746a9a9"
+    },
+    {
+      "bound_by": "requalify_current_perf_0977_v1.py",
+      "bytes": 11346285,
+      "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/translated-corrected.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "offline translated corrected perf-script output",
+      "sha256": "e8af015e82a2dcb0e5f1d3af52b44d27d6c6e3e3e8187280651b273a68e6f9db"
+    },
+    {
+      "bound_by": "requalify_current_perf_0977_v1.py",
+      "bytes": 1169880,
+      "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/original-stock.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "offline stock perf-script output",
+      "sha256": "a41b5f6aa9ab569957746cb33137a31b1120be6685f4dbe7fad7d950a57202fb"
+    },
+    {
+      "bound_by": "requalify_current_perf_0977_v1.py",
+      "bytes": 1169880,
+      "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/original-noop.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "offline noop perf-script output",
+      "sha256": "a41b5f6aa9ab569957746cb33137a31b1120be6685f4dbe7fad7d950a57202fb"
+    },
+    {
+      "bound_by": "requalify_current_perf_0977_v1.py",
+      "bytes": 37423255,
+      "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/original-noop.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "offline noop DWFL output",
+      "sha256": "106569ac655f6c2ede3aa5d39982ac125b9870ddf904cde75eb08f030aec0392"
+    },
+    {
+      "bound_by": "current-perf-requalification-0977-v1",
+      "bytes": 47909224,
+      "path": "/home/zhuhe/litchi-performance-0967/builds/target-baseline-cfb/release/doc_retention_probe_0942_cfb_profile",
+      "repository_copy": false,
+      "role": "retained target executable; never copy to repository",
+      "sha256": "0db34357a1e725dc397a4fd895532433db1214c5862b7bc96bf23f21c0396ecb"
+    },
+    {
+      "bound_by": "current-perf-requalification-0977-v1",
+      "bytes": 26296,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.so",
+      "repository_copy": false,
+      "role": "retained decoder shared object; never copy to repository",
+      "sha256": "2acdc5c06ac672dca0e5a34bf204e0a45451b4bfe2d31c304f4c791f5b2a0a12"
+    },
+    {
+      "bound_by": "current-perf-requalification-0977-v1",
+      "bytes": 33461,
+      "path": "/home/zhuhe/litchi-performance-0976/tools/dwfl_dynamic_shim_0976_cache_final_v2.c",
+      "repository_copy": false,
+      "role": "retained decoder source dependency",
+      "sha256": "a30536989f1fcc3e28c5bbe5876b9f01159841ba0a6d6c3aa22706cdcfd23d1a"
+    },
+    {
+      "bound_by": "perf-tool-drift-0977-v1",
+      "bytes": 25192472,
+      "path": "/usr/bin/perf",
+      "repository_copy": false,
+      "role": "installed perf identity used for offline requalification",
+      "sha256": "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531"
+    },
+    {
+      "bound_by": "integration-v9 integration receipt",
+      "bytes": 687200,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.packet.json",
+      "repository_copy": false,
+      "role": "synthetic duplicate packet used only by offline integration fixture",
+      "sha256": "b026946100fefa1ee594480cd8ce0f9d38b122fd09496f43e50a980c92ac5b15"
+    },
+    {
+      "bound_by": "helper-seal-0977-v2.json",
+      "bytes": 3597,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "repository_copy": false,
+      "role": "sealed launcher dependency from prior packet",
+      "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5"
+    },
+    {
+      "bound_by": "focuseddecode-controls-0977-v4",
+      "bytes": 744081007,
+      "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2d/child-01/child-01.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "retained offline control replay mmap/task stream",
+      "sha256": "14237d982d0ee5e0caa8f4d190b8b79287f2c0e563a728ad8de4f33321ed0715"
+    },
+    {
+      "bound_by": "capture-manifest-v2 + root-office-terminal-v1",
+      "bytes": 237785552,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf.data",
+      "repository_copy": false,
+      "role": "Office child-01 raw perf.data; passed local child gate",
+      "sha256": "ba3d8834e670f6189c7d8e4e7dd8c985f32d62ebcc9724b08e46876db3152e3c"
+    },
+    {
+      "bound_by": "capture-manifest-v2 + root-office-terminal-v1",
+      "bytes": 1139326734,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "Office child-01 raw mmap/task stream",
+      "sha256": "d2fcdd02073d07ae0e08130eae07f4c065713648bbadc3c073bae05776929f85"
+    },
+    {
+      "bound_by": "capture-manifest-v2 + root-office-terminal-v1",
+      "bytes": 237904472,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf.data",
+      "repository_copy": false,
+      "role": "Office child-02 raw perf.data; decoder gate failed",
+      "sha256": "3b929236dc8378e2804d1d7421e0a2f9bfc22fbad7c6f29cc0f8cf1774df22dc"
+    },
+    {
+      "bound_by": "capture-manifest-v2 + root-office-terminal-v1",
+      "bytes": 1140014935,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.perf-mmap-dump.txt",
+      "repository_copy": false,
+      "role": "Office child-02 raw mmap/task stream; decoder gate failed",
+      "sha256": "7bc5c5d1710bc03c7b72b8962febfe5733e152516259ba7d94f7b5b3ad7f08bb"
+    },
+    {
+      "bound_by": "capture-manifest-v2",
+      "bytes": 691781,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.packet.json",
+      "repository_copy": false,
+      "role": "Office child-01 raw packet; external because it is not a reduced cohort summary",
+      "sha256": "434208afdd49d2efeaf43a3e6e4437e5b5f3a6ff6c8fe0759374a3047c4c2331"
+    },
+    {
+      "bound_by": "child-01 corrected decoder command metadata",
+      "bytes": 11865277,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.corrected.perf-script-no-inline.txt",
+      "repository_copy": false,
+      "role": "Office child-01 offline decoder perf-script output",
+      "sha256": "07c0ace894c19e4ac567edab2f7626b52fb4bd0354cfc25f270f1e0ce2402528"
+    },
+    {
+      "bound_by": "child-01 corrected decoder command metadata",
+      "bytes": 229236372,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.corrected.dwfl.jsonl",
+      "repository_copy": false,
+      "role": "Office child-01 offline decoder DWFL output",
+      "sha256": "1bf17f836cd9a68ca9feb2cf0f0fc58751dcbb0a14d2f745e857bcda13c5df4b"
+    },
+    {
+      "bound_by": "child-01 packet metadata",
+      "bytes": 292296,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-01/child-01.report.json",
+      "repository_copy": false,
+      "role": "Office child-01 correctness report retained externally",
+      "sha256": "5feff2a4ab527e22e994e569d9c20778f1486ca2d81047e6b4e5c586283e5add"
+    },
+    {
+      "bound_by": "child-02 packet metadata",
+      "bytes": 292296,
+      "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2/child-02/child-02.report.json",
+      "repository_copy": false,
+      "role": "Office child-02 correctness report retained externally despite decoder gate failure",
+      "sha256": "c28abb5f47fdef1353edd3c4da11572376fd69462b2e19c739cb2b55515e8bbf"
+    },
+    {
+      "bound_by": "cpu-review-office-failed-cohort-0977-v3",
+      "bytes": 14676,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-office-failed-cohort-0977-v3.json",
+      "repository_copy": true,
+      "role": "authoritative independent failed-cohort audit; copied bounded receipt",
+      "sha256": "050b5c6006122ce5ab5fb780971069196bcc03cc7a32ced93f262231d50c1e3d"
+    },
+    {
+      "bound_by": "child02-rawstack-diagnostic-0977-v3",
+      "bytes": 6565,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/child02-rawstack-diagnostic-0977-v3.json",
+      "repository_copy": true,
+      "role": "authoritative child-02 raw-stack diagnostic; copied bounded receipt",
+      "sha256": "dbfb076ec8010d82bb81125569dcc94907b8fcadd67035572a4e4b5532631a1b"
+    },
+    {
+      "bound_by": "child02-rawstack-diagnostic-0977-v3",
+      "bytes": 10409,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/diagnose_child02_rawstack_0977_v3.py",
+      "repository_copy": true,
+      "role": "authoritative offline diagnostic helper; copied source",
+      "sha256": "dcf02c958f74d2c34859575a0223e88d01f3d7ebb4452ea2d3eab80094594a0b"
+    },
+    {
+      "bound_by": "historical diagnostic lineage; superseded by final v3",
+      "bytes": 5916,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/child02-rawstack-diagnostic-0977-v1.json",
+      "repository_copy": false,
+      "role": "superseded child-02 diagnostic v1",
+      "sha256": "51d6e05fb098e10e5f3e7a23957cecc85a1b093a1f33589011f330c2bfde1504"
+    },
+    {
+      "bound_by": "historical diagnostic lineage; superseded by final v3",
+      "bytes": 5951,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/child02-rawstack-diagnostic-0977-v2.json",
+      "repository_copy": false,
+      "role": "superseded child-02 diagnostic v2",
+      "sha256": "53d63ac212d4e4fdc8a082c8303788b860103f20213a7b102b84b52e7eade668"
+    },
+    {
+      "bound_by": "historical failed-cohort review; superseded by final v3",
+      "bytes": 12762,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-office-failed-cohort-0977-v1.json",
+      "repository_copy": false,
+      "role": "superseded failed-cohort audit v1",
+      "sha256": "8cb8d6af83ee6b0d3b74c372119cedfb4e24f0c745871b0697d39cda09600751"
+    },
+    {
+      "bound_by": "final v3 audit dependency",
+      "bytes": 13746,
+      "path": "/home/zhuhe/litchi-performance-0973/tools-v2/raw_stack_0973_v2.py",
+      "repository_copy": false,
+      "role": "historical sealed raw-stack scanner dependency cited by final diagnostic/audit",
+      "sha256": "3a8e36ebc5f21f4f0b8293cafa675d722f2264fb1cfd6c7f48271b4f0a5056d2"
+    }
+  ],
+  "external_inventory_notes": [
+    "The registered Office launch stopped at child 2 after the retained raw STACK_USER scanner rejected one variable-shape sample; children 3--12 were not launched and no retry occurred.",
+    "The final v3 diagnostic corrects the raw perf-data offset to 0x26f5b0 and records the exact 72-byte little-endian event; the audit confirms no capture or evidence mutation.",
+    "The final failed-cohort audit is independent offline evidence and preserves rejection; it makes no optimization, attribution, PMU-skid, or causal claim.",
+    "Office perf.data, mmap/task dumps, child-01 packet and corrected logs, and child-02 perf/mmap remain external and are bound below by exact size/SHA-256.",
+    "The external rows include retained control/requalification inputs, decoded logs, synthetic inputs, target/decoder binaries, and historical scanner dependencies; no compiled artifact is copied.",
+    "Temporary cleanup receipts document removal of only unbound temporary artifacts and preserve bound source, raw evidence, and replay inputs.",
+    "The v9 integration is synthetic duplicate-packet custody/arithmetic evidence and is not a native twelve-child result."
+  ],
+  "external_root": "/home/zhuhe/litchi-performance-0977",
+  "historical_lineage": {
+    "child02_rawstack_diagnostic_v1": {
+      "bytes": 5916,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/child02-rawstack-diagnostic-0977-v1.json",
+      "sha256": "51d6e05fb098e10e5f3e7a23957cecc85a1b093a1f33589011f330c2bfde1504",
+      "status": "superseded_by_v3"
+    },
+    "child02_rawstack_diagnostic_v2": {
+      "bytes": 5951,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/child02-rawstack-diagnostic-0977-v2.json",
+      "sha256": "53d63ac212d4e4fdc8a082c8303788b860103f20213a7b102b84b52e7eade668",
+      "status": "superseded_by_v3"
+    },
+    "office_failed_cohort_audit_v1": {
+      "bytes": 12762,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-office-failed-cohort-0977-v1.json",
+      "sha256": "8cb8d6af83ee6b0d3b74c372119cedfb4e24f0c745871b0697d39cda09600751",
+      "status": "superseded_by_v3"
+    },
+    "prior_packet_manifest": {
+      "path": "docs/performance/results/change-0976/packet-manifest-0976-v1.json",
+      "sha256": "f1808782f20a1b128196ee6320ba5a5d07c84aa342d73c503591a19b6568579c"
+    },
+    "stale_v9_terminal_alias": {
+      "bytes": 2007,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.terminal.json",
+      "sha256": "91b73145943bb404b74d39099a0d152486921ebf40fab8db584e50dd9096ce5c",
+      "status": "historical_alias_corrected_by_integration-v9-terminal-binding-correction-v1"
+    },
+    "superseded_control_audit_v1": {
+      "bytes": 20251,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-control-audit-0977-v1.json",
+      "sha256": "608683db886cfff2b93b1292e312eed2d14eae683aebcc26c245b5ab5ca8b40b",
+      "status": "superseded_by_v2_timestamp_correction"
+    }
+  },
+  "manifest_not_created": false,
+  "payload_constraints": {
+    "all_repository_files_below_1_mib": true,
+    "compiled_binaries_copied": false,
+    "mmap_dumps_copied": false,
+    "office_capture_inventory": "final failed-prefix metadata, child-2 diagnostic v3, independent failed-cohort audit v3, and cleanup receipts are sealed; no all-twelve-child reduction exists",
+    "raw_perf_captures_copied": false
+  },
+  "regeneration": {
+    "control_self_tests": [
+      "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 tools/run_0977_v2.py --self-test",
+      "PYTHONDONTWRITEBYTECODE=1 python3 tools/test_control_replay_0977_v2.py",
+      "PYTHONDONTWRITEBYTECODE=1 python3 tools/test_focuseddecode_0977.py"
+    ],
+    "diagnostic": "PYTHONDONTWRITEBYTECODE=1 python3 tools/diagnose_child02_rawstack_0977_v3.py; the helper has no CLI arguments and writes the v3 receipt with exclusive creation from the bound external files, so replay requires a separate copied external root and a nonexistent output receipt; do not rerun the sealed root.",
+    "office_capture": "Historical exact argv is recorded in receipts/root-office-command-0977-v1.json. A replay requires the sealed GO, a fresh capture/instruction-profile-v2 output root, and the stop-on-first-failure/no-retry contract; do not infer or synthesize Office results from the control.",
+    "offline_requalification": [
+      "PYTHONDONTWRITEBYTECODE=1 python3 tools/requalify_current_perf_0977_v1.py",
+      "PYTHONDONTWRITEBYTECODE=1 python3 tools/posthoc_requalify_current_perf_0977_v2.py",
+      "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0977.py --self-test"
+    ],
+    "plan_check": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 tools/run_0977_v2.py --check-plan plans/plan-0977-v2.json"
+  },
+  "repository_packet": "docs/performance/results/change-0977",
+  "repository_payload_file_count": 109,
+  "repository_payload_files": [
+    {
+      "bytes": 4587,
+      "path": "docs/performance/results/change-0977/README.md",
+      "sha256": "829c712d7afc0999304559331105b234b4184f752a292ab43a976478fde51514"
+    },
+    {
+      "bytes": 9329,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-control-0977-v1.json",
+      "sha256": "49545df60784d616f1cea878c73d853cd91f208516cca2e694ca453f6038ae8d"
+    },
+    {
+      "bytes": 20251,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-control-audit-0977-v1.json",
+      "sha256": "608683db886cfff2b93b1292e312eed2d14eae683aebcc26c245b5ab5ca8b40b"
+    },
+    {
+      "bytes": 20771,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-control-audit-0977-v2.json",
+      "sha256": "2d2f70cb800239201a941d9f78d55129be2344bb6887f8fe34fc6dc2187d7927"
+    },
+    {
+      "bytes": 14676,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-office-failed-cohort-0977-v3.json",
+      "sha256": "050b5c6006122ce5ab5fb780971069196bcc03cc7a32ced93f262231d50c1e3d"
+    },
+    {
+      "bytes": 6535,
+      "path": "docs/performance/results/change-0977/analysis/cpu-review-office-readiness-0977-v2.json",
+      "sha256": "979bea121bdb5e4db5bdcd7a1d02ce212cc20390bfbca083f73bde555621032f"
+    },
+    {
+      "bytes": 6386,
+      "path": "docs/performance/results/change-0977/analysis/perf-drift-review-0977-v1.json",
+      "sha256": "e5175322be7194972afbf59454158c3e118d0b346b3544fa44cefda4269abdff"
+    },
+    {
+      "bytes": 3381,
+      "path": "docs/performance/results/change-0977/analysis/reduce-office-failed-0977-v1.json",
+      "sha256": "48f2dcc61e16dfe666eac4b0f6c87d30c430c6d8e26203c75b1a54d20d86906a"
+    },
+    {
+      "bytes": 62,
+      "path": "docs/performance/results/change-0977/analysis/reduce-office-failed-0977-v1.stderr",
+      "sha256": "bdd78defb8e687eb474d57770ca8896bf84bafe6b02d55cf3f374e6e74da67bc"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/analysis/reduce-office-failed-0977-v1.stdout",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 781,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/capture-manifest.json",
+      "sha256": "15e2a2e04f7263a61402cd846c94ea479c7db9034462537cd7baead68418074c"
+    },
+    {
+      "bytes": 31237,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.affinity-observations.json",
+      "sha256": "de4bb1ba6489e179caaa4fa4e0a600c3d6fc3ba73c7cece67aa14fb18ae4e0ab"
+    },
+    {
+      "bytes": 2268,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.bridge.json",
+      "sha256": "2e1723c824718ea4e9bfbace8fb8c0da83a5efd2acca085fd2884025af01c05c"
+    },
+    {
+      "bytes": 1980,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.command.json",
+      "sha256": "631302da21a8dca34f503fe5096ba589339b11959c7cdd9f98d5c16c2a3eb077"
+    },
+    {
+      "bytes": 215,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.control-summary.json",
+      "sha256": "beb3f5473c28fd1d49e52485a134a004bc5712a1751ee1fef29445dee1e6cde3"
+    },
+    {
+      "bytes": 7667,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.control-target.json",
+      "sha256": "bad01783312a80879f2fde98c71fc71939b61f91d0ba3ff084068b7ec3c901a0"
+    },
+    {
+      "bytes": 33400,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.packet.json",
+      "sha256": "63b8b1676a502bb18fafaa590c3c56e0a3b0aa358efeab4f94e54746651bfd69"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 499,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bytes": 49,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bytes": 1209,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-header.txt",
+      "sha256": "446f682ff5ff5144039d69098fef7bd09626479ee26f3eded84b0cf85c26d7fb"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 188,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.perf.stderr",
+      "sha256": "7299a576995ed3cec21bf06b26c5c46d57239eab511ee032c154ad1641726f53"
+    },
+    {
+      "bytes": 8449,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.raw-stack.json",
+      "sha256": "eb10e54f1473cdf2cef58b22a09751d7aa0452d66a1e5323d668483e723e7662"
+    },
+    {
+      "bytes": 4627,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.report.json",
+      "sha256": "93b38aab39fe2825acd2a498742152c0bba5fde1166da9e1e10d9b4052c38bd9"
+    },
+    {
+      "bytes": 1028,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.status.json",
+      "sha256": "d59063bfa372ef10dab7c8247dabc161ade631453a8591b66f5b57465c2028ff"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 479,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.terminal-report.txt",
+      "sha256": "21ee8c228fbbcbd1268a4864fb4e3850ec1e567d975753e46bb7cdaf35f25e64"
+    },
+    {
+      "bytes": 2236,
+      "path": "docs/performance/results/change-0977/control/affinity-control-v1/child-01/child-01.terminal.json",
+      "sha256": "027276f6e0cba38c074a150f87dd4243b0265e2529fb7d7f2bbd846279ba7f72"
+    },
+    {
+      "bytes": 2219,
+      "path": "docs/performance/results/change-0977/design/design-0977-v1.md",
+      "sha256": "312e2d7963fc8f80eb26c10625bd1013c8dc9d3f5b1df93a951ad2236860049c"
+    },
+    {
+      "bytes": 6038,
+      "path": "docs/performance/results/change-0977/integration-v9/integration-receipt-v1.json",
+      "sha256": "44df985a91724aa1599410ead4751c43bde1997c2644fdfa52545c5d93fc4985"
+    },
+    {
+      "bytes": 4384,
+      "path": "docs/performance/results/change-0977/integration-v9/plan-integration.json",
+      "sha256": "08894a5641918ee47f45f4e89f1a2283c9c88ebc60081d82c497c74cbb66fa77"
+    },
+    {
+      "bytes": 737,
+      "path": "docs/performance/results/change-0977/integration-v9/synthetic-12-manifest.json",
+      "sha256": "0ee27da01bf8c66610c9f73afcc6dcde3377c36c75d9967f20e19624287e66ee"
+    },
+    {
+      "bytes": 1696,
+      "path": "docs/performance/results/change-0977/loader-gate-v1/capture-manifest-bad.json",
+      "sha256": "b4deb903a2e1ae49eb9fbf965eacee6a0f2c7adabb67f2ff3d035481de384a2f"
+    },
+    {
+      "bytes": 1695,
+      "path": "docs/performance/results/change-0977/loader-gate-v1/capture-manifest.json",
+      "sha256": "999676afd11bfa03aa91c27755d17c3b2f8da85d9f8e9ca3ccd35f9d6d1a3688"
+    },
+    {
+      "bytes": 1353,
+      "path": "docs/performance/results/change-0977/loader-gate-v1/loader-gate-receipt-v1.json",
+      "sha256": "fb016c49156835ffd925c5b5962336ba9749e09e1c0b892955de7cbe9c7f7c5d"
+    },
+    {
+      "bytes": 946,
+      "path": "docs/performance/results/change-0977/office/capture-manifest-v2.json",
+      "sha256": "19cd23533d78c09bfa460e74e2d4d215636c112c16efbd2e80e14e97e2afa933"
+    },
+    {
+      "bytes": 2056,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.bridge.json",
+      "sha256": "a9a90f6f1933788a18521cf3ca6ea6213541b7267683828fbce5611e90b4c470"
+    },
+    {
+      "bytes": 2379,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.command.json",
+      "sha256": "58c275585b1375b0f19e28000d46945372772222695dca1623efb41c35dbf313"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.corrected.perf.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1106,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.launch.json",
+      "sha256": "6c5c25ff0dffd6ef3ea8055d3a89793818071761978f99e5405307dbd73c3b46"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-buildid.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 571,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 499,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bytes": 49,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bytes": 1209,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-header.txt",
+      "sha256": "e4049876541fa4ed24912febf8b7bd46e54b7e6e584afd9024e66d1418790457"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1279,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.status.json",
+      "sha256": "74d487b975dde0c5649bb5a240d4781a14a571adcbc1b9019daf85c7073ded31"
+    },
+    {
+      "bytes": 4489,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.target-layout.json",
+      "sha256": "2e9b8a2c7ff8e3a01fdf5289f99a6bc0f9ff33d5d08c0e5671a475004a465ee9"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1057,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.terminal-report.txt",
+      "sha256": "01dc6684f275cc5a49bc531994e81d2999126546ec00949fad42267961940a64"
+    },
+    {
+      "bytes": 2618,
+      "path": "docs/performance/results/change-0977/office/child-01/child-01.terminal.json",
+      "sha256": "0611c23bb7010fb468d0f2d58449456318548de76a14c2e90e122fc8d526e963"
+    },
+    {
+      "bytes": 2056,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.bridge.json",
+      "sha256": "8cb2f60778bc1b5e31ffed24f072a3a4a04c77d7f0343f502d4487bc780f7e9f"
+    },
+    {
+      "bytes": 2379,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.command.json",
+      "sha256": "265736f27d135a4420c2fc6a15e461e07ba367bae96ba925184d622f9cabcff6"
+    },
+    {
+      "bytes": 1106,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.launch.json",
+      "sha256": "96c6ffaab2a0100cd0f11aa2a065986fb6c9e3d6d44209c88a3cdc8d7833fb5a"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-buildid.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 571,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-buildid.txt",
+      "sha256": "6c7729316b6a54fc6ac338ceedfb960f4bb4fc669effac870d8ae58a34902925"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-evlist-v.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 499,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-evlist-v.txt",
+      "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+    },
+    {
+      "bytes": 49,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-header.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    {
+      "bytes": 1209,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-header.txt",
+      "sha256": "6aefd9dbf28e9e3dde996780eae9154676f59d1d973a13fbb8c929f5ab3ea6e1"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.perf-mmap-dump.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 210,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.status.json",
+      "sha256": "53df19f1359f0841ef5468bc5787dcf44b6bb22e2477cfbb8d8e9b353a69708d"
+    },
+    {
+      "bytes": 4484,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.target-layout.json",
+      "sha256": "aa0fc81aac8721b238fc8c31fb04bf040db895f84fca3d2961072e375ed3bbb1"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.terminal-report.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1383,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.terminal-report.txt",
+      "sha256": "f46285b4be0b246d827afc3f18689fc58e34401a01faee55437a39a34f708cbf"
+    },
+    {
+      "bytes": 2618,
+      "path": "docs/performance/results/change-0977/office/child-02/child-02.terminal.json",
+      "sha256": "24d96015d18e117c3772045fc4f9b7b97cc9e60936988b3d6680f6f1e7ba91e5"
+    },
+    {
+      "bytes": 963,
+      "path": "docs/performance/results/change-0977/office/root-office-terminal-v1.json",
+      "sha256": "1b078a7408c0108f5456154649643e589056cb74f1b0aae33b3fd4be0312f834"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/office/root-office-terminal-v1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 1320,
+      "path": "docs/performance/results/change-0977/office/root-office-terminal-v1.stdout",
+      "sha256": "a44f05bf618df7b9e5bbeaa6bc50a25a083f132cac8f32921a784b21bff21641"
+    },
+    {
+      "bytes": 17335,
+      "path": "docs/performance/results/change-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    {
+      "bytes": 5059,
+      "path": "docs/performance/results/change-0977/provenance/reproduction-v1.md",
+      "sha256": "df0faed40bdb9858b6a357f9a1b3835045f8073ffaf2880a7e7455da5bd01d72"
+    },
+    {
+      "bytes": 7819,
+      "path": "docs/performance/results/change-0977/receipts/adr-goal-revalidation-0977-v1.json",
+      "sha256": "cb09d8c6331cde7f9ce44d6c5bb6fd984c8df97780a0e8c47fa0ee2edbdf27b9"
+    },
+    {
+      "bytes": 164,
+      "path": "docs/performance/results/change-0977/receipts/check-plan-0977-v2.stdout",
+      "sha256": "aa364eb935cdbdd854a9d3ecb251bb315f69db6a5f4b2fa471bb67aeb6a49b9f"
+    },
+    {
+      "bytes": 6565,
+      "path": "docs/performance/results/change-0977/receipts/child02-rawstack-diagnostic-0977-v3.json",
+      "sha256": "dbfb076ec8010d82bb81125569dcc94907b8fcadd67035572a4e4b5532631a1b"
+    },
+    {
+      "bytes": 9776,
+      "path": "docs/performance/results/change-0977/receipts/current-perf-requalification-0977-v1-posthoc-v2.json",
+      "sha256": "6735350c47ed5725189f4b91390f0274855068b3f0c20b2f2331bb5fcbc88be3"
+    },
+    {
+      "bytes": 13589,
+      "path": "docs/performance/results/change-0977/receipts/current-perf-requalification-0977-v1.json",
+      "sha256": "c335ce4b557cbc76f5097195272e93aae1bab9ae43bbce20713e7f32a3bf0fbc"
+    },
+    {
+      "bytes": 4287,
+      "path": "docs/performance/results/change-0977/receipts/focuseddecode-controls-0977-v4.json",
+      "sha256": "9ea0c4dc6c30373291060cacf2697be3918f5f6bc245cf0014fc3f396b8fd754"
+    },
+    {
+      "bytes": 3132,
+      "path": "docs/performance/results/change-0977/receipts/helper-seal-0977-v2.json",
+      "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+    },
+    {
+      "bytes": 6882,
+      "path": "docs/performance/results/change-0977/receipts/integration-v9-terminal-binding-correction-v1.json",
+      "sha256": "a9120eee26ca85fd99d2aa146153dec3e6e4b2b2090194e91ac11385eb3f588c"
+    },
+    {
+      "bytes": 1019,
+      "path": "docs/performance/results/change-0977/receipts/perf-tool-drift-0977-v1.json",
+      "sha256": "74e2672f81f15989c51be0359ffa0fe026c1ef7adb4a7bb77e969c20796c996b"
+    },
+    {
+      "bytes": 4276,
+      "path": "docs/performance/results/change-0977/receipts/reduce-office-failed-0977-v1.json",
+      "sha256": "37a34fe0ccc0ad1502e54e5907571a5aacd529b591ccccdf5eb3d24237c1a60a"
+    },
+    {
+      "bytes": 4652,
+      "path": "docs/performance/results/change-0977/receipts/reducer-reconciliation-0977-v3.json",
+      "sha256": "e3ecb9166a20a5f3a7d000579586f6973617065819ae552c628171f792c6fd61"
+    },
+    {
+      "bytes": 0,
+      "path": "docs/performance/results/change-0977/receipts/root-control-0977-v1.stderr",
+      "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+    },
+    {
+      "bytes": 975,
+      "path": "docs/performance/results/change-0977/receipts/root-control-0977-v1.stdout",
+      "sha256": "d853256b008c28812f01c3071e7194fa9fd5e6bb908056d0079ba86ed55da5d1"
+    },
+    {
+      "bytes": 758,
+      "path": "docs/performance/results/change-0977/receipts/root-control-command-0977-v1.json",
+      "sha256": "2026f8cee03da3293212c5f5107b6dca33a7d69abf667f3d3ae6b1173f633812"
+    },
+    {
+      "bytes": 983,
+      "path": "docs/performance/results/change-0977/receipts/root-control-terminal-0977-v1.json",
+      "sha256": "31a4c044407adc4d4df4c95b3a156797c67ca08ea5503424855b64e2ce8078a9"
+    },
+    {
+      "bytes": 1498,
+      "path": "docs/performance/results/change-0977/receipts/root-go-0977-control-v1.json",
+      "sha256": "e428afc235f53d5e82b8e1552002cf10b671306cc7169ceb966a8c0ea6970f60"
+    },
+    {
+      "bytes": 1952,
+      "path": "docs/performance/results/change-0977/receipts/root-go-0977-office-v1.json",
+      "sha256": "ae2b92cc846d50c6e57c508cd2b0ea74421515b5310c516421e2b382a1e86193"
+    },
+    {
+      "bytes": 739,
+      "path": "docs/performance/results/change-0977/receipts/root-office-command-0977-v1.json",
+      "sha256": "fe13432f8656ed5f28c27358847091b57e334c8fac3be8a48b5c118b153a6930"
+    },
+    {
+      "bytes": 501,
+      "path": "docs/performance/results/change-0977/receipts/root-office-empty-directory-preflight-v1.json",
+      "sha256": "f2cdf2b257ff07b18edef4927f59f39d1decd300d50db1a625176d3665e9d246"
+    },
+    {
+      "bytes": 3549,
+      "path": "docs/performance/results/change-0977/receipts/temporary-cleanup-0977-supplement-v1.json",
+      "sha256": "0f8e9785bd83ad5e00fdcf10dea3b2acb0f0a693a4fe43c7fc079c5000a1667c"
+    },
+    {
+      "bytes": 63879,
+      "path": "docs/performance/results/change-0977/receipts/temporary-cleanup-0977-v1.json",
+      "sha256": "405c8f7b6e17b804c02c18b99ea6eeadbe552afc0abf49e5e4e24785b84d79fe"
+    },
+    {
+      "bytes": 13348,
+      "path": "docs/performance/results/change-0977/tools/affinity_bridge_0977.py",
+      "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+    },
+    {
+      "bytes": 10409,
+      "path": "docs/performance/results/change-0977/tools/diagnose_child02_rawstack_0977_v3.py",
+      "sha256": "dcf02c958f74d2c34859575a0223e88d01f3d7ebb4452ea2d3eab80094594a0b"
+    },
+    {
+      "bytes": 66864,
+      "path": "docs/performance/results/change-0977/tools/focuseddecode_0977.py",
+      "sha256": "0a34d1c6d54778dd16bd58dc0a09a00d9a6e276cf4051b97463557bd20730ef3"
+    },
+    {
+      "bytes": 67772,
+      "path": "docs/performance/results/change-0977/tools/focuseddecode_0977_v2.py",
+      "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+    },
+    {
+      "bytes": 18399,
+      "path": "docs/performance/results/change-0977/tools/integration_fixture_0977_v3.py",
+      "sha256": "0debafef8d9409d26430b6108e9afbfa49e35b6a711c21b29112683efa3cb498"
+    },
+    {
+      "bytes": 5587,
+      "path": "docs/performance/results/change-0977/tools/loader_gate_fixture_0977.py",
+      "sha256": "855b139418929f21e51427985f840370bd732213b8845a30ac7023b1d238974c"
+    },
+    {
+      "bytes": 24729,
+      "path": "docs/performance/results/change-0977/tools/plan_binding_0977_v2.py",
+      "sha256": "acd82a2ac09037be84fd3f9ea8def808131d49203fd0748f6e6d9ea68574544b"
+    },
+    {
+      "bytes": 6022,
+      "path": "docs/performance/results/change-0977/tools/posthoc_requalify_current_perf_0977_v2.py",
+      "sha256": "95336cf16368fab2dbd38aa99c146cbae2a79b693320130f23245dc985448d35"
+    },
+    {
+      "bytes": 13231,
+      "path": "docs/performance/results/change-0977/tools/prepare_plan_0977_v2.py",
+      "sha256": "6e6acc54794b72286374a408557ec3dc19110ee7c24eb68fdd0924faaa4f3a57"
+    },
+    {
+      "bytes": 41138,
+      "path": "docs/performance/results/change-0977/tools/reduce_0977.py",
+      "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+    },
+    {
+      "bytes": 11012,
+      "path": "docs/performance/results/change-0977/tools/requalify_current_perf_0977_v1.py",
+      "sha256": "b250a930d22aa162b37791d268482d2d2cac3c1abee8eb6baab39ff8bdec5ef5"
+    },
+    {
+      "bytes": 3415,
+      "path": "docs/performance/results/change-0977/tools/root-launch-office-v1.py",
+      "sha256": "c877e626c6e1a9e4614b73330cb814b5ae7c270aa02627f8147255c54a660c41"
+    },
+    {
+      "bytes": 38108,
+      "path": "docs/performance/results/change-0977/tools/run_0977_v2.py",
+      "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+    },
+    {
+      "bytes": 5572,
+      "path": "docs/performance/results/change-0977/tools/test_control_replay_0977_v2.py",
+      "sha256": "02a0e3ac34649801e451b6b043ab61b86976b554d5e4bc386ed949594738d417"
+    },
+    {
+      "bytes": 10468,
+      "path": "docs/performance/results/change-0977/tools/test_focuseddecode_0977.py",
+      "sha256": "40a397e1b4146adc07357e72cb404a73d772178da3a21644e85892b4aa1680de"
+    }
+  ],
+  "repository_payload_total_bytes": 732980,
+  "schema": "litchi.performance.0977.external_artifact_descriptor.final.v1",
+  "status": "sealed"
+}

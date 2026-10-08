@@ -1,0 +1,226 @@
+{
+  "admission": {
+    "authorized_native_next_step": "root GO only; this receipt does not authorize Office capture by itself",
+    "control_only": true,
+    "plan_schema": "litchi.performance.0977.plan.v1",
+    "plan_status": "pre_capture",
+    "plan_validation": "pass",
+    "required_root_go": {
+      "authorized": true,
+      "independent_review": "root GO must bind this receipt and require status=pass",
+      "mode": "control",
+      "plan": {
+        "bytes": 17335,
+        "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+        "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+      },
+      "quiescence": {
+        "status": "pass"
+      },
+      "schema": "litchi.performance.0977.root_go.v1",
+      "status": "authorized",
+      "synthetic_boundary": {
+        "enabled": false
+      }
+    },
+    "runner_cli": [
+      "cd /home/zhuhe/code/litchi",
+      "env",
+      "PYTHONDONTWRITEBYTECODE=1",
+      "/usr/bin/python3.14",
+      "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+      "--run",
+      "--control",
+      "--plan",
+      "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "--go",
+      "<root-go-json>"
+    ]
+  },
+  "bridge": {
+    "bytes": 13348,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+    "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+  },
+  "build_started": false,
+  "control_replay": {
+    "cpu_gate": true,
+    "evlist_status": "pass",
+    "header_authority": "evlist-v",
+    "packet": {
+      "bytes": 30663,
+      "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2d/control-packet.json",
+      "sha256": "8038060764e8a0e900530cc28476b41c13fdd2fb520f4b39c31cd0569dcd1c7b"
+    },
+    "raw_lost_sum": 0,
+    "raw_perf_data": {
+      "bytes": 154718360,
+      "path": "/home/zhuhe/litchi-performance-0977/control-replay-v2d/child-01/child-01.perf.data",
+      "sha256": "7bbd06c5293915f2d01a8bf756d296fbd55a1ea40fa36cda8dbec9c8a2bb6970"
+    },
+    "sample_count": 4685,
+    "status": "complete",
+    "task_gate": true,
+    "terminal_lost_samples": 0
+  },
+  "created_utc": "2026-10-08T07:20:48.970469+00:00",
+  "current_perf": {
+    "bytes": 25192472,
+    "path": "/usr/bin/perf",
+    "sha256": "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531"
+  },
+  "decoder": {
+    "bytes": 67772,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+    "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+  },
+  "findings": {
+    "control_admission_blockers": [],
+    "offline_integration_caveat": {
+      "actual_current_path_binding": {
+        "bytes": 3057,
+        "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.terminal.json",
+        "sha256": "f873ef8ef1cfc920435666988f1253023752d2af05d2c2ab1a650fd4d21daec9"
+      },
+      "description": "integration-v9 source_bindings.terminal records a pre-synthetic 2007-byte binding at a pathname later rewritten by synthetic runner metadata; terminal_source and synthetic_runner_bindings.terminal are separately bound. This review does not use that stale alias for control admission.",
+      "recorded_binding": {
+        "bytes": 2007,
+        "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.terminal.json",
+        "sha256": "91b73145943bb404b74d39099a0d152486921ebf40fab8db584e50dd9096ce5c"
+      },
+      "required_publication_action": "If integration-v9 is published as custody evidence, add an immutable correction that drops or renames source_bindings.terminal; do not mutate v1.",
+      "severity": "non_admission_receipt_scope",
+      "status": "recorded"
+    }
+  },
+  "focused_controls": {
+    "bytes": 4287,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/focuseddecode-controls-0977-v4.json",
+    "sha256": "9ea0c4dc6c30373291060cacf2697be3918f5f6bc245cf0014fc3f396b8fd754"
+  },
+  "helper_seal": {
+    "bytes": 3132,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/helper-seal-0977-v2.json",
+    "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+  },
+  "limitations": [
+    "The harmless-control replay is retained offline evidence and does not prove a fresh 0977 native control run.",
+    "The integration-v9 all-12 result duplicates one retained child and is analytics/custody validation only, not a cohort.",
+    "No Office marker threshold, attribution, performance, or optimization claim is made by this receipt."
+  ],
+  "native_workload_started": false,
+  "offline_integration_evidence": {
+    "all12_scope": "synthetic in-memory duplicate packet; reducer arithmetic/associations only",
+    "decoder_marker_sample_count": 951,
+    "decoder_sample_count": 6940,
+    "integration_receipt": {
+      "bytes": 6038,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/integration-receipt-v1.json",
+      "sha256": "44df985a91724aa1599410ead4751c43bde1997c2644fdfa52545c5d93fc4985"
+    },
+    "integration_status": "pass",
+    "loader_gate": {
+      "bytes": 1353,
+      "path": "/home/zhuhe/litchi-performance-0977/loader-gate-v1/loader-gate-receipt-v1.json",
+      "sha256": "fb016c49156835ffd925c5b5962336ba9749e09e1c0b892955de7cbe9c7f7c5d"
+    },
+    "negative_mutation": "rejected",
+    "reducer_reconciliation": {
+      "bytes": 4652,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/reducer-reconciliation-0977-v3.json",
+      "sha256": "e3ecb9166a20a5f3a7d000579586f6973617065819ae552c628171f792c6fd61"
+    }
+  },
+  "perf_requalification_posthoc": {
+    "bytes": 9776,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/current-perf-requalification-0977-v1-posthoc-v2.json",
+    "sha256": "6735350c47ed5725189f4b91390f0274855068b3f0c20b2f2331bb5fcbc88be3"
+  },
+  "plan": {
+    "bytes": 17335,
+    "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+    "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+  },
+  "plan_binding_helper": {
+    "bytes": 24729,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/plan_binding_0977_v2.py",
+    "sha256": "acd82a2ac09037be84fd3f9ea8def808131d49203fd0748f6e6d9ea68574544b"
+  },
+  "plan_generator": {
+    "bytes": 13231,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/prepare_plan_0977_v2.py",
+    "sha256": "6e6acc54794b72286374a408557ec3dc19110ee7c24eb68fdd0924faaa4f3a57"
+  },
+  "reducer": {
+    "bytes": 41138,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/reduce_0977.py",
+    "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+  },
+  "review_commands": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/plan_binding_0977_v2.py validate_plan-equivalent",
+      "name": "plan_binding_v2_validate_plan",
+      "status": "pass"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 tools/run_0977_v2.py --check-plan plans/plan-0977-v2.json",
+      "name": "run_0977_v2_check_plan",
+      "status": "pass"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 /usr/bin/python3.14 tools/run_0977_v2.py --self-test",
+      "name": "run_0977_v2_self_test",
+      "status": "pass"
+    },
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 tools/reduce_0977.py --self-test",
+      "name": "reduce_0977_self_test",
+      "status": "pass"
+    }
+  ],
+  "runner": {
+    "bytes": 38108,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+    "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+  },
+  "schema": "litchi.performance.0977.cpu_review_control.v1",
+  "scope": "independent pre-capture control-only admission review; no Office workload, native cohort, build, or capture launched by this review",
+  "sealed_helpers": {
+    "bridge": {
+      "bytes": 13348,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/affinity_bridge_0977.py",
+      "sha256": "2c9f5839c23da769625d3b9fdf339ec00d9c8a3209e6f6c1a5c166d475800a43"
+    },
+    "decoder": {
+      "bytes": 67772,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+      "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+    },
+    "launcher": {
+      "bytes": 3597,
+      "path": "/home/zhuhe/litchi-performance-0970/tools/launch_baseline_v2.py",
+      "sha256": "3b5b79351883a9b4efb680f47498d8e10bdf77d131a60d11c1ecb54ad95430f5"
+    },
+    "plan_binding": {
+      "bytes": 24729,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/plan_binding_0977_v2.py",
+      "sha256": "acd82a2ac09037be84fd3f9ea8def808131d49203fd0748f6e6d9ea68574544b"
+    },
+    "plan_generator": {
+      "bytes": 13231,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/prepare_plan_0977_v2.py",
+      "sha256": "6e6acc54794b72286374a408557ec3dc19110ee7c24eb68fdd0924faaa4f3a57"
+    },
+    "reducer": {
+      "bytes": 41138,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/reduce_0977.py",
+      "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+    },
+    "runner": {
+      "bytes": 38108,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/run_0977_v2.py",
+      "sha256": "d7904b4773cc17d96c7194c5d4df7e83520795580af17a8217da93cfffa565a4"
+    }
+  },
+  "status": "pass"
+}

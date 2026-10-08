@@ -1,0 +1,112 @@
+{
+  "created_utc": "2026-10-08T07:17:15.991721+00:00",
+  "limitations": [
+    "The retained raw capture is historical; final v9 exercised only offline decoder/reducer logic through file-link mocks and launched no perf command/workload/build.",
+    "The all-12 values in fixtures duplicate one retained child for arithmetic/loader custody testing and are not cohort evidence."
+  ],
+  "perf_binding": {
+    "bytes": 25192472,
+    "historical_0975_sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+    "path": "/usr/bin/perf",
+    "sha256": "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531"
+  },
+  "production_changes": {
+    "native_build_started": false,
+    "native_workload_started": false,
+    "repository_files_changed": false,
+    "runtime_source_changed": false
+  },
+  "protocol_bindings": {
+    "focuseddecode_controls_v4": {
+      "bytes": 4287,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/focuseddecode-controls-0977-v4.json",
+      "sha256": "9ea0c4dc6c30373291060cacf2697be3918f5f6bc245cf0014fc3f396b8fd754"
+    },
+    "integration_receipt_v9": {
+      "bytes": 6038,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/integration-receipt-v1.json",
+      "sha256": "44df985a91724aa1599410ead4751c43bde1997c2644fdfa52545c5d93fc4985"
+    },
+    "loader_gate_receipt_v1": {
+      "bytes": 1353,
+      "path": "/home/zhuhe/litchi-performance-0977/loader-gate-v1/loader-gate-receipt-v1.json",
+      "sha256": "fb016c49156835ffd925c5b5962336ba9749e09e1c0b892955de7cbe9c7f7c5d"
+    },
+    "perf_requalification_posthoc_v2": {
+      "bytes": 9776,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/current-perf-requalification-0977-v1-posthoc-v2.json",
+      "sha256": "6735350c47ed5725189f4b91390f0274855068b3f0c20b2f2331bb5fcbc88be3"
+    },
+    "perf_tool_drift": {
+      "bytes": 1019,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/perf-tool-drift-0977-v1.json",
+      "sha256": "74e2672f81f15989c51be0359ffa0fe026c1ef7adb4a7bb77e969c20796c996b"
+    }
+  },
+  "reviewed_additions": {
+    "attribution": [
+      "decoder corrected-only summary reparsed from script",
+      "D/M/R with R labeled marker ancestry not observed",
+      "inclusive overlap not summed",
+      "physical frame-0 leaf plus explicit unknown",
+      "deepest resolved proxy separated",
+      "unresolved/truncation/empty denominators retained",
+      "no automatic owner or speedup claim"
+    ],
+    "packet_custody": [
+      "artifact binding/path drift and alias reconciliation",
+      "raw PERF_RECORD_LOST separated from terminal LOST_SAMPLES",
+      "runner gate passed",
+      "exact taskset/perf/bridge/target argv and bound cwd",
+      "affinity observation handoff row",
+      "process-group cleanup gate"
+    ],
+    "plan_contract": [
+      "exact retained source_manifest/marker/pilot_gate",
+      "all-child child_gate",
+      "serial batch event/period/callgraph",
+      "decoder offline-only/native LD_PRELOAD absent",
+      "decoder-owned terminal LOST_SAMPLES contract"
+    ]
+  },
+  "schema": "litchi.performance.0977.reducer_reconciliation.v3",
+  "scope": "final sole-owner review of current corrected-only reducer and frozen decoder v2 integration custody",
+  "source": {
+    "decoder_v2": {
+      "bytes": 67772,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977_v2.py",
+      "sha256": "31184f1dc044022f262def181af909bf987c04936e1f926acd73f2c10e46e23c"
+    },
+    "reducer": {
+      "bytes": 41138,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/reduce_0977.py",
+      "sha256": "65746c0f22f3434567830a479775e568528657bcc9ecb7467e8f8ea116f817d1"
+    }
+  },
+  "status": "pass",
+  "validation": [
+    {
+      "command": "PYTHONDONTWRITEBYTECODE=1 python3 /home/zhuhe/litchi-performance-0977/tools/reduce_0977.py --self-test",
+      "status": "pass",
+      "workload_started": false
+    },
+    {
+      "artifact": "/home/zhuhe/litchi-performance-0977/integration-v9/integration-receipt-v1.json",
+      "decoder_sample_count": 6940,
+      "helper_before_after_equal": true,
+      "marker_sample_count": 951,
+      "negative_mutation": "rejected",
+      "sha256": "44df985a91724aa1599410ead4751c43bde1997c2644fdfa52545c5d93fc4985",
+      "single_reducer": "pass",
+      "status": "pass"
+    },
+    {
+      "artifact": "/home/zhuhe/litchi-performance-0977/loader-gate-v1/loader-gate-receipt-v1.json",
+      "loaded_children": 12,
+      "negative_identity_mutation": "rejected",
+      "reduced_children": 12,
+      "sha256": "fb016c49156835ffd925c5b5962336ba9749e09e1c0b892955de7cbe9c7f7c5d",
+      "status": "pass"
+    }
+  ]
+}

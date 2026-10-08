@@ -1,0 +1,140 @@
+{
+  "actual_final_synthetic_terminal": {
+    "current_observation": {
+      "bytes": 3057,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.terminal.json",
+      "sha256": "f873ef8ef1cfc920435666988f1253023752d2af05d2c2ab1a650fd4d21daec9"
+    },
+    "field": "synthetic_runner_bindings.terminal",
+    "fixture_scope": "offline decoder/reducer integration; no native runner execution",
+    "matches_recorded_synthetic_binding": true,
+    "recorded_synthetic_runner_binding": {
+      "bytes": 3057,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.terminal.json",
+      "sha256": "f873ef8ef1cfc920435666988f1253023752d2af05d2c2ab1a650fd4d21daec9"
+    },
+    "synthetic_metadata_only": true,
+    "used_by_decoder_and_reducer": true
+  },
+  "correction_scope": "sealed v9 offline decoder/reducer fixture metadata; no native workload or rerun",
+  "corrects": {
+    "field": "source_bindings.terminal",
+    "issue": "The v9 source_bindings.terminal row was captured at the intermediate 2007-byte state of the synthetic terminal pathname, then the fixture builder rewrote that same pathname with final synthetic runner metadata before decoder/reducer execution.",
+    "receipt": {
+      "bytes": 6038,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/integration-receipt-v1.json",
+      "sha256": "44df985a91724aa1599410ead4751c43bde1997c2644fdfa52545c5d93fc4985"
+    },
+    "sealed_receipt_unchanged": true
+  },
+  "created_utc": "2026-10-08T07:23:03.056037+00:00",
+  "fixture_builder": {
+    "script": {
+      "bytes": 18399,
+      "path": "/home/zhuhe/litchi-performance-0977/tools/integration_fixture_0977_v3.py",
+      "sha256": "0debafef8d9409d26430b6108e9afbfa49e35b6a711c21b29112683efa3cb498"
+    },
+    "sequence": [
+      "prepare_fixture copied the retained 0975 terminal JSON, added the fixture terminal-report path and fixture note, wrote the copied pathname, and captured source_bindings.terminal at 2007 bytes / SHA 91b73145943bb404b74d39099a0d152486921ebf40fab8db584e50dd9096ce5c.",
+      "prepare_runner_contract rewrote that same pathname with the synthetic command, affinity_gate, process_group_cleanup, and fixture_scope fields.",
+      "The final 3057-byte / SHA f873ef8ef1cfc920435666988f1253023752d2af05d2c2ab1a650fd4d21daec9 file was then the file present for decoder/reducer validation and was captured by synthetic_runner_bindings.terminal."
+    ]
+  },
+  "immutable_receipt": true,
+  "interpretation": {
+    "native_0977_capture_claim": false,
+    "reason": "The final synthetic terminal pathname and its post-rewrite synthetic_runner_bindings row agree, and the correction records the metadata alias without changing the sealed fixture, packet, receipt, decoder, reducer, or results.",
+    "v9_decoder_reducer_result_invalidated": false
+  },
+  "limitations": [
+    "This is a custody/documentation correction for an offline synthetic fixture, not a native-run receipt.",
+    "The all-12 analytics remain synthetic duplication of one decoded child and are not cohort evidence.",
+    "No claim is made that the retained 0975 terminal metadata represents a 0977 native run."
+  ],
+  "retained_0975_terminal_source": {
+    "current_observation": {
+      "bytes": 1794,
+      "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.terminal.json",
+      "sha256": "dac7cbbba5a40ecf3595d800fe0704f66a6901e08d6c879f86035edd5ee06ff0"
+    },
+    "field": "source_bindings.terminal_source",
+    "interpretation": "The current retained 0975 terminal bytes match the source binding recorded by v9; this receipt establishes hash equality, not an additional historical filesystem immutability claim.",
+    "matches_sealed_record": true,
+    "sealed_record": {
+      "bytes": 1794,
+      "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.terminal.json",
+      "sha256": "dac7cbbba5a40ecf3595d800fe0704f66a6901e08d6c879f86035edd5ee06ff0"
+    }
+  },
+  "schema": "litchi.performance.0977.integration-v9-terminal-binding-correction.v1",
+  "stale_v9_terminal_binding": {
+    "field": "source_bindings.terminal",
+    "not_the_final_decoder_input": true,
+    "path_role": "same synthetic fixture pathname later rewritten in place",
+    "recorded": {
+      "bytes": 2007,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.terminal.json",
+      "sha256": "91b73145943bb404b74d39099a0d152486921ebf40fab8db584e50dd9096ce5c"
+    }
+  },
+  "status": "correction_recorded",
+  "terminal_report": {
+    "bytes": 24,
+    "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.terminal-report.txt",
+    "sha256": "087ec886f2a2696f024cbd9b3137c6a0247d6ace46468f6870bbd899f73d29ac"
+  },
+  "test_scope": {
+    "all12_analytics": {
+      "children": 12,
+      "scope": "synthetic in-memory duplicate packet; reducer arithmetic/associations only",
+      "status": "pass"
+    },
+    "build_started": false,
+    "correction_rerun_performed": false,
+    "decoder": {
+      "marker_period": 951000000,
+      "marker_sample_count": 951,
+      "packet": {
+        "bytes": 687200,
+        "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.packet.json",
+        "sha256": "b026946100fefa1ee594480cd8ce0f9d38b122fd09496f43e50a980c92ac5b15"
+      },
+      "packet_id": "child-01",
+      "sample_count": 6940
+    },
+    "decoder_controls": {
+      "bytes": 4287,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/focuseddecode-controls-0977-v4.json",
+      "sha256": "9ea0c4dc6c30373291060cacf2697be3918f5f6bc245cf0014fc3f396b8fd754"
+    },
+    "loader_gate": {
+      "bytes": 1353,
+      "path": "/home/zhuhe/litchi-performance-0977/loader-gate-v1/loader-gate-receipt-v1.json",
+      "sha256": "fb016c49156835ffd925c5b5962336ba9749e09e1c0b892955de7cbe9c7f7c5d"
+    },
+    "native_workload_started": false,
+    "negative_mutation": {
+      "exception": "ProtocolError",
+      "message": "child-01: repaired decoder count differs at sample_count",
+      "status": "rejected"
+    },
+    "packet": {
+      "bytes": 687200,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/capture/child-01/child-01.packet.json",
+      "sha256": "b026946100fefa1ee594480cd8ce0f9d38b122fd09496f43e50a980c92ac5b15"
+    },
+    "perf_commands_started": false,
+    "reducer_reconciliation": {
+      "bytes": 4652,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/reducer-reconciliation-0977-v3.json",
+      "sha256": "e3ecb9166a20a5f3a7d000579586f6973617065819ae552c628171f792c6fd61"
+    },
+    "single_packet_reducer": {
+      "normalized_packet_id": "child-01",
+      "parsed_marker_sample_count": 951,
+      "parsed_sample_count": 6940,
+      "status": "pass"
+    },
+    "v9_receipt_status": "pass"
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "authorization": {
+    "basis": "explicit parent authorization to terminate only known stale 0977 operational search process group",
+    "main_checkout_files_deleted_or_modified": false,
+    "target_scope": "PGID 3835635 and its descendants only",
+    "unrelated_sessions_touched": false
+  },
+  "background_activity_caveat": {
+    "detail": "The broad grep traversed /home/zhuhe for about 32 minutes and could have read capture/evidence files while a separate capture was running. Its known file descriptor was an unrelated papyrus OpenCV pack; no target write or capture/perf handle was observed. This cleanup cannot prove that no read-side contention occurred during that historical window.",
+    "no_write_claim": "No writes by this group were observed; the command used read-only git, grep, and head operations.",
+    "read_only_process_may_have_scanned_during_capture": true
+  },
+  "created_utc": "2026-10-08T07:36:07.812064+00:00",
+  "custody": {
+    "files_deleted_by_this_action": [],
+    "files_modified_by_this_action": [],
+    "v1_receipt_expected_sha256_before": "405c8f7b6e17b804c02c18b99ea6eeadbe552afc0abf49e5e4e24785b84d79fe",
+    "v1_receipt_path": "/home/zhuhe/litchi-performance-0977/receipts/temporary-cleanup-0977-v1.json",
+    "v1_receipt_sha256_after": "405c8f7b6e17b804c02c18b99ea6eeadbe552afc0abf49e5e4e24785b84d79fe",
+    "v1_receipt_unchanged": true
+  },
+  "immutable_receipt": true,
+  "open_files_before": {
+    "0977_capture_or_perf_handles": false,
+    "0977_source_or_evidence_writes": false,
+    "grep": [
+      "cwd /home/zhuhe/code/litchi",
+      "fd3 read-only /home/zhuhe/code/papyrus/.git/modules/3rdparty/opencv/objects/pack/pack-c81d788bd6f458b37fbf94ffeb72422d74206f65.pack (581978343 bytes)",
+      "stdout pipe",
+      "stderr /dev/null"
+    ],
+    "head": [
+      "cwd /home/zhuhe/code/litchi",
+      "stdin/stdout/stderr pipes"
+    ],
+    "root_shell": [
+      "cwd /home/zhuhe/code/litchi",
+      "stdin /dev/null",
+      "stdout/stderr pipes"
+    ]
+  },
+  "schema": "litchi.performance.0977.stale_search_cleanup.v1",
+  "status": "completed",
+  "target_process_group": {
+    "children_before": [
+      {
+        "command": "grep -R -l 972c01a9c5344bcaef1a0056ab4a8300e1d619112248dc3667c62a2a22c68d29 /home/zhuhe",
+        "pgid": 3835635,
+        "pid": 3835639,
+        "ppid": 3835635,
+        "sid": 3835635,
+        "state": "D"
+      },
+      {
+        "command": "head -20",
+        "pgid": 3835635,
+        "pid": 3835640,
+        "ppid": 3835635,
+        "sid": 3835635,
+        "state": "S"
+      }
+    ],
+    "operation_classification": "read-only git status/log, grep, and head; no capture, perf, build, or workload command",
+    "pgid": 3835635,
+    "ppid": 3080284,
+    "root_command": "/bin/bash -c git -C /home/zhuhe/litchi-performance-0977 status --short 2>&1 || true; git -C /home/zhuhe/litchi-performance-0977 log --oneline --all -- tools/reduce_0977.py 2>&1 | head -20 || true; grep -R -l '972c01a9c5344bcaef1a0056ab4a8300e1d619112248dc3667c62a2a22c68d29' /home/zhuhe 2>/dev/null | head -20",
+    "root_pid": 3835635,
+    "sid": 3835635,
+    "started_observation": "elapsed approximately 31:53 at inspection"
+  },
+  "termination": {
+    "child_pids_absent_after": true,
+    "commands": [
+      "/bin/kill -TERM -- -3835635",
+      "after 1 second verify PGID/pids",
+      "SIGKILL fallback not needed"
+    ],
+    "group_absent_after": true,
+    "kill_fallback_sent": false,
+    "parent_3080284_remained": true,
+    "root_pid_absent_after": true,
+    "term_signal_sent": true
+  }
+}

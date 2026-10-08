@@ -1,0 +1,228 @@
+{
+  "canonical_sequence": {
+    "all_four_equal": true,
+    "count": 6940,
+    "members": {
+      "current_original": {
+        "binding": {
+          "bytes": 11346285,
+          "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/original-corrected.perf-script-no-inline.txt",
+          "sha256": "532faee13c26d6a3790e7ffc81e64ab72ef2138faa2e7ded6e75864ad746a9a9"
+        },
+        "canonical_sha256": "1f7335d982514a9f586e0a3a001343ce7332deb650a9bf6ebae41f60f62dca3c",
+        "summary": {
+          "empty_callchain_count": 0,
+          "explicit_stack_truncated_count": 0,
+          "lost_events": 0,
+          "marker_period": 951000000,
+          "marker_sample_count": 951,
+          "sample_count": 6940,
+          "total_period": 6940000000,
+          "unresolved_frames": 3289
+        }
+      },
+      "current_translated": {
+        "binding": {
+          "bytes": 11346285,
+          "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/translated-corrected.perf-script-no-inline.txt",
+          "sha256": "e8af015e82a2dcb0e5f1d3af52b44d27d6c6e3e3e8187280651b273a68e6f9db"
+        },
+        "canonical_sha256": "1f7335d982514a9f586e0a3a001343ce7332deb650a9bf6ebae41f60f62dca3c",
+        "summary": {
+          "empty_callchain_count": 0,
+          "explicit_stack_truncated_count": 0,
+          "lost_events": 0,
+          "marker_period": 951000000,
+          "marker_sample_count": 951,
+          "sample_count": 6940,
+          "total_period": 6940000000,
+          "unresolved_frames": 3289
+        }
+      },
+      "retained_0976_original": {
+        "binding": {
+          "bytes": 11346285,
+          "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/original.final-v2.corrected.script.txt",
+          "sha256": "532faee13c26d6a3790e7ffc81e64ab72ef2138faa2e7ded6e75864ad746a9a9"
+        },
+        "canonical_sha256": "1f7335d982514a9f586e0a3a001343ce7332deb650a9bf6ebae41f60f62dca3c",
+        "summary": {
+          "empty_callchain_count": 0,
+          "explicit_stack_truncated_count": 0,
+          "lost_events": 0,
+          "marker_period": 951000000,
+          "marker_sample_count": 951,
+          "sample_count": 6940,
+          "total_period": 6940000000,
+          "unresolved_frames": 3289
+        }
+      },
+      "retained_0976_translated": {
+        "binding": {
+          "bytes": 11346285,
+          "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/translated.corrected.script.txt",
+          "sha256": "e8af015e82a2dcb0e5f1d3af52b44d27d6c6e3e3e8187280651b273a68e6f9db"
+        },
+        "canonical_sha256": "1f7335d982514a9f586e0a3a001343ce7332deb650a9bf6ebae41f60f62dca3c",
+        "summary": {
+          "empty_callchain_count": 0,
+          "explicit_stack_truncated_count": 0,
+          "lost_events": 0,
+          "marker_period": 951000000,
+          "marker_sample_count": 951,
+          "sample_count": 6940,
+          "total_period": 6940000000,
+          "unresolved_frames": 3289
+        }
+      }
+    },
+    "sha256": "1f7335d982514a9f586e0a3a001343ce7332deb650a9bf6ebae41f60f62dca3c"
+  },
+  "decoder": {
+    "bytes": 65063,
+    "path": "/home/zhuhe/litchi-performance-0977/tools/focuseddecode_0977.py",
+    "sha256": "634e5aa939f9a3d79eabc803e2c4d7d284795837542701880a044b7dcdc3bd81"
+  },
+  "evlist_v_authority": {
+    "original": {
+      "contract": {
+        "authority": "perf evlist -v; report header descriptor is retained separately and is not admission authority",
+        "event": "instructions:u",
+        "inherit": 0,
+        "inherit_field_absent": true,
+        "line": "instructions:u: type: 4 (cpu), size: 144, config: 0xc0 (instructions), { sample_period, sample_freq }: 1000000, sample_type: IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER, read_format: ID|LOST, disabled: 1, exclude_kernel: 1, exclude_hv: 1, mmap: 1, comm: 1, enable_on_exec: 1, task: 1, mmap_data: 1, sample_id_all: 1, exclude_callchain_kernel: 1, exclude_callchain_user: 1, mmap2: 1, comm_exec: 1, ksymbol: 1, bpf_event: 1, build_id: 1, sample_regs_user: 0xff0fff, sample_stack_user: 32768",
+        "period": 1000000,
+        "required_attributes": [
+          "type: 4 (cpu)",
+          "size: 144",
+          "config: 0xc0 (instructions)",
+          "{ sample_period, sample_freq }: 1000000",
+          "sample_type: IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER",
+          "read_format: ID|LOST",
+          "disabled: 1",
+          "exclude_kernel: 1",
+          "exclude_hv: 1",
+          "mmap: 1",
+          "comm: 1",
+          "enable_on_exec: 1",
+          "task: 1",
+          "mmap_data: 1",
+          "sample_id_all: 1",
+          "exclude_callchain_kernel: 1",
+          "exclude_callchain_user: 1",
+          "mmap2: 1",
+          "comm_exec: 1",
+          "ksymbol: 1",
+          "bpf_event: 1",
+          "build_id: 1",
+          "sample_regs_user: 0xff0fff",
+          "sample_stack_user: 32768"
+        ],
+        "schema": "litchi.performance.0977.evlist_contract.v1",
+        "stack_cap": 32768,
+        "status": "pass"
+      },
+      "output": {
+        "bytes": 499,
+        "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/evlist-original.txt",
+        "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+      },
+      "returncode": 0,
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/evlist-original.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    },
+    "translated": {
+      "contract": {
+        "authority": "perf evlist -v; report header descriptor is retained separately and is not admission authority",
+        "event": "instructions:u",
+        "inherit": 0,
+        "inherit_field_absent": true,
+        "line": "instructions:u: type: 4 (cpu), size: 144, config: 0xc0 (instructions), { sample_period, sample_freq }: 1000000, sample_type: IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER, read_format: ID|LOST, disabled: 1, exclude_kernel: 1, exclude_hv: 1, mmap: 1, comm: 1, enable_on_exec: 1, task: 1, mmap_data: 1, sample_id_all: 1, exclude_callchain_kernel: 1, exclude_callchain_user: 1, mmap2: 1, comm_exec: 1, ksymbol: 1, bpf_event: 1, build_id: 1, sample_regs_user: 0xff0fff, sample_stack_user: 32768",
+        "period": 1000000,
+        "required_attributes": [
+          "type: 4 (cpu)",
+          "size: 144",
+          "config: 0xc0 (instructions)",
+          "{ sample_period, sample_freq }: 1000000",
+          "sample_type: IP|TID|TIME|CALLCHAIN|CPU|PERIOD|REGS_USER|STACK_USER",
+          "read_format: ID|LOST",
+          "disabled: 1",
+          "exclude_kernel: 1",
+          "exclude_hv: 1",
+          "mmap: 1",
+          "comm: 1",
+          "enable_on_exec: 1",
+          "task: 1",
+          "mmap_data: 1",
+          "sample_id_all: 1",
+          "exclude_callchain_kernel: 1",
+          "exclude_callchain_user: 1",
+          "mmap2: 1",
+          "comm_exec: 1",
+          "ksymbol: 1",
+          "bpf_event: 1",
+          "build_id: 1",
+          "sample_regs_user: 0xff0fff",
+          "sample_stack_user: 32768"
+        ],
+        "schema": "litchi.performance.0977.evlist_contract.v1",
+        "stack_cap": 32768,
+        "status": "pass"
+      },
+      "output": {
+        "bytes": 499,
+        "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/evlist-translated.txt",
+        "sha256": "29f2a64536a635ac827b283009f72855d998151954c3000f867cbeaf8b8058af"
+      },
+      "returncode": 0,
+      "stderr": {
+        "bytes": 0,
+        "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/evlist-translated.stderr",
+        "sha256": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855"
+      }
+    }
+  },
+  "header_warning": {
+    "authority": "evlist-v; header warning is descriptive and not silently ignored",
+    "known_invalid_header_event_desc_warning": true,
+    "schema": "litchi.performance.0977.perf_header_metadata.v1",
+    "stderr": {
+      "bytes": 49,
+      "path": "/home/zhuhe/litchi-performance-0977/requalify-current-perf-v1/header-original-current.stderr",
+      "sha256": "73b3a559eb66337c5f0ae4ed3b5f31a3ed98bcccc0058df070ede34679d955df"
+    },
+    "warnings": [
+      "Invalid HEADER_EVENT_DESC: nre=1 sz=144 (min 64)"
+    ]
+  },
+  "interpretation": "Current perf corrected outputs match the retained original/translated canonical sequence. evlist-v is the exact event authority; the current report-header Invalid HEADER_EVENT_DESC warning is preserved descriptively and is not treated as equivalent header validation. Offline evidence does not reidentify the historical native capture tool.",
+  "native_workload_started": false,
+  "raw_input_custody": {
+    "original": {
+      "binding": {
+        "bytes": 229215080,
+        "path": "/home/zhuhe/litchi-performance-0975/capture/instruction-profile-v1/child-01/child-01.perf.data",
+        "sha256": "51b16775fd0f72e154a74acad963c99e2169284ad1e31f78bcabab2bc6d75368"
+      },
+      "unchanged_from_v1": true
+    },
+    "translated": {
+      "binding": {
+        "bytes": 229215080,
+        "path": "/home/zhuhe/litchi-performance-0976/aslr-cache-final-v2-0975-v3/child-01.translated.perf.data",
+        "sha256": "7a77198252c22786fef42530f8716f0c62fdf7d61b869be5bc9aad0a955834b0"
+      },
+      "unchanged_from_v1": true
+    }
+  },
+  "schema": "litchi.performance.0977.current_perf_requalification_posthoc.v2",
+  "source_receipt": {
+    "bytes": 8184,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/current-perf-requalification-0977-v1-posthoc.json",
+    "sha256": "ef42546e408732417d2c387d386f8800252361a20a3c460c7d919200d5a5d1b1"
+  },
+  "status": "pass"
+}

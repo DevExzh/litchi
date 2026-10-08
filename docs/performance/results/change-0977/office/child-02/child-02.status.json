@@ -1,0 +1,7 @@
+{
+  "error": "raw_stack: retained raw STACK_USER scanner rejected child",
+  "no_retry": true,
+  "packet_id": "child-02",
+  "schema": "litchi.performance.0977.child_progress.v1",
+  "status": "decoder_failure"
+}

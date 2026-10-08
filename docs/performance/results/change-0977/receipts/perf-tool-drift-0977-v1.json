@@ -1,0 +1,24 @@
+{
+  "build_started": false,
+  "cause": {
+    "excerpt_lines": [],
+    "excerpt_sha256": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "observed_utc": "2026-10-08T06:46:44Z",
+    "source": "/var/log/dpkg.log",
+    "upgrade": "linux-perf:amd64 7.0.0-34.34 -> 7.0.0-38.38"
+  },
+  "native_workload_started": false,
+  "policy": "decoder retains the prior sealed perf hash and fails closed on this host drift; no hash replacement or capture admission was performed.",
+  "schema": "litchi.performance.0977.perf_tool_drift.v1",
+  "status": "recorded",
+  "tool": {
+    "current_build_id": "b4f63de1b71462b9d1d96aad18279b4a450ca84b",
+    "current_bytes": 25192472,
+    "current_ctime_ns": 1791442004574669486,
+    "current_sha256": "1371ae5cb9fa59632d1d0e34b877d7251df4029810ba67dc56e946545e87b531",
+    "frozen_prior_bytes": 25221960,
+    "frozen_prior_sha256": "174229fb48b8557aafa821dd828d883dce47c35c31067e1f31e4a01a91c6c98b",
+    "path": "/usr/bin/perf",
+    "version": "perf version 7.0.14"
+  }
+}

@@ -1,0 +1,1251 @@
+{
+  "interval_seconds": 0.02,
+  "lifetime_authority": "raw zero-loss perf task stream",
+  "live_history_claim": false,
+  "rows": [
+    {
+      "bridge_handoff_ready": false,
+      "monotonic_ns": 309851952100274,
+      "perf_parent": {
+        "identity": {
+          "comm": "taskset",
+          "exe": "/usr/bin/taskset",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "start",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "start",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "start",
+        "pid": null,
+        "reason": "target PID not known at observation",
+        "scope": "targeted perf/target task only",
+        "status": "unavailable"
+      }
+    },
+    {
+      "bridge_handoff_ready": false,
+      "monotonic_ns": 309851952270705,
+      "perf_parent": {
+        "identity": {
+          "comm": "taskset",
+          "exe": "/usr/bin/taskset",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              0,
+              1,
+              2,
+              3,
+              4,
+              5,
+              6,
+              7,
+              8,
+              9,
+              10,
+              11,
+              12,
+              13,
+              14,
+              15,
+              16,
+              17,
+              18,
+              19,
+              20,
+              21,
+              22,
+              23,
+              24,
+              25,
+              26,
+              27,
+              28,
+              29,
+              30,
+              31
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": null,
+        "reason": "target PID not known at observation",
+        "scope": "targeted perf/target task only",
+        "status": "unavailable"
+      }
+    },
+    {
+      "bridge_handoff_ready": false,
+      "monotonic_ns": 309851972569276,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": null,
+        "reason": "target PID not known at observation",
+        "scope": "targeted perf/target task only",
+        "status": "unavailable"
+      }
+    },
+    {
+      "bridge_handoff_ready": false,
+      "monotonic_ns": 309851992772866,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": null,
+        "reason": "target PID not known at observation",
+        "scope": "targeted perf/target task only",
+        "status": "unavailable"
+      }
+    },
+    {
+      "bridge_handoff_ready": false,
+      "monotonic_ns": 309852012917596,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": null,
+        "reason": "target PID not known at observation",
+        "scope": "targeted perf/target task only",
+        "status": "unavailable"
+      }
+    },
+    {
+      "bridge_handoff_ready": false,
+      "monotonic_ns": 309852033058446,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": null,
+        "reason": "target PID not known at observation",
+        "scope": "targeted perf/target task only",
+        "status": "unavailable"
+      }
+    },
+    {
+      "bridge_handoff_ready": false,
+      "monotonic_ns": 309852053185706,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": null,
+        "reason": "target PID not known at observation",
+        "scope": "targeted perf/target task only",
+        "status": "unavailable"
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852073388246,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852093625947,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852113848077,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852134079788,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852154309388,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852174523209,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852194780869,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852215141930,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852235478431,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852255751262,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852275987223,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852296226113,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852316456274,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852336693054,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "identity": {
+          "comm": "python3.14",
+          "exe": "/usr/bin/python3.14",
+          "pid": 3844957,
+          "starttime": 30985197,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844957
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              31
+            ],
+            "starttime": 30985197,
+            "tid": 3844957
+          }
+        ]
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852356932045,
+      "perf_parent": {
+        "identity": {
+          "comm": "perf",
+          "exe": "/usr/bin/perf",
+          "pid": 3844956,
+          "starttime": 30985195,
+          "uid": 1001
+        },
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844956,
+        "scope": "targeted perf/target task only",
+        "status": "present",
+        "task_ids": [
+          3844956
+        ],
+        "tasks": [
+          {
+            "affinity": [
+              30
+            ],
+            "starttime": 30985195,
+            "tid": 3844956
+          }
+        ]
+      },
+      "phase": "periodic",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "periodic",
+        "pid": 3844957,
+        "reason": "not present at bounded observation",
+        "scope": "targeted perf/target task only",
+        "status": "absent",
+        "task_ids": []
+      }
+    },
+    {
+      "bridge_handoff_ready": true,
+      "monotonic_ns": 309852377146415,
+      "perf_parent": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "end",
+        "pid": 3844956,
+        "reason": "not present at bounded observation",
+        "scope": "targeted perf/target task only",
+        "status": "absent",
+        "task_ids": []
+      },
+      "phase": "end",
+      "target": {
+        "lifetime_authority": "raw zero-loss perf task stream",
+        "live_history_claim": false,
+        "phase": "end",
+        "pid": 3844957,
+        "reason": "not present at bounded observation",
+        "scope": "targeted perf/target task only",
+        "status": "absent",
+        "task_ids": []
+      }
+    }
+  ],
+  "schema": "litchi.performance.0977.affinity_observations.v1",
+  "scope": "bounded observations of the perf parent and same-PID target"
+}

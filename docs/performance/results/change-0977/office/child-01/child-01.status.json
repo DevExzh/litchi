@@ -1,0 +1,54 @@
+{
+  "decoder_gate": {
+    "empty_callchain_count": 0,
+    "explicit_stack_truncated_count": 0,
+    "minimum_marker_samples": 100,
+    "passed": true,
+    "raw_lost_sum": 0,
+    "reasons": [],
+    "shim_log": {
+      "adjusted": 0,
+      "cache_stored": 1,
+      "fallback": 0,
+      "infos": 301409,
+      "reports": 111415,
+      "result_module_null": 0,
+      "reused_existing": 111404,
+      "rows": 412824,
+      "target_infos": 222813,
+      "target_reports": 111405
+    },
+    "terminal_lost_samples": 0,
+    "unresolved_frames": 7700
+  },
+  "empty_callchain_count": 0,
+  "marker_sample_count": 946,
+  "no_retry": true,
+  "packet_id": "child-01",
+  "raw_lost_sum": 0,
+  "runner_gate": {
+    "affinity": {
+      "active_target_rows": 37,
+      "parent_task_keys": [
+        [
+          3848943,
+          31038165
+        ]
+      ],
+      "passed": true,
+      "post_handoff_rows": 38,
+      "postexit_target_rows": 1,
+      "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+    },
+    "passed": true,
+    "process_group_cleanup": {
+      "checked": true,
+      "passed": true,
+      "status": "gone"
+    },
+    "reasons": []
+  },
+  "schema": "litchi.performance.0977.child_progress.v1",
+  "status": "gated",
+  "terminal_lost_samples": 0
+}

@@ -1,0 +1,28 @@
+{
+  "children_completed": 12,
+  "children_requested": 12,
+  "failure": null,
+  "no_retry": true,
+  "packets": [
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-01.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-02.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-03.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-04.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-05.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-06.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-07.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-08.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-09.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-10.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-11.packet.json",
+    "/home/zhuhe/litchi-performance-0977/integration-v7/capture/child-01/child-01.loader-12.packet.json"
+  ],
+  "plan": {
+    "bytes": 4384,
+    "path": "/home/zhuhe/litchi-performance-0977/integration-v7/plan-integration.json",
+    "sha256": "3d06daaf03b3e092fd95b382e67c9e3767984397730315179385ed453c9d6faf"
+  },
+  "schema": "litchi.performance.0977.capture_manifest.v1",
+  "serial": true,
+  "status": "complete"
+}

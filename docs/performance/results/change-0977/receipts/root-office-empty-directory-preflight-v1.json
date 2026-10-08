@@ -1,0 +1,11 @@
+{
+  "created_utc": "2026-10-08T07:31:27.678881+00:00",
+  "status": "empty_precreated_directory_removed",
+  "path": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2",
+  "mtime_ns": 1791442130610222552,
+  "inode": 520084,
+  "entries": [],
+  "native_workload_started": false,
+  "root_go_written": false,
+  "reason": "Root operational preflight rejected pre-existing empty output directory before GO; removed using rmdir only. No capture files or results existed; no workload retry."
+}

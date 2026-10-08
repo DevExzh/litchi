@@ -1,0 +1,156 @@
+{
+  "admission_checks": {
+    "actual_control_audit_status": "pass",
+    "actual_control_no_retry": true,
+    "actual_control_process_cleanup": "pass",
+    "actual_control_terminal_returncode": 0,
+    "all_sealed_helper_bytes_match": true,
+    "decoder_control_evlist_authority": "evlist-v",
+    "decoder_control_raw_loss": 0,
+    "decoder_control_terminal_loss": 0,
+    "decoder_controls_v4_status": "pass",
+    "exact_helper_seal_binding": true,
+    "exact_plan_binding": true,
+    "integration_correction_recorded": true,
+    "native_office_result_present": false
+  },
+  "conclusion": "pass_pre_capture_office_readiness_only",
+  "control_audit": {
+    "bytes": 20771,
+    "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-control-audit-0977-v2.json",
+    "sha256": "2d2f70cb800239201a941d9f78d55129be2344bb6887f8fe34fc6dc2187d7927"
+  },
+  "control_audit_summary": {
+    "active_target_rows": 14,
+    "native_workload_started": false,
+    "parent_cpu30_live_rows": 15,
+    "parent_perf_pid": 3844956,
+    "post_handoff_rows": 16,
+    "process_group_cleanup": "gone",
+    "raw_lost_sum": 0,
+    "recorder_cpu": 30,
+    "sample_count": 4633,
+    "scope": "harmless stdlib control; no Office marker/ELF/DWARF attribution",
+    "status": "pass",
+    "target_cpu": 31,
+    "target_cpu31_live_rows": 14,
+    "target_pid": 3844957,
+    "terminal_lost_samples": 0
+  },
+  "created_utc": "2026-10-08T07:30:48.524557+00:00",
+  "frozen_inputs": {
+    "control_root_go": {
+      "bytes": 1498,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-go-0977-control-v1.json",
+      "sha256": "e428afc235f53d5e82b8e1552002cf10b671306cc7169ceb966a8c0ea6970f60"
+    },
+    "control_root_terminal": {
+      "bytes": 983,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/root-control-terminal-0977-v1.json",
+      "sha256": "31a4c044407adc4d4df4c95b3a156797c67ca08ea5503424855b64e2ce8078a9"
+    },
+    "focused_controls_v4": {
+      "bytes": 4287,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/focuseddecode-controls-0977-v4.json",
+      "sha256": "9ea0c4dc6c30373291060cacf2697be3918f5f6bc245cf0014fc3f396b8fd754"
+    },
+    "integration_v9": {
+      "bytes": 6038,
+      "path": "/home/zhuhe/litchi-performance-0977/integration-v9/integration-receipt-v1.json",
+      "sha256": "44df985a91724aa1599410ead4751c43bde1997c2644fdfa52545c5d93fc4985"
+    },
+    "integration_v9_terminal_binding_correction": {
+      "bytes": 6882,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/integration-v9-terminal-binding-correction-v1.json",
+      "sha256": "a9120eee26ca85fd99d2aa146153dec3e6e4b2b2090194e91ac11385eb3f588c"
+    },
+    "prior_control_review": {
+      "bytes": 9329,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-control-0977-v1.json",
+      "sha256": "49545df60784d616f1cea878c73d853cd91f208516cca2e694ca453f6038ae8d"
+    }
+  },
+  "helper_seal": {
+    "bytes": 3132,
+    "path": "/home/zhuhe/litchi-performance-0977/receipts/helper-seal-0977-v2.json",
+    "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+  },
+  "limitations": [
+    "The control proves the same frozen runner/bridge/perf custody path with a harmless stdlib target; it does not prove Office marker presence or attribution quality.",
+    "Affinity evidence is sampled after handoff and shows positive parent CPU30 and target CPU31 observations; it does not prove continuous affinity between polls.",
+    "The known perf header descriptor warning remains descriptive; evlist-v is the event authority.",
+    "The v9 all-child analytics are synthetic duplication of one decoded child and are not Office cohort evidence."
+  ],
+  "mode": "office_readiness",
+  "plan": {
+    "bytes": 17335,
+    "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+    "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+  },
+  "protocol_limits_confirmed": {
+    "children": 12,
+    "fresh_output_root_required": true,
+    "period": 1000000,
+    "pilot_min_marker_samples": 100,
+    "pilot_raw_lost_sum": 0,
+    "pilot_terminal_lost_samples": 0,
+    "recorder_cpu": 30,
+    "retry": false,
+    "same_binary_fixture_all_children": true,
+    "sample_cpu": 31,
+    "serial": true,
+    "stack_cap": 32768,
+    "stop_on_first_failure": true
+  },
+  "readiness": "pre_capture_office_go_admissible",
+  "root_office_go_requirements": {
+    "authorized": true,
+    "bind_actual_control_audit": {
+      "bytes": 20771,
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-control-audit-0977-v2.json",
+      "sha256": "2d2f70cb800239201a941d9f78d55129be2344bb6887f8fe34fc6dc2187d7927"
+    },
+    "bind_exact_helper_seal": {
+      "bytes": 3132,
+      "path": "/home/zhuhe/litchi-performance-0977/receipts/helper-seal-0977-v2.json",
+      "sha256": "d51ea07cdca58e700a82ff8f4789fffc3dd40e4f284b086026458308fbd78e2e"
+    },
+    "bind_exact_plan": {
+      "bytes": 17335,
+      "path": "/home/zhuhe/litchi-performance-0977/plans/plan-0977-v2.json",
+      "sha256": "12abb6239a7f14a82a84e87306deffca4231c83377bf19a123cfb503a3684a1c"
+    },
+    "bind_this_review": {
+      "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-office-readiness-0977-v2.json",
+      "status": "pass"
+    },
+    "fresh_capture_output_root": "/home/zhuhe/litchi-performance-0977/capture/instruction-profile-v2",
+    "mode": "office",
+    "no_retry": true,
+    "office_results_must_not_be_inferred_from_control": true,
+    "quiescence_status": "pass",
+    "schema": "litchi.performance.0977.root_go.v1",
+    "status": "authorized",
+    "stop_on_first_failure": true
+  },
+  "schema": "litchi.performance.0977.office_readiness_review.v1",
+  "scope": {
+    "native_office_capture_authorized_by_this_receipt": false,
+    "native_office_workload_started": false,
+    "no_build_or_workload_by_reviewer": true,
+    "purpose": "independent pre-capture readiness review after the frozen protocol and one completed harmless control"
+  },
+  "status": "pass",
+  "supersedes": {
+    "bytes": 6013,
+    "path": "/home/zhuhe/litchi-performance-0977/analysis/cpu-review-office-readiness-0977-v1.json",
+    "sha256": "d077ab19b0b80ebd6fba870b1ca5f6628bed930569a0c5a3a393fcd335dfdd66"
+  },
+  "timestamp_correction": {
+    "field": "created_utc",
+    "prior_receipt_time_known": false,
+    "prior_receipt_unchanged": true,
+    "prior_value": "2026-10-08T00:00:00Z",
+    "reason": "prior receipt used a fixed placeholder; this receipt records its own actual creation time"
+  }
+}

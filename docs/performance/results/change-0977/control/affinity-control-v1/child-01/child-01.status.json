@@ -1,0 +1,43 @@
+{
+  "decoder_gate": {
+    "cpu_gate": true,
+    "passed": true,
+    "period": 1000000,
+    "raw_lost_sum": 0,
+    "reasons": [],
+    "sample_count": 4633,
+    "scope": "harmless control only; no Office marker/ELF/DWFL attribution",
+    "task_gate": true,
+    "terminal_lost_samples": 0
+  },
+  "empty_callchain_count": null,
+  "marker_sample_count": null,
+  "no_retry": true,
+  "packet_id": "child-01",
+  "raw_lost_sum": 0,
+  "runner_gate": {
+    "affinity": {
+      "active_target_rows": 14,
+      "parent_task_keys": [
+        [
+          3844956,
+          30985195
+        ]
+      ],
+      "passed": true,
+      "post_handoff_rows": 16,
+      "postexit_target_rows": 2,
+      "scope": "bounded sampled observations; raw task stream remains lifetime authority"
+    },
+    "passed": true,
+    "process_group_cleanup": {
+      "checked": true,
+      "passed": true,
+      "status": "gone"
+    },
+    "reasons": []
+  },
+  "schema": "litchi.performance.0977.child_progress.v1",
+  "status": "gated",
+  "terminal_lost_samples": 0
+}

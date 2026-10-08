@@ -1,0 +1,9 @@
+{
+  "cpu_gate": true,
+  "period": 1000000,
+  "raw_lost_sum": 0,
+  "sample_count": 4633,
+  "scope": "harmless control only; no Office marker/ELF/DWFL attribution",
+  "task_gate": true,
+  "terminal_lost_samples": 0
+}
