@@ -128,6 +128,10 @@ pub mod raw {
 pub use serialize::SerializeError;
 pub use value::{Key, Value};
 pub(crate) use view::Project;
+// The query engine's fake format reads properties through it; the format
+// adapters (R4-R7) will too.
+#[cfg(any(test, feature = "test-support"))]
+pub(crate) use view::Source;
 pub use view::{
     Children, DEFAULT_MAX_NODES, Format, MAX_VIEW_DEPTH, PREVIEW_CHARS, Preview, Prop, View,
     ViewOptions,

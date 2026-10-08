@@ -44,7 +44,7 @@ pub struct Query<'a> {
 }
 
 /// Where a query applies.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Clone, PartialEq, Eq, Hash)]
 #[non_exhaustive]
 pub enum Scope<'a> {
     /// A leading absolute path: `/Sheet1/cell[...]` has scope `/Sheet1`;
@@ -771,5 +771,11 @@ impl fmt::Debug for Element<'_> {
 impl fmt::Debug for Pseudo<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.write_str("Pseudo { .. }")
+    }
+}
+
+impl fmt::Debug for Scope<'_> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("Scope { .. }")
     }
 }

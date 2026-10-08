@@ -559,3 +559,21 @@ unpinned entries. Managed source projections refuse detachable semantic values,
 including effective documents backed by managed donor parts. Configurable
 semantic limits, concrete unified nodes and complete family registration remain
 pending.
+
+## 31. Unified query plans (record 0050)
+
+`query::{IntoQuery, QueryArg, Plan}` accepts selector text, typed syntax and
+reusable compiled plans. Ordinary predicates cannot select native IDs;
+`query::raw::query` explicitly admits them and native identity scope paths.
+A raw compiled plan retains that authorization on reuse. Semantic names remain
+ordinary selectors. Query grammar constructors alone grant no raw access.
+
+Typed syntax is bounded before recursive compilation. Query walkers stream in
+document order, stop on the first error or requested limit, and refuse excessive
+frame depth or visits. These fixed bounds are prerequisites for configurable
+semantic budgets, not their final API.
+
+The design's unknown-key diagnostics and absent-value comparison semantics stay
+intact. Debug and diagnostic rendering omit authored selector content; explicit
+syntax rendering and data accessors remain available. The engine currently runs
+through test-only format adapters; production File dispatch remains pending.

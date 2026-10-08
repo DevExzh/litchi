@@ -190,11 +190,8 @@ fn string_equals(actual: &str, expected: &str) -> bool {
 /// ```
 #[derive(Clone, Copy)]
 pub struct Test<'q> {
-    op: Op,
-    ty: Option<ValueType>,
+    compiled: Compiled,
     literal: &'q str,
-    facts: Facts,
-    typed: Option<Scalar<'q>>,
 }
 
 impl<'q> Test<'q> {
@@ -202,15 +199,8 @@ impl<'q> Test<'q> {
     #[must_use]
     pub const fn exists() -> Self {
         Self {
-            op: Op::Exists,
-            ty: None,
+            compiled: Compiled::EXISTS,
             literal: "",
-            facts: Facts {
-                number: None,
-                unit: Unit::None,
-                emu: None,
-            },
-            typed: None,
         }
     }
 
@@ -219,30 +209,9 @@ impl<'q> Test<'q> {
     /// matches; [`Test::compare`] refuses it instead.
     #[must_use]
     pub fn with_text(op: CompareOp, literal: &'q str, ty: Option<ValueType>) -> Self {
-        let op = match op {
-            CompareOp::Eq => Op::Eq,
-            CompareOp::Ne => Op::Ne,
-            CompareOp::Contains => Op::Contains,
-            CompareOp::Gt => Op::Gt,
-            CompareOp::Lt => Op::Lt,
-            CompareOp::Ge => Op::Ge,
-            CompareOp::Le => Op::Le,
-            // `Test::compare` refuses an operator this version does not know;
-            // compiled here, it never matches.
-            _ => Op::Never,
-        };
-        let typed = match (op, ty) {
-            (Op::Eq | Op::Ne, Some(ty)) if ty != ValueType::Text && !literal.trim().is_empty() => {
-                ty.coerce(literal).ok()
-            },
-            _ => None,
-        };
         Self {
-            op,
-            ty,
+            compiled: Compiled::new(op, literal, ty),
             literal,
-            facts: Facts::of(literal),
-            typed,
         }
     }
 
@@ -254,35 +223,7 @@ impl<'q> Test<'q> {
     /// (`~= r"..."`): the workspace has no regex engine (record 0010, open
     /// question Q3), and for an operator this version does not know.
     pub fn compare(op: CompareOp, value: &'q Value<'q>, ty: Option<ValueType>) -> Result<Self> {
-        if !matches!(
-            op,
-            CompareOp::Eq
-                | CompareOp::Ne
-                | CompareOp::Contains
-                | CompareOp::Gt
-                | CompareOp::Lt
-                | CompareOp::Ge
-                | CompareOp::Le
-        ) {
-            return Err(Error::new(
-                Code::UnsupportedCapability,
-                format!("the comparison operator '{op}' is not supported"),
-            ));
-        }
-        match value {
-            Value::Text(text) => Ok(Self::with_text(op, text, ty)),
-            Value::Regex(_) => Err(Error::new(
-                Code::UnsupportedCapability,
-                "regular-expression values are not supported",
-            )
-            .with_suggestion(
-                "use '~=' with a plain substring; regex matching needs a regex engine the project has not adopted yet",
-            )),
-            _ => Err(Error::new(
-                Code::UnsupportedCapability,
-                "this kind of comparison value is not supported",
-            )),
-        }
+        Ok(Self::with_text(op, literal(op, value)?, ty))
     }
 
     /// Compiles a grammar condition (`[key]` or `[key op value]`) for a key
@@ -305,9 +246,7 @@ impl<'q> Test<'q> {
     /// The compile-time warning, if any.
     #[must_use]
     pub fn warning(&self) -> Option<Warning> {
-        let relational = matches!(self.op, Op::Gt | Op::Lt | Op::Ge | Op::Le);
-        (relational && self.facts.number.is_none() && self.facts.emu.is_none())
-            .then_some(Warning::NonNumeric)
+        self.compiled.warning()
     }
 
     /// The literal read as a number the way OfficeCLI's header-row predicates
@@ -328,6 +267,136 @@ impl<'q> Test<'q> {
     /// absent). Allocation-free.
     #[must_use]
     pub fn eval(&self, actual: Option<Scalar<'_>>) -> bool {
+        self.compiled.eval(self.literal, actual)
+    }
+}
+
+/// The literal of a grammar comparison, after refusing what query comparison
+/// does not evaluate: a regular-expression literal (`~= r"..."`, record 0010
+/// open question Q3) and an operator this version does not know.
+pub(crate) fn literal<'v>(op: CompareOp, value: &'v Value<'_>) -> Result<&'v str> {
+    if !matches!(
+        op,
+        CompareOp::Eq
+            | CompareOp::Ne
+            | CompareOp::Contains
+            | CompareOp::Gt
+            | CompareOp::Lt
+            | CompareOp::Ge
+            | CompareOp::Le
+    ) {
+        return Err(Error::new(
+            Code::UnsupportedCapability,
+            format!("the comparison operator '{op}' is not supported"),
+        ));
+    }
+    match value {
+        Value::Text(text) => Ok(text),
+        Value::Regex(_) => Err(Error::new(
+            Code::UnsupportedCapability,
+            "regular-expression values are not supported",
+        )
+        .with_suggestion(
+            "use '~=' with a plain substring; regex matching needs a regex engine the project has not adopted yet",
+        )),
+        _ => Err(Error::new(
+            Code::UnsupportedCapability,
+            "this kind of comparison value is not supported",
+        )),
+    }
+}
+
+/// A coerced literal that owns nothing it borrowed: every scalar but text.
+/// Query literals never coerce to [`Scalar::Text`] (free text compares as
+/// text), so nothing is lost.
+fn detach(scalar: Scalar<'_>) -> Option<Scalar<'static>> {
+    Some(match scalar {
+        Scalar::Bool(value) => Scalar::Bool(value),
+        Scalar::Int(value) => Scalar::Int(value),
+        Scalar::Number(value) => Scalar::Number(value),
+        Scalar::Token(token) => Scalar::Token(token),
+        Scalar::Length(length) => Scalar::Length(length),
+        Scalar::Color(color) => Scalar::Color(color),
+        Scalar::Text(_) => return None,
+    })
+}
+
+/// A [`Test`] without its literal text: the operator, the key's type, what
+/// OfficeCLI reads from the literal, and the literal coerced to the key's
+/// type. A compiled query plan that owns its literals keeps this and passes
+/// the literal back at evaluation, so the plan needs no self-reference.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Compiled {
+    op: Op,
+    ty: Option<ValueType>,
+    facts: Facts,
+    typed: Option<Scalar<'static>>,
+}
+
+impl Compiled {
+    /// `[key]`: present with non-empty text.
+    pub(crate) const EXISTS: Self = Self {
+        op: Op::Exists,
+        ty: None,
+        facts: Facts {
+            number: None,
+            unit: Unit::None,
+            emu: None,
+        },
+        typed: None,
+    };
+
+    /// Compiles `[key op literal]` for a key of type `ty`.
+    pub(crate) fn new(op: CompareOp, literal: &str, ty: Option<ValueType>) -> Self {
+        let op = match op {
+            CompareOp::Eq => Op::Eq,
+            CompareOp::Ne => Op::Ne,
+            CompareOp::Contains => Op::Contains,
+            CompareOp::Gt => Op::Gt,
+            CompareOp::Lt => Op::Lt,
+            CompareOp::Ge => Op::Ge,
+            CompareOp::Le => Op::Le,
+            // `literal` refuses an operator this version does not know;
+            // compiled here, it never matches.
+            _ => Op::Never,
+        };
+        let typed = match (op, ty) {
+            (Op::Eq | Op::Ne, Some(ty)) if ty != ValueType::Text && !literal.trim().is_empty() => {
+                ty.coerce(literal).ok().and_then(detach)
+            },
+            _ => None,
+        };
+        Self {
+            op,
+            ty,
+            facts: Facts::of(literal),
+            typed,
+        }
+    }
+
+    /// `Some(true)` for `=`, `Some(false)` for `!=`, `None` otherwise.
+    pub(crate) const fn polarity(&self) -> Option<bool> {
+        match self.op {
+            Op::Eq => Some(true),
+            Op::Ne => Some(false),
+            _ => None,
+        }
+    }
+
+    /// Whether the operator is relational (`>`, `<`, `>=`, `<=`).
+    pub(crate) const fn is_relational(&self) -> bool {
+        matches!(self.op, Op::Gt | Op::Lt | Op::Ge | Op::Le)
+    }
+
+    /// The compile-time warning, if any.
+    pub(crate) fn warning(&self) -> Option<Warning> {
+        (self.is_relational() && self.facts.number.is_none() && self.facts.emu.is_none())
+            .then_some(Warning::NonNumeric)
+    }
+
+    /// Evaluates the condition, whose literal is `literal`, against a key's
+    /// value (`None` when the key is absent). Allocation-free.
+    pub(crate) fn eval(&self, literal: &str, actual: Option<Scalar<'_>>) -> bool {
         let Some(actual) = actual else {
             return self.op == Op::Ne;
         };
@@ -344,9 +413,9 @@ impl<'q> Test<'q> {
         };
         match self.op {
             Op::Exists => !text.is_empty(),
-            Op::Eq => self.equals(&actual, text),
-            Op::Ne => !self.equals(&actual, text),
-            Op::Contains => contains_ignore_case(text, self.literal),
+            Op::Eq => self.equals(literal, &actual, text),
+            Op::Ne => !self.equals(literal, &actual, text),
+            Op::Contains => contains_ignore_case(text, literal),
             Op::Gt => self.relation(text, Ordering::is_gt),
             Op::Lt => self.relation(text, Ordering::is_lt),
             Op::Ge => self.relation(text, Ordering::is_ge),
@@ -355,13 +424,24 @@ impl<'q> Test<'q> {
         }
     }
 
-    fn relation(&self, text: &str, holds: fn(Ordering) -> bool) -> bool {
-        compare_numeric(&Facts::of(text), &self.facts).is_some_and(holds)
+    /// Whether the literal reads as neither a number nor a length, so no
+    /// numeric or dimension comparison can hold whatever the value is.
+    fn literal_is_text(&self) -> bool {
+        self.facts.number.is_none() && self.facts.emu.is_none()
     }
 
-    fn equals(&self, actual: &Scalar<'_>, text: &str) -> bool {
-        if string_equals(text, self.literal) {
+    fn relation(&self, text: &str, holds: fn(Ordering) -> bool) -> bool {
+        !self.literal_is_text() && compare_numeric(&Facts::of(text), &self.facts).is_some_and(holds)
+    }
+
+    fn equals(&self, literal: &str, actual: &Scalar<'_>, text: &str) -> bool {
+        if string_equals(text, literal) {
             return true;
+        }
+        if self.literal_is_text() {
+            // Reading the value's number and EMU could not change the
+            // answer: both comparisons need them on both sides.
+            return self.typed_equals(actual);
         }
         let facts = Facts::of(text);
         dimension_equals(&facts, &self.facts)

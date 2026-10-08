@@ -456,12 +456,13 @@ pub(crate) fn addresses_cells(steps: &[Step<'_>], from: usize) -> bool {
 /// optimal-string-alignment distance (OfficeCLI's `EditDistance.Damerau`)
 /// within `max(2, len / 3)`, several when they tie (OfficeCLI offers none on
 /// a tie), or the vocabulary's element names when nothing is near.
-fn did_you_mean(name: &str, vocabulary: &Vocabulary) -> String {
+pub(crate) fn did_you_mean(name: &str, vocabulary: &Vocabulary) -> String {
     let wanted: Vec<char> = name
         .chars()
         .take(128)
         .map(|c| c.to_ascii_lowercase())
         .collect();
+
     let threshold = (wanted.len() / 3).max(2);
     let mut best = usize::MAX;
     let mut nearest: Vec<(&str, &str)> = Vec::new();

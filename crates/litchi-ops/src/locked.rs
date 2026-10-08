@@ -58,12 +58,15 @@ pub enum EncryptionKind {
 /// ```no_run
 /// use litchi_ops::File;
 ///
+/// # #[cfg(feature = "docx")]
 /// # fn main() -> litchi_ops::Result<()> {
 /// if let File::Locked(locked) = litchi_ops::open("secret.docx")? {
 ///     println!("{:?} encrypted with {:?}", locked.format(), locked.encryption());
 /// }
 /// # Ok(())
 /// # }
+/// # #[cfg(not(feature = "docx"))]
+/// # fn main() {}
 /// ```
 #[derive(Clone)]
 pub struct Locked(Arc<LockedState>);

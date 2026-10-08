@@ -55,15 +55,15 @@
     )
 )]
 
-mod arg;
+pub(crate) mod arg;
 #[cfg(any(test, feature = "test-support"))]
 mod fake;
-mod navigate;
-mod report;
-mod resolve;
+pub(crate) mod navigate;
+pub(crate) mod report;
+pub(crate) mod resolve;
 #[cfg(test)]
 mod tests;
-mod vocabulary;
+pub(crate) mod vocabulary;
 
 pub use arg::{IntoPath, PathArg};
 pub use litchi_core::selector::{

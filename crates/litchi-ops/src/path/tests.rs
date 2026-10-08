@@ -1269,6 +1269,7 @@ mod minimal {
         type Kind = Kind;
         type Node = Kind;
         type Gap = Gap;
+        type Children<'a> = std::iter::Empty<Result<Kind>>;
 
         const FORMAT: FileFormat = FileFormat::Doc;
 
@@ -1283,11 +1284,7 @@ mod minimal {
             })
         }
 
-        fn children(
-            &self,
-            _parent: &Kind,
-            _kinds: KindSet<Kind>,
-        ) -> Result<impl Iterator<Item = Result<Kind>> + '_> {
+        fn children(&self, _parent: &Kind, _kinds: KindSet<Kind>) -> Result<Self::Children<'_>> {
             Ok(std::iter::empty())
         }
     }

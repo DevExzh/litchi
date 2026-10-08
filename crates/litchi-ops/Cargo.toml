@@ -111,5 +111,9 @@ zip      = { version = "8", default-features = false, features = ["deflate"] }
 name = "path_allocations"
 required-features = ["test-support"]
 
+[[example]]
+name = "query_walk_bench"
+required-features = ["test-support"]
+
 [lints]
 workspace = true

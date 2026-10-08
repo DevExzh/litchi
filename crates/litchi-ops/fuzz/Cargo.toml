@@ -9,7 +9,7 @@ cargo-fuzz = true
 
 [dependencies]
 libfuzzer-sys = "0.4"
-litchi-ops = { path = "..", default-features = false }
+litchi-ops = { path = "..", default-features = false, features = ["test-support"] }
 
 [[bin]]
 name = "values"
@@ -37,6 +37,20 @@ bench = false
 [[bin]]
 name = "smoke_paths"
 path = "fuzz_targets/smoke_paths.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "query_plan"
+path = "fuzz_targets/query_plan.rs"
+test = false
+doc = false
+bench = false
+
+[[bin]]
+name = "smoke_queries"
+path = "fuzz_targets/smoke_queries.rs"
 test = false
 doc = false
 bench = false

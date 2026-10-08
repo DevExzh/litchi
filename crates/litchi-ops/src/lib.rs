@@ -18,6 +18,7 @@
 //! ```no_run
 //! use litchi_ops::File;
 //!
+//! # #[cfg(feature = "xlsx")]
 //! # fn main() -> litchi_ops::Result<()> {
 //! let file = litchi_ops::open("quarterly.xlsx")?;
 //! println!("{:?}: {}", file.format(), file.text()?);
@@ -29,6 +30,8 @@
 //! println!("{:?}", file.workbook()?.worksheet_names()?);
 //! # Ok(())
 //! # }
+//! # #[cfg(not(feature = "xlsx"))]
+//! # fn main() {}
 //! ```
 //!
 //! Every failure is one typed [`Error`] with a stable [`Code`].
@@ -117,6 +120,7 @@ pub mod node;
 mod open;
 mod options;
 pub mod path;
+pub mod query;
 mod registry;
 mod signed;
 mod tolerance;
@@ -208,3 +212,4 @@ use litchi_opc as opc;
 use litchi_pptx as pptx;
 
 pub use path::{IntoPath, PathArg};
+pub use query::{IntoQuery, QueryArg};

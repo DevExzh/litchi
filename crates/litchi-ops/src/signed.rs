@@ -62,6 +62,7 @@ pub enum SignatureOrigin {
 /// ```no_run
 /// use litchi_ops::File;
 ///
+/// # #[cfg(feature = "docx")]
 /// # fn main() -> litchi_ops::Result<()> {
 /// if let File::Signed(signed) = litchi_ops::open("contract.docx")? {
 ///     println!("{:?} signed in its {:?} container", signed.format(), signed.origin());
@@ -72,6 +73,8 @@ pub enum SignatureOrigin {
 /// }
 /// # Ok(())
 /// # }
+/// # #[cfg(not(feature = "docx"))]
+/// # fn main() {}
 /// ```
 #[derive(Clone)]
 pub struct Signed(Arc<SignedState>);
@@ -151,6 +154,7 @@ impl Signed {
     /// ```no_run
     /// use litchi_ops::File;
     ///
+    /// # #[cfg(feature = "docx")]
     /// # fn main() -> litchi_ops::Result<()> {
     /// let file = match litchi_ops::open("contract.docx")? {
     ///     File::Signed(signed) => signed.unsign(),
@@ -159,6 +163,8 @@ impl Signed {
     /// assert!(!file.is_signed());
     /// # Ok(())
     /// # }
+    /// # #[cfg(not(feature = "docx"))]
+    /// # fn main() {}
     /// ```
     #[must_use = "the unsigned file is the only handle the signature removal authorizes"]
     pub fn unsign(self) -> File {

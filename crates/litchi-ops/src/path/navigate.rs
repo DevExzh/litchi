@@ -66,6 +66,14 @@ pub(crate) trait Navigate<'f> {
     /// The format's capability-gap descriptor (R1's `GapSpec`).
     type Gap: GapInfo;
 
+    /// The iterator [`Navigate::children`] returns. It borrows the adapter,
+    /// never the parent node, so the query walker (record 0010 §5.3) can
+    /// keep a node and the iterator over its children in the same stack
+    /// frame.
+    type Children<'a>: Iterator<Item = Result<Self::Node>>
+    where
+        Self: 'a;
+
     /// The format reported in errors.
     const FORMAT: FileFormat;
     /// Canonical names of the family vocabulary that this format lacks as a
@@ -84,12 +92,13 @@ pub(crate) trait Navigate<'f> {
     ) -> Result<Lookup<Self::Node, Self::Gap>>;
 
     /// The children of `parent` whose kinds are in `kinds`, in document
-    /// order (for the query walker and the node view).
+    /// order (for the query walker and the node view). The iterator is lazy:
+    /// a walk that stops early decodes no later sibling.
     fn children(
         &self,
         parent: &Self::Node,
         kinds: KindSet<Self::Kind>,
-    ) -> Result<impl Iterator<Item = Result<Self::Node>> + '_>;
+    ) -> Result<Self::Children<'_>>;
 
     /// Describes what exists under `parent` for a `path_not_found` or
     /// ambiguity suggestion: counts per kind, or the names of named children.
@@ -211,7 +220,9 @@ impl<K: ElementKind> KindSet<K> {
     /// Every kind.
     pub(crate) const ALL: Self = Self::from_bits(u128::MAX);
 
-    const fn from_bits(bits: u128) -> Self {
+    /// The set whose members are the kinds with ordinal `n` for every bit
+    /// `n` set in `bits`.
+    pub(crate) const fn from_bits(bits: u128) -> Self {
         Self {
             bits,
             kind: PhantomData,

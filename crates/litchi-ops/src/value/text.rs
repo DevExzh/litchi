@@ -113,7 +113,7 @@ fn fold(c: char) -> char {
 }
 
 /// Case-insensitive equality (.NET `string.Equals(a, b, OrdinalIgnoreCase)`).
-pub(super) fn eq_ignore_case(a: &str, b: &str) -> bool {
+pub(crate) fn eq_ignore_case(a: &str, b: &str) -> bool {
     if a.is_ascii() && b.is_ascii() {
         return a.eq_ignore_ascii_case(b);
     }
@@ -129,7 +129,7 @@ pub(super) fn eq_ignore_case(a: &str, b: &str) -> bool {
 
 /// Case-insensitive substring test (.NET `string.Contains(needle,
 /// OrdinalIgnoreCase)`). An empty needle is contained in every text.
-pub(super) fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
+pub(crate) fn contains_ignore_case(haystack: &str, needle: &str) -> bool {
     if needle.is_empty() {
         return true;
     }

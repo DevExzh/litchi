@@ -153,6 +153,13 @@ pub(crate) struct GapSpec {
     pub(crate) reason: &'static str,
 }
 
+/// Path resolution reports a gap through its follow-up (M1 step R2).
+impl crate::path::navigate::GapInfo for GapSpec {
+    fn follow_up(&self) -> &'static str {
+        self.follow_up
+    }
+}
+
 impl GapSpec {
     /// The typed error a request that hits this gap returns. Built on the
     /// error path only.

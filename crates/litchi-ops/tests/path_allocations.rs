@@ -218,3 +218,6 @@ fn lowercase_column_letters_remain_borrowed() {
     let count = allocations(|| get(Document::Workbook, "Sheet1!b:b").expect("column"));
     assert_eq!(count, 0);
 }
+
+#[path = "support/query_allocations.rs"]
+mod query_allocations;

@@ -117,6 +117,7 @@ impl Family {
 /// ```no_run
 /// use litchi_ops::File;
 ///
+/// # #[cfg(feature = "docx")]
 /// # fn main() -> litchi_ops::Result<()> {
 /// let file = litchi_ops::open("report.docx")?;
 /// println!("{:?}: {}", file.format(), file.text()?);
@@ -127,6 +128,8 @@ impl Family {
 /// }
 /// # Ok(())
 /// # }
+/// # #[cfg(not(feature = "docx"))]
+/// # fn main() {}
 /// ```
 #[derive(Clone)]
 #[non_exhaustive]

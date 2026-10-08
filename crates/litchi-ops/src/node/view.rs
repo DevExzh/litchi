@@ -402,6 +402,18 @@ impl<'a> Format<'a> {
     pub(crate) const fn empty() -> Self {
         Self::new(&[], Source::Empty(PhantomData))
     }
+
+    /// The value of the property at `index` in the kind's table, if the
+    /// node has it, whatever the iterator has already yielded: the query
+    /// walker's direct read of one key (record 0010 §5.3). Never allocates
+    /// beyond what the leaf accessor returns.
+    pub(crate) fn get(&self, index: usize) -> Option<Value<'a>> {
+        if index < self.props.len() {
+            self.source.get(index)
+        } else {
+            None
+        }
+    }
 }
 
 impl<'a> Iterator for Format<'a> {

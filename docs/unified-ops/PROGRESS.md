@@ -582,3 +582,11 @@ namespace-preserving values and generation memos, adapted to immutable eager and
 effective source owners. Managed detached views refuse, including donor-backed
 projections. The DOCX unified adapter and M1 closure remain pending; the complete
 all-format goal remains active.
+
+### 0050 — Query engine prerequisite
+
+Record [0050](0050-query-engine.md) integrates bounded plan compilation and
+streaming evaluation, with explicit raw identity admission and content-free
+errors/Debug. Test-only Word, presentation and workbook adapters exercise the
+engine. Concrete DOCX and File dispatch remain pending; M1 and the full goal
+remain active.

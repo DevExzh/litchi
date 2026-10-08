@@ -199,6 +199,7 @@ impl<'f, F: Fixture> Navigate<'f> for Fake<F> {
     type Kind = Kind<F>;
     type Node = Node;
     type Gap = Gap;
+    type Children<'a> = Children<F>;
 
     const FORMAT: FileFormat = F::FORMAT;
     const ABSENT: &'static [&'static str] = F::ABSENT;
@@ -267,21 +268,15 @@ impl<'f, F: Fixture> Navigate<'f> for Fake<F> {
         Ok(found.map_or(Lookup::Missing, |child| Lookup::Found(Node::Tree(child))))
     }
 
-    fn children(
-        &self,
-        parent: &Node,
-        kinds: KindSet<Kind<F>>,
-    ) -> Result<impl Iterator<Item = Result<Node>> + '_> {
+    fn children(&self, parent: &Node, kinds: KindSet<Kind<F>>) -> Result<Children<F>> {
         let children: &'static [Tree] = match parent {
             Node::Tree(tree) => tree.children,
             Node::Cell(_) | Node::Range(_) | Node::Row(_) => &[],
         };
-        Ok(children
-            .iter()
-            .filter(move |child| {
-                Kind::<F>::from_name(child.kind).is_some_and(|kind| kinds.contains(kind))
-            })
-            .map(|child| Ok(Node::Tree(child))))
+        Ok(Children {
+            children: children.iter(),
+            kinds,
+        })
     }
 
     fn available(
@@ -313,6 +308,23 @@ impl<'f, F: Fixture> Navigate<'f> for Fake<F> {
             out.kind(kind, count);
         }
         Ok(())
+    }
+}
+
+/// The children of a fake tree node whose kinds are in a set.
+pub(crate) struct Children<F> {
+    children: std::slice::Iter<'static, Tree>,
+    kinds: KindSet<Kind<F>>,
+}
+
+impl<F: Fixture> Iterator for Children<F> {
+    type Item = Result<Node>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let kinds = self.kinds;
+        self.children
+            .find(|child| Kind::<F>::from_name(child.kind).is_some_and(|kind| kinds.contains(kind)))
+            .map(|child| Ok(Node::Tree(child)))
     }
 }
 

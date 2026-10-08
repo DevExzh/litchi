@@ -564,6 +564,12 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
 };
 
 /// Presentations: PPTX, PPT, ODP.
+///
+/// In paths, `textbox` and `title` are plain aliases of `shape`, counted with
+/// every other shape (`/slide[1]/title[2]` is the second shape). Query
+/// selectors narrow them, as OfficeCLI's do: `title` selects title and
+/// centred-title placeholders, `textbox` every other shape (query
+/// compilation, M1 step R3).
 pub(crate) static PRESENTATION: Vocabulary = Vocabulary {
     family: Family::Presentation,
     root: "presentation",
