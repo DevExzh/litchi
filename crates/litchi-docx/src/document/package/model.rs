@@ -24,7 +24,7 @@ use std::io::Write;
 
 use super::super::model::{Block, Document, Element};
 
-impl<'a> Document<'a> {
+impl Document {
     /// Get all text content from the document.
     ///
     /// This extracts all text from all paragraphs in the document,
@@ -297,7 +297,7 @@ impl<'a> Document<'a> {
     /// This provides lower-level access to the document XML.
     #[inline]
     #[must_use]
-    pub fn part(&self) -> &DocumentPart<'a> {
+    pub fn part(&self) -> &DocumentPart<'static> {
         &self.part
     }
 
@@ -609,7 +609,7 @@ impl<'a> Document<'a> {
     #[inline]
     #[must_use]
     pub fn opc_package(&self) -> &OpcPackage {
-        self.opc
+        &self.opc
     }
 
     /// Search for text in the document.

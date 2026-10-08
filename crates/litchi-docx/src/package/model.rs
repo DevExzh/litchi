@@ -132,7 +132,7 @@ pub(crate) fn validate_document_main_content_type(content_type: &str) -> Result<
 /// ```
 pub struct Package {
     /// The underlying OPC package
-    pub(super) opc: OpcPackage,
+    pub(super) opc: SharedOpc,
     /// Package-scoped clean paragraph memo; entries are invalidated by source
     /// allocation identity when the main relationship or payload changes.
     pub(super) paragraph_index_cache: std::sync::Arc<ParagraphIndexCache>,
@@ -160,6 +160,37 @@ pub struct Package {
     pub(super) source_encryption: Option<Mode>,
 }
 
+/// Shared physical snapshot. Legacy mutation paths detach before writing so
+/// an owned semantic projection always keeps the graph it was created from.
+#[derive(Clone)]
+pub(super) struct SharedOpc(std::sync::Arc<OpcPackage>);
+
+impl SharedOpc {
+    pub(super) fn shared(&self) -> std::sync::Arc<OpcPackage> {
+        std::sync::Arc::clone(&self.0)
+    }
+}
+
+impl From<OpcPackage> for SharedOpc {
+    fn from(package: OpcPackage) -> Self {
+        Self(std::sync::Arc::new(package))
+    }
+}
+
+impl std::ops::Deref for SharedOpc {
+    type Target = OpcPackage;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for SharedOpc {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        std::sync::Arc::make_mut(&mut self.0)
+    }
+}
+
 pub(super) struct StoredRelationship {
     pub(super) reltype: String,
     pub(super) target: String,
@@ -182,7 +213,7 @@ pub(super) struct SettingsPartSnapshot {
 /// their `Arc` allocations. The mutable document stays owned by this guard while
 /// materialization runs, so an error or unwind cannot drop the retryable writer.
 pub(super) struct WriteRollbackGuard {
-    package_before: OpcPackage,
+    package_before: SharedOpc,
     mutable_doc: Option<MutableDocument>,
 }
 
@@ -565,7 +596,10 @@ fn ribbon_slot(set: ribbon::Set<'_>, family: ribbon::Family) -> Option<ribbon::U
 }
 
 impl Package {
-    /// Get the main document for reading.
+    /// Get an owned, read-only projection of the current main document.
+    ///
+    /// The projection retains its physical snapshot and may outlive this
+    /// package. Later package edits do not change its content or relationships.
     ///
     /// Returns the `Document` object which provides access to the document's
     /// content, styles, and other features.
@@ -583,15 +617,15 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn document(&self) -> Result<Document<'_>> {
+    pub fn document(&self) -> Result<Document> {
         let main_part = self
             .opc
             .main_document_part()
             .map_err(|e| Error::PartNotFound(format!("main document part: {e}")))?;
 
         // Create DocumentPart wrapper
-        let doc_part = DocumentPart::from_part_with_cache(
-            main_part,
+        let doc_part = DocumentPart::from_owned_part_with_cache(
+            main_part.clone_part(),
             std::sync::Arc::clone(&self.paragraph_index_cache),
         )?;
 
@@ -603,8 +637,8 @@ impl Package {
         // litchi-doc established. See `crate::leniency`.
         let tolerance = self.tolerance_report();
 
-        // Create and return Document with reference to OPC package
-        Ok(Document::new(doc_part, &self.opc, tolerance))
+        // Retain the same immutable graph used to select the main part.
+        Ok(Document::new(doc_part, self.opc.shared(), tolerance))
     }
 
     /// A snapshot of the repairs made while this package was opened, in

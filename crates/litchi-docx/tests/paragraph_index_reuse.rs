@@ -92,7 +92,7 @@ fn docx_bytes_with_alternate(primary: Vec<u8>, alternate: Vec<u8>) -> Vec<u8> {
     PackageWriter::to_bytes(&package).unwrap()
 }
 
-fn eager_texts(document: &litchi_docx::Document<'_>) -> Vec<String> {
+fn eager_texts(document: &litchi_docx::Document) -> Vec<String> {
     document
         .paragraphs()
         .unwrap()
@@ -110,7 +110,7 @@ fn source_texts(document: &source_backed::Document) -> Vec<String> {
         .collect()
 }
 
-fn assert_eager_view(document: &litchi_docx::Document<'_>, expected: &[&str]) {
+fn assert_eager_view(document: &litchi_docx::Document, expected: &[&str]) {
     assert_eq!(document.paragraph_count().unwrap(), expected.len());
     assert_eq!(document.text().unwrap(), expected.concat());
     assert_eq!(eager_texts(document), expected);
@@ -512,4 +512,85 @@ fn managed_clean_index_pressure_does_not_block_core_metadata_read() {
     drop(hold);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn owned_eager_projection_retains_the_graph_after_publication_and_drop() {
+    fn assert_owned_send_sync<T: Send + Sync + 'static>() {}
+    assert_owned_send_sync::<litchi_docx::Document>();
+
+    let original_core = core_properties_xml("before");
+    let bytes = docx_bytes_with_core(document_xml(&["before"]), original_core.clone());
+    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let document = package.document().unwrap();
+    let second = package.document().unwrap();
+    // Acquiring a projection shares the complete graph; it does not clone
+    // the package's parts or read unrelated payloads.
+    assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
+    assert!(std::ptr::eq(document.opc_package(), second.opc_package()));
+    assert_eager_view(&document, &["before"]);
+    let core = PackURI::new("/docProps/core.xml").unwrap();
+    package
+        .edit_opc(|candidate| {
+            candidate
+                .get_part_mut(&PackURI::new(MAIN).unwrap())?
+                .set_blob(document_xml(&["after", "tail"]));
+            candidate
+                .get_part_mut(&core)?
+                .set_blob(core_properties_xml("after"));
+            Ok(())
+        })
+        .unwrap();
+    assert!(!std::ptr::eq(document.opc_package(), package.opc_package()));
+    assert_eager_view(&package.document().unwrap(), &["after", "tail"]);
+    assert_eq!(
+        document.opc_package().get_part(&core).unwrap().blob(),
+        original_core
+    );
+    drop(package);
+    drop(second);
+    assert_eager_view(&document, &["before"]);
+    assert_eq!(
+        document.opc_package().get_part(&core).unwrap().blob(),
+        original_core
+    );
+}
+
+#[test]
+fn owned_eager_projection_survives_failed_edit_and_failed_save() {
+    let mut package =
+        Package::from_reader(Cursor::new(docx_bytes(document_xml(&["before"])))).unwrap();
+    let document = package.document().unwrap();
+    let error = package.edit_opc(|candidate| {
+        candidate
+            .get_part_mut(&PackURI::new(MAIN).unwrap())?
+            .set_blob(document_xml(&["unpublished"]));
+        Err::<(), _>(Error::InvalidFormat("injected edit failure".into()))
+    });
+    assert!(error.is_err());
+    assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
+    package
+        .document_mut()
+        .unwrap()
+        .add_paragraph_with_text("after");
+    assert!(package.to_stream(FailingWriter).is_err());
+    assert_eager_view(&document, &["before"]);
+    assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
+    let mut output = Cursor::new(Vec::new());
+    package.to_stream(&mut output).unwrap();
+    assert_eager_view(&package.document().unwrap(), &["before", "after"]);
+    drop(package);
+    assert_eager_view(&document, &["before"]);
+}
+
+#[test]
+fn unchanged_eager_save_keeps_projection_graph_shared_and_bytes_exact() {
+    let bytes = docx_bytes(document_xml(&["unchanged"]));
+    let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let document = package.document().unwrap();
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    assert_eq!(output, bytes);
+    assert!(std::ptr::eq(document.opc_package(), package.opc_package()));
+    assert_eager_view(&document, &["unchanged"]);
 }

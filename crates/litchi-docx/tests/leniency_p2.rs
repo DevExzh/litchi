@@ -260,11 +260,8 @@ fn non_numeric_levels_stay_fatal() {
         r#"<w:pPr><w:outlineLvl w:val="-1"/></w:pPr>"#,
     );
     let package = open(&bytes);
-    let mut styles = package
-        .document()
-        .expect("document")
-        .styles()
-        .expect("styles");
+    let document = package.document().expect("document");
+    let mut styles = document.styles().expect("styles");
     assert!(styles.len().is_err());
 }
 
@@ -725,11 +722,8 @@ fn complete_style_num_pr_records_nothing() {
 fn nested_style_num_pr_stays_fatal() {
     let bytes = ilvl_only_style_fixture("<w:numPr><w:numPr/></w:numPr>");
     let package = open(&bytes);
-    let mut styles = package
-        .document()
-        .expect("document")
-        .styles()
-        .expect("styles");
+    let document = package.document().expect("document");
+    let mut styles = document.styles().expect("styles");
     assert!(styles.len().is_err());
 }
 

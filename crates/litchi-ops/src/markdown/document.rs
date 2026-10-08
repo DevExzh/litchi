@@ -259,7 +259,7 @@ fn finish_odt<T>(owner: &OdtOwner, result: Result<T>) -> Result<T> {
 /// The package-aware DOCX view the Markdown adapter reads relationships and
 /// note definitions from.
 #[cfg(feature = "docx")]
-fn docx_document<'a>(view: &DocumentView<'a>) -> Result<Option<litchi_docx::Document<'a>>> {
+fn docx_document(view: &DocumentView<'_>) -> Result<Option<litchi_docx::Document>> {
     #[allow(
         unreachable_patterns,
         reason = "DOCX is the only document format in a docx-only feature build"
@@ -375,7 +375,7 @@ fn check_source(view: &DocumentView<'_>) -> Result<()> {
 }
 
 #[cfg(feature = "docx")]
-fn resolve_docx_lists(document: &litchi_docx::Document<'_>) -> Result<Vec<Option<ListItemInfo>>> {
+fn resolve_docx_lists(document: &litchi_docx::Document) -> Result<Vec<Option<ListItemInfo>>> {
     use litchi_docx::list::ListKind;
 
     let elements = document.elements_with_resolved_list_items()?;

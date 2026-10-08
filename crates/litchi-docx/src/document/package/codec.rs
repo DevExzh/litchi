@@ -18,7 +18,7 @@ use litchi_opc::constants::relationship_type;
 use super::super::codec;
 use super::super::model::Document;
 
-impl<'a> Document<'a> {
+impl Document {
     /// Get all sections in the document.
     ///
     /// Returns a `Sections` collection providing access to each section's
@@ -107,7 +107,7 @@ impl<'a> Document<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation cannot be completed.
-    pub fn styles(&self) -> Result<Styles<'a>> {
+    pub fn styles(&self) -> Result<Styles<'_>> {
         // Try to find the styles part through the main document part's relationships
         let main_part = self.opc.main_document_part()?;
         let rels = main_part.rels();
@@ -1608,7 +1608,7 @@ impl<'a> Document<'a> {
     /// Returns an error if the operation cannot be completed.
     pub fn chart_graph(&self) -> Result<crate::chart::Graph> {
         let main = self.opc.main_document_part()?.partname().clone();
-        crate::chart::load(self.opc, &main)
+        crate::chart::load(&self.opc, &main)
     }
     /// Get all content controls in the document.
     ///

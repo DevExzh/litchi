@@ -476,8 +476,8 @@ pub(crate) fn is_xml_outer_whitespace(bytes: &[u8]) -> bool {
 /// It contains the main document content including paragraphs, tables,
 /// sections, and other block-level elements.
 pub struct DocumentPart<'a> {
-    /// Reference to the underlying part
-    part: &'a dyn Part,
+    /// Borrowed or owned physical part snapshot.
+    part: DocumentPartOwner<'a>,
     xml: Arc<Vec<u8>>,
     /// The source allocation identity used to find a package-scoped memo.
     /// This weak key never keeps the physical payload alive.
@@ -962,11 +962,29 @@ pub(crate) fn document_elements(xml: Arc<Vec<u8>>) -> Result<Vec<crate::Element>
     Ok(elements)
 }
 
+enum DocumentPartOwner<'a> {
+    Borrowed(&'a dyn Part),
+    Owned(Box<dyn Part + Send + Sync>),
+}
+
+impl DocumentPart<'static> {
+    /// Retain a part snapshot without borrowing the package facade.
+    pub(crate) fn from_owned_part_with_cache(
+        part: Box<dyn Part + Send + Sync>,
+        paragraph_cache: Arc<ParagraphIndexCache>,
+    ) -> Result<Self> {
+        Self::from_owner_with_cache(DocumentPartOwner::Owned(part), paragraph_cache)
+    }
+}
+
 impl<'a> DocumentPart<'a> {
     /// Return the original OPC part; semantic reads use the cached MCE view.
     #[must_use]
-    pub fn part(&self) -> &'a dyn Part {
-        self.part
+    pub fn part(&self) -> &dyn Part {
+        match &self.part {
+            DocumentPartOwner::Borrowed(part) => *part,
+            DocumentPartOwner::Owned(part) => part.as_ref(),
+        }
     }
 
     /// Create a `DocumentPart` from a Part.
@@ -987,7 +1005,17 @@ impl<'a> DocumentPart<'a> {
         part: &'a dyn Part,
         paragraph_cache: Arc<ParagraphIndexCache>,
     ) -> Result<Self> {
-        let raw = part.blob_arc();
+        Self::from_owner_with_cache(DocumentPartOwner::Borrowed(part), paragraph_cache)
+    }
+
+    fn from_owner_with_cache(
+        part: DocumentPartOwner<'a>,
+        paragraph_cache: Arc<ParagraphIndexCache>,
+    ) -> Result<Self> {
+        let raw = match &part {
+            DocumentPartOwner::Borrowed(part) => part.blob_arc(),
+            DocumentPartOwner::Owned(part) => part.blob_arc(),
+        };
         let paragraph_source = Arc::downgrade(&raw);
         let xml = visible_document_xml(raw)?;
         Ok(Self {

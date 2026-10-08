@@ -78,7 +78,7 @@ impl Bundle {
     )]
     pub(super) fn build(
         elements: &[DocumentElement],
-        document: &litchi_docx::Document<'_>,
+        document: &litchi_docx::Document,
     ) -> Result<Self> {
         let main_part = document.opc_package().main_document_part()?;
         let relationships = main_part.rels();

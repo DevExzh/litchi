@@ -17,6 +17,9 @@
 //! let package = Package::from_reader(bytes.as_slice())?;
 //! let commit: document::Result<document::Commit> = package.edit()?.commit();
 //! assert!(!commit?.diagnostics().changed());
+//! let document: litchi_docx::Document = package.document()?;
+//! drop(package);
+//! assert!(document.paragraph_count().is_ok());
 //! let source = source_backed::Package::from_reader(bytes.as_slice())?;
 //! assert!(!source.edit()?.commit()?.diagnostics().changed());
 //! # Ok(())

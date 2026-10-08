@@ -21,7 +21,7 @@ use litchi_opc::constants::relationship_type;
 
 use super::super::model::{Document, ImageWatermarkPart};
 
-impl Document<'_> {
+impl Document {
     /// Return the package's glossary/building-block catalog and dialect.
     ///
     /// # Errors
@@ -30,7 +30,7 @@ impl Document<'_> {
     pub fn glossary(
         &self,
     ) -> Result<Option<(crate::glossary::Catalog, crate::glossary::Conformance)>> {
-        crate::glossary::load(self.opc)
+        crate::glossary::load(&self.opc)
     }
 
     /// Load the typed, inert `SmartArt` (`DrawingML` diagram) inventory anchored
@@ -45,7 +45,7 @@ impl Document<'_> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn smart_arts(&self) -> Result<Vec<crate::smartart::Diagram>> {
-        crate::smartart::load_smart_arts(self.opc, self.part.part().partname())
+        crate::smartart::load_smart_arts(&self.opc, self.part.part().partname())
     }
 
     /// Load the typed, inert text-box and `WordArt` inventory anchored in this
@@ -86,7 +86,7 @@ impl Document<'_> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn headers(&self) -> Result<Vec<Story>> {
-        crate::header_footer::load_headers(self.opc, &self.part)
+        crate::header_footer::load_headers(&self.opc, &self.part)
     }
 
     /// Return distinct standard VML text watermarks from document headers.
@@ -122,7 +122,7 @@ impl Document<'_> {
     /// Returns an error if the operation cannot be completed.
     pub fn image_watermarks(&self) -> Result<Vec<ImageWatermarkPart<'_>>> {
         let mut parts = Vec::new();
-        for image in crate::header_footer::image_watermarks(self.opc, &self.part)? {
+        for image in crate::header_footer::image_watermarks(&self.opc, &self.part)? {
             parts.push(ImageWatermarkPart {
                 source_header_name: image.source_header_name,
                 relationship_id: image.relationship_id,
@@ -157,7 +157,7 @@ impl Document<'_> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn footers(&self) -> Result<Vec<Story>> {
-        crate::header_footer::load_footers(self.opc, &self.part)
+        crate::header_footer::load_footers(&self.opc, &self.part)
     }
 
     /// Get a specific header by type.
@@ -678,7 +678,7 @@ impl Document<'_> {
     ///
     /// Returns an error if the operation cannot be completed.
     pub fn web(&self) -> Result<Option<(web::Settings, web::Conformance)>> {
-        web::load(self.opc)
+        web::load(&self.opc)
     }
     /// Get document variables.
     ///

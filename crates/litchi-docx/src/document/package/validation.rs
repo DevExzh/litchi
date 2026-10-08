@@ -5,7 +5,7 @@ use crate::error::{Error, Result};
 
 use super::super::model::Document;
 
-impl Document<'_> {
+impl Document {
     /// Resolve an alternative-format anchor to its borrowed opaque OPC payload.
     ///
     /// This validates the relationship type and internal target but never parses,

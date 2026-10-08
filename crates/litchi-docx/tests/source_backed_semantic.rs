@@ -127,7 +127,7 @@ fn table_signature(table: &litchi_docx::Table) -> litchi_docx::Result<String> {
 }
 
 fn eager_block_signature(
-    document: &litchi_docx::document::Document<'_>,
+    document: &litchi_docx::document::Document,
 ) -> litchi_docx::Result<Vec<String>> {
     document
         .blocks()?
@@ -159,7 +159,7 @@ fn source_block_signature(document: &source_backed::Document) -> litchi_docx::Re
 }
 
 fn eager_element_signature(
-    document: &litchi_docx::document::Document<'_>,
+    document: &litchi_docx::document::Document,
 ) -> litchi_docx::Result<Vec<String>> {
     document
         .elements()?

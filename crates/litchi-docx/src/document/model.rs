@@ -9,7 +9,8 @@ use std::sync::Arc;
 
 /// A Word document.
 ///
-/// This is the main API for reading and manipulating Word document content.
+/// This owned, read-only projection retains the package snapshot it reads.
+/// It can outlive the package handle and is unaffected by later package edits.
 /// It provides access to paragraphs, tables, sections, styles, and other
 /// document elements.
 ///
@@ -30,11 +31,11 @@ use std::sync::Arc;
 /// println!("Number of paragraphs: {}", count);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct Document<'a> {
+pub struct Document {
     /// The underlying document part
-    pub(super) part: DocumentPart<'a>,
-    /// Reference to the OPC package (needed for accessing related parts like styles)
-    pub(super) opc: &'a OpcPackage,
+    pub(super) part: DocumentPart<'static>,
+    /// Shared immutable OPC snapshot used to resolve related parts.
+    pub(super) opc: Arc<OpcPackage>,
     /// Everything repaired while the document was read, aggregated from the
     /// codecs that record. The semantic text sink merges each
     /// `Document::write_text_to` call's repairs here; see `crate::leniency`.
@@ -140,16 +141,16 @@ pub enum Block {
     Unknown(Box<OpaqueBlock>),
 }
 
-impl<'a> Document<'a> {
-    /// Create a new Document from a `DocumentPart` and `OpcPackage` reference.
+impl Document {
+    /// Create an owned document projection over a shared package snapshot.
     ///
     /// This is typically called internally by `Package::document()`, which
     /// aggregates the repairs recorded while the document was opened into
     /// `tolerance`.
     #[inline]
     pub(crate) fn new(
-        part: DocumentPart<'a>,
-        opc: &'a OpcPackage,
+        part: DocumentPart<'static>,
+        opc: Arc<OpcPackage>,
         tolerance: crate::leniency::ToleranceReport,
     ) -> Self {
         Self {

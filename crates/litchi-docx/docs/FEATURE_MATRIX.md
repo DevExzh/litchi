@@ -33,6 +33,15 @@ The implementation owner is crates/litchi-docx/src/; shared OPC, signature, cryp
 embedded-object, web-extension, and common OOXML models are called out where they affect
 DOCX behavior.
 
+## Owned document projection
+
+`Package::document()` returns an owned, read-only `Document`. It retains the
+physical snapshot used for related-part resolution and remains readable after
+package drop or later edits. Secondary style and raw-part views borrow this
+projection. Eager package mutation APIs are still being migrated to the
+immutable package/commit contract; an owned projection does not imply that
+migration is complete.
+
 ## Core WordprocessingML document model
 
 ## Shared specification map

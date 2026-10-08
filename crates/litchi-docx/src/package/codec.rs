@@ -224,7 +224,7 @@ impl Package {
         let custom_props = CustomProps::new();
 
         Ok(Self {
-            opc,
+            opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             main_admission: std::sync::Mutex::new(std::sync::Weak::new()),
             mutable_doc,
@@ -383,7 +383,7 @@ impl Package {
         let properties = Slot::load(&opc)?;
 
         Ok(Self {
-            opc,
+            opc: opc.into(),
             paragraph_index_cache: Arc::new(ParagraphIndexCache::new()),
             main_admission: std::sync::Mutex::new(std::sync::Weak::new()),
             mutable_doc: None,
@@ -1323,17 +1323,26 @@ impl Package {
             // Stage only an explicitly edited core-properties slot. The guard
             // keeps edit intent dirty until the output sink accepts the complete
             // package, so a failed stream remains retryable.
-            let staged_properties = self
-                .properties
-                .stage(&mut self.opc)
-                .map_err(crate::signature_policy::from_shared)?;
+            // Avoid requesting mutable graph access for a clean slot: that
+            // would detach the shared graph even though stage changes nothing.
+            let staged_properties = if self.properties.is_dirty() {
+                Some(
+                    self.properties
+                        .stage(&mut self.opc)
+                        .map_err(crate::signature_policy::from_shared)?,
+                )
+            } else {
+                None
+            };
 
             self.opc.to_stream(writer).map_err(|e| {
                 Error::Io(std::io::Error::other(format!(
                     "Failed to save package: {e}"
                 )))
             })?;
-            staged_properties.commit();
+            if let Some(staged_properties) = staged_properties {
+                staged_properties.commit();
+            }
             self.custom_props_dirty = false;
             Ok(())
         }));

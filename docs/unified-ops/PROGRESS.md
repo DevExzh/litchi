@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0019 | Owned eager DOCX read projection and shared physical graph | projection migrated; immutable package and commit W2 work pending |
 | 0018 | DOCX primary edit entry and focused error/result names; minimal/full glossary bans | names migrated; package-owned commit/projection W2 work pending |
 | 0017 | W0 rustdoc API glossary gate, scoped rules, six-type family checks and CI | complete; profiles for leaf migration waves pending |
 | 0016 | Rebase onto current base; adopt API glossary as ADR 0034; preserve shared fingerprint memo | kickoff; W0 checker and leaf migrations pending |
@@ -183,3 +184,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   historical benchmark records keep their original source/API names.
 - Minimal/full DOCX glossary profiles enforce removal without public aliases.
 - Verification and outstanding W2 ownership work are recorded in 0018.
+
+## 0019 — owned eager DOCX projection
+
+- `Package::document()` returns owned `Document`, retaining a shared physical
+  snapshot. It remains usable after package drop and stable across later edits.
+- Existing eager mutation paths detach through copy-on-write; clean saves
+  preserve the shared graph. Main-part payloads and paragraph indexes remain
+  shared, with related-part resolution tied to the retained graph.
+- Updated dependent Rust types, scoped style borrows, runnable documentation,
+  glossary status and ownership/rollback/no-op regression coverage.
+- This completes the eager projection shape, not the immutable package or
+  package-owning commit contract. Evidence and remaining work are in 0019.

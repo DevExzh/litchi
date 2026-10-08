@@ -25,8 +25,8 @@ Rules of reading:
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ docx/pptx/numbers/pages/keynote/doc/ods · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
-| Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ docx (`Package::document()` view) — becomes owned (W2) |
+| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ pptx/numbers/pages/keynote/doc/ods · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
+| Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ docx owned `Package::document()` projection (0019) |
 | Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · 🔴 xlsx `Workbook` demoted to projection (W2) · 🔴 ods `Spreadsheet`→`Workbook` (W3) · 🔴 xls (W4) |
 | Read-only semantic projection, decks | `Presentation` | — | 🔴 keynote `Document`→`Presentation` (W1) · ✅ pptx view / odp name (shape changes W2/W3) · 🔴 ppt (W4) |
 | Projection accessor | `Package::{document, workbook, presentation}()` | — | owned projections primary; borrowed `*_ref()` views secondary |
@@ -256,7 +256,8 @@ also handles the package ingress error.
 profile enables `automatic-fonts`, `encryption`, `sign` and `vba-inspection`,
 which include every optional DOCX feature. Neither profile registers the
 complete document family yet: `Commit` still carries a document `Snapshot`,
-not the immutable package required by ADR 0034. Package ownership, owned
-read-only projection, primary `apply`, publication replacement, `LimitKind`,
+not the immutable package required by ADR 0034. The eager read-only
+projection is now owned (0019). Immutable package ownership, primary `apply`,
+publication replacement, `LimitKind`,
 and mutable-writer removal remain pending. Scoped transactions and other
 formats are not marked migrated by this step.
