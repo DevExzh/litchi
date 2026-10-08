@@ -2633,12 +2633,34 @@ enum ChangedOverlayTarget {
 ///
 /// Preparation owns every generated overlay and source authorization needed by
 /// publication.  Callers may inspect the effective logical candidate through
-/// [`Self::with_candidate`] before the value is consumed by
+/// [`Self::with_candidate`] before or after the value is borrowed by
 /// [`Self::publish_to_stream`].  Unchanged Part payloads remain lazy source
 /// reads; the prepared value never materializes a replacement ZIP archive.
+/// Clones retain the same candidate and reservations. Publication borrows the
+/// candidate, so retry and repeated output do not require another preparation.
+///
+/// ```
+/// use litchi_opc::{OpcPackage, PackageWriter, SourceBackedPackage, SourceTopologyPlan};
+/// # fn main() -> litchi_opc::Result<()> {
+/// let bytes = PackageWriter::to_bytes(&OpcPackage::new())?;
+/// let source = SourceBackedPackage::from_vec(bytes.clone())?;
+/// let prepared = source.prepare_topology(SourceTopologyPlan::new())?;
+/// let shared = prepared.clone();
+/// let mut first = Vec::new();
+/// prepared.publish_to_stream(&mut first)?;
+/// drop(prepared);
+/// let mut second = Vec::new();
+/// shared.publish_to_stream(&mut second)?;
+/// assert_eq!(first, bytes);
+/// assert_eq!(second, bytes);
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone)]
 pub struct PreparedTopology {
     package: SourceBackedPackage,
-    state: PreparedTopologyState,
+    state: Arc<PreparedTopologyState>,
+    _state_reservation: Option<Arc<Reservation>>,
 }
 
 // Shared by owning publication and borrowed commit-time validation. Every
@@ -2646,19 +2668,19 @@ pub struct PreparedTopology {
 struct PreparedTopologyState {
     changed: Vec<ChangedOverlay>,
     omitted_members: Vec<String>,
-    appended: Vec<soapberry_zip::RegeneratedEntry>,
-    additions: Vec<TopologyPartAddition>,
-    source_xml_tokens: Vec<SourceXmlPart>,
+    appended: Vec<Arc<soapberry_zip::RegeneratedEntry>>,
+    _additions: Vec<TopologyPartAddition>,
+    _source_xml_tokens: Vec<SourceXmlPart>,
     transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
     /// One monitored-read scope per transfer source (change 0600's counted
     /// scopes). They live exactly as long as the prepared state, so every read
     /// of a transfer source during candidate readback and publication
     /// re-observes that source, and a source shared with another package stops
     /// paying the per-read observation once this preparation is dropped.
-    transfer_monitors: Vec<MonitoredReads>,
-    relationship_memory_reservations: Vec<Arc<Reservation>>,
-    content_type_memory_reservations: Vec<Arc<Reservation>>,
-    effective_memory_reservations: Vec<Arc<Reservation>>,
+    _transfer_monitors: Vec<MonitoredReads>,
+    _relationship_memory_reservations: Vec<Arc<Reservation>>,
+    _content_type_memory_reservations: Vec<Arc<Reservation>>,
+    _effective_memory_reservations: Vec<Arc<Reservation>>,
     effective: Option<EffectiveTopologyData>,
     no_op: bool,
 }
@@ -2789,34 +2811,23 @@ impl PreparedTopology {
         self.state.with_candidate(&self.package, callback)
     }
 
-    /// Publish this prepared topology using the existing source-preserving
-    /// sequential writer and its output/error accounting.
-    pub fn publish_to_stream<W: Write>(self, writer: W) -> Result<()> {
+    /// Publish this retained topology through the source-preserving writer.
+    ///
+    /// The candidate and its reservations remain alive after success or sink
+    /// failure. Every publication checks the base and transfer sources again.
+    /// Cloned handles share the candidate without copying payloads or names.
+    pub fn publish_to_stream<W: Write>(&self, writer: W) -> Result<()> {
+        self.state.check_readback_sources(&self.package)?;
         if self.state.no_op {
-            return self.package.write_exact_source(writer);
+            return self.package.clone().write_exact_source(writer);
         }
-        let PreparedTopology { package, state } = self;
-        let PreparedTopologyState {
-            changed,
-            omitted_members,
-            appended,
-            additions: _additions,
-            source_xml_tokens: _source_xml_tokens,
-            transfer_sources,
-            transfer_monitors: _transfer_monitors,
-            relationship_memory_reservations: _relationship_memory_reservations,
-            content_type_memory_reservations: _content_type_memory_reservations,
-            effective_memory_reservations: _effective_memory_reservations,
-            effective: _effective,
-            no_op: _,
-        } = state;
         publish_prepared_topology(
-            package,
+            self.package.clone(),
             writer,
-            changed,
-            omitted_members,
-            appended,
-            transfer_sources,
+            &self.state.changed,
+            &self.state.omitted_members,
+            &self.state.appended,
+            self.state.transfer_sources.clone(),
         )
     }
 }
@@ -2865,16 +2876,16 @@ impl PreparedTopologyState {
 fn publish_prepared_topology<W: Write>(
     package: SourceBackedPackage,
     writer: W,
-    changed: Vec<ChangedOverlay>,
-    omitted_members: Vec<String>,
-    appended: Vec<soapberry_zip::RegeneratedEntry>,
+    changed: &[ChangedOverlay],
+    omitted_members: &[String],
+    appended: &[Arc<soapberry_zip::RegeneratedEntry>],
     transfer_sources: Option<Arc<Vec<SourceSnapshot>>>,
 ) -> Result<()> {
     let Some(transfer_sources) = transfer_sources else {
         return package.write_changed_overlays_with_omissions_and_appended(
             writer,
-            &changed,
-            &omitted_members,
+            changed,
+            omitted_members,
             appended,
         );
     };
@@ -2887,8 +2898,8 @@ fn publish_prepared_topology<W: Write>(
     };
     let publication = package.write_changed_overlays_with_omissions_and_appended(
         checked_writer,
-        &changed,
-        &omitted_members,
+        changed,
+        omitted_members,
         appended,
     );
     let transfer_error = transfer_sources.iter().find_map(|source| {
@@ -8291,9 +8302,13 @@ impl SourceBackedPackage {
     /// physical details unsupported by the rewrite preservation primitive.
     pub fn prepare_topology(self, plan: SourceTopologyPlan) -> Result<PreparedTopology> {
         let state = self.prepare_topology_state(plan)?;
+        let reservation = self.reserve_topology_memory(
+            (size_of::<PreparedTopologyState>() + size_of::<[usize; 2]>()) as u64,
+        )?;
         Ok(PreparedTopology {
             package: self,
-            state,
+            state: Arc::new(state),
+            _state_reservation: reservation,
         })
     }
 
@@ -8337,13 +8352,13 @@ impl SourceBackedPackage {
                 changed: Vec::new(),
                 omitted_members: Vec::new(),
                 appended: Vec::new(),
-                additions: Vec::new(),
-                source_xml_tokens: Vec::new(),
+                _additions: Vec::new(),
+                _source_xml_tokens: Vec::new(),
                 transfer_sources: None,
-                transfer_monitors: Vec::new(),
-                relationship_memory_reservations: Vec::new(),
-                content_type_memory_reservations: Vec::new(),
-                effective_memory_reservations: Vec::new(),
+                _transfer_monitors: Vec::new(),
+                _relationship_memory_reservations: Vec::new(),
+                _content_type_memory_reservations: Vec::new(),
+                _effective_memory_reservations: Vec::new(),
                 effective: None,
                 no_op: true,
             });
@@ -9805,6 +9820,28 @@ impl SourceBackedPackage {
                 }
             }
         }
+        // Retain generated relationship payloads behind shared holders before
+        // repeated publication. Charge the holder metadata before allocation.
+        let shared_relationship_holders = relationship_publications
+            .iter()
+            .filter(|publication| publication.existing_entry.is_some())
+            .count();
+        let shared_relationship_memory = shared_relationship_holders
+            .checked_mul(size_of::<Vec<u8>>() + size_of::<[usize; 2]>())
+            .ok_or_else(|| overlay_unavailable("shared relationship holder bound overflows"))?;
+        if shared_relationship_memory != 0 {
+            topology_relationship_memory_reservations
+                .try_reserve(1)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC shared relationship reservations",
+                    source,
+                })?;
+            if let Some(reservation) =
+                self.reserve_topology_memory(shared_relationship_memory as u64)?
+            {
+                topology_relationship_memory_reservations.push(reservation);
+            }
+        }
         for (index, publication) in relationship_publications.iter_mut().enumerate() {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
@@ -9812,7 +9849,9 @@ impl SourceBackedPackage {
             if publication.existing_entry.is_some() {
                 changed.push(ChangedOverlay {
                     target: ChangedOverlayTarget::Member(publication.member_name.clone()),
-                    replacement: ChangedOverlayPayload::Owned(std::mem::take(&mut publication.xml)),
+                    replacement: ChangedOverlayPayload::Shared(Arc::new(std::mem::take(
+                        &mut publication.xml,
+                    ))),
                 });
             }
             // New relationship members retain their generated serializer
@@ -9857,13 +9896,13 @@ impl SourceBackedPackage {
                 changed: Vec::new(),
                 omitted_members: Vec::new(),
                 appended: Vec::new(),
-                additions: Vec::new(),
-                source_xml_tokens: Vec::new(),
+                _additions: Vec::new(),
+                _source_xml_tokens: Vec::new(),
                 transfer_sources: None,
-                transfer_monitors: Vec::new(),
-                relationship_memory_reservations: Vec::new(),
-                content_type_memory_reservations: Vec::new(),
-                effective_memory_reservations: Vec::new(),
+                _transfer_monitors: Vec::new(),
+                _relationship_memory_reservations: Vec::new(),
+                _content_type_memory_reservations: Vec::new(),
+                _effective_memory_reservations: Vec::new(),
                 effective: None,
                 no_op: true,
             });
@@ -9926,7 +9965,12 @@ impl SourceBackedPackage {
                     additions
                         .len()
                         .checked_add(new_relationship_member_count)?
-                        .checked_mul(size_of::<String>())?,
+                        .checked_mul(
+                            size_of::<String>()
+                                + size_of::<Arc<soapberry_zip::RegeneratedEntry>>()
+                                + size_of::<soapberry_zip::RegeneratedEntry>()
+                                + size_of::<[usize; 2]>(),
+                        )?,
                 )
             })
             .and_then(|bytes| bytes.checked_add(size_of::<EffectiveTopologyData>()))
@@ -10139,17 +10183,17 @@ impl SourceBackedPackage {
                     )
                 },
             };
-            appended.push(entry);
+            appended.push(Arc::new(entry));
         }
         for (index, publication) in relationship_publications.into_iter().enumerate() {
             if index & 0x3f == 0 {
                 self.check_topology_progress()?;
             }
             if publication.existing_entry.is_none() {
-                appended.push(
+                appended.push(Arc::new(
                     soapberry_zip::RegeneratedEntry::new(publication.member_name, publication.xml)
                         .compression_method(soapberry_zip::CompressionMethod::Deflate),
-                );
+                ));
             }
         }
         let transfer_sources = if transfer_sources.is_empty() {
@@ -10161,13 +10205,13 @@ impl SourceBackedPackage {
             changed,
             omitted_members,
             appended,
-            additions,
-            source_xml_tokens,
+            _additions: additions,
+            _source_xml_tokens: source_xml_tokens,
             transfer_sources,
-            transfer_monitors: monitored_transfer_sources,
-            relationship_memory_reservations: topology_relationship_memory_reservations,
-            content_type_memory_reservations,
-            effective_memory_reservations,
+            _transfer_monitors: monitored_transfer_sources,
+            _relationship_memory_reservations: topology_relationship_memory_reservations,
+            _content_type_memory_reservations: content_type_memory_reservations,
+            _effective_memory_reservations: effective_memory_reservations,
             effective: Some(effective),
             no_op: false,
         })
@@ -10383,7 +10427,7 @@ impl SourceBackedPackage {
             Some(accounting) => self.write_changed_overlays_with_appended_accounting(
                 writer,
                 &changed,
-                Vec::new(),
+                &[],
                 accounting,
             ),
             None => self.write_changed_overlays(writer, &changed),
@@ -11972,7 +12016,7 @@ impl SourceBackedPackage {
         writer: W,
         replacements: &[ChangedOverlay],
     ) -> Result<()> {
-        self.write_changed_overlays_with_appended(writer, replacements, Vec::new())
+        self.write_changed_overlays_with_appended(writer, replacements, &[])
     }
 
     fn write_changed_overlays_with_omissions<W: Write>(
@@ -11985,7 +12029,7 @@ impl SourceBackedPackage {
             writer,
             replacements,
             omitted_member_names,
-            Vec::new(),
+            &[],
             None,
         )
     }
@@ -11995,7 +12039,7 @@ impl SourceBackedPackage {
         writer: W,
         replacements: &[ChangedOverlay],
         omitted_member_names: &[String],
-        appended: Vec<soapberry_zip::RegeneratedEntry>,
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
     ) -> Result<()> {
         self.write_changed_overlays_with_appended_inner(
             writer,
@@ -12010,7 +12054,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         replacements: &[ChangedOverlay],
-        appended: Vec<soapberry_zip::RegeneratedEntry>,
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
     ) -> Result<()> {
         self.write_changed_overlays_with_appended_inner(writer, replacements, &[], appended, None)
     }
@@ -12019,7 +12063,7 @@ impl SourceBackedPackage {
         self,
         writer: W,
         replacements: &[ChangedOverlay],
-        appended: Vec<soapberry_zip::RegeneratedEntry>,
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
         accounting: &mut OpcOperationAccounting,
     ) -> Result<()> {
         self.write_changed_overlays_with_appended_inner(
@@ -12036,7 +12080,7 @@ impl SourceBackedPackage {
         writer: W,
         replacements: &[ChangedOverlay],
         omitted_member_names: &[String],
-        appended: Vec<soapberry_zip::RegeneratedEntry>,
+        appended: &[Arc<soapberry_zip::RegeneratedEntry>],
         mut accounting: Option<&mut OpcOperationAccounting>,
     ) -> Result<()> {
         self.disable_read_ahead_for_publication()?;
@@ -12240,7 +12284,7 @@ impl SourceBackedPackage {
             }
         }
         for entry in appended {
-            plan.try_append(entry)
+            plan.try_append_shared(Arc::clone(entry))
                 .map_err(|source| OpcError::Allocation {
                     resource: "source-backed OPC preservation appended member",
                     source,
@@ -21974,7 +22018,7 @@ mod tests {
             .unwrap();
         let mut output = Vec::new();
         assert!(matches!(
-            package.write_changed_overlays_with_appended(&mut output, &[], Vec::new()),
+            package.write_changed_overlays_with_appended(&mut output, &[], &[]),
             Err(OpcError::ReadLimit {
                 resource: ReadResource::ArchiveMetadataBytes,
                 maximum: 1,
@@ -21992,7 +22036,7 @@ mod tests {
         source.overreport.store(true, Ordering::SeqCst);
         output.clear();
         assert!(matches!(
-            package.write_changed_overlays_with_appended(&mut output, &[], Vec::new()),
+            package.write_changed_overlays_with_appended(&mut output, &[], &[]),
             Err(OpcError::IoError(error))
                 if error.kind() == std::io::ErrorKind::InvalidData
         ));

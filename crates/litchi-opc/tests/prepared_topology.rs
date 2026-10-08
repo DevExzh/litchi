@@ -1575,6 +1575,7 @@ fn prepared_source_xml_token_keeps_managed_reservation_until_publication_drop() 
     let mut output = Vec::new();
     prepared.publish_to_stream(&mut output).unwrap();
     assert_eq!(zip_member(&output, "word/document.xml"), b"<changed/>");
+    drop(prepared);
     assert!(
         budget.used(Resource::Memory) < after_prepare,
         "source XML token reservation should release after prepared publication drops it"
@@ -1627,8 +1628,148 @@ fn prepared_precompressed_token_keeps_managed_reservation_until_publication_drop
     let mut output = Vec::new();
     prepared.publish_to_stream(&mut output).unwrap();
     assert_eq!(zip_member(&output, "custom/transferred.xml"), expected);
+    drop(prepared);
     assert!(
         budget.used(Resource::Memory) < after_prepare,
         "precompressed token reservation should release after prepared publication drops it"
     );
+}
+
+#[test]
+fn retained_preparation_retries_and_publishes_shared_candidate_repeatedly() {
+    fn assert_shared<T: Clone + Send + Sync>() {}
+    assert_shared::<litchi_opc::PreparedTopology>();
+    let source = Arc::new(VersionedSource::new(source_bytes()));
+    let prepared = open(Arc::clone(&source))
+        .prepare_topology(mutation_plan())
+        .unwrap();
+    let reads = source.read_count();
+    let shared = prepared.clone();
+    assert_eq!(source.read_count(), reads);
+    let mut failing = PartialWriter {
+        bytes: Vec::new(),
+        remaining: 37,
+    };
+    assert!(matches!(
+        prepared.publish_to_stream(&mut failing),
+        Err(OpcError::IncompleteOutput { .. })
+    ));
+    let mut first = Vec::new();
+    prepared.publish_to_stream(&mut first).unwrap();
+    let mut second = Vec::new();
+    shared.publish_to_stream(&mut second).unwrap();
+    assert_eq!(first, second);
+    assert_eq!(zip_member(&second, "custom/added.xml"), b"<added/>");
+    drop(prepared);
+    shared
+        .with_candidate(|candidate| {
+            assert_eq!(
+                candidate.part(&pack(DOCUMENT))?.data()?.as_bytes(),
+                b"<after/>"
+            );
+            assert_eq!(
+                candidate.part(&pack(ADDED))?.data()?.as_bytes(),
+                b"<added/>"
+            );
+            Ok(())
+        })
+        .unwrap();
+    source.bump();
+    let mut rejected = Vec::new();
+    assert!(matches!(
+        shared.publish_to_stream(&mut rejected),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(rejected.is_empty());
+}
+
+#[test]
+fn prepared_clones_publish_concurrently_from_one_retained_topology() {
+    let prepared = open(Arc::new(VersionedSource::new(source_bytes())))
+        .prepare_topology(mutation_plan())
+        .unwrap();
+    let outputs = std::thread::scope(|scope| {
+        let left = prepared.clone();
+        let right = prepared.clone();
+        let publish = |prepared: litchi_opc::PreparedTopology| {
+            let mut output = Vec::new();
+            prepared.publish_to_stream(&mut output).unwrap();
+            output
+        };
+        let left = scope.spawn(move || publish(left));
+        let right = scope.spawn(move || publish(right));
+        (left.join().unwrap(), right.join().unwrap())
+    });
+    assert_eq!(outputs.0, outputs.1);
+    prepared
+        .with_candidate(|candidate| {
+            assert_eq!(
+                candidate.part(&pack(DOCUMENT))?.data()?.as_bytes(),
+                b"<after/>"
+            );
+            Ok(())
+        })
+        .unwrap();
+}
+
+#[test]
+fn retained_prepared_reservations_release_after_the_last_share() {
+    let (budget, _cancellation, context) = managed_context();
+    let package = SourceBackedPackage::from_read_at_with_execution_context(
+        Arc::new(VersionedSource::new(source_bytes())),
+        litchi_opc::ReadLimits::default(),
+        context,
+    )
+    .unwrap();
+    let prepared = package.prepare_topology(mutation_plan()).unwrap();
+    let before = budget.used(Resource::Memory);
+    let objects = budget.used(Resource::Objects);
+    assert!(before > 0);
+    let shared = prepared.clone();
+    assert_eq!(budget.used(Resource::Memory), before);
+    assert_eq!(budget.used(Resource::Objects), objects);
+    let mut first = Vec::new();
+    prepared.publish_to_stream(&mut first).unwrap();
+    drop(prepared);
+    assert!(budget.used(Resource::Memory) > 0);
+    let mut second = Vec::new();
+    shared.publish_to_stream(&mut second).unwrap();
+    assert_eq!(first, second);
+    drop(shared);
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+}
+
+#[test]
+fn retained_preparation_rechecks_a_transfer_source_on_every_publication() {
+    let foreign_handle = Arc::new(VersionedSource::new(source_bytes()));
+    let foreign = open(Arc::clone(&foreign_handle));
+    let (_, token) = foreign
+        .part(&pack(UNTOUCHED))
+        .unwrap()
+        .data_and_authorize_precompressed()
+        .unwrap();
+    let package = open(Arc::new(VersionedSource::new(source_bytes())));
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_add_precompressed_part(pack("/custom/transferred.xml"), "application/xml", token)
+        .unwrap();
+    let prepared = package.prepare_topology(plan).unwrap();
+    drop(foreign);
+    let mut first = Vec::new();
+    prepared.publish_to_stream(&mut first).unwrap();
+    assert_eq!(
+        zip_member(&first, "custom/transferred.xml"),
+        b"<untouched source='yes'/>"
+    );
+    foreign_handle.bump();
+    let mut second = Vec::new();
+    assert!(matches!(
+        prepared.publish_to_stream(&mut second),
+        Err(OpcError::SourceChanged { .. })
+    ));
+    assert!(second.is_empty());
+    assert!(matches!(
+        prepared.with_candidate(|_| Ok(())),
+        Err(OpcError::SourceChanged { .. })
+    ));
 }

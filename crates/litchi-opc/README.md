@@ -146,3 +146,16 @@ within the original parent; column-name selectors resolve against the owning
 table during ordinary edits. Survey snapshots retain source tokens for exact
 inverse publication and restoration of removed parts. The positional, budget-managed
 `SourceXmlPart` API remains available for source-backed package editing.
+
+## Retained prepared topologies
+
+`SourceBackedPackage::prepare_topology` returns a cheaply cloneable
+`PreparedTopology`. It owns the validated effective catalog, generated members,
+source authorizations and managed reservations. `with_candidate` reads that
+catalog lazily, and `publish_to_stream(&self, writer)` can publish it repeatedly
+or retry after a sink failure. Each publication rechecks base and transfer
+sources. Retained reservations are released when the last owner drops.
+
+This is a prepared candidate, not a chained editable package: XML range proofs
+remain tied to their admitted revision, and an exact no-op still uses the
+original-artifact path without an effective candidate callback.

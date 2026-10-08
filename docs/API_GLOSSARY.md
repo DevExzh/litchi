@@ -301,3 +301,13 @@ registered until that work and `LimitKind` are finished. The root patch still
 uses main-XML equality for ordinary eager sources; full package lineage remains
 required for owner-wide conformance. Broad content-safe Debug cleanup remains
 pending beyond the new canonical Edit/Commit implementations.
+
+## 16. Retained OPC topology foundation (record 0023)
+
+`PreparedTopology` shares its effective catalog, generated members, source
+proofs and reservations. Its stream publisher borrows the retained candidate;
+clones can read or publish it again while physical source checks remain active.
+This supplies retained topology ownership for the source-backed DOCX wave.
+It does not make source-backed `Package::edit()` canonical: chained edits still
+need logical overlay revisions and XML authorization against the effective
+candidate, distinct from the physical archive lineage/version.

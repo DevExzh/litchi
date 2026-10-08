@@ -327,7 +327,7 @@ fn plan_deflate_tasks(plan: &PreservationPlan) -> impl Iterator<Item = &Regenera
             PreservationAction::Regenerate { entry, .. } => Some(entry),
             PreservationAction::Copy(_) | PreservationAction::Omit(_) => None,
         })
-        .chain(plan.appended.iter())
+        .chain(plan.appended.iter().map(Arc::as_ref))
         .filter(|entry| deflate_task_len(entry).is_some())
 }
 
@@ -342,7 +342,7 @@ fn plan_deflate_tasks(plan: &PreservationPlan) -> impl Iterator<Item = &Regenera
 #[derive(Debug, Clone, Default)]
 pub struct PreservationPlan {
     actions: Vec<PreservationAction>,
-    appended: Vec<RegeneratedEntry>,
+    appended: Vec<Arc<RegeneratedEntry>>,
 }
 
 impl PreservationPlan {
@@ -397,6 +397,19 @@ impl PreservationPlan {
         entry: RegeneratedEntry,
     ) -> Result<(), std::collections::TryReserveError> {
         self.appended.try_reserve(1)?;
+        self.appended.push(Arc::new(entry));
+        Ok(())
+    }
+
+    /// Append a retained immutable member without cloning its name or payload.
+    ///
+    /// Only the handle vector grows; the caller may reuse the same entry in
+    /// another plan after success or publication failure.
+    pub fn try_append_shared(
+        &mut self,
+        entry: Arc<RegeneratedEntry>,
+    ) -> Result<(), std::collections::TryReserveError> {
+        self.appended.try_reserve(1)?;
         self.appended.push(entry);
         Ok(())
     }
@@ -406,7 +419,7 @@ impl PreservationPlan {
     }
 
     /// Generated members in their requested append order.
-    pub fn appended(&self) -> &[RegeneratedEntry] {
+    pub fn appended(&self) -> &[Arc<RegeneratedEntry>] {
         &self.appended
     }
 
@@ -4957,8 +4970,18 @@ mod tests {
         )
         .unwrap();
         assert_eq!(plan.appended().len(), 2);
+        let shared = Arc::clone(&plan.appended()[1]);
+        let mut repeated = PreservationPlan::copy_all(&index);
+        repeated
+            .try_append_shared(Arc::clone(&plan.appended()[0]))
+            .unwrap();
+        repeated.try_append_shared(Arc::clone(&shared)).unwrap();
+        assert!(Arc::ptr_eq(&shared, &repeated.appended()[1]));
+        let cloned = plan.clone();
+        assert!(Arc::ptr_eq(&shared, &cloned.appended()[1]));
 
         let output = index.write_to(&plan, Vec::new()).unwrap();
+        assert_eq!(output, index.write_to(&repeated, Vec::new()).unwrap());
         let output_archive = ZipArchive::from_slice(&output).unwrap();
         let output_names: Vec<_> = output_archive
             .entries()

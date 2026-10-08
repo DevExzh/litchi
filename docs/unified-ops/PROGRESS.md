@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0023 | Retained OPC prepared topology and shared ZIP appended members | source-overlay ownership foundation; chained source package commits pending |
 | 0022 | Eager DOCX package-bound Edit/Commit and removal of mutating publication doors | eager primary commit migrated; source overlays, history and full W2 pending |
 | 0021 | Shared source-backed DOCX owners and borrowing stream publication | sharing prerequisite complete; package-bound Edit/Commit pending |
 | 0020 | Cheap eager DOCX package shares and immutable primary patch application | eager apply migrated; package-owning commit W2 work pending |
@@ -238,3 +239,15 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
   inverse, no-op sharing, later source writer changes and security refusals.
 - Source-overlay owners, snapshot composition/history, full package lineage,
   limits and writer removal remain required. Evidence and limits are in 0022.
+
+## 0023 — retained source-backed topology publication
+
+- OPC `PreparedTopology` now cheaply clones its complete prepared candidate
+  and reservations. Publication borrows it, enabling retry and repeated output.
+- ZIP append plans retain shared generated-member handles; publication does
+  not deep-copy prepared relationship XML, member names or appended payloads.
+- Added metadata admissions and tests for concurrent clones, retry, source and
+  transfer rechecks, candidate readback and final-owner reservation release.
+- This is the retained topology foundation, not chained source-package commit.
+  Logical overlay revisions and revision-bound XML proofs remain required;
+  the original physical source proof is deliberately unchanged. See 0023.
