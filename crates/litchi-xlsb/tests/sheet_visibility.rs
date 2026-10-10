@@ -306,6 +306,92 @@ fn unknown_workbook_records_survive_a_native_state_patch() {
 }
 
 #[test]
+fn multi_sheet_visibility_preserves_opaque_records_and_exact_inverse() {
+    let source = with_opaque_sheet_records(
+        &worksheets(&["Active", "First", "Second"])
+            .to_bytes()
+            .expect("source bytes"),
+        &[1, 2],
+    );
+    let package = Package::from_bytes(source).expect("opaque-sheet source");
+    let source_bytes = package.to_bytes().expect("canonical source bytes");
+    let expected_opaque = [1usize, 2usize].map(|position| {
+        let uri = sheet_partname(package.opc_package(), position);
+        let blob = package
+            .opc_package()
+            .get_part(&uri)
+            .expect("sheet part")
+            .blob();
+        record_bytes(blob, opaque_sheet_kind(position))
+    });
+
+    // The first tab is the active sentinel.  Both target sheets are hidden
+    // in one native transaction, so the payload replacement path updates two
+    // physical parts while leaving the selected active view in place.
+    let mut edit = package.edit().expect("edit");
+    assert_eq!(
+        edit.set_sheet_state(1usize, State::Hidden)
+            .expect("hide first opaque sheet"),
+        Some(true)
+    );
+    assert_eq!(
+        edit.set_sheet_state(2usize, State::Hidden)
+            .expect("hide second opaque sheet"),
+        Some(true)
+    );
+    let commit = edit.commit().expect("multi-sheet state commit");
+    let hidden = commit.package();
+    assert_eq!(
+        catalog_states(hidden),
+        vec![State::Visible, State::Hidden, State::Hidden]
+    );
+    assert_eq!(
+        hidden
+            .workbook()
+            .expect("hidden workbook")
+            .active_catalog_position(),
+        Some(0)
+    );
+    assert_ne!(sheet_view_flags(hidden, 0) & 0x0040, 0);
+    for (position, expected) in [(1usize, &expected_opaque[0]), (2, &expected_opaque[1])] {
+        let uri = sheet_partname(hidden.opc_package(), position);
+        let blob = hidden
+            .opc_package()
+            .get_part(&uri)
+            .expect("hidden sheet part")
+            .blob();
+        assert_eq!(
+            record_bytes(blob, opaque_sheet_kind(position)).as_slice(),
+            expected.as_slice()
+        );
+        assert_eq!(sheet_view_flags(hidden, position) & 0x0040, 0);
+    }
+
+    let restored = hidden
+        .apply(&commit.patch().inverse())
+        .expect("apply exact inverse");
+    assert_eq!(
+        restored.to_bytes().expect("inverse bytes"),
+        source_bytes,
+        "inverse restores the complete package image"
+    );
+    assert_ne!(sheet_view_flags(&restored, 0) & 0x0040, 0);
+    for (position, expected) in [(1usize, &expected_opaque[0]), (2, &expected_opaque[1])] {
+        let uri = sheet_partname(restored.opc_package(), position);
+        let blob = restored
+            .opc_package()
+            .get_part(&uri)
+            .expect("restored sheet part")
+            .blob();
+        assert_eq!(
+            record_bytes(blob, opaque_sheet_kind(position)).as_slice(),
+            expected.as_slice()
+        );
+        assert_ne!(sheet_view_flags(&restored, position) & 0x0040, 0);
+    }
+}
+
+#[test]
 fn grouped_rename_metadata_rejects_duplicate_final_names() {
     let package = worksheets(&["Data", "Tail"]);
     let mut edit = package.edit().expect("edit");
@@ -545,6 +631,82 @@ fn sheet_partname(package: &OpcPackage, position: usize) -> PackURI {
         .expect("sheet relationship")
         .target_partname()
         .expect("sheet part")
+}
+
+fn opaque_sheet_kind(position: usize) -> RawKind {
+    RawKind::new(match position {
+        1 => 0x0ffe,
+        2 => 0x0ffd,
+        _ => panic!("unexpected opaque sheet position {position}"),
+    })
+    .expect("opaque record kind")
+}
+
+fn record_bytes(source: &[u8], target: RawKind) -> Vec<u8> {
+    let mut records = Records::new(source);
+    while let Some(item) = records.next() {
+        let record = item.expect("record");
+        if record.kind() == target {
+            return source[record.offset()..records.offset()].to_vec();
+        }
+    }
+    panic!("record {target} not found");
+}
+
+fn sheet_view_flags(package: &Package, position: usize) -> u16 {
+    let uri = sheet_partname(package.opc_package(), position);
+    let blob = package
+        .opc_package()
+        .get_part(&uri)
+        .expect("sheet part")
+        .blob();
+    Records::new(blob)
+        .map(|item| item.expect("sheet record"))
+        .find(|record| record.kind() == kind::BEGIN_WS_VIEW)
+        .map(|record| {
+            u16::from_le_bytes(
+                record
+                    .payload()
+                    .get(..2)
+                    .expect("worksheet view flags")
+                    .try_into()
+                    .expect("worksheet view flags length"),
+            )
+        })
+        .expect("worksheet view")
+}
+
+fn with_opaque_sheet_records(bytes: &[u8], positions: &[usize]) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    for &position in positions {
+        let uri = sheet_partname(&package, position);
+        let original = package.get_part(&uri).expect("sheet part").blob().to_vec();
+        let mut opaque = Vec::new();
+        let payload: &[u8] = match position {
+            1 => b"opaque-first-sheet-record",
+            2 => b"opaque-second-sheet-record",
+            _ => panic!("unexpected opaque sheet position {position}"),
+        };
+        Writer::new(&mut opaque)
+            .write_record(opaque_sheet_kind(position), payload)
+            .expect("opaque record");
+        let end_sheet = Records::new(&original)
+            .map(|item| item.expect("sheet record"))
+            .find(|record| record.kind() == kind::END_SHEET)
+            .expect("end sheet record")
+            .offset();
+        let mut rewritten = Vec::with_capacity(original.len() + opaque.len());
+        rewritten.extend_from_slice(&original[..end_sheet]);
+        rewritten.extend_from_slice(&opaque);
+        rewritten.extend_from_slice(&original[end_sheet..]);
+        package
+            .get_part_mut(&uri)
+            .expect("sheet part")
+            .set_blob(rewritten);
+    }
+    let mut output = Vec::new();
+    package.to_stream(&mut output).expect("serialize OPC");
+    output
 }
 
 fn every_kind_workbook() -> Vec<u8> {

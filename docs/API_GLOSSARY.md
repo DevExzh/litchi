@@ -1120,3 +1120,15 @@ while `Some` reports the staged state change. The existing `sheet::State`
 vocabulary supplies Visible/Hidden/VeryHidden. No mutable writer escape or
 parallel transaction family is added. Worksheet-only legacy rename selection
 remains a separate pending positional migration.
+
+## OPC batch payload replacement (0181)
+
+The raw OPC escape `OpcPackage::replace_part_payloads` accepts an owning batch
+of existing `(PackURI, Vec<u8>)` replacements. It resolves exact names before
+ASCII-case-insensitive aliases, preflights targets and deferred payloads, and
+rejects repeated resolved targets. Empty input preserves exact-source authority.
+Nonempty batches require built-in parts; custom-part packages receive typed
+`UnsupportedCustomPartPayload` before mutation because arbitrary setters cannot
+provide atomic failure. One revocation records signature policy before the
+built-in setters invalidate replaced XML source provenance. XLSB uses this seam
+for workbook and worksheet view payloads staged by its structural edit.

@@ -2041,12 +2041,26 @@ fn apply_sheet_view_dependencies(
         ));
     }
 
+    let replacement_capacity = actions
+        .len()
+        .checked_add(if workbook_output != workbook_source {
+            1
+        } else {
+            0
+        })
+        .ok_or(Error::CapacityOverflow {
+            resource: "XLSB sheet view payload replacements",
+        })?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(replacement_capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet view payload replacements",
+            source,
+        })?;
     if workbook_output != workbook_source {
-        package
-            .get_part_mut(&workbook_uri)?
-            .set_blob(workbook_output);
+        replacements.push((workbook_uri, workbook_output));
     }
-
     for (catalog_position, selected) in actions {
         let Some(partname) = sheet_parts[catalog_position].as_ref() else {
             continue;
@@ -2059,8 +2073,9 @@ fn apply_sheet_view_dependencies(
         let Some(output) = rewrite_sheet_view_flags(&source, part_kind, selected)? else {
             continue;
         };
-        package.get_part_mut(partname)?.set_blob(output);
+        replacements.push((partname.clone(), output));
     }
+    package.replace_part_payloads(replacements)?;
     Ok(())
 }
 

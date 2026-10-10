@@ -68,6 +68,12 @@ pub enum OpcError {
     #[error("Duplicate OPC part name: {0}")]
     DuplicatePartName(String),
 
+    #[error("Duplicate OPC batch payload target: {0}")]
+    DuplicatePartPayload(String),
+
+    #[error("Batch payload replacement requires built-in OPC parts")]
+    UnsupportedCustomPartPayload,
+
     #[error("ASCII-case-equivalent OPC part names coexist: '{existing}' and '{candidate}'")]
     EquivalentPartNames { existing: String, candidate: String },
 
@@ -533,6 +539,7 @@ impl From<OpcError> for litchi_core::Error {
             OpcError::ValidationReport(error) => litchi_core::Error::Other(error.to_string()),
             error @ (OpcError::SourceBackedOverlayUnavailable { .. }
             | OpcError::PreservationUnavailable { .. }
+            | OpcError::UnsupportedCustomPartPayload
             | OpcError::SignedSourceRequiresExplicitPolicy
             | OpcError::SourceArtifactMismatch { .. }
             | OpcError::SourceBackedBatchWorkerPanic { .. }
@@ -554,6 +561,7 @@ impl From<OpcError> for litchi_core::Error {
             | OpcError::PackageNotFound(_)
             | OpcError::InvalidPackUri(_)
             | OpcError::DuplicatePartName(_)
+            | OpcError::DuplicatePartPayload(_)
             | OpcError::EquivalentPartNames { .. }
             | OpcError::DerivedPartNames { .. }
             | OpcError::RelationshipNotFound(_)

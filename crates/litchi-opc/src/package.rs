@@ -1805,6 +1805,90 @@ impl OpcPackage {
             .ok_or_else(|| OpcError::PartNotFound(partname.to_string()))
     }
 
+    /// Replace the payloads of existing parts as one prevalidated raw edit.
+    ///
+    /// Every requested part is resolved before the first replacement. Exact
+    /// names win, then OPC's ASCII-case-insensitive fallback is used. A
+    /// repeated target, including one written through a case alias, is
+    /// rejected before mutation. This makes the duplicate policy explicit and
+    /// prevents two callers from silently disagreeing about one payload.
+    ///
+    /// The empty batch is a no-op and keeps exact-source authorization intact.
+    /// Nonempty batches require a package containing only built-in
+    /// [`BlobPart`](crate::BlobPart) and [`XmlPart`](crate::XmlPart) values.
+    /// Custom parts are refused because their setters cannot guarantee atomic
+    /// failure. All target payloads are decoded before mutation, and any
+    /// returned error leaves payloads and source authorization unchanged.
+    ///
+    /// Exact-source authorization is revoked and signature policy recorded
+    /// once before the setters run. Replacements use [`Part::set_blob`], so
+    /// caller-authored bytes receive no retained XML source provenance.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OpcError::PartNotFound`] for an unknown target,
+    /// [`OpcError::DuplicatePartPayload`] for a repeated resolved target,
+    /// the selected part's deferred decode error, or
+    /// [`OpcError::UnsupportedCustomPartPayload`] when any custom part exists.
+    /// Allocation failures are returned as [`OpcError::Allocation`].
+    pub fn replace_part_payloads(&mut self, replacements: Vec<(PackURI, Vec<u8>)>) -> Result<()> {
+        if replacements.is_empty() {
+            return Ok(());
+        }
+
+        let mut prepared = Vec::new();
+        prepared
+            .try_reserve_exact(replacements.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC batch payload replacements",
+                source,
+            })?;
+        let mut seen = HashSet::new();
+        seen.try_reserve(replacements.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC batch payload target names",
+                source,
+            })?;
+
+        // Resolve and decode every target before changing package state. The
+        // decoded payload can still be deferred in an owned source, so this
+        // pass is also the batch's all-or-nothing decode admission boundary.
+        for (requested, payload) in replacements {
+            let partname = if self.parts.contains_key(&requested) {
+                requested.clone()
+            } else {
+                self.find_case_insensitive(&requested)
+                    .map(|(stored, _)| stored.clone())
+                    .ok_or_else(|| OpcError::PartNotFound(requested.to_string()))?
+            };
+            if !seen.insert(partname.clone()) {
+                return Err(OpcError::DuplicatePartPayload(partname.to_string()));
+            }
+            let part = self
+                .parts
+                .get(&partname)
+                .map(|part| &**part)
+                .ok_or_else(|| OpcError::PartNotFound(requested.to_string()))?;
+            part.ensure_payload()?;
+            prepared.push((partname, payload));
+        }
+
+        if !self.holds_only_built_in_parts() {
+            return Err(OpcError::UnsupportedCustomPartPayload);
+        }
+        self.revoke_exact_source();
+        self.signature_graph_tracked = true;
+        for (partname, payload) in prepared {
+            // Preflight resolved every key and no map mutation intervenes.
+            // Built-in setters cannot change relationships or the part map.
+            self.parts
+                .get_mut(&partname)
+                .expect("preflight resolved the unchanged part map")
+                .set_blob(payload);
+        }
+        Ok(())
+    }
+
     /// Get a part by relationship type from the package level.
     ///
     /// # Arguments
@@ -3257,6 +3341,7 @@ mod tests {
     use std::fs;
     use std::io::Cursor;
     use std::sync::Arc;
+    use std::sync::atomic::{AtomicUsize, Ordering};
     use tempfile::NamedTempFile;
 
     fn create_minimal_docx() -> Vec<u8> {
@@ -3308,6 +3393,107 @@ mod tests {
         }
 
         writer.finish_to_bytes().unwrap()
+    }
+
+    fn create_two_part_source() -> Vec<u8> {
+        let mut package = OpcPackage::from_bytes(&create_minimal_docx()).unwrap();
+        package.add_part(Box::new(BlobPart::new(
+            PackURI::new("/word/second.xml").unwrap(),
+            crate::constants::content_type::XML.to_owned(),
+            b"<second/>".to_vec(),
+        )));
+        crate::PackageWriter::to_bytes(&package).unwrap()
+    }
+
+    #[derive(Clone)]
+    struct DecodeRefusingPart {
+        partname: PackURI,
+        payload: Arc<Vec<u8>>,
+        rels: Relationships,
+    }
+
+    impl Part for DecodeRefusingPart {
+        fn blob(&self) -> &[u8] {
+            self.payload.as_slice()
+        }
+
+        fn blob_arc(&self) -> Arc<Vec<u8>> {
+            Arc::clone(&self.payload)
+        }
+
+        fn content_type(&self) -> &str {
+            crate::constants::content_type::XML
+        }
+
+        fn partname(&self) -> &PackURI {
+            &self.partname
+        }
+
+        fn ensure_payload(&self) -> Result<()> {
+            Err(OpcError::ZipError("test decode refusal".to_owned()))
+        }
+
+        fn rels(&self) -> &Relationships {
+            &self.rels
+        }
+
+        fn rels_mut(&mut self) -> &mut Relationships {
+            &mut self.rels
+        }
+
+        fn set_blob(&mut self, blob: Vec<u8>) {
+            self.payload = Arc::new(blob);
+        }
+    }
+
+    #[derive(Clone)]
+    struct StatefulDecodePart {
+        partname: PackURI,
+        payload: Arc<Vec<u8>>,
+        rels: Relationships,
+        ensure_calls: Arc<AtomicUsize>,
+        fail_on_call: usize,
+    }
+
+    impl Part for StatefulDecodePart {
+        fn blob(&self) -> &[u8] {
+            self.payload.as_slice()
+        }
+
+        fn blob_arc(&self) -> Arc<Vec<u8>> {
+            Arc::clone(&self.payload)
+        }
+
+        fn content_type(&self) -> &str {
+            crate::constants::content_type::XML
+        }
+
+        fn partname(&self) -> &PackURI {
+            &self.partname
+        }
+
+        fn ensure_payload(&self) -> Result<()> {
+            let call = self.ensure_calls.fetch_add(1, Ordering::SeqCst) + 1;
+            if call == self.fail_on_call {
+                Err(OpcError::ZipError(
+                    "test stateful decode refusal".to_owned(),
+                ))
+            } else {
+                Ok(())
+            }
+        }
+
+        fn rels(&self) -> &Relationships {
+            &self.rels
+        }
+
+        fn rels_mut(&mut self) -> &mut Relationships {
+            &mut self.rels
+        }
+
+        fn set_blob(&mut self, blob: Vec<u8>) {
+            self.payload = Arc::new(blob);
+        }
     }
 
     fn large_content_types_archive() -> (Vec<u8>, Vec<u8>) {
@@ -4280,6 +4466,174 @@ mod tests {
         let mut package = base.clone();
         package.unsign();
         assert!(!package.exact_source_authorized);
+    }
+
+    #[test]
+    fn batch_payload_replacement_preflights_all_targets_and_empty_is_exact_noop() {
+        let source = create_two_part_source();
+        let base = OpcPackage::from_vec(source).unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let second = PackURI::new("/word/second.xml").unwrap();
+        let before_source = base.exact_source_shared().unwrap();
+        let before_document = base.get_part(&document).unwrap().blob().to_vec();
+        let before_second = base.get_part(&second).unwrap().blob().to_vec();
+
+        let mut empty = base.clone();
+        empty.replace_part_payloads(Vec::new()).unwrap();
+        assert!(empty.is_unmodified_owned_source());
+        assert!(Arc::ptr_eq(
+            &before_source,
+            &empty.exact_source_shared().unwrap()
+        ));
+
+        let mut package = base;
+        let missing = PackURI::new("/word/missing.xml").unwrap();
+        let error = package
+            .replace_part_payloads(vec![
+                (
+                    PackURI::new("/WORD/DOCUMENT.XML").unwrap(),
+                    b"<changed/>".to_vec(),
+                ),
+                (missing, b"<missing/>".to_vec()),
+            ])
+            .unwrap_err();
+        assert!(matches!(error, OpcError::PartNotFound(_)));
+        assert_eq!(package.get_part(&document).unwrap().blob(), before_document);
+        assert_eq!(package.get_part(&second).unwrap().blob(), before_second);
+        assert!(package.is_unmodified_owned_source());
+        assert!(Arc::ptr_eq(
+            &before_source,
+            &package.exact_source_shared().unwrap()
+        ));
+    }
+
+    #[test]
+    fn batch_payload_replacement_rejects_case_alias_duplicates_before_mutation() {
+        let source = create_two_part_source();
+        let mut package = OpcPackage::from_vec(source).unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let before = package.get_part(&document).unwrap().blob().to_vec();
+
+        let error = package
+            .replace_part_payloads(vec![
+                (document.clone(), b"<first/>".to_vec()),
+                (
+                    PackURI::new("/WORD/DOCUMENT.XML").unwrap(),
+                    b"<last/>".to_vec(),
+                ),
+            ])
+            .unwrap_err();
+        assert!(matches!(error, OpcError::DuplicatePartPayload(_)));
+        assert_eq!(package.get_part(&document).unwrap().blob(), before);
+        assert!(package.is_unmodified_owned_source());
+    }
+
+    #[test]
+    fn batch_payload_replacement_preflights_custom_decode_refusal() {
+        let good = PackURI::new("/custom/good.xml").unwrap();
+        let failing = PackURI::new("/custom/failing.xml").unwrap();
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(BlobPart::new(
+            good.clone(),
+            crate::constants::content_type::XML.to_owned(),
+            b"<good/>".to_vec(),
+        )));
+        package.add_part(Box::new(DecodeRefusingPart {
+            partname: failing.clone(),
+            payload: Arc::new(b"<failing/>".to_vec()),
+            rels: Relationships::new(failing.as_str().to_owned()),
+        }));
+        let before = package.get_part(&good).unwrap().blob().to_vec();
+
+        let error = package
+            .replace_part_payloads(vec![
+                (good.clone(), b"<changed/>".to_vec()),
+                (failing, b"<replacement/>".to_vec()),
+            ])
+            .unwrap_err();
+        assert!(matches!(error, OpcError::ZipError(message) if message == "test decode refusal"));
+        assert_eq!(package.get_part(&good).unwrap().blob(), before);
+    }
+
+    #[test]
+    fn batch_payload_replacement_refuses_custom_parts_before_any_setter() {
+        let first = PackURI::new("/custom/first.xml").unwrap();
+        let second = PackURI::new("/custom/second.xml").unwrap();
+        let first_calls = Arc::new(AtomicUsize::new(0));
+        let second_calls = Arc::new(AtomicUsize::new(0));
+        let mut package = OpcPackage::new();
+        package.add_part(Box::new(StatefulDecodePart {
+            partname: first.clone(),
+            payload: Arc::new(b"<first/>".to_vec()),
+            rels: Relationships::new(first.as_str().to_owned()),
+            ensure_calls: Arc::clone(&first_calls),
+            fail_on_call: usize::MAX,
+        }));
+        package.add_part(Box::new(StatefulDecodePart {
+            partname: second.clone(),
+            payload: Arc::new(b"<second/>".to_vec()),
+            rels: Relationships::new(second.as_str().to_owned()),
+            ensure_calls: Arc::clone(&second_calls),
+            fail_on_call: 2,
+        }));
+
+        let error = package
+            .replace_part_payloads(vec![
+                (first.clone(), b"<changed-first/>".to_vec()),
+                (second.clone(), b"<changed-second/>".to_vec()),
+            ])
+            .unwrap_err();
+        assert!(matches!(error, OpcError::UnsupportedCustomPartPayload));
+        assert_eq!(package.parts.get(&first).unwrap().blob(), b"<first/>");
+        assert_eq!(package.parts.get(&second).unwrap().blob(), b"<second/>");
+        assert_eq!(first_calls.load(Ordering::SeqCst), 1);
+        assert_eq!(second_calls.load(Ordering::SeqCst), 1);
+    }
+
+    #[test]
+    fn batch_payload_replacement_revokes_source_without_bypassing_xml_provenance() {
+        let source = create_two_part_source();
+        let mut package = OpcPackage::from_vec(source).unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let replacement = b"<document><body><p/></body></document>".to_vec();
+
+        package
+            .replace_part_payloads(vec![(document.clone(), replacement)])
+            .unwrap();
+        assert!(!package.is_unmodified_owned_source());
+        assert!(!package.holds_original_source_xml(package.get_part(&document).unwrap()));
+    }
+
+    #[test]
+    fn batch_payload_replacement_preserves_injected_signature_policy() {
+        let source = create_two_part_source();
+        let mut package = OpcPackage::from_vec(source).unwrap();
+        let document = PackURI::new("/word/document.xml").unwrap();
+        let second = PackURI::new("/word/second.xml").unwrap();
+        package
+            .get_part_mut(&document)
+            .unwrap()
+            .rels_mut()
+            .try_add_relationship(
+                "urn:vendor:signature-reference".to_owned(),
+                "/_xmlsignatures/orphan.xml".to_owned(),
+                "rId-signature".to_owned(),
+                crate::TargetMode::Internal,
+            )
+            .unwrap();
+        assert!(package.is_signed());
+        assert!(package.requires_signature_edit_policy());
+
+        package
+            .replace_part_payloads(vec![(second, b"<changed/>".to_vec())])
+            .unwrap();
+        assert!(package.is_signed());
+        assert!(package.requires_signature_edit_policy());
+        assert!(matches!(
+            crate::PackageWriter::to_bytes(&package),
+            Err(OpcError::SignedSourceRequiresExplicitPolicy)
+        ));
+        assert!(package.signature_policy_required);
     }
 
     #[test]
