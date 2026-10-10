@@ -221,3 +221,24 @@ fn lowercase_column_letters_remain_borrowed() {
 
 #[path = "support/query_allocations.rs"]
 mod query_allocations;
+
+#[cfg(feature = "docx")]
+#[test]
+fn capability_construction_and_iteration_allocate_nothing() {
+    assert_eq!(
+        allocations(|| {
+            let caps = litchi_ops::capabilities::Capabilities::of(litchi_core::FileFormat::Docx);
+            for element in caps.elements() {
+                std::hint::black_box(element.operations());
+                for path in element.paths() {
+                    std::hint::black_box(path);
+                }
+                for property in element.properties() {
+                    std::hint::black_box(property.value_type());
+                }
+            }
+            std::hint::black_box(caps.gaps().count());
+        }),
+        0
+    );
+}

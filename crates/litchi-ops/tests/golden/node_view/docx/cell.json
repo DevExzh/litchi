@@ -1,0 +1,42 @@
+{
+  "path": "/body/tbl[1]/tr[2]/tc[1]",
+  "type": "cell",
+  "text": "Westnested",
+  "childCount": 3,
+  "format": {
+    "vmerge": "restart",
+    "colspan": 2
+  },
+  "children": [
+    {
+      "path": "/body/tbl[1]/tr[2]/tc[1]/p[1]",
+      "type": "paragraph",
+      "text": "West",
+      "preview": "West",
+      "style": "Normal",
+      "childCount": 1,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/body/tbl[1]/tr[2]/tc[1]/tbl[1]",
+      "type": "table",
+      "childCount": 1,
+      "format": {
+        "cols": "1",
+        "rows": "1"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/tbl[1]/tr[2]/tc[1]/p[2]",
+      "type": "paragraph",
+      "text": "",
+      "preview": "",
+      "style": "Normal",
+      "childCount": 0,
+      "format": {},
+      "children": []
+    }
+  ]
+}

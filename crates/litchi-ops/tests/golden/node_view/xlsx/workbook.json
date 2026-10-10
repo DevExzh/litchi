@@ -1,0 +1,52 @@
+[
+{
+  "path": "/",
+  "type": "workbook",
+  "childCount": 4,
+  "format": {
+    "title": "Kitchen sink",
+    "author": "Litchi",
+    "created": "2026-10-05T08:00:00.0000000Z"
+  },
+  "children": [
+    {
+      "path": "/sheet[1]",
+      "type": "sheet",
+      "preview": "Data",
+      "format": {
+        "name": "Data"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[2]",
+      "type": "sheet",
+      "preview": "Notes",
+      "format": {
+        "name": "Notes",
+        "hidden": true,
+        "visibility": "hidden"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[3]",
+      "type": "sheet",
+      "preview": "My Data",
+      "format": {
+        "name": "My Data"
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[4]",
+      "type": "sheet",
+      "preview": "Ärger",
+      "format": {
+        "name": "Ärger"
+      },
+      "children": []
+    }
+  ]
+}
+]

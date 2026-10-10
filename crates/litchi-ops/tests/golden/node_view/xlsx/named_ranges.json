@@ -1,0 +1,43 @@
+[
+{
+  "path": "/namedrange[1]",
+  "type": "namedrange",
+  "text": "Data!$A$1",
+  "preview": "Data!$A$1",
+  "childCount": 0,
+  "format": {
+    "name": "Local",
+    "ref": "Data!$A$1",
+    "scope": "Data",
+    "comment": "sheet scoped"
+  },
+  "children": []
+},
+{
+  "path": "/namedrange[2]",
+  "type": "namedrange",
+  "text": "Data!$B$2:$B$5",
+  "preview": "Data!$B$2:$B$5",
+  "childCount": 0,
+  "format": {
+    "name": "Total",
+    "ref": "Data!$B$2:$B$5",
+    "scope": "workbook"
+  },
+  "children": []
+},
+{
+  "path": "/namedrange[3]",
+  "type": "namedrange",
+  "text": "NOW()",
+  "preview": "NOW()",
+  "childCount": 0,
+  "format": {
+    "name": "Volatile",
+    "ref": "NOW()",
+    "scope": "workbook",
+    "volatile": true
+  },
+  "children": []
+}
+]

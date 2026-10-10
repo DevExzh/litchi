@@ -1,0 +1,23 @@
+[
+{
+  "path": "/sheet[1]/table[1]",
+  "type": "table",
+  "text": "Sales",
+  "preview": "Sales (A1:C5)",
+  "childCount": 0,
+  "format": {
+    "name": "Sales",
+    "displayName": "Sales",
+    "ref": "A1:C5",
+    "style": "TableStyleMedium2",
+    "bandedRows": true,
+    "bandedCols": false,
+    "firstCol": false,
+    "lastCol": false,
+    "headerRow": true,
+    "totalRow": false,
+    "columns": "Region,Sales,Status"
+  },
+  "children": []
+}
+]

@@ -1,0 +1,102 @@
+[
+{
+  "path": "/sheet[1]",
+  "type": "sheet",
+  "preview": "Data",
+  "childCount": 7,
+  "format": {
+    "name": "Data"
+  },
+  "children": [
+    {
+      "path": "/sheet[1]/row[1]",
+      "type": "row",
+      "childCount": 4,
+      "format": {
+        "height": "20pt",
+        "customHeight": true
+      },
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[2]",
+      "type": "row",
+      "childCount": 3,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[3]",
+      "type": "row",
+      "childCount": 4,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[4]",
+      "type": "row",
+      "childCount": 4,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[5]",
+      "type": "row",
+      "childCount": 4,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[6]",
+      "type": "row",
+      "childCount": 3,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[1]/row[7]",
+      "type": "row",
+      "childCount": 1,
+      "format": {
+        "hidden": true,
+        "outlineLevel": 1
+      },
+      "children": []
+    }
+  ]
+},
+{
+  "path": "/sheet[2]",
+  "type": "sheet",
+  "preview": "Notes",
+  "childCount": 3,
+  "format": {
+    "name": "Notes",
+    "hidden": true,
+    "visibility": "hidden"
+  },
+  "children": [
+    {
+      "path": "/sheet[2]/row[2]",
+      "type": "row",
+      "childCount": 2,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[2]/row[3]",
+      "type": "row",
+      "childCount": 2,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/sheet[2]/row[4]",
+      "type": "row",
+      "childCount": 2,
+      "format": {},
+      "children": []
+    }
+  ]
+}
+]

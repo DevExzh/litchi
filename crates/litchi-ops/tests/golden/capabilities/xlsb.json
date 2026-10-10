@@ -1,0 +1,1906 @@
+{
+  "format": "xlsb",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "add": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "remove": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "move": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "swap": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "edit": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "batch": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "save": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "W4",
+      "reason": "saving this format is not integrated in the current wave"
+    },
+    "create": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "W4",
+      "reason": "creation is not integrated for this format in the current wave"
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "xlsb",
+      "element": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "sheet",
+          "pathSegment": "<sheet>"
+        },
+        {
+          "element": "namedrange",
+          "pathSegment": "namedrange"
+        }
+      ],
+      "properties": {
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "subject": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "keywords": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "description": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "category": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastModifiedBy": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "revisionNumber": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "created": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "modified": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "workbook.date1904": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "activeTab": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "sheet",
+      "parent": "workbook",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>",
+          "<sheet>!<A1>"
+        ],
+        "positional": [
+          "/sheet[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "column",
+          "pathSegment": "col"
+        },
+        {
+          "element": "row",
+          "pathSegment": "row"
+        },
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        },
+        {
+          "element": "table",
+          "pathSegment": "table"
+        },
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        },
+        {
+          "element": "chart",
+          "pathSegment": "chart"
+        },
+        {
+          "element": "pivottable",
+          "pathSegment": "pivottable"
+        },
+        {
+          "element": "slicer",
+          "pathSegment": "slicer"
+        },
+        {
+          "element": "sparkline",
+          "pathSegment": "sparkline"
+        },
+        {
+          "element": "dataValidation",
+          "pathSegment": "dataValidation"
+        },
+        {
+          "element": "conditionalFormatting",
+          "pathSegment": "cf"
+        },
+        {
+          "element": "autofilter",
+          "pathSegment": "autofilter"
+        },
+        {
+          "element": "hyperlink",
+          "pathSegment": "hyperlink"
+        },
+        {
+          "element": "mergeCell",
+          "pathSegment": "mergeCell"
+        },
+        {
+          "element": "picture",
+          "pathSegment": "picture"
+        },
+        {
+          "element": "shape",
+          "pathSegment": "shape"
+        },
+        {
+          "element": "ole",
+          "pathSegment": "ole"
+        },
+        {
+          "element": "rowbreak",
+          "pathSegment": "rowbreak"
+        },
+        {
+          "element": "colbreak",
+          "pathSegment": "colbreak"
+        }
+      ],
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "visibility": {
+          "type": "enum",
+          "values": [
+            "visible",
+            "hidden",
+            "veryHidden"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "cell",
+      "parent": [
+        "sheet",
+        "range"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "run",
+          "pathSegment": "run"
+        }
+      ],
+      "properties": {
+        "type": {
+          "type": "enum",
+          "values": [
+            "Number",
+            "String",
+            "SharedString",
+            "Boolean",
+            "Error",
+            "InlineString",
+            "Date",
+            "Unknown"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "cachedValue": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "evaluated": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "arrayformula": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "arrayref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "empty": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alignment.textRotation": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alignment.indent": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "alignment.readingOrder": {
+          "type": "enum",
+          "values": [
+            "context",
+            "ltr",
+            "rtl"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "merge": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "mergeAnchor": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type",
+          "value"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "range",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/<A1>:<A1>"
+        ]
+      },
+      "children": [
+        {
+          "element": "cell",
+          "pathSegment": "<A1>"
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "format": "xlsb",
+      "element": "row",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "<sheet>!N:N"
+        ],
+        "positional": [
+          "/<sheet>/row[N]"
+        ]
+      },
+      "properties": {
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "customHeight": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ],
+        "headerColumns": true
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "column",
+      "parent": "sheet",
+      "elementAliases": [
+        "col"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/col[<letters>]",
+          "<sheet>!B:B"
+        ],
+        "positional": [
+          "/<sheet>/col[N]"
+        ]
+      },
+      "properties": {
+        "width": {
+          "type": "number",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "customWidth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "table",
+      "parent": [
+        "sheet",
+        "workbook"
+      ],
+      "elementAliases": [
+        "listobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/table[@name=<name>]",
+          "/table[@name=<name>]"
+        ],
+        "positional": [
+          "/<sheet>/table[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "displayName": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "style": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedRows": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "bandedCols": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "firstCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "lastCol": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "headerRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "totalRow": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "columns": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "namedrange",
+      "parent": "workbook",
+      "elementAliases": [
+        "definedname"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/namedrange[<name>]",
+          "/namedrange[@name=<name>]"
+        ],
+        "positional": [
+          "/namedrange[N]"
+        ]
+      },
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "comment",
+      "parent": "sheet",
+      "elementAliases": [
+        "note"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/comment[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "the XLSB worksheet keeps comments in the leaf part, but no unified comment node reads them yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "chart",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]"
+        ]
+      },
+      "children": [
+        {
+          "element": "series",
+          "pathSegment": "series"
+        },
+        {
+          "element": "axis",
+          "pathSegment": "axis"
+        }
+      ],
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "the XLSB workbook keeps drawing and chart parts, but the unified node has no chart projection yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "series",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/series[K]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB chart series are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "axis",
+      "parent": "chart",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/chart[N]/axis[@role=<role>]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB chart axes are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "pivottable",
+      "parent": "sheet",
+      "elementAliases": [
+        "pivot"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/pivottable[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB pivot tables are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "slicer",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/slicer[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB slicers are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "sparkline",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/sparkline[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB sparkline groups are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "dataValidation",
+      "parent": "sheet",
+      "elementAliases": [
+        "validation"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/dataValidation[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB data validations are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "conditionalFormatting",
+      "parent": "sheet",
+      "elementAliases": [
+        "cf"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/cf[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB conditional formats are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "autofilter",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/<sheet>/autofilter"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB auto-filters are retained by the leaf but not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "hyperlink",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/hyperlink[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB hyperlinks are retained by the leaf but their targets are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "mergeCell",
+      "parent": "sheet",
+      "elementAliases": [
+        "merge",
+        "mergedrange"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/mergeCell[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB merged ranges are retained by the leaf but are not listed as nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "picture",
+      "parent": "sheet",
+      "elementAliases": [
+        "image",
+        "media"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/picture[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB drawings are retained by the leaf but are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "shape",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/shape[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB drawing shapes are retained by the leaf but are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "ole",
+      "parent": "sheet",
+      "elementAliases": [
+        "embed",
+        "object",
+        "oleobject"
+      ],
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/ole[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB OLE objects are retained by the leaf but are not projected into nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "rowbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/rowbreak[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB row page breaks are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "colbreak",
+      "parent": "sheet",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/colbreak[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "XLSB column page breaks are not projected into unified nodes yet"
+      }
+    },
+    {
+      "format": "xlsb",
+      "element": "run",
+      "parent": "cell",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": false,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/<sheet>/<A1>/run[N]"
+        ]
+      },
+      "properties": {},
+      "gap": {
+        "code": "unsupported_capability",
+        "followUp": "M1-extended (R4x)",
+        "reason": "the XLSB cell model exposes a cell value, not a unified rich-text run node"
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "element",
+      "element": "comment",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "the XLSB worksheet keeps comments in the leaf part, but no unified comment node reads them yet"
+    },
+    {
+      "subject": "element",
+      "element": "chart",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "the XLSB workbook keeps drawing and chart parts, but the unified node has no chart projection yet"
+    },
+    {
+      "subject": "element",
+      "element": "series",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB chart series are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "axis",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB chart axes are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "pivottable",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB pivot tables are retained by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "slicer",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB slicers are retained by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "sparkline",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB sparkline groups are retained by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "dataValidation",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB data validations are retained by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "conditionalFormatting",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB conditional formats are retained by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "autofilter",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB auto-filters are retained by the leaf but not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "hyperlink",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB hyperlinks are retained by the leaf but their targets are not projected into nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "mergeCell",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB merged ranges are retained by the leaf but are not listed as nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "picture",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB drawings are retained by the leaf but are not projected into nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "shape",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB drawing shapes are retained by the leaf but are not projected into nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "ole",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB OLE objects are retained by the leaf but are not projected into nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "rowbreak",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB row page breaks are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "colbreak",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB column page breaks are not projected into unified nodes yet"
+    },
+    {
+      "subject": "element",
+      "element": "run",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "the XLSB cell model exposes a cell value, not a unified rich-text run node"
+    },
+    {
+      "subject": "property",
+      "element": "workbook",
+      "key": "calc.mode",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB calculation properties are retained by the leaf but not projected into the workbook node"
+    },
+    {
+      "subject": "property",
+      "element": "workbook",
+      "key": "firstSheet",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "the XLSB workbook node does not expose the authored first-sheet setting yet"
+    },
+    {
+      "subject": "property",
+      "element": "sheet",
+      "key": "freeze",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB sheet views are retained by the leaf but freeze panes are not projected yet"
+    },
+    {
+      "subject": "property",
+      "element": "sheet",
+      "key": "zoom",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB sheet views are retained by the leaf but zoom is not projected yet"
+    },
+    {
+      "subject": "property",
+      "element": "sheet",
+      "key": "autoFilter",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB auto-filter metadata is retained by the leaf but not projected into a sheet node yet"
+    },
+    {
+      "subject": "property",
+      "element": "sheet",
+      "key": "tabColor",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB sheet tab color is not projected into the sheet node yet"
+    },
+    {
+      "subject": "property",
+      "element": "sheet",
+      "key": "protect",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB sheet protection metadata is retained by the leaf but not projected yet"
+    },
+    {
+      "subject": "property",
+      "element": "sheet",
+      "key": "printArea",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB print settings are not projected into the sheet node yet"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "computedValue",
+      "code": "unsupported_capability",
+      "followUp": "M4 (formula evaluation)",
+      "reason": "the full XLSB grid exposes formula text and cached results; the source cached-value fallback has neither formula text nor formatting metadata, and there is no evaluator for an uncached result"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.bold",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.italic",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "strike",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "underline",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.color",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "superscript",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "subscript",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.size",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.name",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.outline",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.shadow",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.condense",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.extend",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.charset",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.family",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "alignment.relativeIndent",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project this alignment attribute into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "alignment.justifyLastLine",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project this alignment attribute into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "font.scheme",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project font records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "fill",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project fill records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "fillPattern",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project fill records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "fillBg",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project fill records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.left",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.left.color",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.right",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.right.color",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.top",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.top.color",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.bottom",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.bottom.color",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.diagonal",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.diagonal.color",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.diagonalUp",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "border.diagonalDown",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project border records into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "protection.locked",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project cell protection metadata"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "protection.hidden",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project cell protection metadata"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "quotePrefix",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not project quote-prefix metadata into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "numFmtId",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "native number-format IDs remain in the XLSB style table and are not admitted as unified properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "numberformat",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB node does not resolve number-format codes into cell properties"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "link",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB hyperlink targets are retained by the leaf but not resolved into cell properties yet"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "tooltip",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB hyperlink tooltips are not resolved into cell properties yet"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "display",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB cells expose stored values, not a separately formatted display string"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "phonetic",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB phonetic runs are retained by the leaf but not projected into cell properties yet"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "richtext",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "the XLSB cell model exposes a flattened value and no unified rich-text run node"
+    },
+    {
+      "subject": "property",
+      "element": "cell",
+      "key": "alt",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB in-cell pictures are not read by the unified adapter"
+    },
+    {
+      "subject": "property",
+      "element": "namedrange",
+      "key": "ref",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB defined-name catalog exposes only the authored name"
+    },
+    {
+      "subject": "property",
+      "element": "namedrange",
+      "key": "scope",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB defined-name catalog exposes only the authored name"
+    },
+    {
+      "subject": "property",
+      "element": "namedrange",
+      "key": "comment",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB defined-name catalog exposes only the authored name"
+    },
+    {
+      "subject": "property",
+      "element": "namedrange",
+      "key": "volatile",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB defined-name catalog exposes only the authored name"
+    },
+    {
+      "subject": "property",
+      "element": "namedrange",
+      "key": "hidden",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4d)",
+      "reason": "the XLSB defined-name catalog exposes only the authored name"
+    },
+    {
+      "subject": "property",
+      "element": "column",
+      "key": "numberformat",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB column styles are not projected into column nodes yet"
+    },
+    {
+      "subject": "property",
+      "element": "range",
+      "key": "merge",
+      "code": "unsupported_capability",
+      "followUp": "M1-extended (R4x)",
+      "reason": "XLSB ranges do not report whether they are merged yet"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

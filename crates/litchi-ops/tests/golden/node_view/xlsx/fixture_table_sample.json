@@ -1,0 +1,38 @@
+[
+{
+  "path": "/sheet[1]/table[1]",
+  "type": "table",
+  "text": "Tabelle1",
+  "preview": "Tabelle1 (C4:G9)",
+  "childCount": 0,
+  "format": {
+    "name": "Tabelle1",
+    "displayName": "Tabelle1",
+    "ref": "C4:G9",
+    "style": "TableStyleMedium2",
+    "bandedRows": true,
+    "bandedCols": false,
+    "firstCol": false,
+    "lastCol": false,
+    "headerRow": true,
+    "totalRow": true,
+    "columns": "Field 1,Field 2,Field 3,Field 4 ,Field 5"
+  },
+  "children": []
+},
+{
+  "path": "/sheet[1]/G5",
+  "type": "cell",
+  "text": "0.16666666666666666",
+  "preview": "G5",
+  "childCount": 0,
+  "format": {
+    "type": "Number",
+    "formula": "Tabelle1[[#This Row],[Field 4 ]]/Tabelle1[[#Totals],[Field 4 ]]",
+    "cachedValue": "0.16666666666666666",
+    "evaluated": true,
+    "numberformat": "0%"
+  },
+  "children": []
+}
+]

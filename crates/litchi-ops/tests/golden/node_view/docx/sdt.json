@@ -1,0 +1,22 @@
+{
+  "path": "/body/sdt[1]",
+  "type": "sdt",
+  "text": "Inside the control",
+  "childCount": 1,
+  "format": {
+    "alias": "Summary",
+    "tag": "sum"
+  },
+  "children": [
+    {
+      "path": "/body/sdt[1]/p[1]",
+      "type": "paragraph",
+      "text": "Inside the control",
+      "preview": "Inside the control",
+      "style": "Normal",
+      "childCount": 1,
+      "format": {},
+      "children": []
+    }
+  ]
+}

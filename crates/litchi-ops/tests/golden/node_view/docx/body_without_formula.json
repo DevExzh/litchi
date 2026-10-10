@@ -1,0 +1,108 @@
+{
+  "path": "/body",
+  "type": "body",
+  "childCount": 8,
+  "format": {},
+  "children": [
+    {
+      "path": "/body/p[1]",
+      "type": "paragraph",
+      "text": "Quarterly report: revenue grew",
+      "preview": "Quarterly report: revenue grew",
+      "style": "Heading1",
+      "childCount": 2,
+      "format": {
+        "style": "Heading1",
+        "styleId": "Heading1",
+        "align": "justify",
+        "spaceBefore": "12pt",
+        "spaceAfter": "6pt",
+        "lineSpacing": "1.15x",
+        "lineRule": "auto",
+        "hangingIndent": "18pt",
+        "indent": "36pt",
+        "keepNext": true,
+        "outlineLvl": 0
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[2]",
+      "type": "paragraph",
+      "text": "See the report or the introduction",
+      "preview": "See the report or the introduction",
+      "style": "Normal",
+      "childCount": 4,
+      "format": {
+        "numId": "3",
+        "numLevel": "1"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/tbl[1]",
+      "type": "table",
+      "childCount": 2,
+      "format": {
+        "cols": "2",
+        "rows": "2",
+        "style": "TableGrid",
+        "width": "100%",
+        "align": "center",
+        "layout": "fixed",
+        "tblLook": "0420",
+        "firstRow": true,
+        "bandedRows": true,
+        "colWidths": "2880dxa,2880dxa"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/sdt[1]",
+      "type": "sdt",
+      "text": "Inside the control",
+      "childCount": 1,
+      "format": {
+        "alias": "Summary",
+        "tag": "sum"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[3]",
+      "type": "paragraph",
+      "text": "Wrapped",
+      "preview": "Wrapped",
+      "style": "Normal",
+      "childCount": 1,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/body/oMathPara[1]",
+      "type": "equation",
+      "childCount": 0,
+      "format": {
+        "mode": "display"
+      },
+      "children": []
+    },
+    {
+      "path": "/body/p[4]",
+      "type": "paragraph",
+      "text": "Duplicate identity",
+      "preview": "Duplicate identity",
+      "style": "Normal",
+      "childCount": 1,
+      "format": {},
+      "children": []
+    },
+    {
+      "path": "/body/section[1]",
+      "type": "section",
+      "childCount": 0,
+      "format": {},
+      "children": []
+    }
+  ]
+}
