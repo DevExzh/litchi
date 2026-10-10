@@ -32,6 +32,7 @@
 //! materializes from the package indexed at open (L-XLSB-1).
 
 use std::ops::Deref;
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use litchi_core::sheet::{
@@ -57,6 +58,7 @@ mod read_tests;
 mod source;
 mod spec;
 mod views;
+pub(crate) mod write;
 
 pub(crate) use children::Children;
 pub(crate) use nav::Nav;
@@ -149,7 +151,7 @@ const _: () = {
 impl XlsbOwner {
     /// The facade's `ensure_source_current`: refuse a source-backed owner
     /// whose file changed since it was opened.
-    fn ensure_current(&self) -> Result<()> {
+    pub(crate) fn ensure_current(&self) -> Result<()> {
         match self {
             Self::Source(workbook) => workbook.ensure_current(),
             Self::Eager(_) => Ok(()),
@@ -158,6 +160,107 @@ impl XlsbOwner {
 }
 
 impl Xlsb {
+    /// The stable path origin captured by a path open, if any.
+    pub(crate) fn origin(&self) -> Option<Arc<Path>> {
+        self.0.origin()
+    }
+
+    /// Attach path metadata to a handle after a path route has finished
+    /// classification. Byte and create routes leave this unset.
+    pub(crate) fn with_origin(&self, origin: Option<Arc<Path>>) -> Self {
+        Self(self.0.with_origin(origin))
+    }
+
+    /// Whether this handle is the same immutable open snapshot as `other`.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// Adopt a validated native package without serializing and reopening it.
+    /// The unified handle retains the source policy, metadata sidecar, origin,
+    /// and signature transition of the input. A removal-authorized edit has
+    /// already removed the native signature graph and therefore becomes an
+    /// ordinary unsigned eager owner.
+    pub(crate) fn adopt_package(&self, package: xlsb::Package) -> Result<Self> {
+        let options = OpenOptions::new()
+            .retain_source(self.0.retain_source)
+            .ooxml_limits(self.0.ooxml_limits);
+        let workbook = package.into_workbook()?;
+        let signature = match self.signature() {
+            Signature::RemovalAuthorized => Signature::Unsigned,
+            signature => signature,
+        };
+        Ok(Self::with_owner(
+            XlsbOwner::Eager(Box::new(workbook)),
+            self.0.metadata.clone(),
+            self.0.metadata_repairs.clone(),
+            &options,
+        )
+        .with_origin(self.origin())
+        .with_signature(signature))
+    }
+
+    /// Check signature disposition and retained-source freshness before a
+    /// mutation. A signed handle refuses before target or property admission,
+    /// including an otherwise exact no-op.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        if self.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Xlsb));
+        }
+        self.0.owner.ensure_current()
+    }
+
+    /// Admit the native structural editor without publishing a candidate.
+    pub(crate) fn admit_edit(&self) -> Result<()> {
+        self.check_source()?;
+        let editor = self.editor()?;
+        let package = match editor {
+            XlsbEditor::Eager(workbook) => workbook.to_package(),
+            XlsbEditor::Materialized(workbook) => workbook.into_package(),
+        };
+        package
+            .edit()
+            .map(|_| ())
+            .map_err(|error| Error::from(error).with_format(FileFormat::Xlsb))?;
+        self.check_source()
+    }
+
+    /// The one-shot unified worksheet-property setter.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        props: impl crate::props::IntoProps<'v>,
+    ) -> Result<write::Commit> {
+        self.set_with_limits(
+            target,
+            props,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Set unified worksheet properties under an explicit semantic budget.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        props: impl crate::props::IntoProps<'v>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        self.check_source()?;
+        let result = write::set_with_limits(self, target, props, limits);
+        self.check_source()?;
+        result
+    }
+
+    /// Stream this immutable snapshot to a sequential sink.
+    pub(crate) fn write_to<W: std::io::Write>(&self, sink: W) -> Result<()> {
+        write::write_to(self, sink)
+    }
+
+    /// Atomically save this immutable snapshot to a filesystem path.
+    pub(crate) fn save_to(&self, path: &Path, options: &crate::save::SaveOptions) -> Result<u64> {
+        write::save_to(self, path, options)
+    }
+
     /// Whether this handle retains an edit source, without reading any payload.
     pub(crate) fn retains_source(&self) -> bool {
         self.0.retain_source
@@ -370,10 +473,6 @@ impl Xlsb {
     /// [`Code::UnsupportedCapability`] when the handle was opened with
     /// [`OpenOptions::retain_source`] `false`; [`Code::IoError`] when the
     /// file changed; and the XLSB error of a failed materialization.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "consumed by the M2 write kernel")
-    )]
     pub(crate) fn editor(&self) -> Result<XlsbEditor<'_>> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Xlsb));

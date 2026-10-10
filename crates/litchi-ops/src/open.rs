@@ -368,13 +368,15 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
 /// route reaches the byte classifier before it knows the package's format;
 /// this helper applies metadata only after classification and preserves a
 /// signed wrapper by temporarily using its existing explicit disposition.
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
     match file {
         #[cfg(feature = "docx")]
         File::Docx(docx) => File::Docx(docx.with_origin(Some(origin))),
         #[cfg(feature = "xlsx")]
         File::Xlsx(xlsx) => File::Xlsx(xlsx.with_origin(Some(origin))),
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(xlsb) => File::Xlsb(xlsb.with_origin(Some(origin))),
         #[cfg(feature = "pptx")]
         File::Pptx(pptx) => File::Pptx(pptx.with_origin(Some(origin))),
         File::Signed(signed) => {
@@ -451,9 +453,9 @@ pub(crate) fn ooxml_from_source_package_with_origin(
             crate::format::xlsx::Xlsx::from_source_package(package, options)?.with_origin(origin),
         ),
         #[cfg(feature = "xlsb")]
-        FileFormat::Xlsb => File::Xlsb(crate::format::xlsb::Xlsb::from_source_package(
-            package, options,
-        )?),
+        FileFormat::Xlsb => File::Xlsb(
+            crate::format::xlsb::Xlsb::from_source_package(package, options)?.with_origin(origin),
+        ),
         other => return Err(not_enabled(other)),
     };
     Ok(signed_if(file, format, signed, crate::SignatureOrigin::Opc))
@@ -497,9 +499,9 @@ pub(crate) fn ooxml_from_eager_package_with_origin(
             crate::format::xlsx::Xlsx::from_opc_package(package, options)?.with_origin(origin),
         ),
         #[cfg(feature = "xlsb")]
-        FileFormat::Xlsb => File::Xlsb(crate::format::xlsb::Xlsb::from_opc_package(
-            package, options,
-        )?),
+        FileFormat::Xlsb => File::Xlsb(
+            crate::format::xlsb::Xlsb::from_opc_package(package, options)?.with_origin(origin),
+        ),
         other => return Err(not_enabled(other)),
     };
     Ok(signed_if(file, format, signed, crate::SignatureOrigin::Opc))

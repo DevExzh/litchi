@@ -136,7 +136,13 @@ fn every_format_has_one_answer_for_its_reads() {
                 && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
             assert_eq!(
                 capabilities.verb(verb),
-                if docx_edit || xlsx_edit || pptx_edit {
+                if docx_edit
+                    || xlsx_edit
+                    || pptx_edit
+                    || (format == FileFormat::Xlsb
+                        && cfg!(feature = "xlsb")
+                        && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch))
+                {
                     Support::Supported
                 } else if get.is_supported() {
                     EDITS.support()
@@ -147,12 +153,14 @@ fn every_format_has_one_answer_for_its_reads() {
             );
         }
 
-        // DOCX, XLSX and PPTX have creators and publishers. A format without a read adapter
+        // DOCX, XLSX and PPTX have creators and publishers; XLSB has a publisher.
+        // A format without a read adapter
         // keeps its whole-format refusal as the authoritative answer.
         for verb in [Verb::Save, Verb::Create] {
             let integrated = (format == FileFormat::Docx && cfg!(feature = "docx"))
                 || (format == FileFormat::Xlsx && cfg!(feature = "xlsx"))
-                || (format == FileFormat::Pptx && cfg!(feature = "pptx"));
+                || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
+                || (format == FileFormat::Xlsb && cfg!(feature = "xlsb") && verb == Verb::Save);
             let expected = if integrated {
                 Support::Supported
             } else if get.is_supported() {

@@ -10,6 +10,7 @@ use std::path::Path;
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "xlsb",
     all(
         any(unix, windows),
         any(
@@ -34,6 +35,7 @@ use crate::{File, OpenOptions};
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "xlsb",
     all(
         any(unix, windows),
         any(
@@ -106,13 +108,14 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             tail,
             super::ooxml_format_for_extension(path),
         )?;
-        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
         let file = if matches!(
             file.format(),
             Some(
                 litchi_core::FileFormat::Docx
                     | litchi_core::FileFormat::Xlsx
                     | litchi_core::FileFormat::Pptx
+                    | litchi_core::FileFormat::Xlsb
             )
         ) || matches!(&file, File::Locked(_))
         {
@@ -179,13 +182,14 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         tail,
         super::ooxml_format_for_extension(path),
     )?;
-    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
     let opened = if matches!(
         opened.format(),
         Some(
             litchi_core::FileFormat::Docx
                 | litchi_core::FileFormat::Xlsx
                 | litchi_core::FileFormat::Pptx
+                | litchi_core::FileFormat::Xlsb
         )
     ) || matches!(&opened, File::Locked(_))
     {
@@ -308,16 +312,29 @@ mod zip {
                     ensure_path_source_current(source.as_ref(), version)?;
                     if let Some(format) = format? {
                         let origin = {
-                            #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+                            #[cfg(any(
+                                feature = "docx",
+                                feature = "xlsx",
+                                feature = "pptx",
+                                feature = "xlsb"
+                            ))]
                             {
                                 matches!(
                                     format,
-                                    FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx
+                                    FileFormat::Docx
+                                        | FileFormat::Xlsx
+                                        | FileFormat::Pptx
+                                        | FileFormat::Xlsb
                                 )
                                 .then(|| super::stable_origin(path))
                                 .transpose()?
                             }
-                            #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx")))]
+                            #[cfg(not(any(
+                                feature = "docx",
+                                feature = "xlsx",
+                                feature = "pptx",
+                                feature = "xlsb"
+                            )))]
                             {
                                 let _ = (format, path);
                                 None

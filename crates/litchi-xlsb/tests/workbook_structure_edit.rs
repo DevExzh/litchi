@@ -18,7 +18,8 @@ use litchi_xlsb::cell_values::{
 use litchi_xlsb::chart::{Chart, ExternalDataPart};
 use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
-use litchi_xlsb::package::{SharedString, SharedStringRun};
+use litchi_xlsb::package::{PackageError, SharedString, SharedStringRun};
+use litchi_xlsb::raw::{Records, Writer, kind};
 use litchi_xlsb::shapes::{
     Anchor as ShapeAnchor, CellMarker, EditAs, Emu, EmuExtent, EmuOffset, Object as ShapeObject,
     Preset,
@@ -48,6 +49,125 @@ fn producer_workbook(name: &str, initial_value: Option<&str>) -> Workbook {
     let mut bytes = Cursor::new(Vec::new());
     producer.save(&mut bytes).expect("producer save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("producer reopen")
+}
+
+fn two_operation_patch() -> Patch {
+    let source = producer_workbook("Source", Some("transferred value"));
+    let target = producer_workbook("Target", None);
+    let mut edit = target.to_package().edit().expect("two-operation edit");
+    edit.rename_sheet(0, "Renamed".to_owned())
+        .expect("rename operation");
+    edit.transfer_cell(
+        &source,
+        0,
+        Reference::new(0, 0).expect("source reference"),
+        0,
+        Reference::new(1, 0).expect("target reference"),
+    )
+    .expect("transfer operation");
+    edit.commit().expect("two-operation commit").patch().clone()
+}
+
+fn workbook_with_bundle_suffix(workbook: &Workbook, suffix: &[u8]) -> Workbook {
+    let mut package = workbook.to_package().into_opc();
+    let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let original = package
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .blob()
+        .to_vec();
+    let mut rewritten = Vec::new();
+    {
+        let mut writer = Writer::new(&mut rewritten);
+        for record in Records::new(&original) {
+            let record = record.expect("workbook record");
+            let mut payload = record.payload().to_vec();
+            if record.kind() == kind::BUNDLE_SH {
+                payload.extend_from_slice(suffix);
+            }
+            writer
+                .write_record(record.kind(), &payload)
+                .expect("rewrite workbook record");
+        }
+    }
+    package
+        .get_part_mut(&workbook_uri)
+        .expect("workbook part")
+        .set_blob(rewritten);
+    Package::from_opc(package)
+        .expect("suffix-tolerant package")
+        .into_workbook()
+        .expect("suffix-tolerant workbook")
+}
+
+fn workbook_with_unpaired_bundle_name(workbook: &Workbook) -> Workbook {
+    let mut package = workbook.to_package().into_opc();
+    let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let original = package
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .blob()
+        .to_vec();
+    let mut rewritten = Vec::new();
+    {
+        let mut writer = Writer::new(&mut rewritten);
+        for record in Records::new(&original) {
+            let record = record.expect("workbook record");
+            let mut payload = record.payload().to_vec();
+            if record.kind() == kind::BUNDLE_SH {
+                let current_id = u32::from_le_bytes(payload[4..8].try_into().expect("tab ID"));
+                let strings_offset = if (1..=0xffff).contains(&current_id) {
+                    8
+                } else {
+                    12
+                };
+                let relationship_units = u32::from_le_bytes(
+                    payload[strings_offset..strings_offset + 4]
+                        .try_into()
+                        .expect("relationship length"),
+                );
+                let name_offset = strings_offset
+                    .checked_add(4)
+                    .and_then(|offset| {
+                        usize::try_from(relationship_units)
+                            .ok()?
+                            .checked_mul(2)
+                            .and_then(|bytes| offset.checked_add(bytes))
+                    })
+                    .expect("name offset")
+                    .checked_add(4)
+                    .expect("name length offset");
+                let name_units = u32::from_le_bytes(
+                    payload[name_offset - 4..name_offset]
+                        .try_into()
+                        .expect("name length"),
+                );
+                assert_eq!(name_units, 1, "fixture name must contain one UTF-16 unit");
+                payload[name_offset..name_offset + 2].copy_from_slice(&0xd800_u16.to_le_bytes());
+            }
+            writer
+                .write_record(record.kind(), &payload)
+                .expect("rewrite workbook record");
+        }
+    }
+    package
+        .get_part_mut(&workbook_uri)
+        .expect("workbook part")
+        .set_blob(rewritten);
+    Package::from_opc(package)
+        .expect("unpaired-name package")
+        .into_workbook()
+        .expect("unpaired-name workbook")
+}
+
+fn assert_limit(error: PackageError, resource: &str) {
+    let PackageError::LimitExceeded {
+        resource: observed, ..
+    } = error
+    else {
+        panic!("expected typed limit error, got {error:?}");
+    };
+    assert_eq!(observed, resource);
 }
 
 fn publish_structure_patch(workbook: &mut Workbook, patch: &Patch) {
@@ -1223,4 +1343,157 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
     assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
     assert_eq!(changed.patch().before(), empty.patch().before());
     assert_eq!(changed.clone().diagnostics(), changed.diagnostics());
+}
+
+#[test]
+fn rename_preserves_tolerated_bundle_sheet_suffix() {
+    const SUFFIX: &[u8] = &[0xde, 0xad, 0xbe, 0xef];
+
+    let workbook = workbook_with_bundle_suffix(&producer_workbook("Original", None), SUFFIX);
+    let mut edit = workbook.to_package().edit().expect("suffix edit");
+    edit.rename_sheet(0, "Renamed".to_owned())
+        .expect("rename with suffix");
+    let commit = edit.commit().expect("rename commit");
+    let wire = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("encode suffix patch");
+    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode suffix patch");
+    let replayed = workbook
+        .to_package()
+        .apply(&decoded)
+        .expect("replay suffix patch");
+    assert_eq!(
+        replayed.to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = replayed
+        .apply(&decoded.inverse())
+        .expect("inverse suffix patch");
+    assert_eq!(
+        restored.to_bytes().unwrap(),
+        workbook.to_package().to_bytes().unwrap()
+    );
+    let renamed = commit
+        .into_package()
+        .into_workbook()
+        .expect("renamed workbook");
+
+    let package = renamed.to_package().into_opc();
+    let workbook_uri = litchi_opc::PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let bundle = Records::new(
+        package
+            .get_part(&workbook_uri)
+            .expect("workbook part")
+            .blob(),
+    )
+    .map(|record| record.expect("workbook record"))
+    .find(|record| record.kind() == kind::BUNDLE_SH)
+    .expect("bundle sheet");
+    assert_eq!(renamed.worksheet_names(), &["Renamed".to_owned()]);
+    assert!(bundle.payload().ends_with(SUFFIX));
+}
+
+#[test]
+fn same_tolerated_unpaired_name_is_an_exact_durable_noop() {
+    let workbook = workbook_with_unpaired_bundle_name(&producer_workbook("X", None));
+    assert_eq!(workbook.worksheet_names(), &["\u{fffd}".to_owned()]);
+    let source_bytes = workbook.to_package().to_bytes().expect("source bytes");
+
+    let mut edit = workbook.to_package().edit().expect("no-op edit");
+    edit.rename_sheet(0, "\u{fffd}".to_owned())
+        .expect("same tolerated name");
+    let commit = edit.commit().expect("no-op commit");
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.package().to_bytes().expect("commit bytes"),
+        source_bytes
+    );
+
+    let wire = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable no-op");
+    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode no-op");
+    assert!(decoded.is_noop());
+    let applied = workbook.to_package().apply(&decoded).expect("apply no-op");
+    assert_eq!(applied.to_bytes().expect("applied bytes"), source_bytes);
+}
+
+#[test]
+fn structural_quotas_return_typed_limit_errors() {
+    let source = producer_workbook("Source", Some("transferred value"));
+    let target = producer_workbook("Target", None);
+    let limits = TransferLimits::new(
+        TransferLimits::DEFAULT.bytes(),
+        1,
+        TransferLimits::DEFAULT.history_entries(),
+        TransferLimits::DEFAULT.history_bytes(),
+    );
+    let mut edit = target
+        .to_package()
+        .edit_with_limits(limits)
+        .expect("limited edit");
+    edit.rename_sheet(0, "Renamed".to_owned())
+        .expect("first operation");
+    let error = edit
+        .transfer_cell(
+            &source,
+            0,
+            Reference::new(0, 0).expect("source reference"),
+            0,
+            Reference::new(1, 0).expect("target reference"),
+        )
+        .expect_err("second operation quota");
+    assert_limit(error, "workbook structural operations");
+
+    let patch = two_operation_patch();
+    let wire = patch
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("default patch encoding");
+
+    let operation_limits = TransferLimits::new(
+        TransferLimits::DEFAULT.bytes(),
+        1,
+        TransferLimits::DEFAULT.history_entries(),
+        TransferLimits::DEFAULT.history_bytes(),
+    );
+    assert_limit(
+        patch
+            .to_bytes(operation_limits)
+            .expect_err("patch operation quota"),
+        "workbook structural operations",
+    );
+    assert_limit(
+        Patch::from_bytes(&wire, operation_limits).expect_err("decoded operation quota"),
+        "workbook structural operations",
+    );
+
+    let byte_limits = TransferLimits::new(
+        wire.len().saturating_sub(1),
+        TransferLimits::DEFAULT.changes(),
+        TransferLimits::DEFAULT.history_entries(),
+        TransferLimits::DEFAULT.history_bytes(),
+    );
+    assert_limit(
+        patch.to_bytes(byte_limits).expect_err("patch byte quota"),
+        "durable workbook patch bytes",
+    );
+    assert_limit(
+        Patch::from_bytes(&wire, byte_limits).expect_err("decoded byte quota"),
+        "durable workbook patch bytes",
+    );
+
+    let history_limits = TransferLimits::new(
+        TransferLimits::DEFAULT.bytes(),
+        TransferLimits::DEFAULT.changes(),
+        TransferLimits::DEFAULT.history_entries(),
+        1,
+    );
+    let mut history = History::new(history_limits).expect("limited history");
+    assert_limit(
+        history.push(patch).expect_err("history byte quota"),
+        "workbook patch history bytes",
+    );
 }

@@ -423,7 +423,7 @@ const CREATE_PENDING: Refusal = Refusal {
 };
 
 /// A retained edit source is required for file-specific writes.
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 const RETAINED_SOURCE: Refusal = Refusal {
     code: Code::UnsupportedCapability,
     follow_up: "reopen with OpenOptions::retain_source(true)",
@@ -681,6 +681,15 @@ impl Capabilities {
                 }
                 return Support::Supported;
             }
+            #[cfg(feature = "xlsb")]
+            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
+                && self.adapter() == Some(Adapter::Xlsb)
+            {
+                if self.retains_source == Some(false) {
+                    return RETAINED_SOURCE.support();
+                }
+                return Support::Supported;
+            }
             return EDITS.support();
         }
         match verb {
@@ -707,11 +716,11 @@ impl Capabilities {
         }
     }
 
-    /// Whether this report's format has an integrated DOCX publisher.
+    /// Whether this report's format has an integrated publisher.
     fn publication_support(&self) -> Support {
         if matches!(
             self.format,
-            Some(FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx)
+            Some(FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx | FileFormat::Xlsb)
         ) && self.adapter().is_some()
         {
             Support::Supported

@@ -880,9 +880,11 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
 
 #[cfg(feature = "xlsb")]
 #[test]
-fn xlsb_reports_keep_selection_semantic_and_read_only() {
+fn xlsb_reports_keep_selection_semantic_and_limit_writes_to_sheet_names() {
     let caps = Capabilities::of(FileFormat::Xlsb);
     assert!(caps.verb(Verb::Get).is_supported());
+    assert!(caps.verb(Verb::Set).is_supported());
+    assert!(caps.verb(Verb::Save).is_supported());
     assert!(caps.element("cell").is_some());
     let computed_value = caps
         .gaps()
@@ -925,7 +927,13 @@ fn xlsb_reports_keep_selection_semantic_and_read_only() {
         }));
         for property in element.properties() {
             assert!(property.get(), "{}", property.name());
-            assert!(!property.set(), "{}", property.name());
+            assert_eq!(
+                property.set(),
+                element.name() == "sheet" && property.name() == "name",
+                "{}.{}",
+                element.name(),
+                property.name()
+            );
             assert!(!property.add(), "{}", property.name());
         }
     }

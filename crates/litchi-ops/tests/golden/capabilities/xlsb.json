@@ -15,10 +15,7 @@
       "supported": true
     },
     "set": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "add": {
       "supported": false,
@@ -45,22 +42,13 @@
       "reason": "edit verbs arrive with the write kernel in milestone M2"
     },
     "edit": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "batch": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "save": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "W4",
-      "reason": "saving this format is not integrated in the current wave"
+      "supported": true
     },
     "create": {
       "supported": false,
@@ -322,7 +310,7 @@
         "name": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "hidden": {

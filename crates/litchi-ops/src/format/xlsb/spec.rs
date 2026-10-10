@@ -10,11 +10,81 @@
 use crate::error::Code;
 use crate::format::workbook::spec as workbook;
 use crate::node::spec::{ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec};
+use crate::registry::{Access, Constraint, Entry, Table};
+use crate::value::ValueType;
 
 pub(crate) use workbook::{
-    COLUMN_PROPS, ColumnKey, Kind, ROW_PROPS, RowKey, SHEET_PROPS, SheetKey, TABLE_PROPS, TableKey,
+    COLUMN_PROPS, ColumnKey, Kind, ROW_PROPS, RowKey, SheetKey, TABLE_PROPS, TableKey,
     WORKBOOK_PROPS, WorkbookKey,
 };
+
+/// The XLSB sheet setter vocabulary. The first unified XLSB write exposes
+/// only a worksheet name; hidden/visibility and every other sheet property
+/// remain read-only or capability gaps.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SheetSetter {
+    Name,
+}
+
+pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 1, 0> = Table::new(
+    [Entry {
+        spec: PropSpec::new("name", ValueType::Text),
+        access: Access::Set(SheetSetter::Name),
+        constraint: Constraint::None,
+        clear: false,
+    }],
+    [],
+);
+
+/// Read-schema projection of the XLSB sheet write registry.
+pub(crate) const SHEET_WRITE_PROPS: &[PropSpec] = &SHEET_WRITE_TABLE.readable();
+
+const fn same_name(left: &str, right: &str) -> bool {
+    let left = left.as_bytes();
+    let right = right.as_bytes();
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < left.len() {
+        let mut a = left[index];
+        let mut b = right[index];
+        if a.is_ascii_uppercase() {
+            a = a.to_ascii_lowercase();
+        }
+        if b.is_ascii_uppercase() {
+            b = b.to_ascii_lowercase();
+        }
+        if a != b {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+const fn sheet_props_with_writes() -> [PropSpec; workbook::SHEET_PROPS.len()] {
+    let mut props = [PropSpec::new("", ValueType::Text); workbook::SHEET_PROPS.len()];
+    let mut index = 0;
+    while index < workbook::SHEET_PROPS.len() {
+        let mut prop = workbook::SHEET_PROPS[index];
+        let mut write_index = 0;
+        while write_index < SHEET_WRITE_PROPS.len() {
+            let write = SHEET_WRITE_PROPS[write_index];
+            if same_name(prop.name, write.name) {
+                prop.access.set = write.access.set;
+                prop.access.add = write.access.add;
+            }
+            write_index += 1;
+        }
+        props[index] = prop;
+        index += 1;
+    }
+    props
+}
+
+/// XLSB's local sheet table, with only `name` marked settable.
+pub(crate) static SHEET_PROPS: &[PropSpec] = &sheet_props_with_writes();
 
 /// XLSB's node exposes only this subset of the shared workbook cell
 /// vocabulary.  Keeping the local key order identical to the filtered table
@@ -249,7 +319,7 @@ const fn with_gap(
 // resolver can use the local `SPEC` without duplicating the vocabulary.
 static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_gap(&workbook::SPEC.elements[0], None),
-    with_gap(&workbook::SPEC.elements[1], None),
+    with_props(&workbook::SPEC.elements[1], SHEET_PROPS, None),
     with_props(&workbook::SPEC.elements[2], CELL_PROPS, None),
     with_gap(&workbook::SPEC.elements[3], None),
     with_gap(&workbook::SPEC.elements[4], None),

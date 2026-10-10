@@ -485,9 +485,10 @@ impl Edit {
 
     fn stage(&mut self, operation: Operation) -> Result<()> {
         if self.operations.len() >= self.limits.changes() {
-            return Err(Error::InvalidLength {
-                expected: self.limits.changes(),
-                found: self.operations.len().saturating_add(1),
+            return Err(Error::LimitExceeded {
+                resource: "workbook structural operations",
+                actual: self.operations.len().saturating_add(1),
+                maximum: self.limits.changes(),
             });
         }
         let selection = operation.selection();
@@ -726,9 +727,10 @@ impl Patch {
     pub fn to_bytes(&self, limits: TransferLimits) -> Result<Vec<u8>> {
         validate_limits(limits)?;
         if self.operations.len() > limits.changes() {
-            return Err(Error::InvalidLength {
-                expected: limits.changes(),
-                found: self.operations.len(),
+            return Err(Error::LimitExceeded {
+                resource: "workbook structural operations",
+                actual: self.operations.len(),
+                maximum: limits.changes(),
             });
         }
         let mut encoded_operations = Vec::new();
@@ -745,9 +747,10 @@ impl Patch {
                 resource: "durable workbook patch bytes",
             })?;
         if total > limits.bytes() {
-            return Err(Error::InvalidLength {
-                expected: limits.bytes(),
-                found: total,
+            return Err(Error::LimitExceeded {
+                resource: "durable workbook patch bytes",
+                actual: total,
+                maximum: limits.bytes(),
             });
         }
         let mut output = Vec::new();
@@ -841,9 +844,10 @@ impl Patch {
     ) -> Result<Self> {
         validate_limits(limits)?;
         if data.len() > limits.bytes() {
-            return Err(Error::InvalidLength {
-                expected: limits.bytes(),
-                found: data.len(),
+            return Err(Error::LimitExceeded {
+                resource: "durable workbook patch bytes",
+                actual: data.len(),
+                maximum: limits.bytes(),
             });
         }
         require(data, 32)?;
@@ -856,9 +860,10 @@ impl Patch {
         let after_len = read_usize(data, 16)?;
         let operation_count = read_usize(data, 24)?;
         if operation_count > limits.changes() {
-            return Err(Error::InvalidLength {
-                expected: limits.changes(),
-                found: operation_count,
+            return Err(Error::LimitExceeded {
+                resource: "workbook structural operations",
+                actual: operation_count,
+                maximum: limits.changes(),
             });
         }
         let before_end = 32usize
@@ -1041,9 +1046,10 @@ impl History {
     pub fn push(&mut self, patch: Patch) -> Result<()> {
         let bytes = patch.retained_bytes()?;
         if bytes > self.limits.history_bytes() {
-            return Err(Error::InvalidLength {
-                expected: self.limits.history_bytes(),
-                found: bytes,
+            return Err(Error::LimitExceeded {
+                resource: "workbook patch history bytes",
+                actual: bytes,
+                maximum: self.limits.history_bytes(),
             });
         }
         let expected = if self.cursor == 0 {
@@ -1612,6 +1618,13 @@ fn transfer_cell(
 
 fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<bool> {
     validate_sheet_name(workbook, sheet, name)?;
+    if workbook
+        .worksheet_names()
+        .get(sheet)
+        .is_some_and(|current| current == name)
+    {
+        return Ok(false);
+    }
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
     let uri = workbook.package.main_document_part()?.partname().clone();
     let source = workbook.package.get_part(&uri)?.blob().to_vec();
@@ -1666,6 +1679,30 @@ fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
         .ok_or(Error::CapacityOverflow {
             resource: "bundle-sheet name offset",
         })?;
+    let name_source = source.get(name_offset..).ok_or(Error::InvalidLength {
+        expected: name_offset,
+        found: source.len(),
+    })?;
+    let old_units = usize::try_from(litchi_core::binary::read_u32_le_at(name_source, 0)?).map_err(
+        |_overflow| Error::CapacityOverflow {
+            resource: "bundle-sheet name units",
+        },
+    )?;
+    let old_name_bytes = old_units
+        .checked_mul(2)
+        .and_then(|bytes| bytes.checked_add(4))
+        .ok_or(Error::CapacityOverflow {
+            resource: "bundle-sheet name length",
+        })?;
+    let suffix_offset = name_offset
+        .checked_add(old_name_bytes)
+        .ok_or(Error::CapacityOverflow {
+            resource: "bundle-sheet suffix offset",
+        })?;
+    let suffix = source.get(suffix_offset..).ok_or(Error::InvalidLength {
+        expected: suffix_offset,
+        found: source.len(),
+    })?;
     let mut payload = source
         .get(..name_offset)
         .ok_or(Error::InvalidLength {
@@ -1674,7 +1711,13 @@ fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
         })?
         .to_vec();
     Writer::new(&mut payload).write_wide_string(name)?;
-    let _validated_record = crate::package::records::BundleSheetRecord::parse(&payload)?;
+    payload.extend_from_slice(suffix);
+    let mut tolerance_report = crate::leniency::ToleranceReport::default();
+    let _validated_record = crate::package::records::BundleSheetRecord::parse_with(
+        &payload,
+        0,
+        crate::leniency::Tolerance::recording(&mut tolerance_report),
+    )?;
     Ok(payload)
 }
 

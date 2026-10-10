@@ -228,7 +228,7 @@ impl File {
             return signed.file().save_with(to, options);
         }
 
-        #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx")))]
+        #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb")))]
         {
             let _ = (to, options);
             return match self {
@@ -237,7 +237,7 @@ impl File {
             };
         }
 
-        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
         {
             // Validate the handle state before looking at caller-supplied path
             // text or destination metadata. A locked or unsupported file must
@@ -248,6 +248,8 @@ impl File {
                 Self::Docx(_) => {},
                 #[cfg(feature = "xlsx")]
                 Self::Xlsx(_) => {},
+                #[cfg(feature = "xlsb")]
+                Self::Xlsb(_) => {},
                 #[cfg(feature = "pptx")]
                 Self::Pptx(_) => {},
                 #[allow(unreachable_patterns)]
@@ -277,6 +279,8 @@ impl File {
                 Self::Docx(handle) => handle.save_to(&destination, options)?,
                 #[cfg(feature = "xlsx")]
                 Self::Xlsx(handle) => handle.save_to(&destination, options)?,
+                #[cfg(feature = "xlsb")]
+                Self::Xlsb(handle) => handle.save_to(&destination, options)?,
                 #[cfg(feature = "pptx")]
                 Self::Pptx(handle) => handle.save_to(&destination, options)?,
                 #[allow(unreachable_patterns)]
@@ -291,10 +295,17 @@ impl File {
     }
 }
 
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
     #[cfg(feature = "docx")]
     if let File::Docx(handle) = file {
+        return handle
+            .origin()
+            .map(|origin| origin.as_ref().to_path_buf())
+            .ok_or_else(|| file_required(format));
+    }
+    #[cfg(feature = "xlsb")]
+    if let File::Xlsb(handle) = file {
         return handle
             .origin()
             .map(|origin| origin.as_ref().to_path_buf())
@@ -317,7 +328,7 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
     Err(file_required(format))
 }
 
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 fn file_required(format: Option<FileFormat>) -> Error {
     let error = Error::new(
         Code::FileRequired,
@@ -339,7 +350,7 @@ fn unsupported_save(format: Option<FileFormat>) -> Error {
 /// Refuse a destination whose extension names a different format.  Flavour
 /// extensions of the same format, unknown extensions and no extension are
 /// accepted because content, rather than a filename, chooses the format.
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 fn same_format(path: &Path, format: FileFormat) -> Result<()> {
     let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
         return Ok(());
@@ -357,7 +368,7 @@ fn same_format(path: &Path, format: FileFormat) -> Result<()> {
     Ok(())
 }
 
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 fn format_of_extension(extension: &str) -> Option<FileFormat> {
     const EXTENSIONS: &[(&str, FileFormat)] = &[
         ("doc", FileFormat::Doc),
@@ -410,7 +421,7 @@ fn format_of_extension(extension: &str) -> Option<FileFormat> {
         .map(|&(_, format)| format)
 }
 
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
 fn refuse_existing(path: &Path, format: Option<FileFormat>) -> Result<()> {
     match std::fs::symlink_metadata(path) {
         Ok(_) => {

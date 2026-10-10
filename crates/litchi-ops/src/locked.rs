@@ -159,7 +159,7 @@ impl Locked {
 
     /// A locked handle carrying the same source and a path origin supplied by
     /// the path route after content classification.
-    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
     #[allow(
         dead_code,
         reason = "used by the OOXML path-origin route when that feature is enabled"
@@ -229,6 +229,7 @@ impl LockedState {
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
+        feature = "xlsb",
         feature = "encryption"
     ))]
     #[allow(

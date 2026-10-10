@@ -105,6 +105,8 @@ struct Step {
     snapshot_bytes: usize,
 }
 enum Leaf {
+    #[cfg(feature = "xlsb")]
+    Xlsb(Box<litchi_xlsb::cell_values::structure::Patch>),
     #[cfg(feature = "pptx")]
     Pptx {
         source: crate::format::pptx::Editable,
@@ -411,7 +413,7 @@ impl Edit {
             {
                 return Ok(());
             }
-            #[cfg(any(feature = "xlsx", feature = "pptx"))]
+            #[cfg(any(feature = "xlsx", feature = "pptx", feature = "xlsb"))]
             let limits = self.limits;
             self.execute(|file| match file {
                 #[cfg(feature = "docx")]
@@ -426,6 +428,10 @@ impl Edit {
                 #[cfg(feature = "xlsx")]
                 File::Xlsx(handle) => {
                     wrap_xlsx(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
+                #[cfg(feature = "xlsb")]
+                File::Xlsb(handle) => {
+                    wrap_xlsb(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
                 #[cfg(feature = "pptx")]
                 File::Pptx(handle) => {
@@ -970,6 +976,33 @@ fn wrap<T>(
     ))
 }
 
+#[cfg(feature = "xlsb")]
+fn wrap_xlsb<T>(
+    before: &crate::format::xlsb::Xlsb,
+    commit: crate::format::xlsb::write::Commit,
+    value: T,
+) -> Result<(Step, T)> {
+    let (after, patch) = commit.into_parts();
+    let leaf_operations = patch.operation_count();
+    // This adapter only stages sheet names (at most 31 UTF-16 units).
+    // Charge their owned text conservatively in addition to both images.
+    let snapshot_bytes = patch
+        .before()
+        .len()
+        .saturating_add(patch.after().len())
+        .saturating_add(leaf_operations.saturating_mul(124));
+    Ok((
+        Step {
+            before: File::Xlsb(before.clone()),
+            after: File::Xlsb(after),
+            leaf: Leaf::Xlsb(Box::new(patch)),
+            leaf_operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
 #[cfg(feature = "xlsx")]
 fn wrap_xlsx<T>(
     before: &crate::format::xlsx::Xlsx,
@@ -1023,6 +1056,8 @@ fn changed(steps: &[Step]) -> Result<bool> {
         return Ok(false);
     };
     match (&first.leaf, &last.leaf) {
+        #[cfg(feature = "xlsb")]
+        (Leaf::Xlsb(first), Leaf::Xlsb(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "pptx")]
         (Leaf::Pptx { source, .. }, Leaf::Pptx { target, .. }) => Ok(!source.same_content(target)?),
         #[cfg(feature = "docx")]
@@ -1038,6 +1073,8 @@ fn changed(steps: &[Step]) -> Result<bool> {
 
 fn same_snapshot(left: &File, right: &File) -> bool {
     match (left, right) {
+        #[cfg(feature = "xlsb")]
+        (File::Xlsb(left), File::Xlsb(right)) => left.same_snapshot(right),
         #[cfg(feature = "pptx")]
         (File::Pptx(left), File::Pptx(right)) => left.same_snapshot(right),
         #[cfg(feature = "docx")]
@@ -1061,6 +1098,8 @@ fn admit(file: &File) -> Result<()> {
         },
         #[cfg(feature = "xlsx")]
         File::Xlsx(handle) => handle.admit_edit(),
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => handle.admit_edit(),
         _ => check_source(file),
     }
 }
@@ -1078,6 +1117,8 @@ fn check_source(file: &File) -> Result<()> {
         },
         #[cfg(feature = "xlsx")]
         File::Xlsx(handle) => handle.check_source(),
+        #[cfg(feature = "xlsb")]
+        File::Xlsb(handle) => handle.check_source(),
         File::Signed(signed) => Err(crate::Error::signed(signed.format())),
         File::Locked(locked) => Err(locked.read_error()),
         #[allow(unreachable_patterns)]

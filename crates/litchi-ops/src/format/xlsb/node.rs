@@ -473,6 +473,16 @@ impl<'f> Node<'f> {
         self.sheet
     }
 
+    /// Zero-based worksheet position used by the native workbook editor.
+    /// Complete workbook catalog positions can also refer to chart, dialog,
+    /// macro, or other non-worksheet tabs, which deliberately return `None`.
+    pub(super) fn worksheet_position(&self) -> Option<usize> {
+        match &self.item {
+            Item::Sheet(sheet) => sheet.handle.worksheet_position().map(Position::get),
+            _ => None,
+        }
+    }
+
     pub(super) fn last_step(&self) -> Option<&PathStep<'f>> {
         usize::from(self.depth)
             .checked_sub(1)
