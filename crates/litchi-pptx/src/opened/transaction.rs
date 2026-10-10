@@ -362,6 +362,110 @@ impl Edit {
         Ok(true)
     }
 
+    /// Replace the authored `p:cSld@name` while preserving every unrelated
+    /// slide byte. An equal semantic name is an exact lexical no-op.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// let source = litchi_pptx::Package::new()?;
+    /// let mut edit = source.edit()?;
+    /// edit.insert_slide(litchi_core::Position::new(0), "Blank")?;
+    /// edit.set_slide_name(0_usize, "Roadmap")?;
+    /// let _package = edit.commit()?.into_package();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_name<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        name: impl AsRef<str>,
+    ) -> Result<bool> {
+        self.set_slide_properties(slide, Some(name.as_ref()), None)
+    }
+
+    /// Set whether the selected slide is hidden during presentation. The
+    /// native `p:sld/@show` default is visible, so setting `hidden` to false
+    /// preserves an omitted or semantically visible attribute exactly.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// let source = litchi_pptx::Package::new()?;
+    /// let mut edit = source.edit()?;
+    /// edit.insert_slide(litchi_core::Position::new(0), "Blank")?;
+    /// edit.set_slide_hidden(0_usize, true)?;
+    /// let _package = edit.commit()?.into_package();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_hidden<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        hidden: bool,
+    ) -> Result<bool> {
+        self.set_slide_properties(slide, None, Some(hidden))
+    }
+
+    /// Atomically update the authored slide name and visibility together.
+    /// Omitted fields remain byte-for-byte untouched.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// let source = litchi_pptx::Package::new()?;
+    /// let mut edit = source.edit()?;
+    /// edit.insert_slide(litchi_core::Position::new(0), "Blank")?;
+    /// edit.set_slide_properties(0_usize, Some("Roadmap"), Some(true))?;
+    /// let _package = edit.commit()?.into_package();
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_properties<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        name: Option<&str>,
+        hidden: Option<bool>,
+    ) -> Result<bool> {
+        if name.is_none() && hidden.is_none() {
+            return Ok(false);
+        }
+        let position = self.resolve_slide_position(slide.into())?;
+        let selected_slide = self.slides[position].clone();
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let Some(xml) = super::stage_slide_properties(
+            owner.blob(),
+            name,
+            hidden,
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?
+        else {
+            return Ok(false);
+        };
+        let renamed = if let Some(name) = name {
+            let mut slides = self.slides.clone();
+            let mut owned = String::new();
+            owned
+                .try_reserve_exact(name.len())
+                .map_err(|source| Error::Allocation {
+                    resource: "opened-presentation slide name",
+                    source,
+                })?;
+            owned.push_str(name);
+            slides[position].name = owned;
+            let index = SlideNameIndex::build(&slides)?;
+            Some((slides, index))
+        } else {
+            None
+        };
+        self.working
+            .get_part_mut(&selected_slide.part_name)?
+            .set_blob(xml);
+        if let Some((slides, index)) = renamed {
+            self.slides = slides;
+            self.slide_name_index = index;
+        }
+        Ok(true)
+    }
+
     /// Atomically replace visible text in a bounded set of shapes on one slide.
     ///
     /// Every selector is resolved against the same immutable staged slide.
@@ -643,15 +747,17 @@ impl Edit {
         let selected = self.resolve_slide(slide.into())?;
         let key = shape.into();
         let owner = self.working.get_part(&selected.part_name)?;
-        let scene = crate::shape::Scene::read(owner.blob())?;
-        let _shape = scene.shape(key)?;
-        let span = crate::tag::shape::selected_raw_span(owner.blob(), key)?;
         let blob = owner.blob();
+        let span = super::xml::shape_removal_span(blob, key)?;
         let removed_relationships =
             shape_relationship_ids(super::xml::span_bytes(blob, span.clone())?, owner.rels())?;
-        let mut xml = Vec::with_capacity(blob.len().saturating_sub(span.len()));
-        xml.extend_from_slice(super::xml::span_bytes(blob, 0..span.start)?);
-        xml.extend_from_slice(super::xml::span_bytes(blob, span.end..blob.len())?);
+        let (xml, _) = super::xml::stage_shape_removal(
+            blob,
+            key,
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        let xml =
+            xml.ok_or_else(|| invalid("opened-presentation shape removal produced no candidate"))?;
         let retained_relationships = shape_relationship_ids(&xml, owner.rels())?;
         let mut candidate = self.working.clone();
         let mut dependency_roots = Vec::new();
@@ -1930,11 +2036,24 @@ fn max_shape_reference_id(xml: &[u8]) -> Result<Option<u32>> {
             || namespace == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE)
             && matches!(
                 local.as_ref(),
-                b"spTgt" | b"bldP" | b"bldDgm" | b"bldOleChart" | b"bldGraphic"
+                b"spTgt" | b"bldP" | b"bldDgm" | b"bldOleChart" | b"bldGraphic" | b"control"
             ) {
             (true, b"spid".as_slice())
         } else if namespace == P14 && local.as_ref() == b"bmkTgt" {
             (true, b"spid".as_slice())
+        } else if namespace == P14
+            && matches!(
+                local.as_ref(),
+                b"triggerEvt"
+                    | b"playEvt"
+                    | b"stopEvt"
+                    | b"pauseEvt"
+                    | b"resumeEvt"
+                    | b"seekEvt"
+                    | b"nullEvt"
+            )
+        {
+            (true, b"objId".as_slice())
         } else if (namespace == litchi_ooxml_common::xml::DRAWINGML_NAMESPACE
             || namespace == litchi_ooxml_common::xml::STRICT_DRAWINGML_NAMESPACE)
             && matches!(local.as_ref(), b"stCxn" | b"endCxn")
@@ -1955,6 +2074,7 @@ fn max_shape_reference_id(xml: &[u8]) -> Result<Option<u32>> {
                 .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
                 .map_err(|error| Error::Xml(error.to_string()))?;
             let value = value
+                .trim()
                 .parse::<u32>()
                 .map_err(|_| invalid("opened-presentation shape reference identity is invalid"))?;
             maximum = Some(maximum.map_or(value, |current: u32| current.max(value)));

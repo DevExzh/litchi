@@ -117,5 +117,28 @@ Native corpus tests use the three LibreOffice fixture copies listed in record
 
 ## Repository and cleanup
 
-Final artifact audit, staging and cleanup are pending.
+The rewritten base remains an ancestor; no rebase was required. Scoped
+formatting and diff checks passed, and both required staged-file guards printed
+nothing. An audit of 705 newly committed and pending paths found no prohibited
+large evidence or compiled binaries.
+
+Commits made outside this agent's tool calls advanced the branch during the
+turn. Native implementation is included in `724a37462f`, facade implementation
+in `723f8c13eb`, harnesses in `4aced1adff`, and this measurement record in
+`c63a0ad4fb`. The sole source difference after the measured source revision is
+`e8e91b4ec4`, which reordered XLSX module declarations. Substituting that file's
+measured-revision content exactly reproduces the recorded source manifest;
+PPTX and harness code are unchanged. The evidence preserves this provenance.
+
+This agent's own scoped staging still failed because Git could not create
+`/home/zhuhe/code/litchi/.git/worktrees/unified-ops-api/index.lock` on its
+read-only filesystem. The implementation and initial measurement record had
+already been committed by the concurrent process; this agent cannot create
+commits under the current filesystem permissions.
+
+All verification and measurement jobs ended before cleanup. Hash-checked
+turn-owned fixture copies, the generated root lockfile, temporary logs/raw JSON
+and build output were removed. The reduced evidence retains every timing
+sample and binary provenance. No temporary worktree was created; inherited
+files and the base checkout were preserved. The full goal remains active.
 

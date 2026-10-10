@@ -1,8 +1,8 @@
 //! Large single-selector PPTX shape sets stay atomic across native chunks.
 //!
-//! These are one query fanout tests.  They deliberately do not measure
-//! performance or stand in for a 1000-command batch: the facade expands one
-//! selector and keeps one native primary edit and one final commit.
+//! These are selector fanout tests.  They deliberately do not measure
+//! performance; they exercise one selector against many shapes and validate
+//! the resulting package through the native scene reader.
 #![cfg(feature = "pptx")]
 
 use std::io::{Cursor, Read as _, Write as _};
@@ -12,6 +12,7 @@ use litchi_ops::transaction::SemanticLimits;
 use litchi_ops::{Code, File, OpenOptions, SourceMode, props};
 
 const LARGE_SHAPE_COUNT: usize = 1_000;
+const NATIVE_SCENE_SHAPE_COUNT: usize = 10_000;
 const CHUNK_BOUNDARY: usize = 256;
 const SELECTOR: &str = "/slide[1]/*";
 
@@ -71,6 +72,26 @@ fn length(file: &File, index: usize, key: &str) -> i64 {
         panic!("expected a length property")
     };
     value.emu()
+}
+
+fn native_shape_values(bytes: &[u8]) -> Vec<(Option<String>, Option<(i64, i64, i64, i64)>)> {
+    litchi_pptx::Package::from_bytes(bytes)
+        .unwrap()
+        .presentation()
+        .unwrap()
+        .slide(0)
+        .unwrap()
+        .unwrap()
+        .shapes()
+        .unwrap()
+        .iter()
+        .map(|shape| {
+            let bounds = shape
+                .bounds()
+                .map(|value| (value.x(), value.y(), value.width(), value.height()));
+            (shape.text().map(ToOwned::to_owned), bounds)
+        })
+        .collect()
 }
 
 fn rewrite_final_transform(bytes: &[u8]) -> Vec<u8> {
@@ -227,6 +248,101 @@ fn one_selector_mixed_text_and_geometry_fanout_crosses_native_chunk_boundary() {
 }
 
 #[test]
+fn ten_thousand_selector_mixed_updates_are_verified_by_one_native_scene_per_owner() {
+    let bytes = fixture(NATIVE_SCENE_SHAPE_COUNT);
+    for eager in [false, true] {
+        let source = open(&bytes, eager);
+        let before = source.to_bytes().unwrap();
+        let updated = source
+            .set(
+                SELECTOR,
+                props! {
+                    "text" => "ten-thousand mixed",
+                    "x" => "1in",
+                    "y" => "2in",
+                    "width" => "3in",
+                    "height" => "4in",
+                },
+            )
+            .unwrap();
+
+        let values = native_shape_values(&updated.to_bytes().unwrap());
+        assert_eq!(values.len(), NATIVE_SCENE_SHAPE_COUNT);
+        for (index, (shape_text, bounds)) in values.iter().enumerate() {
+            assert_eq!(
+                shape_text.as_deref(),
+                Some("ten-thousand mixed"),
+                "shape {index}"
+            );
+            assert_eq!(
+                *bounds,
+                Some((914_400, 1_828_800, 2_743_200, 3_657_600)),
+                "shape {index}"
+            );
+        }
+        assert_eq!(source.to_bytes().unwrap(), before);
+    }
+}
+
+#[test]
+fn selector_fanout_splits_aggregate_text_cap_for_text_and_mixed_updates() {
+    let text_bytes = litchi_pptx::opened::Limits::default()
+        .max_text_bytes()
+        .checked_div(3)
+        .unwrap()
+        .saturating_add(1);
+    let large_text = "x".repeat(text_bytes);
+
+    for mixed in [false, true] {
+        for eager in [false, true] {
+            let source = open(&fixture(3), eager);
+            let before = source.to_bytes().unwrap();
+            let updated = if mixed {
+                source
+                    .set(
+                        SELECTOR,
+                        props! {
+                            "text" => large_text.as_str(),
+                            "x" => "1in",
+                            "y" => "2in",
+                            "width" => "3in",
+                            "height" => "4in",
+                        },
+                    )
+                    .unwrap()
+            } else {
+                source
+                    .set(SELECTOR, props! { "text" => large_text.as_str() })
+                    .unwrap()
+            };
+
+            let updated_bytes = updated.to_bytes().unwrap_or_else(|error| {
+                panic!(
+                    "large selector output serialization failed (mixed={mixed}, eager={eager}): {error}; source={:?}", std::error::Error::source(&error)
+                )
+            });
+            let values = native_shape_values(&updated_bytes);
+            assert_eq!(values.len(), 3);
+            for (index, (shape_text, bounds)) in values.iter().enumerate() {
+                assert_eq!(
+                    shape_text.as_deref(),
+                    Some(large_text.as_str()),
+                    "shape {index}"
+                );
+                if mixed {
+                    assert_eq!(
+                        *bounds,
+                        Some((914_400, 1_828_800, 2_743_200, 3_657_600)),
+                        "shape {index}"
+                    );
+                }
+            }
+            assert_eq!(source.to_bytes().unwrap(), before);
+        }
+    }
+}
+
+#[test]
 fn selector_fanout_keeps_target_and_staged_byte_limits_atomic() {
     let bytes = fixture(LARGE_SHAPE_COUNT);
     let target_limit = SemanticLimits::builder()
@@ -282,6 +398,32 @@ fn malformed_final_transform_rejects_late_geometry_chunk_without_partial_output(
             "unexpected malformed-transform code: {:?}",
             error.code()
         );
+        assert_eq!(source.to_bytes().unwrap(), before);
+    }
+}
+
+#[test]
+fn publication_token_limits_keep_their_code_and_native_source() {
+    // Native staging permits 8 MiB of text, but publication bounds each XML
+    // token to 4 MiB. The save failure must retain resource semantics.
+    let large_text = "x".repeat(4 * 1024 * 1024 + 1);
+    for eager in [false, true] {
+        let source = open(&fixture(1), eager);
+        let before = source.to_bytes().unwrap();
+        let updated = source
+            .set(SELECTOR, props! { "text" => large_text.as_str() })
+            .unwrap();
+        let error = updated.to_bytes().unwrap_err();
+        assert_eq!(error.code(), Code::LimitExceeded);
+        let leaf = std::error::Error::source(&error).unwrap();
+        let native = leaf.downcast_ref::<litchi_pptx::Error>().unwrap();
+        let litchi_pptx::Error::Opc(litchi_opc::OpcError::XmlPublication { source: audit, .. }) =
+            native
+        else {
+            panic!("expected a native XML publication error: {native:?}")
+        };
+        assert!(audit.is_limit());
+        assert!(!audit.is_allocation());
         assert_eq!(source.to_bytes().unwrap(), before);
     }
 }

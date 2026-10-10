@@ -173,6 +173,7 @@ impl Package {
             source: self.clone(),
             working: self.clone(),
             changes: Vec::new(),
+            shape_removals: false,
         })
     }
 
@@ -261,26 +262,27 @@ impl Package {
     /// Replay an exact-source patch without changing this package.
     pub fn apply(&self, patch: &Patch) -> Result<Self> {
         self.check()?;
-        let (source, before_root, before_order, after_root, after_order, changes) =
-            match &patch.data {
-                PatchData::Local {
-                    source,
-                    before_root,
-                    before_order,
-                    after_root,
-                    after_order,
-                    changes,
-                } => (
-                    source,
-                    before_root,
-                    before_order,
-                    after_root,
-                    after_order,
-                    changes,
-                ),
-                PatchData::Durable(data) => return durable::apply(self, data),
-                PatchData::Topology(data) => return data.apply(self),
-            };
+        let (source, before_root, before_order, after_root, after_order, changes) = match &patch
+            .data
+        {
+            PatchData::Local {
+                source,
+                before_root,
+                before_order,
+                after_root,
+                after_order,
+                changes,
+            } => (
+                source,
+                before_root,
+                before_order,
+                after_root,
+                after_order,
+                changes,
+            ),
+            PatchData::Durable(data) => return durable::apply(self, data, patch.shape_removals),
+            PatchData::Topology(data) => return data.apply(self, patch.shape_removals),
+        };
         source.check()?;
         if !self.same_source_owner(source)
             || self.root.as_bytes() != before_root.as_bytes()
@@ -1010,12 +1012,13 @@ impl Slide {
     }
 }
 
-/// Isolated edit of shape creation/text, slide order, and dependency-free
-/// slide removal.
+/// Isolated edit of shape creation, properties and removal, slide order,
+/// and dependency-free slide removal.
 pub struct Edit {
     source: Package,
     working: Package,
     changes: Vec<SourceBackedSlidePatch>,
+    shape_removals: bool,
 }
 impl Edit {
     /// Insert an empty slide at a checked logical position using an exact
@@ -1219,6 +1222,102 @@ impl Edit {
         Ok(changed)
     }
 
+    /// Replace one existing slide's authored `p:cSld@name` value.
+    ///
+    /// The edit is staged against the selected slide's exact source bytes,
+    /// retains unrelated XML and relationships, and composes with earlier
+    /// changes to the same slide. An equal name is an exact no-op.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// use std::sync::Arc;
+    /// use litchi_core::OwnedSource;
+    /// use litchi_pptx::{builder::Builder, source::Package};
+    /// let mut builder = Builder::new()?;
+    /// builder.presentation()?.add_slide()?;
+    /// let mut authored = builder.build()?;
+    /// let source = Package::from_read_at(Arc::new(OwnedSource::new(authored.to_bytes()?)))?;
+    /// let mut edit = source.edit()?;
+    /// edit.set_slide_name(0, "Roadmap")?;
+    /// let _commit = edit.commit()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_name(
+        &mut self,
+        slide: impl Into<Position>,
+        name: impl AsRef<str>,
+    ) -> Result<bool> {
+        let name = name.as_ref();
+        let changed = self.stage_slide_edit(
+            slide.into(),
+            |_package, _snapshot| Ok(None),
+            |edit| edit.set_slide_name(name).map(usize::from),
+        )? != 0;
+        self.shape_removals |= changed;
+        Ok(changed)
+    }
+
+    /// Set whether one existing slide is hidden during presentation.
+    ///
+    /// Only the slide-root `p:sld@show` policy is changed. Unrelated root,
+    /// shape, relationship, and opaque XML bytes remain source-owned.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// use std::sync::Arc;
+    /// use litchi_core::OwnedSource;
+    /// use litchi_pptx::{builder::Builder, source::Package};
+    /// let mut builder = Builder::new()?;
+    /// builder.presentation()?.add_slide()?;
+    /// let mut authored = builder.build()?;
+    /// let source = Package::from_read_at(Arc::new(OwnedSource::new(authored.to_bytes()?)))?;
+    /// let mut edit = source.edit()?;
+    /// edit.set_slide_hidden(0, true)?;
+    /// let _commit = edit.commit()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_hidden(&mut self, slide: impl Into<Position>, hidden: bool) -> Result<bool> {
+        let changed = self.stage_slide_edit(
+            slide.into(),
+            |_package, _snapshot| Ok(None),
+            |edit| edit.set_slide_hidden(hidden).map(usize::from),
+        )? != 0;
+        self.shape_removals |= changed;
+        Ok(changed)
+    }
+
+    /// Remove one top-level slide shape, composing with earlier changes.
+    ///
+    /// Removing a group removes its entire subtree. Grouped descendants and
+    /// removals leaving connector or animation references are refused. Unused
+    /// relationships and parts are retained for exact source replay.
+    ///
+    /// ```no_run
+    /// # fn example() -> litchi_pptx::Result<()> {
+    /// let package = litchi_pptx::source::Package::open("deck.pptx")?;
+    /// let mut edit = package.edit()?;
+    /// edit.remove_shape(0, 0_usize)?;
+    /// edit.commit()?.into_package().save("trimmed.pptx")?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn remove_shape<'k>(
+        &mut self,
+        slide: impl Into<Position>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<bool> {
+        let shape = shape.into();
+        let changed = self.stage_slide_edit(
+            slide.into(),
+            |_package, _snapshot| Ok(None),
+            |edit| edit.remove_shape(shape).map(usize::from),
+        )? != 0;
+        self.shape_removals |= changed;
+        Ok(changed)
+    }
+
     /// Replace text in one shape, composing with earlier staged changes.
     pub fn set_shape_text<'k>(
         &mut self,
@@ -1376,12 +1475,14 @@ impl Edit {
         if self.working.topology.is_some() {
             let source = self.source;
             let topology_patch = topology::patch_from_packages(&source, &self.working)?;
-            topology_patch.encoded_len()?;
+            let patch = Patch {
+                shape_removals: self.shape_removals,
+                data: PatchData::Topology(Arc::new(topology_patch)),
+            };
+            patch.encoded_len()?;
             return Ok(Commit {
                 package: self.working,
-                patch: Patch {
-                    data: PatchData::Topology(Arc::new(topology_patch)),
-                },
+                patch,
             });
         }
         self.changes
@@ -1392,6 +1493,7 @@ impl Edit {
         let after_root = self.working.root.clone();
         let after_order = self.working.order.clone();
         let patch = Patch {
+            shape_removals: self.shape_removals,
             data: PatchData::Local {
                 source,
                 before_root,
@@ -1409,10 +1511,11 @@ impl Edit {
     }
 }
 
-/// Reversible exact-source order and slide-property patch, with bounded durable encoding.
+/// Reversible exact-source slide and shape patch, with bounded durable encoding.
 #[derive(Clone)]
 pub struct Patch {
     data: PatchData,
+    shape_removals: bool,
 }
 #[derive(Clone)]
 enum PatchData {
@@ -1482,7 +1585,10 @@ impl Patch {
             PatchData::Durable(data) => PatchData::Durable(data.inverse()),
             PatchData::Topology(data) => PatchData::Topology(Arc::new(data.inverse())),
         };
-        Self { data }
+        Self {
+            data,
+            shape_removals: self.shape_removals,
+        }
     }
 }
 

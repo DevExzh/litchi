@@ -498,6 +498,16 @@ fn additions_do_not_activate_dangling_shape_references() {
             r#"<p:cxnSp><p:nvCxnSpPr><p:cNvPr id="3" name="Connector"/><p:cNvCxnSpPr><a:stCxn id="4" idx="0"/><a:endCxn id="5" idx="0"/></p:cNvCxnSpPr><p:nvPr/></p:nvCxnSpPr><p:spPr/></p:cxnSp>"#,
             6,
         ),
+        (
+            "</p:cSld>",
+            r#"<p:controls><p:control spid="9"/></p:controls>"#,
+            10,
+        ),
+        (
+            "</p:sld>",
+            r#"<p:extLst><p:ext uri="event"><p14:playEvt xmlns:p14="http://schemas.microsoft.com/office/powerpoint/2010/main" objId="9"/></p:ext></p:extLst>"#,
+            10,
+        ),
     ] {
         let before = slide_extra(&bytes(1, false), marker, extra);
         let source = open(&before);

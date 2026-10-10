@@ -22,7 +22,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `d652462a3706cf23f52c8602715b82a354fb090a00e5332cfcc99696795da7e2` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `4cb6f2bc632a3fef68c45382f4f93ec25a37cda1a9778203cab39d6085ae1d00` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `d1ca594366ded8d3bd1a2d624fcbe8dbccc70a832ec6491c4dba50f713ad3cfc` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -3652,5 +3652,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `remove` | `slide` | `dependency-topology` | native PPTX slide removal currently admits only a dependency-free slide with exactly one layout relationship; notes, comments, images, media, and external or internal relationship closure remain pending | M2 PPTX dependency-aware slide removal |
 | `remove` | `slide` | `final-slide` | native PPTX slide removal currently preserves the final slide and cannot remove the last slide from a presentation | M2 PPTX final-slide removal policy |
 | `remove` | `slide` | `canonical-target` | source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling | M2 PPTX equivalent relationship-target spellings |
+| `remove` | `shape` | `dependency-topology` | shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure | M2 PPTX dependency-aware shape removal |
+| `remove` | `shape` | `non-top-level` | native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology | M2 PPTX grouped/master/layout shape removal |
 | `set` | `shape` | `native-shape-text-preservation` | text replacement requires an existing slide shape text body and native edit admission; master/layout shapes, text-body creation and rich-text formatting remain pending | M2 PPTX structural and rich-text editing |
 | `set` | `presentation` | `managed-signature-removal` | explicit signature removal requires native eager materialization, which managed sources refuse | M2 PPTX managed source-preserving signature removal |

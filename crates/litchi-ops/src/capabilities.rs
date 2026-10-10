@@ -149,6 +149,10 @@ pub struct Capabilities {
     /// slides. Removal and slide or top-level text-box insertion have
     /// source-native paths.
     pptx_slide_remove: Option<bool>,
+    /// For a file report, whether the PPTX owner can remove top-level slide
+    /// shapes. The native path still refuses grouped, master/layout, and
+    /// dependency-bearing shapes during operation admission.
+    pptx_shape_remove: Option<bool>,
     coverage: Coverage,
     ordinary_output_protected: bool,
 }
@@ -458,6 +462,7 @@ impl Capabilities {
             pptx_slide_add: (format == FileFormat::Pptx).then_some(true),
             pptx_shape_add: (format == FileFormat::Pptx).then_some(true),
             pptx_slide_remove: (format == FileFormat::Pptx).then_some(true),
+            pptx_shape_remove: (format == FileFormat::Pptx).then_some(true),
             coverage: coverage(Some(format)),
             ordinary_output_protected: false,
         }
@@ -478,6 +483,7 @@ impl Capabilities {
             pptx_slide_add: pptx_slide_add(file),
             pptx_shape_add: pptx_shape_add(file),
             pptx_slide_remove: pptx_slide_remove(file),
+            pptx_shape_remove: pptx_shape_remove(file),
             coverage: coverage(format),
             ordinary_output_protected: {
                 let mut protected = false;
@@ -661,7 +667,7 @@ impl Capabilities {
                 if self.retains_source == Some(false) {
                     return RETAINED_SOURCE.support();
                 }
-                if self.pptx_slide_remove == Some(true) {
+                if self.pptx_slide_remove == Some(true) || self.pptx_shape_remove == Some(true) {
                     return Support::Supported;
                 }
                 return RETAINED_SOURCE.support();
@@ -753,6 +759,7 @@ impl Capabilities {
             pptx_slide_add: self.pptx_slide_add,
             pptx_shape_add: self.pptx_shape_add,
             pptx_slide_remove: self.pptx_slide_remove,
+            pptx_shape_remove: self.pptx_shape_remove,
             next: 0,
         }
     }
@@ -942,6 +949,24 @@ fn pptx_slide_remove(file: &File) -> Option<bool> {
         match file {
             File::Pptx(handle) => Some(handle.supports_slide_removal()),
             File::Signed(signed) => pptx_slide_remove(signed.file()),
+            _ => None,
+        }
+    }
+    #[cfg(not(feature = "pptx"))]
+    {
+        let _ = file;
+        None
+    }
+}
+
+/// Whether a contextual PPTX owner can remove a top-level slide shape. The
+/// operation itself admits only supported shape topology and dependencies.
+fn pptx_shape_remove(file: &File) -> Option<bool> {
+    #[cfg(feature = "pptx")]
+    {
+        match file {
+            File::Pptx(handle) => Some(handle.supports_shape_removal()),
+            File::Signed(signed) => pptx_shape_remove(signed.file()),
             _ => None,
         }
     }
@@ -1601,6 +1626,7 @@ pub struct Elements {
     pptx_slide_add: Option<bool>,
     pptx_shape_add: Option<bool>,
     pptx_slide_remove: Option<bool>,
+    pptx_shape_remove: Option<bool>,
     next: u16,
 }
 
@@ -1618,6 +1644,7 @@ impl Iterator for Elements {
             pptx_slide_add: self.pptx_slide_add,
             pptx_shape_add: self.pptx_shape_add,
             pptx_slide_remove: self.pptx_slide_remove,
+            pptx_shape_remove: self.pptx_shape_remove,
             index: self.next,
         };
         self.next += 1;
@@ -1635,6 +1662,7 @@ pub struct Element {
     pptx_slide_add: Option<bool>,
     pptx_shape_add: Option<bool>,
     pptx_slide_remove: Option<bool>,
+    pptx_shape_remove: Option<bool>,
     index: u16,
 }
 
@@ -1761,7 +1789,7 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Pptx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "shape" | "placeholder")
+                && matches!(self.data().canonical, "slide" | "shape" | "placeholder")
                 && readable);
         let structural = {
             #[cfg(feature = "docx")]
@@ -1798,8 +1826,19 @@ impl Element {
         let remove = structural
             || (self.adapter == Adapter::Pptx
                 && self.retains_source != Some(false)
-                && self.pptx_slide_remove == Some(true)
-                && self.data().canonical == "slide"
+                && ((self.data().canonical == "slide" && self.pptx_slide_remove == Some(true))
+                    || (matches!(
+                        self.data().canonical,
+                        "shape"
+                            | "placeholder"
+                            | "picture"
+                            | "table"
+                            | "chart"
+                            | "group"
+                            | "connector"
+                            | "smartart"
+                            | "ole"
+                    ) && self.pptx_shape_remove == Some(true)))
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let remove = structural;
@@ -1960,7 +1999,7 @@ const fn pptx_create_gap(context: &'static str, reason: &'static str) -> GapSpec
 }
 
 #[cfg(feature = "pptx")]
-static PPTX_WRITE_GAPS: [GapSpec; 12] = [
+static PPTX_WRITE_GAPS: [GapSpec; 14] = [
     pptx_create_gap(
         "template",
         "native PPTX template creation is not integrated",
@@ -2039,6 +2078,26 @@ static PPTX_WRITE_GAPS: [GapSpec; 12] = [
         code: Code::UnsupportedCapability,
         follow_up: "M2 PPTX equivalent relationship-target spellings",
         reason: "source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "shape",
+            context: "dependency-topology",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPTX dependency-aware shape removal",
+        reason: "shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "shape",
+            context: "non-top-level",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPTX grouped/master/layout shape removal",
+        reason: "native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2150,6 +2209,7 @@ impl Iterator for Related {
             pptx_slide_add: element.pptx_slide_add,
             pptx_shape_add: element.pptx_shape_add,
             pptx_slide_remove: element.pptx_slide_remove,
+            pptx_shape_remove: element.pptx_shape_remove,
             index,
         })
     }

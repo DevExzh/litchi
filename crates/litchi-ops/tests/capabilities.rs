@@ -426,7 +426,7 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
 
 #[cfg(feature = "pptx")]
 #[test]
-fn pptx_reports_selection_and_slide_add_writes() {
+fn pptx_reports_selection_and_structural_writes() {
     let caps = Capabilities::of(FileFormat::Pptx);
     assert!(caps.verb(Verb::Get).is_supported());
     assert!(caps.verb(Verb::Add).is_supported());
@@ -448,7 +448,9 @@ fn pptx_reports_selection_and_slide_add_writes() {
                 && matches!(property.name(), "x" | "y" | "width" | "height");
             assert_eq!(
                 property.set(),
-                text_write || shape_geometry_write,
+                text_write
+                    || shape_geometry_write
+                    || (element.name() == "slide" && matches!(property.name(), "name" | "hidden")),
                 "{}",
                 property.name()
             );
@@ -464,7 +466,21 @@ fn pptx_reports_selection_and_slide_add_writes() {
             );
         }
     }
+    for kind in [
+        "picture",
+        "table",
+        "chart",
+        "group",
+        "connector",
+        "smartart",
+        "ole",
+    ] {
+        let operations = caps.element(kind).unwrap().operations();
+        assert!(operations.remove, "{kind}");
+        assert!(!operations.set, "{kind}");
+    }
     let slide = caps.element("slide").unwrap();
+    assert!(slide.operations().set);
     assert!(slide.operations().add);
     assert!(slide.operations().remove);
     assert!(slide.property("layout").unwrap().add());
@@ -475,12 +491,14 @@ fn pptx_reports_selection_and_slide_add_writes() {
     }
     let shape = caps.element("shape").unwrap();
     assert!(shape.operations().add);
+    assert!(shape.operations().remove);
     for property in shape.properties() {
         let add = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
         assert_eq!(property.add(), add, "{}", property.name());
     }
     let placeholder = caps.element("placeholder").unwrap();
     assert!(!placeholder.operations().add);
+    assert!(placeholder.operations().remove);
     for property in placeholder.properties() {
         assert!(!property.add(), "{}", property.name());
         assert_eq!(
@@ -596,11 +614,38 @@ fn pptx_reports_selection_and_slide_add_writes() {
         assert_eq!(gap.follow_up(), follow_up);
         assert_eq!(gap.reason(), reason);
     }
+    for (context, follow_up, reason) in [
+        (
+            "dependency-topology",
+            "M2 PPTX dependency-aware shape removal",
+            "shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure",
+        ),
+        (
+            "non-top-level",
+            "M2 PPTX grouped/master/layout shape removal",
+            "native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology",
+        ),
+    ] {
+        let gap = caps
+            .gaps()
+            .find(|gap| {
+                gap.subject()
+                    == litchi_ops::capabilities::Subject::Operation {
+                        verb: "remove",
+                        element: "shape",
+                        context,
+                    }
+            })
+            .unwrap_or_else(|| panic!("shape removal gap {context} is missing"));
+        assert_eq!(gap.code(), Code::UnsupportedCapability);
+        assert_eq!(gap.follow_up(), follow_up);
+        assert_eq!(gap.reason(), reason);
+    }
 }
 
 #[cfg(feature = "pptx")]
 #[test]
-fn pptx_slide_add_capabilities_follow_owner_and_retention_policy() {
+fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
     use litchi_ops::{OpenOptions, SourceMode};
     let bytes = std::fs::read(concat!(
         env!("CARGO_MANIFEST_DIR"),
@@ -630,7 +675,7 @@ fn pptx_slide_add_capabilities_follow_owner_and_retention_policy() {
             .add()
     );
     assert!(source_caps.element("shape").unwrap().operations().add);
-    assert!(!source_caps.element("shape").unwrap().operations().remove);
+    assert!(source_caps.element("shape").unwrap().operations().remove);
     for property in source_caps.element("shape").unwrap().properties() {
         let add = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
         assert_eq!(property.add(), add, "{}", property.name());
@@ -639,7 +684,7 @@ fn pptx_slide_add_capabilities_follow_owner_and_retention_policy() {
     }
     assert!(!source_caps.element("placeholder").unwrap().operations().add);
     assert!(
-        !source_caps
+        source_caps
             .element("placeholder")
             .unwrap()
             .operations()
@@ -657,7 +702,19 @@ fn pptx_slide_add_capabilities_follow_owner_and_retention_policy() {
     for element in source_caps.elements() {
         assert_eq!(
             element.operations().remove,
-            element.name() == "slide",
+            matches!(
+                element.name(),
+                "slide"
+                    | "shape"
+                    | "placeholder"
+                    | "picture"
+                    | "table"
+                    | "chart"
+                    | "group"
+                    | "connector"
+                    | "smartart"
+                    | "ole"
+            ),
             "{}",
             element.name()
         );
@@ -678,7 +735,19 @@ fn pptx_slide_add_capabilities_follow_owner_and_retention_policy() {
     for element in eager_caps.elements() {
         assert_eq!(
             element.operations().remove,
-            element.name() == "slide",
+            matches!(
+                element.name(),
+                "slide"
+                    | "shape"
+                    | "placeholder"
+                    | "picture"
+                    | "table"
+                    | "chart"
+                    | "group"
+                    | "connector"
+                    | "smartart"
+                    | "ole"
+            ),
             "{}",
             element.name()
         );
@@ -698,10 +767,10 @@ fn pptx_slide_add_capabilities_follow_owner_and_retention_policy() {
         let set = matches!(property.name(), "text" | "x" | "y" | "width" | "height");
         assert_eq!(property.set(), set, "{}", property.name());
     }
-    assert!(!eager_caps.element("shape").unwrap().operations().remove);
+    assert!(eager_caps.element("shape").unwrap().operations().remove);
     assert!(!eager_caps.element("placeholder").unwrap().operations().add);
     assert!(
-        !eager_caps
+        eager_caps
             .element("placeholder")
             .unwrap()
             .operations()

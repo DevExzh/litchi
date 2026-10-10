@@ -44,6 +44,7 @@ transaction is the bare `Package::edit()`.
 |---|---|---|---|
 | Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · ✅ pptx eager entry (0116) · 🔴 xlsx owner (W2), odt already `edit` but moves onto `Package` (W3) |
 | Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families |
+| PPTX slide metadata | `Edit::{set_slide_name, set_slide_hidden}` | — | Eager/source primary edits and unified slide `name`/`hidden` setters; eager and focused source edits also accept combined `set_slide_properties` (0162) |
 | PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
 | PPTX chunked shape publication | `Edit::{set_shape_text_chunks, set_shape_property_chunks}` | — | Eager/source primary and focused source edits admit bounded, globally disjoint chunks together for one same-slide publication (0158); single-chunk setter limits are retained |
 | Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116); 🔴 xlsb/scoped PPTX families (W2) |
@@ -1099,3 +1100,13 @@ variant are removed. Primary opened slide moves take a semantic source and
 checked destination, swaps take two semantic selectors, and complete reordering
 takes a selector permutation; raw slide IDs remain in private lowering. Other
 legacy order families and positional read signatures remain pending.
+
+## PPTX source shape removal (0161)
+
+Primary source `Edit::remove_shape(slide, shape)` and focused slide
+`remove_shape(shape)` use the same verb and semantic shape key as the eager
+editor. They participate in the existing Edit/Commit/Patch family; no mutable
+package escape or parallel transaction type is introduced. The unified facade
+routes top-level shape targets through those edits. Source removal preserves
+unused relationship resources for exact replay, while shared native admission
+refuses retained connector/animation references to removed shape identities.

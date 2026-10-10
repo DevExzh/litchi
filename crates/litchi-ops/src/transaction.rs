@@ -224,7 +224,8 @@ impl File {
     /// Edit atomically through a closure, retaining a reversible patch and
     /// diagnostics. Integrates DOCX main-document writes and supported XLSX
     /// cell, worksheet and row/column layout writes, plus PPTX shape text,
-    /// eager slide/text-box creation, slide ordering and dependency-free slide removal.
+    /// slide/text-box creation, slide ordering, top-level shape removal and
+    /// dependency-free slide removal.
     ///
     /// # Errors
     /// Returns the first failed mutation with its zero-based item index, the

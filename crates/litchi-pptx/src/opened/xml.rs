@@ -313,7 +313,22 @@ fn write_compact_start(
         let value = attribute
             .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
             .map_err(|error| Error::Xml(error.to_string()))?;
-        output.extend_from_slice(quick_xml::escape::escape(value.as_ref()).as_bytes());
+        // Literal attribute whitespace is normalized to spaces on reparse.
+        // Keep whitespace that originated in character references semantic.
+        let escaped = quick_xml::escape::escape(value.as_ref());
+        let mut start = 0;
+        for (index, byte) in escaped.bytes().enumerate() {
+            let reference: &[u8] = match byte {
+                b'\t' => b"&#9;",
+                b'\n' => b"&#10;",
+                b'\r' => b"&#13;",
+                _ => continue,
+            };
+            output.extend_from_slice(&escaped.as_bytes()[start..index]);
+            output.extend_from_slice(reference);
+            start = index + 1;
+        }
+        output.extend_from_slice(&escaped.as_bytes()[start..]);
         output.push(b'"');
     }
     output.extend_from_slice(if empty { b"/>" } else { b">" });
@@ -1894,6 +1909,259 @@ pub(crate) fn connector_connection_ids(source: &[u8]) -> Result<BTreeSet<u32>> {
         }
     }
     Ok(connections)
+}
+
+/// Plan removal of one direct shape-tree root and collect every shape identity
+/// contained by that root. A grouped child is not a root and therefore cannot
+/// be removed independently; removing the group root removes the complete
+/// grouped subtree as one lexical unit.
+fn shape_removal_plan(
+    xml: &[u8],
+    key: crate::shape::Key<'_>,
+) -> Result<(Range<usize>, BTreeSet<u32>, usize)> {
+    let scene = crate::shape::Scene::read(xml)?;
+    if scene.is_rewritten() {
+        return Err(Error::UnsafeEdit {
+            operation: "remove_shape",
+            reason: "shape removal does not support markup-compatibility branch selection",
+        });
+    }
+    let selected = scene.shape(key)?;
+    let selected_index = selected.common().index();
+    let root = scene
+        .roots()
+        .find(|shape| shape.common().index() == selected_index)
+        .ok_or(Error::UnsafeEdit {
+            operation: "remove_shape",
+            reason: "shape removal requires a direct top-level shape",
+        })?;
+    let root_span = root.common().span()?.range(xml.len())?;
+    let mut identities = BTreeSet::new();
+    let mut removed_identities = BTreeSet::new();
+    for shape in scene.iter() {
+        let span = shape.common().span()?.range(xml.len())?;
+        let inside_root = root_span.start <= span.start && span.end <= root_span.end;
+        let Some(id) = shape.id() else {
+            return Err(invalid(
+                "opened-presentation shape removal requires identifiable shapes",
+            ));
+        };
+        if !identities.insert(id) {
+            return Err(invalid(
+                "opened-presentation shape removal requires unique shape identities",
+            ));
+        }
+        if inside_root {
+            removed_identities.insert(id);
+        }
+    }
+    if removed_identities.is_empty() {
+        return Err(invalid(
+            "opened-presentation removed shape has no non-visual identity",
+        ));
+    }
+    Ok((root_span, removed_identities, scene.len()))
+}
+
+/// Return the raw span of one removable top-level shape after semantic and
+/// identity validation. The eager editor uses this before its relationship
+/// cleanup; source-backed staging uses the complete plan below.
+pub(crate) fn shape_removal_span(xml: &[u8], key: crate::shape::Key<'_>) -> Result<Range<usize>> {
+    shape_removal_plan(xml, key).map(|(span, _, _)| span)
+}
+
+/// Stage one direct top-level shape removal without changing slide
+/// relationships. Relationship IDs and now-unreachable Parts are deliberately
+/// retained by source-backed edits; keeping those opaque package resources is
+/// legal and preserves source topology for exact durable replay.
+pub(crate) fn stage_shape_removal(
+    xml: &[u8],
+    key: crate::shape::Key<'_>,
+    max_output_bytes: usize,
+) -> Result<(Option<Vec<u8>>, usize)> {
+    let (span, removed_identities, shape_count) = shape_removal_plan(xml, key)?;
+    let retained = xml
+        .len()
+        .checked_sub(span.len())
+        .ok_or_else(|| invalid("opened-presentation removed shape span underflows"))?;
+    if retained > max_output_bytes {
+        return Err(Error::Limit {
+            resource: "opened-presentation removed shape XML",
+            limit: max_output_bytes,
+        });
+    }
+    let mut candidate = Vec::new();
+    candidate
+        .try_reserve_exact(retained)
+        .map_err(|source| Error::Allocation {
+            resource: "opened-presentation removed shape XML",
+            source,
+        })?;
+    candidate.extend_from_slice(span_bytes(xml, 0..span.start)?);
+    candidate.extend_from_slice(span_bytes(xml, span.end..xml.len())?);
+    validate_shape_removal_dependencies(&candidate, &removed_identities)?;
+
+    let published = crate::shape::Scene::read(&candidate)?;
+    if published.is_rewritten()
+        || published.len().checked_add(removed_identities.len()) != Some(shape_count)
+    {
+        return Err(invalid(
+            "opened-presentation shape removal changed the semantic shape graph",
+        ));
+    }
+    let original = crate::shape::Scene::read(xml)?;
+    let mut retained_shapes = original.iter().filter(|shape| {
+        shape
+            .id()
+            .is_none_or(|id| !removed_identities.contains(&id))
+    });
+    for shape in published.iter() {
+        let Some(previous) = retained_shapes.next() else {
+            return Err(invalid(
+                "opened-presentation shape removal changed retained shape identities",
+            ));
+        };
+        if previous.id() != shape.id() {
+            return Err(invalid(
+                "opened-presentation shape removal changed retained shape identities",
+            ));
+        }
+    }
+    if retained_shapes.next().is_some() {
+        return Err(invalid(
+            "opened-presentation shape removal lost a retained shape",
+        ));
+    }
+    Ok((Some(candidate), 1))
+}
+
+/// Validate that no connector or animation target in the retained XML points
+/// at a removed shape identity. The scan intentionally covers only known OOXML
+/// target vocabularies; malformed values in those vocabularies are refused.
+pub(crate) fn validate_shape_removal_dependencies(
+    candidate: &[u8],
+    removed_identities: &BTreeSet<u32>,
+) -> Result<()> {
+    let references = shape_reference_ids(candidate)?;
+    if references
+        .iter()
+        .any(|identity| removed_identities.contains(identity))
+    {
+        return Err(Error::UnsafeEdit {
+            operation: "remove_shape",
+            reason: "the removed shape is referenced by a connector or animation target",
+        });
+    }
+    Ok(())
+}
+
+/// Collect connector, timing, show-event and control shape associations from
+/// one owner. Unknown identity-bearing markup is an explicit removal boundary.
+pub(crate) fn shape_reference_ids(source: &[u8]) -> Result<BTreeSet<u32>> {
+    const P14: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+    let mut reader = NsReader::from_reader(source);
+    reader.config_mut().trim_text(false);
+    let decoder = reader.decoder();
+    let mut references = BTreeSet::new();
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let (Event::Start(element) | Event::Empty(element)) = event else {
+            if matches!(event, Event::DocType(_)) {
+                return Err(invalid(
+                    "opened-presentation shape XML contains document-level markup",
+                ));
+            }
+            if matches!(event, Event::Eof) {
+                break;
+            }
+            continue;
+        };
+        let namespace = match namespace {
+            ResolveResult::Bound(Namespace(value)) => value,
+            _ => b"".as_slice(),
+        };
+        let local = element.local_name();
+        let attribute_name = if (namespace == crate::namespace::PRESENTATIONML_NAMESPACE
+            || namespace == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE)
+            && matches!(
+                local.as_ref(),
+                b"spTgt" | b"bldP" | b"bldDgm" | b"bldOleChart" | b"bldGraphic" | b"control"
+            ) {
+            Some(b"spid".as_slice())
+        } else if namespace == P14 && local.as_ref() == b"bmkTgt" {
+            Some(b"spid".as_slice())
+        } else if namespace == P14
+            && matches!(
+                local.as_ref(),
+                b"triggerEvt"
+                    | b"playEvt"
+                    | b"stopEvt"
+                    | b"pauseEvt"
+                    | b"resumeEvt"
+                    | b"seekEvt"
+                    | b"nullEvt"
+            )
+        {
+            Some(b"objId".as_slice())
+        } else if (namespace == DRAWINGML_NAMESPACE || namespace == STRICT_DRAWINGML_NAMESPACE)
+            && matches!(local.as_ref(), b"stCxn" | b"endCxn")
+        {
+            Some(b"id".as_slice())
+        } else {
+            None
+        };
+        let mut identity = None;
+        for attribute in element.checked_attributes() {
+            let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+            let attribute_local = attribute.key.local_name();
+            let legacy_ole = (namespace == crate::namespace::PRESENTATIONML_NAMESPACE
+                || namespace == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE)
+                && local.as_ref() == b"oleObj"
+                && attribute.key.as_ref() == b"spid";
+            if Some(attribute.key.as_ref()) != attribute_name {
+                if !legacy_ole
+                    && matches!(
+                        attribute_local.as_ref(),
+                        b"spid" | b"objId" | b"shapeId" | b"objectId"
+                    )
+                {
+                    return Err(Error::UnsafeEdit {
+                        operation: "remove_shape",
+                        reason: "an opaque shape identity association cannot be preserved after removal",
+                    });
+                }
+                continue;
+            }
+            if identity.is_some() {
+                return Err(invalid(
+                    "opened-presentation shape reference repeats its identity attribute",
+                ));
+            }
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, decoder)
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            identity = Some(value.trim().parse::<u32>().map_err(|_| {
+                if local.as_ref() == b"control" {
+                    Error::UnsafeEdit {
+                        operation: "remove_shape",
+                        reason: "legacy control shape associations cannot be resolved for removal",
+                    }
+                } else {
+                    invalid("opened-presentation shape reference identity is invalid")
+                }
+            })?);
+        }
+        if let Some(identity) = identity {
+            references.insert(identity);
+        } else if attribute_name.is_some() {
+            return Err(invalid(
+                "opened-presentation shape reference identity is missing",
+            ));
+        }
+    }
+    Ok(references)
 }
 
 struct ShapeRemap<'a> {

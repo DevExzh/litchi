@@ -888,6 +888,12 @@ impl Classify for litchi_core::Error {
 impl Classify for litchi_opc::OpcError {
     fn classify(&self) -> Class {
         match self {
+            Self::XmlPublication { source, .. } if source.is_limit() => {
+                Class::of(Code::LimitExceeded)
+            },
+            Self::XmlPublication { source, .. } if source.is_allocation() => {
+                Class::of(Code::InternalError)
+            },
             Self::IoError(error) => error.classify(),
             Self::PackageNotFound(_) => Class::of(Code::FileNotFound),
             Self::SourceChanged { .. }

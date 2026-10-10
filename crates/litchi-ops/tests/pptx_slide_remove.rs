@@ -144,7 +144,7 @@ fn removal_rejects_zero_mixed_and_unsupported_targets_without_mutation() {
     let mixed = source
         .remove(scoped_slide_query("slide[1], slide[1] > shape[1]"))
         .expect_err("mixed slide and shape query");
-    assert_eq!(mixed.code(), Code::UnsupportedType);
+    assert_eq!(mixed.code(), Code::InvalidArgument);
 
     let predicate = source
         .remove(scoped_slide_query("slide[unknownPredicate=true]"))
@@ -293,7 +293,7 @@ fn removal_honors_expanded_target_and_staged_byte_limits() {
     assert_eq!(source.to_bytes().unwrap(), original_bytes);
 
     let exact_limit = SemanticLimits::builder()
-        .max_staged_bytes(2 * size_of::<usize>())
+        .max_staged_bytes(2 * size_of::<(usize, usize, usize)>())
         .unwrap()
         .build()
         .unwrap();

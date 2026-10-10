@@ -1,4 +1,4 @@
-//! Unified PPTX slide removal through the native source/eager transaction.
+//! Unified PPTX slide and shape removal through the native source/eager transaction.
 //!
 //! Target resolution stays in the facade so paths and scoped queries have the
 //! same diagnostics as the other mutation verbs.  The native opened-package
@@ -18,17 +18,25 @@ use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::{Code, Error, Result};
 
-/// One selected slide position is the bounded action charge for removal.
+/// One resolved native target is the bounded action charge for removal.
 /// Native snapshot and patch retention is charged separately from the proof.
-const REMOVE_TARGET_BYTES: usize = size_of::<usize>();
+const REMOVE_TARGET_BYTES: usize = size_of::<Target>();
+
+// Variant order makes descending iteration remove shapes before slides;
+// positions within each slide descend so earlier shape ordinals stay valid.
+#[derive(Clone, Copy, Debug, Eq, Hash, Ord, PartialEq, PartialOrd)]
+enum Target {
+    Slide(usize),
+    Shape { slide: usize, position: usize },
+}
 
 impl Pptx {
-    /// Remove one path or every slide matched by a scoped query.
+    /// Remove slides or top-level shapes selected by a path or scoped query.
     pub(crate) fn remove<'p>(&self, target: TargetArg<'p>) -> Result<Commit> {
         self.remove_with_limits(target, &SemanticLimits::default())
     }
 
-    /// Remove selected slides in one failure-atomic native transaction.
+    /// Remove selected elements in one failure-atomic native transaction.
     pub(crate) fn remove_with_limits<'p>(
         &self,
         target: TargetArg<'p>,
@@ -46,6 +54,7 @@ impl Pptx {
         self.admit_remove_owner()?;
         let mut positions = resolve_targets(self, &target, limits)?;
         admit_remove_targets(positions.len(), limits)?;
+        reject_overlaps(&positions)?;
         self.check_source()?;
 
         // Positions are resolved against one immutable snapshot.  Removing in
@@ -53,12 +62,19 @@ impl Pptx {
         // native edit preserves atomic failure and patch ownership.
         positions.sort_unstable();
         let operations = positions.len();
-        let source = self.editable()?;
+        let source = self.editable_owner()?;
         let (target, proof, changed) = match &source {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 for position in positions.iter().rev().copied() {
-                    edit.remove_slide(Position::new(position))?;
+                    match position {
+                        Target::Slide(slide) => {
+                            edit.remove_slide(Position::new(slide))?;
+                        },
+                        Target::Shape { slide, position } => {
+                            edit.remove_shape(Position::new(slide), position)?;
+                        },
+                    }
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -67,7 +83,14 @@ impl Pptx {
             Editable::Eager(package) => {
                 let mut edit = package.edit()?;
                 for position in positions.iter().rev().copied() {
-                    edit.remove_slide(Position::new(position))?;
+                    match position {
+                        Target::Slide(slide) => {
+                            edit.remove_slide(Position::new(slide))?;
+                        },
+                        Target::Shape { slide, position } => {
+                            edit.remove_shape(Position::new(slide), position)?;
+                        },
+                    }
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -105,6 +128,12 @@ impl Pptx {
         Ok(())
     }
 
+    /// Whether this owner can enter native top-level shape removal.
+    /// Per-shape dependency and topology admission runs during staging.
+    pub(crate) fn supports_shape_removal(&self) -> bool {
+        self.0.retain_source && self.signature() != super::Signature::Signed
+    }
+
     /// Whether this owner can enter the native dependency-free slide-removal
     /// path. Per-slide relationship and final-slide admission still happens
     /// during the operation, so this is only an owner-level capability answer.
@@ -117,7 +146,7 @@ fn resolve_targets(
     file: &Pptx,
     target: &TargetArg<'_>,
     limits: &SemanticLimits,
-) -> Result<Vec<usize>> {
+) -> Result<Vec<Target>> {
     let nav = Nav::new(file);
     let mut positions = Vec::new();
     let mut seen = HashSet::new();
@@ -155,18 +184,38 @@ fn resolve_targets(
 }
 
 fn append_target(
-    positions: &mut Vec<usize>,
-    seen: &mut HashSet<usize>,
+    positions: &mut Vec<Target>,
+    seen: &mut HashSet<Target>,
     node: &super::Node<'_>,
     limits: &SemanticLimits,
 ) -> Result<()> {
-    let Item::Slide(slide) = node.item() else {
-        return Err(error(
-            Code::UnsupportedType,
-            "PPTX slide removal requires slide targets",
-        ));
+    let position = match node.item() {
+        Item::Slide(slide) => Target::Slide(slide.position as usize),
+        Item::Tree(tree) => {
+            let Some(slide) = tree.container.slide() else {
+                return Err(error(
+                    Code::UnsupportedCapability,
+                    "master and layout shape removal is not integrated",
+                ));
+            };
+            if tree.handle.parent().is_some() {
+                return Err(error(
+                    Code::UnsupportedCapability,
+                    "shape removal requires a top-level slide shape",
+                ));
+            }
+            Target::Shape {
+                slide: slide as usize,
+                position: tree.handle.position().get(),
+            }
+        },
+        _ => {
+            return Err(error(
+                Code::UnsupportedType,
+                "PPTX removal requires slide or top-level shape targets",
+            ));
+        },
     };
-    let position = slide.position as usize;
     if seen.contains(&position) {
         return Ok(());
     }
@@ -177,11 +226,40 @@ fn append_target(
     admit_remove_targets(observed, limits)?;
     positions
         .try_reserve(1)
-        .map_err(|source| allocation("PPTX slide removal targets", source))?;
+        .map_err(|source| allocation("PPTX removal targets", source))?;
     seen.try_reserve(1)
-        .map_err(|source| allocation("PPTX slide removal target identities", source))?;
+        .map_err(|source| allocation("PPTX removal target identities", source))?;
     seen.insert(position);
     positions.push(position);
+    Ok(())
+}
+
+fn reject_overlaps(targets: &[Target]) -> Result<()> {
+    let slide_count = targets
+        .iter()
+        .filter(|target| matches!(target, Target::Slide(_)))
+        .count();
+    if slide_count == 0 {
+        return Ok(());
+    }
+    let mut slides = HashSet::new();
+    slides
+        .try_reserve(slide_count)
+        .map_err(|source| allocation("PPTX removal slide identities", source))?;
+    for target in targets {
+        if let Target::Slide(slide) = target {
+            slides.insert(*slide);
+        }
+    }
+    if targets.iter().any(|target| {
+        matches!(target,
+        Target::Shape { slide, .. } if slides.contains(slide))
+    }) {
+        return Err(error(
+            Code::InvalidArgument,
+            "PPTX removal cannot select both a slide and one of its shapes",
+        ));
+    }
     Ok(())
 }
 

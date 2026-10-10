@@ -96,8 +96,8 @@ impl Patch {
         )?))
     }
 
-    pub(super) fn apply(&self, package: &Package) -> Result<Package> {
-        apply(package, &self.data)
+    pub(super) fn apply(&self, package: &Package, shape_removals: bool) -> Result<Package> {
+        apply(package, &self.data, shape_removals)
     }
 }
 
@@ -421,7 +421,7 @@ pub(super) fn patch_from_packages(source: &Package, target: &Package) -> Result<
 /// Apply a v3 structural patch to a source package.  The current effective
 /// state is checked first, then the target is rebuilt as one typed topology;
 /// no output ZIP or eager fallback owner is created.
-pub(super) fn apply(package: &Package, data: &Data) -> Result<Package> {
+pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Result<Package> {
     package.check()?;
     let (current, _current_retention) = effective_state_with_retention(package)?;
     if !state_equal(&current, &data.before) {
@@ -450,6 +450,7 @@ pub(super) fn apply(package: &Package, data: &Data) -> Result<Package> {
         &mut retained,
         allows_empty_result,
         true,
+        shape_removals,
     )?;
     if data.before.topology_digest == data.after.topology_digest
         && data.before.root.as_slice() == data.after.root.as_slice()
@@ -956,6 +957,7 @@ fn validate_changes_against_effective(
     retained: &mut Retention,
     allows_empty_result: bool,
     allows_unrelated_opaque_targets: bool,
+    shape_removals: bool,
 ) -> Result<()> {
     let mut seen = HashSet::new();
     for change in changes {
@@ -987,6 +989,7 @@ fn validate_changes_against_effective(
                     after.xml.as_slice(),
                     Some(package.owner.limits),
                     package.owner.package.execution_context().as_ref(),
+                    shape_removals,
                 )?;
             },
             (None, Some(after)) => {

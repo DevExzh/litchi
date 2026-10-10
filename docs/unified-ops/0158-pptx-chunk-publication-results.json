@@ -953,7 +953,8 @@
     "dirty": true,
     "source_files": 8231,
     "manifest_sha256": "a07972428bf70d947f61ab9a740aa9ce8e76a42bad0c4aceeec9317c3a1ec596",
-    "manifest_algorithm": "Sorted relative paths under crates and tools/perf-baseline/unified-pptx-chunk-publication with extension .rs or name Cargo.toml/Cargo.lock; concatenate SHA256(file), two spaces, path, LF; SHA256 UTF-8 concatenation."
+    "manifest_algorithm": "Sorted relative paths under crates and tools/perf-baseline/unified-pptx-chunk-publication with extension .rs or name Cargo.toml/Cargo.lock; concatenate SHA256(file), two spaces, path, LF; SHA256 UTF-8 concatenation.",
+    "post_measurement_change": "Concurrent commit e8e91b4ec4 reordered xlsx module declarations only. Replacing that one file with its measured-source-commit content reproduces the recorded manifest digest; no PPTX or harness code differs."
   },
   "measurement": {
     "cpu_affinity": [

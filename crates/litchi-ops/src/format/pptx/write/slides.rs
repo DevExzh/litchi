@@ -1,0 +1,186 @@
+//! Slide metadata dispatch through the existing native transaction family.
+use super::{Commit, Editable, Pptx, Proof, allocation, bound, error, validate_text};
+use crate::format::pptx::Nav;
+use crate::format::pptx::node::Item;
+use crate::format::pptx::spec::{SLIDE_WRITE_TABLE, SlideProperty};
+use crate::registry::Operation;
+use crate::target::TargetArg;
+use crate::transaction::{LimitKind, SemanticLimits};
+use crate::value::Scalar;
+use crate::{Code, Props, Result};
+use litchi_core::Position;
+use std::collections::HashSet;
+use std::sync::Arc;
+
+pub(super) fn accepts(target: &TargetArg<'_>, props: &Props<'_>) -> bool {
+    target.path().is_some_and(|path| {
+        path.path()
+            .steps()
+            .last()
+            .is_some_and(|step| step.name().eq_ignore_ascii_case("slide"))
+    }) || props.iter().any(|(key, _)| {
+        key.as_str().eq_ignore_ascii_case("name") || key.as_str().eq_ignore_ascii_case("hidden")
+    })
+}
+
+impl Pptx {
+    pub(super) fn set_slide_properties(
+        &self,
+        target: TargetArg<'_>,
+        props: &Props<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Commit> {
+        let mut name = None;
+        let mut hidden = None;
+        let mut properties = 0_u8;
+        for (key, value) in props.iter() {
+            let (index, entry) = SLIDE_WRITE_TABLE
+                .resolve(key.as_str())
+                .map_err(|error| error.with_property(key.as_str().to_owned()))?;
+            let bit = 1_u8 << index;
+            if properties & bit != 0 {
+                return Err(error(
+                    Code::InvalidArgument,
+                    "a slide property was assigned more than once",
+                )
+                .with_property(entry.spec.name));
+            }
+            properties |= bit;
+            entry.prepare(Operation::Set, value, |setter, value| {
+                match setter {
+                    SlideProperty::Name => {
+                        let value = match value {
+                            Some(Scalar::Text(value)) => value,
+                            None => "",
+                            _ => unreachable!("slide name coercion"),
+                        };
+                        bound(
+                            LimitKind::StagedBytes,
+                            value.len(),
+                            limits.max_staged_bytes(),
+                        )?;
+                        validate_text(value).map_err(|error| error.with_property("name"))?;
+                        let mut owned = String::new();
+                        owned.try_reserve_exact(value.len()).map_err(allocation)?;
+                        owned.push_str(value);
+                        name = Some(owned);
+                    },
+                    SlideProperty::Hidden => {
+                        let Some(Scalar::Bool(value)) = value else {
+                            unreachable!("slide visibility coercion")
+                        };
+                        hidden = Some(value);
+                    },
+                    SlideProperty::Layout => unreachable!("read-only slide layout setter"),
+                }
+                Ok(())
+            })?;
+        }
+        let mut targets = Vec::new();
+        let mut seen = HashSet::new();
+        let charge = name
+            .as_ref()
+            .map_or(0, String::len)
+            .saturating_add(size_of::<usize>() + size_of::<Option<bool>>());
+        let mut append = |node: crate::format::pptx::Node<'_>| -> Result<()> {
+            let Item::Slide(slide) = node.item() else {
+                return Err(error(
+                    Code::UnsupportedCapability,
+                    "slide properties require slide targets",
+                ));
+            };
+            if seen.contains(&slide.position) {
+                return Ok(());
+            }
+            let count = targets.len().saturating_add(1);
+            bound(
+                LimitKind::ExpandedTargets,
+                count,
+                limits.max_expanded_targets(),
+            )?;
+            bound(
+                LimitKind::StagedBytes,
+                count.saturating_mul(charge),
+                limits.max_staged_bytes(),
+            )?;
+            targets.try_reserve(1).map_err(allocation)?;
+            seen.try_reserve(1).map_err(allocation)?;
+            targets.push(Position::new(slide.position as usize));
+            seen.insert(slide.position);
+            Ok(())
+        };
+        let nav = Nav::new(self);
+        if let Some(path) = target.path() {
+            append(crate::path::resolve::get(&nav, path)?)?;
+        } else if let Some(query) = target.query() {
+            let walk = crate::query::run(nav, query.clone())?;
+            if !walk.plan().diagnostics().is_empty() {
+                return Err(error(
+                    Code::InvalidSelector,
+                    "mutation selector contains an unsupported predicate",
+                ));
+            }
+            for node in walk {
+                append(node?)?;
+            }
+        } else {
+            return Err(error(Code::InvalidArgument, "mutation target is empty"));
+        }
+        if targets.is_empty() {
+            return Err(error(
+                Code::ZeroMatches,
+                "mutation selector matched no element",
+            ));
+        }
+        let source = self.editable_owner()?;
+        let (target, proof, changed) = match &source {
+            Editable::Source(package) => {
+                let mut edit = package.edit()?;
+                for position in &targets {
+                    if let Some(name) = &name {
+                        edit.set_slide_name(*position, name)?;
+                    }
+                    if let Some(hidden) = hidden {
+                        edit.set_slide_hidden(*position, hidden)?;
+                    }
+                }
+                let (target, patch) = edit.commit()?.into_parts();
+                let changed = !patch.is_noop();
+                (Editable::Source(target), Proof::Source(patch), changed)
+            },
+            Editable::Eager(package) => {
+                let mut edit = package.edit()?;
+                for position in &targets {
+                    if let Some(name) = &name {
+                        edit.set_slide_name(*position, name)?;
+                    }
+                    if let Some(hidden) = hidden {
+                        edit.set_slide_hidden(*position, hidden)?;
+                    }
+                }
+                let (target, patch) = edit.commit()?.into_parts();
+                let changed = !patch.is_noop();
+                (
+                    Editable::Eager(Arc::new(target)),
+                    Proof::Eager(patch),
+                    changed,
+                )
+            },
+        };
+        let after = if changed {
+            match &target {
+                Editable::Source(package) => self.adopt_source(package.clone())?,
+                Editable::Eager(package) => self.adopt_eager(Arc::clone(package)),
+            }
+        } else {
+            self.clone()
+        };
+        Ok(Commit {
+            after,
+            source,
+            target,
+            proof,
+            operations: targets.len(),
+        })
+    }
+}

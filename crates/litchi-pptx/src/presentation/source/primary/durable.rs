@@ -19,6 +19,7 @@ use crate::{Error, Result};
 use sha2::{Digest, Sha256};
 use std::sync::Arc;
 
+const REMOVAL_MAGIC: &[u8; 8] = b"LPSX0004";
 const MAGIC: &[u8; 8] = b"LPSX0002";
 const HEADER: usize = 8 + 32 + 4 + 4 + 4 + 8 + 8;
 const KEY_FIXED: usize = 4 + 4 + 4;
@@ -66,12 +67,17 @@ impl Patch {
     /// source.  The stable catalog keys are physical identities, so all wire
     /// positions continue to refer to the same slide after a reorder.
     pub fn to_bytes(&self) -> Result<Vec<u8>> {
-        if let PatchData::Topology(data) = &self.data {
-            return data.to_bytes();
+        if !self.shape_removals {
+            if let PatchData::Topology(data) = &self.data {
+                return data.to_bytes();
+            }
         }
         let length = self.encoded_len()?;
         let mut output = Vec::new();
         output.try_reserve_exact(length).map_err(allocation)?;
+        if self.shape_removals {
+            output.extend_from_slice(REMOVAL_MAGIC);
+        }
         match &self.data {
             PatchData::Local {
                 source,
@@ -123,7 +129,7 @@ impl Patch {
                     write_payload(&mut output, &change.after);
                 }
             },
-            PatchData::Topology(data) => return data.to_bytes(),
+            PatchData::Topology(data) => output.extend_from_slice(&data.to_bytes()?),
         }
         if output.len() != length {
             return Err(invalid("wire length accounting mismatch"));
@@ -133,12 +139,22 @@ impl Patch {
 
     /// Decode a bounded source patch. Version 2 retains text/permutation
     /// semantics; version 3 additionally carries guarded topology changes.
+    /// Version 4 wraps either format and admits the managed slide name/hidden
+    /// grammar as well as reversible top-level shape removal. Earlier versions
+    /// retain their narrower addition grammar.
     /// Framing, complete root/order
     /// state, stable-key uniqueness, and XML pairs are validated before any
     /// retained payload is allocated.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        if bytes.len() > maximum() {
+            return Err(limit("source-backed durable patch bytes", maximum()));
+        }
+        let (shape_removals, bytes) = bytes
+            .strip_prefix(REMOVAL_MAGIC)
+            .map_or((false, bytes), |body| (true, body));
         if bytes.starts_with(b"LPSX0003") {
             return Ok(Self {
+                shape_removals,
                 data: PatchData::Topology(Arc::new(super::topology::Patch::from_bytes(bytes)?)),
             });
         }
@@ -219,7 +235,7 @@ impl Patch {
             if before == after {
                 return Err(invalid("redundant no-op delta"));
             }
-            validate_pair(before, after, None, None)?;
+            validate_pair(before, after, None, None, shape_removals)?;
             entries.push((key, before, after));
         }
         if input.offset != bytes.len() {
@@ -235,6 +251,7 @@ impl Patch {
             });
         }
         Ok(Self {
+            shape_removals,
             data: PatchData::Durable(Data {
                 root,
                 before_root,
@@ -247,7 +264,12 @@ impl Patch {
     }
 
     pub(super) fn encoded_len(&self) -> Result<usize> {
-        let mut total = HEADER;
+        let mut total = HEADER
+            + if self.shape_removals {
+                REMOVAL_MAGIC.len()
+            } else {
+                0
+            };
         match &self.data {
             PatchData::Local {
                 source,
@@ -301,13 +323,23 @@ impl Patch {
                     ));
                 }
             },
-            PatchData::Topology(data) => return data.encoded_len(),
+            PatchData::Topology(data) => {
+                total = data.encoded_len()?
+                    + if self.shape_removals {
+                        REMOVAL_MAGIC.len()
+                    } else {
+                        0
+                    };
+            },
+        }
+        if total > maximum() {
+            return Err(limit("source-backed durable patch bytes", maximum()));
         }
         Ok(total)
     }
 }
 
-pub(super) fn apply(package: &Package, data: &Data) -> Result<Package> {
+pub(super) fn apply(package: &Package, data: &Data, shape_removals: bool) -> Result<Package> {
     package.check()?;
     if root_digest(package)? != data.root
         || package.root.as_bytes() != data.before_root.as_slice()
@@ -362,6 +394,7 @@ pub(super) fn apply(package: &Package, data: &Data) -> Result<Package> {
             &change.after,
             Some(package.owner.limits),
             package.owner.package.execution_context().as_ref(),
+            shape_removals,
         )?;
         retained_bytes = retained_bytes
             .checked_add(change.after.len())
@@ -430,6 +463,7 @@ pub(super) fn validate_pair(
     after: &[u8],
     limits: Option<litchi_opc::SourceLimits>,
     context: Option<&litchi_core::ExecutionContext>,
+    shape_removals: bool,
 ) -> Result<()> {
     let _proof_reservation = context
         .map(|context| {
@@ -464,14 +498,70 @@ pub(super) fn validate_pair(
         }
         crate::presentation::transition::validate_source(xml, "apply")?;
     }
-    let before_skeleton = crate::opened::shape_text_skeleton(before)?;
-    let after_skeleton = crate::opened::shape_text_skeleton(after)?;
-    if before_skeleton == after_skeleton {
+    // Old wire versions retain their original shape-only proof grammar.
+    if !shape_removals {
+        let before_skeleton = crate::opened::shape_text_skeleton(before)?;
+        let after_skeleton = crate::opened::shape_text_skeleton(after)?;
+        if before_skeleton == after_skeleton
+            || validate_property_surface(
+                before,
+                after,
+                before_skeleton,
+                after_skeleton,
+                context,
+                false,
+            )?
+        {
+            return Ok(());
+        }
+        return Err(invalid(
+            "patch changes XML outside editable shape properties",
+        ));
+    }
+
+    // The expanded envelope admits managed slide attributes. A matching
+    // rooted skeleton proves an attribute-only edit without shape decoding.
+    // Both scans validate managed values before erasing their lexical spans.
+    if crate::opened::slide_properties_skeleton(before)?
+        == crate::opened::slide_properties_skeleton(after)?
+    {
         return Ok(());
+    }
+    let normalized_before = crate::opened::normalize_slide_properties(before)?;
+    let normalized_after = crate::opened::normalize_slide_properties(after)?;
+    let before_skeleton = crate::opened::shape_text_skeleton(&normalized_before)?;
+    let after_skeleton = crate::opened::shape_text_skeleton(&normalized_after)?;
+    if validate_property_surface(
+        &normalized_before,
+        &normalized_after,
+        before_skeleton,
+        after_skeleton,
+        context,
+        true,
+    )? {
+        return Ok(());
+    }
+    Err(invalid(
+        "patch changes XML outside editable shape properties or top-level removal",
+    ))
+}
+
+/// Apply the existing bounded text, geometry, append, and optional removal
+/// proof to a pair whose managed slide attributes have already been validated
+/// and, when needed, erased by the expanded proof caller.
+fn validate_property_surface(
+    before: &[u8],
+    after: &[u8],
+    before_skeleton: [u8; 32],
+    after_skeleton: [u8; 32],
+    context: Option<&litchi_core::ExecutionContext>,
+    shape_removals: bool,
+) -> Result<bool> {
+    if before_skeleton == after_skeleton {
+        return Ok(true);
     }
     // Geometry is a separate, narrowly located surface. Mask only validated
     // direct transform values, then apply the existing exact text-slot proof.
-    // Keep ordinary text edits on the fast path above.
     let properties_equal = |left: &[u8], right: &[u8]| -> Result<bool> {
         let _geometry_reservation = context
             .map(|context| {
@@ -501,7 +591,7 @@ pub(super) fn validate_pair(
             == crate::opened::shape_text_skeleton(&right)?)
     };
     if properties_equal(before, after)? {
-        return Ok(());
+        return Ok(true);
     }
     let unchanged = if let Some(stripped_after) =
         crate::opened::strip_appended_text_boxes(before, after)?
@@ -514,12 +604,27 @@ pub(super) fn validate_pair(
     } else {
         false
     };
-    if !unchanged {
-        return Err(invalid(
-            "patch changes XML outside editable shape properties",
-        ));
+    if unchanged {
+        return Ok(true);
     }
-    Ok(())
+    if shape_removals {
+        // A reversible root deletion/restoration may compose with retained
+        // text and geometry edits plus canonical appended text boxes.
+        for (forward, replacements) in [(true, false), (false, false), (true, true), (false, true)]
+        {
+            if let Some(pair) =
+                crate::opened::normalize_shape_removal_pair(before, after, forward, replacements)?
+            {
+                if crate::opened::shape_text_skeleton(&pair.before)?
+                    == crate::opened::shape_text_skeleton(&pair.after)?
+                    || properties_equal(&pair.before, &pair.after)?
+                {
+                    return Ok(true);
+                }
+            }
+        }
+    }
+    Ok(false)
 }
 
 /// Digest the physical source topology and a canonicalized presentation root.

@@ -554,6 +554,37 @@ pub enum Error {
 }
 
 impl Error {
+    /// Whether a finite audit resource budget was exceeded.
+    ///
+    /// The resource, configured limit, observation and offset remain available
+    /// in [`Self::Limit`]. This predicate lets wrappers classify a borrowed
+    /// audit failure without replacing its typed diagnostic.
+    ///
+    /// ```
+    /// use xml_minifier::audit::{Error, Resource};
+    /// let error = Error::Limit {
+    ///     resource: Resource::TokenBytes,
+    ///     limit: 8,
+    ///     actual: 9,
+    ///     offset: 10,
+    /// };
+    /// assert!(error.is_limit());
+    /// ```
+    pub const fn is_limit(&self) -> bool {
+        matches!(self, Self::Limit { .. })
+    }
+
+    /// Whether reserving an audit buffer failed.
+    ///
+    /// ```
+    /// use xml_minifier::audit::Error;
+    /// assert!(Error::Allocation.is_allocation());
+    /// assert!(!Error::Encoding { valid_up_to: 0 }.is_allocation());
+    /// ```
+    pub const fn is_allocation(&self) -> bool {
+        matches!(self, Self::Allocation)
+    }
+
     fn malformed(offset: usize, detail: impl Into<String>) -> Self {
         Self::Malformed {
             offset,

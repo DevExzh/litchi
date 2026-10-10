@@ -478,6 +478,119 @@ fn reserve_source_text_box(
         })
 }
 
+/// Reserve the source shape-removal scene/index, candidate, and semantic
+/// readback envelope before the native codec allocates either scene.
+fn reserve_source_shape_removal(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let input_scene = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            resource: "source-backed removed shape admission bytes",
+            limit: maximum,
+        })?;
+    let output_bound = input_bytes.min(max_output_bytes);
+    let output_scene = output_bound
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            resource: "source-backed removed shape admission bytes",
+            limit: maximum,
+        })?;
+    let amount = input_scene
+        .checked_add(output_scene)
+        .and_then(|size| size.checked_add(output_bound))
+        .and_then(|size| size.checked_add(4096))
+        .filter(|size| *size <= maximum)
+        .ok_or(Error::Limit {
+            resource: "source-backed removed shape admission bytes",
+            limit: maximum,
+        })?;
+    context
+        .reserve(litchi_core::Resource::Memory, amount as u64)
+        .map(|reservation| Some(Arc::new(reservation)))
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                other => litchi_opc::OpcError::Execution(other),
+            })
+        })
+}
+
+/// Reserve the transient parse, lexical rewrite, and semantic read-back
+/// envelope for one source-backed slide metadata edit before the shared
+/// codec allocates its candidate XML.
+fn reserve_source_slide_properties(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    name: Option<&str>,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let name_bytes = name.map_or(0, str::len);
+    // Attribute escaping can expand each input byte to a six-byte entity. A
+    // small fixed charge covers a newly inserted attribute; the native stage
+    // still applies the exact output-byte limit before allocating the result.
+    let conservative_output_bound = input_bytes
+        .checked_add(name_bytes.checked_mul(6).ok_or(Error::Limit {
+            resource: "source-backed slide property admission bytes",
+            limit: maximum,
+        })?)
+        .and_then(|size| size.checked_add(16))
+        .ok_or(Error::Limit {
+            resource: "source-backed slide property admission bytes",
+            limit: maximum,
+        })?;
+    // The native stage applies the exact output limit after it knows whether
+    // each requested attribute is a no-op, replacement, insertion, or
+    // shortening.  Admission must not reject a valid shortening merely
+    // because this conservative preallocation envelope exceeds that limit.
+    let output_bound = conservative_output_bound.min(max_output_bytes);
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let input_scene = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            resource: "source-backed slide property admission bytes",
+            limit: maximum,
+        })?;
+    let output_scene = output_bound
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            resource: "source-backed slide property admission bytes",
+            limit: maximum,
+        })?;
+    let amount = input_scene
+        .checked_add(output_scene)
+        .and_then(|size| size.checked_add(output_bound))
+        .and_then(|size| size.checked_add(name_bytes.checked_mul(6)?))
+        .and_then(|size| size.checked_add(4096))
+        .filter(|amount| *amount <= maximum)
+        .ok_or(Error::Limit {
+            resource: "source-backed slide property admission bytes",
+            limit: maximum,
+        })?;
+    context
+        .reserve(litchi_core::Resource::Memory, amount as u64)
+        .map(|reservation| Some(Arc::new(reservation)))
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                other => litchi_opc::OpcError::Execution(other),
+            })
+        })
+}
+
 fn reserve_source_shape_properties(
     context: Option<&ExecutionContext>,
     input_bytes: usize,
@@ -2721,6 +2834,121 @@ impl SourceBackedSlideEdit {
         &self.source
     }
 
+    /// Replace the authored slide name and/or visibility attributes in one
+    /// source-backed slide operation.
+    ///
+    /// `name` targets `p:cSld@name`; `hidden` targets the inverse of
+    /// `p:sld@show`. Omitted fields are preserved byte-for-byte. The shared
+    /// codec retains all unrelated root, shape, and opaque XML, and an equal
+    /// value is an exact no-op.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// use std::sync::Arc;
+    /// use litchi_core::OwnedSource;
+    /// use litchi_pptx::{builder::Builder, SourceBackedPresentationEditor};
+    /// let mut builder = Builder::new()?;
+    /// builder.presentation()?.add_slide()?;
+    /// let bytes = builder.build()?.to_bytes()?;
+    /// let editor = SourceBackedPresentationEditor::from_read_at(
+    ///     Arc::new(OwnedSource::new(bytes)),
+    /// )?;
+    /// let snapshot = editor.slide_snapshot(0)?;
+    /// let mut edit = snapshot.edit();
+    /// edit.set_slide_properties(Some("Roadmap"), Some(true))?;
+    /// let _commit = edit.commit_checked()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_properties(
+        &mut self,
+        name: Option<&str>,
+        hidden: Option<bool>,
+    ) -> Result<bool> {
+        self.check_execution()?;
+        if name.is_none() && hidden.is_none() {
+            return Ok(false);
+        }
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "set_slide_properties",
+                reason: "source-backed slide edits support one atomic semantic operation",
+            });
+        }
+        let reservation = reserve_source_slide_properties(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            name,
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        let xml = crate::opened::stage_slide_properties(
+            self.working.as_bytes(),
+            name,
+            hidden,
+            self.source.max_output_bytes,
+        )?;
+        let changed = xml.is_some();
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            let bytes = Arc::new(xml);
+            self.working = match reservation {
+                Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+                None => SourcePayload::Edited(bytes),
+            };
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Replace the authored `p:cSld@name` value.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// use std::sync::Arc;
+    /// use litchi_core::OwnedSource;
+    /// use litchi_pptx::{builder::Builder, SourceBackedPresentationEditor};
+    /// let mut builder = Builder::new()?;
+    /// builder.presentation()?.add_slide()?;
+    /// let bytes = builder.build()?.to_bytes()?;
+    /// let editor = SourceBackedPresentationEditor::from_read_at(
+    ///     Arc::new(OwnedSource::new(bytes)),
+    /// )?;
+    /// let snapshot = editor.slide_snapshot(0)?;
+    /// let mut edit = snapshot.edit();
+    /// edit.set_slide_name("Roadmap")?;
+    /// let _commit = edit.commit_checked()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_name(&mut self, name: impl AsRef<str>) -> Result<bool> {
+        self.set_slide_properties(Some(name.as_ref()), None)
+    }
+
+    /// Set whether the slide is hidden during presentation.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// use std::sync::Arc;
+    /// use litchi_core::OwnedSource;
+    /// use litchi_pptx::{builder::Builder, SourceBackedPresentationEditor};
+    /// let mut builder = Builder::new()?;
+    /// builder.presentation()?.add_slide()?;
+    /// let bytes = builder.build()?.to_bytes()?;
+    /// let editor = SourceBackedPresentationEditor::from_read_at(
+    ///     Arc::new(OwnedSource::new(bytes)),
+    /// )?;
+    /// let snapshot = editor.slide_snapshot(0)?;
+    /// let mut edit = snapshot.edit();
+    /// edit.set_slide_hidden(true)?;
+    /// let _commit = edit.commit_checked()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_hidden(&mut self, hidden: bool) -> Result<bool> {
+        self.set_slide_properties(None, Some(hidden))
+    }
+
     /// Set or replace this existing slide's direct typed transition.
     ///
     /// This operation never changes relationships or package topology. The
@@ -2778,6 +3006,46 @@ impl SourceBackedSlideEdit {
         let text = text.as_ref();
         let replacement = crate::opened::ShapeTextReplacement::new(shape.into(), text);
         Ok(self.set_shape_texts(std::slice::from_ref(&replacement))? != 0)
+    }
+
+    /// Remove one direct top-level shape from this exact source slide.
+    ///
+    /// A whole top-level group may be removed as one opaque root; selecting a
+    /// grouped descendant is refused. Connector endpoints and animation
+    /// targets that still point at any removed identity are also refused.
+    /// Source-backed removal keeps the slide relationship table and any now
+    /// unreachable Parts intact so the exact source topology remains
+    /// reversible; the eager package editor may prune that closure separately.
+    pub fn remove_shape<'k>(&mut self, shape: impl Into<crate::shape::Key<'k>>) -> Result<bool> {
+        self.check_execution()?;
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "remove_shape",
+                reason: "source-backed slide edits support one atomic semantic operation",
+            });
+        }
+        let reservation = reserve_source_shape_removal(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        let (xml, changed) = crate::opened::stage_shape_removal(
+            self.working.as_bytes(),
+            shape.into(),
+            self.source.max_output_bytes,
+        )?;
+        let Some(xml) = xml else {
+            return Ok(false);
+        };
+        self.check_execution()?;
+        let bytes = Arc::new(xml);
+        self.working = match reservation {
+            Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+            None => SourcePayload::Edited(bytes),
+        };
+        self.operation_used = true;
+        Ok(changed != 0)
     }
 
     /// Atomically replace visible text in a bounded set of shapes.

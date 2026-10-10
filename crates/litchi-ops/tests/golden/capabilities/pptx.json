@@ -210,7 +210,7 @@
       "parent": "presentation",
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -314,13 +314,13 @@
         "name": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "hidden": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         }
       },
@@ -350,7 +350,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -670,7 +670,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -977,7 +977,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1068,7 +1068,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1261,7 +1261,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1366,7 +1366,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1510,7 +1510,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1601,7 +1601,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1673,7 +1673,7 @@
         "set": false,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -3299,6 +3299,24 @@
       "code": "unsupported_capability",
       "followUp": "M2 PPTX equivalent relationship-target spellings",
       "reason": "source-backed PPTX slide removal requires canonical owner-relative relationship targets so inverse replay can restore the original OPC spelling"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "shape",
+      "context": "dependency-topology",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPTX dependency-aware shape removal",
+      "reason": "shape removal refuses retained connector or animation references to removed IDs; source-backed removal preserves unused relationships and parts, while eager removal prunes unreachable relationship closure"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "shape",
+      "context": "non-top-level",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPTX grouped/master/layout shape removal",
+      "reason": "native PPTX shape removal currently requires a top-level slide shape; grouped children and master or layout shapes remain outside the admitted topology"
     },
     {
       "subject": "operation",

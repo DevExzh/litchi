@@ -15,7 +15,9 @@ mod insert;
 mod model;
 mod patch;
 mod properties;
+mod removal_proof;
 mod remove_plan;
+mod slide_properties;
 mod transaction;
 mod xml;
 
@@ -50,17 +52,21 @@ pub(crate) use model::{
 };
 pub(crate) use patch::{apply, apply_to_new};
 pub(crate) use properties::stage_shape_properties;
+pub(crate) use removal_proof::normalize_shape_removal_pair;
 pub(crate) use remove_plan::apply_patch as apply_removal_patch;
 pub(crate) use remove_plan::{
     validate_insertion_owner, validate_removal_presentation_owner, validate_removal_slide_surface,
+};
+pub(crate) use slide_properties::{
+    normalize_slide_properties, slide_properties_skeleton, stage_slide_properties,
 };
 pub(crate) use transaction::{
     next_shape_id, stage_text_box, text_box_fragment, text_box_output_bound,
     validate_text_box_input,
 };
 pub(crate) use xml::{
-    insert_slide_binding, reorder_slide_bindings, shape_text_skeleton, stage_shape_texts,
-    strip_appended_text_boxes, validate_slide_bindings,
+    insert_slide_binding, reorder_slide_bindings, shape_text_skeleton, stage_shape_removal,
+    stage_shape_texts, strip_appended_text_boxes, validate_slide_bindings,
 };
 pub(crate) use xml::{remove_slide_binding, validate_slide_catalog_delta};
 

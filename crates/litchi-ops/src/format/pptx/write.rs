@@ -1,5 +1,6 @@
 //! Immutable native shape writes; no XML editing in the facade.
 pub(crate) mod coalesce;
+mod slides;
 use super::node::Item;
 use super::spec::{Kind, SHAPE_WRITE_TABLE, ShapeSetter};
 use super::{Editable, Nav, Pptx};
@@ -172,6 +173,9 @@ impl Pptx {
         props: Props<'_>,
         limits: &SemanticLimits,
     ) -> Result<Commit> {
+        if slides::accepts(&target, &props) {
+            return self.set_slide_properties(target, &props, limits);
+        }
         // Admit caller payload before allocating a native edit or walking targets.
         let values = admit_shape_props(&props, limits)?;
         let text = values.text.as_deref();
@@ -294,12 +298,20 @@ impl Pptx {
                 let mut edit = package.edit()?;
                 if has_geometry {
                     stage_properties(&targets, text, |slide, replacements| {
-                        operations += edit.set_shape_properties(slide, replacements)?;
+                        operations += if replacements.len() == 1 {
+                            edit.set_shape_properties(slide, replacements[0])?
+                        } else {
+                            edit.set_shape_property_chunks(slide, replacements)?
+                        };
                         Ok(())
                     })?;
                 } else if let Some(text) = text {
                     stage(&targets, text, |slide, replacements| {
-                        operations += edit.set_shape_texts(slide, replacements)?;
+                        operations += if replacements.len() == 1 {
+                            edit.set_shape_texts(slide, replacements[0])?
+                        } else {
+                            edit.set_shape_text_chunks(slide, replacements)?
+                        };
                         Ok(())
                     })?;
                 }
@@ -311,12 +323,20 @@ impl Pptx {
                 let mut edit = package.edit()?;
                 if has_geometry {
                     stage_properties(&targets, text, |slide, replacements| {
-                        operations += edit.set_shape_properties(slide, replacements)?;
+                        operations += if replacements.len() == 1 {
+                            edit.set_shape_properties(slide, replacements[0])?
+                        } else {
+                            edit.set_shape_property_chunks(slide, replacements)?
+                        };
                         Ok(())
                     })?;
                 } else if let Some(text) = text {
                     stage(&targets, text, |slide, replacements| {
-                        operations += edit.set_shape_texts(slide, replacements)?;
+                        operations += if replacements.len() == 1 {
+                            edit.set_shape_texts(slide, replacements[0])?
+                        } else {
+                            edit.set_shape_text_chunks(slide, replacements)?
+                        };
                         Ok(())
                     })?;
                 }
@@ -357,15 +377,11 @@ struct Target {
 fn stage(
     targets: &[Target],
     text: &str,
-    mut apply: impl FnMut(usize, &[litchi_pptx::opened::ShapeTextReplacement<'_>]) -> Result<()>,
+    mut apply: impl FnMut(usize, &[&[litchi_pptx::opened::ShapeTextReplacement<'_>]]) -> Result<()>,
 ) -> Result<()> {
-    // Text/property writes preserve pre-order positions. Split only the native
-    // call's finite capacity; the caller retains one Edit and commits after
-    // every chunk succeeds, so a later refusal discards the whole selection.
-    for group in targets
-        .chunk_by(|left, right| left.slide == right.slide)
-        .flat_map(|slide| slide.chunks(litchi_pptx::opened::MAX_SHAPE_TEXT_REPLACEMENTS))
-    {
+    // All same-slide targets share publication. Each input chunk still
+    // observes native target and text-byte limits.
+    for group in targets.chunk_by(|left, right| left.slide == right.slide) {
         let mut replacements = Vec::new();
         replacements
             .try_reserve_exact(group.len())
@@ -376,7 +392,7 @@ fn stage(
                 text,
             ));
         }
-        apply(group[0].slide, &replacements)?;
+        apply_chunks(group[0].slide, &replacements, text.len(), &mut apply)?;
     }
     Ok(())
 }
@@ -384,12 +400,12 @@ fn stage(
 fn stage_properties(
     targets: &[Target],
     text: Option<&str>,
-    mut apply: impl FnMut(usize, &[litchi_pptx::opened::ShapePropertiesReplacement<'_>]) -> Result<()>,
+    mut apply: impl FnMut(
+        usize,
+        &[&[litchi_pptx::opened::ShapePropertiesReplacement<'_>]],
+    ) -> Result<()>,
 ) -> Result<()> {
-    for group in targets
-        .chunk_by(|left, right| left.slide == right.slide)
-        .flat_map(|slide| slide.chunks(litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS))
-    {
+    for group in targets.chunk_by(|left, right| left.slide == right.slide) {
         let mut replacements = Vec::new();
         replacements
             .try_reserve_exact(group.len())
@@ -405,9 +421,39 @@ fn stage_properties(
             }
             replacements.push(replacement);
         }
-        apply(group[0].slide, &replacements)?;
+        apply_chunks(
+            group[0].slide,
+            &replacements,
+            text.map_or(0, str::len),
+            &mut apply,
+        )?;
     }
     Ok(())
+}
+
+fn apply_chunks<T>(
+    slide: usize,
+    replacements: &[T],
+    text_bytes: usize,
+    apply: &mut impl FnMut(usize, &[&[T]]) -> Result<()>,
+) -> Result<()> {
+    let capacity = litchi_pptx::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS;
+    // An individually oversized value reaches the ordinary native typed
+    // refusal. Uniform fanout values make the byte boundary exact.
+    let chunk_size = litchi_pptx::opened::Limits::default()
+        .max_text_bytes()
+        .checked_div(text_bytes)
+        .unwrap_or(capacity)
+        .clamp(1, capacity);
+    if replacements.len() <= chunk_size {
+        return apply(slide, std::slice::from_ref(&replacements));
+    }
+    let mut chunks = Vec::new();
+    chunks
+        .try_reserve_exact(replacements.len().div_ceil(chunk_size))
+        .map_err(allocation)?;
+    chunks.extend(replacements.chunks(chunk_size));
+    apply(slide, &chunks)
 }
 
 fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {

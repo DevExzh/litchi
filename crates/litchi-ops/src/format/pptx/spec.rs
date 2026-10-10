@@ -1508,10 +1508,12 @@ const PLACEHOLDER_CAPABILITY_PROPS_ARRAY: [PropSpec; SHAPE_WRITE_COUNT] =
 pub(crate) const PLACEHOLDER_CAPABILITY_PROPS: &[PropSpec] = &PLACEHOLDER_CAPABILITY_PROPS_ARRAY;
 
 #[derive(Clone, Copy)]
-pub(super) enum SlideAdder {
+pub(super) enum SlideProperty {
     Layout,
+    Name,
+    Hidden,
 }
-const fn slide_add_entries() -> [crate::registry::Entry<SlideAdder>; SLIDE_PROPS.len()] {
+const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_PROPS.len()] {
     use crate::registry::{Access, Constraint, Entry};
     let mut entries = [Entry::read(SLIDE_PROPS[0]); SLIDE_PROPS.len()];
     let mut index = 0;
@@ -1521,12 +1523,27 @@ const fn slide_add_entries() -> [crate::registry::Entry<SlideAdder>; SLIDE_PROPS
     }
     entries[0] = Entry {
         spec: SLIDE_PROPS[0],
-        access: Access::Add(SlideAdder::Layout),
+        access: Access::Add(SlideProperty::Layout),
         constraint: Constraint::NotEmpty,
+        clear: false,
+    };
+    entries[2] = Entry {
+        spec: SLIDE_PROPS[2],
+        access: Access::Set(SlideProperty::Name),
+        constraint: Constraint::None,
+        clear: true,
+    };
+    entries[3] = Entry {
+        spec: SLIDE_PROPS[3],
+        access: Access::Set(SlideProperty::Hidden),
+        constraint: Constraint::None,
         clear: false,
     };
     entries
 }
-pub(super) const SLIDE_ADD_TABLE: crate::registry::Table<SlideAdder, { SLIDE_PROPS.len() }, 0> =
-    crate::registry::Table::new(slide_add_entries(), []);
-pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_ADD_TABLE.readable();
+pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<
+    SlideProperty,
+    { SLIDE_PROPS.len() },
+    0,
+> = crate::registry::Table::new(slide_write_entries(), []);
+pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();

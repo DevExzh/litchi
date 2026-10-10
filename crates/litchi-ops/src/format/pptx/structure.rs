@@ -1,6 +1,6 @@
 //! Structural additions delegate authoring and preservation to the native owner.
 use super::node::Item;
-use super::spec::SLIDE_ADD_TABLE;
+use super::spec::SLIDE_WRITE_TABLE;
 use super::write::{Commit, Proof};
 use super::{Editable, Nav, Pptx, PptxOwner};
 use crate::path::PathArg;
@@ -84,7 +84,7 @@ impl Pptx {
         }
         let mut layout = None;
         for (key, value) in node.props().iter() {
-            let (_, entry) = SLIDE_ADD_TABLE
+            let (_, entry) = SLIDE_WRITE_TABLE
                 .resolve(key.as_str())
                 .map_err(|e| e.with_property(key.as_str().to_owned()))?;
             entry.prepare(Operation::Add, value, |_, value| {
