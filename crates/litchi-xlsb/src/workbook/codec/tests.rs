@@ -6,7 +6,7 @@
 //! Focused tests for the private workbook codec owners.
 
 use super::super::super::Workbook;
-use crate::package::error::Result;
+use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
 use crate::raw::{Kind, Records, Writer, kind};
 
@@ -16,6 +16,14 @@ fn wide_string(value: &str) -> Vec<u8> {
     for unit in value.encode_utf16() {
         data.extend_from_slice(&unit.to_le_bytes());
     }
+    data
+}
+
+fn bundle_sheet_payload(id: u32, relationship_id: &str, name: &str) -> Vec<u8> {
+    let mut data = 0_u32.to_le_bytes().to_vec();
+    data.extend_from_slice(&id.to_le_bytes());
+    data.extend_from_slice(&wide_string(relationship_id));
+    data.extend_from_slice(&wide_string(name));
     data
 }
 
@@ -199,4 +207,49 @@ fn ordinary_table_owner_rejects_mismatched_xml_map_extensions() {
         Workbook::parse_table_definition(&data, 0, &mut crate::leniency::Tolerance::refusing())
             .is_err()
     );
+}
+
+#[test]
+fn workbook_sheet_name_index_expands_unicode_lowercase_without_normalizing() {
+    let duplicate_names = ["\u{0130}", "i\u{0307}"];
+    let duplicate_records = duplicate_names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            (
+                kind::BUNDLE_SH,
+                bundle_sheet_payload(
+                    u32::try_from(index + 1).unwrap(),
+                    &format!("rId{}", index + 1),
+                    name,
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
+    let duplicate_data = record_stream(&duplicate_records).unwrap();
+    let mut duplicate_iter = Records::new(&duplicate_data);
+    assert!(matches!(
+        Workbook::read_workbook(&mut duplicate_iter, &mut Default::default()),
+        Err(Error::Unrecognized { typ, .. }) if typ == "BrtBundleSh strName"
+    ));
+
+    let canonically_equivalent_names = ["é", "e\u{301}"];
+    let distinct_records = canonically_equivalent_names
+        .iter()
+        .enumerate()
+        .map(|(index, name)| {
+            (
+                kind::BUNDLE_SH,
+                bundle_sheet_payload(
+                    u32::try_from(index + 1).unwrap(),
+                    &format!("rId{}", index + 1),
+                    name,
+                ),
+            )
+        })
+        .collect::<Vec<_>>();
+    let distinct_data = record_stream(&distinct_records).unwrap();
+    let mut distinct_iter = Records::new(&distinct_data);
+    let info = Workbook::read_workbook(&mut distinct_iter, &mut Default::default()).unwrap();
+    assert_eq!(info.worksheet_names, canonically_equivalent_names);
 }

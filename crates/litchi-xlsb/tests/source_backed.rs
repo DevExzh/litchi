@@ -1012,7 +1012,11 @@ fn eager_grid_selectors_share_the_owner_cache_and_survive_republication() {
 fn case_variant_duplicate_sheet_targets_are_rejected() {
     let source = rewrite_sheet_target("/xl/worksheets/sheet2.bin", "worksheets/SHEET1.bin");
     assert!(matches!(
-        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))),
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source.clone()))),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+    assert!(matches!(
+        Workbook::new(Cursor::new(source)),
         Err(PackageError::InvalidRelationship(_))
     ));
 }
@@ -1020,13 +1024,29 @@ fn case_variant_duplicate_sheet_targets_are_rejected() {
 #[test]
 fn unique_case_variant_sheet_target_opens_and_materializes() {
     let source = rewrite_sheet_target("/xl/worksheets/sheet2.bin", "worksheets/SHEET2.bin");
-    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source.clone()))).unwrap();
     let selected = workbook.worksheet_by_index(1).unwrap().unwrap();
     assert_eq!(
         selected.name().unwrap(),
         workbook.worksheet_names().unwrap()[1]
     );
     selected.materialize().unwrap();
+    let eager = Workbook::new(Cursor::new(source)).unwrap();
+    assert!(eager.grid(1).unwrap().is_some());
+}
+
+#[test]
+fn exact_duplicate_sheet_targets_are_rejected() {
+    let source = rewrite_sheet_target("/xl/worksheets/sheet2.bin", "worksheets/sheet1.bin");
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source.clone()))),
+        Err(PackageError::InvalidRelationship(_))
+    ));
+    assert!(matches!(
+        Workbook::new(Cursor::new(source)),
+        Err(PackageError::InvalidRelationship(_))
+    ));
 }
 
 #[test]

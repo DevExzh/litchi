@@ -26,7 +26,7 @@ use litchi_ooxml_common::web;
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::part::Part;
 use litchi_opc::{OpcError, OpcPackage};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::io::{Read, Seek, Write};
 use std::sync::Arc;
 
@@ -1331,9 +1331,9 @@ impl Workbook {
                 resource: "eager XLSB sheet-tab catalog",
                 source,
             })?;
-        let mut sheet_targets: Vec<litchi_opc::PackURI> = Vec::new();
+        let mut sheet_targets = HashSet::new();
         sheet_targets
-            .try_reserve_exact(info.worksheet_rel_ids.len())
+            .try_reserve(info.worksheet_rel_ids.len())
             .map_err(|source| crate::package::error::Error::Allocation {
                 resource: "eager XLSB sheet-target validation",
                 source,
@@ -1373,15 +1373,11 @@ impl Workbook {
                 });
             };
             let partname = relationship.target_partname()?;
-            if sheet_targets
-                .iter()
-                .any(|target| target.is_equivalent_to(&partname))
-            {
+            if !sheet_targets.insert(partname.as_str().to_ascii_lowercase()) {
                 return Err(crate::package::error::Error::InvalidRelationship(
                     "multiple XLSB sheet tabs resolve to one physical part".to_string(),
                 ));
             }
-            sheet_targets.push(partname.clone());
             let sheet_part = self.package.get_part(&partname)?;
             validate_sheet_content_type(sheet_part, kind)?;
             sheet_tabs.push(TabMetadata::new(name.to_owned(), kind, state));

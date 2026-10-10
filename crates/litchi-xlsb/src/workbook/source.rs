@@ -1,5 +1,6 @@
 //! Deferred, source-backed XLSB worksheet catalog and materialization.
 
+use std::collections::HashSet;
 use std::fmt;
 use std::io::{self, Cursor, Read, Write};
 use std::ops::ControlFlow;
@@ -727,9 +728,9 @@ impl SourceBackedWorkbook {
                 resource: "source-backed XLSB table relationship catalog",
                 source,
             })?;
-        let mut sheet_targets: Vec<PackURI> = Vec::new();
+        let mut sheet_targets = HashSet::new();
         sheet_targets
-            .try_reserve_exact(info.worksheet_names.len())
+            .try_reserve(info.worksheet_names.len())
             .map_err(|source| Error::Allocation {
                 resource: "source-backed XLSB worksheet target validation",
                 source,
@@ -772,15 +773,11 @@ impl SourceBackedWorkbook {
                 ));
             }
             let partname = relationship.target_partname()?;
-            if sheet_targets
-                .iter()
-                .any(|target| target.is_equivalent_to(&partname))
-            {
+            if !sheet_targets.insert(partname.as_str().to_ascii_lowercase()) {
                 return Err(Error::InvalidRelationship(
                     "multiple XLSB sheets resolve to one physical target".to_string(),
                 ));
             }
-            sheet_targets.push(partname.clone());
             let sheet_part = package.part(&partname)?;
             let sheet_kind = if matches!(
                 relationship.reltype(),

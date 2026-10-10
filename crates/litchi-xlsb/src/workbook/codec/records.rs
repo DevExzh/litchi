@@ -7,16 +7,39 @@
 
 //! Typed workbook, external-link, PivotTable, and table record codecs.
 
+use std::collections::HashSet;
+
 use super::super::model::Workbook;
 use crate::calc::{self, Props};
 use crate::leniency::{Tolerance, ToleranceReport};
 use crate::named_ranges::Definition;
 use crate::package::error::Result;
 use crate::package::formula::{
-    ExternalSheet, SupportingLink, View, excel_name_eq, table::Definition as TableDefinition,
+    ExternalSheet, SupportingLink, View, table::Definition as TableDefinition,
 };
 use crate::raw::{Records, kind};
 use litchi_core::binary;
+
+fn worksheet_name_key(name: &str) -> Result<String> {
+    let key_len =
+        name.chars()
+            .flat_map(char::to_lowercase)
+            .try_fold(0usize, |length, character| {
+                length.checked_add(character.len_utf8()).ok_or(
+                    crate::package::error::Error::CapacityOverflow {
+                        resource: "XLSB worksheet-name equivalence key",
+                    },
+                )
+            })?;
+    let mut key = String::new();
+    key.try_reserve_exact(key_len)
+        .map_err(|source| crate::package::error::Error::Allocation {
+            resource: "XLSB worksheet-name equivalence key",
+            source,
+        })?;
+    key.extend(name.chars().flat_map(char::to_lowercase));
+    Ok(key)
+}
 
 /// A record's byte offset in its part, saturated for the tolerance report.
 fn record_location(offset: usize) -> u32 {
@@ -52,6 +75,7 @@ impl Workbook {
         let external_sheets = &mut info.external_sheets;
         let external_link_rel_ids = &mut info.external_link_rel_ids;
         let defined_names = &mut info.defined_names;
+        let mut worksheet_name_keys = HashSet::new();
         let is_1904 = &mut info.is_1904;
         let mut book_views_open = false;
         let mut book_views_seen = false;
@@ -151,15 +175,20 @@ impl Workbook {
                         u32::try_from(worksheet_names.len()).unwrap_or(u32::MAX),
                         Tolerance::recording(report),
                     )?;
-                    if worksheet_names
-                        .iter()
-                        .any(|name| excel_name_eq(name, &bundle_sh.name))
-                    {
+                    let name_key = worksheet_name_key(&bundle_sh.name)?;
+                    if worksheet_name_keys.contains(&name_key) {
                         return Err(crate::package::error::Error::Unrecognized {
                             typ: "BrtBundleSh strName".to_string(),
                             val: format!("duplicate sheet name {:?}", bundle_sh.name),
                         });
                     }
+                    worksheet_name_keys.try_reserve(1).map_err(|source| {
+                        crate::package::error::Error::Allocation {
+                            resource: "XLSB worksheet-name equivalence index",
+                            source,
+                        }
+                    })?;
+                    worksheet_name_keys.insert(name_key);
                     worksheet_names.push(bundle_sh.name);
                     worksheet_rel_ids.push(bundle_sh.rel_id);
                     worksheet_states.push(bundle_sh.state);
