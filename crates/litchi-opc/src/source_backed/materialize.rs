@@ -23,19 +23,42 @@ impl PreparedTopology {
     /// or a source, execution, allocation, payload or relationship error.
     pub fn to_opc_package(&self) -> Result<OpcPackage> {
         self.check_source()?;
-        let result = self.materialize_effective();
+        let result = self.materialize_effective(false);
         self.check_source()?;
         result
     }
 
-    fn materialize_effective(&self) -> Result<OpcPackage> {
+    /// Materialize the effective graph while retaining a bounded exact source
+    /// archive for later owning publication.
+    ///
+    /// This is the explicit Eager conversion seam for a prepared candidate.
+    /// The source-backed owner shares an existing in-memory archive or copies
+    /// a positional source once under its input limit; unchanged members can
+    /// then remain byte-for-byte preserved after the candidate is adopted.
+    pub fn to_opc_package_preserving_source(&self) -> Result<OpcPackage> {
+        self.check_source()?;
+        let result = self.materialize_effective(true);
+        self.check_source()?;
+        result
+    }
+
+    fn materialize_effective(&self, preserve_source: bool) -> Result<OpcPackage> {
         if self.is_managed() {
             return Err(OpcError::ManagedPackageMaterialization);
         }
         if self.state.no_op {
-            return self.package.to_opc_package();
+            return if preserve_source {
+                self.package.to_opc_package_preserving_source()
+            } else {
+                self.package.to_opc_package()
+            };
         }
         self.package.disable_read_ahead_for_publication()?;
+        let source = self.package.finish_stage(if preserve_source {
+            self.package.materialization_source_shared().map(Some)
+        } else {
+            Ok(self.package.owned_source_shared())
+        })?;
         let non_part_members = self.package.cloned_non_part_members()?;
         let mut package = OpcPackage::new();
         copy_relationships(self.rels(), package.rels_mut())?;
@@ -60,10 +83,22 @@ impl PreparedTopology {
                 bytes,
             )?;
             copy_relationships(effective.relationships(&self.package), part.rels_mut())?;
-            package.try_add_source_part(part)?;
+            if effective.replacement.is_some() {
+                // A replacement is authored by the candidate.  Keep it out
+                // of the source XML provenance map so the preservation writer
+                // cannot mistake the replacement allocation for the
+                // untouched source member.
+                package.try_add_part(part)?;
+            } else {
+                package.try_add_source_part(part)?;
+            }
         }
         package.set_non_part_members(non_part_members);
         package.set_tolerance_report(self.package.catalog.tolerance_report.clone());
+        if let Some(source) = source {
+            self.package
+                .attach_owned_source_preservation(&mut package, false, source, None)?;
+        }
         package.mark_source_ingress_signature_policy();
         Ok(package)
     }

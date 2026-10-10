@@ -172,6 +172,53 @@ where
     )
 }
 
+/// Atomically create `path` without replacing an existing destination while
+/// preserving a caller-owned typed error.
+///
+/// The complete artifact is staged in a sibling temporary file before the
+/// no-clobber operation is attempted. The destination is therefore either
+/// created in one filesystem operation or left untouched. In particular, an
+/// existence check performed before staging is not used as the overwrite
+/// policy: a destination created concurrently after that check is still
+/// refused by the atomic finalization operation.
+pub fn replace_with_durability_noclobber<E>(
+    path: &Path,
+    durability: Durability,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+{
+    replace_with_noclobber_steps(path, durability, &mut SystemSteps, write)
+}
+
+/// Atomically create `path` without replacing an existing destination and
+/// run a final caller-owned fence immediately before publication.
+///
+/// The fence and cancellation check both run after staging and the selected
+/// file synchronization, but before the atomic no-clobber operation. A
+/// destination that appears after the staging work is still refused without
+/// replacing that destination.
+pub fn replace_guarded_with_durability_noclobber<E>(
+    path: &Path,
+    durability: Durability,
+    context: Option<&ExecutionContext>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+    before_commit: impl FnOnce() -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+{
+    replace_with_guarded_noclobber_steps(
+        path,
+        durability,
+        &mut SystemSteps,
+        context,
+        write,
+        before_commit,
+    )
+}
+
 fn execution_error(error: ExecutionError) -> OpcError {
     match error {
         ExecutionError::Cancelled => OpcError::Cancelled,
@@ -188,6 +235,14 @@ trait PublishSteps {
 
     /// Renames the staged temporary file over `destination`.
     fn persist(
+        &mut self,
+        temporary: NamedTempFile,
+        destination: &Path,
+    ) -> std::result::Result<File, PersistError>;
+
+    /// Creates `destination` without replacing an entry that appeared after
+    /// staging.
+    fn persist_noclobber(
         &mut self,
         temporary: NamedTempFile,
         destination: &Path,
@@ -212,6 +267,14 @@ impl PublishSteps for SystemSteps {
         destination: &Path,
     ) -> std::result::Result<File, PersistError> {
         temporary.persist(destination)
+    }
+
+    fn persist_noclobber(
+        &mut self,
+        temporary: NamedTempFile,
+        destination: &Path,
+    ) -> std::result::Result<File, PersistError> {
+        temporary.persist_noclobber(destination)
     }
 
     fn sync_parent(&mut self, parent: &Path) -> io::Result<()> {
@@ -252,6 +315,19 @@ where
     replace_with_guarded_steps(path, durability, steps, None, write, || Ok(()))
 }
 
+fn replace_with_noclobber_steps<E, S>(
+    path: &Path,
+    durability: Durability,
+    steps: &mut S,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+    S: PublishSteps,
+{
+    replace_with_guarded_noclobber_steps(path, durability, steps, None, write, || Ok(()))
+}
+
 fn replace_with_guarded_steps<E, S>(
     path: &Path,
     durability: Durability,
@@ -259,6 +335,59 @@ fn replace_with_guarded_steps<E, S>(
     context: Option<&ExecutionContext>,
     write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
     before_commit: impl FnOnce() -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+    S: PublishSteps,
+{
+    replace_with_guarded_mode(
+        path,
+        durability,
+        steps,
+        context,
+        write,
+        before_commit,
+        PersistMode::Replace,
+    )
+}
+
+fn replace_with_guarded_noclobber_steps<E, S>(
+    path: &Path,
+    durability: Durability,
+    steps: &mut S,
+    context: Option<&ExecutionContext>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+    before_commit: impl FnOnce() -> std::result::Result<(), E>,
+) -> std::result::Result<(), E>
+where
+    E: From<OpcError>,
+    S: PublishSteps,
+{
+    replace_with_guarded_mode(
+        path,
+        durability,
+        steps,
+        context,
+        write,
+        before_commit,
+        PersistMode::NoClobber,
+    )
+}
+
+#[derive(Clone, Copy)]
+enum PersistMode {
+    Replace,
+    NoClobber,
+}
+
+fn replace_with_guarded_mode<E, S>(
+    path: &Path,
+    durability: Durability,
+    steps: &mut S,
+    context: Option<&ExecutionContext>,
+    write: impl FnOnce(&mut AtomicSink<'_>) -> std::result::Result<(), E>,
+    before_commit: impl FnOnce() -> std::result::Result<(), E>,
+    persist_mode: PersistMode,
 ) -> std::result::Result<(), E>
 where
     E: From<OpcError>,
@@ -315,10 +444,20 @@ where
     if let Some(context) = context {
         context.check().map_err(execution_error).map_err(E::from)?;
     }
-    let _persisted = steps
-        .persist(temporary, path)
-        .map_err(|error| OpcError::IoError(error.error))
-        .map_err(E::from)?;
+    match persist_mode {
+        PersistMode::Replace => {
+            steps
+                .persist(temporary, path)
+                .map_err(|error| OpcError::IoError(error.error))
+                .map_err(E::from)?;
+        },
+        PersistMode::NoClobber => {
+            steps
+                .persist_noclobber(temporary, path)
+                .map_err(|error| OpcError::IoError(error.error))
+                .map_err(E::from)?;
+        },
+    }
     if durability.syncs_directory() {
         steps
             .sync_parent(parent)
@@ -408,6 +547,14 @@ mod testing {
             temporary.persist(destination)
         }
 
+        fn persist_noclobber(
+            &mut self,
+            temporary: NamedTempFile,
+            destination: &Path,
+        ) -> Result<File, PersistError> {
+            temporary.persist_noclobber(destination)
+        }
+
         fn sync_parent(&mut self, parent: &Path) -> io::Result<()> {
             match self.sync.take() {
                 Some(sync) => sync(parent),
@@ -449,6 +596,15 @@ mod testing {
         ) -> Result<File, PersistError> {
             self.persists += 1;
             temporary.persist(destination)
+        }
+
+        fn persist_noclobber(
+            &mut self,
+            temporary: NamedTempFile,
+            destination: &Path,
+        ) -> Result<File, PersistError> {
+            self.persists += 1;
+            temporary.persist_noclobber(destination)
         }
 
         fn sync_parent(&mut self, parent: &Path) -> io::Result<()> {
@@ -534,6 +690,68 @@ mod tests {
         .expect("atomic replacement");
 
         assert_eq!(fs::read(destination).expect("read destination"), b"new");
+    }
+
+    #[test]
+    fn no_clobber_refuses_an_existing_destination_and_removes_the_staged_file() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("report.xlsx");
+        fs::write(&destination, b"original").expect("seed destination");
+
+        let result = replace_with_durability_noclobber::<OpcError>(
+            &destination,
+            Durability::Full,
+            |temporary| {
+                temporary.write_all(b"replacement")?;
+                Ok(())
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(OpcError::IoError(error)) if error.kind() == io::ErrorKind::AlreadyExists
+        ));
+        assert_eq!(
+            fs::read(&destination).expect("read destination"),
+            b"original"
+        );
+        assert_eq!(
+            directory_entries(directory.path()),
+            vec![destination.file_name().unwrap().to_owned()]
+        );
+    }
+
+    #[test]
+    fn no_clobber_rechecks_the_destination_at_publication() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("report.xlsx");
+
+        let result = replace_guarded_with_durability_noclobber::<OpcError>(
+            &destination,
+            Durability::Full,
+            None,
+            |temporary| {
+                temporary.write_all(b"replacement")?;
+                Ok(())
+            },
+            || {
+                fs::write(&destination, b"racing writer")?;
+                Ok(())
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(OpcError::IoError(error)) if error.kind() == io::ErrorKind::AlreadyExists
+        ));
+        assert_eq!(
+            fs::read(&destination).expect("read racing destination"),
+            b"racing writer"
+        );
+        assert_eq!(
+            directory_entries(directory.path()),
+            vec![destination.file_name().unwrap().to_owned()]
+        );
     }
 
     #[test]
@@ -1019,6 +1237,68 @@ mod tests {
         assert_eq!(steps.persists, 0);
         assert_eq!(fs::read(&destination).unwrap(), b"original");
         assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+
+    #[test]
+    fn guarded_no_clobber_fence_runs_after_selected_sync_and_before_publication() {
+        for durability in LEVELS {
+            let directory = tempfile::tempdir().unwrap();
+            let destination = directory.path().join("package.docx");
+            let mut steps = testing::CountingSteps::default();
+            let result = replace_with_guarded_noclobber_steps::<TypedError, _>(
+                &destination,
+                durability,
+                &mut steps,
+                None,
+                |sink| {
+                    sink.write_all(b"complete replacement").unwrap();
+                    Ok(())
+                },
+                || {
+                    let temporary = fs::read_dir(directory.path())
+                        .unwrap()
+                        .map(|entry| entry.unwrap().path())
+                        .find(|path| path != &destination)
+                        .unwrap();
+                    assert_eq!(fs::read(temporary).unwrap(), b"complete replacement");
+                    Err(TypedError::Write)
+                },
+            );
+
+            assert!(matches!(result, Err(TypedError::Write)));
+            assert_eq!(steps.file_syncs, usize::from(durability.syncs_file()));
+            assert_eq!(steps.persists, 0);
+            assert_eq!(steps.parent_syncs, 0);
+            assert!(!destination.exists());
+            assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
+        }
+    }
+
+    #[test]
+    fn guarded_no_clobber_parent_sync_failure_reports_committed_after_creation() {
+        let directory = tempfile::tempdir().unwrap();
+        let destination = directory.path().join("package.docx");
+        let mut steps = testing::CountingSteps {
+            fail_parent_sync: true,
+            ..Default::default()
+        };
+        let result = replace_with_guarded_noclobber_steps::<OpcError, _>(
+            &destination,
+            Durability::Full,
+            &mut steps,
+            None,
+            |sink| {
+                sink.write_all(b"replacement")?;
+                Ok(())
+            },
+            || Ok(()),
+        );
+
+        assert!(matches!(result, Err(OpcError::Committed { .. })));
+        assert_eq!(fs::read(&destination).unwrap(), b"replacement");
+        assert_eq!(steps.file_syncs, 1);
+        assert_eq!(steps.persists, 1);
+        assert_eq!(steps.parent_syncs, 1);
     }
 
     #[test]

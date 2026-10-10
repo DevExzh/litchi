@@ -141,6 +141,11 @@ impl OwnedXmlPart {
             bytes_len as u64,
             limits.max_part_bytes(),
         )?;
+        limits.check(
+            crate::SourceLimitKind::EntryBytes,
+            bytes_len as u64,
+            limits.max_entry_bytes(),
+        )?;
         if bytes_len > MAX_OWNED_XML_BYTES {
             return Err(invalid_source("owned XML exceeds 32 MiB"));
         }

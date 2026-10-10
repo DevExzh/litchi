@@ -18,6 +18,11 @@ use std::collections::HashSet;
 use std::ops::Range;
 use std::sync::Arc;
 
+mod fragments;
+pub use fragments::{
+    RelationshipFragment, RelationshipFragmentEdit, RelationshipFragmentPlan, RelationshipFragments,
+};
+
 /// Immutable relationship XML bound to its package or part owner.
 ///
 /// Capture with [`OpcPackage::source_relationships`]. Clones share source bytes;
@@ -662,7 +667,7 @@ impl OwnedRelationships {
     }
 }
 
-fn clone_string_bounded(value: &str, resource: &'static str) -> Result<String> {
+pub(super) fn clone_string_bounded(value: &str, resource: &'static str) -> Result<String> {
     let mut owned = String::new();
     owned
         .try_reserve_exact(value.len())
@@ -863,7 +868,7 @@ fn scan_relationship_source(
     })
 }
 
-fn relationship_id(
+pub(super) fn relationship_id(
     element: &quick_xml::events::BytesStart<'_>,
     decoder: quick_xml::Decoder,
 ) -> Result<String> {
@@ -892,7 +897,7 @@ impl OwnedRelationships {
         self.xml.bytes()
     }
 
-    pub(crate) fn bytes_arc(&self) -> Arc<Vec<u8>> {
+    pub fn bytes_arc(&self) -> Arc<Vec<u8>> {
         Arc::clone(&self.xml.bytes)
     }
 
@@ -1395,6 +1400,73 @@ impl OpcPackage {
             xml,
             member_present,
         })
+    }
+
+    /// Replace relationship XML decoded from a durable format-level patch.
+    ///
+    /// The expected source token must still match, including physical member
+    /// presence. Raw replacement bytes are bounded, parsed and audited before
+    /// mutation; they never grant source-replacement authority. A package-root
+    /// member cannot be absent. An absent part member must use the canonical
+    /// empty XML view, so no supplied lexical content is silently discarded.
+    /// The format owner must validate the changed dependency closure and reserve
+    /// package-wide aggregate budgets (including member-presence changes).
+    /// This is exact-image restoration; use structural metadata plans when
+    /// transporting edits onto a divergent source.
+    pub fn try_replace_relationships_bytes_with_limits(
+        &mut self,
+        expected: &OwnedRelationships,
+        replacement: Arc<Vec<u8>>,
+        member_present: bool,
+        limits: SourceLimits,
+    ) -> Result<bool> {
+        let current = self.source_relationships_with_limits(&expected.owner, limits)?;
+        if current != *expected {
+            return Err(invalid("stale relationship replacement"));
+        }
+        if expected.bytes() == replacement.as_slice() && expected.member_present == member_present {
+            return Ok(false);
+        }
+        if self.is_signed() || self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        if !member_present && expected.owner.as_str() == "/" {
+            return Err(invalid("package-root relationship member cannot be absent"));
+        }
+        OwnedXmlPart::check_capture_size(&expected.xml.name, replacement.len(), limits)?;
+        limits.check(
+            SourceLimitKind::TotalRelationshipXmlBytes,
+            replacement.len() as u64,
+            limits.max_total_relationship_xml_bytes() as u64,
+        )?;
+        let relationships = crate::pkgreader::PackageReader::parse_owned_relationships_with_limits(
+            &replacement,
+            &expected.owner,
+            limits,
+        )?;
+        if !member_present {
+            if !relationships.is_empty() {
+                return Err(invalid("absent relationship member has edges"));
+            }
+            let canonical = relationships.plan_canonical(limits)?.materialize(limits)?;
+            if replacement.as_slice() != canonical.as_slice() {
+                return Err(invalid(
+                    "absent relationship member requires its canonical empty view",
+                ));
+            }
+        }
+        let xml = OwnedXmlPart::capture_with_limits(
+            expected.xml.name.clone(),
+            crate::constants::content_type::OPC_RELATIONSHIPS.to_owned(),
+            replacement,
+            limits,
+        )?;
+        let replacement = OwnedRelationships {
+            owner: expected.owner.clone(),
+            xml,
+            member_present,
+        };
+        self.try_replace_relationships_with_limits(expected, &replacement, limits)
     }
 
     /// Replace an exact expected relationship snapshot with a source-derived token.

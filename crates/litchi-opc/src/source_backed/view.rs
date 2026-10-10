@@ -2,6 +2,56 @@
 
 use super::*;
 
+/// Exact decoded candidate metadata, retaining its source or overlay admission.
+///
+/// Clones share bytes and retain the complete prepared candidate, including
+/// managed reservations and donor contexts. Captured bytes remain readable
+/// after source changes; acquiring a new handle checks source and execution
+/// guards again. This is a metadata image, not authority to replace metadata.
+#[derive(Clone)]
+pub struct PreparedMetadataData {
+    topology: PreparedTopology,
+    payload: PreparedMetadataPayload,
+}
+
+#[derive(Clone)]
+enum PreparedMetadataPayload {
+    Source(PartData),
+    Changed(usize),
+    Appended(usize),
+}
+
+impl std::fmt::Debug for PreparedMetadataData {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("PreparedMetadataData")
+            .field("bytes", &self.as_bytes().len())
+            .finish()
+    }
+}
+
+impl PreparedMetadataData {
+    /// Borrow the exact decoded metadata bytes captured by this handle.
+    #[must_use]
+    pub fn as_bytes(&self) -> &[u8] {
+        match &self.payload {
+            PreparedMetadataPayload::Source(data) => data.as_bytes(),
+            PreparedMetadataPayload::Changed(index) => {
+                self.topology.state.changed[*index].replacement.as_slice()
+            },
+            PreparedMetadataPayload::Appended(index) => {
+                self.topology.state.retained().appended_metadata[*index]
+                    .1
+                    .as_slice()
+            },
+        }
+    }
+
+    /// Recheck the execution contexts retained by this captured metadata.
+    pub fn check_execution(&self) -> Result<()> {
+        self.topology.check_execution()
+    }
+}
+
 /// An owned, lazy Part view retaining its complete effective package.
 ///
 /// Cloning shares the candidate without reading or copying payloads. Views
@@ -42,6 +92,122 @@ impl std::fmt::Debug for PreparedPartData {
 }
 
 impl PreparedTopology {
+    /// Capture the exact effective relationship member for a Part or `/`.
+    ///
+    /// `None` means the member is absent, including after owner removal. A
+    /// physically present empty relationship file yields `Some`. Changed and
+    /// appended bytes are shared with publication; unchanged metadata is read
+    /// lazily under the source's managed payload policy. No other Part is read.
+    ///
+    /// # Errors
+    /// Returns source, execution, invalid owner URI, or metadata limit errors.
+    pub fn relationships_data_for_with_limit(
+        &self,
+        owner: &PackURI,
+        maximum: usize,
+    ) -> Result<Option<PreparedMetadataData>> {
+        self.check_source()?;
+        // PackURI identity is case-equivalent, while ZIP member lookup is
+        // exact. Derive the member name from the admitted owner spelling,
+        // including removed physical owners and newly added candidate owners.
+        let owner = self
+            .state
+            .effective
+            .as_ref()
+            .and_then(|effective| {
+                effective.parts.iter().find_map(|part| {
+                    let name = part.partname(&self.package);
+                    name.is_equivalent_to(owner).then_some(name)
+                })
+            })
+            .or_else(|| {
+                self.package
+                    .part_index(owner)
+                    .map(|index| &self.package.catalog.parts[index].partname)
+            })
+            .unwrap_or(owner);
+        let uri = owner.rels_uri().map_err(OpcError::InvalidPackUri)?;
+        let maximum = maximum.min(self.package.limits.max_relationship_xml_bytes());
+        self.capture_metadata(
+            uri.membername(),
+            maximum,
+            SourceLimitKind::RelationshipXmlBytes,
+            || {
+                self.package
+                    .relationships_data_for_with_limit(owner, maximum)
+            },
+        )
+    }
+
+    /// Capture the exact effective content-types manifest under a byte ceiling.
+    ///
+    /// The image matches decoded publication bytes, preserving lexical trivia.
+    /// This does not regenerate XML from the effective typed content-type map.
+    ///
+    /// # Errors
+    /// Returns source, execution, missing manifest, or metadata limit errors.
+    pub fn content_types_data_with_limit(&self, maximum: usize) -> Result<PreparedMetadataData> {
+        let maximum = maximum.min(self.package.limits.max_content_types_bytes());
+        self.capture_metadata(
+            &self.package.catalog.content_types_member,
+            maximum,
+            SourceLimitKind::ContentTypesBytes,
+            || {
+                self.package
+                    .content_types_data_with_limit(maximum)
+                    .map(Some)
+            },
+        )?
+        .ok_or_else(|| OpcError::PartNotFound(self.package.catalog.content_types_member.clone()))
+    }
+
+    fn capture_metadata(
+        &self,
+        member: &str,
+        maximum: usize,
+        kind: SourceLimitKind,
+        source: impl FnOnce() -> Result<Option<PartData>>,
+    ) -> Result<Option<PreparedMetadataData>> {
+        self.read_capture(|| {
+            let retained = self.state.retained.as_ref();
+            if retained.is_some_and(|state| {
+                state
+                    .omitted_members
+                    .iter()
+                    .any(|name| name.eq_ignore_ascii_case(member))
+            }) {
+                return Ok(None);
+            }
+            let changed = self.state.changed.iter().position(|overlay| {
+                matches!(&overlay.target, ChangedOverlayTarget::Member(name)
+                    if name.eq_ignore_ascii_case(member))
+            });
+            let appended = retained.and_then(|state| {
+                state
+                    .appended_metadata
+                    .iter()
+                    .position(|(name, _)| name.eq_ignore_ascii_case(member))
+            });
+            let payload = if let Some(index) = changed {
+                PreparedMetadataPayload::Changed(index)
+            } else if let Some(index) = appended {
+                PreparedMetadataPayload::Appended(index)
+            } else if let Some(data) = source()? {
+                PreparedMetadataPayload::Source(data)
+            } else {
+                return Ok(None);
+            };
+            let data = PreparedMetadataData {
+                topology: self.clone(),
+                payload,
+            };
+            self.package
+                .limits
+                .check(kind, data.as_bytes().len() as u64, maximum as u64)?;
+            Ok(Some(data))
+        })
+    }
+
     fn read_capture<T>(&self, capture: impl FnOnce() -> Result<T>) -> Result<T> {
         self.check_source()?;
         let result = capture();

@@ -86,6 +86,14 @@ impl ContentTypeMap {
         }
     }
 
+    pub(crate) fn contains_fragment_key(&self, default: bool, normalized: &str) -> bool {
+        if default {
+            self.defaults.contains_key(normalized)
+        } else {
+            self.overrides.contains_key(normalized)
+        }
+    }
+
     pub(crate) fn mapping_count(&self) -> usize {
         self.defaults.len().saturating_add(self.overrides.len())
     }

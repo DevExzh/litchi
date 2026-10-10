@@ -427,6 +427,10 @@ pub(crate) struct RelationshipXmlMetrics {
 pub(crate) struct SourceCatalog {
     pub(crate) pkg_srels: SmallVec<[SerializedRelationship; 8]>,
     pub(crate) parts: Vec<DeferredPart>,
+    /// The parsed source manifest is retained with the admitted catalog so a
+    /// later owning conversion can transfer its source binding without
+    /// reparsing the manifest or reopening the archive.
+    pub(crate) content_types: Arc<ContentTypeMap>,
     /// Metrics for each relationship owner whose manifest was admitted and
     /// parsed during catalog construction.  The package pseudo-part `/` is
     /// included when it has a `.rels` member.  The map is bounded by the
@@ -802,7 +806,15 @@ impl PackageReader {
         Self::parse_owned_relationships_with_limits(xml, owner, SourceLimits::default())
     }
 
-    pub(crate) fn parse_owned_relationships_with_limits(
+    /// Decode relationship XML for an owner under explicit source limits.
+    ///
+    /// The returned graph carries no source-replacement authority. Callers
+    /// installing XML must still use a package-bound source token and validate
+    /// their application's dependency closure.
+    ///
+    /// # Errors
+    /// Returns an error for invalid XML, relationships, owner names, or limits.
+    pub fn parse_owned_relationships_with_limits(
         xml: &[u8],
         owner: &PackURI,
         limits: SourceLimits,
@@ -1849,6 +1861,7 @@ impl PackageReader {
         Ok(SourceCatalog {
             pkg_srels,
             parts,
+            content_types: Arc::new(content_types),
             relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
             content_types_member: content_types_member.to_string(),
@@ -1932,6 +1945,7 @@ impl PackageReader {
         Ok(SourceCatalog {
             pkg_srels,
             parts,
+            content_types: Arc::new(content_types),
             relationship_xml_metrics: ledger.relationship_xml_metrics,
             non_part_members,
             content_types_member: content_types_member.to_string(),

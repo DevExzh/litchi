@@ -72,9 +72,11 @@ pub use execution::OpenSession;
 pub use limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilder};
 pub use members::{NonPartMember, NonPartReason};
 pub use package::{
-    CanonicalRelationshipsPlan, CompressedPartTransfer, ContentTypeEdit, ContentTypesEditPlan,
-    FontEmbedding, OpcPackage, OwnedContentTypes, OwnedRelationships, RelationshipEdit,
-    RelationshipSourcePlan, RelationshipsEditPlan, SaveOptions,
+    CanonicalRelationshipsPlan, CompressedPartTransfer, ContentTypeEdit, ContentTypeFragment,
+    ContentTypeFragmentEdit, ContentTypeFragmentKey, ContentTypeFragmentPlan, ContentTypeFragments,
+    ContentTypesEditPlan, FontEmbedding, OpcPackage, OwnedContentTypes, OwnedRelationships,
+    RelationshipEdit, RelationshipFragment, RelationshipFragmentEdit, RelationshipFragmentPlan,
+    RelationshipFragments, RelationshipSourcePlan, RelationshipsEditPlan, SaveOptions,
 };
 pub use packuri::PackURI;
 pub use part::{BlobPart, Part, PartMetadata, XmlPart};
@@ -87,16 +89,16 @@ pub use prepared::PreparedOoxmlSource;
 pub use rel::{Relationship, Relationships, TargetMode};
 pub use source_backed::{
     AuthorizedPrecompressedPart, EffectiveContentType, EffectivePart, EffectivePartData,
-    EffectiveTopology, PartBatch, PartData, PartReadSession, PartView, PreparedPartData,
-    PreparedPartView, PreparedTopology, ReplacementSpan, RetainedPrecompressedPart, SourceArtifact,
-    SourceArtifactFingerprint, SourceArtifactRestoreProof, SourceBackedPackage,
-    SourceCacheCounterDelta, SourceCacheDiagnostics, SourceCacheDiagnosticsError,
-    SourceCacheLimitError, SourceCacheLimits, SourceLineage, SourcePartSpliceFragment,
-    SourcePartSpliceLimits, SourcePartSplicePlan, SourcePartSpliceProof,
-    SourcePartSplicePublication, SourcePartSpliceReplay, SourcePartSpliceReplayError,
-    SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof, SourceReadDiagnostics,
-    SourceReadPolicy, SourceReadPolicyError, SourceRelationshipTarget, SourceTopologyPlan,
-    VerifiedDecodedReaderError,
+    EffectiveTopology, PartBatch, PartData, PartReadSession, PartView, PreparedMetadataData,
+    PreparedPartData, PreparedPartView, PreparedTopology, ReplacementSpan,
+    RetainedPrecompressedPart, SourceArtifact, SourceArtifactFingerprint,
+    SourceArtifactRestoreProof, SourceBackedPackage, SourceCacheCounterDelta,
+    SourceCacheDiagnostics, SourceCacheDiagnosticsError, SourceCacheLimitError, SourceCacheLimits,
+    SourceLineage, SourcePartSpliceFragment, SourcePartSpliceLimits, SourcePartSplicePlan,
+    SourcePartSpliceProof, SourcePartSplicePublication, SourcePartSpliceReplay,
+    SourcePartSpliceReplayError, SourcePartSpliceReplayHandle, SourcePartSpliceReplayProof,
+    SourceReadDiagnostics, SourceReadPolicy, SourceReadPolicyError, SourceRelationshipTarget,
+    SourceTopologyPlan, VerifiedDecodedReaderError,
 };
 #[cfg(feature = "performance-diagnostics")]
 pub use source_backed::{CacheState, DiagnosticSnapshot, FlightState, Operation};

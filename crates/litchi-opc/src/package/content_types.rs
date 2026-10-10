@@ -93,6 +93,15 @@ impl<'source> ContentTypesEditPlan<'source> {
             limits.max_content_type_mappings() as u64,
         )?;
         if self.inner.is_noop() {
+            // Materialization may use a stricter structural profile than the
+            // one used during planning, even when the token stays shared.
+            OwnedXmlPart::preflight_capture_with_limits(
+                &source.xml.name,
+                &source.xml.content_type,
+                source.bytes(),
+                limits,
+            )?;
+            crate::content_type::ContentTypeMap::from_xml(source.bytes(), limits)?;
             return Ok(source.clone());
         }
         let bytes = self.inner.materialize_public(limits)?;
@@ -1147,3 +1156,9 @@ mod tests {
         ));
     }
 }
+
+mod fragments;
+pub use fragments::{
+    ContentTypeFragment, ContentTypeFragmentEdit, ContentTypeFragmentKey, ContentTypeFragmentPlan,
+    ContentTypeFragments,
+};

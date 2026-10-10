@@ -24,12 +24,25 @@ use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 mod content_types;
+mod metadata_fragments;
 mod relationships;
-pub use content_types::{ContentTypeEdit, ContentTypesEditPlan};
-pub use relationships::{
-    CanonicalRelationshipsPlan, OwnedRelationships, RelationshipEdit, RelationshipSourcePlan,
-    RelationshipsEditPlan,
+pub use content_types::{
+    ContentTypeEdit, ContentTypeFragment, ContentTypeFragmentEdit, ContentTypeFragmentKey,
+    ContentTypeFragmentPlan, ContentTypeFragments, ContentTypesEditPlan,
 };
+pub use relationships::{
+    CanonicalRelationshipsPlan, OwnedRelationships, RelationshipEdit, RelationshipFragment,
+    RelationshipFragmentEdit, RelationshipFragmentPlan, RelationshipFragments,
+    RelationshipSourcePlan, RelationshipsEditPlan,
+};
+
+fn same_optional_manifest_bytes(left: Option<&[u8]>, right: Option<&[u8]>) -> bool {
+    match (left, right) {
+        (None, None) => true,
+        (Some(left), Some(right)) => left == right,
+        (Some(_), None) | (None, Some(_)) => false,
+    }
+}
 
 /// Options for saving an OPC package.
 #[derive(Debug, Clone, Default)]
@@ -331,6 +344,12 @@ impl OwnedContentTypes {
     #[must_use]
     pub fn bytes(&self) -> &[u8] {
         self.xml.bytes()
+    }
+
+    /// Share the exact immutable manifest image without copying its bytes.
+    #[must_use]
+    pub fn bytes_arc(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.xml.bytes)
     }
 
     /// Remove exact part and relationship-part overrides while preserving all
@@ -801,6 +820,49 @@ impl OpcPackage {
         Ok(OwnedContentTypes { xml, binding })
     }
 
+    /// Replace manifest XML decoded from a durable format-level patch.
+    ///
+    /// `expected` must match the current publication view. Replacement bytes
+    /// are untrusted: bounded XML and content-type parsing and the publication
+    /// audit run before mutation. This does not create a source token from raw
+    /// bytes or bypass signature policy. The format owner remains responsible
+    /// for applying the corresponding part/type dependency closure and reserving
+    /// package-wide aggregate budgets. This is exact-image restoration; use
+    /// structural metadata plans when transporting edits onto a divergent source.
+    pub fn try_replace_content_types_bytes_with_limits(
+        &mut self,
+        expected: &[u8],
+        replacement: Arc<Vec<u8>>,
+        limits: SourceLimits,
+    ) -> Result<bool> {
+        let current = self.source_content_types_with_limits(limits)?;
+        if current.bytes() != expected {
+            return Err(OpcError::InvalidContentTypesManifest(
+                "stale content-types source replacement".to_owned(),
+            ));
+        }
+        if current.bytes() == replacement.as_slice() {
+            return Ok(false);
+        }
+        if self.is_signed() || self.requires_signature_edit_policy() {
+            return Err(OpcError::SignedSourceRequiresExplicitPolicy);
+        }
+        let name = PackURI::new(CONTENT_TYPES_URI).map_err(OpcError::InvalidPackUri)?;
+        crate::OwnedXmlPart::check_capture_size(&name, replacement.len(), limits)?;
+        let binding = Arc::new(ContentTypeMap::from_xml(&replacement, limits)?);
+        let xml = crate::OwnedXmlPart::capture_with_limits(
+            name,
+            crate::constants::content_type::XML.to_owned(),
+            replacement,
+            limits,
+        )?;
+        self.try_replace_content_types_with_limits(
+            expected,
+            &OwnedContentTypes { xml, binding },
+            limits,
+        )
+    }
+
     /// Replace an exact source-manifest snapshot.
     ///
     /// The caller owns the format-level dependency closure. Publication only
@@ -899,6 +961,83 @@ impl OpcPackage {
             .map(|source| source.bytes.as_slice()))
     }
 
+    /// Compare retained content-type spelling without serializing fallback XML.
+    /// This is a provenance comparison; callers must separately compare the
+    /// typed graph when both sides would use authored fallback metadata.
+    pub fn same_retained_content_types(&self, other: &Self) -> Result<bool> {
+        Ok(same_optional_manifest_bytes(
+            self.source_content_types_source()?.map(|(bytes, _)| bytes),
+            other.source_content_types_source()?.map(|(bytes, _)| bytes),
+        ))
+    }
+
+    /// Compare one owner's retained relationship spelling and physical presence.
+    /// Typed relationship equality is a separate caller check; two absent
+    /// retained tokens may have different authored fallback graphs.
+    pub fn same_retained_relationships(&self, other: &Self, owner: &PackURI) -> Result<bool> {
+        let left = if owner.as_str() == PACKAGE_URI {
+            Some(&self.rels)
+        } else {
+            self.part_metadata(owner).map(|part| part.rels())
+        };
+        let right = if owner.as_str() == PACKAGE_URI {
+            Some(&other.rels)
+        } else {
+            other.part_metadata(owner).map(|part| part.rels())
+        };
+        match (left, right) {
+            (None, None) => Ok(true),
+            (Some(left), Some(right)) => Ok((!left.is_empty()
+                || self.source_relationships_member_present(owner))
+                == (!right.is_empty() || other.source_relationships_member_present(owner))
+                && same_optional_manifest_bytes(
+                    self.source_relationships_xml(owner, left)?,
+                    other.source_relationships_xml(owner, right)?,
+                )),
+            _ => Ok(false),
+        }
+    }
+
+    /// Compare the retained publication manifests without serializing them.
+    ///
+    /// The typed OPC graph does not include `[Content_Types].xml` or the
+    /// relationship members as ordinary parts.  When either package still
+    /// has a valid retained source token, compare that member's exact bytes;
+    /// when both sides have no token they will use the same deterministic
+    /// authored fallback after the caller has established graph equality.
+    /// A retained token on only one side, or different retained bytes, is a
+    /// conservative inequality because the source may carry producer markup
+    /// outside the typed graph.
+    pub fn same_retained_publication_manifests(&self, other: &Self) -> Result<bool> {
+        if !same_optional_manifest_bytes(
+            self.source_content_types_source()?.map(|(bytes, _)| bytes),
+            other.source_content_types_source()?.map(|(bytes, _)| bytes),
+        ) {
+            return Ok(false);
+        }
+
+        let package_uri = PackURI::new(PACKAGE_URI).map_err(OpcError::InvalidPackUri)?;
+        if !same_optional_manifest_bytes(
+            self.source_relationships_xml(&package_uri, &self.rels)?,
+            other.source_relationships_xml(&package_uri, &other.rels)?,
+        ) {
+            return Ok(false);
+        }
+
+        for metadata in self.iter_parts() {
+            let Some(other_metadata) = other.part_metadata(metadata.partname()) else {
+                return Ok(false);
+            };
+            if !same_optional_manifest_bytes(
+                self.source_relationships_xml(metadata.partname(), metadata.rels())?,
+                other.source_relationships_xml(other_metadata.partname(), other_metadata.rels())?,
+            ) {
+                return Ok(false);
+            }
+        }
+        Ok(true)
+    }
+
     /// Set save options for the package.
     pub fn set_save_options(&mut self, options: SaveOptions) {
         self.revoke_exact_source();
@@ -979,6 +1118,21 @@ impl OpcPackage {
     #[must_use]
     pub fn exact_source_len(&self) -> Option<usize> {
         self.exact_source().map(<[u8]>::len)
+    }
+
+    /// Whether two package snapshots retain the same immutable source archive.
+    ///
+    /// This is a preservation identity proof, not a content comparison: the
+    /// archive allocation is immutable and every package clone or source
+    /// descendant points at the same bytes. Format owners can use it to prove
+    /// equality for opaque ZIP members which are intentionally outside the
+    /// OPC part graph, while still comparing the exposed graph separately.
+    #[must_use]
+    pub fn shares_source_archive(&self, other: &Self) -> bool {
+        self.source_archive
+            .as_ref()
+            .zip(other.source_archive.as_ref())
+            .is_some_and(|(left, right)| Arc::ptr_eq(left.bytes(), right.bytes()))
     }
 
     /// The read limits this package's owned source archive was admitted
@@ -1338,7 +1492,7 @@ impl OpcPackage {
         Ok(package)
     }
 
-    fn retain_relationships_xml(
+    pub(crate) fn retain_relationships_xml(
         &mut self,
         owner: PackURI,
         bytes: Arc<Vec<u8>>,
@@ -2634,7 +2788,44 @@ impl OpcPackage {
 
     /// Retain an owned source archive that deferred payloads already share.
     fn authorize_shared_owned_source(&mut self, source: Arc<Vec<u8>>, limits: SourceLimits) {
+        let source_content_types_xml = self.source_content_types_xml.clone();
+        let source_content_types = self.source_content_types.clone();
+        let _ = self.attach_owned_source_preservation(
+            source,
+            source_content_types_xml,
+            source_content_types,
+            limits,
+            true,
+        );
+    }
+
+    /// Attach source archive/provenance to a package materialized from an
+    /// already admitted source-backed catalog.
+    ///
+    /// The source bytes and parsed content-types binding are transferred by
+    /// shared ownership.  The OPC catalog is not reparsed; a bounded ZIP
+    /// member scan builds the physical publication provenance.  `exact` is
+    /// true only for a graph that is still the physical source; changed
+    /// candidates retain the same archive and provenance for targeted
+    /// publication while forcing the writer through its changed-package path.
+    pub(crate) fn attach_owned_source_preservation(
+        &mut self,
+        source: Arc<Vec<u8>>,
+        source_content_types_xml: Option<Arc<Vec<u8>>>,
+        source_content_types: Option<Arc<ContentTypeMap>>,
+        limits: SourceLimits,
+        exact: bool,
+    ) -> Result<()> {
+        if let (Some(xml), Some(binding)) = (source_content_types_xml, source_content_types) {
+            self.source_content_types_xml = Some(xml);
+            self.source_content_types = Some(binding);
+        }
         let preservation = PreservationProvenance::from_package(source.as_slice(), self);
+        if !exact && preservation.is_none() {
+            return Err(OpcError::PreservationUnavailable {
+                reason: "owned source preservation provenance could not be established".to_owned(),
+            });
+        }
         if let Some(preservation) = preservation.as_ref() {
             self.bind_relationship_captures(preservation);
         }
@@ -2642,7 +2833,8 @@ impl OpcPackage {
         self.source_archive = Some(retained_archive::RetainedArchive::new(source));
         self.source_limits = limits;
         self.transfer_index = Some(Arc::new(OnceLock::new()));
-        self.exact_source_authorized = true;
+        self.exact_source_authorized = exact;
+        Ok(())
     }
 
     /// Hand every relationship collection the canonical serialization the

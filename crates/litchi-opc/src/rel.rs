@@ -366,6 +366,21 @@ impl Relationships {
         self.source_capture.as_ref()
     }
 
+    /// Compare the semantic relationship collection while ignoring its
+    /// publication provenance handle.
+    pub(crate) fn semantically_eq(&self, other: &Self) -> bool {
+        self.base_uri == other.base_uri
+            && self.source_uri == other.source_uri
+            && self.rels.len() == other.rels.len()
+            && self.rels.iter().all(|(id, relationship)| {
+                other.rels.get(id).is_some_and(|candidate| {
+                    relationship.reltype() == candidate.reltype()
+                        && relationship.target_ref() == candidate.target_ref()
+                        && relationship.target_mode() == candidate.target_mode()
+                })
+            })
+    }
+
     /// Drop the open-time proof because this collection is about to change.
     fn invalidate_source_capture(&mut self) {
         self.source_capture = None;

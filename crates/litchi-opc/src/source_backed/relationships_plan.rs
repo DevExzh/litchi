@@ -308,21 +308,12 @@ pub(crate) fn plan_relationship_publications(
             continue;
         }
         let group = changes_for_owner(changes, owner);
-        let append_only = group
-            .iter()
-            .all(|change| matches!(change.operation, TopologyRelationshipOperation::Add { .. }));
         let removal_only = group.iter().all(|change| {
             matches!(
                 change.operation,
                 TopologyRelationshipOperation::Remove { .. }
             )
         });
-        if !append_only && !removal_only {
-            return Err(super::overlay_unavailable(format!(
-                "existing relationships member '{}' is not canonical",
-                member_name
-            )));
-        }
         let parsed = parse_noncanonical_relationship_source(
             &original,
             &member_name,
@@ -385,42 +376,104 @@ pub(crate) fn plan_relationship_publications(
                     .map(|metrics| metrics.event_count),
             });
         } else {
+            // Preserve a noncanonical source member even when one candidate
+            // both removes old edges and appends new ones.  The old planner
+            // admitted only add-only or remove-only groups, which made a
+            // composed insertion/removal edit fall back to canonical XML and
+            // lose source comments/whitespace.  The publication pass performs
+            // the same remove-then-append splice after this bounded preflight.
+            let mut ranges: Vec<Range<usize>> = Vec::new();
+            let mut removed_events = 0_u64;
             let mut append_len = 0usize;
+            let mut added_count = 0_u64;
+            ranges
+                .try_reserve_exact(group.len())
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC relationship preflight mixed ranges",
+                    source,
+                })?;
             for change in group {
-                let TopologyRelationshipOperation::Add { reltype, target } = &change.operation
-                else {
-                    return Err(super::overlay_unavailable(
-                        "relationship preflight operation mismatch",
-                    ));
-                };
-                let (target_ref, target_mode) =
-                    SourceBackedPackage::topology_relationship_target_ref(
-                        target,
-                        owner.base_uri(),
-                    )?;
-                append_len = append_len
-                    .checked_add(relationship_append_fragment_len(
-                        parsed.root_prefix.len(),
-                        &change.r_id,
-                        reltype,
-                        &target_ref,
-                        target_mode,
-                    )?)
-                    .ok_or_else(|| {
-                        super::overlay_unavailable("relationship append length overflows")
-                    })?;
+                match &change.operation {
+                    TopologyRelationshipOperation::Remove { .. } => {
+                        let range =
+                            parsed
+                                .relationship_ranges
+                                .get(&change.r_id)
+                                .ok_or_else(|| {
+                                    super::overlay_unavailable(format!(
+                                        "source relationships member '{}' has no range for '{}'",
+                                        member_name, change.r_id
+                                    ))
+                                })?;
+                        ranges.push(range.clone());
+                        removed_events = removed_events
+                            .checked_add(
+                                *parsed
+                                    .relationship_event_counts
+                                    .get(&change.r_id)
+                                    .ok_or_else(|| {
+                                        super::overlay_unavailable(
+                                            "relationship event count is unavailable",
+                                        )
+                                    })?,
+                            )
+                            .ok_or_else(|| {
+                                super::overlay_unavailable("relationship event count overflows")
+                            })?;
+                    },
+                    TopologyRelationshipOperation::Add { reltype, target } => {
+                        let (target_ref, target_mode) =
+                            SourceBackedPackage::topology_relationship_target_ref(
+                                target,
+                                owner.base_uri(),
+                            )?;
+                        append_len = append_len
+                            .checked_add(relationship_append_fragment_len(
+                                parsed.root_prefix.len(),
+                                &change.r_id,
+                                reltype,
+                                &target_ref,
+                                target_mode,
+                            )?)
+                            .ok_or_else(|| {
+                                super::overlay_unavailable("relationship append length overflows")
+                            })?;
+                        added_count = added_count.checked_add(1).ok_or_else(|| {
+                            super::overlay_unavailable("relationship count overflows")
+                        })?;
+                    },
+                    TopologyRelationshipOperation::Replace { .. } => {
+                        return Err(super::overlay_unavailable(
+                            "noncanonical relationship replacement is not source-spliceable",
+                        ));
+                    },
+                }
             }
-            let final_len = relationship_source_append_output_len(
-                original.len(),
-                parsed.root_empty_end.is_some(),
-                parsed.root_name.len(),
-                append_len,
-            )?;
+            ranges.sort_unstable_by_key(|range| range.start);
+            let compact_len = if ranges.is_empty() {
+                original.len()
+            } else {
+                relationship_source_output_len(original.len(), &ranges)?
+            };
+            let final_len = if append_len == 0 {
+                compact_len
+            } else {
+                relationship_source_append_output_len(
+                    compact_len,
+                    parsed.root_empty_end.is_some(),
+                    parsed.root_name.len(),
+                    append_len,
+                )?
+            };
             let final_events = parsed
                 .event_count
-                .checked_add(u64::from(parsed.root_empty_end.is_some()))
+                .checked_sub(removed_events)
+                .ok_or_else(|| super::overlay_unavailable("relationship event count underflows"))?
+                .checked_add(u64::from(
+                    parsed.root_empty_end.is_some() && append_len != 0,
+                ))
                 .ok_or_else(|| super::overlay_unavailable("relationship event count overflows"))?
-                .checked_add(group.len() as u64)
+                .checked_add(added_count)
                 .ok_or_else(|| super::overlay_unavailable("relationship event count overflows"))?;
             summaries.push(RelationshipPreflight {
                 owner: owner.clone(),
