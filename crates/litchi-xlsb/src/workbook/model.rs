@@ -133,6 +133,15 @@ impl Workbook {
         self.leniency
     }
 
+    /// Clone the physical package owner while retaining this workbook's policies.
+    ///
+    /// Payloads retain their existing shared ownership; the workbook projection
+    /// and its worksheet caches are not copied.
+    #[must_use]
+    pub fn to_package(&self) -> crate::Package {
+        crate::Package::from_workbook(self)
+    }
+
     /// Consume this workbook into its physical package owner without reparsing.
     ///
     /// The OPC graph, external-link limits, drawing projection, worksheet

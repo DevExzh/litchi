@@ -94,11 +94,7 @@ fn drawing_parse_state_is_distinct_from_empty_inventory() {
 #[test]
 fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
     let workbook = generated_workbook();
-    let commit = workbook
-        .edit_workbook_structure()
-        .unwrap()
-        .commit()
-        .unwrap();
+    let commit = workbook.to_package().edit().unwrap().commit().unwrap();
     let encoded = commit
         .patch()
         .to_bytes(crate::cell_values::TransferLimits::DEFAULT)

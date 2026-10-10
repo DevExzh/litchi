@@ -220,9 +220,7 @@ fn skipped_malformed_donor_transfers_to_eager_target_without_drawing_parse() {
     let target_drawing_uri = first_drawing_uri(&target);
     let target_drawing_before = part_bytes(&target, &target_drawing_uri);
 
-    let mut edit = target
-        .edit_workbook_structure()
-        .expect("target structure edit");
+    let mut edit = target.to_package().edit().expect("target structure edit");
     edit.transfer_cell(&donor, source_sheet, source_reference, 0, destination)
         .expect("transfer scalar from skipped malformed donor");
     let commit = edit.commit().expect("transfer commit");
@@ -288,7 +286,7 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
     let drawing_uri = first_drawing_uri(&source);
     let drawing_before = part_bytes(&source, &drawing_uri);
     let old_name = source.worksheet_names()[0].clone();
-    let mut edit = source.edit_workbook_structure().expect("structure edit");
+    let mut edit = source.to_package().edit().expect("structure edit");
     edit.rename_sheet(0, format!("{old_name}_patched"))
         .expect("sheet rename");
     let commit = edit.commit().expect("structure commit");
@@ -309,7 +307,8 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
     let malformed_before = saved(&malformed);
     let malformed_name = malformed.worksheet_names()[0].clone();
     let mut malformed_edit = malformed
-        .edit_workbook_structure()
+        .to_package()
+        .edit()
         .expect("malformed structure edit");
     malformed_edit
         .rename_sheet(0, format!("{malformed_name}_patched"))

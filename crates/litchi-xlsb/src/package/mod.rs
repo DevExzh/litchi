@@ -117,6 +117,36 @@ pub struct Package(
 );
 
 impl Package {
+    /// Start the primary detached workbook transaction.
+    pub fn edit(&self) -> Result<crate::cell_values::structure::Edit> {
+        self.edit_with_limits(crate::cell_values::TransferLimits::DEFAULT)
+    }
+
+    /// Start a transaction with explicit finite transfer and patch limits.
+    pub fn edit_with_limits(
+        &self,
+        limits: crate::cell_values::TransferLimits,
+    ) -> Result<crate::cell_values::structure::Edit> {
+        crate::cell_values::structure::Edit::new(self, limits)
+    }
+
+    /// Apply an exact-source structural patch and return a new package.
+    pub fn apply(&self, patch: &crate::cell_values::structure::Patch) -> Result<Self> {
+        patch.apply_to_package(self)
+    }
+
+    pub(crate) const fn drawing_load_policy(&self) -> DrawingLoadPolicy {
+        self.3
+    }
+
+    pub(crate) fn project_candidate(&self, candidate: OpcPackage) -> Result<Workbook> {
+        let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
+            candidate, self.1, self.3,
+        )?;
+        workbook.set_projection_leniency(self.4);
+        Ok(workbook)
+    }
+
     /// Create a deterministic workbook containing one visible worksheet.
     pub fn create() -> Result<Self> {
         let mut writer = WorkbookWriter::new();
@@ -488,6 +518,16 @@ impl Package {
             DrawingLoadPolicy::Eager,
             Leniency::Strict,
         ))
+    }
+
+    pub(crate) fn from_workbook(workbook: &Workbook) -> Self {
+        Self(
+            workbook.package.clone(),
+            workbook.external_link_limits(),
+            workbook.tolerance_report().clone(),
+            workbook.drawing_load_policy(),
+            workbook.leniency(),
+        )
     }
 
     /// Adopt a validated workbook without serializing or reparsing its graph.

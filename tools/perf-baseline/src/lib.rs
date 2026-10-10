@@ -30934,8 +30934,8 @@ fn run_xlsb_workbook_structure_edit_save(
 
     let mut elapsed = Vec::with_capacity(samples);
     let mut summary = XlsbWorkbookStructureSummary {
-        implementation: "litchi_xlsb::Workbook::edit_workbook_structure + apply_workbook_structure",
-        timing_scope: "total_ns encloses detached edit planning/commit, Workbook::apply_workbook_structure, and Workbook::save; workbook construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
+        implementation: "litchi_xlsb::Package::edit + Commit::into_package",
+        timing_scope: "total_ns encloses detached package edit planning/commit, Commit::into_package, and Package::write_to; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
         performance_claim: "attribution-only phase evidence; no speedup, allocation, RSS, physical-I/O, cold-cache, or producer claim",
         source_archive_sha256: corpus.manifest.archive_sha256.clone(),
         selected_operation: "rename_sheet(0, \"Renamed\")",
@@ -30950,25 +30950,26 @@ fn run_xlsb_workbook_structure_edit_save(
     };
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+        let workbook = litchi_xlsb::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
         if workbook.worksheet_names() != source_sheet_names.as_slice() {
             return Err("XLSB structure source worksheet names differ from specification".into());
         }
+        let package = workbook.into_package();
         let total_started = Instant::now();
 
         let started = Instant::now();
-        let mut edit = workbook.edit_workbook_structure()?;
+        let mut edit = package.edit()?;
         edit.rename_sheet(0, "Renamed".to_owned())?;
         let commit = edit.commit()?;
         let planning_ns = elapsed_ns(started.elapsed())?;
 
         let started = Instant::now();
-        workbook.apply_workbook_structure(&commit)?;
+        let package = commit.into_package();
         let publication_ns = elapsed_ns(started.elapsed())?;
 
         let started = Instant::now();
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output)?;
+        package.write_to(&mut output)?;
         let output = output.into_inner();
         let save_ns = elapsed_ns(started.elapsed())?;
         let total_ns = elapsed_ns(total_started.elapsed())?;
@@ -30997,7 +30998,7 @@ fn run_xlsb_workbook_structure_edit_save(
             return Err("XLSB structure reopened target cell differs from specification".into());
         }
         let output_sha256 = sha256_hex(&output);
-        std::hint::black_box((&workbook, &output));
+        std::hint::black_box((&package, &output));
 
         if iteration >= warmup_iterations {
             elapsed.push(total_ns);

@@ -2050,7 +2050,8 @@ mod tests {
             malformed(&bytes).expect("malformed structure no-op fixture");
         let structure_noop_before = package_part_digests(structure_noop.opc_package());
         let structure_noop_commit = structure_noop
-            .edit_workbook_structure()
+            .to_package()
+            .edit()
             .expect("structure no-op edit")
             .commit()
             .expect("structure no-op commit");
@@ -2059,9 +2060,12 @@ mod tests {
             structure_noop_commit.patch().before(),
             structure_noop_commit.patch().after()
         );
-        structure_noop
-            .apply_workbook_structure(&structure_noop_commit)
-            .expect("structure no-op publication");
+        structure_noop = structure_noop
+            .to_package()
+            .apply(structure_noop_commit.patch())
+            .expect("structure no-op publication")
+            .into_workbook()
+            .expect("reopen structure no-op publication");
         assert!(structure_noop.sheet_drawings().is_empty());
         assert_eq!(
             package_part_digests(structure_noop.opc_package()),
@@ -2079,15 +2083,18 @@ mod tests {
             .get(drawing_uri.as_str())
             .cloned()
             .expect("malformed drawing digest");
-        let mut structure_edit = structure.edit_workbook_structure().expect("structure edit");
+        let mut structure_edit = structure.to_package().edit().expect("structure edit");
         let new_name = format!("{}_v3", corpus.worksheet_names[0]);
         structure_edit
             .rename_sheet(0, new_name)
             .expect("structure rename");
         let structure_commit = structure_edit.commit().expect("structure commit");
-        structure
-            .apply_workbook_structure(&structure_commit)
-            .expect("structure publication");
+        structure = structure
+            .to_package()
+            .apply(structure_commit.patch())
+            .expect("structure publication")
+            .into_workbook()
+            .expect("reopen structure publication");
         assert!(structure.sheet_drawings().is_empty());
         let structure_parts = package_part_digests(structure.opc_package());
         assert_eq!(

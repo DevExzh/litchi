@@ -2,34 +2,29 @@
 //!
 //! This family uses module-local transaction names. Worksheet-only cell edits
 //! remain in the parent module; the workbook owner supplies this family's
-//! entry point through [Workbook::edit_workbook_structure].
+//! entry point through [crate::Package::edit].
 //!
 //! ```
-//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
-//! use std::io::Cursor;
+//! # fn main() -> litchi_xlsb::package::PackageResult<()> {
 //! use litchi_core::sheet::traits::WorkbookTrait;
-//! use litchi_xlsb::Workbook;
-//! use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+//! use litchi_xlsb::Package;
 //! use litchi_xlsb::cell_values::TransferLimits;
-//! use litchi_xlsb::cell_values::structure::{Commit, Edit, History, Patch};
+//! use litchi_xlsb::cell_values::structure::Patch;
 //!
-//! let mut builder = WorkbookWriter::new();
-//! builder.add_worksheet(MutableWorksheet::new("Original"));
-//! let mut bytes = Cursor::new(Vec::new());
-//! builder.save(&mut bytes)?;
-//! let mut workbook = Workbook::new(Cursor::new(bytes.into_inner()))?;
-//! let mut edit: Edit = workbook.edit_workbook_structure()?;
+//! let source = Package::create()?;
+//! let mut edit = source.edit()?;
 //! edit.rename_sheet(0, "Renamed".to_owned())?;
-//! let commit: Commit = edit.commit()?;
+//! let commit = edit.commit()?;
 //! assert!(commit.diagnostics().changed());
 //! assert!(!commit.patch().is_noop());
-//! let wire = commit.patch().to_bytes(TransferLimits::DEFAULT)?;
-//! let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT)?;
-//! patch.apply(&mut workbook)?;
-//! let mut history = History::new(TransferLimits::DEFAULT)?;
-//! history.push(patch)?;
-//! history.undo(&mut workbook)?;
-//! assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
+//! assert_eq!(commit.package().workbook()?.worksheet_names(), &["Renamed"]);
+//! let (package, patch) = commit.into_parts();
+//! let wire = patch.to_bytes(TransferLimits::DEFAULT)?;
+//! let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT)?;
+//! let applied = source.apply(&decoded)?;
+//! assert_eq!(package.to_bytes()?, applied.to_bytes()?);
+//! let restored = package.apply(&patch.inverse())?;
+//! assert_eq!(restored.to_bytes()?, source.to_bytes()?);
 //! # Ok(())
 //! # }
 //! ```
@@ -193,6 +188,7 @@ impl Operation {
 /// A detached workbook transaction planned against one exact package image.
 #[derive(Debug, Clone)]
 pub struct Edit {
+    base: crate::Package,
     before: Arc<[u8]>,
     operations: Vec<Operation>,
     limits: TransferLimits,
@@ -201,14 +197,15 @@ pub struct Edit {
 }
 
 impl Edit {
-    pub(crate) fn new(workbook: &Workbook, limits: TransferLimits) -> Result<Self> {
+    pub(crate) fn new(package: &crate::Package, limits: TransferLimits) -> Result<Self> {
         validate_limits(limits)?;
         Ok(Self {
-            before: Arc::from(workbook_bytes(workbook)?),
+            base: package.clone(),
+            before: Arc::from(package.to_bytes()?),
             operations: Vec::new(),
             limits,
-            external_link_limits: workbook.external_link_limits(),
-            drawing_load_policy: workbook.drawing_load_policy(),
+            external_link_limits: package.external_link_limits(),
+            drawing_load_policy: package.drawing_load_policy(),
         })
     }
 
@@ -219,11 +216,7 @@ impl Edit {
     /// Returns an error for an invalid selector, invalid/duplicate name, or a
     /// transaction that exceeds its finite change policy.
     pub fn rename_sheet(&mut self, sheet: usize, name: String) -> Result<()> {
-        let workbook = workbook_from_bytes(
-            &self.before,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?;
+        let workbook = self.base.workbook()?;
         validate_sheet_name(&workbook, sheet, &name)?;
         self.stage(Operation::RenameSheet { sheet, name })
     }
@@ -259,12 +252,7 @@ impl Edit {
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay(
-            &self.before,
-            &candidate,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?;
+        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
         self.stage(operation)
     }
 
@@ -332,11 +320,7 @@ impl Edit {
                 "formula authoring requires a Formula*Cache value".to_string(),
             ));
         }
-        let mut donor = workbook_from_bytes(
-            &self.before,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?;
+        let mut donor = self.base.workbook()?;
         let style_index = author_style(&mut donor, style)?;
         insert_candidate_cell(
             &mut donor,
@@ -362,12 +346,7 @@ impl Edit {
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay(
-            &self.before,
-            &candidate,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?;
+        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
         self.stage(operation)
     }
 
@@ -436,12 +415,7 @@ impl Edit {
         };
         let mut candidate = self.operations.clone();
         candidate.push(operation.clone());
-        let _validated_candidate = replay(
-            &self.before,
-            &candidate,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?;
+        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
         self.stage(operation)
     }
 
@@ -453,11 +427,7 @@ impl Edit {
         style: &AuthoredStyle,
         shared: bool,
     ) -> Result<()> {
-        let mut donor = workbook_from_bytes(
-            &self.before,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?;
+        let mut donor = self.base.workbook()?;
         let style_index = author_style(&mut donor, style)?;
         let font_id = donor
             .styles()
@@ -493,12 +463,8 @@ impl Edit {
     ///
     /// Returns an error when replay, complete workbook readback, or bounds fail.
     pub fn commit(self) -> Result<Commit> {
-        let after = Arc::from(replay(
-            &self.before,
-            &self.operations,
-            self.external_link_limits,
-            self.drawing_load_policy,
-        )?);
+        let (after, package) = replay_package(&self.base, &self.before, &self.operations)?;
+        let after = Arc::from(after);
         let patch = Patch {
             before: self.before,
             after,
@@ -510,7 +476,11 @@ impl Edit {
         let diagnostics = Diagnostics {
             changed: !patch.is_noop(),
         };
-        Ok(Commit { patch, diagnostics })
+        Ok(Commit {
+            package,
+            patch,
+            diagnostics,
+        })
     }
 
     fn stage(&mut self, operation: Operation) -> Result<()> {
@@ -538,6 +508,7 @@ impl Edit {
 /// A validated workbook transaction ready for atomic publication.
 #[derive(Debug, Clone)]
 pub struct Commit {
+    package: crate::Package,
     patch: Patch,
     diagnostics: Diagnostics,
 }
@@ -560,6 +531,24 @@ impl Diagnostics {
 }
 
 impl Commit {
+    /// Validated package produced by this transaction.
+    #[must_use]
+    pub const fn package(&self) -> &crate::Package {
+        &self.package
+    }
+
+    /// Consume the commit and retain its package.
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        self.package
+    }
+
+    /// Consume the commit into its package and durable patch.
+    #[must_use]
+    pub fn into_parts(self) -> (crate::Package, Patch) {
+        (self.package, self.patch)
+    }
+
     /// Summary computed from the validated package images at commit time.
     #[must_use]
     pub const fn diagnostics(&self) -> Diagnostics {
@@ -584,6 +573,23 @@ pub struct Patch {
 }
 
 impl Patch {
+    pub(crate) fn apply_to_package(&self, package: &crate::Package) -> Result<crate::Package> {
+        if package.to_bytes()?.as_slice() != self.before.as_ref() {
+            return Err(Error::UnsupportedFeature(
+                "workbook patch source is stale".to_owned(),
+            ));
+        }
+        if self.is_noop() {
+            return Ok(package.clone());
+        }
+        crate::signature_policy::ensure_unsigned(package.opc_package())?;
+        let limits = package.opc_package().read_limits();
+        let candidate = litchi_opc::OpcPackage::from_bytes_with_limits(&self.after, limits)?;
+        let workbook = package.project_candidate(candidate)?;
+        validate_all_worksheets(&workbook)?;
+        Ok(workbook.into_package())
+    }
+
     /// Whether the canonical before and after package images are identical.
     ///
     /// This compares images, not the number of retained forward operations.
@@ -1106,13 +1112,46 @@ fn replay(
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
 ) -> Result<Vec<u8>> {
-    let mut workbook = validated_workbook_with_external_link_limits_and_drawing_policy(
+    let workbook = validated_workbook_with_external_link_limits_and_drawing_policy(
         before,
         external_link_limits,
         drawing_load_policy,
     )?;
+    replay_workbook(workbook, before, operations).map(|(bytes, _)| bytes)
+}
+
+fn replay_package(
+    base: &crate::Package,
+    before: &[u8],
+    operations: &[Operation],
+) -> Result<(Vec<u8>, crate::Package)> {
+    // Durable replay is defined against this exact serialized image, not the
+    // in-memory graph's potentially different archive/layout provenance.
+    let limits = base.opc_package().read_limits();
+    let graph = litchi_opc::OpcPackage::from_bytes_with_limits(before, limits)?;
+    let workbook = base.project_candidate(graph)?;
+    validate_all_worksheets(&workbook)?;
+    let (bytes, mut workbook) = replay_workbook(workbook, before, operations)?;
+    let package = if bytes == before {
+        base.clone()
+    } else {
+        // Admit the generated physical image under the same finite policy
+        // before publication. This also establishes the precise archive
+        // lineage used by later edits/applications. The semantic workbook is
+        // already validated by replay; do not parse that projection again.
+        workbook.package = litchi_opc::OpcPackage::from_bytes_with_limits(&bytes, limits)?;
+        workbook.into_package()
+    };
+    Ok((bytes, package))
+}
+
+fn replay_workbook(
+    mut workbook: Workbook,
+    before: &[u8],
+    operations: &[Operation],
+) -> Result<(Vec<u8>, Workbook)> {
     if operations.is_empty() {
-        return Ok(before.to_vec());
+        return Ok((before.to_vec(), workbook));
     }
     let mut changed = false;
     for operation in operations {
@@ -1159,11 +1198,12 @@ fn replay(
         }
     }
     validate_all_worksheets(&workbook)?;
-    if changed {
-        workbook_bytes(&workbook)
+    let bytes = if changed {
+        workbook_bytes(&workbook)?
     } else {
-        Ok(before.to_vec())
-    }
+        before.to_vec()
+    };
+    Ok((bytes, workbook))
 }
 
 fn author_style(workbook: &mut Workbook, style: &AuthoredStyle) -> Result<super::StyleIndex> {

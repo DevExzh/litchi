@@ -50,6 +50,15 @@ fn producer_workbook(name: &str, initial_value: Option<&str>) -> Workbook {
     Workbook::new(Cursor::new(bytes.into_inner())).expect("producer reopen")
 }
 
+fn publish_structure_patch(workbook: &mut Workbook, patch: &Patch) {
+    *workbook = workbook
+        .to_package()
+        .apply(patch)
+        .expect("publish structure patch")
+        .into_workbook()
+        .expect("reopen published structure patch");
+}
+
 fn shape_marker(column: u32, row: u32) -> CellMarker {
     CellMarker {
         column,
@@ -269,9 +278,7 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
     let mut target = producer_workbook("Target", None);
     let destination = Reference::new(4, 3).expect("destination");
 
-    let mut edit = target
-        .edit_workbook_structure()
-        .expect("detached workbook edit");
+    let mut edit = target.to_package().edit().expect("detached workbook edit");
     edit.rename_sheet(0, "Imported".to_string())
         .expect("rename");
     edit.transfer_cell(
@@ -366,7 +373,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         }],
         phonetic: None,
     };
-    let mut edit = workbook.edit_workbook_structure().expect("root edit");
+    let mut edit = workbook.to_package().edit().expect("root edit");
     edit.insert_shared_string(0, shared_ref, string.clone(), &style)
         .expect("SST authoring");
     edit.insert_rich_string(0, rich_ref, string, &style)
@@ -461,15 +468,14 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
 
     let mut transfer_target = producer_workbook("Image target", None);
     let mut transfer = transfer_target
-        .edit_workbook_structure()
+        .to_package()
+        .edit()
         .expect("image transfer edit");
     transfer
         .transfer_image(&reopened, 0, 0, 0, ChartAnchor::new(3, 4, 6, 9))
         .expect("dependency-closed image transfer");
     let transfer_commit = transfer.commit().expect("image transfer commit");
-    transfer_target
-        .apply_workbook_structure(&transfer_commit)
-        .expect("publish transferred image");
+    publish_structure_patch(&mut transfer_target, transfer_commit.patch());
     let transferred = transfer_target
         .sheet_drawing(0)
         .expect("transferred drawing");
@@ -488,7 +494,8 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
     .with_description("appended image")
     .expect("valid appended description");
     let mut append_edit = transfer_target
-        .edit_workbook_structure()
+        .to_package()
+        .edit()
         .expect("existing drawing edit");
     append_edit
         .insert_image(0, appended)
@@ -515,15 +522,14 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
     let source = shape_graph_workbook("Source shapes");
     let mut empty_target = producer_workbook("Empty target", None);
     let mut empty_edit = empty_target
-        .edit_workbook_structure()
+        .to_package()
+        .edit()
         .expect("empty drawing edit");
     empty_edit
         .transfer_drawing_object(&source, 0, 2, 0)
         .expect("new connector drawing transfer");
     let empty_commit = empty_edit.commit().expect("new drawing commit");
-    empty_target
-        .apply_workbook_structure(&empty_commit)
-        .expect("publish new drawing");
+    publish_structure_patch(&mut empty_target, empty_commit.patch());
     assert_eq!(
         empty_target
             .sheet_drawing(0)
@@ -538,7 +544,7 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
     let before = target.sheet_drawing(0).expect("target drawing");
     assert_eq!(before.drawing.anchors.len(), 3);
 
-    let mut drawing_edit = target.edit_workbook_structure().expect("drawing edit");
+    let mut drawing_edit = target.to_package().edit().expect("drawing edit");
     drawing_edit
         .transfer_drawing_object(&source, 0, 2, 0)
         .expect("connector closure transfer");
@@ -550,7 +556,7 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
     let drawing_patch =
         Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("drawing patch replay");
 
-    let mut rename_edit = target.edit_workbook_structure().expect("rename edit");
+    let mut rename_edit = target.to_package().edit().expect("rename edit");
     rename_edit
         .rename_sheet(0, "Transferred graphs".to_string())
         .expect("rename");
@@ -659,9 +665,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
     let mut target = Workbook::new(Cursor::new(target_bytes.into_inner())).expect("target reopen");
     let existing_drawing_xml = standard_drawing_xml(&target);
 
-    let mut edit = target
-        .edit_workbook_structure()
-        .expect("chart transfer edit");
+    let mut edit = target.to_package().edit().expect("chart transfer edit");
     edit.transfer_drawing_object(&source, 0, 0, 0)
         .expect("chart graph transfer");
     let commit = edit.commit().expect("chart transfer commit");
@@ -705,9 +709,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
     };
     assert_eq!(data, b"PK exact chart workbook");
 
-    let mut picture_edit = target
-        .edit_workbook_structure()
-        .expect("picture refusal edit");
+    let mut picture_edit = target.to_package().edit().expect("picture refusal edit");
     let error = picture_edit
         .transfer_drawing_object(&target, 0, 0, 0)
         .expect_err("pictures use the image API");
@@ -733,7 +735,7 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
         vec![("rId1".to_string(), "http://lucene.apache.org/".to_string())]
     );
     let mut target = producer_workbook("Hyperlink target", None);
-    let mut drawing_edit = target.edit_workbook_structure().expect("hyperlink edit");
+    let mut drawing_edit = target.to_package().edit().expect("hyperlink edit");
     drawing_edit
         .transfer_drawing_object(&source, 0, 0, 0)
         .expect("genuine shape hyperlink transfer");
@@ -745,7 +747,7 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
     let drawing_patch =
         Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("durable hyperlink replay");
 
-    let mut rename_edit = target.edit_workbook_structure().expect("rename edit");
+    let mut rename_edit = target.to_package().edit().expect("rename edit");
     rename_edit
         .rename_sheet(0, "Hyperlinked shape".to_string())
         .expect("rename");
@@ -867,13 +869,11 @@ fn checked_in_unique_standard_drawing_corpus_transfers_every_anchor() {
             };
             for anchor in 0..drawing.drawing.anchors.len() {
                 let mut target = producer_workbook("Corpus target", None);
-                let mut edit = target.edit_workbook_structure().expect("corpus edit");
+                let mut edit = target.to_package().edit().expect("corpus edit");
                 edit.transfer_drawing_object(&source, worksheet_ordinal, anchor, 0)
                     .expect("corpus drawing transfer");
                 let commit = edit.commit().expect("corpus commit");
-                target
-                    .apply_workbook_structure(&commit)
-                    .expect("publish corpus drawing");
+                publish_structure_patch(&mut target, commit.patch());
                 let mut bytes = Cursor::new(Vec::new());
                 target.save(&mut bytes).expect("save corpus transfer");
                 let reopened = Workbook::new(Cursor::new(bytes.into_inner()))
@@ -957,7 +957,7 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         }],
         phonetic: None,
     };
-    let mut source_edit = source.edit_workbook_structure().expect("source root edit");
+    let mut source_edit = source.to_package().edit().expect("source root edit");
     source_edit
         .insert_formula(
             source_summary,
@@ -971,15 +971,13 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .insert_rich_string(source_summary, rich_ref, rich, &rich_style)
         .expect("rich resource authoring");
     let source_commit = source_edit.commit().expect("source dependency commit");
-    source
-        .apply_workbook_structure(&source_commit)
-        .expect("publish source dependencies");
+    publish_structure_patch(&mut source, source_commit.patch());
 
     let mut target = formula_dependency_workbook(false);
     let name_target_ref = Reference::new(4, 0).expect("name target");
     let table_target_ref = Reference::new(4, 1).expect("table target");
     let rich_target_ref = Reference::new(4, 2).expect("rich target");
-    let mut transfer = target.edit_workbook_structure().expect("transfer edit");
+    let mut transfer = target.to_package().edit().expect("transfer edit");
     transfer
         .transfer_cell(&source, source_summary, contextual_ref, 0, name_target_ref)
         .expect("name and sheet dependency remap");
@@ -1084,13 +1082,11 @@ fn third_party_fixture_cell_transfers_with_its_style_dependency_closure() {
         .expect("a third-party fixture contains a direct stored cell");
     let destination = Reference::new(10, 7).expect("destination");
     let mut target = producer_workbook("Target", None);
-    let mut edit = target.edit_workbook_structure().expect("root edit");
+    let mut edit = target.to_package().edit().expect("root edit");
     edit.transfer_cell(&source, sheet, source_reference, 0, destination)
         .expect("third-party transfer plan");
     let commit = edit.commit().expect("third-party transfer commit");
-    target
-        .apply_workbook_structure(&commit)
-        .expect("publish third-party transfer");
+    publish_structure_patch(&mut target, commit.patch());
 
     let transferred_snapshot = target.cell_values(0).expect("transferred snapshot");
     let transferred = transferred_snapshot
@@ -1122,13 +1118,13 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
     let mut target = producer_workbook("Target", None);
     let destination = Reference::new(8, 2).expect("destination");
 
-    let mut left_edit = target.edit_workbook_structure().expect("left plan");
+    let mut left_edit = target.to_package().edit().expect("left plan");
     left_edit
         .rename_sheet(0, "Merged".to_string())
         .expect("rename");
     let left_commit = left_edit.commit().expect("left commit");
 
-    let mut right_edit = target.edit_workbook_structure().expect("right plan");
+    let mut right_edit = target.to_package().edit().expect("right plan");
     right_edit
         .transfer_cell(
             &source,
@@ -1181,7 +1177,8 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
 fn structural_diagnostics_distinguish_images_from_operation_counts() {
     let mut workbook = producer_workbook("Original", None);
     let empty = workbook
-        .edit_workbook_structure()
+        .to_package()
+        .edit()
         .expect("edit")
         .commit()
         .expect("commit");
@@ -1189,7 +1186,7 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
     assert!(empty.patch().is_noop());
     assert!(empty.patch().inverse().is_noop());
 
-    let mut edit = workbook.edit_workbook_structure().expect("edit");
+    let mut edit = workbook.to_package().edit().expect("edit");
     edit.rename_sheet(0, "Original".to_owned())
         .expect("same name");
     let same = edit.commit().expect("same-name commit");
@@ -1205,7 +1202,7 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
     decoded.apply(&mut workbook).expect("no-op apply");
     assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
 
-    let mut edit = workbook.edit_workbook_structure().expect("edit");
+    let mut edit = workbook.to_package().edit().expect("edit");
     edit.rename_sheet(0, "Changed".to_owned()).expect("rename");
     let changed = edit.commit().expect("changed commit");
     assert!(changed.diagnostics().changed());

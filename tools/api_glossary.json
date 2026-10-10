@@ -1655,6 +1655,21 @@
           "scope": "litchi_xlsb::cell_values",
           "replacement": "use cell_values::structure::AuthoredStyle",
           "recursive": false
+        },
+        {
+          "name": "edit_workbook_structure",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit"
+        },
+        {
+          "name": "edit_workbook_structure_with_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_with_limits"
+        },
+        {
+          "name": "apply_workbook_structure",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::apply"
         }
       ],
       "families": []
@@ -1756,6 +1771,21 @@
           "scope": "litchi_xlsb::cell_values",
           "replacement": "use cell_values::structure::AuthoredStyle",
           "recursive": false
+        },
+        {
+          "name": "edit_workbook_structure",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit"
+        },
+        {
+          "name": "edit_workbook_structure_with_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_with_limits"
+        },
+        {
+          "name": "apply_workbook_structure",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::apply"
         }
       ],
       "families": []

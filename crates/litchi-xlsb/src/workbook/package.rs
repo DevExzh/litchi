@@ -358,29 +358,6 @@ impl Workbook {
         )
     }
 
-    /// Start a detached, exact-source transaction spanning sheet metadata and
-    /// dependency-managed cross-workbook cell transfer.
-    pub fn edit_workbook_structure(&self) -> Result<cell_values::structure::Edit> {
-        self.edit_workbook_structure_with_limits(cell_values::TransferLimits::DEFAULT)
-    }
-
-    /// Start a detached workbook transaction with explicit transfer/history
-    /// limits. Planning does not mutate this workbook.
-    pub fn edit_workbook_structure_with_limits(
-        &self,
-        limits: cell_values::TransferLimits,
-    ) -> Result<cell_values::structure::Edit> {
-        cell_values::structure::Edit::new(self, limits)
-    }
-
-    /// Atomically publish a complete source-checked workbook transaction.
-    pub fn apply_workbook_structure(
-        &mut self,
-        commit: &cell_values::structure::Commit,
-    ) -> Result<()> {
-        commit.patch().apply(self)
-    }
-
     /// Read source-bound, editable stored values on one worksheet.
     ///
     /// This inventories ordinary scalar cells, formula cached results, and
