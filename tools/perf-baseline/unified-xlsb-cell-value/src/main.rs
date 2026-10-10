@@ -2,7 +2,10 @@
 //! unified `File::edit`/`Edit::set` route.
 //!
 //! Corpus generation, opening, target/property preparation, warm-up, output
-//! serialization and equivalence checks are outside the timed interval. The
+//! serialization and equivalence checks are outside the timed interval. Facade
+//! property recollection, admission and coercion remain inside the clock. The
+//! eager native leg starts from Package; the eager facade starts from Workbook.
+//! This is a package-native comparison, not identical prepared owner types. The
 //! native source leg deliberately materializes its prepared
 //! `SourceBackedWorkbook` into a package for every edit, matching the source
 //! facade's edit boundary. Each timed operation stages all selected cells in
@@ -757,7 +760,7 @@ fn main() -> Result<()> {
                 "xlsb_source_native_primary_cell_value_edit_v1",
                 "xlsb_source_unified_file_edit_cell_value_v1",
             ],
-            "timing_scope": "one native Package::edit_cell_values + N Edit::set_scalar(Reference, Scalar::Number) + commit + Commit::into_package call; source-owner native samples additionally include SourceBackedWorkbook::to_workbook().into_package() per edit; one-shot unified samples time File::set('/sheet[1]/A1', {value: number}); batch unified samples time one File::edit closure with N tx.set('/sheet[1]/A1', {value: number}) calls and report retained leaf commits; excludes corpus generation, opening, target/property preparation, warm-up, output serialization/write_to, equivalence checks and drop",
+            "timing_scope": "one native Package::edit_cell_values + N Edit::set_scalar(Reference, Scalar::Number) + commit + Commit::into_package call; source-owner native samples additionally include SourceBackedWorkbook::to_workbook().into_package() per edit; one-shot unified samples time File::set('/sheet[1]/A1', {value: number}); batch unified samples time one File::edit closure with N tx.set('/sheet[1]/A1', {value: number}) calls and report retained leaf commits; includes facade property recollection, admission and coercion; eager native starts from Package while eager unified starts from Workbook; excludes corpus generation, opening, caller target/property preparation, warm-up, output serialization/write_to, equivalence checks and drop",
             "publication_contract": "native commits stage all selected cells in one package-owned edit; one-shot unified routes use one File::set; batch unified routes use one File::edit and expose diagnostics.commits to make coalescing observable",
             "equivalence_scope": "warm-up outputs are compared by exact ZIP bytes, falling back to decoded ZIP member bytes with per-member length and SHA-256 reporting",
             "build_provenance": build_provenance(),

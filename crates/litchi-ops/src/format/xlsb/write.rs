@@ -560,7 +560,12 @@ fn resolve_cell_targets(
     let mut matched = false;
     let mut non_cell = false;
     if let Some(path) = target.path() {
-        let node = crate::path::resolve::get(&Nav::new(file), path)?;
+        let nav = if direct_cell_path(target) {
+            Nav::for_cell_target(file)
+        } else {
+            Nav::new(file)
+        };
+        let node = crate::path::resolve::get(&nav, path)?;
         matched = true;
         append_cell_node(&mut targets, &mut seen, &mut non_cell, node, limits)?;
     } else if let Some(query) = target.query() {
@@ -602,6 +607,20 @@ fn resolve_cell_targets(
     } else {
         Ok(Some(targets))
     }
+}
+
+fn direct_cell_path(target: &TargetArg<'_>) -> bool {
+    target.path().is_some_and(|path| {
+        // A root-level `/A1` can be a valid sheet name.  Only a scoped,
+        // bare-coordinate path is a direct cell mutation target; all other
+        // paths retain the normal read-capable navigation mode.
+        path.path().steps().len() > 1
+            && path
+                .path()
+                .steps()
+                .last()
+                .is_some_and(|step| step.cell_ref().is_some())
+    })
 }
 
 fn preflight_direct_cell_range(target: &TargetArg<'_>, limits: &SemanticLimits) -> Result<()> {

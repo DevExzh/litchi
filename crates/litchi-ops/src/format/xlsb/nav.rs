@@ -28,11 +28,26 @@ use crate::query::inspect::{HeaderBinding, HeaderKey, Inspect};
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Nav<'f> {
     file: &'f Xlsb,
+    /// Direct mutation paths only need the checked coordinate and worksheet
+    /// position.  Keep the normal navigation path read-capable while letting
+    /// the write resolver defer the sparse-grid parse until a node is
+    /// actually inspected.
+    cell_target: bool,
 }
 
 impl<'f> Nav<'f> {
     pub(crate) const fn new(file: &'f Xlsb) -> Self {
-        Self { file }
+        Self {
+            file,
+            cell_target: false,
+        }
+    }
+
+    pub(crate) const fn for_cell_target(file: &'f Xlsb) -> Self {
+        Self {
+            file,
+            cell_target: true,
+        }
     }
 
     pub(super) fn file(self) -> &'f Xlsb {
@@ -146,8 +161,17 @@ impl<'f> Nav<'f> {
         Ok(match (kind, select) {
             (Kind::Cell, Select::Cell(at)) => {
                 let at = address(at)?;
-                let grid = sheet.grid()?.clone();
-                Self::found(Node::new_cell(file, position, at, CellSource::Grid(grid)))
+                if self.cell_target {
+                    Self::found(Node::new_cell_target(
+                        file,
+                        position,
+                        at,
+                        sheet.handle.clone(),
+                    ))
+                } else {
+                    let grid = sheet.grid()?.clone();
+                    Self::found(Node::new_cell(file, position, at, CellSource::Grid(grid)))
+                }
             },
             (Kind::Range, Select::Range(cells)) => {
                 let rect = rect(cells)?;

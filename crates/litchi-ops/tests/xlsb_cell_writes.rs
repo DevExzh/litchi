@@ -45,6 +45,51 @@ fn fixture() -> Vec<u8> {
     output.into_inner()
 }
 
+fn named_fixture() -> Vec<u8> {
+    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+
+    let mut writer = WorkbookWriter::new();
+    let mut data = MutableWorksheet::new("My Data");
+    data.set_cell(0, 0, "seed");
+    data.set_cell(0, 1, "second");
+    writer.add_worksheet(data);
+    writer.add_worksheet(MutableWorksheet::new("Archive"));
+
+    let mut output = Cursor::new(Vec::new());
+    writer
+        .save(&mut output)
+        .expect("serialize named XLSB fixture");
+    output.into_inner()
+}
+
+fn chart_first_fixture() -> Vec<u8> {
+    use litchi_xlsb::chart::{Anchor, Chart};
+    use litchi_xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+
+    let chart = Chart::bar_chart_with_cache(
+        "Sales",
+        "Data!$A$1:$A$2",
+        &["North", "South"],
+        "Data!$B$1:$B$2",
+        &[42.0, 55.0],
+        Anchor::new(0, 0, 10, 20),
+    )
+    .expect("chart fixture");
+    let mut writer = WorkbookWriter::new();
+    writer
+        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .expect("chart sheet");
+    let mut data = MutableWorksheet::new("Data");
+    data.set_cell(0, 0, "seed");
+    writer.add_worksheet(data);
+
+    let mut output = Cursor::new(Vec::new());
+    writer
+        .save(&mut output)
+        .expect("serialize chart-first XLSB fixture");
+    output.into_inner()
+}
+
 fn open_owner(bytes: &[u8], eager: bool) -> File {
     litchi_ops::open_bytes_with(
         bytes.to_vec(),
@@ -113,6 +158,137 @@ fn sheet_property(file: &File, path: &str, key: &str) -> Option<String> {
         .unwrap_or_else(|error| panic!("read {path} properties: {error}"))
         .find(|property| property.key() == key)
         .map(|property| property.value().to_string())
+}
+
+#[test]
+fn direct_targets_honor_named_case_quoted_and_alias_paths() {
+    let bytes = named_fixture();
+
+    for eager in [false, true] {
+        let original = open_owner(&bytes, eager);
+        let original_bytes = original.to_bytes().expect("publish named fixture");
+        let updated = original
+            .set("'My Data'!a1", props! { "value" => "quoted" })
+            .expect("quoted Excel sheet path")
+            .set("/MY DATA/b1", props! { "value" => "root name" })
+            .expect("case-insensitive root sheet path")
+            .set("'my data'!C1", props! { "value" => "Excel name" })
+            .expect("case-insensitive Excel sheet path")
+            .set("'MY DATA'!D2:E2", props! { "value" => "range" })
+            .expect("quoted named range path");
+
+        assert_eq!(
+            cell_text(&updated, "/sheet[1]/A1").as_deref(),
+            Some("quoted")
+        );
+        assert_eq!(
+            cell_text(&updated, "/sheet[1]/B1").as_deref(),
+            Some("root name")
+        );
+        assert_eq!(
+            cell_text(&updated, "/sheet[1]/C1").as_deref(),
+            Some("Excel name")
+        );
+        for path in ["/sheet[1]/D2", "/sheet[1]/E2"] {
+            assert_eq!(
+                cell_text(&updated, path).as_deref(),
+                Some("range"),
+                "{path}"
+            );
+        }
+        assert_eq!(
+            original.to_bytes().expect("publish unchanged named base"),
+            original_bytes
+        );
+    }
+}
+
+#[test]
+fn direct_targets_guard_complete_catalog_tabs_and_missing_names() {
+    let bytes = chart_first_fixture();
+
+    for eager in [false, true] {
+        let original = open_owner(&bytes, eager);
+        let original_bytes = original.to_bytes().expect("publish chart-first fixture");
+        let chart_error = original
+            .set("/sheet[1]/A1", props! { "value" => "must refuse" })
+            .expect_err("a chart tab cannot receive a cell write");
+        assert_eq!(chart_error.code(), Code::UnsupportedType);
+
+        let missing_error = original
+            .set("Missing!A1", props! { "value" => "must refuse" })
+            .expect_err("a missing semantic sheet must be refused");
+        assert_eq!(missing_error.code(), Code::PathNotFound);
+
+        let updated = original
+            .set("data!a1", props! { "value" => "worksheet" })
+            .expect("the worksheet after the chart tab remains addressable");
+        assert_eq!(
+            cell_text(&updated, "/sheet[2]/A1").as_deref(),
+            Some("worksheet")
+        );
+        assert_eq!(
+            original.to_bytes().expect("publish unchanged chart base"),
+            original_bytes
+        );
+    }
+}
+
+#[test]
+fn direct_targets_reject_invalid_coordinates_and_paths_atomically() {
+    let bytes = fixture();
+
+    for eager in [false, true] {
+        let original = open_owner(&bytes, eager);
+        let original_bytes = original.to_bytes().expect("publish original fixture");
+        for path in ["Data!A0", "Data!XFE1", "Data!A1048577", "Data!A1[0]"] {
+            let error = original
+                .set(path, props! { "value" => "must refuse" })
+                .expect_err("invalid direct target must be refused");
+            assert_eq!(error.code(), Code::InvalidPath, "{path}: {error:?}");
+            assert_eq!(
+                original.to_bytes().expect("publish after invalid path"),
+                original_bytes,
+                "invalid target mutated the {eager:?} owner: {path}"
+            );
+        }
+    }
+}
+
+#[test]
+fn semantic_cell_paths_survive_staged_reads_and_rename_barriers() {
+    let bytes = fixture();
+
+    for eager in [false, true] {
+        let original = open_owner(&bytes, eager);
+        let commit = original
+            .edit(|transaction| {
+                transaction.set("'Data'!A1", props! { "value" => "before rename" })?;
+                {
+                    let observed = transaction.get("/DATA/a1")?;
+                    assert_eq!(observed.view().text()?.as_deref(), Some("before rename"));
+                }
+                transaction.set("/sheet[1]", props! { "name" => "Renamed" })?;
+                transaction.set("'renamed'!b1", props! { "value" => "after rename" })?;
+                Ok::<_, litchi_ops::Error>(())
+            })
+            .expect("semantic paths across read and rename barriers");
+
+        assert_eq!(commit.diagnostics.operations(), 3);
+        assert_eq!(commit.diagnostics.commits(), 3);
+        assert_eq!(
+            sheet_property(&commit.file, "/sheet[1]", "name").as_deref(),
+            Some("Renamed")
+        );
+        assert_eq!(
+            cell_text(&commit.file, "/sheet[1]/A1").as_deref(),
+            Some("before rename")
+        );
+        assert_eq!(
+            cell_text(&commit.file, "/sheet[1]/B1").as_deref(),
+            Some("after rename")
+        );
+    }
 }
 
 #[test]

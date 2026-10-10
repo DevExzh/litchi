@@ -102,6 +102,13 @@ pub(super) struct CellItem {
 #[derive(Clone)]
 pub(super) enum CellSource {
     Grid(Grid),
+    /// A direct mutation target.  The worksheet grid remains lazy so target
+    /// admission can validate the path without parsing the read projection;
+    /// a later inspection still resolves the same source-backed grid.
+    Deferred {
+        handle: SheetHandle,
+        grid: OnceLock<Grid>,
+    },
     Stub,
 }
 
@@ -389,6 +396,23 @@ impl<'f> Node<'f> {
         Self::in_sheet(file, sheet, item, PathStep::cell(column, row))
     }
 
+    pub(super) fn new_cell_target(
+        file: &'f Xlsb,
+        sheet: usize,
+        at: Address,
+        handle: SheetHandle,
+    ) -> Self {
+        Self::new_cell(
+            file,
+            sheet,
+            at,
+            CellSource::Deferred {
+                handle,
+                grid: OnceLock::new(),
+            },
+        )
+    }
+
     pub(super) fn new_range(file: &'f Xlsb, sheet: usize, grid: Grid, rect: Rect) -> Self {
         let first = (rect.start().column().get(), rect.start().row().get());
         let last = (
@@ -627,10 +651,25 @@ pub(super) enum CellState<'a> {
 }
 
 impl CellItem {
+    fn grid(&self) -> Result<&Grid> {
+        match &self.source {
+            CellSource::Grid(grid) => Ok(grid),
+            CellSource::Deferred { handle, grid } => {
+                if let Some(grid) = grid.get() {
+                    return Ok(grid);
+                }
+                let materialized = Grid::from_handle(handle)?;
+                Ok(grid.get_or_init(|| materialized))
+            },
+            CellSource::Stub => Err(unsupported("the XLSB cell has no worksheet grid")),
+        }
+    }
+
     pub(super) fn state(&self) -> Result<CellState<'_>> {
         match &self.source {
             CellSource::Stub => Ok(CellState::Stub),
-            CellSource::Grid(grid) => {
+            CellSource::Grid(_) | CellSource::Deferred { .. } => {
+                let grid = self.grid()?;
                 let at = self.at;
                 if let Some(cell) = grid.record(at)? {
                     return Ok(CellState::Stored(cell));
@@ -649,8 +688,8 @@ impl CellItem {
         if let Some(format) = self.format.get() {
             return Ok(format.as_ref());
         }
-        let format = match (&self.source, self.state()?) {
-            (CellSource::Grid(grid), CellState::Stored(_)) => grid.format(self.at)?,
+        let format = match self.state()? {
+            CellState::Stored(_) => self.grid()?.format(self.at)?,
             _ => None,
         };
         Ok(self.format.get_or_init(|| format).as_ref())
@@ -659,14 +698,20 @@ impl CellItem {
     fn merge(&self, state: CellState<'_>) -> Result<Option<(Rect, bool)>> {
         match (&self.source, state) {
             (_, CellState::Covered(range)) => Ok(Some((range, false))),
-            (CellSource::Grid(grid), CellState::Stored(_)) => grid.merge(self.at),
+            (CellSource::Grid(_) | CellSource::Deferred { .. }, CellState::Stored(_)) => {
+                self.grid()?.merge(self.at)
+            },
             _ => Ok(None),
         }
     }
 
     fn props(&self) -> Result<CellProps<'_>> {
         let state = self.state()?;
-        let cached_only = matches!(&self.source, CellSource::Grid(grid) if grid.cached_only());
+        let cached_only = match &self.source {
+            CellSource::Grid(grid) => grid.cached_only(),
+            CellSource::Deferred { .. } => self.grid()?.cached_only(),
+            CellSource::Stub => false,
+        };
         let format = match state {
             CellState::Stored(_) if !cached_only => self.format()?,
             _ => None,

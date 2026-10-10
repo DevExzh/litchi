@@ -16,6 +16,10 @@ shape. Opening, corpus generation, target/property preparation, warm-up,
 serialization and equivalence checks are outside the clocks. Source-owner
 native samples include `SourceBackedWorkbook::to_workbook().into_package()`
 inside the timed native edit, matching the unified source edit boundary.
+The eager native leg starts from `Package`, while the eager facade starts from
+`Workbook`; this is a package-native comparison with different prepared owner
+types. Facade property recollection, admission and coercion are timed even
+though caller target/property preparation is outside the clocks.
 
 Run from the repository root with no concurrent build, test or measurement job:
 
