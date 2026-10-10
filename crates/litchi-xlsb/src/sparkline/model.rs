@@ -6,7 +6,7 @@
 
 //! Package-neutral sparkline values and invariants.
 
-use std::num::FpCategory;
+use std::{mem::size_of, num::FpCategory};
 
 use bitflags::bitflags;
 use litchi_sheet::sparkline::{AxisType, EmptyCells, SparklineType};
@@ -531,6 +531,11 @@ impl Formula {
             rgcb: copy_boxed(rgcb, "formula ancillary data")?,
         })
     }
+
+    /// Return the exact allocations retained by the boxed token streams.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.rgce.len().saturating_add(self.rgcb.len())
+    }
 }
 
 /// A non-automatic BIFF12 color family.
@@ -951,6 +956,11 @@ impl Sparkline {
     pub const fn location(&self) -> Location {
         self.location
     }
+
+    /// Return the exact allocations retained by this sparkline's formula.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.formula.as_ref().map_or(0, Formula::retained_bytes)
+    }
 }
 
 /// One XLSB sparkline group.
@@ -1138,6 +1148,18 @@ impl Group {
         validate_group(&value, limits)?;
         Ok(value)
     }
+
+    /// Return all heap allocations owned by this group.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let mut total = self.items.capacity().saturating_mul(size_of::<Sparkline>());
+        if let Some(formula) = &self.date_formula {
+            total = total.saturating_add(formula.retained_bytes());
+        }
+        for item in &self.items {
+            total = total.saturating_add(item.retained_bytes());
+        }
+        total
+    }
 }
 
 /// A nonempty, ordered worksheet sparkline collection.
@@ -1179,6 +1201,15 @@ impl Groups {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.groups.is_empty()
+    }
+
+    /// Return all heap allocations owned by this collection.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let mut total = self.groups.capacity().saturating_mul(size_of::<Group>());
+        for group in &self.groups {
+            total = total.saturating_add(group.retained_bytes());
+        }
+        total
     }
 
     /// Iterate in worksheet stream order.

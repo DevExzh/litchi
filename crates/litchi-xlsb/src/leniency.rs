@@ -69,6 +69,12 @@
 //!   contributes its repairs exactly once. Each binary-index lookup through
 //!   `SourceBackedIndexedWorksheet::cached_value` that performs a repair
 //!   records it here as well.
+//! - [`SourceBackedWorkbook::read_tolerance_report`](crate::SourceBackedWorkbook::read_tolerance_report)
+//!   explicitly adds the reports of successfully materialized worksheets to
+//!   that workbook-scope snapshot. Each retained worksheet report contributes
+//!   once, even after semantic-cache eviction and reparse; a failed or
+//!   cancelled materialization contributes nothing. The accessor also applies
+//!   the source and execution fences around the snapshot.
 //! - [`cell_values::Snapshot::tolerance_report`](crate::cell_values::Snapshot::tolerance_report)
 //!   covers the worksheet stream behind one cell-value edit snapshot.
 //!
@@ -101,6 +107,8 @@
 //! a report (for example [`styles::parse_border`](crate::styles::parse_border))
 //! remain strict, so a repair can never happen without being recorded; the
 //! write path keeps validating authored payloads strictly as well.
+
+use std::mem::size_of;
 
 /// Upper bound on individually recorded defects.
 ///
@@ -459,6 +467,15 @@ struct PackageLocation {
     value: Option<Box<str>>,
 }
 
+impl PackageLocation {
+    fn retained_bytes(&self) -> usize {
+        size_of::<Self>()
+            .saturating_add(self.part.len())
+            .saturating_add(self.item.as_deref().map_or(0, str::len))
+            .saturating_add(self.value.as_deref().map_or(0, str::len))
+    }
+}
+
 /// One repaired defect, with enough context to locate it in the workbook.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct ToleratedDefect {
@@ -537,6 +554,12 @@ impl ToleratedDefect {
             .as_deref()
             .and_then(|location| location.value.as_deref())
     }
+
+    fn retained_bytes(&self) -> usize {
+        self.package
+            .as_deref()
+            .map_or(0, PackageLocation::retained_bytes)
+    }
 }
 
 /// Everything a read repaired, in the order the defects were found.
@@ -589,6 +612,18 @@ impl ToleranceReport {
     #[must_use]
     pub fn total(&self) -> u64 {
         self.defects.len() as u64 + u64::from(self.unrecorded)
+    }
+
+    /// Return all heap allocations owned by this report.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let mut total = self
+            .defects
+            .capacity()
+            .saturating_mul(size_of::<ToleratedDefect>());
+        for defect in &self.defects {
+            total = total.saturating_add(defect.retained_bytes());
+        }
+        total
     }
 
     /// How many individually recorded defects belong to `defect`.

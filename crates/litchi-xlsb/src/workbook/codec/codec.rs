@@ -12,7 +12,15 @@ use std::io::Cursor;
 
 impl Workbook {
     pub fn worksheet(&self, index: usize) -> Result<Worksheet> {
-        let catalog_position = self.catalog_position_for_worksheet(index)?;
+        let worksheet = self.cached_worksheet(index)?;
+        Ok((*worksheet).clone())
+    }
+
+    pub(crate) fn parse_worksheet(
+        &self,
+        index: usize,
+        catalog_position: usize,
+    ) -> Result<Worksheet> {
         let name = self
             .formula_context
             .worksheet_names

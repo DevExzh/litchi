@@ -20,6 +20,125 @@ use litchi_core::sheet::{
 use litchi_sheet::view::View;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
+
+/// Checked sparse worksheet reads over the zero-based XLSB grid.
+pub mod read;
+mod weight;
+
+pub use read::Cells;
+
+// Sheet metadata is shared by eager and source-backed workbook views.  Keep
+// the ordinary vocabulary under this public sheet namespace; native tab IDs,
+// relationship IDs, and part names stay in the raw layer.
+pub use crate::workbook::catalog::{Kind, Selector, State, Tab};
+pub use litchi_core::Position;
+pub use litchi_sheet::{Area, At, Rect};
+
+/// An immutable, cheaply cloned snapshot of one XLSB worksheet grid.
+///
+/// A grid owns an `Arc` to the fully decoded worksheet. It remains usable
+/// after the workbook's bounded worksheet cache evicts its entry and after a
+/// source-backed workbook is dropped. Grid methods operate only on this
+/// captured snapshot; source and execution fences belong to the owner method
+/// that created it.
+#[derive(Clone)]
+pub struct Grid {
+    worksheet: Arc<Worksheet>,
+}
+
+const _: () = {
+    const fn assert_send_sync<T: Send + Sync>() {}
+    assert_send_sync::<Grid>();
+};
+
+impl Grid {
+    pub(crate) fn from_arc(worksheet: Arc<Worksheet>) -> Self {
+        Self { worksheet }
+    }
+
+    /// Borrow the decoded worksheet snapshot retained by this grid.
+    ///
+    /// This accessor is intended for format adapters that need the existing
+    /// XLSB semantic worksheet methods. It does not expose package identity or
+    /// any source-backed owner.
+    pub fn worksheet(&self) -> &Worksheet {
+        &self.worksheet
+    }
+
+    /// Borrow one stored cell by a checked zero-based coordinate or A1 label.
+    pub fn cell_at<'a>(
+        &self,
+        at: impl Into<At<'a>>,
+    ) -> crate::package::error::Result<Option<&Cell>> {
+        self.worksheet.cell_at(at)
+    }
+
+    /// Lazily borrow stored cells inside a checked zero-based half-open range.
+    pub fn cells_in<'a>(
+        &self,
+        area: impl Into<Area<'a>>,
+    ) -> crate::package::error::Result<Cells<'_>> {
+        self.worksheet.cells_in(area)
+    }
+
+    /// Number of stored cell records in this snapshot.
+    #[must_use]
+    pub fn stored_cell_count(&self) -> usize {
+        self.worksheet.cells.len()
+    }
+
+    /// The worksheet name retained in this snapshot.
+    #[must_use]
+    pub fn name(&self) -> &str {
+        SheetWorksheet::name(self.worksheet.as_ref())
+    }
+
+    /// The worksheet dimensions, if it contains stored cells.
+    #[must_use]
+    pub fn dimensions(&self) -> Option<(u32, u32, u32, u32)> {
+        SheetWorksheet::dimensions(self.worksheet.as_ref())
+    }
+
+    /// Number of logical rows represented by this worksheet.
+    #[must_use]
+    pub fn row_count(&self) -> usize {
+        SheetWorksheet::row_count(self.worksheet.as_ref())
+    }
+
+    /// Number of logical columns represented by this worksheet.
+    #[must_use]
+    pub fn column_count(&self) -> usize {
+        SheetWorksheet::column_count(self.worksheet.as_ref())
+    }
+
+    /// Repairs recorded while the worksheet stream and its adjuncts were read.
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        self.worksheet.tolerance_report()
+    }
+
+    /// Compute the logical retained weight charged to the worksheet cache.
+    ///
+    /// Cache publication computes this value once, before publication. A
+    /// normal grid construction remains constant time with respect to the
+    /// worksheet size; callers that explicitly request accounting opt into
+    /// this traversal.
+    #[must_use]
+    pub fn retained_weight(&self) -> usize {
+        self.worksheet.retained_bytes()
+    }
+}
+
+impl std::fmt::Debug for Grid {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Grid")
+            .field("stored_cells", &self.stored_cell_count())
+            .field("dimensions", &self.dimensions())
+            .finish_non_exhaustive()
+    }
+}
 
 /// Width, style, visibility, and outline metadata for an XLSB column range.
 #[derive(Debug, Clone, PartialEq)]
@@ -122,7 +241,7 @@ pub struct StrongProtection {
 }
 
 /// XLSB worksheet implementation
-#[derive(Debug, Clone)]
+#[derive(Clone)]
 pub struct Worksheet {
     name: String,
     cells: BTreeMap<(u32, u32), Cell>,
@@ -147,6 +266,18 @@ pub struct Worksheet {
     timelines: Option<crate::timeline::Views>,
     sparkline_groups: Option<crate::sparkline::Groups>,
     tolerance: crate::leniency::ToleranceReport,
+}
+
+impl std::fmt::Debug for Worksheet {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Worksheet")
+            .field("stored_cells", &self.cells.len())
+            .field("max_row", &self.max_row)
+            .field("max_column", &self.max_col)
+            .field("merged_ranges", &self.merged_cells.len())
+            .finish_non_exhaustive()
+    }
 }
 
 impl Worksheet {

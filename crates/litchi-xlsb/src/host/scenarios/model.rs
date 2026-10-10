@@ -6,6 +6,7 @@
 
 use super::validation;
 use crate::package::error::Result;
+use std::mem::size_of;
 
 /// Maximum number of changing cells in one scenario.
 pub const MAX_CHANGED_CELLS: usize = 32;
@@ -170,6 +171,11 @@ impl ChangedCell {
         validation::validate_changed_cell(&cell)?;
         Ok(cell)
     }
+
+    /// Return the heap allocation retained by the authored value.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.value.capacity()
+    }
 }
 
 /// One unrecognised BIFF12 record retained as inert data.
@@ -207,6 +213,11 @@ impl UnknownRecord {
             kind,
             payload: payload.to_vec().into_boxed_slice(),
         })
+    }
+
+    /// Return the exact allocation retained by the opaque payload.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.payload.len()
     }
 }
 
@@ -390,6 +401,33 @@ impl Scenario {
     pub(crate) fn is_opaque(&self) -> bool {
         !self.unknown.is_empty()
     }
+
+    /// Return all heap allocations owned by this scenario.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let mut total = self
+            .name
+            .capacity()
+            .saturating_add(self.comment.capacity())
+            .saturating_add(self.user_name.capacity())
+            .saturating_add(
+                self.changed_cells
+                    .capacity()
+                    .saturating_mul(size_of::<ChangedCell>()),
+            )
+            .saturating_add(
+                self.unknown
+                    .capacity()
+                    .saturating_mul(size_of::<UnknownRecord>()),
+            )
+            .saturating_add(self.order.capacity().saturating_mul(size_of::<Child>()));
+        for cell in &self.changed_cells {
+            total = total.saturating_add(cell.retained_bytes());
+        }
+        for record in &self.unknown {
+            total = total.saturating_add(record.retained_bytes());
+        }
+        total
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -558,5 +596,31 @@ impl Manager {
 
     pub(crate) fn is_opaque(&self) -> bool {
         !self.unknown.is_empty() || self.scenarios.iter().any(Scenario::is_opaque)
+    }
+
+    /// Return all heap allocations owned by this Scenario Manager.
+    pub(crate) fn retained_bytes(&self) -> usize {
+        let mut total = self
+            .result_ranges
+            .capacity()
+            .saturating_mul(size_of::<CellRange>())
+            .saturating_add(
+                self.scenarios
+                    .capacity()
+                    .saturating_mul(size_of::<Scenario>()),
+            )
+            .saturating_add(
+                self.unknown
+                    .capacity()
+                    .saturating_mul(size_of::<UnknownRecord>()),
+            )
+            .saturating_add(self.order.capacity().saturating_mul(size_of::<Entry>()));
+        for scenario in &self.scenarios {
+            total = total.saturating_add(scenario.retained_bytes());
+        }
+        for record in &self.unknown {
+            total = total.saturating_add(record.retained_bytes());
+        }
+        total
     }
 }

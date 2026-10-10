@@ -1637,8 +1637,8 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
     };
     let mut standalone = ShapeSpec::text_box("Standalone", two_cell, Preset::RoundRect, "A\nB");
     standalone.description = Some("Typed XLSB text box".to_string());
-    standalone.paragraphs[0].runs[0].bold = Some(true);
-    standalone.paragraphs[0].runs[0].font_size = Some(TextSize::new(1_400).unwrap());
+    standalone.paragraphs[0].runs[0].properties.bold = Some(true);
+    standalone.paragraphs[0].runs[0].properties.size = Some(TextSize::new(1_400).unwrap());
 
     let group_anchor = Anchor::OneCell {
         from: marker(4, 1),
@@ -1719,7 +1719,9 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
     );
     assert_eq!(shape.text_body.as_ref().unwrap().text(), "A\nB");
     assert_eq!(
-        shape.text_body.as_ref().unwrap().paragraphs[0].runs[0].bold,
+        shape.text_body.as_ref().unwrap().paragraphs[0].runs[0]
+            .properties
+            .bold,
         Some(true)
     );
 

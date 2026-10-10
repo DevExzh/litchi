@@ -1,16 +1,22 @@
 //! Typed XLSB workbook state and its public model accessors.
 
+use super::cache::{Stats, WorksheetCache};
+use super::catalog::TabMetadata;
 use crate::calc::Props;
 use crate::external_link::{ExternalLinkLimits, Link};
 use crate::package::Cell;
-use crate::package::formula::{Context, ExternalBook, View, table::Definition as TableDefinition};
+use crate::package::formula::{
+    Context, ExternalBook, View, excel_name_eq, table::Definition as TableDefinition,
+};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::{CellFormat, StylesTable};
-use crate::sheet::Worksheet;
+use crate::sheet::{Grid, Selector, Tab, Worksheet};
+use litchi_core::Position;
 use litchi_core::sheet::{
     Result as SheetResult, Worksheet as SheetTrait, WorksheetIterator as SheetIterator,
 };
 use litchi_opc::OpcPackage;
+use std::sync::Arc;
 
 /// Typed drawing projection selected when the workbook was opened.
 ///
@@ -31,6 +37,8 @@ pub(crate) enum DrawingLoadPolicy {
 )]
 pub struct Workbook {
     pub(crate) package: OpcPackage,
+    /// Owner-scoped bounded retention for parsed worksheet snapshots.
+    pub(super) worksheet_cache: WorksheetCache,
     pub(super) worksheets: Vec<Worksheet>,
     /// Worksheet-only names in public worksheet ordinal order.
     pub(super) worksheet_names: Vec<String>,
@@ -38,6 +46,11 @@ pub struct Workbook {
     pub(super) worksheet_positions: Vec<usize>,
     /// Relationship identifiers in full workbook sheet-catalog order.
     pub(super) worksheet_rel_ids: Vec<Option<String>>,
+    /// The validated semantic metadata of every tab, in full workbook
+    /// sheet-catalog order. The formula context retains its own full-name
+    /// projection for formula resolution; native IDs and part names remain
+    /// in `worksheet_rel_ids` and never enter this semantic value.
+    pub(super) sheet_tabs: Vec<TabMetadata>,
     /// Primary `BrtBookView.itabCur` position in full workbook sheet order.
     pub(super) active_catalog_position: Option<usize>,
     pub(crate) formula_context: Context,
@@ -61,8 +74,9 @@ pub struct Workbook {
 impl std::fmt::Debug for Workbook {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("Workbook")
-            .field("worksheet_names", &self.formula_context.worksheet_names)
-            .field("worksheet_rel_ids", &self.worksheet_rel_ids)
+            .field("sheet_tab_count", &self.sheet_tabs.len())
+            .field("worksheet_count", &self.worksheet_names.len())
+            .field("active_catalog_position", &self.active_catalog_position)
             .field("shared_strings_count", &self.shared_strings.len())
             .field("cell_xfs_count", &self.styles.cell_xfs.len())
             .field("calc", &self.calc)
@@ -73,6 +87,32 @@ impl std::fmt::Debug for Workbook {
 }
 
 impl Workbook {
+    pub(crate) fn cached_worksheet(
+        &self,
+        index: usize,
+    ) -> crate::package::error::Result<Arc<Worksheet>> {
+        let catalog_position = self.catalog_position_for_worksheet(index)?;
+        if let Some(worksheet) = self.worksheet_cache.get(catalog_position, true) {
+            return Ok(worksheet);
+        }
+        let worksheet = Arc::new(self.parse_worksheet(index, catalog_position)?);
+        let weight = worksheet.retained_bytes();
+        Ok(self
+            .worksheet_cache
+            .publish(catalog_position, worksheet, weight))
+    }
+
+    /// Content-free diagnostics for the owner-scoped worksheet cache.
+    #[must_use]
+    pub fn semantic_cache_diagnostics(&self) -> Stats {
+        self.worksheet_cache.stats()
+    }
+
+    /// Release parsed worksheet values that no grid or legacy handle pins.
+    pub fn trim_semantic_cache(&self) -> usize {
+        self.worksheet_cache.trim_clean()
+    }
+
     /// Every repair applied while this workbook was opened.
     ///
     /// Covers the OPC package read that admitted the workbook (its
@@ -117,6 +157,76 @@ impl Workbook {
                 "Worksheet index {index} out of bounds"
             ))
         })
+    }
+
+    /// Every workbook tab in workbook order, including chart, dialog, and
+    /// macro tabs. The worksheet-only APIs continue to expose only entries
+    /// whose [`Tab::worksheet_position`] is `Some`.
+    pub fn sheets(&self) -> impl ExactSizeIterator<Item = Tab<'_>> + DoubleEndedIterator + '_ {
+        self.sheet_tabs
+            .iter()
+            .enumerate()
+            .map(|(position, tab)| self.tab_at(position, tab))
+    }
+
+    /// Select any workbook tab by its semantic name or checked zero-based
+    /// position in complete workbook order.
+    pub fn sheet<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+    ) -> crate::package::error::Result<Option<Tab<'_>>> {
+        let position = match selector.into() {
+            Selector::Position(position) => Some(position.get()),
+            Selector::Name(name) => self
+                .sheet_tabs
+                .iter()
+                .position(|tab| excel_name_eq(tab.name(), &name)),
+        };
+        Ok(position.and_then(|position| {
+            self.sheet_tabs
+                .get(position)
+                .map(|tab| self.tab_at(position, tab))
+        }))
+    }
+
+    /// Select a semantic workbook tab and return its immutable worksheet grid.
+    ///
+    /// A missing name or position returns `Ok(None)`. A selected chart,
+    /// dialog, macro, or unbound tab returns a typed unsupported-feature
+    /// error because those tabs do not own a worksheet grid.
+    pub fn grid<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+    ) -> crate::package::error::Result<Option<Grid>> {
+        let Some(tab) = self.sheet(selector)? else {
+            return Ok(None);
+        };
+        let Some(position) = tab.worksheet_position() else {
+            return Err(crate::package::error::Error::UnsupportedFeature(
+                "selected XLSB tab has no worksheet grid".to_string(),
+            ));
+        };
+        // `Tab::worksheet_position` is the worksheet-only ordinal. The
+        // catalog position was already used to select the tab above, so do
+        // not feed this ordinal back into the catalog-position helper when a
+        // chart or other non-worksheet tab precedes it.
+        self.cached_worksheet(position.get())
+            .map(|worksheet| Some(Grid::from_arc(worksheet)))
+    }
+
+    fn tab_at<'a>(&'a self, position: usize, tab: &'a TabMetadata) -> Tab<'a> {
+        let worksheet_position = self
+            .worksheet_positions
+            .binary_search(&position)
+            .ok()
+            .map(Position::new);
+        Tab::new(
+            tab.name(),
+            Position::new(position),
+            worksheet_position,
+            tab.kind(),
+            tab.state(),
+        )
     }
 
     /// Workbook and sheet-scoped defined names in `PtgName` index order.

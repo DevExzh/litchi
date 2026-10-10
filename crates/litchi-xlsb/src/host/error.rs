@@ -38,6 +38,10 @@ pub enum Error {
     MergedCell(crate::merged_cells::Error),
     /// Typed hyperlink record error.
     Hyperlink(crate::hyperlinks::Error),
+    /// Invalid checked cell coordinate supplied by a caller.
+    Coordinate(litchi_sheet::CoordinateError),
+    /// Invalid checked cell rectangle supplied by a caller.
+    Range(litchi_sheet::RangeError),
     /// Invalid record type
     InvalidRecordType(u16),
     /// Unexpected record
@@ -167,6 +171,8 @@ impl fmt::Display for Error {
             Error::Calc(e) => write!(f, "XLSB calculation-property error: {e}"),
             Error::MergedCell(e) => write!(f, "XLSB merged-cell error: {e}"),
             Error::Hyperlink(e) => write!(f, "XLSB hyperlink error: {e}"),
+            Error::Coordinate(e) => write!(f, "XLSB coordinate error: {e}"),
+            Error::Range(e) => write!(f, "XLSB range error: {e}"),
             Error::InvalidRecordType(rt) => write!(f, "Invalid record type: 0x{:04X}", rt),
             Error::UnexpectedRecord { expected, found } => {
                 write!(
@@ -269,6 +275,8 @@ impl std::error::Error for Error {
             Error::Calc(e) => Some(e),
             Error::MergedCell(e) => Some(e),
             Error::Hyperlink(e) => Some(e),
+            Error::Coordinate(e) => Some(e),
+            Error::Range(e) => Some(e),
             Error::DrawingTransfer(refusal) => Some(refusal),
             Error::Allocation { source, .. } => Some(source),
             Error::Drawing(e) => Some(e),
@@ -478,5 +486,17 @@ impl From<litchi_core::ExecutionError> for Error {
 impl From<String> for Error {
     fn from(err: String) -> Self {
         Error::Encoding(err)
+    }
+}
+
+impl From<litchi_sheet::CoordinateError> for Error {
+    fn from(error: litchi_sheet::CoordinateError) -> Self {
+        Self::Coordinate(error)
+    }
+}
+
+impl From<litchi_sheet::RangeError> for Error {
+    fn from(error: litchi_sheet::RangeError) -> Self {
+        Self::Range(error)
     }
 }

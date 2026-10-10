@@ -1,5 +1,6 @@
 //! OPC/package integration for the typed XLSB workbook.
 
+use super::catalog::TabMetadata;
 use super::model::{DrawingLoadPolicy, Workbook};
 use crate::calc::Props;
 use crate::cell_values;
@@ -16,6 +17,7 @@ use crate::package::vba_project::{
 };
 use crate::package::web_extension_bindings::PackageAppRefs;
 use crate::raw::Records;
+use crate::sheet::{Kind, State};
 use crate::sparkline;
 use litchi_core::ExecutionContext;
 use litchi_ooxml_common::embedded;
@@ -44,6 +46,12 @@ const MACRO_SHEET_RELATIONSHIP_TYPES: &[&str] = &[
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
 ];
 
+const XLSB_WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
+const XLSB_CHARTSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.chartsheet";
+const XLSB_DIALOGSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.dialogsheet";
+const XLSB_MACROSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.macrosheet";
+const XLSB_INTL_MACROSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.intlmacrosheet";
+
 fn is_worksheet_relationship(reltype: &str) -> bool {
     matches!(
         reltype,
@@ -63,6 +71,28 @@ fn is_known_non_worksheet_relationship(reltype: &str) -> bool {
     CHART_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
         || DIALOG_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
         || MACRO_SHEET_RELATIONSHIP_TYPES.contains(&reltype)
+}
+
+fn validate_sheet_content_type(part: &dyn Part, kind: Kind) -> Result<()> {
+    let expected = match kind {
+        Kind::Worksheet => XLSB_WORKSHEET_CONTENT_TYPE,
+        Kind::Chart => XLSB_CHARTSHEET_CONTENT_TYPE,
+        Kind::Dialog => XLSB_DIALOGSHEET_CONTENT_TYPE,
+        Kind::Macro => XLSB_MACROSHEET_CONTENT_TYPE,
+        Kind::IntlMacro => XLSB_INTL_MACROSHEET_CONTENT_TYPE,
+        Kind::Unbound => {
+            return Err(crate::package::error::Error::UnsupportedFeature(
+                "unbound XLSB tabs have no physical content type".to_string(),
+            ));
+        },
+    };
+    if part.content_type() != expected {
+        return Err(crate::package::error::Error::InvalidContentType {
+            expected: expected.to_string(),
+            got: part.content_type().to_string(),
+        });
+    }
+    Ok(())
 }
 
 impl Workbook {
@@ -1245,10 +1275,12 @@ impl Workbook {
         let tolerance = ToleranceReport::from_package(package.tolerance_report());
         let mut workbook = Workbook {
             package,
+            worksheet_cache: super::cache::WorksheetCache::new(),
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
             worksheet_positions: Vec::new(),
             worksheet_rel_ids: Vec::new(),
+            sheet_tabs: Vec::new(),
             active_catalog_position: None,
             formula_context: Context::default(),
             external_link_limits,
@@ -1286,6 +1318,16 @@ impl Workbook {
         let blob = workbook_part.blob();
         let mut iter = Records::new(blob);
         let info = Self::read_workbook(&mut iter, &mut self.tolerance)?;
+        if info.worksheet_names.len() != info.worksheet_rel_ids.len() {
+            return Err(crate::package::error::Error::InvalidFormat(
+                "XLSB sheet names and relationship identifiers have different lengths".to_string(),
+            ));
+        }
+        if info.worksheet_names.len() != info.worksheet_states.len() {
+            return Err(crate::package::error::Error::InvalidFormat(
+                "XLSB sheet names and visibility states have different lengths".to_string(),
+            ));
+        }
         let active_catalog_position =
             (!info.worksheet_names.is_empty()).then_some(info.active_catalog_position.unwrap_or(0));
         // BrtSupBookSrc identifiers are workbook-stream metadata. The
@@ -1381,15 +1423,32 @@ impl Workbook {
                 resource: "eager XLSB worksheet-name map",
                 source,
             })?;
-        for (catalog_position, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
-            let rel_id = rel_id.as_deref().ok_or_else(|| {
-                crate::package::error::Error::Unrecognized {
-                    typ: "sheet relationship".to_string(),
-                    val: format!(
-                        "sheet catalog position {catalog_position} has no relationship identifier"
-                    ),
-                }
+        let mut sheet_tabs = Vec::new();
+        sheet_tabs
+            .try_reserve_exact(info.worksheet_rel_ids.len())
+            .map_err(|source| crate::package::error::Error::Allocation {
+                resource: "eager XLSB sheet-tab catalog",
+                source,
             })?;
+        let mut sheet_targets: Vec<litchi_opc::PackURI> = Vec::new();
+        sheet_targets
+            .try_reserve_exact(info.worksheet_rel_ids.len())
+            .map_err(|source| crate::package::error::Error::Allocation {
+                resource: "eager XLSB sheet-target validation",
+                source,
+            })?;
+        for (catalog_position, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
+            let name = &info.worksheet_names[catalog_position];
+            let state = State::from_hs_state(info.worksheet_states[catalog_position])?;
+            let Some(rel_id) = rel_id.as_deref() else {
+                if state != State::VeryHidden {
+                    return Err(crate::package::error::Error::InvalidRelationship(
+                        "unbound XLSB sheet tabs must be very hidden".to_string(),
+                    ));
+                }
+                sheet_tabs.push(TabMetadata::new(name.to_owned(), Kind::Unbound, state));
+                continue;
+            };
             let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
                 crate::package::error::Error::Unrecognized {
                     typ: "sheet relationship".to_string(),
@@ -1403,10 +1462,7 @@ impl Workbook {
                     "sheet catalog position {catalog_position} has an external relationship"
                 )));
             }
-            if !is_worksheet_relationship(relationship.reltype()) {
-                if is_known_non_worksheet_relationship(relationship.reltype()) {
-                    continue;
-                }
+            let Some(kind) = Kind::from_relationship_type(relationship.reltype()) else {
                 return Err(crate::package::error::Error::Unrecognized {
                     typ: "sheet relationship".to_string(),
                     val: format!(
@@ -1414,28 +1470,29 @@ impl Workbook {
                         relationship.reltype()
                     ),
                 });
+            };
+            let partname = relationship.target_partname()?;
+            if sheet_targets
+                .iter()
+                .any(|target| target.is_equivalent_to(&partname))
+            {
+                return Err(crate::package::error::Error::InvalidRelationship(
+                    "multiple XLSB sheet tabs resolve to one physical part".to_string(),
+                ));
             }
-            let name = info
-                .worksheet_names
-                .get(catalog_position)
-                .cloned()
-                .ok_or_else(|| crate::package::error::Error::Unrecognized {
-                    typ: "worksheet catalog".to_string(),
-                    val: format!("missing worksheet name for catalog position {catalog_position}"),
-                })?;
-            worksheet_positions.push(catalog_position);
-            worksheet_names.push(name);
+            sheet_targets.push(partname.clone());
+            let sheet_part = self.package.get_part(&partname)?;
+            validate_sheet_content_type(sheet_part, kind)?;
+            sheet_tabs.push(TabMetadata::new(name.to_owned(), kind, state));
+            if kind.is_worksheet() {
+                worksheet_positions.push(catalog_position);
+                worksheet_names.push(name.to_owned());
+            }
         }
         for (sheet_index, rel_id) in info.worksheet_rel_ids.iter().enumerate() {
-            let rel_id =
-                rel_id
-                    .as_deref()
-                    .ok_or_else(|| crate::package::error::Error::Unrecognized {
-                        typ: "sheet relationship".to_string(),
-                        val: format!(
-                            "sheet catalog position {sheet_index} has no relationship identifier"
-                        ),
-                    })?;
+            let Some(rel_id) = rel_id.as_deref() else {
+                continue;
+            };
             let sheet_relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
                 crate::package::error::Error::Unrecognized {
                     typ: "sheet relationship".to_string(),
@@ -1477,7 +1534,7 @@ impl Workbook {
                         typ: "BrtBundleSh".to_string(),
                         val: format!("chart sheet index {sheet_index} out of bounds"),
                     })?;
-                let state = info.worksheet_states.get(sheet_index).copied().unwrap_or(0);
+                let state = info.worksheet_states[sheet_index];
                 let chart_sheet = crate::package::chartsheet::parse_chart_sheet_part(
                     sheet_part.blob(),
                     name,
@@ -1653,6 +1710,7 @@ impl Workbook {
         self.worksheet_names = worksheet_names;
         self.worksheet_positions = worksheet_positions;
         self.worksheet_rel_ids = info.worksheet_rel_ids;
+        self.sheet_tabs = sheet_tabs;
         self.active_catalog_position = active_catalog_position;
         self.is_1904 = info.is_1904;
         self.calc = info.calc.unwrap_or_default();

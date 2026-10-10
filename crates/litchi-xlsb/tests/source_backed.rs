@@ -17,15 +17,25 @@ use litchi_opc::constants::relationship_type;
 use litchi_opc::{
     BlobPart, OpcError, OpcPackage, PackURI, Part, SourceBackedPackage, SourceCacheLimits,
 };
+use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::external_link::ExternalLinkLimits;
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Header, Limits as RawLimits, Records, Writer, kind};
-use litchi_xlsb::{SourceBackedWorkbook, SourceLimits, Workbook};
+use litchi_xlsb::sheet::{Kind, State};
+use litchi_xlsb::{Leniency, SourceBackedWorkbook, SourceLimits, Workbook};
 
 fn fixture() -> Vec<u8> {
     std::fs::read(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ooxml/xlsb/Simple.xlsb"
+    ))
+    .unwrap()
+}
+
+fn indexed_fixture() -> Vec<u8> {
+    std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/sample.xlsb"
     ))
     .unwrap()
 }
@@ -138,6 +148,129 @@ fn rewrite_part(partname: &str, blob: Vec<u8>) -> Vec<u8> {
     let mut output = Vec::new();
     package.to_stream(&mut output).unwrap();
     output
+}
+
+fn reserved_cell_flag_fixture() -> Vec<u8> {
+    let source = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ooxml/xlsb/universal-content.xlsb"
+    ))
+    .unwrap();
+    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+    let source = package.get_part(&uri).unwrap().blob().to_vec();
+    let mut rewritten = Vec::new();
+    let mut writer = Writer::new(&mut rewritten);
+    let mut changed = false;
+    for record in Records::new(&source) {
+        let record = record.unwrap();
+        let mut payload = record.payload().to_vec();
+        if record.kind() == kind::CELL_RK && !changed {
+            payload[7] |= 0x80;
+            changed = true;
+        }
+        writer.write_record(record.kind(), &payload).unwrap();
+    }
+    assert!(changed, "Simple.xlsb should contain an RK cell");
+    package.get_part_mut(&uri).unwrap().set_blob(rewritten);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    output
+}
+
+fn reserved_indexed_fixture() -> Vec<u8> {
+    let source = indexed_fixture();
+    let mut package = OpcPackage::from_reader(Cursor::new(source)).unwrap();
+    let uri = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
+    let source = package.get_part(&uri).unwrap().blob().to_vec();
+    let mut rewritten = Vec::new();
+    let mut writer = Writer::new(&mut rewritten);
+    let mut changed = false;
+    for record in Records::new(&source) {
+        let record = record.unwrap();
+        let mut payload = record.payload().to_vec();
+        if record.kind() == kind::CELL_RK && !changed {
+            payload[7] |= 0x80;
+            changed = true;
+        }
+        writer.write_record(record.kind(), &payload).unwrap();
+    }
+    assert!(changed, "sample.xlsb should contain an RK cell");
+    package.get_part_mut(&uri).unwrap().set_blob(rewritten);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    output
+}
+
+fn rewrite_workbook_blob(blob: Vec<u8>) -> Vec<u8> {
+    let mut package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    package
+        .get_part_mut(&PackURI::new("/xl/workbook.bin").unwrap())
+        .unwrap()
+        .set_blob(blob);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).unwrap();
+    output
+}
+
+fn rewrite_sheet_states(states: &[u32]) -> Vec<u8> {
+    let package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let mut workbook_blob = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let offsets: Vec<usize> = Records::new(&workbook_blob)
+        .filter_map(|record| {
+            let record = record.unwrap();
+            (record.kind() == kind::BUNDLE_SH).then(|| {
+                let (_, header_len) =
+                    Header::parse(&workbook_blob[record.offset()..], RawLimits::DEFAULT).unwrap();
+                record.offset() + header_len
+            })
+        })
+        .collect();
+    for (offset, state) in offsets.into_iter().zip(states.iter().copied()) {
+        workbook_blob[offset..offset + 4].copy_from_slice(&state.to_le_bytes());
+    }
+    rewrite_workbook_blob(workbook_blob)
+}
+
+fn rewrite_null_relationship(position: usize, state: u32) -> Vec<u8> {
+    let package = OpcPackage::from_reader(Cursor::new(fixture())).unwrap();
+    let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
+    let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
+    let mut workbook_blob = Vec::new();
+    let mut current_position = 0;
+    {
+        let mut writer = Writer::new(&mut workbook_blob);
+        for record in Records::new(&original) {
+            let record = record.unwrap();
+            let mut payload = record.payload().to_vec();
+            if record.kind() == kind::BUNDLE_SH {
+                if current_position == position {
+                    payload[0..4].copy_from_slice(&state.to_le_bytes());
+                    let current_id = u32::from_le_bytes(payload[4..8].try_into().unwrap());
+                    let strings_offset = if (1..=0xFFFF).contains(&current_id) {
+                        8
+                    } else {
+                        12
+                    };
+                    let rel_units = u32::from_le_bytes(
+                        payload[strings_offset..strings_offset + 4]
+                            .try_into()
+                            .unwrap(),
+                    ) as usize;
+                    let rel_end = strings_offset + 4 + rel_units * 2;
+                    let mut null_payload = Vec::with_capacity(payload.len() - rel_units * 2);
+                    null_payload.extend_from_slice(&payload[..strings_offset]);
+                    null_payload.extend_from_slice(&u32::MAX.to_le_bytes());
+                    null_payload.extend_from_slice(&payload[rel_end..]);
+                    payload = null_payload;
+                }
+                current_position += 1;
+            }
+            writer.write_record(record.kind(), &payload).unwrap();
+        }
+    }
+    rewrite_workbook_blob(workbook_blob)
 }
 
 fn remove_part(partname: &str) -> Vec<u8> {
@@ -366,6 +499,70 @@ impl VersionedSource {
     }
 }
 
+struct LateFenceSource {
+    bytes: Vec<u8>,
+    revision: AtomicU64,
+    armed: AtomicBool,
+    skip_versions: AtomicUsize,
+}
+
+impl LateFenceSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes,
+            revision: AtomicU64::new(0),
+            armed: AtomicBool::new(false),
+            skip_versions: AtomicUsize::new(0),
+        }
+    }
+
+    fn arm_after_versions(&self, skip_versions: usize) {
+        self.skip_versions.store(skip_versions, Ordering::SeqCst);
+        self.armed.store(true, Ordering::SeqCst);
+    }
+
+    fn reset(&self) {
+        self.revision.store(0, Ordering::SeqCst);
+        self.skip_versions.store(0, Ordering::SeqCst);
+        self.armed.store(false, Ordering::SeqCst);
+    }
+}
+
+impl ReadAt for LateFenceSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset = usize::try_from(offset)
+            .map_err(|_error| io::Error::new(io::ErrorKind::InvalidInput, "offset too large"))?;
+        if offset >= self.bytes.len() {
+            return Ok(0);
+        }
+        let end = offset.saturating_add(output.len()).min(self.bytes.len());
+        output[..end - offset].copy_from_slice(&self.bytes[offset..end]);
+        Ok(end - offset)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        if self.armed.load(Ordering::SeqCst)
+            && self
+                .skip_versions
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |remaining| {
+                    remaining.checked_sub(1)
+                })
+                .is_err()
+        {
+            self.armed.store(false, Ordering::SeqCst);
+            self.revision.fetch_add(1, Ordering::SeqCst);
+        }
+        Ok(SourceVersion::new(
+            0x4c41_5445,
+            self.revision.load(Ordering::SeqCst),
+        ))
+    }
+}
+
 fn managed_context() -> (CancellationSource, ExecutionContext) {
     let budget = Budget::root(
         "xlsb-source-backed-test",
@@ -432,14 +629,38 @@ fn catalog_defers_sheet_payloads_and_materializes_one_selection() {
     selected.materialize().unwrap();
 
     let first_materialization = workbook.cache_diagnostics();
+    let first_semantic = workbook.semantic_cache_diagnostics();
     assert!(first_materialization.cold_loads > catalog_diagnostics.cold_loads);
     selected.materialize().unwrap();
     let repeated_materialization = workbook.cache_diagnostics();
+    let repeated_semantic = workbook.semantic_cache_diagnostics();
     assert_eq!(
         repeated_materialization.cold_loads,
         first_materialization.cold_loads
     );
-    assert!(repeated_materialization.hits > first_materialization.hits);
+    assert!(repeated_semantic.hits > first_semantic.hits);
+}
+
+#[test]
+fn cached_grid_projects_indexed_scalars_and_reuses_the_leaf_snapshot() {
+    let workbook = SourceBackedWorkbook::from_reader(Cursor::new(indexed_fixture())).unwrap();
+    let sheet = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let indexed = sheet.indexed_values().unwrap().unwrap();
+    let expected = indexed.cached_value(0, 1).unwrap().unwrap();
+
+    let first = sheet.cached_grid().unwrap();
+    assert_eq!(first.cell_at((0, 1)).unwrap().unwrap().value(), &expected);
+    assert!(first.stored_cell_count() > 0);
+    assert!(
+        first
+            .cells_in("A1:Z20")
+            .unwrap()
+            .all(|cell| !matches!(cell.value(), CellValue::Formula { .. }))
+    );
+
+    let second = sheet.cached_grid().unwrap();
+    assert_eq!(second.stored_cell_count(), first.stored_cell_count());
+    assert_eq!(second.name(), first.name());
 }
 
 #[test]
@@ -486,6 +707,8 @@ fn managed_cancellation_is_checked_for_catalog_selectors_state_and_handles() {
     assert_cancelled(workbook.sheet_by_index(usize::MAX));
     assert_cancelled(workbook.sheet_by_name(&sheet_name));
     assert_cancelled(workbook.sheet_by_name("missing"));
+    assert_cancelled(workbook.sheet(0_usize));
+    assert_cancelled(workbook.sheet("missing"));
     assert_cancelled(workbook.worksheet_count());
     assert_cancelled(workbook.worksheet_names());
     assert_cancelled(workbook.worksheets());
@@ -499,6 +722,8 @@ fn managed_cancellation_is_checked_for_catalog_selectors_state_and_handles() {
     assert_cancelled(workbook.is_1904_date_system());
     assert_cancelled(selected_sheet.name());
     assert_cancelled(selected_sheet.workbook_position());
+    assert_cancelled(selected_sheet.kind());
+    assert_cancelled(selected_sheet.state());
     assert_cancelled(selected_worksheet.materialize());
 }
 
@@ -542,10 +767,23 @@ fn stale_source_preflight_remains_source_changed_without_cancellation() {
         context,
     )
     .unwrap();
+    let selected = workbook.sheet(0_usize).unwrap().unwrap();
     source.change();
 
     assert!(matches!(
         workbook.sheet_count(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(matches!(
+        workbook.sheet(0_usize),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(matches!(
+        selected.kind(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    assert!(matches!(
+        selected.state(),
         Err(PackageError::Opc(OpcError::SourceChanged { .. }))
     ));
 }
@@ -562,6 +800,7 @@ fn cancellation_during_selected_materialization_is_typed_and_not_cached() {
     .unwrap();
     let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
     let before = workbook.cache_diagnostics();
+    let before_semantic = workbook.semantic_cache_diagnostics();
 
     source.arm();
     assert!(matches!(
@@ -572,6 +811,197 @@ fn cancellation_during_selected_materialization_is_typed_and_not_cached() {
 
     let after = workbook.cache_diagnostics();
     assert_eq!(after.retained_entries, before.retained_entries);
+    let after_semantic = workbook.semantic_cache_diagnostics();
+    assert_eq!(
+        after_semantic.retained_entries,
+        before_semantic.retained_entries
+    );
+    assert_eq!(after_semantic.builds, before_semantic.builds);
+}
+
+#[test]
+fn source_fences_run_before_a_semantic_cache_hit() {
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    selected.grid().unwrap();
+    let before_change = workbook.semantic_cache_diagnostics();
+    assert_eq!(before_change.builds, 1);
+
+    source.change();
+    assert!(matches!(
+        selected.grid(),
+        Err(PackageError::Opc(OpcError::SourceChanged { .. }))
+    ));
+    let after_change = workbook.semantic_cache_diagnostics();
+    assert_eq!(after_change.hits, before_change.hits);
+    assert_eq!(after_change.builds, before_change.builds);
+
+    let source = Arc::new(VersionedSource::new(fixture()));
+    let (cancellation_source, context) = managed_context();
+    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+        source,
+        SourceLimits::default(),
+        context,
+    )
+    .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    selected.grid().unwrap();
+    let before_cancel = workbook.semantic_cache_diagnostics();
+
+    cancellation_source.cancel();
+    assert_cancelled(selected.grid());
+    let after_cancel = workbook.semantic_cache_diagnostics();
+    assert_eq!(after_cancel.hits, before_cancel.hits);
+    assert_eq!(after_cancel.builds, before_cancel.builds);
+}
+
+#[test]
+fn late_source_fence_rolls_back_candidate_and_report_publication() {
+    let mut observed_postpublication_failure = false;
+    for skip_versions in 0..64 {
+        let source = Arc::new(LateFenceSource::new(reserved_cell_flag_fixture()));
+        let workbook = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+        let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+        source.arm_after_versions(skip_versions);
+
+        let result = selected.grid();
+        let Err(error) = result else {
+            break;
+        };
+        assert!(matches!(
+            error,
+            PackageError::Opc(OpcError::SourceChanged { .. })
+        ));
+
+        let diagnostics = workbook.semantic_cache_diagnostics();
+        if diagnostics.builds > 0 {
+            observed_postpublication_failure = true;
+            assert_eq!(diagnostics.retained_entries, 0);
+            source.reset();
+            assert_eq!(workbook.read_tolerance_report().unwrap().total(), 0);
+            selected.grid().unwrap();
+            assert_eq!(workbook.read_tolerance_report().unwrap().total(), 1);
+            break;
+        }
+    }
+    assert!(
+        observed_postpublication_failure,
+        "the late-fence source did not reach the publication rollback fence"
+    );
+}
+
+#[test]
+fn cached_grid_trim_and_reparse_keeps_one_fallback_tolerance_report() {
+    let source = add_pivot_relationship(reserved_indexed_fixture());
+    let workbook =
+        SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(source), Leniency::Strict)
+            .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    assert!(matches!(
+        selected.grid(),
+        Err(PackageError::UnsupportedFeature(_))
+    ));
+
+    let first = selected.cached_grid().unwrap();
+    let report = first.tolerance_report().clone();
+    assert_eq!(report.total(), 1);
+    assert_eq!(workbook.read_tolerance_report().unwrap(), report);
+    drop(first);
+    assert!(workbook.trim_semantic_cache() > 0);
+
+    let second = selected.cached_grid().unwrap();
+    assert_eq!(second.tolerance_report(), &report);
+    assert_eq!(workbook.read_tolerance_report().unwrap(), report);
+}
+
+#[test]
+fn late_source_fence_rolls_back_cached_grid_and_fallback_report() {
+    let source_bytes = add_pivot_relationship(reserved_indexed_fixture());
+    for skip_versions in 0..128 {
+        let source = Arc::new(LateFenceSource::new(source_bytes.clone()));
+        let workbook =
+            SourceBackedWorkbook::from_read_at_with_leniency(source.clone(), Leniency::Strict)
+                .unwrap();
+        let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+        source.arm_after_versions(skip_versions);
+
+        let result = selected.cached_grid();
+        let Err(error) = result else {
+            continue;
+        };
+        assert!(matches!(
+            error,
+            PackageError::Opc(OpcError::SourceChanged { .. })
+        ));
+        source.reset();
+        assert!(workbook.read_tolerance_report().unwrap().is_clean());
+        let retry = selected.cached_grid().unwrap();
+        assert_eq!(retry.tolerance_report().total(), 1);
+        assert_eq!(workbook.read_tolerance_report().unwrap().total(), 1);
+        return;
+    }
+    panic!("the late-fence source did not produce a source-change refusal");
+}
+
+#[test]
+fn source_trim_and_reparse_keeps_one_worksheet_tolerance_report() {
+    let source = reserved_cell_flag_fixture();
+    let workbook =
+        SourceBackedWorkbook::from_reader_with_leniency(Cursor::new(source), Leniency::Strict)
+            .unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+
+    let first = selected.grid().unwrap();
+    let report = first.tolerance_report().clone();
+    assert_eq!(report.total(), 1);
+    assert!(workbook.tolerance_report().is_clean());
+    let aggregate = workbook.read_tolerance_report().unwrap();
+    assert_eq!(aggregate, report);
+    drop(first);
+    assert!(workbook.trim_semantic_cache() > 0);
+
+    let second = selected.grid().unwrap();
+    assert_eq!(second.tolerance_report(), &report);
+    assert!(workbook.tolerance_report().is_clean());
+    assert_eq!(workbook.read_tolerance_report().unwrap(), aggregate);
+}
+
+#[test]
+fn eager_grid_selectors_share_the_owner_cache_and_survive_republication() {
+    let mut workbook = Workbook::new(Cursor::new(fixture())).unwrap();
+    let old_grid = workbook.grid(0_usize).unwrap().unwrap();
+    let name = old_grid.name().to_owned();
+    let before = workbook.semantic_cache_diagnostics();
+
+    let by_name = workbook.grid(name.as_str()).unwrap().unwrap();
+    assert_eq!(by_name.name(), name);
+    let after_hit = workbook.semantic_cache_diagnostics();
+    assert_eq!(after_hit.hits, before.hits + 1);
+    assert!(workbook.grid("missing").unwrap().is_none());
+
+    let inserted = Reference::new(10_001, 100).unwrap();
+    let mut edit = workbook.edit_cell_values(0).unwrap();
+    edit.insert(inserted, StyleIndex::new(0).unwrap(), Value::Number(1.0))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    workbook.apply_cell_values(0, &commit).unwrap();
+
+    assert!(
+        old_grid
+            .worksheet()
+            .get_cell(inserted.row(), inserted.column())
+            .is_none()
+    );
+    let new_grid = workbook.grid(0_usize).unwrap().unwrap();
+    assert_eq!(
+        new_grid
+            .worksheet()
+            .get_cell(inserted.row(), inserted.column())
+            .unwrap()
+            .value(),
+        &CellValue::Float(1.0)
+    );
 }
 
 #[test]
@@ -616,6 +1046,7 @@ fn managed_package_handoff_checks_cancellation_before_catalog_construction() {
 fn unselected_malformed_sheet_remains_deferred() {
     let source = rewrite_part("/xl/worksheets/sheet2.bin", vec![0xff; 8]);
     let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let before = workbook.read_tolerance_report().unwrap();
     assert!(
         workbook
             .worksheet_by_index(0)
@@ -632,6 +1063,7 @@ fn unselected_malformed_sheet_remains_deferred() {
             .materialize()
             .is_err()
     );
+    assert_eq!(workbook.read_tolerance_report().unwrap(), before);
 }
 
 #[test]
@@ -739,6 +1171,138 @@ fn recognized_nonworksheet_sheet_relationships_are_exact_and_typed() {
 }
 
 #[test]
+fn source_sheet_kind_covers_all_kinds_and_strict_relationship_namespaces() {
+    const RELATIONSHIPS: &[(&str, &str, Kind)] = &[
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet",
+            "application/vnd.ms-excel.worksheet",
+            Kind::Worksheet,
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/worksheet",
+            "application/vnd.ms-excel.worksheet",
+            Kind::Worksheet,
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+            Kind::Chart,
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet",
+            "application/vnd.ms-excel.chartsheet",
+            Kind::Chart,
+        ),
+        (
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+            Kind::Dialog,
+        ),
+        (
+            "http://purl.oclc.org/ooxml/officeDocument/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+            Kind::Dialog,
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+            "application/vnd.ms-excel.macrosheet",
+            Kind::Macro,
+        ),
+        (
+            "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+            "application/vnd.ms-excel.intlmacrosheet",
+            Kind::IntlMacro,
+        ),
+    ];
+    for &(relationship_type, content_type, expected_kind) in RELATIONSHIPS {
+        let source = rewrite_sheet_relationship(relationship_type, content_type);
+        let workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let sheet = workbook.sheet(0_usize).unwrap().unwrap();
+        assert_eq!(sheet.kind().unwrap(), expected_kind, "{relationship_type}");
+        assert_eq!(sheet.state().unwrap(), State::Visible);
+    }
+}
+
+#[test]
+fn source_sheet_state_preserves_visible_hidden_and_very_hidden() {
+    for (raw, expected) in [
+        (0, State::Visible),
+        (1, State::Hidden),
+        (2, State::VeryHidden),
+    ] {
+        let source = rewrite_sheet_states(&[raw]);
+        let workbook =
+            SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+        let sheet = workbook.sheet(0_usize).unwrap().unwrap();
+        assert_eq!(sheet.state().unwrap(), expected);
+        assert_eq!(expected.is_visible(), raw == 0);
+        assert_eq!(expected.is_hidden(), raw != 0);
+        assert_eq!(expected.is_very_hidden(), raw == 2);
+    }
+}
+
+#[test]
+fn source_catalog_retains_a_very_hidden_unbound_tab_and_refuses_payload_access() {
+    let source = rewrite_null_relationship(0, 2);
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let selected = workbook.sheet(0_usize).unwrap().unwrap();
+    assert_eq!(selected.kind().unwrap(), Kind::Unbound);
+    assert_eq!(selected.state().unwrap(), State::VeryHidden);
+    assert_eq!(selected.workbook_position().unwrap(), 0);
+    assert!(matches!(
+        selected.materialize(),
+        Err(PackageError::UnsupportedFeature(_))
+    ));
+    assert!(matches!(
+        selected.indexed_values(),
+        Err(PackageError::UnsupportedFeature(_))
+    ));
+    assert!(
+        workbook
+            .worksheets()
+            .unwrap()
+            .iter()
+            .all(|sheet| sheet.workbook_position().unwrap() != 0)
+    );
+}
+
+#[test]
+fn source_catalog_rejects_unbound_tabs_that_are_not_very_hidden() {
+    for state in [0, 1] {
+        let source = rewrite_null_relationship(0, state);
+        assert!(SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).is_err());
+    }
+}
+
+#[test]
+fn source_sheet_rejects_malformed_bundle_state_before_catalog_open() {
+    let source = rewrite_sheet_states(&[3]);
+    assert!(matches!(
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))),
+        Err(PackageError::Unrecognized { typ, val })
+            if typ == "BrtBundleSh hsState" && val == "3"
+    ));
+}
+
+#[test]
+fn source_sheet_selector_is_position_or_case_insensitive_name() {
+    let workbook =
+        SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(fixture()))).unwrap();
+    let name = workbook.sheet_names().unwrap().remove(0);
+    let lower = name.to_lowercase();
+    assert_eq!(
+        workbook.sheet(0_usize).unwrap().unwrap().name().unwrap(),
+        name
+    );
+    assert_eq!(
+        workbook.sheet(lower).unwrap().unwrap().name().unwrap(),
+        name
+    );
+    assert!(workbook.sheet("missing").unwrap().is_none());
+}
+
+#[test]
 fn recognized_nonworksheet_sheet_relationships_require_binary_content_types() {
     const RELATIONSHIPS: &[&str] = &[
         "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet",
@@ -786,7 +1350,20 @@ fn full_sheet_catalog_preserves_nonworksheet_tabs_and_worksheet_selectors() {
         for (position, sheet) in sheets.iter().enumerate() {
             assert_eq!(sheet.name().unwrap(), names[position].as_str());
             assert_eq!(sheet.workbook_position().unwrap(), position);
+            assert_eq!(sheet.state().unwrap(), State::Visible);
         }
+        let expected_kind = match relationship_type {
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet" => {
+                Kind::Chart
+            },
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet" => {
+                Kind::Dialog
+            },
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet" => Kind::Macro,
+            _ => unreachable!("recognized mixed-tab relationship"),
+        };
+        assert_eq!(sheets[0].kind().unwrap(), expected_kind);
+        assert_eq!(sheets[1].kind().unwrap(), Kind::Worksheet);
         assert!(matches!(
             sheets[0].materialize(),
             Err(PackageError::UnsupportedFeature(_))
@@ -958,12 +1535,17 @@ fn finite_cache_policy_is_forwarded_to_deferred_parts() {
     .unwrap();
     let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
     let before = workbook.cache_diagnostics().cold_loads;
+    let semantic_before = workbook.semantic_cache_diagnostics();
     selected.materialize().unwrap();
     let first = workbook.cache_diagnostics().cold_loads;
+    let semantic_first = workbook.semantic_cache_diagnostics();
     selected.materialize().unwrap();
     let second = workbook.cache_diagnostics().cold_loads;
+    let semantic_second = workbook.semantic_cache_diagnostics();
     assert!(first > before);
-    assert!(second > first);
+    assert_eq!(second, first);
+    assert!(semantic_first.builds > semantic_before.builds);
+    assert!(semantic_second.hits > semantic_first.hits);
     assert_eq!(workbook.cache_diagnostics().retained_entries, 0);
 }
 
@@ -1425,11 +2007,36 @@ fn source_catalog_defers_table_payload_and_materializes_cross_sheet_reference() 
 
     let first = source.table_payload_reads();
     let first_diagnostics = workbook.cache_diagnostics();
+    let first_semantic = workbook.semantic_cache_diagnostics();
     selected.materialize().unwrap();
     assert_eq!(source.table_payload_reads(), first);
     let second_diagnostics = workbook.cache_diagnostics();
-    assert!(second_diagnostics.cold_loads > first_diagnostics.cold_loads);
+    let second_semantic = workbook.semantic_cache_diagnostics();
+    assert_eq!(second_diagnostics.cold_loads, first_diagnostics.cold_loads);
+    assert!(second_semantic.hits > first_semantic.hits);
     assert_eq!(second_diagnostics.retained_entries, 0);
+}
+
+#[test]
+fn selected_source_tables_do_not_parse_an_unselected_table_part() {
+    let source = table_workbook_source(
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            table_part_payload(7, "LocalTable"),
+            false,
+        )),
+        Some((
+            "application/vnd.ms-excel.table".to_owned(),
+            vec![0xff; 8],
+            false,
+        )),
+        None,
+    );
+    let workbook = SourceBackedWorkbook::from_read_at(Arc::new(OwnedSource::new(source))).unwrap();
+    let selected = workbook.worksheet_by_index(0).unwrap().unwrap();
+    let tables = selected.tables().unwrap();
+    assert_eq!(tables.len(), 1);
+    assert_eq!(tables[0].display_name.as_deref(), Some("LocalTable"));
 }
 
 #[test]

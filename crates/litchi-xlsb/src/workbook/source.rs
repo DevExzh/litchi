@@ -2,6 +2,7 @@
 
 use std::fmt;
 use std::io::{self, Cursor, Read, Write};
+use std::ops::ControlFlow;
 use std::sync::{Arc, Mutex};
 
 use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet as SheetWorksheet};
@@ -16,6 +17,8 @@ use litchi_opc::{
 };
 use once_cell::sync::OnceCell;
 
+use super::cache::{Limits as WorksheetCacheLimits, Stats, WorksheetCache};
+use super::catalog::{Kind, State};
 use super::model::Workbook;
 use crate::external_link::{ExternalLinkLimits, Link};
 use crate::leniency::{Leniency, Tolerance, ToleranceReport};
@@ -23,8 +26,9 @@ use crate::package::error::{Error, Result};
 use crate::package::formula::{Context, Definition, ExternalBook};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::StylesTable;
+use crate::package::table::Table;
 use crate::raw::{Records, kind};
-use crate::sheet::Worksheet;
+use crate::sheet::{Grid, Selector, Worksheet};
 
 const XLSB_WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
 const XLSB_CHARTSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.chartsheet";
@@ -51,21 +55,29 @@ const XLSB_MACROSHEET_RELATIONSHIP: &str =
 const XLSB_INTL_MACROSHEET_RELATIONSHIP: &str =
     "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet";
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum SheetKind {
-    Worksheet,
-    Chart,
-    Dialog,
-    Macro,
-    IntlMacro,
-}
+// Scalar-only fallback grids have a separate, deliberately smaller budget
+// from complete worksheet snapshots. A source owner therefore cannot retain
+// two full default caches merely by requesting both projections.
+const CACHED_VALUE_CACHE_LIMITS: WorksheetCacheLimits = WorksheetCacheLimits {
+    max_entries: 32,
+    max_weight: 16 * 1024 * 1024,
+};
 
 #[derive(Debug)]
 struct SheetMetadata {
     name: String,
     workbook_position: usize,
-    partname: PackURI,
-    kind: SheetKind,
+    partname: Option<PackURI>,
+    kind: Kind,
+    state: State,
+    /// The compact worksheet repair report survives semantic-cache eviction.
+    tolerance: OnceCell<ToleranceReport>,
+    /// Repairs from the scalar-only indexed projection. A later successful
+    /// full worksheet read supersedes this report in the aggregate accessor.
+    cached_value_tolerance: OnceCell<ToleranceReport>,
+    /// Serializes builders for this worksheet only; parsing never holds the
+    /// owner-wide cache mutex.
+    build: Mutex<()>,
 }
 
 #[derive(Debug)]
@@ -96,6 +108,11 @@ struct SourceInner {
     styles: SemanticCache<StylesTable>,
     tables: SemanticCache<TableDefinitions>,
     external_books: SemanticCache<ExternalBooks>,
+    worksheet_cache: WorksheetCache,
+    /// Separate bounded retention for scalar-only indexed fallback grids.
+    /// These snapshots never enter the full worksheet cache because they do
+    /// not contain formulas, styles, or worksheet adjuncts.
+    cached_value_cache: WorksheetCache,
     /// Workbook-scope repairs: the workbook stream at open, then each lazily
     /// parsed workbook-scope part once its semantic cache is initialized.
     tolerance: Mutex<ToleranceReport>,
@@ -173,27 +190,169 @@ impl SourceBackedIndexedWorksheet {
     /// shared-string table uses the workbook's existing ingress policy.
     pub fn cached_value(&self, row: u32, column: u32) -> Result<Option<CellValue>> {
         let _ = preflight_package(&self.inner.package)?;
-        let record = self
-            .index
-            .lookup_record(self.worksheet.as_bytes(), row, column)?;
-        let value = match record {
-            Some((offset, payload)) => {
-                let mut report = ToleranceReport::default();
-                let value = crate::binary_index::decode_cached_value(
-                    crate::raw::Kind::new(offset.record_kind)?,
-                    payload,
-                    self.limits.raw,
-                    row,
-                    &mut Tolerance::recording_with(&mut report, self.inner.leniency),
-                )?;
-                // Every lookup that performs a repair records it.
-                self.inner.lock_tolerance().append(&report);
-                Some(self.scalar_value(value)?)
-            },
-            None => None,
-        };
-        postflight_package(&self.inner.package)?;
+        let result: Result<(Option<CellValue>, ToleranceReport)> = (|| {
+            let record = self
+                .index
+                .lookup_record(self.worksheet.as_bytes(), row, column)?;
+            let (value, report) = match record {
+                Some((offset, payload)) => {
+                    let mut report = ToleranceReport::default();
+                    let value = crate::binary_index::decode_cached_value(
+                        crate::raw::Kind::new(offset.record_kind)?,
+                        payload,
+                        self.limits.raw,
+                        row,
+                        &mut Tolerance::recording_with(&mut report, self.inner.leniency),
+                    )?;
+                    (Some(self.scalar_value(value)?), report)
+                },
+                None => (None, ToleranceReport::default()),
+            };
+            Ok((value, report))
+        })();
+        let fence = postflight_package(&self.inner.package);
+        fence?;
+        let (value, report) = result?;
+        // Publish repairs only after both the lookup and its freshness fence
+        // have succeeded. A failed or stale lookup must not mutate the report.
+        self.inner.lock_tolerance().append(&report);
         Ok(value)
+    }
+
+    /// Visit the stored scalar values in worksheet row-major order without
+    /// constructing a complete [`Worksheet`]. Formula tokens remain opaque;
+    /// each formula contributes only its stored cached scalar. Returning
+    /// [`ControlFlow::Break`] stops the scan after the selected cell.
+    pub fn visit_cached_values<B, F>(&self, visit: F) -> Result<ControlFlow<B>>
+    where
+        F: FnMut(crate::binary_index::CellOffset, CellValue) -> ControlFlow<B>,
+    {
+        let (result, report) = self.visit_cached_values_with_report(visit)?;
+        // The public visitor retains its legacy behavior: repairs discovered
+        // by an explicit scan join the workbook report immediately after its
+        // own source fence has passed.
+        self.inner.lock_tolerance().append(&report);
+        Ok(result)
+    }
+
+    fn visit_cached_values_with_report<B, F>(
+        &self,
+        mut visit: F,
+    ) -> Result<(ControlFlow<B>, ToleranceReport)>
+    where
+        F: FnMut(crate::binary_index::CellOffset, CellValue) -> ControlFlow<B>,
+    {
+        let _ = preflight_package(&self.inner.package)?;
+        let mut report = ToleranceReport::default();
+        let result = (|| {
+            let mut in_sheet_data = false;
+            let mut seen_sheet_data = false;
+            let mut current_row = None;
+            let mut record_count = 0usize;
+            for record_result in
+                Records::try_with_limits(self.worksheet.as_bytes(), self.limits.raw)?
+            {
+                let record = record_result?;
+                record_count = record_count.checked_add(1).ok_or(Error::CapacityOverflow {
+                    resource: "indexed worksheet record count",
+                })?;
+                if record_count > self.limits.max_records {
+                    return Err(Error::LimitExceeded {
+                        resource: "indexed worksheet records",
+                        actual: record_count,
+                        maximum: self.limits.max_records,
+                    });
+                }
+                match record.kind() {
+                    kind::BEGIN_SHEET_DATA => {
+                        if in_sheet_data || seen_sheet_data || !record.payload().is_empty() {
+                            return Err(Error::InvalidFormat(
+                                "indexed worksheet has invalid sheet-data framing".to_string(),
+                            ));
+                        }
+                        in_sheet_data = true;
+                        seen_sheet_data = true;
+                        current_row = None;
+                    },
+                    kind::END_SHEET_DATA => {
+                        if !in_sheet_data || !record.payload().is_empty() {
+                            return Err(Error::InvalidFormat(
+                                "indexed worksheet has invalid sheet-data framing".to_string(),
+                            ));
+                        }
+                        in_sheet_data = false;
+                        current_row = None;
+                    },
+                    kind::ROW_HDR if in_sheet_data => {
+                        let bytes = record.payload().get(..4).ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "indexed worksheet row header is truncated".to_string(),
+                            )
+                        })?;
+                        let row = u32::from_le_bytes(bytes.try_into().map_err(|_error| {
+                            Error::InvalidFormat(
+                                "indexed worksheet row header is truncated".to_string(),
+                            )
+                        })?);
+                        if row > crate::binary_index::MAX_ROW_INDEX {
+                            return Err(Error::InvalidFormat(
+                                "indexed worksheet row is outside the BIFF12 grid".to_string(),
+                            ));
+                        }
+                        current_row = Some(row);
+                    },
+                    cell_kind if in_sheet_data && crate::binary_index::is_cell_kind(cell_kind) => {
+                        let row = current_row.ok_or_else(|| {
+                            Error::InvalidFormat(
+                                "indexed worksheet cell has no row header".to_string(),
+                            )
+                        })?;
+                        let bytes = record.payload().get(..4).ok_or_else(|| {
+                            Error::InvalidFormat("indexed worksheet cell is truncated".to_string())
+                        })?;
+                        let column = u32::from_le_bytes(bytes.try_into().map_err(|_error| {
+                            Error::InvalidFormat("indexed worksheet cell is truncated".to_string())
+                        })?);
+                        if column > crate::binary_index::MAX_COLUMN_INDEX {
+                            return Err(Error::InvalidFormat(
+                                "indexed worksheet column is outside the BIFF12 grid".to_string(),
+                            ));
+                        }
+                        let value = crate::binary_index::decode_cached_value(
+                            cell_kind,
+                            record.payload(),
+                            self.limits.raw,
+                            row,
+                            &mut Tolerance::recording_with(&mut report, self.inner.leniency),
+                        )?;
+                        let value = self.scalar_value(value)?;
+                        let offset = crate::binary_index::CellOffset {
+                            row,
+                            column,
+                            offset: u64::try_from(record.offset()).map_err(|_error| {
+                                Error::CapacityOverflow {
+                                    resource: "indexed worksheet record offset",
+                                }
+                            })?,
+                            record_kind: cell_kind.get(),
+                        };
+                        if let ControlFlow::Break(value) = visit(offset, value) {
+                            return Ok(ControlFlow::Break(value));
+                        }
+                    },
+                    _ => {},
+                }
+            }
+            if !seen_sheet_data || in_sheet_data {
+                return Err(Error::InvalidFormat(
+                    "indexed worksheet sheet-data framing is incomplete".to_string(),
+                ));
+            }
+            Ok(ControlFlow::Continue(()))
+        })();
+        let fence = postflight_package(&self.inner.package);
+        fence?;
+        Ok((result?, report))
     }
 
     fn scalar_value(&self, value: crate::cell_values::Value) -> Result<CellValue> {
@@ -490,6 +649,11 @@ impl SourceBackedWorkbook {
                 "XLSB sheet names and relationship identifiers have different lengths".to_string(),
             ));
         }
+        if info.worksheet_names.len() != info.worksheet_states.len() {
+            return Err(Error::InvalidFormat(
+                "XLSB sheet names and visibility states have different lengths".to_string(),
+            ));
+        }
 
         let shared_strings_part = optional_related_part(
             &workbook_part,
@@ -579,29 +743,42 @@ impl SourceBackedWorkbook {
             .enumerate()
         {
             package.check_execution()?;
-            let relationship_id = relationship_id.as_deref().ok_or_else(|| {
-                Error::InvalidRelationship(format!(
-                    "XLSB sheet {name:?} has no relationship identifier"
-                ))
-            })?;
+            let state_value = info.worksheet_states[workbook_position];
+            let state = State::from_hs_state(state_value)?;
+            let Some(relationship_id) = relationship_id.as_deref() else {
+                if state != State::VeryHidden {
+                    return Err(Error::InvalidRelationship(
+                        "XLSB unbound sheet tabs must be very hidden".to_string(),
+                    ));
+                }
+                sheets.push(SheetMetadata {
+                    name: name.clone(),
+                    workbook_position,
+                    partname: None,
+                    kind: Kind::Unbound,
+                    state,
+                    tolerance: OnceCell::new(),
+                    cached_value_tolerance: OnceCell::new(),
+                    build: Mutex::new(()),
+                });
+                continue;
+            };
             let relationship = workbook_part.rels().get(relationship_id).ok_or_else(|| {
-                Error::InvalidRelationship(format!(
-                    "XLSB sheet {name:?} relationship {relationship_id:?} is missing"
-                ))
+                Error::InvalidRelationship("XLSB sheet relationship is missing".to_string())
             })?;
             if relationship.is_external() {
-                return Err(Error::InvalidRelationship(format!(
-                    "XLSB sheet {name:?} has an external relationship"
-                )));
+                return Err(Error::InvalidRelationship(
+                    "XLSB sheet has an external relationship".to_string(),
+                ));
             }
             let partname = relationship.target_partname()?;
             if sheet_targets
                 .iter()
                 .any(|target| target.is_equivalent_to(&partname))
             {
-                return Err(Error::InvalidRelationship(format!(
-                    "multiple XLSB sheets resolve to {partname}"
-                )));
+                return Err(Error::InvalidRelationship(
+                    "multiple XLSB sheets resolve to one physical target".to_string(),
+                ));
             }
             sheet_targets.push(partname.clone());
             let sheet_part = package.part(&partname)?;
@@ -617,9 +794,9 @@ impl SourceBackedWorkbook {
                         relationship_type::TABLE | relationship_type::STRICT_TABLE
                     ) {
                         if relationship.is_external() {
-                            return Err(Error::InvalidRelationship(format!(
-                                "XLSB worksheet {name:?} has an external table relationship"
-                            )));
+                            return Err(Error::InvalidRelationship(
+                                "XLSB worksheet has an external table relationship".to_string(),
+                            ));
                         }
                         let table_partname = relationship.target_partname()?;
                         let table_part = package.part(&table_partname)?;
@@ -642,30 +819,29 @@ impl SourceBackedWorkbook {
                         incomplete_formula_context = true;
                     }
                 }
-                SheetKind::Worksheet
+                Kind::Worksheet
             } else {
                 match relationship.reltype() {
                     XLSB_CHARTSHEET_RELATIONSHIP | XLSB_STRICT_CHARTSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_CHARTSHEET_CONTENT_TYPE)?;
-                        SheetKind::Chart
+                        Kind::Chart
                     },
                     XLSB_DIALOGSHEET_RELATIONSHIP | XLSB_STRICT_DIALOGSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_DIALOGSHEET_CONTENT_TYPE)?;
-                        SheetKind::Dialog
+                        Kind::Dialog
                     },
                     XLSB_MACROSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_MACROSHEET_CONTENT_TYPE)?;
-                        SheetKind::Macro
+                        Kind::Macro
                     },
                     XLSB_INTL_MACROSHEET_RELATIONSHIP => {
                         require_content_type(&sheet_part, XLSB_INTL_MACROSHEET_CONTENT_TYPE)?;
-                        SheetKind::IntlMacro
+                        Kind::IntlMacro
                     },
                     _ => {
-                        return Err(Error::InvalidRelationship(format!(
-                            "XLSB sheet {name:?} has unsupported relationship type {:?}",
-                            relationship.reltype()
-                        )));
+                        return Err(Error::InvalidRelationship(
+                            "XLSB sheet relationship type is unsupported".to_string(),
+                        ));
                     },
                 }
             };
@@ -673,10 +849,14 @@ impl SourceBackedWorkbook {
             sheets.push(SheetMetadata {
                 name: name.clone(),
                 workbook_position,
-                partname,
+                partname: Some(partname),
                 kind: sheet_kind,
+                state,
+                tolerance: OnceCell::new(),
+                cached_value_tolerance: OnceCell::new(),
+                build: Mutex::new(()),
             });
-            if matches!(sheet_kind, SheetKind::Worksheet) {
+            if matches!(sheet_kind, Kind::Worksheet) {
                 worksheet_positions.push(catalog_position);
             }
         }
@@ -723,6 +903,8 @@ impl SourceBackedWorkbook {
                 styles: SemanticCache::new(),
                 tables: SemanticCache::new(),
                 external_books: SemanticCache::new(),
+                worksheet_cache: WorksheetCache::new(),
+                cached_value_cache: WorksheetCache::with_limits(CACHED_VALUE_CACHE_LIMITS),
                 tolerance: Mutex::new(tolerance),
                 leniency,
             }),
@@ -737,11 +919,106 @@ impl SourceBackedWorkbook {
     /// is parsed lazily the first time a worksheet materialization needs it,
     /// and its repairs join this report then, exactly once. Worksheet-stream
     /// repairs are reported by [`Worksheet::tolerance_report`] on each
-    /// materialized worksheet. See [`crate::leniency`] for the repair
-    /// contract.
+    /// materialized worksheet. A scalar-only indexed fallback retains its
+    /// compact report beside the selected catalog entry until a successful
+    /// full worksheet read supersedes it. See [`crate::leniency`] for the
+    /// repair contract.
     #[must_use]
     pub fn tolerance_report(&self) -> ToleranceReport {
         self.inner.lock_tolerance().clone()
+    }
+
+    /// Return the workbook report together with every worksheet repair that
+    /// has been successfully published by this source-backed owner.
+    ///
+    /// Worksheet streams are parsed lazily. Their compact reports are
+    /// retained beside the worksheet catalog, so cache eviction and a later
+    /// materialization do not append the same report twice. A scalar-only
+    /// indexed fallback has a parallel report slot; a successful full read
+    /// takes precedence for that worksheet. A failed or cancelled read
+    /// publishes neither its semantic value nor its report. The accessor does
+    /// not parse source parts. Its source and execution fences run before and
+    /// after the report snapshot, so callers cannot observe a report from a
+    /// stale or cancelled source.
+    #[must_use]
+    pub fn read_tolerance_report(&self) -> Result<ToleranceReport> {
+        let _ = preflight_package(&self.inner.package)?;
+        let mut report = self.inner.lock_tolerance().clone();
+        for sheet in &self.inner.sheets {
+            if let Some(tolerance) = sheet
+                .tolerance
+                .get()
+                .or_else(|| sheet.cached_value_tolerance.get())
+            {
+                report.append(tolerance);
+            }
+        }
+        postflight_package(&self.inner.package)?;
+        Ok(report)
+    }
+
+    /// Return the workbook and sheet-scoped defined names retained by the
+    /// catalog. The name records are read from `workbook.bin`; no worksheet
+    /// or table part is materialized by this accessor.
+    pub fn defined_names(&self) -> Result<Arc<[String]>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let names = Arc::clone(&self.inner.formula_context.defined_names);
+        postflight_package(&self.inner.package)?;
+        Ok(names)
+    }
+
+    /// Return formula-context table definitions, loading the bounded table
+    /// parts through the leaf semantic cache when necessary.
+    pub fn tables(&self) -> Result<Arc<[Definition]>> {
+        self.inner.tables()
+    }
+
+    /// Return parsed ListObject table parts grouped by public worksheet
+    /// ordinal. Each selected worksheet loads only its own table parts. The
+    /// returned aggregate is caller-owned; the source owner does not retain a
+    /// second unbounded all-table cache.
+    pub fn structured_tables(&self) -> Result<Arc<[(usize, Table)]>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let mut tables = Vec::new();
+        tables
+            .try_reserve_exact(self.inner.table_parts.len())
+            .map_err(|source| Error::Allocation {
+                resource: "source-backed XLSB structured tables",
+                source,
+            })?;
+        for (worksheet_position, &catalog_position) in
+            self.inner.worksheet_positions.iter().enumerate()
+        {
+            let sheet = SourceBackedWorksheet {
+                inner: Arc::clone(&self.inner),
+                catalog_position,
+            };
+            for table in sheet.tables()?.iter() {
+                tables.push((worksheet_position, table.clone()));
+            }
+        }
+        postflight_package(&self.inner.package)?;
+        Ok(tables.into())
+    }
+
+    /// Return the source owner's validated style table. Styles are parsed at
+    /// most once and remain owned by the leaf semantic cache.
+    pub fn styles(&self) -> Result<Arc<StylesTable>> {
+        self.inner.styles()
+    }
+
+    /// Content-free diagnostics for the owner-scoped worksheet cache.
+    #[must_use]
+    pub fn semantic_cache_diagnostics(&self) -> Stats {
+        self.inner.worksheet_cache.stats()
+    }
+
+    /// Release parsed worksheet values that no grid or legacy handle pins.
+    pub fn trim_semantic_cache(&self) -> usize {
+        self.inner
+            .worksheet_cache
+            .trim_clean()
+            .saturating_add(self.inner.cached_value_cache.trim_clean())
     }
 
     /// Return the number of external-link owners without reading their payloads.
@@ -831,6 +1108,35 @@ impl SourceBackedWorkbook {
         );
         postflight_package(&self.inner.package)?;
         Ok(sheets)
+    }
+
+    /// Select a workbook tab by its semantic name or checked zero-based
+    /// position in complete workbook order.
+    ///
+    /// Names use the workbook's case-insensitive comparison policy. A missing
+    /// name or position returns `Ok(None)`; every source and cancellation
+    /// fence is checked around the lookup.
+    pub fn sheet<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+    ) -> Result<Option<SourceBackedWorksheet>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let catalog_position = match selector.into() {
+            Selector::Position(position) => self
+                .inner
+                .sheets
+                .get(position.get())
+                .map(|_| position.get()),
+            Selector::Name(name) => self.inner.sheets.iter().position(|sheet| {
+                crate::package::formula::excel_name_eq(&sheet.name, name.as_ref())
+            }),
+        };
+        let sheet = catalog_position.map(|catalog_position| SourceBackedWorksheet {
+            inner: Arc::clone(&self.inner),
+            catalog_position,
+        });
+        postflight_package(&self.inner.package)?;
+        Ok(sheet)
     }
 
     /// Select a workbook tab by zero-based position in complete workbook order.
@@ -1192,53 +1498,57 @@ impl SourceBackedWorksheet {
         limits: crate::binary_index::Limits,
     ) -> Result<Option<SourceBackedIndexedWorksheet>> {
         let _ = preflight_package(&self.inner.package)?;
-        let limits = limits.validate()?;
-        let metadata = self.metadata();
-        if !matches!(metadata.kind, SheetKind::Worksheet) {
-            return Err(Error::UnsupportedFeature(
-                "binary-index value lookup requires an XLSB worksheet".to_string(),
-            ));
-        }
-        let part = self.inner.package.part(&metadata.partname)?;
-        let Some(index_uri) = optional_related_part(
-            &part,
-            &["http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex"],
-            "worksheet binary index",
-        )?
-        else {
-            postflight_package(&self.inner.package)?;
-            return Ok(None);
-        };
-        let index_part = self.inner.package.part(&index_uri)?;
-        require_content_type(&index_part, "application/vnd.ms-excel.binIndexWs")?;
-        if !index_part.rels().is_empty() {
-            return Err(Error::InvalidRelationship(
-                "worksheet binary index part must not have relationships".to_string(),
-            ));
-        }
-        preflight_indexed_part(
-            &index_part,
-            limits
-                .source_bytes
-                .min(crate::binary_index::MAX_INDEX_STREAM_BYTES),
-            "binary-index bytes",
-        )?;
-        preflight_indexed_part(&part, limits.source_bytes, "indexed worksheet bytes")?;
-        let index_data = index_part.data()?;
-        let worksheet = part.data()?;
-        let _ = preflight_package(&self.inner.package)?;
-        let index = crate::binary_index::WorksheetBinaryIndex::from_parts(
-            index_data.as_bytes(),
-            worksheet.as_bytes(),
-            limits,
-        )?;
-        postflight_package(&self.inner.package)?;
-        Ok(Some(SourceBackedIndexedWorksheet {
-            inner: Arc::clone(&self.inner),
-            worksheet,
-            index: Arc::new(index),
-            limits,
-        }))
+        let result = (|| {
+            let limits = limits.validate()?;
+            let metadata = self.metadata();
+            if !matches!(metadata.kind, Kind::Worksheet) {
+                return Err(Error::UnsupportedFeature(
+                    "binary-index value lookup requires an XLSB worksheet".to_string(),
+                ));
+            }
+            let partname = self.physical_partname()?;
+            let part = self.inner.package.part(partname)?;
+            let Some(index_uri) = optional_related_part(
+                &part,
+                &["http://schemas.microsoft.com/office/2006/relationships/xlBinaryIndex"],
+                "worksheet binary index",
+            )?
+            else {
+                return Ok(None);
+            };
+            let index_part = self.inner.package.part(&index_uri)?;
+            require_content_type(&index_part, "application/vnd.ms-excel.binIndexWs")?;
+            if !index_part.rels().is_empty() {
+                return Err(Error::InvalidRelationship(
+                    "worksheet binary index part must not have relationships".to_string(),
+                ));
+            }
+            preflight_indexed_part(
+                &index_part,
+                limits
+                    .source_bytes
+                    .min(crate::binary_index::MAX_INDEX_STREAM_BYTES),
+                "binary-index bytes",
+            )?;
+            preflight_indexed_part(&part, limits.source_bytes, "indexed worksheet bytes")?;
+            let index_data = index_part.data()?;
+            let worksheet = part.data()?;
+            let _ = preflight_package(&self.inner.package)?;
+            let index = crate::binary_index::WorksheetBinaryIndex::from_parts(
+                index_data.as_bytes(),
+                worksheet.as_bytes(),
+                limits,
+            )?;
+            Ok(Some(SourceBackedIndexedWorksheet {
+                inner: Arc::clone(&self.inner),
+                worksheet,
+                index: Arc::new(index),
+                limits,
+            }))
+        })();
+        let fence = postflight_package(&self.inner.package);
+        fence?;
+        result
     }
 
     /// Return this sheet's name after checking source freshness.
@@ -1257,6 +1567,101 @@ impl SourceBackedWorksheet {
         Ok(position)
     }
 
+    /// Return this tab's semantic kind after checking source freshness.
+    ///
+    /// Relationship identifiers and part names used to resolve the kind are
+    /// retained only by the source-backed owner; callers receive the semantic
+    /// projection in [`crate::sheet::Kind`].
+    pub fn kind(&self) -> Result<Kind> {
+        let _ = preflight_package(&self.inner.package)?;
+        let kind = self.metadata().kind;
+        postflight_package(&self.inner.package)?;
+        Ok(kind)
+    }
+
+    /// Return this tab's semantic visibility state after checking source
+    /// freshness.
+    pub fn state(&self) -> Result<State> {
+        let _ = preflight_package(&self.inner.package)?;
+        let state = self.metadata().state;
+        postflight_package(&self.inner.package)?;
+        Ok(state)
+    }
+
+    /// Resolve one materialized cell's local style through the source-owned
+    /// stylesheet cache. The cell and stylesheet remain tied to this source
+    /// generation; no eager workbook reconstruction is performed.
+    pub fn style_for_cell(
+        &self,
+        cell: &crate::package::Cell,
+    ) -> Result<Option<crate::package::styles_table::CellFormat>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let styles = self.inner.styles()?;
+        let style = styles.get_cell_format(cell.style_id() as usize).cloned();
+        postflight_package(&self.inner.package)?;
+        Ok(style)
+    }
+
+    /// Read the ListObject table parts owned by this worksheet only.
+    ///
+    /// Table parts remain deferred and are parsed through the leaf on each
+    /// selected read. The source owner deliberately does not retain an
+    /// unbounded second table-value cache: the caller owns the returned Arc,
+    /// while malformed or unrelated table parts remain untouched. The table
+    /// codec's strict parser is used here, so a failed read never publishes a
+    /// partial table collection or a duplicate tolerance report.
+    pub fn tables(&self) -> Result<Arc<[Table]>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let result = (|| {
+            if !matches!(self.metadata().kind, Kind::Worksheet) {
+                return Err(Error::UnsupportedFeature(
+                    "source-backed XLSB tables require a worksheet tab".to_string(),
+                ));
+            }
+            let worksheet_position = self
+                .inner
+                .worksheet_positions
+                .binary_search(&self.catalog_position)
+                .map_err(|_error| {
+                    Error::InvalidRelationship(
+                        "source-backed XLSB worksheet catalog is internally inconsistent"
+                            .to_string(),
+                    )
+                })?;
+            let count = self
+                .inner
+                .table_parts
+                .iter()
+                .filter(|part| part.worksheet_position == worksheet_position)
+                .count();
+            let mut tables = Vec::new();
+            tables
+                .try_reserve_exact(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "source-backed XLSB selected worksheet tables",
+                    source,
+                })?;
+            for table_part in self
+                .inner
+                .table_parts
+                .iter()
+                .filter(|part| part.worksheet_position == worksheet_position)
+            {
+                let _ = preflight_package(&self.inner.package)?;
+                let part = self.inner.package.part(&table_part.partname)?;
+                require_content_type(&part, XLSB_TABLE_CONTENT_TYPE)?;
+                let data = part.data()?;
+                let table = crate::package::table::parse_table_part(data.as_bytes())?;
+                postflight_package(&self.inner.package)?;
+                tables.push(table);
+            }
+            Ok(tables.into())
+        })();
+        let fence = postflight_package(&self.inner.package);
+        fence?;
+        result
+    }
+
     /// Parse the selected worksheet BIFF12 stream without reading unselected sheets.
     ///
     /// This source-backed layer materializes stream-owned worksheet data and
@@ -1265,23 +1670,163 @@ impl SourceBackedWorksheet {
     /// PivotTables, slicers, and timelines remain separately deferred rather
     /// than forcing eager loading.
     pub fn materialize(&self) -> Result<Worksheet> {
+        Ok((*self.cached_worksheet()?).clone())
+    }
+
+    /// Return this worksheet as an immutable, cheaply cloned grid snapshot.
+    ///
+    /// The owner performs source and execution fences before returning the
+    /// grid. Subsequent grid reads use only the captured worksheet value and
+    /// therefore remain valid after cache eviction or owner drop.
+    pub fn grid(&self) -> Result<Grid> {
+        self.cached_worksheet().map(Grid::from_arc)
+    }
+
+    /// Build a scalar-only grid from the worksheet's binary cached-value
+    /// index. This is the explicit source fallback for workbooks whose full
+    /// worksheet materialization is refused because of an unsupported
+    /// deferred adjunct such as a PivotTable, slicer, or timeline.
+    ///
+    /// The fallback performs one bounded row-major index scan and creates
+    /// ordinary scalar cells with [`crate::package::Cell::new`]. It never invents formula
+    /// text, styles, comments, or other worksheet metadata. A missing binary
+    /// index is a typed unsupported-feature error.
+    pub fn cached_grid(&self) -> Result<Grid> {
+        let _ = preflight_package(&self.inner.package)?;
+        let metadata = self.metadata();
+        if !matches!(metadata.kind, Kind::Worksheet) {
+            return Err(Error::UnsupportedFeature(
+                "source-backed XLSB cached values require a worksheet tab".to_string(),
+            ));
+        }
+        // The cache hit still crosses the source fence before the snapshot
+        // escapes. The build lock serializes full and scalar-only builds for
+        // this catalog position without holding the cache mutex during scan.
+        let _build = metadata
+            .build
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(worksheet) = self
+            .inner
+            .cached_value_cache
+            .get(self.catalog_position, true)
+        {
+            postflight_package(&self.inner.package)?;
+            return Ok(Grid::from_arc(worksheet));
+        }
+        let indexed = self.indexed_values()?.ok_or_else(|| {
+            Error::UnsupportedFeature(
+                "source-backed XLSB worksheet has no indexed cached-value projection".to_string(),
+            )
+        })?;
+        let mut worksheet = Worksheet::new(metadata.name.clone());
+        let (_, report) = indexed.visit_cached_values_with_report(|offset, value| {
+            worksheet.add_cell(crate::package::Cell::new(offset.row, offset.column, value));
+            ControlFlow::<()>::Continue(())
+        })?;
+        worksheet.set_tolerance_report(report.clone());
         self.inner.package.check_execution()?;
         self.inner.package.source_version()?;
+        let candidate = Arc::new(worksheet);
+        let weight = candidate.retained_bytes();
+        postflight_package(&self.inner.package)?;
+        let canonical = self.inner.cached_value_cache.publish(
+            self.catalog_position,
+            Arc::clone(&candidate),
+            weight,
+        );
+        if let Err(error) = postflight_package(&self.inner.package) {
+            if Arc::ptr_eq(&canonical, &candidate) {
+                self.inner
+                    .cached_value_cache
+                    .discard_if(self.catalog_position, &candidate);
+            }
+            return Err(error);
+        }
+        // Keep fallback repairs only after the candidate has crossed the
+        // outer publication fence. If a later full worksheet read succeeds,
+        // `read_tolerance_report` prefers its report for this sheet.
+        self.metadata()
+            .cached_value_tolerance
+            .get_or_init(|| report);
+        Ok(Grid::from_arc(canonical))
+    }
+
+    /// Return a pinned, immutable worksheet snapshot from the owner-scoped
+    /// weighted cache. The source and execution fences run on cache hits as
+    /// well as misses; parsing is never performed while the cache mutex is
+    /// held.
+    pub(crate) fn cached_worksheet(&self) -> Result<Arc<Worksheet>> {
+        let _ = preflight_package(&self.inner.package)?;
         let metadata = self.metadata();
-        if !matches!(metadata.kind, SheetKind::Worksheet) {
+        if !matches!(metadata.kind, Kind::Worksheet) {
             return Err(Error::UnsupportedFeature(
                 "source-backed XLSB non-worksheet materialization is not supported".to_string(),
             ));
         }
+        let partname = self.physical_partname()?.clone();
+        // Resolving the physical part is intentional on hits: it verifies the
+        // captured source snapshot before any retained semantic value escapes.
+        let _part = self.inner.package.part(&partname)?;
+        // The per-sheet build lock also covers the cache hit path. A builder
+        // publishes the value before its final fence but initializes the
+        // retained report immediately after that fence; taking this lock
+        // before looking in the cache prevents a concurrent reader from
+        // observing that provisional interval.
+        let _build = self
+            .metadata()
+            .build
+            .lock()
+            .unwrap_or_else(std::sync::PoisonError::into_inner);
+        if let Some(worksheet) = self.inner.worksheet_cache.get(self.catalog_position, true) {
+            postflight_package(&self.inner.package)?;
+            return Ok(worksheet);
+        }
+
+        let mut worksheet = self.parse_materialized(partname)?;
+        self.inner.package.check_execution()?;
+        self.inner.package.source_version()?;
+        let report = worksheet.tolerance_report().clone();
+        if let Some(retained_report) = self.metadata().tolerance.get() {
+            worksheet.set_tolerance_report(retained_report.clone());
+        }
+        let candidate = Arc::new(worksheet);
+        let weight = candidate.retained_bytes();
+        // Check once before publication and once after it. The second fence
+        // closes the race in which the source changes between the first check
+        // and the cache publication.
+        postflight_package(&self.inner.package)?;
+        let canonical = self.inner.worksheet_cache.publish(
+            self.catalog_position,
+            Arc::clone(&candidate),
+            weight,
+        );
+        if let Err(error) = postflight_package(&self.inner.package) {
+            if Arc::ptr_eq(&canonical, &candidate) {
+                self.inner
+                    .worksheet_cache
+                    .discard_if(self.catalog_position, &candidate);
+            }
+            return Err(error);
+        }
+        // This infallible publication is intentionally after the final
+        // source/execution fence, so a refused candidate leaves no aggregate
+        // worksheet report behind.
+        self.metadata().tolerance.get_or_init(|| report);
+        Ok(canonical)
+    }
+
+    fn parse_materialized(&self, partname: PackURI) -> Result<Worksheet> {
         if self.inner.incomplete_formula_context {
             return Err(Error::UnsupportedFeature(
                 "source-backed XLSB worksheet materialization requires deferred PivotTable formula owners"
                     .to_string(),
             ));
         }
+        let metadata = self.metadata();
         let external_books = self.inner.external_books()?;
         let tables = self.inner.tables()?;
-        let worksheet_part = self.inner.package.part(&metadata.partname)?;
+        let worksheet_part = self.inner.package.part(&partname)?;
         if worksheet_part.rels().iter().any(|relationship| {
             relationship.reltype().contains("/slicer")
                 || relationship.reltype().contains("/timeline")
@@ -1341,12 +1886,19 @@ impl SourceBackedWorksheet {
                 worksheet.add_comment(comment);
             }
         }
-        postflight_package(&self.inner.package)?;
         Ok(worksheet)
     }
 
     fn metadata(&self) -> &SheetMetadata {
         &self.inner.sheets[self.catalog_position]
+    }
+
+    fn physical_partname(&self) -> Result<&PackURI> {
+        self.metadata().partname.as_ref().ok_or_else(|| {
+            Error::UnsupportedFeature(
+                "selected XLSB sheet tab has no physical sheet part".to_string(),
+            )
+        })
     }
 }
 
@@ -1525,20 +2077,18 @@ impl SourceInner {
                     .iter()
                     .any(|existing: &Definition| existing.table_id() == table.table_id())
                 {
-                    Some(Error::InvalidFormula(format!(
-                        "duplicate workbook table ID {}",
-                        table.table_id()
-                    )))
+                    Some(Error::InvalidFormula(
+                        "duplicate workbook table ID".to_string(),
+                    ))
                 } else if tables.iter().any(|existing: &Definition| {
                     crate::package::formula::excel_name_eq(
                         existing.display_name(),
                         table.display_name(),
                     )
                 }) {
-                    Some(Error::InvalidFormula(format!(
-                        "duplicate workbook table display name {:?}",
-                        table.display_name()
-                    )))
+                    Some(Error::InvalidFormula(
+                        "duplicate workbook table display name".to_string(),
+                    ))
                 } else {
                     None
                 };

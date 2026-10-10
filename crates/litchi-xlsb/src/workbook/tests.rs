@@ -48,10 +48,12 @@ fn external_link_records(records: &[(RawKind, Vec<u8>)]) -> Vec<u8> {
 fn empty_workbook() -> Workbook {
     Workbook {
         package: OpcPackage::new(),
+        worksheet_cache: super::cache::WorksheetCache::new(),
         worksheets: Vec::new(),
         worksheet_names: Vec::new(),
         worksheet_positions: Vec::new(),
         worksheet_rel_ids: Vec::new(),
+        sheet_tabs: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
         external_link_limits: ExternalLinkLimits::default(),
@@ -237,10 +239,12 @@ fn parse_external_link_with_relationship_type(
     package.add_part(Box::new(part));
     let workbook = Workbook {
         package,
+        worksheet_cache: super::cache::WorksheetCache::new(),
         worksheets: Vec::new(),
         worksheet_names: Vec::new(),
         worksheet_positions: Vec::new(),
         worksheet_rel_ids: Vec::new(),
+        sheet_tabs: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
         external_link_limits: ExternalLinkLimits::default(),
@@ -1179,10 +1183,12 @@ fn reads_external_book_metadata_from_local_fixture() {
     let package = OpcPackage::open(path).unwrap();
     let workbook = Workbook {
         package,
+        worksheet_cache: super::cache::WorksheetCache::new(),
         worksheets: Vec::new(),
         worksheet_names: Vec::new(),
         worksheet_positions: Vec::new(),
         worksheet_rel_ids: Vec::new(),
+        sheet_tabs: Vec::new(),
         active_catalog_position: None,
         formula_context: Context::default(),
         external_link_limits: ExternalLinkLimits::default(),
@@ -1588,10 +1594,12 @@ fn styles_projection(styles: &StylesTable) -> String {
 fn workbook_projection(workbook: &Workbook) -> String {
     let Workbook {
         package,
+        worksheet_cache: _,
         worksheets,
         worksheet_names,
         worksheet_positions,
         worksheet_rel_ids,
+        sheet_tabs,
         active_catalog_position,
         formula_context,
         external_link_limits,
@@ -1610,9 +1618,14 @@ fn workbook_projection(workbook: &Workbook) -> String {
     } = workbook;
     let package = package_digest(package).join("\n  ");
     let styles = styles_projection(styles);
+    let sheet_tabs = sheet_tabs
+        .iter()
+        .map(|tab| (tab.kind(), tab.state()))
+        .collect::<Vec<_>>();
     format!(
         "package=\n  {package}\nworksheets={worksheets:?}\nworksheet_names={worksheet_names:?}\n\
          worksheet_positions={worksheet_positions:?}\nworksheet_rel_ids={worksheet_rel_ids:?}\n\
+         sheet_tabs={sheet_tabs:?}\n\
          active_catalog_position={active_catalog_position:?}\n\
          formula_context={formula_context:?}\nexternal_link_limits={external_link_limits:?}\n\
          shared_strings={shared_strings:?}\nstyles={styles}\ncalc={calc:?}\nis_1904={is_1904:?}\n\

@@ -5,6 +5,7 @@ use crate::package::formula::{Compiler, Context, Group, GroupKind, ParsedFormula
 use crate::package::records::CellRecord;
 use crate::package::shared_strings::SharedString;
 use litchi_core::sheet::{Cell as SheetCell, CellValue};
+use std::mem::size_of;
 use std::sync::Arc;
 
 /// Why a formula cell has an opaque formula rather than a resolved expression.
@@ -346,6 +347,40 @@ impl Cell {
         self.rich_string.as_ref()
     }
 
+    /// Logical bytes owned by this cell outside its inline representation.
+    ///
+    /// The worksheet cache uses this helper while accounting for a decoded
+    /// worksheet.  It intentionally counts capacities and saturates; shared
+    /// formula allocations are charged once per referring cell, which is a
+    /// conservative cache weight rather than an allocator measurement.
+    pub(crate) fn heap_weight(&self) -> usize {
+        let mut weight = value_heap_weight(&self.value);
+        if let Some(cached) = &self.cached_value {
+            weight = weight
+                .saturating_add(size_of::<CellValue>())
+                .saturating_add(value_heap_weight(cached));
+        }
+        if let Some(formula) = &self.formula {
+            weight = weight
+                .saturating_add(formula.rgce.capacity())
+                .saturating_add(formula.rgcb.capacity());
+        }
+        if let Some(raw_formula) = &self.raw_formula {
+            weight = weight.saturating_add(raw_formula.capacity());
+        }
+        if let Some(rich_string) = &self.rich_string {
+            weight = weight.saturating_add(shared_string_heap_weight(rich_string));
+        }
+        if let Some(group) = &self.formula_group {
+            weight = weight
+                .saturating_add(2 * size_of::<usize>())
+                .saturating_add(size_of::<Group>())
+                .saturating_add(group.formula.rgce.capacity())
+                .saturating_add(group.formula.rgcb.capacity());
+        }
+        weight
+    }
+
     pub(crate) fn new_styled(row: u32, header: CellHeader, value: CellValue) -> Self {
         Self {
             row,
@@ -511,6 +546,62 @@ impl SheetCell for Cell {
     fn is_formula(&self) -> bool {
         self.formula_resolution_status.is_some()
     }
+}
+
+/// The bytes a cell value owns outside its inline size, following a chain of
+/// boxed cached results iteratively.
+fn value_heap_weight(value: &CellValue) -> usize {
+    let mut weight = 0_usize;
+    let mut next = Some(value);
+    while let Some(value) = next.take() {
+        match value {
+            CellValue::String(text) | CellValue::Error(text) => {
+                weight = weight.saturating_add(text.capacity());
+            },
+            CellValue::Formula {
+                formula,
+                cached_value,
+                array_range,
+                ..
+            } => {
+                weight = weight.saturating_add(formula.capacity());
+                if let Some(range) = array_range {
+                    weight = weight.saturating_add(range.capacity());
+                }
+                if let Some(cached) = cached_value {
+                    weight = weight.saturating_add(size_of::<CellValue>());
+                    next = Some(cached);
+                }
+            },
+            CellValue::Empty
+            | CellValue::Bool(_)
+            | CellValue::Int(_)
+            | CellValue::Float(_)
+            | CellValue::DateTime(_) => {},
+        }
+    }
+    weight
+}
+
+/// The bytes a shared or inline rich string owns outside its inline size.
+fn shared_string_heap_weight(string: &SharedString) -> usize {
+    let mut weight = string.text.capacity().saturating_add(
+        string
+            .runs
+            .capacity()
+            .saturating_mul(size_of::<crate::package::shared_strings::SharedStringRun>()),
+    );
+    if let Some(phonetic) = &string.phonetic {
+        weight = weight
+            .saturating_add(phonetic.text.capacity())
+            .saturating_add(
+                phonetic
+                    .runs
+                    .capacity()
+                    .saturating_mul(size_of::<crate::package::shared_strings::PhoneticRun>()),
+            );
+    }
+    weight
 }
 
 #[cfg(test)]

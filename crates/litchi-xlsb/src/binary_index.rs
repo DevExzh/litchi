@@ -987,7 +987,7 @@ fn scan_worksheet(worksheet: &[u8], limits: Limits) -> Result<WorksheetScan> {
     })
 }
 
-fn is_cell_kind(kind_value: raw::Kind) -> bool {
+pub(crate) fn is_cell_kind(kind_value: raw::Kind) -> bool {
     (kind::CELL_BLANK.get()..=kind::FMLA_ERROR.get()).contains(&kind_value.get())
         || kind_value == kind::CELL_R_STRING
 }
