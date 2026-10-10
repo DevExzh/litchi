@@ -7,6 +7,7 @@
 
 use std::io::{Read, Write};
 use std::path::Path;
+use std::sync::Arc;
 
 use litchi_core::{ExecutionContext, sheet::WorkbookTrait};
 use litchi_opc::{OpcPackage, PackageWriter, SourceLimits};
@@ -114,6 +115,11 @@ pub struct Package(
     ToleranceReport,
     DrawingLoadPolicy,
     Leniency,
+    // A validated projection is retained only by constructors that already
+    // paid to build it.  The physical package remains the owner snapshot;
+    // this cache lets an un-cloned consuming projection reuse that validation
+    // without reparsing the same admitted graph.
+    Option<Arc<Workbook>>,
 );
 
 impl Package {
@@ -513,6 +519,7 @@ impl Package {
             tolerance,
             DrawingLoadPolicy::Eager,
             Leniency::Strict,
+            None,
         ))
     }
 
@@ -523,6 +530,7 @@ impl Package {
             workbook.tolerance_report().clone(),
             workbook.drawing_load_policy(),
             workbook.leniency(),
+            None,
         )
     }
 
@@ -538,21 +546,31 @@ impl Package {
             tolerance,
             drawing_policy,
             leniency,
+            None,
         )
     }
 
-    /// Adopt an OPC image that has already been semantically validated by a
-    /// workbook projection, while retaining this package's format policies.
+    /// Adopt a physically admitted workbook while retaining its validated
+    /// projection for one consuming `into_workbook` call.
     ///
-    /// The physical image is admitted separately by callers before this seam
-    /// is used. Keeping the policy adoption here avoids reparsing the same
-    /// workbook projection solely to rebuild the package owner.
-    pub(crate) fn with_admitted_opc(
-        &self,
-        package: OpcPackage,
-        tolerance: ToleranceReport,
-    ) -> Self {
-        Self(package, self.1, tolerance, self.3, self.4)
+    /// This narrow constructor is reserved for publication paths that have
+    /// already parsed and validated the candidate. Ordinary workbook-to-
+    /// package conversion intentionally discards the projection so a package
+    /// does not retain an unused duplicate semantic graph.
+    pub(crate) fn from_validated_workbook_with_projection(workbook: Workbook) -> Self {
+        let limits = workbook.external_link_limits();
+        let tolerance = workbook.tolerance_report().clone();
+        let drawing_policy = workbook.drawing_load_policy();
+        let leniency = workbook.leniency();
+        let package = workbook.package.clone();
+        Self(
+            package,
+            limits,
+            tolerance,
+            drawing_policy,
+            leniency,
+            Some(Arc::new(workbook)),
+        )
     }
 
     /// Revalidate a candidate under the owner's retained projection policies.
@@ -560,7 +578,7 @@ impl Package {
         let workbook =
             Workbook::reparse_candidate_with_policy(candidate.clone(), self.1, self.3, self.4)?;
         let tolerance = workbook.into_tolerance_report();
-        Ok(Self(candidate, self.1, tolerance, self.3, self.4))
+        Ok(Self(candidate, self.1, tolerance, self.3, self.4, None))
     }
 
     /// The worksheet repair policy retained by this package.
@@ -610,11 +628,24 @@ impl Package {
     }
 
     /// Consume this package and materialize its workbook handle.
+    ///
+    /// A uniquely held projection retained by cell publication is reused.
+    /// Packages without one, including shared projections, are parsed under
+    /// the retained source and format policies.
     pub fn into_workbook(self) -> Result<Workbook> {
+        let Self(package, external_link_limits, _tolerance, drawing_load_policy, leniency, cached) =
+            self;
+        if let Some(cached) = cached {
+            if let Ok(workbook) = Arc::try_unwrap(cached) {
+                return Ok(workbook);
+            }
+        }
         let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
-            self.0, self.1, self.3,
+            package,
+            external_link_limits,
+            drawing_load_policy,
         )?;
-        workbook.set_projection_leniency(self.4);
+        workbook.set_projection_leniency(leniency);
         Ok(workbook)
     }
 
@@ -696,6 +727,7 @@ impl From<OpcPackage> for Package {
             ToleranceReport::default(),
             DrawingLoadPolicy::Eager,
             Leniency::Strict,
+            None,
         )
     }
 }

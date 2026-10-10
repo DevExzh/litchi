@@ -18,7 +18,7 @@ use crate::package::Package;
 use crate::package::error::{Error, Result};
 use crate::package::shared_strings::{PhoneticRun, SharedString, SharedStringRun};
 use crate::sheet::Selector;
-use litchi_opc::{OpcPackage, PackURI};
+use litchi_opc::{OpcPackage, PackURI, PackageWriter};
 use std::io::{self, Write};
 use std::mem::size_of;
 use std::sync::Arc;
@@ -727,15 +727,21 @@ fn shared_string_delta(changes: &[Change]) -> i64 {
 
 fn publish_validated_workbook(
     base: &Package,
-    workbook: crate::Workbook,
+    mut workbook: crate::Workbook,
     image_budget: usize,
 ) -> Result<(Package, Vec<u8>)> {
     super::structure::validate_all_worksheets(&workbook)?;
-    let tolerance = workbook.tolerance_report().clone();
-    let candidate = Package::from_validated_workbook(workbook);
-    let after = serialize_package(&candidate, image_budget)?;
+    // Serialize the already validated candidate directly.  The exact bytes
+    // are admitted below and installed into the same projection before the
+    // package retains it, so a consuming projection never points at the
+    // pre-admission OPC graph.
+    let after = serialize_opc_package(&workbook.package, image_budget)?;
     let admitted = OpcPackage::from_bytes_with_limits(&after, base.opc_package().read_limits())?;
-    Ok((base.with_admitted_opc(admitted, tolerance), after))
+    workbook.package = admitted;
+    Ok((
+        Package::from_validated_workbook_with_projection(workbook),
+        after,
+    ))
 }
 
 fn remaining_image_budget(before_len: usize, limits: TransferLimits) -> Result<usize> {
@@ -750,8 +756,12 @@ fn remaining_image_budget(before_len: usize, limits: TransferLimits) -> Result<u
 }
 
 fn serialize_package(package: &Package, maximum: usize) -> Result<Vec<u8>> {
+    serialize_opc_package(package.opc_package(), maximum)
+}
+
+fn serialize_opc_package(package: &OpcPackage, maximum: usize) -> Result<Vec<u8>> {
     let mut writer = BoundedWriter::new(maximum);
-    let result = package.write_to(&mut writer);
+    let result = PackageWriter::write_to_stream(&mut writer, package);
     if writer.exceeded {
         return Err(Error::LimitExceeded {
             resource: "cell-values package image",
