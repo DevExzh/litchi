@@ -95,7 +95,7 @@ fn package_inventory_rejects_missing_chart_targets() {
 }
 
 fn generated_package() -> Package {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     let chart = Chart::new(Type::Bar, 914400, 914400, 4572000, 2743200)
         .with_title("Quarterly sales")
         .add_series(
@@ -105,8 +105,9 @@ fn generated_package() -> Package {
         );
 
     {
-        package.presentation_mut().unwrap().add_slide().unwrap();
+        builder.presentation().unwrap().add_slide().unwrap();
     }
+    let mut package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     chart::add(&mut opc, "/ppt/slides/slide1.xml", &chart).unwrap();

@@ -5,7 +5,6 @@
 )]
 
 use litchi_opc::{OpcPackage, PackURI, Part};
-use litchi_pptx::Package;
 use litchi_pptx::parts::SlidePart;
 use quick_xml::Reader;
 use quick_xml::events::Event;
@@ -84,8 +83,9 @@ fn parse_visibility(part: &dyn Part) -> Visibility {
 }
 
 fn package_with_header_footer_xml() -> OpcPackage {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut package = OpcPackage::from_vec(bytes).unwrap();
     replace_part(

@@ -10,9 +10,9 @@ use tempfile::NamedTempFile;
 #[test]
 fn inserted_slides_keep_position_and_ids_after_round_trip() {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     {
-        let presentation = package.presentation_mut().unwrap();
+        let presentation = builder.presentation().unwrap();
         presentation.add_slide().unwrap().set_title("one");
         presentation.add_slide().unwrap().set_title("two");
         presentation.add_slide().unwrap().set_title("three");
@@ -33,6 +33,7 @@ fn inserted_slides_keep_position_and_ids_after_round_trip() {
             [260, 256, 259, 257, 258, 261]
         );
     }
+    let mut package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let reopened = Package::open(output.path()).unwrap();

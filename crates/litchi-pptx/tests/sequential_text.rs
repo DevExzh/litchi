@@ -24,13 +24,14 @@ fn slide_xml(body: &str) -> Vec<u8> {
 }
 
 fn package_bytes(slides: &[Vec<u8>]) -> Vec<u8> {
-    let mut authored = Package::new().expect("new PPTX package");
+    let mut builder = litchi_pptx::builder::Builder::new().expect("new PPTX package");
     {
-        let presentation = authored.presentation_mut().expect("mutable presentation");
+        let presentation = builder.presentation().expect("mutable presentation");
         for _ in slides {
             presentation.add_slide().expect("add slide");
         }
     }
+    let mut authored = builder.build().expect("new PPTX package");
     let authored_bytes = authored.to_bytes().expect("serialize authored package");
     let mut package = Package::from_bytes(&authored_bytes).expect("open authored package");
     package

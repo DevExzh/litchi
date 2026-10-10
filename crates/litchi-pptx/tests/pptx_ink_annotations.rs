@@ -77,8 +77,9 @@ fn package_inventory_rejects_malformed_inkml() {
 
 fn package_with_ink() -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let package = Package::open(output.path()).unwrap();

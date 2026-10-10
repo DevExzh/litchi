@@ -20,9 +20,9 @@ use tempfile::NamedTempFile;
 /// writer so the catalog and the slide parts are physically present.
 fn authored(slides: usize) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     {
-        let presentation = package.presentation_mut().unwrap();
+        let presentation = builder.presentation().unwrap();
         for index in 0..slides {
             presentation
                 .add_slide()
@@ -30,6 +30,7 @@ fn authored(slides: usize) -> Package {
                 .set_title(&format!("Slide {index}"));
         }
     }
+    let mut package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     Package::open(output.path()).unwrap()
 }

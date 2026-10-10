@@ -349,15 +349,16 @@ fn cross_copy_preserves_custom_parts_and_save_options_through_forward_and_invers
 }
 
 fn authored_package(names: &[&str]) -> TestResult<Vec<u8>> {
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         for name in names {
             let slide = presentation.add_slide()?;
             slide.set_title(name);
             slide.add_text_box(&format!("body:{name}"), 10, 20, 300, 400);
         }
     }
+    let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
     let mut opc = OpcPackage::from_vec(bytes)?;
     for (index, name) in names.iter().enumerate() {

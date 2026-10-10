@@ -157,9 +157,9 @@ fn differential(
 }
 
 fn text_deck() -> Vec<u8> {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     {
-        let presentation = package.presentation_mut().unwrap();
+        let presentation = builder.presentation().unwrap();
         for slide_index in 0..3_i64 {
             let slide = presentation.add_slide().unwrap();
             for shape in 0..3_i64 {
@@ -173,6 +173,7 @@ fn text_deck() -> Vec<u8> {
             }
         }
     }
+    let mut package = builder.build().unwrap();
     package.to_bytes().unwrap()
 }
 
@@ -236,16 +237,16 @@ fn scene_spans_are_byte_offsets_into_the_marked_slide() {
 fn opened_transaction_edits_of_marked_slides_match_unmarked_edits() {
     let deck = text_deck();
     let (kept, _) = differential(&deck, is_xml_member, |package| {
-        let mut edit = package.opened_presentation_transaction().unwrap();
+        let mut edit = package.edit().unwrap();
         assert!(
             edit.set_shape_text(0_usize, 1_usize, "edited & <ok>")
                 .unwrap()
         );
         assert!(edit.remove_shape(1_usize, 0_usize).is_ok());
         edit.add_text_box(2_usize, "added", (5, 6, 7, 8)).unwrap();
-        assert!(edit.move_slide(0, 2).unwrap());
+        assert!(edit.move_slide(0, litchi_core::Position::new(2)).unwrap());
         let commit = edit.commit().unwrap();
-        package.apply_opened_presentation_commit(commit).unwrap();
+        *package = commit.into_package();
         slide_texts(package)
     });
     // The edited slides are spliced and compacted from their marked sources,
@@ -263,14 +264,14 @@ fn batched_text_edits_of_a_marked_slide_match_unmarked_edits() {
         &deck,
         |name| name == "ppt/slides/slide2.xml",
         |package| {
-            let mut edit = package.opened_presentation_transaction().unwrap();
+            let mut edit = package.edit().unwrap();
             let replacements = [
                 litchi_pptx::opened::ShapeTextReplacement::at(0, "first"),
                 litchi_pptx::opened::ShapeTextReplacement::at(2, "third"),
             ];
             assert_eq!(edit.set_shape_texts(1_usize, &replacements).unwrap(), 2);
             let commit = edit.commit().unwrap();
-            package.apply_opened_presentation_commit(commit).unwrap();
+            *package = commit.into_package();
             slide_texts(package)
         },
     );

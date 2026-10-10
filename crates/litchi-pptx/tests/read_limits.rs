@@ -46,8 +46,7 @@ fn direct_pptx_constructors_apply_exact_and_over_input_limits() {
     Package::from_bytes_with_limits(&bytes, exact).expect("exact slice limit accepts PPTX");
     assert_input_limit(
         Package::from_bytes_with_limits(&bytes, over)
-            .err()
-            .expect("slice must propagate OPC input limit"),
+            .expect_err("slice must propagate OPC input limit"),
         bytes.len(),
         bytes.len() - 1,
     );
@@ -55,8 +54,7 @@ fn direct_pptx_constructors_apply_exact_and_over_input_limits() {
     Package::from_vec_with_limits(bytes.clone(), exact).expect("exact owned limit accepts PPTX");
     assert_input_limit(
         Package::from_vec_with_limits(bytes.clone(), over)
-            .err()
-            .expect("owned bytes must propagate OPC input limit"),
+            .expect_err("owned bytes must propagate OPC input limit"),
         bytes.len(),
         bytes.len() - 1,
     );
@@ -64,8 +62,7 @@ fn direct_pptx_constructors_apply_exact_and_over_input_limits() {
         .expect("exact reader limit accepts PPTX");
     assert_input_limit(
         Package::from_reader_with_limits(Cursor::new(bytes.clone()), over)
-            .err()
-            .expect("reader must propagate OPC input limit"),
+            .expect_err("reader must propagate OPC input limit"),
         bytes.len(),
         bytes.len() - 1,
     );
@@ -75,8 +72,7 @@ fn direct_pptx_constructors_apply_exact_and_over_input_limits() {
     Package::open_with_limits(file.path(), exact).expect("exact path limit accepts PPTX");
     assert_input_limit(
         Package::open_with_limits(file.path(), over)
-            .err()
-            .expect("path must propagate OPC input limit"),
+            .expect_err("path must propagate OPC input limit"),
         bytes.len(),
         bytes.len() - 1,
     );

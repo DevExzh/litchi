@@ -238,12 +238,13 @@ fn authored_notes_xml_and_referenced_master_are_compact() {
 
 fn opened_deck(slides: &[(&str, &str)]) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     for (name, note) in slides {
-        let slide = package.presentation_mut().unwrap().add_slide().unwrap();
+        let slide = builder.presentation().unwrap().add_slide().unwrap();
         slide.set_title(name);
         slide.set_notes(note);
     }
+    let mut package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     let mut package = Package::open(output.path()).unwrap();
     for (index, (name, _)) in slides.iter().enumerate() {

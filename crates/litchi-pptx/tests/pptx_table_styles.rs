@@ -7,7 +7,6 @@
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::part::BlobPart;
 use litchi_opc::{PackURI, PackageWriter};
-use litchi_pptx::Error;
 use litchi_pptx::Package;
 use litchi_pptx::shape::Shape;
 use litchi_pptx::table::Table;
@@ -140,14 +139,15 @@ fn package_updates_and_removes_catalog_without_legacy_writer_state() {
 
 #[test]
 fn style_edit_composes_with_a_new_deck_slide_edit() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     let created = Id::parse("{11111111-2222-3333-4444-555555555555}").unwrap();
     let mut styles = package.styles().unwrap().unwrap();
     styles.add(Def::new(created, "Created").unwrap()).unwrap();
     styles.set_default(created);
     assert!(package.put_styles(styles).unwrap());
 
-    package.presentation_mut().unwrap().add_slide().unwrap();
     assert_eq!(package.styles().unwrap().unwrap().default(), created);
 
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
@@ -159,9 +159,10 @@ fn style_edit_composes_with_a_new_deck_slide_edit() {
 
 #[test]
 fn style_removal_composes_with_a_new_deck_slide_edit() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     assert!(package.remove_styles().unwrap().is_some());
-    package.presentation_mut().unwrap().add_slide().unwrap();
     assert!(package.styles().unwrap().is_none());
 
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
@@ -246,13 +247,6 @@ fn noncanonical_style_target_survives_transactional_raw_save() {
     let before_id = before.r_id().to_owned();
     assert_eq!(before_id, "rId1");
 
-    assert!(matches!(
-        package.presentation_mut(),
-        Err(Error::UnsafeEdit {
-            operation: "presentation_mut",
-            ..
-        })
-    ));
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
     package.save(output.path()).unwrap();
     let reopened = Package::open(output.path()).unwrap();
@@ -279,13 +273,6 @@ fn strict_raw_edit_disables_the_transitional_legacy_writer() {
         package.styles().unwrap().unwrap().conformance(),
         Conformance::Strict
     );
-    assert!(matches!(
-        package.presentation_mut(),
-        Err(Error::UnsafeEdit {
-            operation: "presentation_mut",
-            ..
-        })
-    ));
     let before = PackageWriter::to_bytes(package.opc().unwrap()).unwrap();
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
 

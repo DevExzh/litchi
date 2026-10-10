@@ -96,13 +96,14 @@ fn expected_background() -> SlideBackground {
 
 fn package_with_picture_background() -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package
-        .presentation_mut()
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder
+        .presentation()
         .unwrap()
         .add_slide()
         .unwrap()
         .set_background(expected_background());
+    let mut package = builder.build().unwrap();
     package.save(output.path()).unwrap();
     let mut package = Package::open(output.path()).unwrap();
     let slide_name = PackURI::new("/ppt/slides/slide1.xml").unwrap();

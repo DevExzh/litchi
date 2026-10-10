@@ -178,8 +178,9 @@ fn package_model3d_failed_edit_restores_the_snapshot() {
 }
 
 fn package_with_model() -> Package {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     let bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     install_model(&mut opc);

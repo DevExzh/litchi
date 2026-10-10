@@ -31,8 +31,9 @@ fn omitted_slide_show_flag_is_not_hidden() {
 fn package_with_slide_xml(xml: &[u8]) -> Package {
     // Opened packages intentionally expose only read-only OPC access. Build
     // the synthetic graph through the public OPC owner and then adopt it.
-    let mut authored = Package::new().unwrap();
-    authored.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&bytes).unwrap();
     opc.get_part_mut(&PackURI::new("/ppt/slides/slide1.xml").unwrap())

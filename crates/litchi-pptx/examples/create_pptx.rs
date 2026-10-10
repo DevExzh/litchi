@@ -13,8 +13,8 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         )
     })?;
 
-    let mut package = Package::new()?;
-    let slide = package.presentation_mut()?.add_slide()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let slide = builder.presentation()?.add_slide()?;
     slide.set_title("Litchi Office verification");
     slide.add_text_box(
         "Created without a PowerPoint repair prompt",
@@ -23,11 +23,7 @@ fn main() -> Result<(), Box<dyn Error + Send + Sync>> {
         7_315_200,
         914_400,
     );
-    package.save(&destination)?;
-
-    // Reopening establishes an immutable package snapshot before attaching a
-    // move-owned tag list through the standalone package service.
-    let package = Package::open(&destination)?;
+    let package = builder.build()?;
     let owner = package
         .presentation()?
         .slide(0)?

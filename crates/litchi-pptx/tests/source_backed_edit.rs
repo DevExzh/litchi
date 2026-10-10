@@ -5,7 +5,8 @@ use std::sync::Arc;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::{
-    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, ReadAt, SourceVersion,
+    Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits, Position, ReadAt,
+    Resource, SourceVersion,
 };
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI, PackageWriter};
@@ -311,6 +312,29 @@ fn multi_fixture(slide_count: usize, signed: bool) -> Vec<u8> {
     PackageWriter::to_bytes(&package).unwrap()
 }
 
+fn multi_fixture_with_lexical_order_trivia() -> Vec<u8> {
+    let source = multi_fixture(4, false);
+    let presentation = format!(
+        r#"<?xml version="1.0" encoding="UTF-8"?>
+<!-- source-order lexical trivia before the root -->
+<p:presentation xmlns:p="{PML}" xmlns:r="{REL}">
+  <p:sldIdLst>
+    <!-- first slot -->
+    <p:sldId id="256" r:id="rIdSlide1"/>
+	<!-- second slot -->
+    <p:sldId id="257" r:id="rIdSlide2"/>
+    <!-- third slot -->
+    <p:sldId id="258" r:id="rIdSlide3"/>
+    <!-- fourth slot -->
+    <p:sldId id="259" r:id="rIdSlide4"/>
+  </p:sldIdLst>
+  <!-- suffix trivia stays after the ordered entries -->
+</p:presentation>
+"#
+    );
+    with_presentation_xml(&source, presentation)
+}
+
 fn with_presentation_xml(source: &[u8], presentation_xml: String) -> Vec<u8> {
     let mut package = OpcPackage::from_bytes(source).unwrap();
     let main = PackURI::new(MAIN).unwrap();
@@ -503,6 +527,23 @@ fn source_order_context() -> (CancellationSource, ExecutionContext) {
         cancellation_source,
         ExecutionContext::new(budget, cancellation, execution_limits),
     )
+}
+
+fn source_order_context_with_memory(memory: u64) -> (Budget, CancellationSource, ExecutionContext) {
+    let budget = Budget::root(
+        "pptx-source-slide-order-managed-test",
+        Limits::new(memory, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (cancellation_source, cancellation) = CancellationSource::pair();
+    let execution_limits = ExecutionLimits::new(
+        std::num::NonZeroUsize::new(1).unwrap(),
+        std::num::NonZeroUsize::new(1).unwrap(),
+        std::num::NonZeroU64::new(memory.max(1)).unwrap(),
+        0,
+    )
+    .unwrap();
+    let context = ExecutionContext::new(budget.clone(), cancellation, execution_limits);
+    (budget, cancellation_source, context)
 }
 
 #[test]
@@ -1888,7 +1929,7 @@ fn source_slide_order_move_changes_only_root_and_keeps_payloads_lazy() {
     assert_eq!(before.hits, 0);
 
     let mut edit = editor.edit_slide_order().unwrap();
-    assert!(edit.move_slide(0, 2).unwrap());
+    assert!(edit.move_slide(Position::new(0), Position::new(2)).unwrap());
     let commit = edit.commit().unwrap();
     assert!(commit.is_changed());
     let replayed = commit.patch().apply(commit.patch().source()).unwrap();
@@ -1908,26 +1949,195 @@ fn source_slide_order_move_changes_only_root_and_keeps_payloads_lazy() {
 }
 
 #[test]
+fn source_slide_order_composes_current_positions_and_preserves_lazy_payloads() {
+    let source = multi_fixture(4, false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let before = editor.cache_diagnostics();
+    assert_eq!(before.successful_loads, 1);
+    assert_eq!(before.hits, 0);
+
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(edit.move_slide(Position::new(0), Position::new(3)).unwrap());
+    // The next operation addresses the currently staged order [1, 2, 3, 0].
+    assert!(
+        edit.swap_slides(Position::new(0), Position::new(2))
+            .unwrap()
+    );
+    // The following move also addresses the current order [3, 2, 1, 0].
+    assert!(edit.move_slide(Position::new(3), Position::new(0)).unwrap());
+    assert_eq!(
+        editor.cache_diagnostics().successful_loads,
+        before.successful_loads
+    );
+    assert_eq!(editor.cache_diagnostics().hits, before.hits);
+
+    let commit = edit.commit().unwrap();
+    assert!(commit.is_changed());
+    let replay = commit.patch().apply(commit.patch().source()).unwrap();
+    assert!(replay.is_exactly_same_as(commit.snapshot()));
+    let restored = commit.inverse().apply(&replay).unwrap();
+    assert!(restored.is_exactly_same_as(commit.patch().source()));
+    let mut output = Vec::new();
+    editor
+        .publish_slide_order_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(slide_ids(&output), vec![256, 259, 258, 257]);
+}
+
+#[test]
+fn source_slide_order_manages_candidate_memory_before_rewrite_and_releases_it() {
+    let source = multi_fixture(3, false);
+    let root = OpcPackage::from_bytes(&source)
+        .unwrap()
+        .get_part(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64;
+    let (budget, _cancellation, context) = source_order_context_with_memory(root);
+    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+        Arc::new(VersionedSource::new(source)),
+        SourceLimits::default(),
+        context,
+    )
+    .unwrap();
+    assert_eq!(budget.used(Resource::Memory), root);
+
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(matches!(
+        edit.move_slide(Position::new(0), Position::new(2)),
+        Err(Error::Opc(OpcError::Execution(
+            litchi_core::ExecutionError::ResourceLimit(limit)
+        ))) if limit.resource == Resource::Memory
+    ));
+    assert_eq!(budget.used(Resource::Memory), root);
+    drop(edit);
+    drop(editor);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn source_slide_order_retains_candidate_charge_through_patch_clones() {
+    let source = multi_fixture(3, false);
+    let root = OpcPackage::from_bytes(&source)
+        .unwrap()
+        .get_part(&PackURI::new(MAIN).unwrap())
+        .unwrap()
+        .blob()
+        .len() as u64;
+    let (budget, _cancellation, context) = source_order_context_with_memory(3 * root);
+    let editor = SourceBackedPresentationEditor::from_read_at_with_limits_and_execution_context(
+        Arc::new(VersionedSource::new(source)),
+        SourceLimits::default(),
+        context,
+    )
+    .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
+    assert_eq!(budget.used(Resource::Memory), 2 * root);
+    edit.move_slide(Position::new(2), Position::new(0)).unwrap();
+    assert_eq!(budget.used(Resource::Memory), root);
+    edit.swap_slides(Position::new(0), Position::new(2))
+        .unwrap();
+    assert_eq!(budget.used(Resource::Memory), 2 * root);
+    edit.move_slide(Position::new(0), Position::new(1)).unwrap();
+    assert_eq!(budget.used(Resource::Memory), 2 * root);
+    let commit = edit.commit().unwrap();
+    let patch = commit.patch().clone();
+    let inverse = patch.inverse();
+    drop(editor);
+    drop(commit);
+    assert_eq!(budget.used(Resource::Memory), 2 * root);
+    drop(patch);
+    assert_eq!(budget.used(Resource::Memory), 2 * root);
+    drop(inverse);
+    assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn source_slide_order_cancellation_reuses_original_lexical_spans_and_zip() {
+    let source = multi_fixture_with_lexical_order_trivia();
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        source.clone(),
+    )))
+    .unwrap();
+    let before = editor.cache_diagnostics();
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(edit.move_slide(Position::new(0), Position::new(3)).unwrap());
+    assert!(
+        edit.swap_slides(Position::new(0), Position::new(3))
+            .unwrap()
+    );
+    assert!(edit.move_slide(Position::new(3), Position::new(0)).unwrap());
+    assert!(
+        edit.swap_slides(Position::new(0), Position::new(1))
+            .unwrap()
+    );
+    let commit = edit.commit().unwrap();
+    assert!(!commit.is_changed());
+    assert_eq!(editor.cache_diagnostics(), before);
+
+    let mut output = Vec::new();
+    editor
+        .publish_slide_order_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source);
+}
+
+#[test]
+fn source_slide_order_invalid_later_step_keeps_prior_staged_state() {
+    let source = multi_fixture(3, false);
+    let editor =
+        SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
+            .unwrap();
+    let mut edit = editor.edit_slide_order().unwrap();
+    assert!(edit.move_slide(Position::new(0), Position::new(2)).unwrap());
+    assert!(matches!(
+        edit.swap_slides(Position::new(3), Position::new(0)),
+        Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
+    ));
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    editor
+        .publish_slide_order_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(slide_ids(&output), vec![257, 258, 256]);
+}
+
+#[test]
 fn source_slide_order_noop_is_byte_exact_signed_and_bad_positions_are_refused() {
     let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
         multi_fixture(3, false),
     )))
     .unwrap();
-    assert!(matches!(
-        editor.edit_slide_order().unwrap().commit(),
-        Err(Error::SlideOrderPlan {
-            kind: SlideOrderRefusal::NoMove,
-            ..
-        })
-    ));
+    let empty = editor.edit_slide_order().unwrap().commit().unwrap();
+    assert!(!empty.is_changed());
+    let mut empty_output = Vec::new();
+    editor
+        .publish_slide_order_commit_to_stream(&mut empty_output, &empty)
+        .unwrap();
+    assert_eq!(empty_output, multi_fixture(3, false));
 
     let signed = multi_fixture(3, true);
     let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
         signed.clone(),
     )))
     .unwrap();
+    let empty = editor.edit_slide_order().unwrap().commit().unwrap();
+    assert!(!empty.is_changed());
+    let mut empty_output = Vec::new();
+    editor
+        .publish_slide_order_commit_to_stream(&mut empty_output, &empty)
+        .unwrap();
+    assert_eq!(empty_output, signed);
+
+    let editor = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
+        signed.clone(),
+    )))
+    .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    assert!(!edit.move_slide(1, 1).unwrap());
+    assert!(!edit.move_slide(Position::new(1), Position::new(1)).unwrap());
     let commit = edit.commit().unwrap();
     assert!(!commit.is_changed());
     let mut output = Vec::new();
@@ -1942,21 +2152,15 @@ fn source_slide_order_noop_is_byte_exact_signed_and_bad_positions_are_refused() 
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
     assert!(matches!(
-        edit.move_slide(3, 0),
+        edit.move_slide(Position::new(3), Position::new(0)),
         Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
     ));
     assert!(matches!(
-        edit.move_slide(0, 3),
+        edit.move_slide(Position::new(0), Position::new(3)),
         Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
     ));
-    assert!(edit.move_slide(0, 2).unwrap());
-    assert!(matches!(
-        edit.move_slide(1, 2),
-        Err(Error::SlideOrderPlan {
-            kind: SlideOrderRefusal::MultipleMoves,
-            ..
-        })
-    ));
+    assert!(edit.move_slide(Position::new(0), Position::new(2)).unwrap());
+    assert!(edit.move_slide(Position::new(1), Position::new(2)).unwrap());
 }
 
 #[test]
@@ -1967,7 +2171,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     )))
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
 
     let foreign = SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(
@@ -1984,7 +2188,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     let source = Arc::new(VersionedSource::new(source_bytes.clone()));
     let editor = SourceBackedPresentationEditor::from_read_at(source.clone()).unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     source.changed();
     output.clear();
@@ -1999,7 +2203,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     )))
     .unwrap();
     let mut edit = signed.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let signed_commit = edit.commit().unwrap();
     output.clear();
     assert!(matches!(
@@ -2016,7 +2220,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     )
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let cancelled_commit = edit.commit().unwrap();
     cancellation_source.cancel();
     output.clear();
@@ -2036,7 +2240,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     )))
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     output.clear();
     assert!(matches!(
@@ -2050,7 +2254,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     )))
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    assert!(!edit.move_slide(1, 1).unwrap());
+    assert!(!edit.move_slide(Position::new(1), Position::new(1)).unwrap());
     let commit = edit.commit().unwrap();
     output.clear();
     editor
@@ -2063,7 +2267,7 @@ fn source_slide_order_refuses_stale_foreign_signed_cancelled_and_partial_output(
     )))
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     let mut sink = FailingSink {
         accepted: 0,
@@ -2097,11 +2301,11 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
     assert!(matches!(
-        edit.move_slide(3, 0),
+        edit.move_slide(Position::new(3), Position::new(0)),
         Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
     ));
     assert!(matches!(
-        edit.move_slide(0, 3),
+        edit.move_slide(Position::new(0), Position::new(3)),
         Err(Error::SlideIndexOutOfBounds { index: 3, len: 3 })
     ));
 
@@ -2110,7 +2314,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(mce))).unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
     assert!(matches!(
-        edit.move_slide(0, 2),
+        edit.move_slide(Position::new(0), Position::new(2)),
         Err(Error::SlideOrderPlan {
             kind: SlideOrderRefusal::MarkupCompatibility,
             ..
@@ -2136,7 +2340,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(custom)))
             .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     editor
@@ -2159,7 +2363,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
     let editor =
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(safe))).unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     output.clear();
     editor
@@ -2175,7 +2379,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
             .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     output.clear();
     assert!(matches!(
@@ -2195,7 +2399,7 @@ fn source_slide_order_rejects_limits_malformed_mce_and_invalid_owners() {
         SourceBackedPresentationEditor::from_read_at(Arc::new(VersionedSource::new(source)))
             .unwrap();
     let mut edit = editor.edit_slide_order().unwrap();
-    edit.move_slide(0, 2).unwrap();
+    edit.move_slide(Position::new(0), Position::new(2)).unwrap();
     let commit = edit.commit().unwrap();
     output.clear();
     assert!(matches!(

@@ -938,15 +938,16 @@ fn add_zip_metadata(bytes: &[u8], archive_comment: &[u8]) -> TestResult<Vec<u8>>
 /// graph and dependency-free slide bodies. Names are changed in the ZIP after
 /// authoring because the public writer intentionally derives names from IDs.
 fn authored_package(slide_titles: &[&str]) -> TestResult<Vec<u8>> {
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         for title in slide_titles {
             let slide = presentation.add_slide()?;
             slide.set_title(title);
             slide.add_text_box(&format!("body:{title}"), 10, 20, 300, 400);
         }
     }
+    let mut package = builder.build()?;
     package.to_bytes()
 }
 

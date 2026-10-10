@@ -48,8 +48,9 @@ fn master_theme_accessor_rejects_external_theme_relationships() {
 }
 
 fn package_with_slide() -> Package {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     let package_bytes = package.to_bytes().unwrap();
     Package::from_bytes(&package_bytes).unwrap()
 }

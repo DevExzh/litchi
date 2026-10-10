@@ -799,13 +799,14 @@ fn families() -> Vec<Family> {
             prepare: None,
             change: Some(Change {
                 edit: |package| {
-                    let mut transaction = package.opened_presentation_transaction()?;
+                    let mut transaction = package.edit()?;
                     transaction.add_comment_author(
                         legacy_author(1, "Reviewer"),
                         LegacyConformance::Transitional,
                     )?;
                     let commit = transaction.commit()?;
-                    package.apply_opened_presentation_commit(commit).map(drop)
+                    *package = commit.into_package();
+                    Ok(())
                 },
                 shows: |package| {
                     package.with_opc(|opc| {
@@ -815,11 +816,12 @@ fn families() -> Vec<Family> {
             }),
             no_op: Some(|package| {
                 let styles = package.styles()?.expect("table-style catalog");
-                let mut transaction = package.opened_presentation_transaction()?;
+                let mut transaction = package.edit()?;
                 assert!(!transaction.put_table_styles(styles)?);
                 let commit = transaction.commit()?;
-                assert!(!commit.is_changed());
-                package.apply_opened_presentation_commit(commit).map(drop)
+                assert!(!commit.diagnostics().changed());
+                *package = commit.into_package();
+                Ok(())
             }),
         },
     ];

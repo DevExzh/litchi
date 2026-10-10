@@ -7,7 +7,6 @@
 use litchi_opc::constants::relationship_type as rt;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_pptx::Error;
-use litchi_pptx::Package;
 use litchi_pptx::parts::{PresentationPart, SlideMasterPart, SlidePart};
 use litchi_pptx::transition::{Kind, Ms, Ripple, Transition, read};
 
@@ -175,9 +174,10 @@ fn package_with_inherited_transition_fragment(fragment: &str) -> OpcPackage {
 }
 
 fn package_with_slides(count: usize) -> OpcPackage {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
     for _ in 0..count {
-        package.presentation_mut().unwrap().add_slide().unwrap();
+        builder.presentation().unwrap().add_slide().unwrap();
     }
+    let mut package = builder.build().unwrap();
     OpcPackage::from_vec(package.to_bytes().unwrap()).unwrap()
 }

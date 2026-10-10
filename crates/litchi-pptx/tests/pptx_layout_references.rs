@@ -32,8 +32,9 @@ fn master_layout_relationships_keep_stable_ids() {
 }
 
 fn package_with_master_xml() -> Package {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     let package_bytes = package.to_bytes().unwrap();
     let mut opc = OpcPackage::from_bytes(&package_bytes).unwrap();
     let part_name = PackURI::new("/ppt/slideMasters/slideMaster1.xml").unwrap();

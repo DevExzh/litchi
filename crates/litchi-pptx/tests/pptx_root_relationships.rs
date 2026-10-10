@@ -132,8 +132,9 @@ fn strict_root_slide_and_master_relationships_are_supported() {
 }
 
 fn package_with_slide() -> OpcPackage {
-    let mut authored = Package::new().unwrap();
-    authored.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut authored = builder.build().unwrap();
     OpcPackage::from_bytes(&authored.to_bytes().unwrap()).unwrap()
 }
 

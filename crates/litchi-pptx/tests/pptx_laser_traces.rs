@@ -56,8 +56,9 @@ fn package_with_local_laser() -> Package {
 
 fn package_with_laser_extension(extension: &str) -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let package = Package::open(output.path()).unwrap();

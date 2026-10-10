@@ -140,8 +140,9 @@ fn package_inventory_ignores_non_ole_graphic_data() {
 
 fn package_with_local_ole_objects() -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let package = Package::open(output.path()).unwrap();

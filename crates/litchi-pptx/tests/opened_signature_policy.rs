@@ -41,7 +41,7 @@ fn changed_commit_on_a_signed_package_is_refused() {
         let bytes = fixture(name);
         let mut package = Package::from_vec(bytes.clone()).unwrap();
         assert!(package.opc().unwrap().is_signed(), "{name}");
-        let mut transaction = package.opened_presentation_transaction().unwrap();
+        let mut transaction = package.edit().unwrap();
         transaction
             .add_text_box(0_usize, "edited", (0, 0, 914_400, 914_400))
             .unwrap();
@@ -63,13 +63,9 @@ fn exact_noop_commit_keeps_the_signature_bytes() {
     for name in SIGNED {
         let bytes = fixture(name);
         let mut package = Package::from_vec(bytes.clone()).unwrap();
-        let commit = package
-            .opened_presentation_transaction()
-            .unwrap()
-            .commit()
-            .unwrap();
-        assert!(!commit.is_changed(), "{name}");
-        package.apply_opened_presentation_commit(commit).unwrap();
+        let commit = package.edit().unwrap().commit().unwrap();
+        assert!(!commit.diagnostics().changed(), "{name}");
+        package = commit.into_package();
         assert_eq!(package.to_bytes().unwrap(), bytes, "{name}");
     }
 }
@@ -80,13 +76,13 @@ fn explicit_unsign_authorizes_a_changed_commit() {
         let mut package = Package::from_vec(fixture(name)).unwrap();
         package.unsign().unwrap();
         assert!(!package.opc().unwrap().is_signed(), "{name}");
-        let mut transaction = package.opened_presentation_transaction().unwrap();
+        let mut transaction = package.edit().unwrap();
         transaction
             .add_text_box(0_usize, "edited after unsign", (0, 0, 914_400, 914_400))
             .unwrap();
         let commit = transaction.commit().unwrap();
-        assert!(commit.is_changed(), "{name}");
-        package.apply_opened_presentation_commit(commit).unwrap();
+        assert!(commit.diagnostics().changed(), "{name}");
+        package = commit.into_package();
         let output = package.to_bytes().unwrap();
         assert!(!carries_signature(&output), "{name}");
         let reopened = Package::from_vec(output).unwrap();
@@ -99,17 +95,29 @@ fn explicit_unsign_authorizes_a_changed_commit() {
 
 #[test]
 fn unsigning_an_unsigned_package_changes_nothing() {
-    let mut authored = Package::new().unwrap();
-    authored.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut package = Package::from_vec(bytes.clone()).unwrap();
     package.unsign().unwrap();
     assert!(!package.opc().unwrap().is_signed());
-    let commit = package
-        .opened_presentation_transaction()
-        .unwrap()
-        .commit()
-        .unwrap();
-    assert!(!commit.is_changed());
+    let commit = package.edit().unwrap().commit().unwrap();
+    assert!(!commit.diagnostics().changed());
     assert_eq!(package.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn insertion_refuses_signed_sources_before_layout_resolution() {
+    for name in SIGNED {
+        let mut source = Package::from_vec(fixture(name)).unwrap();
+        let before = source.to_bytes().unwrap();
+        let mut edit = source.edit().unwrap();
+        assert!(matches!(
+            edit.insert_slide(litchi_core::Position::new(0), "unused layout selector"),
+            Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+        ));
+        assert!(edit.commit().unwrap().patch().is_noop());
+        assert_eq!(source.to_bytes().unwrap(), before);
+    }
 }

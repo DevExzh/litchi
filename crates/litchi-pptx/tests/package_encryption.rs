@@ -199,10 +199,6 @@ fn downgrade_and_mutation_are_explicit() {
         Err(Error::EncryptionPolicy { .. })
     ));
     assert!(matches!(
-        package.presentation_mut(),
-        Err(Error::EncryptionPolicy { .. })
-    ));
-    assert!(matches!(
         package.put_fonts(Default::default()),
         Err(Error::EncryptionPolicy { .. })
     ));
@@ -378,4 +374,103 @@ fn raw_opc_noop_preserves_signature_and_changed_edit_requires_explicit_unsign() 
             .unwrap()
             .contains_part(&PackURI::new("/custom/raw.bin").unwrap())
     );
+}
+
+#[test]
+fn immutable_reencryption_preserves_profile_content_and_protection() {
+    for mode in [Mode::Standard, Mode::Agile] {
+        let input = encrypted(mode, "old");
+        let package = Package::from_vec_with_password(input, "old").unwrap();
+        let mut output = Vec::new();
+        package
+            .write_reencrypted(&mut output, "new", EncryptionLimits::default())
+            .unwrap();
+        let clear = encryption::open(output, "new").unwrap();
+        assert_eq!(clear.mode(), Some(mode));
+        assert_eq!(clear.into_bytes(), plain());
+        assert_eq!(package.encryption(), Some(mode));
+        assert!(matches!(
+            package.write_to(Vec::new()),
+            Err(Error::EncryptionPolicy { .. })
+        ));
+    }
+}
+
+#[test]
+fn immutable_reencryption_refuses_before_emitting_ciphertext_on_staging_failure() {
+    let package = Package::from_vec_with_password(encrypted(Mode::Standard, "old"), "old").unwrap();
+    let mut sink = Vec::new();
+    let limits = EncryptionLimits {
+        max_plaintext_bytes: 1,
+        ..EncryptionLimits::default()
+    };
+    let error = package
+        .write_reencrypted(&mut sink, "new", limits)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Encryption(encryption::Error::Limit {
+            resource: "plaintext",
+            ..
+        })
+    ));
+    assert!(sink.is_empty());
+    assert!(
+        package
+            .write_reencrypted(&mut sink, "", EncryptionLimits::default())
+            .is_err()
+    );
+    assert!(sink.is_empty());
+    assert_eq!(package.encryption(), Some(Mode::Standard));
+    let authored = Package::new().unwrap();
+    assert!(matches!(
+        authored.write_reencrypted(&mut sink, "new", EncryptionLimits::default()),
+        Err(Error::EncryptionPolicy { .. })
+    ));
+    let clear = Package::from_vec(plain()).unwrap();
+    assert!(matches!(
+        clear.write_reencrypted(&mut sink, "new", EncryptionLimits::default()),
+        Err(Error::EncryptionPolicy { .. })
+    ));
+    assert!(sink.is_empty());
+}
+
+#[test]
+fn immutable_reencryption_keeps_sink_errors_and_owner_protection() {
+    struct FailedSink;
+    impl std::io::Write for FailedSink {
+        fn write(&mut self, _: &[u8]) -> std::io::Result<usize> {
+            Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Ok(())
+        }
+    }
+    struct FlushFailure;
+    impl std::io::Write for FlushFailure {
+        fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+            Ok(bytes.len())
+        }
+        fn flush(&mut self) -> std::io::Result<()> {
+            Err(std::io::Error::from(std::io::ErrorKind::BrokenPipe))
+        }
+    }
+    let package = Package::from_vec_with_password(encrypted(Mode::Standard, "old"), "old").unwrap();
+    let error = package
+        .write_reencrypted(FailedSink, "new", EncryptionLimits::default())
+        .unwrap_err();
+    assert!(
+        matches!(error, Error::Io(ref source) if source.kind() == std::io::ErrorKind::BrokenPipe)
+    );
+    let error = package
+        .write_reencrypted(FlushFailure, "new", EncryptionLimits::default())
+        .unwrap_err();
+    assert!(
+        matches!(error, Error::Io(ref source) if source.kind() == std::io::ErrorKind::BrokenPipe)
+    );
+    assert_eq!(package.encryption(), Some(Mode::Standard));
+    assert!(matches!(
+        package.write_to(Vec::new()),
+        Err(Error::EncryptionPolicy { .. })
+    ));
 }

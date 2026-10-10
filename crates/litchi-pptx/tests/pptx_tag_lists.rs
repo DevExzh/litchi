@@ -301,17 +301,19 @@ fn package_tag_crud_edits_only_the_active_raw_mce_branch() {
 }
 
 #[test]
-fn package_tag_edits_reject_a_dirty_legacy_writer() {
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
-
-    assert!(matches!(
-        package.put_tags(0, tag_list("Owner", "Alice")),
-        Err(Error::UnsafeEdit {
-            operation: "put_tags",
-            ..
-        })
-    ));
+fn built_package_accepts_tag_edits_without_an_archive_round_trip() {
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
+    assert!(
+        package
+            .put_tags(0, tag_list("Owner", "Alice"))
+            .unwrap()
+            .is_none()
+    );
+    let bytes = package.to_bytes().unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
+    assert!(package.same_content(&reopened).unwrap());
 }
 
 fn package_with_direct_tag_lists() -> Package {
@@ -333,9 +335,10 @@ fn package_with_direct_tag_lists() -> Package {
 
 fn package_with_named_slides() -> Package {
     let output = NamedTempFile::with_suffix(".pptx").unwrap();
-    let mut package = Package::new().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
-    package.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = litchi_pptx::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     package.save(output.path()).unwrap();
 
     let mut package = Package::open(output.path()).unwrap();
