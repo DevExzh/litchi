@@ -277,3 +277,166 @@ fn source_add_keeps_format_and_source_diagnostics() {
     assert_eq!(error.format(), Some(FileFormat::Pptx));
     assert!(error.property().is_some());
 }
+
+fn slide_property(file: &File, path: &str, key: &str) -> Option<String> {
+    file.get(path)
+        .unwrap()
+        .view()
+        .format()
+        .unwrap()
+        .find(|property| property.key() == key)
+        .map(|property| property.value().to_string())
+}
+
+#[test]
+fn slide_creation_properties_round_trip_and_replay_for_both_owners() {
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let before = empty_fixture();
+        let source =
+            litchi_ops::open_bytes_with(before.clone(), &OpenOptions::new().source_mode(mode))
+                .unwrap();
+        let name = "Roadmap & Q4\nDraft";
+        let commit = source
+            .edit(|edit| {
+                edit.add("/", slide("Blank").prop("NaMe", name).prop("HIDDEN", true))?;
+                Ok(())
+            })
+            .unwrap();
+        for file in [&commit.file, &open_source(commit.file.to_bytes().unwrap())] {
+            assert_eq!(
+                slide_property(file, "/slide[1]", "name").as_deref(),
+                Some(name)
+            );
+            assert_eq!(
+                slide_property(file, "/slide[1]", "hidden").as_deref(),
+                Some("true")
+            );
+        }
+        assert_eq!(
+            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+            commit.file.to_bytes().unwrap()
+        );
+        assert_eq!(
+            commit
+                .patch
+                .inverse()
+                .apply(&commit.file)
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            before
+        );
+        assert_eq!(source.to_bytes().unwrap(), before);
+        for key in ["name", "hidden"] {
+            assert!(
+                source
+                    .capabilities()
+                    .element("slide")
+                    .unwrap()
+                    .property(key)
+                    .unwrap()
+                    .add()
+            );
+        }
+        let blank = source
+            .add(
+                "/",
+                slide("Blank")
+                    .prop("name", litchi_ops::PropValue::Null)
+                    .prop("hidden", false),
+            )
+            .unwrap();
+        assert_eq!(
+            slide_property(&blank.file, "/slide[1]", "name").as_deref(),
+            Some("")
+        );
+        assert!(matches!(
+            slide_property(&blank.file, "/slide[1]", "hidden").as_deref(),
+            None | Some("false")
+        ));
+    }
+}
+
+#[test]
+fn slide_creation_properties_fail_atomically_before_publication() {
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let source =
+            litchi_ops::open_bytes_with(fixture(), &OpenOptions::new().source_mode(mode)).unwrap();
+        let before = source.to_bytes().unwrap();
+        for (node, code) in [
+            (
+                slide("Blank").prop("name", "Draft").prop("hidden", "maybe"),
+                Code::InvalidValue,
+            ),
+            (slide("Blank").prop("name", "bad\u{1}"), Code::InvalidValue),
+            (
+                slide("Blank").prop("name", "A").prop("NAME", "B"),
+                Code::InvalidArgument,
+            ),
+            (
+                slide("Blank").prop("hidden", true).prop("HIDDEN", false),
+                Code::InvalidArgument,
+            ),
+            (
+                NewNode::new("slide").prop("name", "Missing layout"),
+                Code::MissingProperty,
+            ),
+        ] {
+            assert_eq!(source.add("/", node).unwrap_err().code(), code);
+            assert_eq!(source.to_bytes().unwrap(), before);
+        }
+        let limits = SemanticLimits::builder()
+            .max_staged_bytes(8)
+            .unwrap()
+            .build()
+            .unwrap();
+        let error = source
+            .edit_with_limits(&limits, |edit| {
+                edit.add(
+                    "/",
+                    slide("Blank").prop("name", "Draft").prop("hidden", true),
+                )
+            })
+            .unwrap_err();
+        assert_eq!(error.code(), Code::LimitExceeded);
+        assert_eq!(source.to_bytes().unwrap(), before);
+    }
+}
+
+#[test]
+fn batches_preserve_creation_properties_and_isolate_invalid_items() {
+    for mode in [SourceMode::Auto, SourceMode::Eager] {
+        let source =
+            litchi_ops::open_bytes_with(fixture(), &OpenOptions::new().source_mode(mode)).unwrap();
+        let before = source.to_bytes().unwrap();
+        let items = || {
+            let mut valid = add_item("Blank");
+            valid.props = Some(
+                Props::new()
+                    .with("layout", "Blank")
+                    .with("name", "Batch Draft")
+                    .with("hidden", true),
+            );
+            let mut invalid = add_item("Blank");
+            invalid.props = Some(Props::new().with("layout", "Blank").with("hidden", "maybe"));
+            [valid, invalid]
+        };
+        assert!(source.batch(items(), BatchMode::Atomic).is_err());
+        assert_eq!(source.to_bytes().unwrap(), before);
+        let result = source.batch(items(), BatchMode::BestEffort).unwrap();
+        assert!(matches!(&result.results[0], ItemResult::Applied(applied) if applied.changed));
+        assert!(
+            matches!(&result.results[1], ItemResult::Failed(error) if error.code() == Code::InvalidValue)
+        );
+        assert_eq!(
+            slide_property(&result.file, "/slide[4]", "name").as_deref(),
+            Some("Batch Draft")
+        );
+        assert_eq!(
+            slide_property(&result.file, "/slide[4]", "hidden").as_deref(),
+            Some("true")
+        );
+        assert!(result.file.get("/slide[5]").is_err());
+        assert_eq!(source.to_bytes().unwrap(), before);
+    }
+}

@@ -1529,13 +1529,13 @@ const fn slide_write_entries() -> [crate::registry::Entry<SlideProperty>; SLIDE_
     };
     entries[2] = Entry {
         spec: SLIDE_PROPS[2],
-        access: Access::Set(SlideProperty::Name),
+        access: Access::SetAndAdd(SlideProperty::Name),
         constraint: Constraint::None,
         clear: true,
     };
     entries[3] = Entry {
         spec: SLIDE_PROPS[3],
-        access: Access::Set(SlideProperty::Hidden),
+        access: Access::SetAndAdd(SlideProperty::Hidden),
         constraint: Constraint::None,
         clear: false,
     };

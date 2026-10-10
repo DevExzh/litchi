@@ -313,13 +313,13 @@
         },
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "hidden": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         }

@@ -454,7 +454,8 @@ fn pptx_reports_selection_and_structural_writes() {
                 "{}",
                 property.name()
             );
-            let slide_add = element.name() == "slide" && property.name() == "layout";
+            let slide_add = element.name() == "slide"
+                && matches!(property.name(), "layout" | "name" | "hidden");
             let shape_add = element.name() == "shape"
                 && matches!(property.name(), "text" | "x" | "y" | "width" | "height");
             assert_eq!(
@@ -485,9 +486,12 @@ fn pptx_reports_selection_and_structural_writes() {
     assert!(slide.operations().remove);
     assert!(slide.property("layout").unwrap().add());
     for property in slide.properties() {
-        if property.name() != "layout" {
-            assert!(!property.add(), "{}", property.name());
-        }
+        assert_eq!(
+            property.add(),
+            matches!(property.name(), "layout" | "name" | "hidden"),
+            "{}",
+            property.name()
+        );
     }
     let shape = caps.element("shape").unwrap();
     assert!(shape.operations().add);

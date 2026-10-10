@@ -486,3 +486,37 @@ fn combined_primary_properties_match_sequential_edits_and_preserve_prior_staging
     let mut eager = edit.commit().unwrap().into_package();
     assert_eq!(eager.to_bytes().unwrap(), changed.to_bytes().unwrap());
 }
+
+#[test]
+fn inserted_slide_properties_survive_durable_topology_transport() {
+    let before = fixture(1, 1);
+    let source = open_source(&before);
+    let mut edit = source.edit().unwrap();
+    edit.insert_slide(Position::new(0), "Blank").unwrap();
+    edit.set_slide_properties(0, Some("Inserted\nDraft"), Some(true))
+        .unwrap();
+    let (changed, patch) = edit.commit().unwrap().into_parts();
+    let durable = transported(&patch);
+    let bytes = changed.to_bytes().unwrap();
+    assert_eq!(source.apply(&durable).unwrap().to_bytes().unwrap(), bytes);
+    let reopened = open_source(&bytes);
+    assert_eq!(
+        reopened
+            .presentation()
+            .unwrap()
+            .slide(Position::new(0))
+            .unwrap()
+            .authored_name()
+            .unwrap()
+            .as_deref(),
+        Some("Inserted\nDraft")
+    );
+    assert_eq!(
+        reopened
+            .apply(&durable.inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
+}
