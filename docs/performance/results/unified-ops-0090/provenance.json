@@ -1,0 +1,30 @@
+{
+  "head": "0314261beb53838bbc5e5c46aa94c8515ee945c6",
+  "dirty_worktree": true,
+  "rust_toml_source_files": 8159,
+  "rust_toml_source_sha256": "5145e5925896152c8064185946a12f75d065cc7de7e3f17468e13dec384bd83f",
+  "source_hash_method": "sorted crates/**/*.rs and crates/**/*.toml excluding target components, plus root Cargo.toml; SHA-256 of repeated UTF-8 relative path + NUL + content + NUL",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "cpu": "AMD EPYC 9R45",
+  "os": "Linux x86_64",
+  "affinity_cpu": 0,
+  "build_command": "CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/tmp/litchi-unified-0090-target cargo build --release --locked --manifest-path tools/perf-baseline/unified-docx-text-fanout/Cargo.toml",
+  "measure_command": "taskset -c 0 /tmp/litchi-unified-0090-target/release/unified-docx-text-fanout-baseline 9",
+  "invocation_order": [
+    "paired-1",
+    "paired-2"
+  ],
+  "binary": {
+    "name": "unified-docx-text-fanout-baseline",
+    "bytes": 105778368,
+    "sha256": "659d1de078a5ae6da999ea8bc16b1732a9100179fa764af48d7e5bc864cb6a0c"
+  },
+  "harness_files": {
+    "Cargo.lock": "8f4b270f97a30e23853b91b6c94ac0478f4697ddb04e4ecd5ec17ea90adf264e",
+    "Cargo.toml": "ee765911737b6ddd8bae12948025e9298411609986deeebf7288aeb5b742105a",
+    "README.md": "9e92bc22dbe496c6690a158e86dc4232abde13fbf00b22f31b1cc512a6305879",
+    "src/main.rs": "c7c1b257b3c71a937be250415b92c14340fc982001d0f5ea7d41a1f1d8914b71",
+    "summarize.py": "2bc97cee51beb3b9b2445f974865336c404e17f8d9095259c11bc41c645ceeb6"
+  },
+  "comparison_note": "Prior checkpoint 0089 is historical baseline, not an interleaved before/after control. No statistically established timing improvement claimed."
+}

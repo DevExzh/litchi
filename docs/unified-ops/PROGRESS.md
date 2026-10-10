@@ -6,6 +6,111 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0157 | [PPTX slide-root admission](0157-pptx-slide-root-admission.md) | Distinct slide/notes node limits and preserved typed resource errors; 1,665 native and 1,107 facade tests/doctests passed; eager 10k workloads pass with 1.016–1.022 ratios; Clippy/glossary/boundaries passed; artifacts cleaned; commit blocked by read-only Git metadata; linear scaling and full goal remain open |
+| 0156 | [PPTX command coalescing](0156-pptx-command-coalescing.md) | 1,000 direct shape commands share one native commit; 1,107 combined tests/doctests plus Clippy passed; 1k paired ratios 1.005–1.224; linear scaling fails and eager 10k exposes masked native node limit; artifacts cleaned; commit blocked by read-only Git metadata; full goal remains open |
+| 0155 | [One eager edit per PPTX setter](0155-pptx-single-edit.md) | Removed discarded native edit; paired eager one-shape overhead is 4–5% in the measured generated corpus; 1,097 facade tests/doctests and Clippy passed; artifacts cleaned; commit blocked by read-only Git metadata; command coalescing, wider performance acceptance and full goal remain open |
+| 0154 | [PPTX selector fanout](0154-pptx-selector-fanout.md) | Atomic text/geometry selection beyond 256 targets; 1,096 facade tests/doctests passed; paired 1–1,000-shape evidence finds eager small-write overhead above budget; Clippy passed; artifacts cleaned; commit blocked by read-only Git metadata; command batching, performance acceptance and full goal remain open |
+| 0153 | [Atomic PPTX text and geometry writes](0153-shape-geometry-writes.md) | Native eager/source and unified combined text/bounds edits with durable replay; 1,663 native and 1,092 facade tests/doctests, Clippy/docs/glossary/boundaries passed; commit blocked by read-only Git metadata; broader CRUD/performance/full goal remain open |
+| 0152 | [Text-box output admission](0152-text-box-output-admission.md) | Caller output limits checked before managed memory admission; 11 native and six facade tests plus Clippy passed; artifacts cleaned; commit blocked by read-only Git metadata; full goal remains open |
+| 0151 | [Source-backed text-box addition](0151-source-text-box-addition.md) | Native and unified source text-box creation, canonical durable suffix proof and reference-aware IDs; 1,642 native and 1,090 combined facade tests/doctests passed; Clippy/docs/glossary/boundaries passed; commit blocked by read-only Git metadata; broader shape/format CRUD and full goal remain open |
+| 0150 | [Source-backed slide insertion](0150-source-slide-insertion.md) | Native and unified source slide insertion, empty/disjoint durable topology and mixed lexical relationship edits; 1,144 OPC, 1,630 PPTX and 1,089 combined facade tests/doctests passed; Clippy/docs/glossary/boundaries passed; commit blocked by read-only Git metadata; source shape creation and full goal remain open |
+| 0149 | [Unified source slide removal](0149-unified-source-slide-removal.md) | Source File/query/transaction/batch removal and effective catalog/related reads; 1,614 native and 1,081 combined facade tests/doctests passed; Clippy/docs/glossary/boundaries passed; commit blocked by read-only Git metadata; source insertion, broader CRUD and full goal remain open |
+| 0148 | [Primary source slide removal](0148-primary-source-slide-removal.md) | Readable structural revisions and durable v3 replay/inverse after reopening; 1,614 native and 1,078 combined facade tests/doctests passed; Clippy/docs/glossary/boundaries passed; commit blocked by read-only Git metadata; facade source removal and full goal remain open |
+| 0147 | [Exact prepared metadata images](0147-prepared-metadata-images.md) | Bounded source/changed/appended/omitted metadata handles retain managed admissions; 1,141 OPC, 1,589 native PPTX and 1,078 combined facade tests/doctests passed; OPC Clippy/docs and crate boundaries passed; commit blocked by read-only Git metadata; primary topology/durable integration and full goal remain open |
+| 0146 | [Source-native slide removal plan](0146-source-slide-removal-plan.md) | Lazy OPC removal with strict ownership/metadata guards and exact root splicing; 1,589 native and 1,078 combined facade tests/doctests, Clippy/docs/glossary/boundaries passed; commit blocked by read-only Git metadata; primary durable source removal and full goal remain open |
+| 0145 | [Guarded source topology metadata](0145-source-topology-metadata.md) | Source-native exact relationship/content-type XML restoration behind physical and typed guards; 1,135 OPC, 1,583 native PPTX and 1,078 combined facade tests/doctests passed; Clippy/docs/glossary/boundaries passed; commit blocked by read-only Git metadata; primary source removal and full goal remain open |
+| 0144 | [Source PPTX removal prerequisites](0144-source-removal-prerequisites.md) | Shared lexical binding removal and source layout validation; physical XML limits enforced on master/layout/theme; 1,583 native and 1,078 combined tests/doctests plus Clippy/docs/glossary passed; boundaries passed and temporary artifacts cleaned, commit blocked by read-only Git metadata; primary source removal and full goal remain open |
+| 0143 | [PPTX modeled order metadata](0143-pptx-modeled-order-metadata.md) | Stock source Move/Swap and typed presentation extensions preserve exact metadata; 1,578 native, 562 PPTX facade and 1,078 combined tests/doctests passed; Clippy/docs/glossary/boundaries passed; commit blocked by read-only Git metadata; source topology and full goal open |
+| 0142 | [Primary source PPTX slide ordering](0142-pptx-primary-source-order.md) | Source Move/Swap composed with text, logical read mapping, stable bindings and durable v2 proofs; 1,572 native, 561 PPTX facade and 1,077 combined tests/doctests, Clippy/docs/glossary passed; commit blocked by read-only Git metadata; source topology, positional metadata and full goal open |
+| 0141 | [Composable source PPTX slide ordering](0141-pptx-source-order-composition.md) | Native staged moves/swaps, checked positions, exact cancellation and managed root reservations; 1,557 native, 559 PPTX facade and 1,075 combined tests/doctests, Clippy/docs/glossary passed; commit blocked by read-only Git metadata; primary catalog/durable integration and full goal open |
+| 0140 | [Unified PPTX slide removal](0140-pptx-unified-slide-removal.md) | Eager path/scoped-query removal, native dependency/final-slide guards and typed refusal mapping; 558 PPTX and 1,074 combined tests/doctests, Clippy/docs/glossary passed; commit blocked by read-only Git metadata; richer dependencies/source topology and full goal open |
+| 0139 | [Unified PPTX slide ordering](0139-pptx-unified-slide-order.md) | Eager move/swap through File, transactions and batches; exact placement/no-op/replay/undo and pre-promotion refusal; 548 PPTX and 1,064 combined tests/doctests, Clippy/docs/glossary passed; commit blocked by read-only Git metadata; removal/source topology and full goal open |
+| 0138 | [Unified PPTX text-box addition](0138-pptx-unified-text-box-addition.md) | Eager shape/textbox creation, strict geometry and native CR preservation; 987 native, 543 PPTX facade and 1,059 combined tests/doctests passed; Clippy/docs/glossary passed; commit blocked by read-only Git metadata; source structural creation and full goal open |
+| 0137 | [Unified PPTX slide addition](0137-pptx-unified-slide-addition.md) | File/transaction/batch add for created and eager owners, native preservation/proofs and explicit source-owner capability gap; 538 PPTX and 1,054 combined facade tests/doctests, Clippy/docs/glossary passed; commit blocked by read-only Git metadata; source topology, broader CRUD and full goal open |
+| 0136 | [Native PPTX slide insertion](0136-pptx-native-slide-insertion.md) | Checked position/exact layout insertion, durable replay/inverse and topology dependency guards; 1,001 native tests, 20 native doctests and 533 facade tests/doctests passed; Clippy/docs/glossary passed; commit blocked by read-only Git metadata; facade CRUD and full goal open |
+| 0135 | [PPTX part relationship metadata resolution](0135-pptx-part-metadata-three-way.md) | Physical part choices retain matching graph/XML; unrelated content-type and owner edits remain automatic; 986 native and 533 facade tests/doctests, Clippy/docs/glossary passed; commit blocked by read-only Git metadata; type/topology projection and full goal open |
+| 0134 | [PPTX package-root three-way merge](0134-pptx-root-three-way.md) | Compatible root IDs merge automatically; divergent graph/XML candidates resolve with Base/Left/Right and durable inverse preservation; 983 native and 533 facade tests/doctests, Clippy/docs/glossary passed; commit blocked by read-only Git metadata; part/content-type conflict resolution and full goal open |
+| 0133 | [PPTX durable metadata replay](0133-pptx-durable-metadata-replay.md) | LPTX0003 per-key metadata replay, exact forward/inverse publication and deterministic disjoint joins; 978 native, 1,126 OPC and 533 facade tests/doctests passed; Clippy/docs/glossary passed; commit blocked by read-only Git metadata; three-way metadata conflict resolution and full goal open |
+| 0132 | [Guarded OPC content-type fragments](0132-opc-content-type-fragments.md) | Native-key Default/Override transport, shared metadata planner and stricter no-op revalidation; 1,126 OPC tests/doctests, 967 native PPTX tests, Clippy/docs passed; commit blocked by read-only Git metadata; durable metadata wire integration and full goal open |
+| 0131 | [Guarded OPC relationship fragments](0131-opc-relationship-fragments.md) | Bounded lexical entry transport with source/context guards and exact inverse restoration; full OPC suite, 13 final focused tests, Clippy/docs and native PPTX check passed; commit blocked by read-only Git metadata; content-type transport, native wire integration and full goal open |
+| 0130 | [Semantic PPTX slide-order selectors](0130-pptx-slide-order-selectors.md) | Canonical slide selector, semantic move/swap/reorder and private raw-ID lowering; 982 native and 533 facade tests/doctests, harness, Clippy and glossary passed; commit blocked by read-only Git metadata; metadata transport and full goal open |
+| 0129 | [Guarded OPC metadata restoration](0129-opc-guarded-metadata-restoration.md) | Exact-source raw metadata installation with bounded parsing/audit and physical member presence; 1,103 OPC tests/doctests, 967 native PPTX tests and Clippy passed; commit blocked by read-only Git metadata; native durable wire integration and full goal open |
+| 0128 | [PPTX empty slide-list prerequisite](0128-pptx-empty-slide-list.md) | Empty-list lexical insertion and bounded IDs; 967 native tests plus metadata replay diagnostic and 99 integration tests and Clippy passed; durable forward metadata preservation remains prerequisite to public insertion; commit blocked by read-only Git metadata; full goal open |
+| 0127 | PPTX canonical constructor | Public package writer/font setters removed; native 1,515 and combined facade 1,081 tests/doctests passed; direct new-package edits/replay/inverse verified; remaining mutators/full goal open; commit blocked |
+| 0126 | PPTX builder consumer migration | Public authoring consumers migrated; 12 unified write + 10 harness tests, 21/24 root and both native smoke examples passed; 3 existing codec/adapter failures recorded; native constructor/full goal open; commit blocked |
+| 0125 | PPTX native builder and unified creation | Direct canonical native owner, typed option gaps and creation capabilities; 1,081 combined facade tests/doctests and native builder regression passed; Clippy/both glossary profiles passed; commit blocked by read-only Git metadata; full goal remains open |
+| 0124 | PPTX immutable encrypted publication | Retained-profile re-encryption integrated with common atomic save; 531 facade tests/doctests, 13 native encryption tests and final public regressions passed; Clippy/glossary passed; commit blocked by read-only Git metadata; full goal remains open |
+| 0123 | PPTX unified shape-text writes and publication | Native immutable setters, transactions/batches and atomic save integrated; 962 native + 1,076 combined facade tests/doctests passed; Clippy/glossary/review passed; commit blocked by read-only Git metadata; broader writes and full goal remain open |
+| 0122 | PPTX committed source revision readback | 26 native primary tests, 17 native doctests and 519 facade tests/doctests passed; Clippy/glossary/review passed; commit blocked by read-only Git metadata; facade writes and full goal remain open |
+| 0121 | Shared immutable PPTX native promotion | 518 facade tests/doctests and final signature regression passed; Clippy/glossary passed; commit blocked by read-only Git metadata; facade writes and full goal remain open |
+| 0120 | PPTX durable source shape-text patches | 960 encrypted native tests, 17 native doctests and 516 facade tests/doctests passed; Clippy/glossary/review passed; commit blocked by read-only Git metadata; full goal open |
+| 0119 | PPTX immutable source package ownership | 92 source, 8 owned-scene, 17 native doctests and 516 facade tests/doctests passed; Clippy/glossary/review passed; commit blocked by read-only Git metadata; full goal open |
+| 0118 | PPTX committed package and immutable patch replay | 210 encrypted native opened-editor, 22 policy/marked-XML, 16 native doctests and 516 facade tests/doctests passed; consumers/features/glossary and Clippy passed; commit blocked by read-only Git metadata; full goal open |
+| 0117 | PPTX patch admission and visible payload ownership | 203 default + 203 encrypted native opened-editor, 22 policy/marked-XML and 516 facade tests/doctests passed; Clippy clean; commit blocked; package-carrying commits and full goal remain open |
+| 0116 | PPTX primary Edit entry and drop semantics | 193 native opened-editor, 22 policy/marked-XML, one native example and 516 facade tests/doctests passed; glossary, Clippy, harness and public example checks passed; commit blocked; full goal open |
+| 0115 | XLSX border writes and typed local formatting | 1,012 combined tests/doctests, 90 stylesheet codec, 64 native cell-edit and 3 state tests passed; native examples, capabilities, Clippy and XLSX glossary passed; commit blocked; full goal open |
+| 0114 | XLSX gradient-fill writes | 1,001 combined tests/doctests, 81 stylesheet codec, 57 native cell-edit and 78 style tests passed; canonical native replacement, bounded multi-stop input and typed join-budget recovery; examples, capabilities, Clippy and XLSX glossary passed; commit blocked; full goal open |
+| 0113 | XLSX solid and pattern-fill writes | 995 combined tests/doctests, 75 stylesheet codec and 50 native cell-edit tests passed; typed native fill changes, facade foreground/pattern/background policy, Clippy/native example, both capability profiles and XLSX glossary check passed; commit blocked; full goal open |
+| 0112 | XLSX number-format writes | 988 combined tests/doctests, 66 stylesheet codec, 44 native cell-edit and 75 style tests passed; native resource reuse/allocation and unified aliases; Clippy/native example clean; commit blocked; full goal open |
+| 0111 | XLSX protection and remaining alignment attributes | 982 combined tests/doctests, 56 stylesheet, 39 native cell-edit and 73 native style checks passed; five setters and optional justification readback; 50 final facade checks and Clippy clean; commit blocked; full goal open |
+| 0110 | XLSX alignment writes | 975 combined + 45 final facade cell tests/doctests, 48 stylesheet and 37 native cell-edit checks passed; Clippy and native example clean; shared font/alignment lowering and seven setters; commit blocked; full goal open |
+| 0109 | XLSX remaining typed font properties | 967 final DOCX/XLSX/XLSB/encryption tests/doctests, 38 stylesheet, 38 font-focused and 39 final cell-write checks passed; seven font read/write properties, checked integer bounds and explicit XLSB gaps; Clippy clean; commit blocked; full goal open |
+| 0108 | XLSX font color writes | 929 combined + 34 final cell tests/doctests, 32 stylesheet and 32 font-focused checks passed; typed RGB/theme/tint, lexical preservation and ordered insertion; Clippy clean; full goal open; commit blocked |
+| 0107 | XLSX font name, size and script writes | 924 combined + 29 final cell tests/doctests, 26 stylesheet and 28 font-focused checks passed; Clippy clean; owned names, checked size/script, bounded quote-safe writes; full goal open; commit blocked |
+| 0106 | XLSX strike-through and underline writes | 919 combined + 49 final write tests/doctests, 20 stylesheet and 22 font-focused checks passed; Clippy clean; native strike/underline, aliases and strict XML envelope; full goal open; commit blocked |
+| 0105 | Reuse explicit XLSX merge-list planning | 914 combined tests/doctests and 18 focused merge tests passed; Clippy clean; per-worksheet admission reuse retains selected-node limits and atomic companions; full performance/coverage goal open; commit blocked |
+| 0104 | XLSX merge operations and range readback | 911 combined + 419 minimal tests/doctests, 37 native + 21 source merge tests and final 15 unified regressions passed; Clippy clean; bounded native merges, atomic companions and table guards; broader coverage/full goal open; commit blocked |
+| 0103 | XLSX row and column layout | 895 combined + 419 minimal tests/doctests and 14 delta tests passed; Clippy clean; native height/width/visibility/outline/collapse assignments with bounded selectors; broader writes/full goal open; commit blocked |
+| 0102 | XLSX worksheet lifecycle | 883 combined + 419 minimal tests/doctests and final 34 targeted regressions passed; Clippy clean; worksheet add/remove, tab rename/visibility/move/swap and native patch integration; broader coverage/full goal open; commit blocked |
+| 0101 | XLSX distinct-cell batch coalescing | 870 combined + 419 minimal tests/doctests, 3 native state tests and 9 native doctests passed; Clippy clean; source/eager 1k scalar batches within 2× native in scoped ABBA runs; broader coalescing/full goal open; commit blocked |
+| 0100 | Preserve ignorable XLSX stylesheet extensions | 16 codec + 11 native font + 859 combined tests/doctests and 14 delta tests passed; Clippy clean; bounded MCE admission, opaque preservation and font insertion order verified; broader formatting/full goal open; commit blocked |
+| 0099 | XLSX native and unified font assignments | 2,254 native + 858 combined + 419 minimal tests/doctests, final 11 codec and 14 delta tests passed; Clippy clean; lossless bold/italic resources, range writes, joins, replay and inverse verified; stylesheet profiles/compaction and full goal open; commit blocked |
+| 0098 | XLSX range and scoped-selector writes | 855 combined + 419 minimal tests/doctests, 14 target-write regressions and 14 delta tests passed; Clippy clean; one native commit, distinct-cell/staging budgets and early rectangle admission verified; structural/coalesced writes and full goal open; commit blocked |
+| 0097 | XLSX cell writes and native transaction history | 2,233 native + 20 final native + 841 combined + 419 minimal tests/doctests and 14 delta tests passed; Clippy clean; direct cell writes, rollback, replay, opaque preservation and protection reports verified; range/structural/coalesced writes and full goal open; commit blocked |
+| 0096 | Immutable XLSX source promotion | 561 XLSX encryption + 817 combined tests/doctests and final concurrent regression passed; Clippy clean; exact source, successful promotion reuse, retry and signature isolation verified; cell writes/full goal open; commit blocked |
+| 0095 | XLSX native creation and publication | 814 combined DOCX/XLSX + 558 XLSX encryption + 418 minimal tests/doctests and 14 delta tests passed; strict output/origin/signature policies verified; XLSX mutations and managed publication/full goal open; commit blocked |
+| 0094 | DOCX cached-result field invalidation | 2,282 native + 703 DOCX + 418 minimal tests/doctests and 14 delta tests passed; exact dirty-marker replay/inverse and atomic rollback verified; additional namespace replay regression and Clippy passed; full goal open; commit blocked |
+| 0093 | DOCX command paragraph-add splitting | 700 DOCX + 418 minimal tests/doctests, 39 final batch and 14 delta tests passed; Clippy clean; atomic LF splitting/VT inline controls verified; full goal open; commit blocked |
+| 0092 | Literal first-node DOCX command run text | 2,277 native + 697 DOCX + 418 minimal tests/doctests; 14 delta tests, Clippy and replay review passed; paragraph splitting/field cache/managed edits/full goal open; commit blocked |
+| 0091 | Reuse DOCX body during write admission | 692 DOCX tests/doctests and Clippy passed; controlled 1k fanout at 1.13× eager / 1.10–1.11× source native; small-write/full goal open; commit blocked |
+| 0090 | Borrow DOCX immediate write assignments | 691 DOCX tests/doctests and Clippy passed; deferred plans retain ownership, paired timing shows no clear improvement; full goal open; commit blocked |
+| 0089 | Paired DOCX paragraph text fanout baseline | Two 9-round ABBA invocations, byte/ledger equivalence and Clippy passed; small-write overhead exceeds review trigger, 10k typed refusal; full goal open; commit blocked |
+| 0088 | DOCX paragraph selector command text controls | 690 DOCX + 418 minimal tests/doctests, 31 batch and 14 delta tests passed; single-pass target admission, Clippy clean; broader text/full goal open; commit blocked |
+| 0087 | Native bulk dispatch for DOCX paragraph text fanout | 688 unified DOCX tests/doctests and 3 final fanout regressions passed; Clippy clean; eligible fanout uses native bulk, performance/full goal open; commit blocked |
+| 0086 | Native DOCX bulk paragraph inline controls | 1,397 native + 12 bulk integration + 685 unified tests/doctests passed; managed publication/inverse and resource release verified, Clippy clean; full goal open; commit blocked |
+| 0085 | Direct DOCX paragraph inline text controls | 1,397 native + 9 managed + 685 DOCX + 418 minimal tests/doctests; Clippy/delta checks passed; direct paragraph command controls integrated, broader text/full goal open; commit blocked |
+| 0084 | DOCX command run-add text controls | 683 DOCX tests/doctests, 32 focused batch/capability and 14 delta tests passed; Clippy clean; input run controls integrated, other text contexts/full goal open; commit blocked |
+| 0083 | Decode typed DOCX scalar controls in scope | 1,397 native + 19 source/content + 680 unified tests/doctests passed; 3k typed controls need zero owner scans; malformed scalar payloads refused; Clippy clean; full goal open, commit blocked |
+| 0082 | Reuse DOCX run namespace context | 1,395 native + 19 source/content + 680 unified tests/doctests passed; zero owner scans for 1k captured run text reads, Clippy clean; broader context/performance/full goal open; commit blocked by read-only Git metadata |
+| 0081 | Contextual DOCX paragraph/run text reads | 1,393 native + 5 content + 10 tracker + 39 source/streaming + 680 unified tests/doctests passed; Clippy clean; context reuse, text policy and full goal open; commit blocked by read-only Git metadata |
+| 0080 | Namespace-correct DOCX typed run content | 1,397 final native unit/integration + 679 unified tests/doctests; fixture targets recovered (36 tests), Clippy clean; text-policy completion remains open; commit blocked by read-only Git metadata |
+| 0079 | Shared formatting runs for DOCX closure edits | 678 DOCX +418 minimal tests/doctests and final19 transaction tests passed; typed targets, staged reads, poison and best-effort isolation verified; wider coalescing/full goal open; commit blocked by read-only Git metadata |
+| 0078 | Paired DOCX batch scaling and target reuse | 452 focused tests + final 25 batch regressions passed; repeated-target 1k batch measures 1.08–1.10× leaf across eager/source; broader performance acceptance open; commit blocked by read-only Git metadata |
+| 0077 | Atomic DOCX direct-path formatting runs | 669 DOCX + 418 minimal tests/doctests, final 24 batch regressions and 2 bisection probes passed; native-capacity splitting and retained XML reduction verified; performance/wider coalescing open; commit blocked by read-only Git metadata |
+| 0076 | DOCX atomic and best-effort command batches | 1,039 all-feature + 665 final DOCX tests/doctests and 26 final batch/capability regressions passed; atomic/best-effort core integrated; coalescing/full command coverage open; commit blocked by read-only Git metadata |
+| 0075 | Bounded DOCX explicit transactions | 1,021 all-feature + 417 minimal tests/doctests and final 24 transaction/capability regressions passed; owner-bound replay/limits verified; coalescing/batch remain open; commit blocked by read-only Git metadata |
+| 0074 | Complete internal DOCX operation commits | 1,002 all-feature + 413 minimal tests/doctests; patch/diagnostics retained across all five verbs, replay/inverse/no-ops verified and empty-target admission fixed; public transactions/coalescing remain open; commit blocked by read-only Git metadata |
+| 0073 | Bounded OfficeCLI batch payload ingress | 994 all-feature + 413 minimal tests/doctests; complete transport vocabulary, caller-selected byte/item limits and typed redacted failures verified; executor/coalescing remains open; commit blocked by read-only Git metadata |
+| 0072 | DOCX creation and atomic path saving | 970 all-feature ops + 596 DOCX-only + 389 minimal + 1,097 OPC tests/doctests; typed creation, origin retention, guarded overwrite policy and encrypted save round trips verified; broader writes/batches remain open; commit blocked by read-only Git metadata |
+| 0071 | Immutable DOCX structural operations | 946 all-feature ops + 2,257 DOCX leaf + 384 minimal tests/doctests; paragraph/run add/remove/move/swap, exact slot preservation and add registry verified; batches/path saving remain open; commit blocked by read-only Git metadata |
+| 0070 | Immutable DOCX set and stream publication | 917 all-feature ops + 2,252 DOCX leaf + 1,093 OPC tests/doctests; 68 setters and exact eager/source no-ops verified; structural writes/batches/path saving open; commit blocked by read-only Git metadata |
+| 0069 | Property inputs, strict registry admission and error attribution | M2 W1/W2 foundation: 529 DOCX + 359 minimal tests/doctests; File setters/batches pending; commit blocked by read-only Git metadata |
+| 0068 | XLSB unified read adapter and indexed scalar fallback | R4d integrated: 1,076 leaf + 418 ops + 468 XLSX regression tests/doctests; extended gaps/write/performance open; commit blocked by read-only Git metadata |
+| 0067 | XLSB retained grids and checked sparse reads | L-XLSB-R2 verified: 1,072 leaf + 401 ops tests/doctests; R4d pending; commit blocked by read-only Git metadata |
+| 0066 | XLSB semantic tab catalog | L-XLSB-R1 verified: 1,055 leaf + 400 ops tests/doctests; R2/R4d pending; commit blocked by read-only Git metadata |
+| 0065 | XLSX trait read boundaries and capability publication | 468 tests/doctests and Clippy passed; infallible metadata migration open; commit blocked by read-only Git metadata |
+| 0064 | PPTX unified read adapter | R4c integrated; 2,310 tests/doctests passed, 3 ignored; extended gaps/performance open; commit blocked by read-only Git metadata |
+| 0063 | Source-backed PPTX modern comments | R9 read foundation verified; unified PPTX dispatch pending; commit blocked |
+| 0062 | Source-backed PPTX presentation catalog | R4 read foundation verified; full goal active; commit blocked |
+| 0061 | Source-backed PPTX related parts | R3 read foundation verified; modern comments and full charts pending; commit blocked |
+| 0060 | Shared DrawingML text bodies | R7 codec/property projection verified; full policy migration pending; commit blocked |
+| 0059 | PPTX lazy shape properties | R6 properties/raw identity verified; commit blocked |
+| 0058 | Source-backed PPTX scenes and bounded retention | R1/R2 source read/cache verified; R3/R6/R7 and R4c pending; commit blocked by read-only Git metadata |
+| 0057 | Independently retained PPTX scenes and token classification | R2 eager foundation and R10 verified; source memo and R4c pending; commit blocked by read-only Git metadata |
+| 0056 | XLSX unified read adapter and File dispatch | R4b integrated and verified; broader M1 and performance acceptance pending; commit blocked by read-only Git metadata |
+| 0055 | XLSX readable formatting and source table access | L-XLSX-R3/R4 integrated and verified; adapter and performance acceptance pending; commit blocked |
+| 0054 | XLSX retained grid, metadata projection and early-stop leaf reads | L-XLSX-R1/R2/R6 integrated; formatting/tables, adapter and performance acceptance pending; commit blocked |
+| 0053 | Capability reports and generated OfficeCLI comparison | DOCX discovery integrated; parity/registry incomplete; commit blocked by read-only Git metadata |
 | 0036 | OPC source-limit kinds and canonical errors | physical kind/error fields migrated; broader limits policy pending |
 | 0035 | OPC/OOXML source-limit vocabulary | shared physical profile and builder renamed; broader limits policy pending |
 | 0034 | Effective source DOCX text streaming | retained main/donor output integrated; specialized routes pending |
@@ -590,3 +695,135 @@ streaming evaluation, with explicit raw identity admission and content-free
 errors/Debug. Test-only Word, presentation and workbook adapters exercise the
 engine. Concrete DOCX and File dispatch remain pending; M1 and the full goal
 remain active.
+
+### 0051 — DOCX read adapter integration
+
+Record [0051](0051-docx-read-adapter.md) integrates DOCX nodes, navigation,
+query binding, projections and internal document views. ADR 0034 adaptations
+keep ordinary paths positional and native identities behind raw admission.
+Source freshness, invalid-property refusal and feature-specific snapshots are
+covered by regressions. File dispatch, M1 acceptance and the full goal remain
+active.
+
+### 0052 — File unified read entry points
+
+Record [0052](0052-file-read-dispatch.md) connects DOCX navigation, lazy queries
+and text/JSON views to File and the `litchi` facade. Walks now own their adapter,
+with retained source checks and borrowed-plan reuse. Security wrappers and raw
+identity admission have public dispatch coverage. Other adapters, capability
+publication and M1 acceptance remain open. Git metadata is still read-only, so
+records 0051–0052 remain uncommitted working-tree changes.
+
+## Capability reports (record 0053)
+
+File/facade capability discovery publishes static DOCX read metadata and
+truthful protected/pending-format refusals. Ordinary reports hide native
+selection fields and paths. Generated OfficeCLI deltas and CI snapshot-hash
+checks expose remaining parity work. Complete gap triage, registry writes,
+other adapters and full-goal verification remain pending. Changes in records
+0051–0053 remain uncommitted because Git metadata is read-only.
+
+## XLSX leaf read prerequisites (record 0054)
+
+Focused `workbook::source::{Grid, CacheDiagnostics}`, bounded shared retention,
+worksheet delegates and early-stop visits are integrated. Cold cell reads
+retain streaming; metadata projection enforces caller physical XML limits.
+R3/R4 formatting/table prerequisites and the concrete XLSX adapter remain
+pending. Source/semantic-limit and owner vocabulary migrations are incomplete.
+The full goal remains active; records 0051–0054 are uncommitted due to read-only
+Git metadata.
+
+
+## XLSX formatting and tables (record 0055)
+
+Readable formatting, lineage-bound source style keys, source table access,
+checked table bands and ambiguity-refusing Unicode name lookup are integrated.
+Caller XML policy and content-free diagnostics passed regression checks. The concrete
+XLSX adapter and performance acceptance remain pending. The full goal is active;
+records 0051–0055 remain uncommitted because linked-worktree Git metadata is
+read-only. See [0055](0055-xlsx-formatting-and-tables.md).
+
+
+## XLSX unified read adapter (record 0056)
+
+XLSX now participates in File navigation, lazy queries, typed node views and
+text/annotated/outline/stats views. Ordinary canonical paths are positional;
+native number-format predicates require explicit raw admission. Source fences,
+Unicode ambiguity, caller limits and fixed per-walk allocation costs are
+covered by regression checks. Operations tests, facade tests, feature builds,
+Clippy, rustdoc, workspace compilation, glossary and boundaries pass. M1 acceptance,
+remaining adapters and all later milestones remain open. See
+[0056](0056-xlsx-unified-read-adapter.md).
+
+
+## PPTX retained-scene foundation (record 0057)
+
+Eager slides, layouts and masters expose independently retained scenes with
+checked positional/name selection, typed ambiguity and content-free diagnostics.
+Layout and placeholder token classifiers are integrated. Source-backed scene
+caching, related parts and the unified PPTX adapter remain open. See
+[0057](0057-owned-pptx-scenes.md); the full goal remains active.
+
+
+## Source-backed PPTX scenes (record 0058)
+
+Source slide scenes now use the independent owned projection and a bounded
+weighted LRU, with managed no-retention, source/execution fences and physical
+XML limits before MCE. Scene handles do not retain their presentation owner.
+Related parts, richer property/text projection and unified PPTX dispatch remain
+open. See [0058](0058-source-pptx-scenes.md); the full goal remains active.
+
+
+## PPTX lazy shape properties (record 0059)
+
+Non-visual properties and full DrawingML transforms are decoded on demand;
+native payload relationships and spans use explicit raw access. Namespace,
+ambiguity, retained-source parity and diagnostic redaction checks pass.
+Formatting tab stops no longer appear as literal text. Related parts, R7 text
+projection and unified PPTX dispatch remain open; the full goal is active.
+See [0059](0059-pptx-shape-properties.md).
+
+
+## Shared DrawingML text bodies (record 0060)
+
+PPTX lazy body reads and SpreadsheetDrawing now share paragraph/run/property
+decoding. Strict refusal, raw native identities, retained limits, redacted
+diagnostics and atomic authoring guards replace the candidate's lossy legacy
+policy. Namespace preparation has a root-inheritance fast path. Related parts,
+unified PPTX dispatch and the full goal remain open.
+See [0060](0060-shared-drawingml-text-bodies.md).
+
+
+## Source PPTX related parts (record 0061)
+
+Source slides now acquire detached layout, notes, legacy comments and basic
+chart snapshots. Native identities remain under explicit raw access. Reads
+apply source/execution fences, bounded preprocessing, strict relationship
+validation and rollback of failed scene publication. Full PPTX tests and the
+final targeted related-part regressions pass. Presentation metadata, full
+chart/modern-comment coverage and unified PPTX dispatch remain pending.
+See [0061](0061-source-pptx-related-parts.md); the full goal is active.
+
+
+## Source PPTX presentation catalog (record 0062)
+
+Source presentations now expose detached masters, layouts and sections in
+authored order, plus explicit raw root access. Shared leaf codecs enforce
+core namespaces, ID-list structure and schema-valid dimensions. Collection
+reads bound accounted retained bytes and roll back failed scene publication.
+Full PPTX tests, focused source tests, Clippy, rustdoc, workspace compilation
+and both glossary profiles pass. Modern comments, full charts, unified PPTX
+dispatch and performance acceptance remain pending; the full goal is active.
+See [0062](0062-source-pptx-presentation-catalog.md).
+
+
+## Source PPTX modern comments (record 0063)
+
+Selected slides now acquire detached modern comments and replies with semantic
+text and author names. The source read validates its selected author closure,
+preserves inherited body namespaces, and keeps wire identities under explicit
+raw access. Shared codecs accept valid XML character references and retain typed
+resource refusals. Full PPTX tests, Clippy, rustdoc, workspace compilation and
+both glossary profiles pass. Full charts, unified PPTX dispatch and performance
+acceptance remain pending; the full goal is active.
+See [0063](0063-source-pptx-modern-comments.md).

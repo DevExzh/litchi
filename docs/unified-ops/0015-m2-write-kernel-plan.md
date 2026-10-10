@@ -776,7 +776,7 @@ constructor.
 **Addressing.** The R4c adapter (`uo/m1-r4c-pptx`, `5e9137372c`) resolves
 `/slide[N]` and per-kind shape counters over the direct children of each
 shape tree, with `shape[@id=N]` (the `cNvPr` id) as the canonical step
-(record 0010 D5). The transaction addresses slides by `slide::Key::Index`
+(record 0010 D5). The transaction addresses slides by `slide::Selector::Position`
 (zero-based, *staged* order) or by name (`P/slide/model.rs:18-23`;
 `P/opened/transaction.rs:1472-1484`) and shapes by `shape::Key::Name` (exact,
 ambiguity refused) or `Index` (depth-first pre-order position)
@@ -785,7 +785,7 @@ although every add verb returns it (`P/opened/transaction.rs:300-361`).
 
 | Path | Leaf coordinate |
 |---|---|
-| `/slide[N]` | `slide::Key::Index(N-1)`: the staged order makes a moved or added slide addressable in the same run |
+| `/slide[N]` | `slide::Selector::Position(Position::new(N-1))`: the staged order makes a moved or added slide addressable in the same run |
 | `/slide[N]/shape[K]`, `…/shape[@id=I]`, `picture[K]`, `table[K]`, … | today: the pre-order index the scene gives for that record, recomputed when the run changed the slide's tree (a barrier); after L-PPTX-W2: `shape::Key::Id(I)`, stable across staged adds and removes |
 | `/slide[N]/notes` | the slide's notes (existing notes only, `P/opened/transaction.rs:657`, refusal `:663-669`) |
 | `/` | presentation keys; metadata after L-PPTX-W6 |

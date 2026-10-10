@@ -25,7 +25,7 @@ Rules of reading:
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ pptx/numbers/pages/keynote/doc/ods · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
+| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
 | Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ docx owned `Package::document()` projection (0019) |
 | Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · 🔴 xlsx `Workbook` demoted to projection (W2) · 🔴 ods `Spreadsheet`→`Workbook` (W3) · 🔴 xls (W4) |
 | Read-only semantic projection, decks | `Presentation` | — | 🔴 keynote `Document`→`Presentation` (W1) · ✅ pptx view / odp name (shape changes W2/W3) · 🔴 ppt (W4) |
@@ -42,18 +42,20 @@ transaction is the bare `Package::edit()`.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · 🔴 pptx/xlsx (W2), odt already `edit` but moves onto `Package` (W3) |
+| Edit entry, primary transaction | `Package::edit()` | `edit_document()` (docx), `opened_presentation_transaction()` (pptx), `Workbook::edit()` (xlsx — moves to `Package`) | ✅ docx eager/source entry name (0018; eager package-bound commit 0022, source 0031) · ✅ iWork/xlsx-name · ✅ pptx eager entry (0116) · 🔴 xlsx owner (W2), odt already `edit` but moves onto `Package` (W3) |
 | Edit entry, scoped family | `Package::edit_x()` | — | ✅ numbers/keynote/pages families |
-| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | 🔴 W2 |
+| PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
+| PPTX chunked shape publication | `Edit::{set_shape_text_chunks, set_shape_property_chunks}` | — | Eager/source primary and focused source edits admit bounded, globally disjoint chunks together for one same-slide publication (0158); single-chunk setter limits are retained |
+| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116); 🔴 xlsb/scoped PPTX families (W2) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
-| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031) · 🔴 other W2 |
-| Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork · 🔴 xlsx/pptx (W2) |
-| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031); 🔴 remaining owner shapes |
-| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); 🔴 legacy publishers and other W2 owners |
-| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx · 🔴 W2 |
+| New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118) · 🔴 other W2 |
+| Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118) · 🔴 remaining owners (W2) |
+| Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031), PPTX eager (0118); 🔴 remaining owner shapes |
+| Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); 🔴 other W2 owners |
+| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
-| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | 🔴 W2 |
-| Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | 🔴 W2: authoring verbs move into `Edit`; `UnsafeEdit` refusals disappear with the writers |
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); 🔴 scoped PPTX families (W2) |
+| Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
 composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
@@ -67,7 +69,7 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
 | Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 |
-| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx/pptx · 🔴 xlsx (W2); all formats gain it |
+| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127) · 🔴 xlsx (W2); all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML; extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | ✅ owning DOCX (0044); lazy managed DOCX bytes pending. `build()` returns `Package`; output lives on `Package` |
@@ -577,3 +579,523 @@ The design's unknown-key diagnostics and absent-value comparison semantics stay
 intact. Debug and diagnostic rendering omit authored selector content; explicit
 syntax rendering and data accessors remain available. The engine currently runs
 through test-only format adapters; production File dispatch remains pending.
+
+## DOCX unified read adapter (record 0051)
+
+DOCX nodes use positional canonical paths. Paragraph/content-control identity
+selection requires raw paths or queries; ordinary node projections hide these
+identity fields. Typed leaf access and transaction-position reads validate the
+retained owner revision and return typed errors. The static query vocabulary
+and internal document views are integrated; File dispatch and production
+registry/capability publication remain pending.
+
+## File read dispatch (record 0052)
+
+DOCX unified reads are now available from File, including lazy query Matches
+and typed JSON rendering. Ordinary paths/results remain positional; native
+selection requires explicit raw admission. The facade exports the same node,
+path, query and view modules. View options remain internal pending typed public
+integration; other format adapters and capability publication remain pending.
+
+## Capability discovery (record 0053)
+
+`File::capabilities()` and `capabilities::Capabilities::of` expose typed
+read-support metadata. Ordinary element/property discovery excludes native
+identity fields and native selector templates using the query compiler's
+classification. Positional paths and semantic selectors remain discoverable;
+raw selection is still explicit. `view::Mode::ALL` enumerates supported and
+refused modes for inspection. Source freshness is validated by reads, not by
+static capability discovery. Full property-registry and gap coverage remain
+pending.
+
+## XLSX source-grid prerequisites (record 0054)
+
+New grid and cache-diagnostic types use the focused names
+`workbook::source::{Grid, CacheDiagnostics}` without root aliases. XLSX minimal
+and full API profiles ban the candidate names `SourceGrid` and
+`SemanticCacheDiagnostics`. Grid addressing retains `At`/`Area`; row/column
+coordinates remain checked. This does not claim migration of the existing
+XLSX package/projection or transaction API families.
+
+
+## XLSX readable formatting (record 0055)
+
+Source cell records use `workbook::source::Record`; their optional style keys
+reuse opaque, lineage-bound `style::StyleKey`. Keys from another workbook are
+refused, while cloned owners share the lineage. No numeric source key accessor
+is public. The stored number-format ID is available only through explicit
+`style::cell_format::raw::number_format_id`; ordinary NumberFormat reads expose
+format codes and classification. Both XLSX glossary profiles register these
+bans. Legacy table-model physical metadata and existing XLSX transaction-family
+migration remain pending.
+
+
+## XLSX unified read projection (record 0056)
+
+File XLSX reads return concrete nodes with canonical positional sheet/table/
+defined-name paths and checked A1 coordinates. Authored sheet-name reads are
+fallible; structural positions are infallible. Native `numFmtId` metadata is
+explicitly marked raw in the static property registry, hidden from ordinary
+views/discovery and admitted only by raw queries. Raw properties are separate
+from resolver identities. The source leaf's checked `style_key` yields the
+existing opaque lineage-bound key without cloning a cell. Legacy XLSX owner,
+transaction and raw table-model migration remain pending.
+
+
+## Independently retained PPTX scenes (record 0057)
+
+The new `shape::owned` module uses `Scene`, `Handle`, `Handles`, `Selector`
+and `Error`. Selection admits only exact case-sensitive producer names and
+`Position(Position)`; missing values return `Ok(None)`, ambiguity has a
+content-free typed error. Handles expose `position() -> Position`; raw owner
+XML lives in `owned::raw`. Debug omits authored content. Minimal/full PPTX
+profiles enforce these names for the new module. Existing borrowed Shape,
+scene Key/index APIs and broad PPTX owner/default-policy migration remain open.
+
+
+## Source PPTX scene retention (record 0058)
+
+`SourceSlide::scene()` returns `shape::owned::Scene`, retaining no presentation
+owner. Memo diagnostics use focused `presentation::scene::CacheDiagnostics`;
+the prefixed candidate spelling is banned in the minimal/full PPTX profiles.
+Diagnostics expose only structural counters. New source scene reads enforce
+physical XML limits before MCE and source/execution fences around memo access.
+Existing source-owner positional/native accessors and semantic execution-budget
+accounting remain migration debt.
+
+
+## PPTX lazy shape metadata (record 0059)
+
+Common/Shape expose semantic NonVisual values and typed transforms. Newly
+introduced relationship IDs and physical spans are confined to `shape::raw`;
+minimal/full profiles ban ordinary Payload/PayloadAttribute exports and
+payload/span methods. Raw ambiguity and namespace failures are content-free
+typed errors. Common/shape/non-visual/payload Debug omits authored data.
+Borrowed scenes, iterators, selectors and lookup errors also redact Debug/Display.
+Legacy borrowed shape IDs/XML access and selector/error field migration remain pending.
+
+
+## Shared DrawingML text bodies (record 0060)
+
+PPTX and SpreadsheetDrawing use one strict `text::body::reader`; the new
+DrawingML glossary profile bans `Profile` and `read_with`. Native field and
+hyperlink/picture relationship IDs are private and use `body::raw` access.
+Both PPTX profiles ban ordinary `text_body_span`. Authored model/reader Debug
+is redacted. Shared writers return typed results, validate before mutation,
+and refuse incomplete or unsupported local projections. Broad source-limit
+and owner vocabulary migration remains open.
+
+
+## Source PPTX related snapshots (record 0061)
+
+`presentation::related` names the retained `Layout`, `Notes`, `Comments`,
+`Comment` and `Chart` projections without source-owner prefixes. Semantic
+accessors expose authored values; `related::raw` owns physical part names,
+relationship identifiers and bytes. Both PPTX profiles ban native identities
+on the ordinary snapshot types. Indexed chart selection accepts `Position`.
+Source acquisition is fallible; detached snapshot accessors read already
+validated values. Broad source-owner vocabulary migration remains pending.
+
+
+## Source PPTX presentation catalog (record 0062)
+
+Detached masters use `presentation::related::Master`; layouts reuse `Layout`.
+Catalog selection uses `Position` and preserves authored XML order. Section
+projections use `presentation::sections::{List, Section}` with semantic slide
+positions; native GUIDs, slide IDs and opaque extensions use `sections::raw`.
+Captured main-root bytes use `presentation::raw`. Ordinary snapshot diagnostics
+omit names and native identities. Broad source-owner naming and policy-envelope
+migration remains pending.
+
+
+## Source PPTX modern comments (record 0063)
+
+`presentation::modern_comments::{List, Comment, Reply}` provides detached
+semantic projections. `entries`, checked positional selectors, `text` and
+`author_name` expose authored content; wire IDs, assignments, namespace bindings,
+XML and physical metadata use `modern_comments::raw`. Missing and present-empty
+text bodies remain distinct; status and progress accessors apply schema defaults.
+Both PPTX glossary profiles register the new native-identity bans. Full package
+owner vocabulary and configurable semantic-policy migration remain pending.
+
+## Unified batch payloads (record 0073)
+
+`BatchItem` carries the full OfficeCLI command envelope. Rust uses `kind` for
+the wire key `type` and `dump_version` for `dumpVersion`; `op` is an input
+alias of `command`, not a second Rust field. Wire field matching is ASCII
+case-insensitive. Unknown or repeated envelope fields refuse, including
+`command` together with `op`. `Props` retains its ordered assignments and
+typed null semantics. Authored fields are omitted from `Debug` and decoder
+error messages. `BatchMode::Atomic` is the default; `BestEffort` is explicit.
+
+These are transport inputs, not an alternate document model. Numeric wire
+fields retain OfficeCLI's signed 32-bit representation; future command
+admission must convert positions to `Position` and validate command-specific
+ranges. Batch execution, staged navigation, commit diagnostics and composite
+patches remain pending; payload decoding alone grants no capability.
+
+`batch::SourceLimits` and its consuming `SourceLimitsBuilder` use
+`max_input_bytes` and `max_items`; `SourceLimitKind::{InputBytes, Items}`
+identify those dimensions. `batch::Error` carries `InvalidLimit`, `Limit`,
+`Malformed` (line/column only) and `Allocation`. Bounded array ingress returns
+the unified error with that typed source and, where applicable, item index.
+Out-of-range wire integers fail transport; in-range negative values are
+retained for command-specific validation.
+
+## Unified closure transactions (record 0075)
+
+`File::{edit, edit_with_limits}` use `transaction::Edit`, replacing the draft
+proxy name `Transaction`. `transaction::{Commit, Patch, Diagnostics, Error,
+LimitKind}` name their result/replay family; `SemanticLimits` and its consuming
+builder bound mutation calls and retained main XML. The normalized public
+`Commit<T>` fields retain the file, patch, diagnostics and closure value.
+`Diagnostics::changed()` and `Patch::is_noop()` describe the final logical
+artifact, not how many operations ran. Other counts remain explicit facts.
+
+Patches are process-local and bound to exact immutable owner handles (clones
+accepted). `Patch::inverse()` reverses endpoint direction; `Patch::apply(&File)`
+returns the retained validated endpoint after source guards. It cannot apply to
+an independent open or reverse explicit signature removal. `Error::PatchConflict`
+remains distinct from physical stale-source failures. `capabilities::Verb::Edit`
+advertises this DOCX closure subset; command `Batch` execution stays pending.
+
+## Unified command execution (record 0076)
+
+`File::apply` executes one command and returns `transaction::Commit<Applied>`;
+`File::{batch, batch_with_limits}` return `BatchCommit` with `file`, `patch`,
+`diagnostics` and `results`. `ItemResult::{Applied, Failed}` preserves input
+order; failures retain their original item index. `Applied` carries `changed`
+and `path: Option<Box<Path<'static>>>`, populated by creation. The optional
+path is indirect so ordinary result entries do not embed the grammar's large
+inline path storage; callers borrow it with `as_deref()`.
+
+Atomic and best-effort modes share one transaction and resource profile.
+Ordinary best-effort failures roll back one item, while global resource,
+source/protection/cancellation failures abort the whole batch. The DOCX core
+command subset is discoverable through `Verb::Batch`; contextual gaps retain
+follow-ups for command families and text/dump semantics not yet implemented.
+
+## XLSX unified creation and publication (record 0095)
+
+`create(FileFormat::Xlsx)` adopts the native `Workbook::create` owner directly.
+`File::{to_bytes, write_to, save, save_as, save_with}` share the existing
+publication vocabulary and strict policies across DOCX and XLSX. Path-backed
+XLSX handles retain their origin through unlock; bytes and newly created
+handles require a destination. Ordinary encrypted output refuses protection
+removal, and explicit `SaveOptions::reencrypt` retains the native profile.
+Template, Strict and initial-metadata creation options remain discoverable
+refusals. The initial XLSX cell mutation surface is described below.
+
+XLSX edit admission now borrows the handle (`editor(&self)`, internal) rather
+than consuming it or choosing an engine from reference counts (record 0096).
+Successful exact-source promotion shares a native workbook per open; explicit
+signature removal has a separate owner slot.
+
+## XLSX unified cell writes (record 0097)
+
+`File::set` accepts direct cell paths with registry properties `value`,
+`formula`, and `clear`; the same operations participate in `File::edit` and
+atomic or best-effort batches. `ValueType::Scalar` preserves text, boolean,
+64-bit integer, and finite-number kinds. Text stays literal; native formulas
+omit the leading `=`. Null clears `value` or `formula`.
+
+Transactions retain native patches and immutable endpoint owners. Replay is
+bound to the input snapshot, and inverse replay returns the retained source.
+Native content comparison detects final no-ops without ZIP serialization.
+Structural commands, command coalescing, OfficeCLI string inference/extended
+clear modes, and encrypted-owner edits remain explicit capability gaps.
+
+Record 0098 adds rectangle and scoped-selector cell assignments. Ranges include
+blank coordinates; formulas broadcast without relative translation. All
+selected cells stage in one native commit. `SemanticLimits` now admits
+`max_expanded_targets` and `max_staged_bytes` for XLSX fanout, defaulting to
+65,536 distinct cells and a 16 MiB payload/action charge. Caller-selected
+profiles flow through `File::edit_with_limits` and batch execution. Unknown
+predicates, zero matches and excessive expansion are typed failures.
+
+Record 0099 adds `font.bold` and `font.italic` assignments alongside cell
+payloads. Boolean false remains distinct from null, which removes the authored
+font flag. The native parameter `style::FontChange` stages through
+`WorksheetEdit::font`; it exposes no font or cell-format indexes. Stylesheet
+resource compaction across separate commits remains an explicit capability
+gap.
+
+Record 0100 narrows the XLSX font-authoring profile: the native source-span
+editor accepts `mc:Ignorable` stylesheets when the shared MCE admission proof
+establishes source/projection agreement. Opaque extensions stay in the
+published XML. Alternate content, unproven directives, escaped namespace
+bindings and inherited formatting remain explicit gaps.
+
+Record 0101 adds native `WorksheetEdit::state` for the cell-local staged state,
+using the same `State` and shared-string identity as native patches. It is not
+commit validation or a final workbook preview; pending font changes refuse.
+Unified closure edits and atomic batches group distinct direct cell payload
+assignments into one native edit. Repeated targets, ranges, selectors, fonts,
+reads, metadata and the cumulative staged-byte bound close a group. Best-effort
+items remain isolated. Broader coalescing and structural commands remain open.
+
+Record 0102 adds XLSX worksheet creation/removal and tab rename, visibility,
+move and swap through the native workbook edit. The sheet registry shares
+`name` and `hidden` admission between set and add. Omitted names use
+`Sheet{count+1}`; explicit placements use the existing `Placement` vocabulary.
+Scoped sheet selectors deduplicate and enforce expansion/staging limits before
+publication. Native dependency, protection and last-visible-tab checks remain
+authoritative. Structural commands close pending cell runs and retain native
+patches for replay/inverse. Non-worksheet removal, OfficeCLI placeholder reuse,
+`ifExists`, additional sheet properties and broader coalescing remain open.
+
+Record 0103 adds row/column layout assignment through native worksheet editors.
+Rows accept `height` in the existing point-based length vocabulary; columns
+accept `width` in native character units. Both accept `hidden`, `outline`
+(aliases `outlineLevel` and `group`) and `collapsed`. Null invokes the native
+reset/default operation. Existing `outlineLevel` readback remains canonical.
+Bounded selectors deduplicate sheet/axis/index identities and retain one native
+commit; mixed dimension families refuse atomically. Protection and native
+capability guards retain distinct typed error categories. Whole-axis cell
+payloads, structural displacement and unit-qualified column width conversion
+remain open.
+
+Record 0104 adds native merge geometry writes and XLSX range `merge` boolean
+readback. `merge` accepts a checked scalar grammar: range booleans, matching
+A1 text, explicit cell/sheet range lists, and range-only `sweep`; null clears
+through the same exact-unmerge policy. Cell unmerge is anchor-only. A nonexact
+overlapping range reports `merge_not_exact`. Mixed cell or sheet assignments
+share one native commit. Selected nodes and geometry intents have separate
+bounds, and combined staged actions obey the transaction limits. Raw text
+is bounded before trimming or deduplication. Native `TableOverlap` prevents
+new merges crossing tables; native preservation guards remain authoritative.
+Blank merge anchors now retain their merge readback even without a cell record.
+
+
+Record 0106 adds native `FontChange::strike` and `FontChange::underline`, used
+by unified cell/range `strike` and `underline` assignments. Underline accepts
+five native tokens and documented textual aliases through the static registry.
+Null removes the authored element; false strike and underline `none` remain
+explicit native values. Existing readback omits disabled underline. Key aliases
+resolve to the same setter for duplicate rejection. These properties share
+native commits with payloads and remain barriers to payload-only coalescing.
+
+
+Record 0107 extends native `FontChange` with checked `name` and `size` builders
+and a typed `script` assignment. It retains shared owned name text and is
+`Clone`, not `Copy`. Unified `font.name`, `font.size`, `superscript` and
+`subscript` assignments use this native value. Names are byte-budgeted before
+ownership; size uses the shared point grammar and the 0.5–409 point authoring
+domain. Script false authors baseline, null removes the authored element,
+and two script selectors in one property list are a typed conflict. Alias
+admission and range broadcast retain the same limits and native commit path.
+
+Record 0108 adds native typed `FontChange::color` and unified `font.color`
+(`color` alias). Spreadsheet RGB/ARGB and theme colors retain checked tint;
+null removes the authored element. Parsed source lexical markup is excluded
+from native change ownership and equality. The facade preserves its existing
+read projection: theme tint is exposed, while RGB tint remains native-only.
+Color assignments share native commits, limits, conflict checks and payload
+coalescing barriers with other font properties.
+
+Record 0109 extends native `FontChange` and the unified registry/read vocabulary
+with `font.outline`, `font.shadow`, `font.condense`, `font.extend`, `font.charset`,
+`font.family` and `font.scheme`. Family and charset builders are fallible and
+check the authoring domains 0–5 and 0–255. Explicit false, zero and scheme
+`none` remain distinct from null removal. The facade reads these fields from
+the existing native format owner and uses the same shared scheme token table
+for read metadata and write coercion.
+
+Record 0110 adds native `AlignmentChange` and worksheet `alignment` staging.
+The request retains typed tri-state assignments for the seven curated
+alignment attributes. Native style lowering combines it with `FontChange`
+per cell before cloning shared resources. Unified `alignment.*` setters use
+these owners directly, with OfficeCLI aliases and checked rotation/indent
+domains. Null clears an attribute; contextual reading order also clears at
+the facade boundary, while native callers may explicitly author context.
+
+Record 0111 adds native `ProtectionChange` and worksheet `protection` and
+`quote_prefix` staging. Alignment requests also expose `relative_indent` and
+`justify_last_line`, using the native signed integer and optional boolean.
+`Alignment::justify_last_line` now preserves absence versus explicit false as
+`Option<bool>`; this is an intentional alpha API change to the canonical model.
+The unified setters use `alignment.relativeIndent`,
+`alignment.justifyLastLine`, `protection.locked`, `protection.hidden` and
+`quotePrefix`. Native lowering combines all formatting facets in one request,
+without facade-owned style records or a parallel formatting model.
+
+Record 0112 adds worksheet `number_format` staging by checked code. The native
+`NumberFormat::validate_code` shares authoring rules with the unified property
+admission; `NumberFormat` remains the canonical resource model. Resource IDs
+are resolved by the native stylesheet editor. The facade only normalizes
+OfficeCLI keyword aliases for the existing `numberformat` vocabulary.
+
+Record 0113 adds native `FillChange` and worksheet `fill` staging using the
+existing `Pattern` and `Color` types, reexported as `FillPattern` and `FillColor`
+for authoring. The unified writer resolves OfficeCLI incremental/replacement
+policy against native effective formats, including the base format for missing
+cells. Ordinary node readback keeps its existing base-format omission policy.
+
+Record 0114 extends the existing native `Fill`, `PatternFill`, `GradientFill`
+and `GradientStop` types with checked authoring and whole-fill replacement.
+`FillChange::replace` owns a shared native fill; the request is `Clone`, not
+`Copy`, and its equality/hash use semantic values rather than pointer identity.
+A later replacement supersedes earlier granular fields, while granular edits
+can compose with a replacement pattern. A granular pattern edit cannot
+implicitly convert a replacement gradient. The unified layer admits gradient
+text into these native values and retains the existing worksheet transaction.
+
+Record 0115 adds `format::xlsx::Node::cell_format()`, returning the borrowed
+native `style::Format` already cached by the node. Complete native gradient
+geometry and color values remain in their leaf-owned types; the unified API
+does not introduce an aggregate formatting model. The accessor retains source
+freshness checks even after the format has been cached.
+
+Native `BorderChange` stages whole-side replacements or independent line/color
+changes using the existing `Side`, `Line` and `BorderColor` types. Worksheet
+`border` participates in the same Edit/Commit/Patch path as other cell format
+facets. Null line and color fields clear only that attribute; whole-side
+replacement is explicit. Direction and outline fields distinguish omission,
+authored false and removal. The unified `border.*` properties and shorthands
+lower into these native changes.
+
+## PPTX primary edit entry (0116)
+
+`Package::edit()` returns the detached `opened::Edit`; `Snapshot::edit()`
+returns the same type. The primary `Transaction` name, verbose package entry,
+and `rollback()` method are removed without aliases. Dropping the edit keeps
+the caller's source unchanged. The PPTX glossary profile rejects all three
+removed names. Scoped editors and source-backed publication, package-carrying
+commits, diagnostics, canonical patch introspection, and immutable patch apply
+remain migration work; this entry-point change does not certify the whole
+PPTX transaction family.
+
+## PPTX primary committed package (0118)
+
+`opened::Commit` now exposes `package()`, `into_package()`, `patch()`,
+`diagnostics()`, and `into_parts() -> (Package, Patch)`. `Package::apply(&patch)`
+returns a new package. The old mutable publication entry points, public commit
+`snapshot()`/`is_changed()`, edit `is_changed()`, and patch `is_empty()` are
+removed; `Diagnostics::changed()` and `Patch::is_noop()` provide introspection.
+
+Direct publication retains the edit's candidate. Durable patch replay validates
+its write set against the destination and retains that destination's unrelated
+state. Both carry native tolerance, physical-source and encryption policy.
+Changed signed replay refuses; exact no-ops keep signatures and encryption
+provenance. Encrypted results still require explicit re-encryption or plaintext
+output policy. Commit clones share the returned package; consuming a shared
+clone copies its OPC graph while retained source buffers remain shared.
+
+Source-backed commit ownership, scoped families, new-package authoring, and
+remaining selector/error vocabulary remain migration work. The glossary checker
+therefore enforces the completed primary names without claiming complete family
+alignment.
+
+## PPTX primary deferred-source owner (0119)
+
+`pptx::source::{Package, Presentation, Slide, Edit, Commit, Patch, Diagnostics}`
+now provides immutable retained-source package revisions and an owned read-only
+projection. Shape-text edits compose and return the canonical commit triad;
+package `apply` is immutable, patches expose `is_noop` and `inverse`, and saves
+use guarded atomic replacement. Managed payload reservations follow retained
+candidates, patches, scenes, and shape handles. `from_presentation` shares
+already-admitted source state without requiring exclusive projection ownership.
+
+Record 0120 adds bounded durable `Patch::to_bytes` / `Patch::from_bytes`
+transport with root, selected-relationship and exact before-XML guards. Local
+patches retain owner-lineage checks; decoded patches can replay after reopening.
+Structural editing, source-family renames, primary creation, and facade write
+dispatch remain pending. This scoped entry does not certify the full source
+transaction family or replace the broader glossary gates.
+
+
+## PPTX facade native-owner promotion (0121)
+
+The internal facade adapter now borrows its handle to obtain an immutable native
+source or eager package. The consuming `into_editor` handoff and sharing-only
+refusal are removed. Source promotion reuses admitted state with live readers;
+successful results are cached, failed attempts remain retryable, and every
+lookup preserves source/execution fences. Explicit signature removal has a
+separate owner cache. Unified PPTX mutation dispatch remains pending.
+
+
+## PPTX source revision readback (0122)
+
+Native `source::Slide::{text, text_with_tolerance, text_and_name}` reads the
+captured immutable revision through existing native slide readers. Facade
+source-revision adoption now carries that revision through text, shape-scene,
+paragraph/run and tolerance reads and subsequent native edits. Non-text facts
+remain on the admitted source projection under the private same-owner,
+shape-text-commit adoption contract. Unified PPTX mutation dispatch is still
+pending; these readback adapters do not advertise new write capabilities.
+
+
+## PPTX unified shape-text writes (0123)
+
+`File::set` now lowers slide shape/placeholder `text` assignments to one native
+immutable commit, with scoped selectors, explicit clearing, bounded expansion,
+transactions and ordered batches. Original snapshots remain readable; native
+proofs back process-local replay and inverse. Source/eager publication shares
+the uniform atomic save and origin policy. Signature removal preserves source
+freshness; managed unsigned promotion retains the native materialization refusal.
+Other properties, structural writes and unified re-encryption remain gaps in
+capability reports. No second facade document model or XML editor is introduced.
+
+
+## PPTX immutable encrypted publication (0124)
+
+`Package::write_reencrypted` accepts shared immutable access, a sink, password
+and explicit crypto limits for an already-opened encrypted package. It preserves
+retained provenance and refuses mutable authoring state. The facade's existing
+`SaveOptions::reencrypt` now delegates to it under common atomic save policies.
+Plaintext output stays protected, and encrypted signature-removal requests still
+refuse until native edits can fulfill them. Typed crypto errors retain their
+classification instead of becoming generic corrupt-file errors.
+
+
+## PPTX builder and unified creation (0125)
+
+The focused `builder::Builder` owns native typed authoring and returns a
+canonical `Package` from `build()`. It has no publication methods. Unified
+PPTX creation adopts that result directly. No duplicate `Package::create`
+entry remains. Existing mutable `Package::new` consumers still require migration
+to finish the canonical fresh-package/builder split; this wave does not certify
+that broader migration or its complete glossary family.
+
+Both PPTX profiles reject `Package::create` and publication methods on the
+new builder; output remains on its built package.
+
+
+## PPTX builder consumer migration (0126)
+
+Public PPTX authoring examples, the unified write fixture and live performance
+fixture generators now configure `builder::Builder::presentation()` and finish
+with `build()` before package edits or publication. Finalization-only archive
+round trips are removed. Native source-ingress reopens remain explicit.
+`Builder::font_embedding(mode)` configures automatic font embedding before
+finalization; font discovery/embedding errors propagate from `build()`.
+
+Native authoring fixtures still use the legacy mutable `Package::new` and
+`presentation_mut` surface. Removing that surface and making `Package::new`
+canonical remain required; this consumer wave does not mark them conformant.
+See [record 0126](unified-ops/0126-pptx-builder-consumer-migration.md).
+
+
+## PPTX canonical constructor and private authoring (0127)
+
+`Package::new()` now returns the canonical empty presentation, directly usable
+with reads, `edit()`, immutable replay and publication. The focused builder owns
+private authoring state and finalizes it without serializing/reopening a ZIP.
+The public `Package::presentation_mut`, `set_font_embedding` and
+`with_font_embedding` methods are deleted. Configure fonts through
+`Builder::font_embedding` before `build()`. Unified creation now calls the native
+canonical constructor. Native fixtures and public doctests use the builder.
+
+Both PPTX glossary profiles ban the removed names. This completes the constructor /
+package-writer separation described as pending in 0125–0126. Remaining package
+mutators and authoring verbs still require migration into edit/commit families;
+this change does not claim the full single-write-path policy or removal of every
+`UnsafeEdit` variant. See [record 0127](unified-ops/0127-pptx-canonical-constructor.md).
+
+
+Native PPTX slide selection now uses `slide::Selector` with borrowed/owned names
+or `Position(Position)` (record 0130). The old slide/root `Key` and its `Index`
+variant are removed. Primary opened slide moves take a semantic source and
+checked destination, swaps take two semantic selectors, and complete reordering
+takes a selector permutation; raw slide IDs remain in private lowering. Other
+legacy order families and positional read signatures remain pending.

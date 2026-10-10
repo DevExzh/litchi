@@ -1,0 +1,327 @@
+{
+  "schema": 1,
+  "corpus_sha256": "f2f69d43d37d3103a1e82214e189b90ad627a8fa135427f9e82592bc6bb27a4a",
+  "confidence_scope": "paired ABBA-block bootstrap; does not capture other-host or workload uncertainty",
+  "measurements": [
+    {
+      "version": "control",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 1,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 36800.5,
+      "unified_median_ns": 48175.0,
+      "unified_p95_ns": 60760.25,
+      "unified_p99_ns": 63841.0,
+      "unified_over_leaf": 1.3090854743821416,
+      "ratio_block_bootstrap_95_percent": [
+        1.2934159587420144,
+        1.3346563376427103
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 10,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 152791.0,
+      "unified_median_ns": 224961.0,
+      "unified_p95_ns": 235976.0,
+      "unified_p99_ns": 236731.0,
+      "unified_over_leaf": 1.4723445752694857,
+      "ratio_block_bootstrap_95_percent": [
+        1.4577207965627654,
+        1.4852438629082585
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 100,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 1310251.5,
+      "unified_median_ns": 2071975.0,
+      "unified_p95_ns": 2093965.0,
+      "unified_p99_ns": 2116818.5,
+      "unified_over_leaf": 1.5813567089982343,
+      "ratio_block_bootstrap_95_percent": [
+        1.577280554144889,
+        1.5881010514716292
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 1000,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 13530269.5,
+      "unified_median_ns": 20543058.5,
+      "unified_p95_ns": 20692602.0,
+      "unified_p99_ns": 20765353.0,
+      "unified_over_leaf": 1.5183037189318365,
+      "ratio_block_bootstrap_95_percent": [
+        1.5083385784968213,
+        1.5249275566381137
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 10000,
+      "samples_per_leg": 36,
+      "native_commits": 3,
+      "leaf_median_ns": 133901160.0,
+      "unified_median_ns": 202103822.0,
+      "unified_p95_ns": 203201808.25,
+      "unified_p99_ns": 203469180.15,
+      "unified_over_leaf": 1.509350792778793,
+      "ratio_block_bootstrap_95_percent": [
+        1.5055293808204169,
+        1.511756193543748
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 1,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 90025.0,
+      "unified_median_ns": 100565.0,
+      "unified_p95_ns": 120728.5,
+      "unified_p99_ns": 121869.0,
+      "unified_over_leaf": 1.1170785892807553,
+      "ratio_block_bootstrap_95_percent": [
+        1.0992035561119664,
+        1.1396560360661212
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 10,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 206706.0,
+      "unified_median_ns": 271716.0,
+      "unified_p95_ns": 282246.75,
+      "unified_p99_ns": 287604.0,
+      "unified_over_leaf": 1.3145046587907463,
+      "ratio_block_bootstrap_95_percent": [
+        1.2986344946361323,
+        1.3342821046008033
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 100,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 1402051.5,
+      "unified_median_ns": 2039680.0,
+      "unified_p95_ns": 2087182.5,
+      "unified_p99_ns": 2097966.85,
+      "unified_over_leaf": 1.4547825097722873,
+      "ratio_block_bootstrap_95_percent": [
+        1.4413560248631134,
+        1.456996538892054
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 1000,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 13750250.5,
+      "unified_median_ns": 19818078.5,
+      "unified_p95_ns": 20236055.25,
+      "unified_p99_ns": 20332067.15,
+      "unified_over_leaf": 1.441288542343283,
+      "ratio_block_bootstrap_95_percent": [
+        1.4392132559379027,
+        1.4478256072888422
+      ]
+    },
+    {
+      "version": "control",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 10000,
+      "samples_per_leg": 36,
+      "native_commits": 3,
+      "leaf_median_ns": 135838453.5,
+      "unified_median_ns": 381539318.5,
+      "unified_p95_ns": 383118721.25,
+      "unified_p99_ns": 386051056.0,
+      "unified_over_leaf": 2.80877254318859,
+      "ratio_block_bootstrap_95_percent": [
+        2.8015981750743784,
+        2.815384733235853
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 1,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 37885.0,
+      "unified_median_ns": 49085.0,
+      "unified_p95_ns": 63112.75,
+      "unified_p99_ns": 64642.85,
+      "unified_over_leaf": 1.2956315164313053,
+      "ratio_block_bootstrap_95_percent": [
+        1.2788316259555303,
+        1.3131542090245136
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 10,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 154105.5,
+      "unified_median_ns": 173951.0,
+      "unified_p95_ns": 183468.25,
+      "unified_p99_ns": 186590.15,
+      "unified_over_leaf": 1.1287786613715929,
+      "ratio_block_bootstrap_95_percent": [
+        1.106316682550779,
+        1.1529775280898877
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 100,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 1305766.5,
+      "unified_median_ns": 1483622.0,
+      "unified_p95_ns": 1502572.25,
+      "unified_p99_ns": 1505147.35,
+      "unified_over_leaf": 1.1362077369881982,
+      "ratio_block_bootstrap_95_percent": [
+        1.1323111123519258,
+        1.143293386845843
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 1000,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 13495934.5,
+      "unified_median_ns": 14547084.0,
+      "unified_p95_ns": 14701482.5,
+      "unified_p99_ns": 14737238.0,
+      "unified_over_leaf": 1.07788638126541,
+      "ratio_block_bootstrap_95_percent": [
+        1.0754517415511453,
+        1.0826327823906305
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_eager_unified_format_batch_v1",
+      "operations": 10000,
+      "samples_per_leg": 36,
+      "native_commits": 3,
+      "leaf_median_ns": 134234029.0,
+      "unified_median_ns": 137692090.0,
+      "unified_p95_ns": 138696810.0,
+      "unified_p99_ns": 139209247.45,
+      "unified_over_leaf": 1.0257614334141756,
+      "ratio_block_bootstrap_95_percent": [
+        1.0212864317688137,
+        1.0292143596082561
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 1,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 89815.5,
+      "unified_median_ns": 100965.0,
+      "unified_p95_ns": 119013.25,
+      "unified_p99_ns": 120483.65,
+      "unified_over_leaf": 1.1241378158558377,
+      "ratio_block_bootstrap_95_percent": [
+        1.1084269270087674,
+        1.15365862826858
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 10,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 208516.0,
+      "unified_median_ns": 231776.0,
+      "unified_p95_ns": 242528.5,
+      "unified_p99_ns": 247675.5,
+      "unified_over_leaf": 1.1115501927909608,
+      "ratio_block_bootstrap_95_percent": [
+        1.0995326022169547,
+        1.1180308462768005
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 100,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 1408826.5,
+      "unified_median_ns": 1602762.5,
+      "unified_p95_ns": 1622248.0,
+      "unified_p99_ns": 1626601.35,
+      "unified_over_leaf": 1.1376578308258682,
+      "ratio_block_bootstrap_95_percent": [
+        1.1322124057509317,
+        1.143077716265889
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 1000,
+      "samples_per_leg": 36,
+      "native_commits": 1,
+      "leaf_median_ns": 13833121.5,
+      "unified_median_ns": 15142913.0,
+      "unified_p95_ns": 15264458.0,
+      "unified_p99_ns": 15351535.3,
+      "unified_over_leaf": 1.0946851728295743,
+      "ratio_block_bootstrap_95_percent": [
+        1.090838840772622,
+        1.096688518489167
+      ]
+    },
+    {
+      "version": "candidate",
+      "route": "docx_source_unified_format_batch_v1",
+      "operations": 10000,
+      "samples_per_leg": 36,
+      "native_commits": 3,
+      "leaf_median_ns": 135344133.5,
+      "unified_median_ns": 138765096.0,
+      "unified_p95_ns": 140759514.0,
+      "unified_p99_ns": 140866432.15,
+      "unified_over_leaf": 1.0252760308964555,
+      "ratio_block_bootstrap_95_percent": [
+        1.0204610669979852,
+        1.0283503087105095
+      ]
+    }
+  ]
+}
