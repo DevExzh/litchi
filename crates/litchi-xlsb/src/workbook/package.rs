@@ -334,28 +334,34 @@ impl Workbook {
     /// Reparse an owned candidate while retaining this workbook's typed
     /// drawing projection boundary.
     pub(crate) fn reparse_candidate(&self, package: OpcPackage) -> Result<Self> {
-        let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+        Self::reparse_candidate_with_policy(
             package,
             self.external_link_limits,
             self.drawing_load_policy,
-        )?;
-        workbook.leniency = self.leniency;
-        Ok(workbook)
+            self.leniency,
+        )
     }
 
-    /// Reparse bytes after a caller has already selected the projection
-    /// policy.  This is the single internal seam used by detached CRUD
-    /// validators so opaque drawing parts are never parsed accidentally.
+    /// Reparse bytes after a caller has selected the projection policies.
+    /// This is the single internal seam used by detached CRUD validators so
+    /// opaque drawing parts are never parsed accidentally.
+    ///
+    /// Raw OPC callers pass [`Leniency::Strict`] to retain the historical
+    /// strict worksheet projection; workbook-owned callers pass their
+    /// retained policy before validating lazy worksheet projections.
     pub(crate) fn reparse_candidate_with_policy(
         package: OpcPackage,
         external_link_limits: ExternalLinkLimits,
         drawing_load_policy: DrawingLoadPolicy,
+        leniency: Leniency,
     ) -> Result<Self> {
-        Self::from_opc_package_with_external_link_limits_and_drawing_policy(
+        let mut workbook = Self::from_opc_package_with_external_link_limits_and_drawing_policy(
             package,
             external_link_limits,
             drawing_load_policy,
-        )
+        )?;
+        workbook.set_projection_leniency(leniency);
+        Ok(workbook)
     }
 
     /// Read source-bound, editable stored values on one worksheet.
@@ -445,6 +451,7 @@ impl Workbook {
             commit,
             self.external_link_limits,
             self.drawing_load_policy,
+            self.leniency,
         )?;
         match applied {
             cell_values::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
@@ -553,6 +560,7 @@ impl Workbook {
             commit,
             self.external_link_limits,
             self.drawing_load_policy,
+            self.leniency,
         )?;
         match applied {
             sparkline::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
@@ -594,6 +602,7 @@ impl Workbook {
             commit,
             self.external_link_limits,
             self.drawing_load_policy,
+            self.leniency,
         )?;
         match applied {
             cell_watches::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),

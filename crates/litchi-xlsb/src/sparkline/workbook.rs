@@ -51,6 +51,7 @@ pub(crate) fn apply_retaining_parse(
     commit: Commit,
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
+    leniency: crate::Leniency,
 ) -> Result<Applied> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
@@ -72,6 +73,7 @@ pub(crate) fn apply_retaining_parse(
         candidate,
         external_link_limits,
         drawing_load_policy,
+        leniency,
     )?;
     Ok(Applied::Published {
         snapshot,

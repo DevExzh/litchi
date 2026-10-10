@@ -574,6 +574,15 @@ pub struct Patch {
 }
 
 impl Patch {
+    fn changed_candidate(&self, package: &crate::Package) -> Result<Workbook> {
+        crate::signature_policy::ensure_unsigned(package.opc_package())?;
+        let limits = package.opc_package().read_limits();
+        let candidate = litchi_opc::OpcPackage::from_bytes_with_limits(&self.after, limits)?;
+        let workbook = package.project_candidate(candidate)?;
+        validate_all_worksheets(&workbook)?;
+        Ok(workbook)
+    }
+
     pub(crate) fn apply_to_package(&self, package: &crate::Package) -> Result<crate::Package> {
         if package.to_bytes()?.as_slice() != self.before.as_ref() {
             return Err(Error::UnsupportedFeature(
@@ -583,11 +592,7 @@ impl Patch {
         if self.is_noop() {
             return Ok(package.clone());
         }
-        crate::signature_policy::ensure_unsigned(package.opc_package())?;
-        let limits = package.opc_package().read_limits();
-        let candidate = litchi_opc::OpcPackage::from_bytes_with_limits(&self.after, limits)?;
-        let workbook = package.project_candidate(candidate)?;
-        validate_all_worksheets(&workbook)?;
+        let workbook = self.changed_candidate(package)?;
         Ok(workbook.into_package())
     }
 
@@ -632,12 +637,8 @@ impl Patch {
         if self.is_noop() {
             return Ok(());
         }
-        crate::signature_policy::ensure_unsigned(&workbook.package)?;
-        let candidate = validated_workbook_with_external_link_limits_and_drawing_policy(
-            &self.after,
-            workbook.external_link_limits(),
-            workbook.drawing_load_policy(),
-        )?;
+        let package = crate::Package::from_workbook(workbook);
+        let candidate = self.changed_candidate(&package)?;
         *workbook = candidate;
         Ok(())
     }
@@ -1232,7 +1233,14 @@ fn insert_candidate_cell(
 ) -> Result<()> {
     let uri = workbook.worksheet_uri(sheet)?;
     let package = workbook.package.clone();
-    let mut edit = super::workbook::read(&package, &uri)?.edit();
+    let leniency = workbook.leniency();
+    let mut edit = super::workbook::read_with_limits_and_leniency(
+        &package,
+        &uri,
+        super::Limits::DEFAULT,
+        leniency,
+    )?
+    .edit();
     if let Some(formula) = formula {
         edit.insert_formula(reference, style, value, formula)?;
     } else {
@@ -1246,6 +1254,7 @@ fn insert_candidate_cell(
         &commit,
         external_link_limits,
         workbook.drawing_load_policy(),
+        leniency,
     )?;
     if let super::workbook::Applied::Published {
         workbook: validated,
@@ -1588,7 +1597,14 @@ fn transfer_cell(
         Value::FormulaErrorCache(value) => Value::FormulaErrorCache(*value),
     };
     let uri = target.worksheet_uri(target_sheet)?;
-    let mut edit = super::workbook::read(&package, &uri)?.edit();
+    let leniency = target.leniency();
+    let mut edit = super::workbook::read_with_limits_and_leniency(
+        &package,
+        &uri,
+        super::Limits::DEFAULT,
+        leniency,
+    )?
+    .edit();
     if let Some(formula) = source_cell.formula() {
         let formula =
             super::formula_transfer::remap(&source, target, source_sheet, target_sheet, formula)?;
@@ -1605,6 +1621,7 @@ fn transfer_cell(
         &commit,
         external_link_limits,
         target.drawing_load_policy(),
+        leniency,
     )?;
     if let super::workbook::Applied::Published {
         workbook: validated,
@@ -1785,7 +1802,12 @@ fn workbook_from_bytes(
     drawing_load_policy: DrawingLoadPolicy,
 ) -> Result<Workbook> {
     let package = litchi_opc::OpcPackage::from_bytes(bytes)?;
-    Workbook::reparse_candidate_with_policy(package, external_link_limits, drawing_load_policy)
+    Workbook::reparse_candidate_with_policy(
+        package,
+        external_link_limits,
+        drawing_load_policy,
+        crate::Leniency::Strict,
+    )
 }
 
 fn workbook_bytes(workbook: &Workbook) -> Result<Vec<u8>> {

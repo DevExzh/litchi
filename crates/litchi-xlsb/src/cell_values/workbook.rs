@@ -101,6 +101,7 @@ pub(crate) fn apply_with_external_link_limits_and_drawing_policy(
         commit,
         external_link_limits,
         drawing_load_policy,
+        crate::Leniency::Strict,
     )?;
     match applied {
         Applied::Unchanged(snapshot) => Ok(snapshot),
@@ -154,6 +155,7 @@ pub(crate) fn apply_retaining_parse(
     commit: &Commit,
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
+    leniency: crate::Leniency,
 ) -> Result<Applied> {
     let part = package.get_part(worksheet)?;
     require_worksheet(part)?;
@@ -170,6 +172,7 @@ pub(crate) fn apply_retaining_parse(
         candidate,
         external_link_limits,
         drawing_load_policy,
+        leniency,
     )?;
     let worksheet_index = (0..parsed.worksheet_count())
         .find_map(|index| {

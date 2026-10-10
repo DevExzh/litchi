@@ -140,11 +140,7 @@ impl Package {
     }
 
     pub(crate) fn project_candidate(&self, candidate: OpcPackage) -> Result<Workbook> {
-        let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
-            candidate, self.1, self.3,
-        )?;
-        workbook.set_projection_leniency(self.4);
-        Ok(workbook)
+        Workbook::reparse_candidate_with_policy(candidate, self.1, self.3, self.4)
     }
 
     /// Create a deterministic workbook containing one visible worksheet.
@@ -547,11 +543,8 @@ impl Package {
 
     /// Revalidate a candidate under the owner's retained projection policies.
     pub(crate) fn reparse_candidate(&self, candidate: OpcPackage) -> Result<Self> {
-        let workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
-            candidate.clone(),
-            self.1,
-            self.3,
-        )?;
+        let workbook =
+            Workbook::reparse_candidate_with_policy(candidate.clone(), self.1, self.3, self.4)?;
         let tolerance = workbook.into_tolerance_report();
         Ok(Self(candidate, self.1, tolerance, self.3, self.4))
     }
