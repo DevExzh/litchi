@@ -2,8 +2,8 @@
 
 use super::{
     CompactionPolicy, Diagnostics, HyperlinkTextReplacement, ParagraphTextReplacement,
-    ParagraphTransfer, Patch, Result, RevisionAction, RevisionKind, RevisionSelector, Snapshot,
-    TableCellAddress, transaction,
+    ParagraphTransfer, Patch, Result, RevisionAction, RevisionKind, RevisionSelector, RunAnchor,
+    Snapshot, TableCellAddress, transaction,
 };
 use crate::Package;
 use litchi_core::Position;
@@ -106,6 +106,15 @@ impl<P: Clone> Edit<P> {
         self.inner.move_paragraph(position, to)
     }
 
+    /// Swap two direct-body paragraphs while retaining their exact XML.
+    ///
+    /// See [`super::snapshot::Edit::swap_paragraphs`] for selection and
+    /// preservation rules.
+    pub fn swap_paragraphs(&mut self, first: Position, second: Position) -> Result<&mut Self> {
+        self.inner.swap_paragraphs(first, second)?;
+        Ok(self)
+    }
+
     /// Insert a typed run before a direct run position.
     ///
     /// See [`super::snapshot::Edit::insert_run`] for selection and preservation rules.
@@ -145,6 +154,63 @@ impl<P: Clone> Edit<P> {
         Ok(self)
     }
 
+    /// Move one direct run within a paragraph while retaining its exact XML.
+    ///
+    /// See [`super::snapshot::Edit::move_run`] for selection and preservation
+    /// rules.
+    pub fn move_run(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        to: RunAnchor,
+    ) -> Result<Position> {
+        self.inner.move_run(paragraph, run, to)
+    }
+
+    /// Move one direct run to another direct-body paragraph when the source
+    /// and destination namespace scopes are proven equivalent.
+    ///
+    /// See [`super::snapshot::Edit::move_run_to`] for selection and
+    /// preservation rules.
+    pub fn move_run_to(
+        &mut self,
+        from_paragraph: Position,
+        run: Position,
+        to_paragraph: Position,
+        to: RunAnchor,
+    ) -> Result<Position> {
+        self.inner
+            .move_run_to(from_paragraph, run, to_paragraph, to)
+    }
+
+    /// Swap two direct runs in one paragraph while retaining their exact XML.
+    ///
+    /// See [`super::snapshot::Edit::swap_runs`] for selection and preservation
+    /// rules.
+    pub fn swap_runs(
+        &mut self,
+        paragraph: Position,
+        first: Position,
+        second: Position,
+    ) -> Result<&mut Self> {
+        self.inner.swap_runs(paragraph, first, second)?;
+        Ok(self)
+    }
+
+    /// Swap direct runs in two direct-body paragraphs while retaining their
+    /// exact XML fragments.
+    pub fn swap_runs_to(
+        &mut self,
+        first_paragraph: Position,
+        first: Position,
+        second_paragraph: Position,
+        second: Position,
+    ) -> Result<&mut Self> {
+        self.inner
+            .swap_runs_to(first_paragraph, first, second_paragraph, second)?;
+        Ok(self)
+    }
+
     /// Borrow the source main-document projection.
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
@@ -155,6 +221,15 @@ impl<P: Clone> Edit<P> {
     #[must_use]
     pub const fn projected(&self) -> &Snapshot {
         self.inner.projected()
+    }
+
+    /// Remaining semantic-operation slots in the native document ledger.
+    ///
+    /// This is the native cap, not a limit on the number of caller commands.
+    /// One caller command may stage several operations or only exact no-ops.
+    #[must_use]
+    pub fn remaining_operations(&self) -> usize {
+        self.inner.remaining_operations()
     }
 
     /// Choose how changed main-document XML is compacted at commit.
@@ -278,6 +353,38 @@ impl<P: Clone> Edit<P> {
         authored_text: impl Into<String>,
     ) -> Result<&mut Self> {
         self.inner.replace_run_text(paragraph, run, authored_text)?;
+        Ok(self)
+    }
+
+    /// Replace only the first direct `w:t` child of one run while retaining
+    /// its attributes and every other run child byte-for-byte. Tabs, line
+    /// feeds, and carriage returns remain literal text-node characters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot. Budget-managed edits
+    /// retain the same explicit refusal as native source-preserving run edits.
+    pub fn replace_run_text_node(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        authored_text: impl Into<String>,
+    ) -> Result<&mut Self> {
+        self.inner
+            .replace_run_text_node(paragraph, run, authored_text)?;
+        Ok(self)
+    }
+
+    /// Mark the owning complex field dirty when a direct run is a cached
+    /// result. Runs outside a cached result, empty runs, and already-dirty
+    /// fields are no-ops.
+    pub fn mark_cached_run_field_dirty(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+    ) -> Result<&mut Self> {
+        self.inner.mark_cached_run_field_dirty(paragraph, run)?;
         Ok(self)
     }
 

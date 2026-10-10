@@ -1384,6 +1384,262 @@ fn runs_insert_append_and_remove_with_exact_inverses() {
 }
 
 #[test]
+fn runs_and_paragraphs_move_losslessly_and_replay_exactly() {
+    let base = snapshot(concat!(
+        r#"<w:p><w:r><w:rPr><w:b/></w:rPr><w:t>A</w:t><w:opaque w:value="keep"/></w:r>"#,
+        "\n<!-- run-owned -->\n",
+        r#"<w:r><w:t>B</w:t></w:r></w:p>"#,
+        r#"<w:p><w:r><w:t>C</w:t></w:r><w:opaque w:value="paragraph"/></w:p>"#,
+        r#"<w:p><w:r><w:t>D</w:t></w:r></w:p>"#
+    ));
+
+    let mut runs = base.edit();
+    assert_eq!(
+        runs.move_run(Position::new(0), Position::new(0), RunAnchor::End)
+            .unwrap(),
+        Position::new(1)
+    );
+    assert_eq!(
+        runs.projected()
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "BA"
+    );
+    assert!(
+        std::str::from_utf8(runs.projected().xml_bytes())
+            .unwrap()
+            .contains(r#"<w:opaque w:value="keep"/>"#)
+    );
+    let moved = commit_and_check(&base, runs);
+    assert!(
+        std::str::from_utf8(moved.snapshot().xml_bytes())
+            .unwrap()
+            .contains("<!-- run-owned -->")
+    );
+
+    let mut cross = base.edit();
+    assert_eq!(
+        cross
+            .move_run_to(
+                Position::new(0),
+                Position::new(0),
+                Position::new(1),
+                RunAnchor::End,
+            )
+            .unwrap(),
+        Position::new(1)
+    );
+    assert_eq!(
+        cross
+            .projected()
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "B"
+    );
+    assert_eq!(
+        cross
+            .projected()
+            .paragraph(Position::new(1))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "CA"
+    );
+    let cross_commit = commit_and_check(&base, cross);
+    let restored = cross_commit
+        .patch()
+        .inverse()
+        .apply(cross_commit.snapshot())
+        .unwrap();
+    assert_eq!(restored.xml_bytes(), base.xml_bytes());
+
+    let mut swapped = base.edit();
+    swapped
+        .swap_runs(Position::new(0), Position::new(0), Position::new(1))
+        .unwrap();
+    swapped
+        .swap_paragraphs(Position::new(0), Position::new(2))
+        .unwrap();
+    assert_eq!(
+        texts(swapped.projected()),
+        vec!["D".to_owned(), "C".to_owned(), "BA".to_owned()]
+    );
+    let swapped_commit = commit_and_check(&base, swapped);
+    assert!(
+        swapped_commit
+            .patch()
+            .operations()
+            .iter()
+            .filter(|operation| {
+                matches!(
+                    operation,
+                    Operation::InsertRun { .. } | Operation::RemoveRun { .. }
+                )
+            })
+            .count()
+            >= 2
+    );
+}
+
+#[test]
+fn cross_paragraph_run_move_refuses_unproven_namespace_scope() {
+    let base = Snapshot::from_xml(format!(
+        r#"<w:document xmlns:w="{WORD}" xmlns:x="urn:one"><w:body><w:p><w:r><w:t>A</w:t></w:r></w:p><w:p xmlns:x="urn:two"><w:r><w:t>B</w:t></w:r></w:p></w:body></w:document>"#
+    ))
+    .unwrap();
+    let mut edit = base.edit();
+    assert!(matches!(
+        edit.move_run_to(
+            Position::new(0),
+            Position::new(0),
+            Position::new(1),
+            RunAnchor::End,
+        ),
+        Err(Error::Refused {
+            reason: Refusal::ComplexContent,
+            ..
+        })
+    ));
+    assert_eq!(edit.projected().xml_bytes(), base.xml_bytes());
+}
+
+#[test]
+fn cross_paragraph_run_move_opens_empty_target_and_replays_exactly() {
+    let base = snapshot(r#"<w:p><w:r><w:t>moved</w:t><w:opaque w:value="run"/></w:r></w:p><w:p/>"#);
+    let mut edit = base.edit();
+    assert_eq!(
+        edit.move_run_to(
+            Position::new(0),
+            Position::new(0),
+            Position::new(1),
+            RunAnchor::End,
+        )
+        .unwrap(),
+        Position::new(0)
+    );
+    assert_eq!(
+        texts(edit.projected()),
+        vec!["".to_owned(), "moved".to_owned()]
+    );
+    assert!(
+        std::str::from_utf8(edit.projected().xml_bytes())
+            .unwrap()
+            .contains(r#"<w:opaque w:value="run"/>"#)
+    );
+    commit_and_check(&base, edit);
+}
+
+#[test]
+fn swaps_exchange_physical_slots_around_opaque_children() {
+    let table =
+        r#"<w:tbl><w:tr><w:tc><w:p><w:r><w:t>table</w:t></w:r></w:p></w:tc></w:tr></w:tbl>"#;
+    let base_xml = format!(
+        r#"<w:p><w:r><w:t>A</w:t></w:r></w:p>{table}<w:p><w:r><w:t>B</w:t></w:r></w:p><w:opaque w:id="between"/><w:p><w:r><w:t>C</w:t></w:r></w:p>"#
+    );
+    let base = snapshot(&base_xml);
+    let mut paragraphs = base.edit();
+    paragraphs
+        .swap_paragraphs(Position::new(0), Position::new(2))
+        .unwrap();
+    let children = container_children(paragraphs.projected().xml_bytes(), "body");
+    assert_eq!(local_name(&children[0]), "p");
+    assert_eq!(local_name(&children[1]), "tbl");
+    assert_eq!(local_name(&children[2]), "p");
+    assert_eq!(local_name(&children[3]), "opaque");
+    assert_eq!(local_name(&children[4]), "p");
+    assert!(
+        children[0]
+            .windows(b">C<".len())
+            .any(|window| window == b">C<")
+    );
+    assert!(
+        children[2]
+            .windows(b">B<".len())
+            .any(|window| window == b">B<")
+    );
+    assert!(
+        children[4]
+            .windows(b">A<".len())
+            .any(|window| window == b">A<")
+    );
+    assert_eq!(children[1], table.as_bytes());
+    assert_eq!(texts(paragraphs.projected()), vec!["C", "B", "A"]);
+    commit_and_check(&base, paragraphs);
+
+    let run_base = snapshot(
+        r#"<w:p><w:r><w:t>A</w:t></w:r><w:opaque w:id="one"/><w:r><w:t>B</w:t></w:r><w:opaque w:id="two"/><w:r><w:t>C</w:t></w:r></w:p>"#,
+    );
+    let mut runs = run_base.edit();
+    runs.swap_runs(Position::new(0), Position::new(0), Position::new(2))
+        .unwrap();
+    let paragraph = paragraph_xml(runs.projected(), 0);
+    let children = container_children(&paragraph, "p");
+    assert_eq!(local_name(&children[0]), "r");
+    assert_eq!(local_name(&children[1]), "opaque");
+    assert_eq!(local_name(&children[2]), "r");
+    assert_eq!(local_name(&children[3]), "opaque");
+    assert_eq!(local_name(&children[4]), "r");
+    assert!(
+        children[0]
+            .windows(b">C<".len())
+            .any(|window| window == b">C<")
+    );
+    assert!(
+        children[2]
+            .windows(b">B<".len())
+            .any(|window| window == b">B<")
+    );
+    assert!(
+        children[4]
+            .windows(b">A<".len())
+            .any(|window| window == b">A<")
+    );
+    commit_and_check(&run_base, runs);
+}
+
+#[test]
+fn cross_paragraph_run_swap_keeps_each_opaque_slot() {
+    let base = snapshot(
+        r#"<w:p><w:r><w:t>A</w:t></w:r><w:opaque w:id="left"/><w:r><w:t>B</w:t></w:r></w:p><w:p><w:opaque w:id="before"/><w:r><w:t>C</w:t></w:r><w:opaque w:id="after"/><w:r><w:t>D</w:t></w:r></w:p>"#,
+    );
+    let mut edit = base.edit();
+    edit.swap_runs_to(
+        Position::new(0),
+        Position::new(0),
+        Position::new(1),
+        Position::new(0),
+    )
+    .unwrap();
+    assert_eq!(texts(edit.projected()), vec!["CB", "AD"]);
+    let first = paragraph_xml(edit.projected(), 0);
+    let second = paragraph_xml(edit.projected(), 1);
+    let first_children = container_children(&first, "p");
+    let second_children = container_children(&second, "p");
+    assert_eq!(local_name(&first_children[0]), "r");
+    assert_eq!(local_name(&first_children[1]), "opaque");
+    assert_eq!(local_name(&first_children[2]), "r");
+    assert_eq!(local_name(&second_children[0]), "opaque");
+    assert_eq!(local_name(&second_children[1]), "r");
+    assert_eq!(local_name(&second_children[2]), "opaque");
+    assert_eq!(local_name(&second_children[3]), "r");
+    assert!(
+        first_children[0]
+            .windows(b">C<".len())
+            .any(|window| window == b">C<")
+    );
+    assert!(
+        second_children[1]
+            .windows(b">A<".len())
+            .any(|window| window == b">A<")
+    );
+    commit_and_check(&base, edit);
+}
+
+#[test]
 fn run_structure_refuses_field_interiors_and_story_anchors() {
     let base = snapshot(concat!(
         r#"<w:p><w:r><w:t>a</w:t></w:r>"#,

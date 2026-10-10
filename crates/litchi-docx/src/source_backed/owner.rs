@@ -36,6 +36,25 @@ impl Package {
         result
     }
 
+    /// Read a paragraph's inlines using this owner's effective main-document relationships.
+    /// The paragraph must have been read from this owner's main document.
+    ///
+    /// # Errors
+    /// Returns typed XML/relationship errors and rechecks every retained source.
+    pub fn paragraph_inlines(&self, paragraph: &Paragraph) -> Result<Vec<crate::Inline>> {
+        self.check_source()?;
+        let result = (|| match &self.effective {
+            Some(topology) => {
+                paragraph.inlines_with_relationships(topology.main_document_part()?.rels())
+            },
+            None => {
+                paragraph.inlines_with_relationships(self.physical.main_document_part()?.rels())
+            },
+        })();
+        self.check_source()?;
+        result
+    }
+
     /// Recheck the physical archive and every retained transfer source/context.
     pub fn check_source(&self) -> Result<()> {
         match &self.effective {

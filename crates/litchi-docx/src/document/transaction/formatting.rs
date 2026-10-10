@@ -188,6 +188,22 @@ pub enum BodyAnchor {
     End,
 }
 
+/// Where a direct run goes inside a paragraph.
+///
+/// The position is the projected position of a direct `w:r`, and is checked
+/// against the paragraph that is passed to [`Edit::move_run`]. `Before` may
+/// name the run count and is then equivalent to the end of the paragraph.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum RunAnchor {
+    /// Immediately before the direct run.
+    Before(Position),
+    /// Immediately after the direct run.
+    After(Position),
+    /// After every direct child of the paragraph.
+    End,
+}
+
 /// What one direct child of `w:body` is.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum ChildKind {
@@ -358,6 +374,19 @@ impl ParagraphChildren {
             .get(child + 1)
             .map_or(self.close_start, |next| next.0);
         Some((found.0, next))
+    }
+}
+
+fn run_anchor_child(layout: &ParagraphChildren, anchor: RunAnchor) -> Result<usize, Refusal> {
+    match anchor {
+        RunAnchor::Before(position) => layout
+            .run_insertion_child(position.get())
+            .ok_or(Refusal::RunNotFound),
+        RunAnchor::After(position) => layout
+            .run_child(position.get())
+            .map(|child| child + 1)
+            .ok_or(Refusal::RunNotFound),
+        RunAnchor::End => Ok(layout.children.len()),
     }
 }
 
@@ -723,6 +752,86 @@ impl Edit {
         Ok(moved)
     }
 
+    /// Swap two direct-body paragraphs, retaining their complete owned
+    /// fragments and the bytes between each fragment and its next sibling.
+    ///
+    /// The operation is represented by the existing exact paragraph removal
+    /// and insertion records. Consequently its inverse and durable replay
+    /// use the same source fragments as ordinary structure operations.
+    /// Paragraphs are addressed in the projected document; equal positions
+    /// are an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same checked-position, dependency, section, and resource
+    /// errors as [`Self::move_paragraph`]. Managed snapshots are refused
+    /// because they do not retain a source-preserving structural publication
+    /// route.
+    pub fn swap_paragraphs(&mut self, first: Position, second: Position) -> Result<&mut Self> {
+        self.ensure_unmanaged("swap_paragraphs")?;
+        if first == second {
+            self.paragraph_bounds(first)?;
+            return Ok(self);
+        }
+        let (left, right) = if first < second {
+            (first, second)
+        } else {
+            (second, first)
+        };
+        let (left_start, left_end) = self.paragraph_bounds(left)?;
+        let (right_start, right_end) = self.paragraph_bounds(right)?;
+        let left_inherited = self.projected.paragraph_namespaces[left.get()].as_ref();
+        let right_inherited = self.projected.paragraph_namespaces[right.get()].as_ref();
+        let left_xml = &self.projected.xml_bytes()[left_start..left_end];
+        let right_xml = &self.projected.xml_bytes()[right_start..right_end];
+        paragraph_dependencies(left_xml, left_inherited)
+            .refuse(Removal::Move)
+            .map_err(refused(left))?;
+        paragraph_dependencies(right_xml, right_inherited)
+            .refuse(Removal::Move)
+            .map_err(refused(right))?;
+        let body = body(self)?;
+        let left_child = body
+            .paragraph_child(left.get())
+            .ok_or_else(|| invalid("direct paragraph is missing from the body"))?;
+        let right_child = body
+            .paragraph_child(right.get())
+            .ok_or_else(|| invalid("direct paragraph is missing from the body"))?;
+        let (left_owned_start, left_owned_end) = body
+            .extent(left_child)
+            .ok_or_else(|| invalid("direct paragraph is missing from the body"))?;
+        let (right_owned_start, right_owned_end) = body
+            .extent(right_child)
+            .ok_or_else(|| invalid("direct paragraph is missing from the body"))?;
+        let left_fragment =
+            Arc::new(self.projected.xml_bytes()[left_owned_start..left_owned_end].to_vec());
+        let right_fragment =
+            Arc::new(self.projected.xml_bytes()[right_owned_start..right_owned_end].to_vec());
+        // Removing both fragments and inserting them at their original child
+        // slots swaps the paragraphs while leaving tables, controls, unknown
+        // elements, comments, and their physical gaps in those slots.  A
+        // pair of ordinal paragraph moves cannot provide that guarantee.
+        let mut candidate = self.try_clone()?;
+        candidate.remove_paragraph_fragment(Position::new(right_child), right, &right_fragment)?;
+        candidate.remove_paragraph_fragment(Position::new(left_child), left, &left_fragment)?;
+        let body_after_removal = body_of(&candidate)?;
+        let moved_right = Position::new(body_after_removal.paragraphs_before(left_child));
+        candidate.insert_paragraph_fragment(
+            Position::new(left_child),
+            moved_right,
+            &right_fragment,
+        )?;
+        let body_after_right = body_of(&candidate)?;
+        let moved_left = Position::new(body_after_right.paragraphs_before(right_child));
+        candidate.insert_paragraph_fragment(
+            Position::new(right_child),
+            moved_left,
+            &left_fragment,
+        )?;
+        *self = candidate;
+        Ok(self)
+    }
+
     /// Insert a run with direct properties as a direct child of a paragraph,
     /// before direct run `run`, or after the paragraph's last child when
     /// `run` is the paragraph's direct run count; return `run`.
@@ -823,6 +932,458 @@ impl Edit {
             .ok_or_else(|| invalid("direct run is missing from the paragraph"))?;
         let xml = Arc::new(paragraph_xml[from..to].to_vec());
         self.remove_run_fragment(paragraph, Position::new(child), run, &xml)?;
+        Ok(self)
+    }
+
+    /// Move one direct run within its paragraph, unchanged, to `to`.
+    ///
+    /// The run's complete owned fragment is spliced, including whitespace and
+    /// comments up to the next direct child. The source run must be outside a
+    /// complex field and must not contain a field character or instruction;
+    /// the destination must also be outside a complex field. This keeps field
+    /// ownership intact while allowing inert run markup to travel byte for
+    /// byte.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked run or field/dependency refusal, a malformed XML or
+    /// resource error, or an unsafe-edit refusal for managed snapshots. The
+    /// edit remains unchanged on every error.
+    pub fn move_run(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        to: RunAnchor,
+    ) -> Result<Position> {
+        self.ensure_unmanaged("move_run")?;
+        let (start, end) = self.paragraph_bounds(paragraph)?;
+        let inherited = self.projected.paragraph_namespaces[paragraph.get()].as_ref();
+        let paragraph_xml = &self.projected.xml_bytes()[start..end];
+        let layout = paragraph_children(paragraph_xml, inherited).map_err(refused(paragraph))?;
+        let source_child = layout
+            .run_child(run.get())
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(paragraph))?;
+        let (run_start, _run_end, _) = layout.children[source_child];
+        if inside_complex_field(paragraph_xml, run_start, inherited).map_err(refused(paragraph))? {
+            return Err(refused(paragraph)(Refusal::FieldInterior));
+        }
+        let target_child = run_anchor_child(&layout, to).map_err(refused(paragraph))?;
+        if target_child == source_child || target_child == source_child + 1 {
+            return Ok(run);
+        }
+        let (owned_start, owned_end) = layout
+            .extent(source_child)
+            .ok_or_else(|| invalid("direct run is missing from the paragraph"))?;
+        let xml = Arc::new(paragraph_xml[owned_start..owned_end].to_vec());
+        let insertion_offset = layout
+            .insertion_offset(target_child)
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(paragraph))?;
+        if inside_complex_field(paragraph_xml, insertion_offset, inherited)
+            .map_err(refused(paragraph))?
+        {
+            return Err(refused(paragraph)(Refusal::FieldInterior));
+        }
+        run_dependencies(
+            &paragraph_xml[run_start..layout.children[source_child].1],
+            inherited,
+        )
+        .map_err(refused(paragraph))?;
+
+        let destination = if target_child > source_child {
+            target_child - 1
+        } else {
+            target_child
+        };
+        let mut candidate = self.try_clone()?;
+        candidate.remove_run_fragment(paragraph, Position::new(source_child), run, &xml)?;
+        let (candidate_start, candidate_end) = candidate.paragraph_bounds(paragraph)?;
+        let candidate_inherited =
+            candidate.projected.paragraph_namespaces[paragraph.get()].as_ref();
+        let candidate_xml = &candidate.projected.xml_bytes()[candidate_start..candidate_end];
+        let candidate_layout =
+            paragraph_children(candidate_xml, candidate_inherited).map_err(refused(paragraph))?;
+        let moved = Position::new(candidate_layout.runs_before(destination));
+        candidate.insert_run_fragment(paragraph, Position::new(destination), moved, &xml)?;
+        *self = candidate;
+        Ok(moved)
+    }
+
+    /// Move one direct run to another direct-body paragraph.
+    ///
+    /// Cross-paragraph movement is admitted only when the source and target
+    /// paragraphs have identical captured namespace scopes. That is a
+    /// conservative proof that every prefix used by the retained fragment
+    /// keeps the same meaning after the splice; a destination with a
+    /// different scope is refused instead of rewriting unknown XML.
+    ///
+    /// `to` is resolved against the target paragraph before the move. When
+    /// both paragraphs are equal this delegates to [`Self::move_run`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the same checked run, field, namespace, dependency, malformed
+    /// XML, resource, or managed-owner refusal as the focused move. The edit
+    /// remains unchanged on every error.
+    pub fn move_run_to(
+        &mut self,
+        from_paragraph: Position,
+        run: Position,
+        to_paragraph: Position,
+        to: RunAnchor,
+    ) -> Result<Position> {
+        self.ensure_unmanaged("move_run_to")?;
+        if from_paragraph == to_paragraph {
+            return self.move_run(from_paragraph, run, to);
+        }
+
+        let (from_start, from_end) = self.paragraph_bounds(from_paragraph)?;
+        let (to_start, to_end) = self.paragraph_bounds(to_paragraph)?;
+        let source_inherited = self.projected.paragraph_namespaces[from_paragraph.get()].as_ref();
+        let target_inherited = self.projected.paragraph_namespaces[to_paragraph.get()].as_ref();
+        if source_inherited != target_inherited {
+            return Err(refused(from_paragraph)(Refusal::ComplexContent));
+        }
+        let source_xml = &self.projected.xml_bytes()[from_start..from_end];
+        let target_xml = &self.projected.xml_bytes()[to_start..to_end];
+        let source_layout =
+            paragraph_children(source_xml, source_inherited).map_err(refused(from_paragraph))?;
+        let target_layout =
+            paragraph_children(target_xml, target_inherited).map_err(refused(to_paragraph))?;
+        let source_child = source_layout
+            .run_child(run.get())
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(from_paragraph))?;
+        let (run_start, run_end, _) = source_layout.children[source_child];
+        if inside_complex_field(source_xml, run_start, source_inherited)
+            .map_err(refused(from_paragraph))?
+        {
+            return Err(refused(from_paragraph)(Refusal::FieldInterior));
+        }
+        run_dependencies(&source_xml[run_start..run_end], source_inherited)
+            .map_err(refused(from_paragraph))?;
+        let target_child = run_anchor_child(&target_layout, to).map_err(refused(to_paragraph))?;
+        let target_offset = target_layout
+            .insertion_offset(target_child)
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(to_paragraph))?;
+        if inside_complex_field(target_xml, target_offset, target_inherited)
+            .map_err(refused(to_paragraph))?
+        {
+            return Err(refused(to_paragraph)(Refusal::FieldInterior));
+        }
+        let (owned_start, owned_end) = source_layout
+            .extent(source_child)
+            .ok_or_else(|| invalid("direct run is missing from the paragraph"))?;
+        let xml = Arc::new(source_xml[owned_start..owned_end].to_vec());
+
+        let mut candidate = self.try_clone()?;
+        candidate.remove_run_fragment(from_paragraph, Position::new(source_child), run, &xml)?;
+        // Removing a run does not remove its paragraph, so the target
+        // paragraph's position remains stable even when it follows the
+        // source paragraph.
+        let target_after_removal = to_paragraph;
+        let (candidate_start, candidate_end) = candidate.paragraph_bounds(target_after_removal)?;
+        let candidate_inherited =
+            candidate.projected.paragraph_namespaces[target_after_removal.get()].as_ref();
+        let candidate_xml = &candidate.projected.xml_bytes()[candidate_start..candidate_end];
+        let mut candidate_layout = paragraph_children(candidate_xml, candidate_inherited)
+            .map_err(refused(target_after_removal))?;
+        if candidate_layout.empty {
+            // Match the empty-paragraph route of `insert_run`: opening the
+            // retained root is itself an exact, reversible head operation.
+            let closed = Arc::new(candidate_xml.to_vec());
+            let open = Arc::new(opened(candidate_xml)?);
+            candidate.replace_paragraph_properties(target_after_removal, &closed, &open)?;
+            let (opened_start, opened_end) = candidate.paragraph_bounds(target_after_removal)?;
+            let opened_inherited =
+                candidate.projected.paragraph_namespaces[target_after_removal.get()].as_ref();
+            candidate_layout = paragraph_children(
+                &candidate.projected.xml_bytes()[opened_start..opened_end],
+                opened_inherited,
+            )
+            .map_err(refused(target_after_removal))?;
+        }
+        let moved = Position::new(candidate_layout.runs_before(target_child));
+        candidate.insert_run_fragment(
+            target_after_removal,
+            Position::new(target_child),
+            moved,
+            &xml,
+        )?;
+        *self = candidate;
+        Ok(moved)
+    }
+
+    /// Swap two direct runs in one paragraph, preserving each run's exact
+    /// fragment. Equal positions are an exact no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same checked-position, field/dependency, malformed XML,
+    /// resource, or managed-owner refusal as [`Self::move_run`].
+    pub fn swap_runs(
+        &mut self,
+        paragraph: Position,
+        first: Position,
+        second: Position,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("swap_runs")?;
+        if first == second {
+            let (start, end) = self.paragraph_bounds(paragraph)?;
+            let inherited = self.projected.paragraph_namespaces[paragraph.get()].as_ref();
+            let layout = paragraph_children(&self.projected.xml_bytes()[start..end], inherited)
+                .map_err(refused(paragraph))?;
+            if layout.run_child(first.get()).is_none() {
+                return Err(refused(paragraph)(Refusal::RunNotFound));
+            }
+            return Ok(self);
+        }
+        let (left, right) = if first < second {
+            (first, second)
+        } else {
+            (second, first)
+        };
+        let (start, end) = self.paragraph_bounds(paragraph)?;
+        let inherited = self.projected.paragraph_namespaces[paragraph.get()].as_ref();
+        let paragraph_xml = &self.projected.xml_bytes()[start..end];
+        let layout = paragraph_children(paragraph_xml, inherited).map_err(refused(paragraph))?;
+        let left_child = layout
+            .run_child(left.get())
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(paragraph))?;
+        let right_child = layout
+            .run_child(right.get())
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(paragraph))?;
+        let (left_start, left_end) = layout
+            .extent(left_child)
+            .ok_or_else(|| invalid("direct run is missing from the paragraph"))?;
+        let (right_start, right_end) = layout
+            .extent(right_child)
+            .ok_or_else(|| invalid("direct run is missing from the paragraph"))?;
+        if inside_complex_field(paragraph_xml, left_start, inherited).map_err(refused(paragraph))?
+            || inside_complex_field(paragraph_xml, right_start, inherited)
+                .map_err(refused(paragraph))?
+        {
+            return Err(refused(paragraph)(Refusal::FieldInterior));
+        }
+        let left_element_end = left_start
+            .checked_add(element_len(&paragraph_xml[left_start..left_end])?)
+            .ok_or_else(|| invalid("direct run offset overflow"))?;
+        let right_element_end = right_start
+            .checked_add(element_len(&paragraph_xml[right_start..right_end])?)
+            .ok_or_else(|| invalid("direct run offset overflow"))?;
+        run_dependencies(&paragraph_xml[left_start..left_element_end], inherited)
+            .map_err(refused(paragraph))?;
+        run_dependencies(&paragraph_xml[right_start..right_element_end], inherited)
+            .map_err(refused(paragraph))?;
+        let left_offset = layout
+            .insertion_offset(left_child)
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(paragraph))?;
+        let right_offset = layout
+            .insertion_offset(right_child)
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(paragraph))?;
+        if inside_complex_field(paragraph_xml, left_offset, inherited)
+            .map_err(refused(paragraph))?
+            || inside_complex_field(paragraph_xml, right_offset, inherited)
+                .map_err(refused(paragraph))?
+        {
+            return Err(refused(paragraph)(Refusal::FieldInterior));
+        }
+        let left_fragment = Arc::new(paragraph_xml[left_start..left_end].to_vec());
+        let right_fragment = Arc::new(paragraph_xml[right_start..right_end].to_vec());
+        // As with paragraphs, operate on one candidate and use the original
+        // direct-child slots. This exchanges runs around opaque direct
+        // children without rotating those children with either run, and an
+        // error in either half leaves the editor unchanged.
+        let mut candidate = self.try_clone()?;
+        candidate.remove_run_fragment(
+            paragraph,
+            Position::new(right_child),
+            right,
+            &right_fragment,
+        )?;
+        candidate.remove_run_fragment(
+            paragraph,
+            Position::new(left_child),
+            left,
+            &left_fragment,
+        )?;
+        let after_removal = {
+            let (start, end) = candidate.paragraph_bounds(paragraph)?;
+            let inherited = candidate.projected.paragraph_namespaces[paragraph.get()].as_ref();
+            paragraph_children(&candidate.projected.xml_bytes()[start..end], inherited)
+                .map_err(refused(paragraph))?
+        };
+        let moved_right = Position::new(after_removal.runs_before(left_child));
+        candidate.insert_run_fragment(
+            paragraph,
+            Position::new(left_child),
+            moved_right,
+            &right_fragment,
+        )?;
+        let after_right = {
+            let (start, end) = candidate.paragraph_bounds(paragraph)?;
+            let inherited = candidate.projected.paragraph_namespaces[paragraph.get()].as_ref();
+            paragraph_children(&candidate.projected.xml_bytes()[start..end], inherited)
+                .map_err(refused(paragraph))?
+        };
+        let moved_left = Position::new(after_right.runs_before(right_child));
+        candidate.insert_run_fragment(
+            paragraph,
+            Position::new(right_child),
+            moved_left,
+            &left_fragment,
+        )?;
+        *self = candidate;
+        Ok(self)
+    }
+
+    /// Swap direct runs in two different direct-body paragraphs while
+    /// retaining each run's complete fragment and each paragraph's physical
+    /// child slots.
+    ///
+    /// The paragraphs must have identical captured namespace scopes. This
+    /// conservative proof permits unknown run markup to cross the paragraph
+    /// boundary without rewriting its prefixes. Opaque direct children,
+    /// comments, and whitespace remain in their original paragraph slots.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked-position, namespace, field/dependency, malformed
+    /// XML, resource, or managed-owner refusal. All validation and both
+    /// splices happen on one candidate, so an error leaves this edit intact.
+    pub fn swap_runs_to(
+        &mut self,
+        first_paragraph: Position,
+        first: Position,
+        second_paragraph: Position,
+        second: Position,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("swap_runs_to")?;
+        if first_paragraph == second_paragraph {
+            return self.swap_runs(first_paragraph, first, second);
+        }
+
+        let (first_start, first_end) = self.paragraph_bounds(first_paragraph)?;
+        let (second_start, second_end) = self.paragraph_bounds(second_paragraph)?;
+        let first_inherited = self.projected.paragraph_namespaces[first_paragraph.get()].as_ref();
+        let second_inherited = self.projected.paragraph_namespaces[second_paragraph.get()].as_ref();
+        if first_inherited != second_inherited {
+            return Err(refused(first_paragraph)(Refusal::ComplexContent));
+        }
+        let first_xml = &self.projected.xml_bytes()[first_start..first_end];
+        let second_xml = &self.projected.xml_bytes()[second_start..second_end];
+        let first_layout =
+            paragraph_children(first_xml, first_inherited).map_err(refused(first_paragraph))?;
+        let second_layout =
+            paragraph_children(second_xml, second_inherited).map_err(refused(second_paragraph))?;
+        let first_child = first_layout
+            .run_child(first.get())
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(first_paragraph))?;
+        let second_child = second_layout
+            .run_child(second.get())
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(second_paragraph))?;
+        let (first_fragment_start, first_fragment_end) = first_layout
+            .extent(first_child)
+            .ok_or_else(|| invalid("direct run is missing from the paragraph"))?;
+        let (second_fragment_start, second_fragment_end) = second_layout
+            .extent(second_child)
+            .ok_or_else(|| invalid("direct run is missing from the paragraph"))?;
+        let first_element_end = first_fragment_start
+            .checked_add(element_len(
+                &first_xml[first_fragment_start..first_fragment_end],
+            )?)
+            .ok_or_else(|| invalid("direct run offset overflow"))?;
+        let second_element_end = second_fragment_start
+            .checked_add(element_len(
+                &second_xml[second_fragment_start..second_fragment_end],
+            )?)
+            .ok_or_else(|| invalid("direct run offset overflow"))?;
+        if inside_complex_field(first_xml, first_fragment_start, first_inherited)
+            .map_err(refused(first_paragraph))?
+            || inside_complex_field(second_xml, second_fragment_start, second_inherited)
+                .map_err(refused(second_paragraph))?
+        {
+            return Err(refused(first_paragraph)(Refusal::FieldInterior));
+        }
+        run_dependencies(
+            &first_xml[first_fragment_start..first_element_end],
+            first_inherited,
+        )
+        .map_err(refused(first_paragraph))?;
+        run_dependencies(
+            &second_xml[second_fragment_start..second_element_end],
+            second_inherited,
+        )
+        .map_err(refused(second_paragraph))?;
+        let first_offset = first_layout
+            .insertion_offset(first_child)
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(first_paragraph))?;
+        let second_offset = second_layout
+            .insertion_offset(second_child)
+            .ok_or(Refusal::RunNotFound)
+            .map_err(refused(second_paragraph))?;
+        if inside_complex_field(first_xml, first_offset, first_inherited)
+            .map_err(refused(first_paragraph))?
+            || inside_complex_field(second_xml, second_offset, second_inherited)
+                .map_err(refused(second_paragraph))?
+        {
+            return Err(refused(first_paragraph)(Refusal::FieldInterior));
+        }
+        let first_fragment = Arc::new(first_xml[first_fragment_start..first_fragment_end].to_vec());
+        let second_fragment =
+            Arc::new(second_xml[second_fragment_start..second_fragment_end].to_vec());
+
+        let mut candidate = self.try_clone()?;
+        candidate.remove_run_fragment(
+            second_paragraph,
+            Position::new(second_child),
+            second,
+            &second_fragment,
+        )?;
+        candidate.remove_run_fragment(
+            first_paragraph,
+            Position::new(first_child),
+            first,
+            &first_fragment,
+        )?;
+        let first_after_removal = {
+            let (start, end) = candidate.paragraph_bounds(first_paragraph)?;
+            let inherited =
+                candidate.projected.paragraph_namespaces[first_paragraph.get()].as_ref();
+            paragraph_children(&candidate.projected.xml_bytes()[start..end], inherited)
+                .map_err(refused(first_paragraph))?
+        };
+        let moved_second = Position::new(first_after_removal.runs_before(first_child));
+        candidate.insert_run_fragment(
+            first_paragraph,
+            Position::new(first_child),
+            moved_second,
+            &second_fragment,
+        )?;
+        let second_after_removal = {
+            let (start, end) = candidate.paragraph_bounds(second_paragraph)?;
+            let inherited =
+                candidate.projected.paragraph_namespaces[second_paragraph.get()].as_ref();
+            paragraph_children(&candidate.projected.xml_bytes()[start..end], inherited)
+                .map_err(refused(second_paragraph))?
+        };
+        let moved_first = Position::new(second_after_removal.runs_before(second_child));
+        candidate.insert_run_fragment(
+            second_paragraph,
+            Position::new(second_child),
+            moved_first,
+            &first_fragment,
+        )?;
+        *self = candidate;
         Ok(self)
     }
 
@@ -1094,9 +1655,11 @@ impl Edit {
         let (run_start, run_end) = layout
             .extent(child.get())
             .ok_or(Error::SemanticPrecondition)?;
+        let element = element_len(xml)?;
         if !is_run
             || layout.runs_before(child.get()) != run.get()
-            || paragraph_xml.get(run_start..run_end) != Some(xml.as_slice())
+            || paragraph_xml.get(run_start..run_end.min(run_start + element))
+                != Some(&xml[..element])
         {
             return Err(Error::SemanticPrecondition);
         }

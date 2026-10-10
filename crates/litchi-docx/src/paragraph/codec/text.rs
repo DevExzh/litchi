@@ -41,8 +41,25 @@ const MAX_TEXT_DECODE_CHUNK_BYTES: usize = 4096;
 const MAX_TEXT_REFERENCE_BYTES: usize = 64 * 1024;
 
 pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
+    collect_word_text::<false>(xml_bytes, &[])
+}
+
+// Retained semantic owners know their root namespace. Only an unresolved
+// root enables fragment fallback; an unqualified descendant cannot opt in.
+// Raw fragment helpers retain their historical fallback policy.
+pub(super) fn extract_word_text_with_bindings(
+    xml_bytes: &[u8],
+    bindings: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<String> {
+    collect_word_text::<true>(xml_bytes, bindings)
+}
+
+fn collect_word_text<const ROOT_ONLY: bool>(
+    xml_bytes: &[u8],
+    bindings: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<String> {
     let mut result = String::new();
-    for_each_word_text_chunk(xml_bytes, |chunk| {
+    scan_word_text::<false, ROOT_ONLY, _, _>(xml_bytes, "", bindings, |chunk| {
         result
             .try_reserve(chunk.len())
             .map_err(|source| Error::Allocation {
@@ -67,7 +84,7 @@ pub(crate) fn extract_word_text(xml_bytes: &[u8]) -> Result<String> {
 /// [`extract_word_text`] fails.
 pub(crate) fn extract_word_paragraph_text(xml_bytes: &[u8], separator: &str) -> Result<String> {
     let mut result = String::new();
-    scan_word_text::<true, _, _>(xml_bytes, separator, |chunk| {
+    scan_word_text::<true, false, _, _>(xml_bytes, separator, &[], |chunk| {
         result
             .try_reserve(chunk.len())
             .map_err(|source| Error::Allocation {
@@ -88,16 +105,17 @@ where
     F: FnMut(&str) -> std::result::Result<(), E>,
     E: From<Error>,
 {
-    scan_word_text::<false, F, E>(xml_bytes, "", append)
+    scan_word_text::<false, false, F, E>(xml_bytes, "", &[], append)
 }
 
 /// The visible-text scanner behind [`for_each_word_text_chunk`] and
 /// [`extract_word_paragraph_text`]. With `PARAGRAPHS` it also appends
 /// `separator` before every paragraph after the first; without it, the
 /// paragraph bookkeeping compiles away and `separator` is unused.
-fn scan_word_text<const PARAGRAPHS: bool, F, E>(
+fn scan_word_text<const PARAGRAPHS: bool, const ROOT_ONLY: bool, F, E>(
     xml_bytes: &[u8],
     separator: &str,
+    bindings: &[(Option<Vec<u8>>, Vec<u8>)],
     mut append: F,
 ) -> std::result::Result<(), E>
 where
@@ -119,8 +137,18 @@ where
     // its result. `extract_word_text_base_oracle`, the production loop before
     // the change with quick-xml's own resolver, pins the output.
     let mut reader = Reader::from_reader(xml_bytes);
-    let mut tracker = BindingTracker::new();
+    let mut tracker = BindingTracker::with_bindings(bindings.iter().map(|(prefix, uri)| {
+        (
+            prefix.as_deref().map_or(
+                quick_xml::name::PrefixDeclaration::Default,
+                quick_xml::name::PrefixDeclaration::Named,
+            ),
+            uri.as_slice(),
+        )
+    }))
+    .map_err(|error| E::from(Error::Xml(error.to_string())))?;
     let mut pending_pop = false;
+    let mut saw_root = false;
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
     let mut depth = 0usize;
     let mut nodes = 0usize;
@@ -185,7 +213,7 @@ where
             |local: &[u8]| PARAGRAPHS && local == b"p" && paragraph_depth == 0;
         let resolves = match &event {
             Event::Start(_) => {
-                fragment_prefix.is_none()
+                (!ROOT_ONLY || !saw_root) && fragment_prefix.is_none()
                     || local == b"t"
                     || is_word_special_character_name(local)
                     || paragraph_candidate(local)
@@ -196,7 +224,8 @@ where
         };
         let namespace = resolves.then(|| tracker.resolve_prefix_bytes(prefix));
 
-        if fragment_prefix.is_none()
+        if (!ROOT_ONLY || !saw_root)
+            && fragment_prefix.is_none()
             && matches!(event, Event::Start(_))
             && !matches!(namespace, Some(ResolveResult::Bound(_)))
         {
@@ -207,6 +236,10 @@ where
                 )?),
                 None => None,
             });
+        }
+
+        if matches!(event, Event::Start(_) | Event::Empty(_)) {
+            saw_root = true;
         }
 
         // Whether this start or empty element begins a top-level Word
@@ -1520,7 +1553,7 @@ impl Paragraph {
     /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         let _parser_admission = self.parser_admission()?;
-        extract_word_text(self.xml_bytes())
+        extract_word_text_with_bindings(self.xml_bytes(), &self.xml_data.inherited_namespaces()?)
     }
 }
 

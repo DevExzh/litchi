@@ -856,6 +856,8 @@ fn history_graph_transition(
             | Operation::ReplaceParagraphText { .. }
             | Operation::ReplaceHyperlinkText { .. }
             | Operation::ReplaceRunText { .. }
+            | Operation::ReplaceRunTextNode { .. }
+            | Operation::MarkCachedRunFieldDirty { .. }
             | Operation::ReplaceSimpleFieldText { .. }
             | Operation::ReplaceComplexFieldText { .. }
             | Operation::ReplaceRevisionText { .. }
@@ -968,6 +970,24 @@ fn operation_effects(
                 reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
                 writes.push(format!(
                     "body/paragraph:{}/run:{}/text",
+                    paragraph.get(),
+                    run.get()
+                ));
+            },
+            Operation::ReplaceRunTextNode { paragraph, run, .. } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/run:{}/text-node",
+                    paragraph.get(),
+                    run.get()
+                ));
+            },
+            Operation::MarkCachedRunFieldDirty { paragraph, run, .. } => {
+                reads.push("body/paragraph-order".to_owned());
+                reads.push(format!("body/paragraph:{}/all-text", paragraph.get()));
+                writes.push(format!(
+                    "body/paragraph:{}/run:{}/cached-field-dirty",
                     paragraph.get(),
                     run.get()
                 ));
@@ -1245,6 +1265,35 @@ fn durable_operation(
                 "run.text.replace",
                 format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
                 Value::String(after.clone()),
+            )
+        },
+        Operation::ReplaceRunTextNode {
+            paragraph,
+            run,
+            before,
+            after,
+        } => {
+            preconditions.insert("before".to_owned(), markup_value(before, "run text node")?);
+            (
+                "run.text-node.replace",
+                format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
+                markup_value(after, "run text node")?,
+            )
+        },
+        Operation::MarkCachedRunFieldDirty {
+            paragraph,
+            run,
+            before,
+            after,
+        } => {
+            preconditions.insert(
+                "before".to_owned(),
+                markup_value(before, "cached field marker")?,
+            );
+            (
+                "run.cached-field-dirty.mark",
+                format!("paragraph:{}/run:{}", paragraph.get(), run.get()),
+                markup_value(after, "cached field marker")?,
             )
         },
         Operation::ReplaceSimpleFieldText {
@@ -1711,6 +1760,8 @@ fn restore_transfer_operation(
         | Operation::ReplaceParagraphText { .. }
         | Operation::ReplaceHyperlinkText { .. }
         | Operation::ReplaceRunText { .. }
+        | Operation::ReplaceRunTextNode { .. }
+        | Operation::MarkCachedRunFieldDirty { .. }
         | Operation::ReplaceSimpleFieldText { .. }
         | Operation::ReplaceComplexFieldText { .. }
         | Operation::ReplaceRevisionText { .. }
@@ -1908,6 +1959,24 @@ fn parse_durable_operation(
                 run,
                 before: before()?,
                 after: after()?,
+            })
+        },
+        "run.text-node.replace" if operation.preconditions.len() == 3 => {
+            let (paragraph, run) = parse_paragraph_child_target(&operation.target, "/run:")?;
+            Ok(Operation::ReplaceRunTextNode {
+                paragraph,
+                run,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
+            })
+        },
+        "run.cached-field-dirty.mark" if operation.preconditions.len() == 3 => {
+            let (paragraph, run) = parse_paragraph_child_target(&operation.target, "/run:")?;
+            Ok(Operation::MarkCachedRunFieldDirty {
+                paragraph,
+                run,
+                before: Arc::new(before()?.into_bytes()),
+                after: Arc::new(after()?.into_bytes()),
             })
         },
         "field.result-text.replace" if operation.preconditions.len() == 3 => {

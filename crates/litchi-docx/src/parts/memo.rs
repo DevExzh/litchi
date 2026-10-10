@@ -339,6 +339,12 @@ impl MemoValue for VisiblePayload {
     }
 }
 
+impl std::fmt::Debug for VisiblePayload {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("VisiblePayload { .. }")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -525,11 +531,5 @@ mod tests {
         let payload = VisiblePayload::project(&selected).unwrap();
         assert_eq!(payload.positions(), RawPositions::Unproven);
         assert!(payload.same_projection(&VisiblePayload::project(&selected).unwrap(), &selected));
-    }
-}
-
-impl std::fmt::Debug for VisiblePayload {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str("VisiblePayload { .. }")
     }
 }

@@ -37,7 +37,7 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) use durable::durable_transfer_operations;
 pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
-pub use formatting::{BodyAnchor, BodyBlock, NewParagraph, NewRun};
+pub use formatting::{BodyAnchor, BodyBlock, NewParagraph, NewRun, RunAnchor};
 pub use litchi_core::patch::{
     CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
     ThreeWayMergeFailure,
@@ -86,10 +86,12 @@ const WORD_2023_DATE_UTC_NAMESPACE: &[u8] =
 pub type Result<T> = std::result::Result<T, Error>;
 
 pub(crate) fn validate_paragraph_text(position: Position, text: &str) -> Result<()> {
-    validate_authored_text(text).map_err(|reason| Error::Refused {
-        position: position.get(),
-        reason,
-    })
+    if text.chars().any(|character| {
+        !matches!(character, '\t' | '\n' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}')
+    }) {
+        return Err(Error::Refused { position: position.get(), reason: Refusal::StructuralText });
+    }
+    Ok(())
 }
 
 /// A typed reason why a paragraph operation cannot be represented safely.
@@ -2018,6 +2020,34 @@ pub enum Operation {
         /// Text produced by the operation.
         after: String,
     },
+    /// Replace only the first direct `w:t` element in one run, retaining its
+    /// exact element attributes and every other run child.
+    ///
+    /// The operation retains the exact before/after text-node fragments so
+    /// replay and inversion preserve authored XML spelling (including
+    /// numeric carriage-return references).
+    ReplaceRunTextNode {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct run position within the paragraph.
+        run: Position,
+        /// Exact first direct text-node bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact first direct text-node bytes produced by the operation.
+        after: Arc<Vec<u8>>,
+    },
+    /// Mark the owning complex field of one cached-result run dirty while
+    /// retaining the exact field-marker fragment.
+    MarkCachedRunFieldDirty {
+        /// Direct-body paragraph position.
+        paragraph: Position,
+        /// Direct run position within the paragraph.
+        run: Position,
+        /// Exact owning `w:fldChar` fragment required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact owning `w:fldChar` fragment produced by the operation.
+        after: Arc<Vec<u8>>,
+    },
     /// Replace the displayed result of one direct `w:fldSimple` field.
     ReplaceSimpleFieldText {
         /// Direct-body paragraph position.
@@ -2316,6 +2346,8 @@ impl Operation {
             Self::ReplaceParagraphText { .. }
             | Self::ReplaceHyperlinkText { .. }
             | Self::ReplaceRunText { .. }
+            | Self::ReplaceRunTextNode { .. }
+            | Self::MarkCachedRunFieldDirty { .. }
             | Self::ReplaceSimpleFieldText { .. }
             | Self::ReplaceComplexFieldText { .. }
             | Self::ReplaceRevisionText { .. }
@@ -2350,6 +2382,8 @@ impl Operation {
         matches!(
             self,
             Self::ApplyRevision { .. }
+                | Self::ReplaceRunTextNode { .. }
+                | Self::MarkCachedRunFieldDirty { .. }
                 | Self::ReplaceRunProperties { .. }
                 | Self::ReplaceParagraphProperties { .. }
                 | Self::InsertParagraphFragment { .. }
@@ -2391,6 +2425,28 @@ impl Operation {
                 run: *run,
                 before: after.clone(),
                 after: before.clone(),
+            },
+            Self::ReplaceRunTextNode {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::ReplaceRunTextNode {
+                paragraph: *paragraph,
+                run: *run,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::MarkCachedRunFieldDirty {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::MarkCachedRunFieldDirty {
+                paragraph: *paragraph,
+                run: *run,
+                before: Arc::clone(after),
+                after: Arc::clone(before),
             },
             Self::ReplaceSimpleFieldText {
                 paragraph,
@@ -2731,6 +2787,15 @@ impl Edit {
         &self.projected
     }
 
+    /// Remaining semantic-operation slots in this edit's bounded ledger.
+    ///
+    /// Coordinators can close a run before staging a group of operations that
+    /// would exceed the native cap. A no-op may use fewer slots than requested.
+    #[must_use]
+    pub fn remaining_operations(&self) -> usize {
+        MAX_OPERATIONS.saturating_sub(self.operations.len())
+    }
+
     /// Choose how this edit compacts the main document it publishes.
     ///
     /// The default is [`CompactionPolicy::PreserveUnmodified`], which leaves
@@ -2828,7 +2893,9 @@ impl Edit {
     ///
     /// Replacement characters are assigned to the existing text slots in
     /// order: each slot keeps up to its original character count and the final
-    /// slot receives any remainder. Direct hyperlinks and other paragraph
+    /// slot receives any remainder. Tabs and LF become inline Word tab and
+    /// wrapping-break elements; paragraph count does not change. CR and XML-illegal
+    /// controls remain refused. Direct hyperlinks and other paragraph
     /// wrappers use their focused operations and are refused here.
     /// The input must expose its borrowed `str` view as well as a `String`
     /// conversion so managed callers can be admitted before conversion.
@@ -2860,10 +2927,7 @@ impl Edit {
         }
         self.reserve_operation()?;
         let text = authored_text.into();
-        validate_authored_text(&text).map_err(|reason| Error::Refused {
-            position: position.get(),
-            reason,
-        })?;
+        validate_paragraph_text(position, &text)?;
         let range = self.range(position)?;
         let paragraph_start = usize::try_from(range.start).map_err(|_conversion_error| {
             crate::Error::InvalidFormat("paragraph offset does not fit usize".into())
@@ -2939,10 +3003,7 @@ impl Edit {
             })
         })?;
         context.check().map_err(managed_execution)?;
-        validate_authored_text(&authored_text).map_err(|reason| Error::Refused {
-            position: position.get(),
-            reason,
-        })?;
+        validate_paragraph_text(position, &authored_text)?;
         let range = self.range(position)?;
         let paragraph_start = usize::try_from(range.start).map_err(|_conversion_error| {
             crate::Error::InvalidFormat("paragraph offset does not fit usize".into())
@@ -3503,6 +3564,7 @@ impl Edit {
     /// Positions must be non-empty, unique, and strictly increasing. Every
     /// paragraph retains its run boundaries, formatting, drawings, and unknown
     /// run XML under the same refusal rules as [`Self::replace_paragraph_text`].
+    /// Tabs and LF become inline controls; this does not split paragraphs.
     ///
     /// # Errors
     ///
@@ -3530,10 +3592,7 @@ impl Edit {
             })?;
         for replacement in replacements {
             candidate.reserve_operation()?;
-            validate_authored_text(replacement.text.as_str()).map_err(|reason| Error::Refused {
-                position: replacement.position.get(),
-                reason,
-            })?;
+            validate_paragraph_text(replacement.position, replacement.text.as_str())?;
             let replacement_text_bytes = candidate.checked_text_total(replacement.text.len())?;
             let range = candidate.range(replacement.position)?;
             let paragraph_start = checked_start(range, "paragraph")?;
@@ -3662,10 +3721,7 @@ impl Edit {
             }
         }
         for replacement in replacements {
-            validate_authored_text(replacement.text.as_str()).map_err(|reason| Error::Refused {
-                position: replacement.position.get(),
-                reason,
-            })?;
+            validate_paragraph_text(replacement.position, replacement.text.as_str())?;
         }
 
         // Decisions retain the immutable-base text and its scan admission
@@ -4129,6 +4185,301 @@ impl Edit {
                 after,
             },
         )
+    }
+
+    /// Replace only the first direct `w:t` child of one run while preserving
+    /// its attributes and every other run child byte-for-byte. Unlike
+    /// [`Self::replace_run_text`], authored tabs, line feeds, and carriage
+    /// returns remain literal text-node characters; carriage returns are
+    /// written as numeric XML references so XML line-ending normalization
+    /// cannot change them on a later parse.
+    ///
+    /// # Errors
+    ///
+    /// Returns a checked selector/refusal, resource-limit, or malformed XML
+    /// error without changing the projected snapshot. Budget-managed edits
+    /// retain the same explicit refusal as the other source-preserving native
+    /// run operations.
+    pub fn replace_run_text_node(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        authored_text: impl Into<String>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("replace_run_text_node")?;
+        self.reserve_operation()?;
+        let text = authored_text.into();
+        validate_authored_run_content(&text).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(text.len())?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(paragraph.get())
+            .ok_or(Error::OutOfBounds {
+                position: paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let run_range = select_direct_child_with_transaction_namespace_context(
+            paragraph_xml,
+            b"p",
+            b"r",
+            run,
+            Refusal::RunNotFound,
+            inherited_namespaces,
+        )
+        .map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let run_start = checked_relative_start(paragraph_start, run_range)?;
+        let run_end = checked_relative_end(paragraph_start, run_range)?;
+        let run_xml = checked_slice(self.projected.xml_bytes(), run_start, run_end, "run")?;
+        let Some(text_range) =
+            first_direct_text_node(run_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?
+        else {
+            if run_has_only_properties(run_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })? {
+                return Ok(self);
+            }
+            return Err(Error::Refused {
+                position: paragraph.get(),
+                reason: Refusal::ComplexRun,
+            });
+        };
+        let text_start = checked_relative_start(run_start, text_range)?;
+        let text_end = checked_relative_end(run_start, text_range)?;
+        let before = checked_slice(
+            self.projected.xml_bytes(),
+            text_start,
+            text_end,
+            "run text node",
+        )?;
+        let existing = decode_text_fragment(before).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        if existing == text {
+            return Ok(self);
+        }
+        let after = rewrite_literal_text_node(before, &text)?;
+        let xml = replace_range(self.projected.xml_bytes(), text_start, text_end, &after)?;
+        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate_paragraph_range = candidate.range(paragraph)?;
+        let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph = checked_slice(
+            candidate.xml_bytes(),
+            candidate_paragraph_start,
+            candidate_paragraph_end,
+            "paragraph",
+        )?;
+        let candidate_run = select_direct_child_with_transaction_namespace_context(
+            candidate_paragraph,
+            b"p",
+            b"r",
+            run,
+            Refusal::RunNotFound,
+            inherited_namespaces,
+        )
+        .map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let candidate_run_start = checked_relative_start(candidate_paragraph_start, candidate_run)?;
+        let candidate_run_end = checked_relative_end(candidate_paragraph_start, candidate_run)?;
+        let candidate_run_xml = checked_slice(
+            candidate.xml_bytes(),
+            candidate_run_start,
+            candidate_run_end,
+            "run",
+        )?;
+        let candidate_text = first_direct_text_node(candidate_run_xml, inherited_namespaces)
+            .map_err(|reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            })?
+            .ok_or(Error::Refused {
+                position: paragraph.get(),
+                reason: Refusal::ComplexRun,
+            })?;
+        let candidate_text_start = checked_relative_start(candidate_run_start, candidate_text)?;
+        let candidate_text_end = checked_relative_end(candidate_run_start, candidate_text)?;
+        if checked_slice(
+            candidate.xml_bytes(),
+            candidate_text_start,
+            candidate_text_end,
+            "run text node",
+        )? != after.as_slice()
+        {
+            return Err(crate::Error::InvalidFormat(
+                "document run text-node edit failed exact readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::ReplaceRunTextNode {
+            paragraph,
+            run,
+            before: Arc::new(before.to_vec()),
+            after: Arc::new(after),
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
+    /// Mark the owning complex field dirty when a direct run is a cached
+    /// result. The operation follows direct run siblings backwards, ignores
+    /// closed nested fields, and changes only the owning `w:fldChar` marker.
+    /// Runs outside a cached result, empty runs, and already-dirty fields are
+    /// no-ops.
+    pub fn mark_cached_run_field_dirty(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("mark_cached_run_field_dirty")?;
+        self.reserve_operation()?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(paragraph.get())
+            .ok_or(Error::OutOfBounds {
+                position: paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let runs =
+            scan_cached_field_runs(paragraph_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?;
+        let Some(selected) = runs.get(run.get()) else {
+            return Err(Error::Refused {
+                position: paragraph.get(),
+                reason: Refusal::RunNotFound,
+            });
+        };
+        if !selected.has_direct_text {
+            return Ok(self);
+        }
+        let Some((owner_run, marker)) = owning_cached_field_marker(&runs, run.get()) else {
+            return Ok(self);
+        };
+        if marker.dirty {
+            return Ok(self);
+        }
+        let owner_start = checked_relative_start(paragraph_start, runs[owner_run].range)?;
+        let marker_start = checked_relative_start(owner_start, marker.range)?;
+        let marker_end = checked_relative_end(owner_start, marker.range)?;
+        let before = checked_slice(
+            self.projected.xml_bytes(),
+            marker_start,
+            marker_end,
+            "cached field marker",
+        )?;
+        let owner_end = checked_relative_end(paragraph_start, runs[owner_run].range)?;
+        let owner_xml = checked_slice(
+            self.projected.xml_bytes(),
+            owner_start,
+            owner_end,
+            "cached field run",
+        )?;
+        let marker_namespaces =
+            run_namespace_context(owner_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?;
+        let after = rewrite_cached_field_marker(before, &marker_namespaces)?;
+        if after == before {
+            return Ok(self);
+        }
+        let replacement_text_bytes = self.checked_text_total(after.len())?;
+        let xml = replace_range(self.projected.xml_bytes(), marker_start, marker_end, &after)?;
+        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate_paragraph_range = candidate.range(paragraph)?;
+        let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph = checked_slice(
+            candidate.xml_bytes(),
+            candidate_paragraph_start,
+            candidate_paragraph_end,
+            "paragraph",
+        )?;
+        let candidate_runs = scan_cached_field_runs(candidate_paragraph, inherited_namespaces)
+            .map_err(|reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            })?;
+        let Some((candidate_owner_run, candidate_marker)) =
+            owning_cached_field_marker(&candidate_runs, run.get())
+        else {
+            return Err(crate::Error::InvalidFormat(
+                "document cached field marker edit lost its owning field".into(),
+            )
+            .into());
+        };
+        let candidate_owner_start = checked_relative_start(
+            candidate_paragraph_start,
+            candidate_runs[candidate_owner_run].range,
+        )?;
+        let candidate_marker_start =
+            checked_relative_start(candidate_owner_start, candidate_marker.range)?;
+        let candidate_marker_end =
+            checked_relative_end(candidate_owner_start, candidate_marker.range)?;
+        if checked_slice(
+            candidate.xml_bytes(),
+            candidate_marker_start,
+            candidate_marker_end,
+            "cached field marker",
+        )? != after.as_slice()
+        {
+            return Err(crate::Error::InvalidFormat(
+                "document cached field marker edit failed exact readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::MarkCachedRunFieldDirty {
+            paragraph,
+            run,
+            before: Arc::new(before.to_vec()),
+            after: Arc::new(after),
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
     }
 
     /// Replace the displayed text of one direct simple field while preserving
@@ -5058,6 +5409,18 @@ impl Edit {
                 }
                 self.replace_run_text(*paragraph, *run, after.clone())
             },
+            Operation::ReplaceRunTextNode {
+                paragraph,
+                run,
+                before,
+                after,
+            } => self.replace_run_text_node_exact(*paragraph, *run, before, after),
+            Operation::MarkCachedRunFieldDirty {
+                paragraph,
+                run,
+                before,
+                after,
+            } => self.mark_cached_run_field_dirty_exact(*paragraph, *run, before, after),
             Operation::ReplaceSimpleFieldText {
                 paragraph,
                 field,
@@ -5581,6 +5944,225 @@ impl Edit {
         Ok(self)
     }
 
+    fn replace_run_text_node_exact(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        before: &Arc<Vec<u8>>,
+        after: &Arc<Vec<u8>>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("replace_run_text_node")?;
+        self.reserve_operation()?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(paragraph.get())
+            .ok_or(Error::OutOfBounds {
+                position: paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let run_range = select_direct_child_with_transaction_namespace_context(
+            paragraph_xml,
+            b"p",
+            b"r",
+            run,
+            Refusal::RunNotFound,
+            inherited_namespaces,
+        )
+        .map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let run_start = checked_relative_start(paragraph_start, run_range)?;
+        let run_end = checked_relative_end(paragraph_start, run_range)?;
+        let run_xml = checked_slice(self.projected.xml_bytes(), run_start, run_end, "run")?;
+        let text_range = first_direct_text_node(run_xml, inherited_namespaces)
+            .map_err(|reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            })?
+            .ok_or(Error::SemanticPrecondition)?;
+        let text_start = checked_relative_start(run_start, text_range)?;
+        let text_end = checked_relative_end(run_start, text_range)?;
+        let current = checked_slice(
+            self.projected.xml_bytes(),
+            text_start,
+            text_end,
+            "run text node",
+        )?;
+        if current != before.as_slice() {
+            return Err(Error::SemanticPrecondition);
+        }
+        validate_literal_text_node_fragment(after, inherited_namespaces).map_err(|reason| {
+            Error::Refused {
+                position: paragraph.get(),
+                reason,
+            }
+        })?;
+        let after_text = decode_text_fragment(after).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        validate_authored_run_content(&after_text).map_err(|reason| Error::Refused {
+            position: paragraph.get(),
+            reason,
+        })?;
+        let replacement_text_bytes = self.checked_text_total(after_text.len())?;
+        let xml = replace_range(self.projected.xml_bytes(), text_start, text_end, after)?;
+        let candidate = self.projected.with_rewritten_xml(xml)?;
+        self.operations.push(Operation::ReplaceRunTextNode {
+            paragraph,
+            run,
+            before: Arc::clone(before),
+            after: Arc::clone(after),
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
+    fn mark_cached_run_field_dirty_exact(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        before: &Arc<Vec<u8>>,
+        after: &Arc<Vec<u8>>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("mark_cached_run_field_dirty")?;
+        self.reserve_operation()?;
+        let paragraph_range = self.range(paragraph)?;
+        let paragraph_start = checked_start(paragraph_range, "paragraph")?;
+        let paragraph_end = checked_end(paragraph_range, "paragraph")?;
+        let paragraph_xml = checked_slice(
+            self.projected.xml_bytes(),
+            paragraph_start,
+            paragraph_end,
+            "paragraph",
+        )?;
+        let inherited_namespaces = self
+            .projected
+            .paragraph_namespaces
+            .get(paragraph.get())
+            .ok_or(Error::OutOfBounds {
+                position: paragraph.get(),
+                len: self.projected.paragraph_count(),
+            })?;
+        let runs =
+            scan_cached_field_runs(paragraph_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?;
+        let Some(selected) = runs.get(run.get()) else {
+            return Err(Error::Refused {
+                position: paragraph.get(),
+                reason: Refusal::RunNotFound,
+            });
+        };
+        if !selected.has_direct_text {
+            return Err(Error::SemanticPrecondition);
+        }
+        let Some((owner_run, marker)) = owning_cached_field_marker(&runs, run.get()) else {
+            return Err(Error::SemanticPrecondition);
+        };
+        let owner_start = checked_relative_start(paragraph_start, runs[owner_run].range)?;
+        let marker_start = checked_relative_start(owner_start, marker.range)?;
+        let marker_end = checked_relative_end(owner_start, marker.range)?;
+        let current = checked_slice(
+            self.projected.xml_bytes(),
+            marker_start,
+            marker_end,
+            "cached field marker",
+        )?;
+        if current != before.as_slice() {
+            return Err(Error::SemanticPrecondition);
+        }
+        let owner_end = checked_relative_end(paragraph_start, runs[owner_run].range)?;
+        let owner_xml = checked_slice(
+            self.projected.xml_bytes(),
+            owner_start,
+            owner_end,
+            "cached field run",
+        )?;
+        let marker_namespaces =
+            run_namespace_context(owner_xml, inherited_namespaces).map_err(|reason| {
+                Error::Refused {
+                    position: paragraph.get(),
+                    reason,
+                }
+            })?;
+        validate_cached_field_marker_transition(before, after, &marker_namespaces).map_err(
+            |reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            },
+        )?;
+        let replacement_text_bytes = self.checked_text_total(after.len())?;
+        let xml = replace_range(self.projected.xml_bytes(), marker_start, marker_end, after)?;
+        let candidate = self.projected.with_rewritten_xml(xml)?;
+        let candidate_paragraph_range = candidate.range(paragraph)?;
+        let candidate_paragraph_start = checked_start(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph_end = checked_end(candidate_paragraph_range, "paragraph")?;
+        let candidate_paragraph = checked_slice(
+            candidate.xml_bytes(),
+            candidate_paragraph_start,
+            candidate_paragraph_end,
+            "paragraph",
+        )?;
+        let candidate_runs = scan_cached_field_runs(candidate_paragraph, inherited_namespaces)
+            .map_err(|reason| Error::Refused {
+                position: paragraph.get(),
+                reason,
+            })?;
+        let Some((candidate_owner_run, candidate_marker)) =
+            owning_cached_field_marker(&candidate_runs, run.get())
+        else {
+            return Err(crate::Error::InvalidFormat(
+                "exact cached field marker replay lost its owning field".into(),
+            )
+            .into());
+        };
+        let candidate_owner_start = checked_relative_start(
+            candidate_paragraph_start,
+            candidate_runs[candidate_owner_run].range,
+        )?;
+        let candidate_marker_start =
+            checked_relative_start(candidate_owner_start, candidate_marker.range)?;
+        let candidate_marker_end =
+            checked_relative_end(candidate_owner_start, candidate_marker.range)?;
+        if checked_slice(
+            candidate.xml_bytes(),
+            candidate_marker_start,
+            candidate_marker_end,
+            "cached field marker",
+        )? != after.as_slice()
+        {
+            return Err(crate::Error::InvalidFormat(
+                "exact cached field marker replay failed exact readback".into(),
+            )
+            .into());
+        }
+        self.operations.push(Operation::MarkCachedRunFieldDirty {
+            paragraph,
+            run,
+            before: Arc::clone(before),
+            after: Arc::clone(after),
+        });
+        self.replacement_text_bytes = replacement_text_bytes;
+        self.projected = candidate;
+        Ok(self)
+    }
+
     fn replace_selected_owner_text(
         &mut self,
         range: (usize, usize),
@@ -6056,6 +6638,12 @@ fn operation_string_bytes(operation: &Operation) -> usize {
         | Operation::ReplaceCellParagraphText { before, after, .. }
         | Operation::ReplaceNestedCellParagraphText { before, after, .. }
         | Operation::ReplaceNestedCellParagraphHyperlinkText { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
+        Operation::ReplaceRunTextNode { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
+        Operation::MarkCachedRunFieldDirty { before, after, .. } => {
             before.capacity().saturating_add(after.capacity())
         },
         Operation::InsertParagraph { text, .. } | Operation::RemoveParagraph { text, .. } => {
@@ -6748,13 +7336,471 @@ struct TextSlot {
     characters: usize,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum ComplexFieldMarker {
     Begin,
     Separate,
     End,
 }
 
+#[derive(Clone, Copy)]
+struct CachedFieldMarker {
+    range: Range,
+    kind: ComplexFieldMarker,
+    dirty: bool,
+}
+
+struct CachedFieldRun {
+    range: Range,
+    has_direct_text: bool,
+    marker: Option<CachedFieldMarker>,
+}
+
+fn scan_cached_field_runs(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<Vec<CachedFieldRun>, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let origin = ReaderOrigin::of(xml);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut root_depth = None;
+    let mut run_capture = None::<(usize, usize)>;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut runs = Vec::new();
+    runs.try_reserve(1)
+        .map_err(|_error| Refusal::ComplexContent)?;
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
+        let raw = reader
+            .read_event()
+            .map_err(|_error| Refusal::ComplexContent)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !transaction_fragment_word_name_matches(
+                            &namespace,
+                            element.name(),
+                            b"p",
+                            &fragment_prefix,
+                            true,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    saw_root = true;
+                    root_depth = Some(depth);
+                } else if run_capture.is_none()
+                    && root_depth.is_some_and(|root| depth == root + 1)
+                    && transaction_fragment_word_name_matches(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        true,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    run_capture = Some((start, depth));
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !transaction_fragment_word_name_matches(
+                            &namespace,
+                            element.name(),
+                            b"p",
+                            &fragment_prefix,
+                            true,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    return Ok(runs);
+                }
+                if run_capture.is_none()
+                    && root_depth.is_some_and(|root| child_depth == root + 1)
+                    && transaction_fragment_word_name_matches(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        true,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    let range =
+                        checked_range(start, end).map_err(|_error| Refusal::ComplexContent)?;
+                    let run_xml = xml.get(start..end).ok_or(Refusal::ComplexContent)?;
+                    let (has_direct_text, marker) =
+                        inspect_cached_field_run(run_xml, inherited_namespaces)?;
+                    runs.try_reserve(1)
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    runs.push(CachedFieldRun {
+                        range,
+                        has_direct_text,
+                        marker,
+                    });
+                    if runs.len() > MAX_OPERATIONS {
+                        return Err(Refusal::ComplexContent);
+                    }
+                }
+            },
+            Event::End(element) => {
+                if let Some((capture_start, capture_depth)) = run_capture
+                    && depth == capture_depth
+                    && transaction_fragment_word_name_matches(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        true,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    let range = checked_range(capture_start, end)
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    let run_xml = xml.get(capture_start..end).ok_or(Refusal::ComplexContent)?;
+                    let (has_direct_text, marker) =
+                        inspect_cached_field_run(run_xml, inherited_namespaces)?;
+                    runs.try_reserve(1)
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    runs.push(CachedFieldRun {
+                        range,
+                        has_direct_text,
+                        marker,
+                    });
+                    if runs.len() > MAX_OPERATIONS {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    run_capture = None;
+                }
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexContent)?;
+                if depth == 0 {
+                    return if saw_root && run_capture.is_none() {
+                        Ok(runs)
+                    } else {
+                        Err(Refusal::ComplexContent)
+                    };
+                }
+            },
+            Event::Eof => {
+                return if saw_root && depth == 0 && run_capture.is_none() {
+                    Ok(runs)
+                } else {
+                    Err(Refusal::ComplexContent)
+                };
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn inspect_cached_field_run(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<(bool, Option<CachedFieldMarker>), Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let origin = ReaderOrigin::of(xml);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut root_depth = None;
+    let mut pending_marker = None::<(usize, usize, ComplexFieldMarker, bool)>;
+    let mut marker = None;
+    let mut has_direct_text = false;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
+        let raw = reader
+            .read_event()
+            .map_err(|_error| Refusal::ComplexContent)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexContent)?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !transaction_fragment_word_name_matches(
+                            &namespace,
+                            element.name(),
+                            b"r",
+                            &fragment_prefix,
+                            true,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    saw_root = true;
+                    root_depth = Some(depth);
+                } else if root_depth.is_some_and(|root| depth == root + 1) {
+                    if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        has_direct_text = true;
+                    } else if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"fldChar",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        let (kind, dirty) = parse_cached_field_marker(
+                            &element,
+                            reader.resolver(),
+                            reader.decoder(),
+                            &fragment_prefix,
+                        )?;
+                        if pending_marker.is_some() {
+                            return Err(Refusal::ComplexContent);
+                        }
+                        pending_marker = Some((start, depth, kind, dirty));
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !transaction_fragment_word_name_matches(
+                            &namespace,
+                            element.name(),
+                            b"r",
+                            &fragment_prefix,
+                            true,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    return Ok((false, None));
+                }
+                if root_depth.is_some_and(|root| child_depth == root + 1) {
+                    if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        has_direct_text = true;
+                    } else if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"fldChar",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        let (kind, dirty) = parse_cached_field_marker(
+                            &element,
+                            reader.resolver(),
+                            reader.decoder(),
+                            &fragment_prefix,
+                        )?;
+                        let range =
+                            checked_range(start, end).map_err(|_error| Refusal::ComplexContent)?;
+                        if marker.is_some() {
+                            return Err(Refusal::ComplexContent);
+                        }
+                        marker = Some(CachedFieldMarker { range, kind, dirty });
+                    }
+                }
+            },
+            Event::End(element) => {
+                if let Some((marker_start, marker_depth, kind, dirty)) = pending_marker
+                    && depth == marker_depth
+                    && is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"fldChar",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    let range = checked_range(marker_start, end)
+                        .map_err(|_error| Refusal::ComplexContent)?;
+                    if marker.is_some() {
+                        return Err(Refusal::ComplexContent);
+                    }
+                    marker = Some(CachedFieldMarker { range, kind, dirty });
+                    pending_marker = None;
+                }
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexContent)?;
+                if depth == 0 {
+                    return if saw_root && pending_marker.is_none() {
+                        Ok((has_direct_text, marker))
+                    } else {
+                        Err(Refusal::ComplexContent)
+                    };
+                }
+            },
+            Event::Eof => {
+                return if saw_root && depth == 0 && pending_marker.is_none() {
+                    Ok((has_direct_text, marker))
+                } else {
+                    Err(Refusal::ComplexContent)
+                };
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+fn parse_cached_field_marker(
+    element: &quick_xml::events::BytesStart<'_>,
+    resolver: &quick_xml::name::NamespaceResolver,
+    decoder: quick_xml::encoding::Decoder,
+    fragment_prefix: &FragmentPrefix,
+) -> std::result::Result<(ComplexFieldMarker, bool), Refusal> {
+    let mut kind = None;
+    let mut dirty = false;
+    let mut dirty_seen = false;
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|_error| Refusal::ComplexContent)?;
+        let (namespace, local_name) = resolver.resolve_attribute(attribute.key);
+        if !is_cached_field_word_attribute(&namespace, fragment_prefix) {
+            continue;
+        }
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|_error| Refusal::ComplexContent)?;
+        match local_name.as_ref() {
+            b"fldCharType" => {
+                if kind.is_some() {
+                    return Err(Refusal::ComplexContent);
+                }
+                kind = Some(match value.as_ref() {
+                    "begin" => ComplexFieldMarker::Begin,
+                    "separate" => ComplexFieldMarker::Separate,
+                    "end" => ComplexFieldMarker::End,
+                    _ => return Err(Refusal::ComplexContent),
+                });
+            },
+            b"dirty" => {
+                if dirty_seen {
+                    return Err(Refusal::ComplexContent);
+                }
+                dirty_seen = true;
+                dirty = match value.as_ref() {
+                    "true" | "1" | "on" => true,
+                    "false" | "0" | "off" => false,
+                    _ => return Err(Refusal::ComplexContent),
+                };
+            },
+            _ => {},
+        }
+    }
+    kind.map(|kind| (kind, dirty))
+        .ok_or(Refusal::ComplexContent)
+}
+
+fn is_cached_field_word_attribute(
+    namespace: &ResolveResult<'_>,
+    fragment_prefix: &FragmentPrefix,
+) -> bool {
+    if is_wordprocessing_namespace(namespace) {
+        return true;
+    }
+    match namespace {
+        ResolveResult::Unknown(prefix) => matches!(
+            fragment_prefix,
+            FragmentPrefix::Prefixed(candidate) if candidate.as_slice() == prefix.as_slice()
+        ),
+        ResolveResult::Bound(_) | ResolveResult::Unbound => false,
+    }
+}
+
+fn owning_cached_field_marker(
+    runs: &[CachedFieldRun],
+    selected: usize,
+) -> Option<(usize, CachedFieldMarker)> {
+    let selected_run = runs.get(selected)?;
+    if !selected_run.has_direct_text {
+        return None;
+    }
+    let mut closed_depth = 0usize;
+    let mut separate = false;
+    for run in runs[..selected].iter().rev() {
+        let Some(marker) = run.marker else { continue };
+        match marker.kind {
+            ComplexFieldMarker::End => closed_depth = closed_depth.saturating_add(1),
+            ComplexFieldMarker::Begin => {
+                if closed_depth == 0 {
+                    return None;
+                }
+                closed_depth -= 1;
+            },
+            ComplexFieldMarker::Separate if closed_depth == 0 => {
+                separate = true;
+                break;
+            },
+            ComplexFieldMarker::Separate => {},
+        }
+    }
+    if !separate {
+        return None;
+    }
+    closed_depth = 0;
+    for (index, run) in runs[..selected].iter().enumerate().rev() {
+        let Some(marker) = run.marker else { continue };
+        match marker.kind {
+            ComplexFieldMarker::End => closed_depth = closed_depth.saturating_add(1),
+            ComplexFieldMarker::Begin => {
+                if closed_depth == 0 {
+                    return Some((index, marker));
+                }
+                closed_depth -= 1;
+            },
+            ComplexFieldMarker::Separate => {},
+        }
+    }
+    None
+}
+
+#[derive(Clone)]
 enum FragmentPrefix {
     Unseen,
     Unprefixed,
@@ -6767,6 +7813,64 @@ impl FragmentPrefix {
             Self::Prefixed(prefix.into_inner().to_vec())
         })
     }
+}
+
+struct TransactionNamespaceState {
+    inherited_default_binding: bool,
+    default_scopes: Vec<bool>,
+    pending_pop: bool,
+}
+
+impl TransactionNamespaceState {
+    fn new(inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)]) -> Self {
+        Self {
+            inherited_default_binding: inherited_namespaces
+                .iter()
+                .any(|(prefix, _namespace)| prefix.is_none()),
+            default_scopes: Vec::new(),
+            pending_pop: false,
+        }
+    }
+
+    fn fallback_for_event(&mut self, event: &Event<'_>) -> bool {
+        if self.pending_pop {
+            self.default_scopes.pop();
+            self.pending_pop = false;
+        }
+        match event {
+            Event::Start(element) => {
+                self.default_scopes
+                    .push(element_declares_default_namespace(element));
+            },
+            Event::Empty(element) => {
+                self.default_scopes
+                    .push(element_declares_default_namespace(element));
+                self.pending_pop = true;
+            },
+            Event::End(_) => self.pending_pop = true,
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_)
+            | Event::Eof => {},
+        }
+        !self.inherited_default_binding && !self.default_scopes.iter().any(|scope| *scope)
+    }
+}
+
+fn element_declares_default_namespace(element: &quick_xml::events::BytesStart<'_>) -> bool {
+    element
+        .unchecked_attributes()
+        .filter_map(std::result::Result::ok)
+        .any(|attribute| {
+            attribute
+                .key
+                .as_namespace_binding()
+                .is_some_and(|prefix| matches!(prefix, PrefixDeclaration::Default))
+        })
 }
 
 struct CellSelection<'a> {
@@ -8546,10 +9650,14 @@ fn is_xml_scope_attribute(local_name: &[u8]) -> bool {
     matches!(local_name, b"space" | b"lang")
 }
 
+#[derive(Clone)]
 struct RawTagAttribute {
     name: Vec<u8>,
     value: Vec<u8>,
     raw: Vec<u8>,
+    /// Byte range of the quoted value within the opening tag.
+    value_start: usize,
+    value_end: usize,
 }
 
 #[derive(Clone, Copy, PartialEq, Eq)]
@@ -8806,6 +9914,7 @@ fn raw_tag_attributes(tag: &[u8]) -> std::result::Result<Vec<RawTagAttribute>, R
         if cursor >= tag.len() {
             return Err(Refusal::RevisionDependency);
         }
+        let value_end = cursor;
         cursor += 1;
         attribute_count = attribute_count
             .checked_add(1)
@@ -8844,6 +9953,8 @@ fn raw_tag_attributes(tag: &[u8]) -> std::result::Result<Vec<RawTagAttribute>, R
             name: name_owned,
             value: value_owned,
             raw: raw_owned,
+            value_start,
+            value_end,
         });
     }
     Ok(attributes)
@@ -9120,13 +10231,24 @@ fn decode_text_fragment(xml: &[u8]) -> std::result::Result<String, Refusal> {
     let mut reader = Reader::from_reader(xml);
     let mut value = String::new();
     let mut depth = 0usize;
+    let mut root_seen = false;
     loop {
         match reader.read_event().map_err(|_error| Refusal::ComplexRun)? {
             Event::Start(_) => {
+                if depth == 0 && root_seen {
+                    return Err(Refusal::ComplexRun);
+                }
                 depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
                 if depth > 1 {
                     return Err(Refusal::ComplexRun);
                 }
+                root_seen = true;
+            },
+            Event::Empty(_) if depth == 0 => {
+                if root_seen {
+                    return Err(Refusal::ComplexRun);
+                }
+                root_seen = true;
             },
             Event::Empty(_) => return Err(Refusal::ComplexRun),
             Event::Text(text) if depth == 1 => {
@@ -9153,7 +10275,7 @@ fn decode_text_fragment(xml: &[u8]) -> std::result::Result<String, Refusal> {
                 depth = depth.checked_sub(1).ok_or(Refusal::ComplexRun)?;
             },
             Event::Eof => {
-                if depth == 0 {
+                if depth == 0 && root_seen {
                     break;
                 }
                 return Err(Refusal::ComplexRun);
@@ -9315,6 +10437,42 @@ fn is_transaction_fragment_word_name(
     name.local_name().as_ref() == local_name && is_fragment_word_element(namespace, fragment_prefix)
 }
 
+fn is_transaction_fragment_word_name_with_default_fallback(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &FragmentPrefix,
+    default_namespace_fallback_allowed: bool,
+) -> bool {
+    name.local_name().as_ref() == local_name
+        && is_fragment_word_element_with_default_fallback(
+            namespace,
+            fragment_prefix,
+            default_namespace_fallback_allowed,
+        )
+}
+
+fn transaction_fragment_word_name_matches(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    local_name: &[u8],
+    fragment_prefix: &FragmentPrefix,
+    reject_default_namespace_fallback: bool,
+    default_namespace_fallback_allowed: bool,
+) -> bool {
+    if reject_default_namespace_fallback {
+        is_transaction_fragment_word_name_with_default_fallback(
+            namespace,
+            name,
+            local_name,
+            fragment_prefix,
+            default_namespace_fallback_allowed,
+        )
+    } else {
+        is_transaction_fragment_word_name(namespace, name, local_name, fragment_prefix)
+    }
+}
+
 fn is_fragment_word_element(
     namespace: &ResolveResult<'_>,
     fragment_prefix: &FragmentPrefix,
@@ -9328,6 +10486,27 @@ fn is_fragment_word_element(
             FragmentPrefix::Prefixed(candidate) if candidate.as_slice() == prefix.as_slice()
         ),
         ResolveResult::Unbound => matches!(fragment_prefix, FragmentPrefix::Unprefixed),
+        ResolveResult::Bound(_) => false,
+    }
+}
+
+fn is_fragment_word_element_with_default_fallback(
+    namespace: &ResolveResult<'_>,
+    fragment_prefix: &FragmentPrefix,
+    default_namespace_fallback_allowed: bool,
+) -> bool {
+    if is_wordprocessing_namespace(namespace) {
+        return true;
+    }
+    match namespace {
+        ResolveResult::Unknown(prefix) => matches!(
+            fragment_prefix,
+            FragmentPrefix::Prefixed(candidate) if candidate.as_slice() == prefix.as_slice()
+        ),
+        ResolveResult::Unbound => {
+            default_namespace_fallback_allowed
+                && matches!(fragment_prefix, FragmentPrefix::Unprefixed)
+        },
         ResolveResult::Bound(_) => false,
     }
 }
@@ -9536,6 +10715,814 @@ fn scan_run_region(xml: &[u8]) -> std::result::Result<(Vec<u8>, usize, usize, Te
     Ok((wrapper, open.len(), close.len(), owner))
 }
 
+fn literal_run_direct_child_refused(
+    namespace: &ResolveResult<'_>,
+    name: quick_xml::name::QName<'_>,
+    fragment_prefix: &FragmentPrefix,
+    default_namespace_fallback_allowed: bool,
+) -> bool {
+    if matches!(
+        namespace,
+        ResolveResult::Bound(Namespace(uri)) if *uri == MARKUP_COMPATIBILITY_NAMESPACE
+    ) && matches!(
+        name.local_name().as_ref(),
+        b"AlternateContent" | b"Choice" | b"Fallback"
+    ) {
+        return true;
+    }
+    if !is_fragment_word_element_with_default_fallback(
+        namespace,
+        fragment_prefix,
+        default_namespace_fallback_allowed,
+    ) {
+        return false;
+    }
+    matches!(
+        name.local_name().as_ref(),
+        b"ptab" | b"fldChar" | b"instrText" | b"drawing" | b"pict" | b"object"
+    )
+}
+
+fn validate_literal_text_node_fragment(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<(), Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    loop {
+        let raw = reader.read_event().map_err(|_error| Refusal::ComplexRun)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if depth == 1 {
+                    if saw_root {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    let fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if !is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    saw_root = true;
+                } else {
+                    return Err(Refusal::ComplexRun);
+                }
+            },
+            Event::Empty(element) if depth == 0 => {
+                if saw_root {
+                    return Err(Refusal::ComplexRun);
+                }
+                let fragment_prefix = FragmentPrefix::from_name(element.name());
+                if !is_transaction_fragment_word_name_with_default_fallback(
+                    &namespace,
+                    element.name(),
+                    b"t",
+                    &fragment_prefix,
+                    default_namespace_fallback_allowed,
+                ) {
+                    return Err(Refusal::ComplexRun);
+                }
+                saw_root = true;
+            },
+            Event::End(_) => {
+                if depth != 1 {
+                    return Err(Refusal::ComplexRun);
+                }
+                depth = 0;
+            },
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_)
+                if depth == 1 => {},
+            Event::Eof => {
+                return (saw_root && depth == 0)
+                    .then_some(())
+                    .ok_or(Refusal::ComplexRun);
+            },
+            Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {
+                return Err(Refusal::ComplexRun);
+            },
+            Event::Text(_) | Event::CData(_) | Event::Comment(_) | Event::GeneralRef(_) => {
+                return Err(Refusal::ComplexRun);
+            },
+            Event::Empty(_) => return Err(Refusal::ComplexRun),
+        }
+    }
+}
+
+/// Return the byte range of the first direct WordprocessingML text element in
+/// a run. The range is retained from the original source so callers can
+/// replace only that node and leave all neighbouring run markup untouched.
+fn first_direct_text_node(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<Option<Range>, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let origin = ReaderOrigin::of(xml);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut root_depth = None;
+    let mut text_depth = None;
+    let mut text_start = None;
+    let mut first_text = None;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexRun)?;
+        let raw = reader.read_event().map_err(|_error| Refusal::ComplexRun)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or(Refusal::ComplexRun)?;
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if root_depth.is_none() {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if saw_root
+                        || !is_transaction_fragment_word_name_with_default_fallback(
+                            &namespace,
+                            element.name(),
+                            b"r",
+                            &fragment_prefix,
+                            default_namespace_fallback_allowed,
+                        )
+                    {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    root_depth = Some(depth);
+                    saw_root = true;
+                } else if root_depth.is_some_and(|root| depth == root + 1) {
+                    if literal_run_direct_child_refused(
+                        &namespace,
+                        element.name(),
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) && text_start.is_none()
+                    {
+                        text_start = Some(start);
+                        text_depth = Some(depth);
+                    }
+                }
+            },
+            Event::Empty(element) => {
+                let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if root_depth.is_some_and(|root| child_depth == root + 1) {
+                    if literal_run_direct_child_refused(
+                        &namespace,
+                        element.name(),
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    if is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) && first_text.is_none()
+                    {
+                        first_text =
+                            Some(checked_range(start, end).map_err(|_| Refusal::ComplexRun)?);
+                    }
+                }
+            },
+            Event::End(element) => {
+                if let (Some(capture_start), Some(capture_depth)) = (text_start, text_depth)
+                    && depth == capture_depth
+                    && is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    if first_text.is_none() {
+                        first_text = Some(
+                            checked_range(capture_start, end).map_err(|_| Refusal::ComplexRun)?,
+                        );
+                    }
+                    text_start = None;
+                    text_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexRun)?;
+                if depth == 0 {
+                    return Ok(first_text);
+                }
+            },
+            Event::Eof => {
+                if depth != 0 || text_start.is_some() {
+                    return Err(Refusal::ComplexRun);
+                }
+                return Ok(first_text);
+            },
+            Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => {},
+        }
+    }
+}
+
+/// Decide whether a run with no direct `w:t` is an ordinary empty run. Word's
+/// setter treats `<w:r/>` and runs containing only `w:rPr` as a no-op, while
+/// a run containing a structural or opaque child must remain an explicit
+/// refusal for the focused text-node operation.
+fn run_has_only_properties(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<bool, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut depth = 0usize;
+    let mut saw_root = false;
+    let mut property_depth = None;
+    loop {
+        let raw = reader.read_event().map_err(|_error| Refusal::ComplexRun)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        match event {
+            Event::Start(element) => {
+                depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if depth == 1 {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    if !is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Err(Refusal::ComplexRun);
+                    }
+                    saw_root = true;
+                } else if depth == 2 {
+                    if !is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"rPr",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ) {
+                        return Ok(false);
+                    }
+                    property_depth = Some(depth);
+                }
+            },
+            Event::Empty(element) => {
+                if depth == 0 {
+                    fragment_prefix = FragmentPrefix::from_name(element.name());
+                    return Ok(is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"r",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    ));
+                }
+                let child_depth = depth.checked_add(1).ok_or(Refusal::ComplexRun)?;
+                if child_depth == 2
+                    && !is_transaction_fragment_word_name_with_default_fallback(
+                        &namespace,
+                        element.name(),
+                        b"rPr",
+                        &fragment_prefix,
+                        default_namespace_fallback_allowed,
+                    )
+                {
+                    return Ok(false);
+                }
+            },
+            Event::End(_) => {
+                if property_depth == Some(depth) {
+                    property_depth = None;
+                }
+                depth = depth.checked_sub(1).ok_or(Refusal::ComplexRun)?;
+            },
+            Event::Text(text) if depth == 1 => {
+                let value = text
+                    .xml_content(XmlVersion::Explicit1_0)
+                    .map_err(|_error| Refusal::ComplexRun)?;
+                if !value.trim().is_empty() {
+                    return Ok(false);
+                }
+            },
+            Event::CData(_) | Event::GeneralRef(_) if depth == 1 => return Ok(false),
+            Event::Comment(_) | Event::Decl(_) | Event::DocType(_) | Event::PI(_) => {},
+            Event::Text(_) | Event::CData(_) | Event::GeneralRef(_) => {},
+            Event::Eof => return Ok(saw_root && depth == 0 && property_depth.is_none()),
+        }
+    }
+}
+
+fn seed_transaction_namespaces(
+    reader: &mut NsReader<&[u8]>,
+    inherited: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<(), Refusal> {
+    for (prefix, namespace) in inherited {
+        let prefix = prefix
+            .as_deref()
+            .map_or(PrefixDeclaration::Default, PrefixDeclaration::Named);
+        reader
+            .resolver_mut()
+            .add(prefix, Namespace(namespace))
+            .map_err(|_| Refusal::ComplexRun)?;
+    }
+    Ok(())
+}
+
+/// Rebuild one text element while retaining its original opening tag,
+/// attributes, prefix, and closing tag. A self-closing node becomes paired
+/// only when non-empty content is written.
+#[derive(Clone)]
+struct CachedFieldMarkerFragment {
+    kind: ComplexFieldMarker,
+    dirty: bool,
+    tag_end: usize,
+    dirty_attribute: Option<RawTagAttribute>,
+    marker_prefix: FragmentPrefix,
+    marker_namespace: Vec<u8>,
+}
+
+fn run_namespace_context(
+    run_xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<Vec<(Option<Vec<u8>>, Vec<u8>)>, Refusal> {
+    let tag_end = find_tag_end(run_xml).ok_or(Refusal::ComplexContent)?;
+    let declarations = raw_tag_attributes(run_xml.get(..tag_end).ok_or(Refusal::ComplexContent)?)?;
+    let mut bindings = Vec::new();
+    bindings
+        .try_reserve_exact(
+            inherited_namespaces
+                .len()
+                .saturating_add(declarations.len()),
+        )
+        .map_err(|_error| Refusal::ComplexContent)?;
+    for (prefix, namespace) in inherited_namespaces {
+        bindings.push((prefix.clone(), namespace.clone()));
+    }
+    for declaration in declarations
+        .iter()
+        .filter(|attribute| is_namespace_declaration_name(&attribute.name))
+    {
+        let prefix = raw_namespace_declaration_prefix(&declaration.name)
+            .map_err(|_error| Refusal::ComplexContent)?
+            .map(ToOwned::to_owned);
+        bindings.retain(|(current, _)| current.as_deref() != prefix.as_deref());
+        bindings.push((prefix, declaration.value.clone()));
+    }
+    Ok(bindings)
+}
+
+fn cached_field_marker_fragment(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<CachedFieldMarkerFragment, Refusal> {
+    let mut reader = NsReader::from_reader(xml);
+    seed_transaction_namespaces(&mut reader, inherited_namespaces)?;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
+    let mut depth = 0usize;
+    let mut nodes = 0usize;
+    {
+        let raw = reader
+            .read_event()
+            .map_err(|_error| Refusal::ComplexContent)?;
+        let (namespace, event) = reader.resolver().resolve_event(raw);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
+        nodes = nodes.checked_add(1).ok_or(Refusal::ComplexContent)?;
+        if nodes > MAX_DOCUMENT_NODES {
+            return Err(Refusal::ComplexContent);
+        }
+        let is_empty = matches!(&event, Event::Empty(_));
+        match event {
+            Event::Start(element) | Event::Empty(element) if depth == 0 => {
+                let marker_prefix = FragmentPrefix::from_name(element.name());
+                if !is_transaction_fragment_word_name_with_default_fallback(
+                    &namespace,
+                    element.name(),
+                    b"fldChar",
+                    &marker_prefix,
+                    default_namespace_fallback_allowed,
+                ) {
+                    return Err(Refusal::ComplexContent);
+                }
+                let (kind, dirty) = parse_cached_field_marker(
+                    &element,
+                    reader.resolver(),
+                    reader.decoder(),
+                    &marker_prefix,
+                )?;
+                let tag_end = find_tag_end(xml).ok_or(Refusal::ComplexContent)?;
+                let raw_attributes =
+                    raw_tag_attributes(xml.get(..tag_end).ok_or(Refusal::ComplexContent)?)?;
+                let dirty_index =
+                    raw_attributes
+                        .iter()
+                        .enumerate()
+                        .find_map(|(index, attribute)| {
+                            let (attribute_namespace, local_name) = reader
+                                .resolver()
+                                .resolve_attribute(quick_xml::name::QName(&attribute.name));
+                            (local_name.as_ref() == b"dirty"
+                                && is_cached_field_word_attribute(
+                                    &attribute_namespace,
+                                    &marker_prefix,
+                                ))
+                            .then_some(index)
+                        });
+                let dirty_attribute = dirty_index.map(|index| raw_attributes[index].clone());
+                let marker_namespace = match namespace {
+                    ResolveResult::Bound(Namespace(uri))
+                        if is_wordprocessing_namespace(&namespace) =>
+                    {
+                        uri.to_vec()
+                    },
+                    _ => WORDPROCESSINGML_NAMESPACE.to_vec(),
+                };
+                if is_empty {
+                    // The resolver has already consumed the complete element.
+                    // Its next event must be EOF; the loop below enforces that.
+                    depth = 0;
+                } else {
+                    depth = 1;
+                }
+                return if is_empty {
+                    match reader
+                        .read_event()
+                        .map_err(|_error| Refusal::ComplexContent)?
+                    {
+                        Event::Eof => Ok(CachedFieldMarkerFragment {
+                            kind,
+                            dirty,
+                            tag_end,
+                            dirty_attribute,
+                            marker_prefix,
+                            marker_namespace,
+                        }),
+                        _ => Err(Refusal::ComplexContent),
+                    }
+                } else {
+                    // A paired marker may carry opaque children. Read them to
+                    // prove the fragment is one well-formed root, while the
+                    // exact transition check below retains those bytes.
+                    loop {
+                        let nested = reader
+                            .read_event()
+                            .map_err(|_error| Refusal::ComplexContent)?;
+                        nodes = nodes.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                        if nodes > MAX_DOCUMENT_NODES {
+                            return Err(Refusal::ComplexContent);
+                        }
+                        match nested {
+                            Event::Start(_) => {
+                                depth = depth.checked_add(1).ok_or(Refusal::ComplexContent)?;
+                                if depth > MAX_DOCUMENT_DEPTH {
+                                    return Err(Refusal::ComplexContent);
+                                }
+                            },
+                            Event::Empty(_) => {
+                                if depth.checked_add(1).ok_or(Refusal::ComplexContent)?
+                                    > MAX_DOCUMENT_DEPTH
+                                {
+                                    return Err(Refusal::ComplexContent);
+                                }
+                            },
+                            Event::End(_) => {
+                                depth = depth.checked_sub(1).ok_or(Refusal::ComplexContent)?;
+                                if depth == 0 {
+                                    return match reader
+                                        .read_event()
+                                        .map_err(|_error| Refusal::ComplexContent)?
+                                    {
+                                        Event::Eof => Ok(CachedFieldMarkerFragment {
+                                            kind,
+                                            dirty,
+                                            tag_end,
+                                            dirty_attribute,
+                                            marker_prefix,
+                                            marker_namespace,
+                                        }),
+                                        _ => Err(Refusal::ComplexContent),
+                                    };
+                                }
+                            },
+                            Event::Eof => return Err(Refusal::ComplexContent),
+                            Event::Text(_)
+                            | Event::CData(_)
+                            | Event::Comment(_)
+                            | Event::Decl(_)
+                            | Event::DocType(_)
+                            | Event::PI(_)
+                            | Event::GeneralRef(_) => {},
+                        }
+                    }
+                };
+            },
+            Event::Eof => return Err(Refusal::ComplexContent),
+            Event::Start(_)
+            | Event::Empty(_)
+            | Event::End(_)
+            | Event::Text(_)
+            | Event::CData(_)
+            | Event::Comment(_)
+            | Event::Decl(_)
+            | Event::DocType(_)
+            | Event::PI(_)
+            | Event::GeneralRef(_) => return Err(Refusal::ComplexContent),
+        }
+    }
+}
+
+fn rewrite_cached_field_marker(
+    xml: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> Result<Vec<u8>> {
+    let fragment = cached_field_marker_fragment(xml, inherited_namespaces).map_err(|reason| {
+        Error::Refused {
+            position: 0,
+            reason,
+        }
+    })?;
+    if fragment.dirty {
+        return Ok(xml.to_vec());
+    }
+    let tag_end = fragment.tag_end;
+    if let Some(attribute) = fragment.dirty_attribute {
+        let value_start = attribute.value_start;
+        let value_end = attribute.value_end;
+        return replace_range(xml, value_start, value_end, b"true");
+    }
+    let start_tag = xml.get(..tag_end).ok_or(Error::Refused {
+        position: 0,
+        reason: Refusal::ComplexContent,
+    })?;
+    let mut prefix = match &fragment.marker_prefix {
+        FragmentPrefix::Prefixed(prefix) => prefix.clone(),
+        FragmentPrefix::Unseen | FragmentPrefix::Unprefixed => Vec::new(),
+    };
+    let mut add_binding = false;
+    if prefix.is_empty() {
+        let mut reader = NsReader::from_reader(start_tag);
+        seed_transaction_namespaces(&mut reader, inherited_namespaces).map_err(|reason| {
+            Error::Refused {
+                position: 0,
+                reason,
+            }
+        })?;
+        let _ = reader.read_event().map_err(|_error| Error::Refused {
+            position: 0,
+            reason: Refusal::ComplexContent,
+        })?;
+        if let Some(candidate) = reader
+            .resolver()
+            .bindings()
+            .find_map(|(candidate, namespace)| {
+                let PrefixDeclaration::Named(candidate) = candidate else {
+                    return None;
+                };
+                (namespace.as_ref() == fragment.marker_namespace.as_slice())
+                    .then(|| candidate.to_vec())
+            })
+        {
+            prefix = candidate;
+        } else {
+            prefix.extend_from_slice(b"w");
+            add_binding = true;
+        }
+    }
+    let mut inserted = Vec::new();
+    if add_binding {
+        inserted.extend_from_slice(b" xmlns:");
+        inserted.extend_from_slice(&prefix);
+        inserted.extend_from_slice(b"=\"");
+        inserted.extend_from_slice(&fragment.marker_namespace);
+        inserted.push(b'"');
+    }
+    inserted.push(b' ');
+    inserted.extend_from_slice(&prefix);
+    inserted.extend_from_slice(b":dirty=\"true\"");
+    let insertion = if start_tag
+        .get(..start_tag.len().saturating_sub(1))
+        .is_some_and(|tag| tag.trim_ascii_end().ends_with(b"/"))
+    {
+        start_tag
+            .len()
+            .checked_sub(1)
+            .and_then(|position| start_tag[..position].iter().rposition(|byte| *byte == b'/'))
+            .ok_or(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexContent,
+            })?
+    } else {
+        tag_end.checked_sub(1).ok_or(Error::Refused {
+            position: 0,
+            reason: Refusal::ComplexContent,
+        })?
+    };
+    replace_range(xml, insertion, insertion, &inserted)
+}
+
+fn validate_cached_field_marker_transition(
+    before: &[u8],
+    after: &[u8],
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<(), Refusal> {
+    let before_fragment = cached_field_marker_fragment(before, inherited_namespaces)?;
+    let after_fragment = cached_field_marker_fragment(after, inherited_namespaces)?;
+    if before_fragment.kind == after_fragment.kind && before_fragment.dirty != after_fragment.dirty
+    {
+        let expected = if before_fragment.dirty {
+            rewrite_cached_field_marker(after, inherited_namespaces)
+        } else {
+            rewrite_cached_field_marker(before, inherited_namespaces)
+        }
+        .map_err(|_error| Refusal::ComplexContent)?;
+        if (before_fragment.dirty && expected == before)
+            || (!before_fragment.dirty && expected == after)
+        {
+            return Ok(());
+        }
+    }
+    Err(Refusal::ComplexContent)
+}
+
+fn rewrite_literal_text_node(xml: &[u8], text: &str) -> Result<Vec<u8>> {
+    if xml.first() != Some(&b'<') {
+        return Err(Error::Refused {
+            position: 0,
+            reason: Refusal::ComplexRun,
+        });
+    }
+    let start_end = find_tag_end(xml).ok_or(Error::Refused {
+        position: 0,
+        reason: Refusal::ComplexRun,
+    })?;
+    let start_tag = &xml[..start_end];
+    let empty = start_tag
+        .get(..start_tag.len().saturating_sub(1))
+        .is_some_and(|tag| tag.trim_ascii_end().ends_with(b"/"));
+    let (open, close) = if empty {
+        let slash = start_tag[..start_tag.len() - 1]
+            .iter()
+            .rposition(|byte| *byte == b'/')
+            .ok_or(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexRun,
+            })?;
+        let mut open = start_tag[..slash].to_vec();
+        open.push(b'>');
+        let name = tag_name_from_start(start_tag)?;
+        let mut close = Vec::with_capacity(name.len() + 3);
+        close.extend_from_slice(b"</");
+        close.extend_from_slice(name);
+        close.push(b'>');
+        (open, close)
+    } else {
+        let close_start = xml
+            .iter()
+            .rposition(|byte| *byte == b'<')
+            .ok_or(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexRun,
+            })?;
+        let close = xml
+            .get(close_start..)
+            .ok_or(Error::Refused {
+                position: 0,
+                reason: Refusal::ComplexRun,
+            })?
+            .to_vec();
+        (start_tag.to_vec(), close)
+    };
+    let encoded_len = literal_escaped_xml_len(text)?;
+    let capacity = open
+        .len()
+        .checked_add(encoded_len)
+        .and_then(|length| length.checked_add(close.len()))
+        .ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: usize::MAX,
+        })?;
+    if capacity > MAX_DOCUMENT_XML_BYTES {
+        return Err(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: capacity,
+        });
+    }
+    let mut output = Vec::new();
+    output.try_reserve_exact(capacity).map_err(|source| {
+        Error::Document(crate::Error::Allocation {
+            resource: "run text-node replacement XML",
+            source,
+        })
+    })?;
+    output.extend_from_slice(&open);
+    append_literal_escaped_xml(&mut output, text);
+    output.extend_from_slice(&close);
+    Ok(output)
+}
+
+fn find_tag_end(xml: &[u8]) -> Option<usize> {
+    let mut quote = None;
+    for (index, byte) in xml.iter().copied().enumerate() {
+        match (quote, byte) {
+            (None, b'\'' | b'"') => quote = Some(byte),
+            (Some(current), byte) if current == byte => quote = None,
+            (None, b'>') => return Some(index + 1),
+            _ => {},
+        }
+    }
+    None
+}
+
+fn tag_name_from_start(start_tag: &[u8]) -> Result<&[u8]> {
+    let end = start_tag
+        .get(1..)
+        .and_then(|bytes| {
+            bytes
+                .iter()
+                .position(|byte| matches!(*byte, b'>' | b'/' | b' ' | b'\t' | b'\r' | b'\n'))
+        })
+        .and_then(|offset| offset.checked_add(1))
+        .ok_or(Error::Refused {
+            position: 0,
+            reason: Refusal::ComplexRun,
+        })?;
+    start_tag.get(1..end).ok_or(Error::Refused {
+        position: 0,
+        reason: Refusal::ComplexRun,
+    })
+}
+
+fn literal_escaped_xml_len(text: &str) -> Result<usize> {
+    text.bytes().try_fold(0usize, |length, byte| {
+        let encoded = match byte {
+            b'&' => 5,
+            b'<' | b'>' => 4,
+            b'"' | b'\'' => 6,
+            b'\r' => 5,
+            _ => 1,
+        };
+        length.checked_add(encoded).ok_or(Error::Limit {
+            kind: crate::document::LimitKind::ReplacementXmlBytes,
+            maximum: MAX_DOCUMENT_XML_BYTES,
+            observed: usize::MAX,
+        })
+    })
+}
+
+fn append_literal_escaped_xml(output: &mut Vec<u8>, text: &str) {
+    let mut cursor = 0usize;
+    for (index, byte) in text.bytes().enumerate() {
+        let replacement = match byte {
+            b'&' => Some(b"&amp;".as_slice()),
+            b'<' => Some(b"&lt;".as_slice()),
+            b'>' => Some(b"&gt;".as_slice()),
+            b'"' => Some(b"&quot;".as_slice()),
+            b'\'' => Some(b"&apos;".as_slice()),
+            b'\r' => Some(b"&#xD;".as_slice()),
+            _ => None,
+        };
+        if let Some(replacement) = replacement {
+            output.extend_from_slice(&text.as_bytes()[cursor..index]);
+            output.extend_from_slice(replacement);
+            cursor = index + 1;
+        }
+    }
+    output.extend_from_slice(&text.as_bytes()[cursor..]);
+}
+
 fn select_direct_child(
     xml: &[u8],
     root_name: &[u8],
@@ -9554,6 +11541,45 @@ fn select_direct_child_with_context(
     missing: Refusal,
     inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
 ) -> std::result::Result<Range, Refusal> {
+    select_direct_child_with_context_mode(
+        xml,
+        root_name,
+        child_name,
+        position,
+        missing,
+        inherited_namespaces,
+        false,
+    )
+}
+
+fn select_direct_child_with_transaction_namespace_context(
+    xml: &[u8],
+    root_name: &[u8],
+    child_name: &[u8],
+    position: Position,
+    missing: Refusal,
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+) -> std::result::Result<Range, Refusal> {
+    select_direct_child_with_context_mode(
+        xml,
+        root_name,
+        child_name,
+        position,
+        missing,
+        inherited_namespaces,
+        true,
+    )
+}
+
+fn select_direct_child_with_context_mode(
+    xml: &[u8],
+    root_name: &[u8],
+    child_name: &[u8],
+    position: Position,
+    missing: Refusal,
+    inherited_namespaces: &[(Option<Vec<u8>>, Vec<u8>)],
+    reject_default_namespace_fallback: bool,
+) -> std::result::Result<Range, Refusal> {
     let mut reader = NsReader::from_reader(xml);
     let origin = ReaderOrigin::of(xml);
     for (prefix, namespace) in inherited_namespaces {
@@ -9566,6 +11592,7 @@ fn select_direct_child_with_context(
             .map_err(|_error| missing)?;
     }
     let mut fragment_prefix = FragmentPrefix::Unseen;
+    let mut namespace_state = TransactionNamespaceState::new(inherited_namespaces);
     let mut root_depth = None;
     let mut capture = None::<(usize, usize)>;
     let mut depth = 0usize;
@@ -9575,6 +11602,7 @@ fn select_direct_child_with_context(
         let start = origin.offset(reader.buffer_position()).ok_or(missing)?;
         let raw_event = reader.read_event().map_err(|_error| missing)?;
         let (namespace, event) = reader.resolver().resolve_event(raw_event);
+        let default_namespace_fallback_allowed = namespace_state.fallback_for_event(&event);
         let end = origin.offset(reader.buffer_position()).ok_or(missing)?;
         match event {
             Event::Start(element) => {
@@ -9582,11 +11610,13 @@ fn select_direct_child_with_context(
                 if root_depth.is_none() {
                     fragment_prefix = FragmentPrefix::from_name(element.name());
                     if saw_root
-                        || !is_transaction_fragment_word_name(
+                        || !transaction_fragment_word_name_matches(
                             &namespace,
                             element.name(),
                             root_name,
                             &fragment_prefix,
+                            reject_default_namespace_fallback,
+                            default_namespace_fallback_allowed,
                         )
                     {
                         return Err(missing);
@@ -9594,11 +11624,13 @@ fn select_direct_child_with_context(
                     saw_root = true;
                     root_depth = Some(depth);
                 } else if root_depth.is_some_and(|root| depth == root + 1)
-                    && is_transaction_fragment_word_name(
+                    && transaction_fragment_word_name_matches(
                         &namespace,
                         element.name(),
                         child_name,
                         &fragment_prefix,
+                        reject_default_namespace_fallback,
+                        default_namespace_fallback_allowed,
                     )
                 {
                     if index == position.get() {
@@ -9610,11 +11642,13 @@ fn select_direct_child_with_context(
             Event::Empty(element) => {
                 let child_depth = depth.checked_add(1).ok_or(missing)?;
                 if root_depth.is_some_and(|root| child_depth == root + 1)
-                    && is_transaction_fragment_word_name(
+                    && transaction_fragment_word_name_matches(
                         &namespace,
                         element.name(),
                         child_name,
                         &fragment_prefix,
+                        reject_default_namespace_fallback,
+                        default_namespace_fallback_allowed,
                     )
                 {
                     if index == position.get() {
@@ -11680,6 +13714,518 @@ mod tests {
     }
 
     #[test]
+    fn literal_run_text_node_preserves_siblings_controls_and_durable_exactness() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:rPr><w:b/></w:rPr><w:tab/><w:t xml:space=\"preserve\">old &amp; text</w:t><w:br/><w:t>second</w:t><x:opaque xmlns:x=\"urn:test\"/></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replace_run_text_node(Position::new(0), Position::new(0), "new\r\n\t<&")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let xml = std::str::from_utf8(commit.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains(
+            "<w:rPr><w:b/></w:rPr><w:tab/><w:t xml:space=\"preserve\">new&#xD;\n\t&lt;&amp;</w:t><w:br/><w:t>second</w:t><x:opaque xmlns:x=\"urn:test\"/>"
+        ));
+        assert_eq!(commit.diagnostics().operations(), 1);
+        assert!(matches!(
+            commit.patch().operations(),
+            [Operation::ReplaceRunTextNode { .. }]
+        ));
+        assert_eq!(
+            commit
+                .snapshot()
+                .paragraph(Position::new(0))
+                .unwrap()
+                .text()
+                .unwrap(),
+            "\tnew\r\n\t<&\nsecond"
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let durable = commit.patch().to_durable(durable_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                durable_limits(),
+            )
+            .unwrap();
+        assert_eq!(
+            source.apply_durable(&decoded).unwrap().xml_bytes(),
+            commit.snapshot().xml_bytes()
+        );
+        assert_eq!(
+            source
+                .apply_durable(&decoded)
+                .unwrap()
+                .apply_durable(&decoded.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn literal_run_text_node_empty_runs_are_noops_and_structural_runs_refuse() {
+        for body in ["<w:r/>", "<w:r><w:rPr><w:i/></w:rPr></w:r>"] {
+            let source = Snapshot::from_xml(document(&format!("<w:p>{body}</w:p>"))).unwrap();
+            let mut edit = source.edit();
+            edit.replace_run_text_node(Position::new(0), Position::new(0), "ignored")
+                .unwrap();
+            let commit = edit.commit().unwrap();
+            assert_eq!(commit.snapshot().xml_bytes(), source.xml_bytes());
+            assert_eq!(commit.diagnostics().operations(), 0);
+        }
+
+        let source = Snapshot::from_xml(document("<w:p><w:r><w:t/></w:r></w:p>")).unwrap();
+        let mut edit = source.edit();
+        edit.replace_run_text_node(Position::new(0), Position::new(0), "filled")
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        assert!(
+            std::str::from_utf8(commit.snapshot().xml_bytes())
+                .unwrap()
+                .contains("<w:t>filled</w:t>")
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        for child in [
+            "<w:tab/>",
+            "<w:br/>",
+            "<w:fldChar w:fldCharType=\"begin\"/>",
+            "<w:instrText>DATE</w:instrText>",
+            "<w:drawing/>",
+        ] {
+            let source =
+                Snapshot::from_xml(document(&format!("<w:p><w:r>{child}</w:r></w:p>"))).unwrap();
+            let mut edit = source.edit();
+            assert!(matches!(
+                edit.replace_run_text_node(Position::new(0), Position::new(0), "refused"),
+                Err(Error::Refused {
+                    reason: Refusal::ComplexRun,
+                    ..
+                })
+            ));
+            assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+            assert!(edit.operations.is_empty());
+        }
+
+        let source =
+            Snapshot::from_xml(document("<w:p><w:r><w:t>before</w:t></w:r></w:p>")).unwrap();
+        let mut edit = source.edit();
+        assert!(matches!(
+            edit.replace_run_text_node(Position::new(0), Position::new(0), "bad\u{000b}"),
+            Err(Error::Refused {
+                reason: Refusal::StructuralText,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        assert!(edit.operations.is_empty());
+    }
+
+    #[test]
+    fn literal_run_text_node_uses_inherited_word_namespace_bindings() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:q=\"{WORD}\"><w:body><q:p><q:r><q:t>before</q:t><q:t>tail</q:t></q:r></q:p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replace_run_text_node(Position::new(0), Position::new(0), "after")
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains("<q:p><q:r><q:t>after</q:t><q:t>tail</q:t></q:r></q:p>"));
+        assert!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.snapshot())
+                .unwrap()
+                .xml_bytes()
+                == source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn literal_run_text_node_respects_default_namespace_resets() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\"><w:body><p xmlns=\"{WORD}\"><r><t xmlns=\"\">foreign</t></r><r><t>word</t></r></p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        let result = edit.replace_run_text_node(Position::new(0), Position::new(0), "refused");
+        assert!(matches!(
+            result,
+            Err(Error::Refused {
+                reason: Refusal::ComplexRun,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\"><w:body><p xmlns=\"{WORD}\"><r xmlns=\"\"><t>foreign</t></r></p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        assert!(matches!(
+            edit.replace_run_text_node(Position::new(0), Position::new(0), "refused"),
+            Err(Error::Refused {
+                reason: Refusal::RunNotFound,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn literal_run_text_node_replay_validates_controls_and_charges_text() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:t>one</w:t></w:r><w:r><w:t>two</w:t></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replacement_text_bytes = MAX_REPLACEMENT_TEXT_BYTES - 3;
+        edit.apply_operation(&Operation::ReplaceRunTextNode {
+            paragraph: Position::new(0),
+            run: Position::new(0),
+            before: Arc::new(b"<w:t>one</w:t>".to_vec()),
+            after: Arc::new(b"<w:t>uno</w:t>".to_vec()),
+        })
+        .unwrap();
+        assert_eq!(edit.replacement_text_bytes, MAX_REPLACEMENT_TEXT_BYTES);
+        let projected_after_first = edit.projected().xml_bytes().to_vec();
+        assert!(matches!(
+            edit.apply_operation(&Operation::ReplaceRunTextNode {
+                paragraph: Position::new(0),
+                run: Position::new(1),
+                before: Arc::new(b"<w:t>two</w:t>".to_vec()),
+                after: Arc::new(b"<w:t>dos</w:t>".to_vec()),
+            }),
+            Err(Error::Limit {
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                maximum: MAX_REPLACEMENT_TEXT_BYTES,
+                ..
+            })
+        ));
+        assert_eq!(edit.replacement_text_bytes, MAX_REPLACEMENT_TEXT_BYTES);
+        assert_eq!(
+            edit.projected().xml_bytes(),
+            projected_after_first.as_slice()
+        );
+        assert_eq!(edit.operations.len(), 1);
+
+        let source = Snapshot::from_xml(document("<w:p><w:r><w:t>one</w:t></w:r></w:p>")).unwrap();
+        let mut edit = source.edit();
+        assert!(matches!(
+            edit.apply_operation(&Operation::ReplaceRunTextNode {
+                paragraph: Position::new(0),
+                run: Position::new(0),
+                before: Arc::new(b"<w:t>one</w:t>".to_vec()),
+                after: Arc::new(b"<w:t>&#xB;</w:t>".to_vec()),
+            }),
+            Err(Error::Refused {
+                reason: Refusal::StructuralText,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        assert!(edit.operations.is_empty());
+    }
+
+    #[test]
+    fn cached_run_field_dirty_marks_owner_and_round_trips_exactly() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:instrText> PAGE </w:instrText></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>1</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.mark_cached_run_field_dirty(Position::new(0), Position::new(3))
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains("<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>"));
+        assert!(matches!(
+            committed.patch().operations(),
+            [Operation::MarkCachedRunFieldDirty { .. }]
+        ));
+        assert_eq!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let durable = committed.patch().to_durable(durable_limits()).unwrap();
+        let wire = durable.to_deterministic_json().unwrap();
+        let decoded =
+            litchi_core::patch::Patch::<litchi_core::patch::Reversible>::from_deterministic_json(
+                &wire,
+                durable_limits(),
+            )
+            .unwrap();
+        assert_eq!(
+            source.apply_durable(&decoded).unwrap().xml_bytes(),
+            committed.snapshot().xml_bytes()
+        );
+        assert_eq!(
+            committed
+                .snapshot()
+                .apply_durable(&decoded.inverse())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn cached_run_field_dirty_obeys_nested_and_noop_rules() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>inner</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r><w:r><w:t>outer</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut inner = source.edit();
+        inner
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(4))
+            .unwrap();
+        let inner = inner.commit().unwrap();
+        let inner_xml = std::str::from_utf8(inner.snapshot().xml_bytes()).unwrap();
+        assert!(inner_xml.contains(
+            "<w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/>",
+        ));
+        assert!(inner_xml.contains("<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>"));
+
+        let mut outer = source.edit();
+        outer
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(6))
+            .unwrap();
+        let outer = outer.commit().unwrap();
+        let outer_xml = std::str::from_utf8(outer.snapshot().xml_bytes()).unwrap();
+        assert!(outer_xml.contains("<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>"));
+        assert_eq!(outer.patch().operations().len(), 1);
+
+        let mut noops = source.edit();
+        noops
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(0))
+            .unwrap()
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(0))
+            .unwrap();
+        assert!(noops.operations.is_empty());
+        let mut no_cache = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:t>plain</w:t></w:r></w:p>",
+        ))
+        .unwrap()
+        .edit();
+        no_cache
+            .mark_cached_run_field_dirty(Position::new(0), Position::new(1))
+            .unwrap();
+        assert!(no_cache.operations.is_empty());
+    }
+
+    #[test]
+    fn cached_run_field_dirty_preserves_default_elements_and_foreign_dirty_attributes() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\" xmlns:x=\"urn:foreign\"><w:body><p xmlns=\"{WORD}\"><r><fldChar w:fldCharType=\"begin\" x:dirty=\"false\"/></r><r><fldChar w:fldCharType=\"separate\"/></r><r><t>cached</t></r></p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        edit.mark_cached_run_field_dirty(Position::new(0), Position::new(2))
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
+        assert!(
+            xml.contains("<fldChar w:fldCharType=\"begin\" x:dirty=\"false\" w:dirty=\"true\"/>")
+        );
+        assert_eq!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+    }
+
+    #[test]
+    fn cached_run_field_dirty_refuses_malformed_markers_and_noops_without_owner() {
+        for marker in [
+            "<w:fldChar/>",
+            "<w:fldChar w:fldCharType=\"unknown\"/>",
+            "<w:fldChar w:fldCharType=\"begin\" w:fldCharType=\"end\"/>",
+        ] {
+            let source = Snapshot::from_xml(document(&format!(
+                "<w:p><w:r>{marker}</w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>cached</w:t></w:r></w:p>"
+            )))
+            .unwrap();
+            let mut edit = source.edit();
+            assert!(matches!(
+                edit.mark_cached_run_field_dirty(Position::new(0), Position::new(2)),
+                Err(Error::Refused {
+                    reason: Refusal::ComplexContent,
+                    ..
+                })
+            ));
+            assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+            assert!(edit.operations.is_empty());
+        }
+
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>outside</w:t></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.mark_cached_run_field_dirty(Position::new(0), Position::new(1))
+            .unwrap();
+        assert!(edit.operations.is_empty());
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+    }
+
+    #[test]
+    fn cached_run_field_dirty_preserves_marker_local_binding_and_self_closing_spacing() {
+        let source = Snapshot::from_xml(
+            format!(
+                "<w:document xmlns:w=\"{WORD}\"><w:body><w:p><w:r><w:fldChar xmlns:q=\"{WORD}\" q:fldCharType=\"begin\" /></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>cached</w:t></w:r><w:r><w:fldChar w:fldCharType=\"end\"/></w:r></w:p><w:sectPr/></w:body></w:document>"
+            )
+            .into_bytes(),
+        )
+        .unwrap();
+        let mut edit = source.edit();
+        edit.mark_cached_run_field_dirty(Position::new(0), Position::new(2))
+            .unwrap();
+        let committed = edit.commit().unwrap();
+        let xml = std::str::from_utf8(committed.snapshot().xml_bytes()).unwrap();
+        assert!(xml.contains(
+            "<w:fldChar xmlns:q=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\" q:fldCharType=\"begin\"  w:dirty=\"true\"/>"
+        ));
+        assert_eq!(
+            committed
+                .patch()
+                .inverse()
+                .apply(committed.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            source.xml_bytes()
+        );
+
+        let Operation::MarkCachedRunFieldDirty {
+            paragraph,
+            run,
+            before,
+            after,
+        } = committed.patch().operations()[0].clone()
+        else {
+            panic!("cached field edit must retain its marker operation");
+        };
+        let forged = Arc::new(
+            format!("<w:fldChar xmlns:q=\"{WORD}\" q:fldCharType=\"begin\" q:dirty=\"true\"/>")
+                .into_bytes(),
+        );
+        assert_ne!(after.as_slice(), forged.as_slice());
+        let mut replay = source.edit();
+        assert!(matches!(
+            replay.apply_operation(&Operation::MarkCachedRunFieldDirty {
+                paragraph,
+                run,
+                before,
+                after: forged,
+            }),
+            Err(Error::Refused {
+                reason: Refusal::ComplexContent,
+                ..
+            })
+        ));
+        assert_eq!(replay.projected().xml_bytes(), source.xml_bytes());
+        assert!(replay.operations.is_empty());
+    }
+
+    #[test]
+    fn cached_run_field_dirty_rejects_forged_marker_transition_and_charges_bytes() {
+        let source = Snapshot::from_xml(document(
+            "<w:p><w:r><w:fldChar w:fldCharType=\"begin\"/></w:r><w:r><w:fldChar w:fldCharType=\"separate\"/></w:r><w:r><w:t>cached</w:t></w:r></w:p>",
+        ))
+        .unwrap();
+        let mut edit = source.edit();
+        edit.replacement_text_bytes = MAX_REPLACEMENT_TEXT_BYTES - 1;
+        let before = Arc::new(b"<w:fldChar w:fldCharType=\"begin\"/>".to_vec());
+        let after = Arc::new(b"<w:fldChar w:fldCharType=\"end\" w:dirty=\"true\"/>".to_vec());
+        assert!(matches!(
+            edit.apply_operation(&Operation::MarkCachedRunFieldDirty {
+                paragraph: Position::new(0),
+                run: Position::new(2),
+                before: Arc::clone(&before),
+                after: Arc::clone(&after),
+            }),
+            Err(Error::Refused {
+                reason: Refusal::ComplexContent,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), source.xml_bytes());
+        assert!(edit.operations.is_empty());
+
+        let valid_after =
+            Arc::new(b"<w:fldChar w:fldCharType=\"begin\" w:dirty=\"true\"/>".to_vec());
+        edit.replacement_text_bytes = MAX_REPLACEMENT_TEXT_BYTES - valid_after.len();
+        edit.apply_operation(&Operation::MarkCachedRunFieldDirty {
+            paragraph: Position::new(0),
+            run: Position::new(2),
+            before: Arc::new(b"<w:fldChar w:fldCharType=\"begin\"/>".to_vec()),
+            after: Arc::clone(&valid_after),
+        })
+        .unwrap();
+        assert_eq!(edit.replacement_text_bytes, MAX_REPLACEMENT_TEXT_BYTES);
+        let projected_after = edit.projected().xml_bytes().to_vec();
+        assert!(matches!(
+            edit.apply_operation(&Operation::MarkCachedRunFieldDirty {
+                paragraph: Position::new(0),
+                run: Position::new(2),
+                before: valid_after,
+                after: before,
+            }),
+            Err(Error::Limit {
+                kind: crate::document::LimitKind::ReplacementTextBytes,
+                ..
+            })
+        ));
+        assert_eq!(edit.projected().xml_bytes(), projected_after.as_slice());
+        assert_eq!(edit.operations.len(), 1);
+    }
+
+    #[test]
     fn paragraph_text_batch_is_canonical_atomic_and_reversible() {
         let source = Snapshot::from_xml(document(
             "<w:p w:rsidR=\"1\"><w:r><w:rPr><w:b/></w:rPr><w:t>first</w:t></w:r></w:p><w:p><w:r><w:t>retained</w:t></w:r></w:p><w:p><w:r><w:rPr><w:i/></w:rPr><w:t>third</w:t></w:r></w:p>",
@@ -11775,7 +14321,7 @@ mod tests {
         ];
         let late_failure = [
             ParagraphTextReplacement::new(Position::new(0), "would change"),
-            ParagraphTextReplacement::new(Position::new(2), "line\nbreak"),
+            ParagraphTextReplacement::new(Position::new(2), "line\u{b}break"),
         ];
         let mut refused = source.edit();
         assert!(matches!(
@@ -12177,6 +14723,32 @@ mod tests {
         assert!(managed.projected.is_managed());
         let projected = managed.projected().xml_bytes().to_vec();
         let reserved = budget.used(Resource::Memory);
+
+        assert!(matches!(
+            managed.replace_run_text_node(Position::new(0), Position::new(0), "managed"),
+            Err(Error::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "replace_run_text_node",
+                ..
+            }))
+        ));
+        assert!(managed.projected.is_managed());
+        assert_eq!(managed.projected().xml_bytes(), projected.as_slice());
+        assert!(managed.operations.is_empty());
+        assert_eq!(budget.used(Resource::Memory), reserved);
+
+        assert!(matches!(
+            managed.mark_cached_run_field_dirty(Position::new(0), Position::new(0)),
+            Err(Error::Document(crate::Error::UnsafeEdit {
+                format: "DOCX",
+                operation: "mark_cached_run_field_dirty",
+                ..
+            }))
+        ));
+        assert!(managed.projected.is_managed());
+        assert_eq!(managed.projected().xml_bytes(), projected.as_slice());
+        assert!(managed.operations.is_empty());
+        assert_eq!(budget.used(Resource::Memory), reserved);
 
         assert!(matches!(
             managed.apply_operation(&recorded),

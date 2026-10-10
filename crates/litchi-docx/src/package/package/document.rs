@@ -548,6 +548,8 @@ fn transfer_graph_transition(
             | crate::document::Operation::ReplaceParagraphText { .. }
             | crate::document::Operation::ReplaceHyperlinkText { .. }
             | crate::document::Operation::ReplaceRunText { .. }
+            | crate::document::Operation::ReplaceRunTextNode { .. }
+            | crate::document::Operation::MarkCachedRunFieldDirty { .. }
             | crate::document::Operation::ReplaceSimpleFieldText { .. }
             | crate::document::Operation::ReplaceComplexFieldText { .. }
             | crate::document::Operation::ReplaceRevisionText { .. }

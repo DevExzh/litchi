@@ -76,6 +76,8 @@ impl fmt::Debug for Operation {
             Self::ReplaceParagraphText { .. } => "ReplaceParagraphText",
             Self::ReplaceHyperlinkText { .. } => "ReplaceHyperlinkText",
             Self::ReplaceRunText { .. } => "ReplaceRunText",
+            Self::ReplaceRunTextNode { .. } => "ReplaceRunTextNode",
+            Self::MarkCachedRunFieldDirty { .. } => "MarkCachedRunFieldDirty",
             Self::ReplaceSimpleFieldText { .. } => "ReplaceSimpleFieldText",
             Self::ReplaceComplexFieldText { .. } => "ReplaceComplexFieldText",
             Self::ReplaceRevisionText { .. } => "ReplaceRevisionText",

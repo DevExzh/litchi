@@ -820,3 +820,158 @@ fn run_property_lookups_without_a_value_read_every_repeated_name() {
         (Some(true), Some(true), Some(true), None, None, None)
     );
 }
+
+#[test]
+fn retained_run_content_preserves_literal_and_structural_breaks_across_namespace_aliases() {
+    let paragraph = Paragraph::new(br#"<a:p xmlns:a="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:b="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:f="urn:foreign"><a:r><b:t>A&#10;B</b:t><b:br f:type="page" b:type="column" f:clear="all" b:clear="left"/><b:br/><b:cr/><f:br/></a:r></a:p>"#.to_vec());
+    let runs = paragraph.runs().unwrap();
+    let run = &runs[0];
+    let contents = run.contents().unwrap();
+    assert!(matches!(&contents[0], RunContent::Text(text) if text=="A\nB"));
+    assert!(matches!(
+        contents[1],
+        RunContent::Break(RunBreak {
+            break_type: RunBreakType::Column,
+            clear: RunBreakClear::Left
+        })
+    ));
+    assert!(matches!(
+        contents[2],
+        RunContent::Break(RunBreak {
+            break_type: RunBreakType::TextWrapping,
+            clear: RunBreakClear::None
+        })
+    ));
+    assert!(matches!(contents[3], RunContent::CarriageReturn));
+    assert!(matches!(contents[4], RunContent::Unknown(_)));
+    let breaks = run.breaks().unwrap();
+    assert_eq!(breaks.len(), 2);
+    assert_eq!(breaks[0].break_type, RunBreakType::Column);
+    assert_eq!(breaks[0].clear, RunBreakClear::Left);
+}
+
+#[test]
+fn run_breaks_ignore_foreign_elements_and_attributes_and_refuse_duplicate_word_attributes() {
+    let run = Run::new(br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:f="urn:foreign"><f:br f:type="not-a-word-value"/><w:br f:type="page" f:clear="all"/></w:r>"#.to_vec());
+    assert_eq!(run.breaks().unwrap().as_slice(), &[RunBreak::default()]);
+    let run = Run::new(br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:a="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:br w:type="page" a:type="column"/></w:r>"#.to_vec());
+    assert!(run.breaks().is_err());
+    assert!(run.contents().is_err());
+}
+
+#[test]
+fn run_traversals_capture_and_share_namespace_context() {
+    use std::sync::Arc;
+    let paragraph = Paragraph::new(br#"<a:p xmlns:a="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:b="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><b:r><b:t>one</b:t></b:r><a:r><b:t>two</b:t></a:r><a:r xmlns:b="urn:foreign"><b:t>hidden</b:t><a:t>three</a:t></a:r><b:r/></a:p>"#.to_vec());
+    let inline_runs: Vec<_> = paragraph
+        .inlines()
+        .unwrap()
+        .into_iter()
+        .filter_map(|inline| {
+            if let Inline::Run(run) = inline {
+                Some(*run)
+            } else {
+                None
+            }
+        })
+        .collect();
+    for runs in [
+        paragraph.runs().unwrap().into_vec(),
+        paragraph.addressable_runs().unwrap().into_vec(),
+        inline_runs,
+    ] {
+        assert_eq!(runs.len(), 4);
+        assert!(runs.iter().all(|run| run.namespaces.is_some()));
+        assert!(Arc::ptr_eq(
+            runs[0].namespaces.as_ref().unwrap(),
+            runs[1].namespaces.as_ref().unwrap()
+        ));
+        assert!(!Arc::ptr_eq(
+            runs[1].namespaces.as_ref().unwrap(),
+            runs[2].namespaces.as_ref().unwrap()
+        ));
+        assert_eq!(
+            runs.iter()
+                .map(|run| run.text().unwrap())
+                .collect::<Vec<_>>(),
+            ["one", "two", "three", ""]
+        );
+        let clone = runs[0].clone();
+        assert!(Arc::ptr_eq(
+            clone.namespaces.as_ref().unwrap(),
+            runs[0].namespaces.as_ref().unwrap()
+        ));
+    }
+}
+
+#[test]
+fn dense_run_text_reads_do_not_rescan_the_owner() {
+    let xml = format!(
+        "<w:p xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\">{}</w:p>",
+        "<w:r><w:t>text</w:t></w:r>".repeat(1_000)
+    );
+    let paragraph = Paragraph::new(xml.into_bytes());
+    let groups = [
+        paragraph.runs().unwrap(),
+        paragraph.addressable_runs().unwrap(),
+    ];
+    drop(paragraph);
+    for runs in groups {
+        model::NAMESPACE_OWNER_SCANS.with(|count| count.set(0));
+        for run in &runs {
+            assert_eq!(run.text().unwrap(), "text");
+        }
+        model::NAMESPACE_OWNER_SCANS.with(|count| assert_eq!(count.get(), 0));
+    }
+}
+
+#[test]
+fn typed_scalar_children_are_empty_and_use_the_current_namespace_scope() {
+    for child in [
+        "br",
+        "tab",
+        "cr",
+        "noBreakHyphen",
+        "softHyphen",
+        "footnoteRef",
+        "endnoteRef",
+        "footnoteReference",
+        "endnoteReference",
+    ] {
+        for payload in ["<w:t>lost</w:t>", "lost", "<![CDATA[lost]]>", "&#65;"] {
+            let xml = format!(
+                "<w:r xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:{child} w:id=\"7\">{payload}</w:{child}></w:r>"
+            );
+            assert!(
+                Run::new(xml.into_bytes()).contents().is_err(),
+                "{child}: {payload}"
+            );
+        }
+    }
+    let run = Run::new(br#"<w:r xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main" xmlns:b="urn:foreign"><w:br xmlns:b="http://schemas.openxmlformats.org/wordprocessingml/2006/main" b:type="column"> <!-- inert --> </w:br><w:footnoteReference xmlns:b="http://schemas.openxmlformats.org/wordprocessingml/2006/main" b:id="&#55;"></w:footnoteReference><w:endnoteReference w:id="9"/><b:br><b:t>opaque</b:t></b:br></w:r>"#.to_vec());
+    let contents = run.contents().unwrap();
+    assert!(matches!(
+        contents[0],
+        RunContent::Break(RunBreak {
+            break_type: RunBreakType::Column,
+            ..
+        })
+    ));
+    assert!(matches!(contents[1], RunContent::FootnoteReference(7)));
+    assert!(matches!(contents[2], RunContent::EndnoteReference(9)));
+    assert!(matches!(contents[3], RunContent::Unknown(_)));
+}
+
+#[test]
+fn dense_typed_break_and_note_reads_do_not_rescan_the_owner() {
+    let xml = format!(
+        "<w:p xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:r>{}</w:r></w:p>",
+        "<w:br/><w:footnoteReference w:id=\"7\"/><w:endnoteReference w:id=\"9\"/>".repeat(1_000)
+    );
+    let paragraph = Paragraph::new(xml.into_bytes());
+    let run = paragraph.runs().unwrap().remove(0);
+    drop(paragraph);
+    model::NAMESPACE_OWNER_SCANS.with(|count| count.set(0));
+    assert_eq!(run.contents().unwrap().len(), 3_000);
+    model::NAMESPACE_OWNER_SCANS.with(|count| assert_eq!(count.get(), 0));
+}

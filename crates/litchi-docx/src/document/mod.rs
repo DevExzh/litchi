@@ -61,9 +61,9 @@ pub use transaction::{
     BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics, Error,
     History, HistoryLimits, HyperlinkTextReplacement, JoinError, MergeChoice, NewParagraph, NewRun,
     Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement, ParagraphTransfer, Patch,
-    PreparedEdit, Refusal, Result, RevisionAction, RevisionKind, RevisionSelector, Snapshot,
-    SubEditConflict, SubEditJoinFailure, TableCellAddress, ThreeWayError, ThreeWayMergeFailure,
-    ThreeWayPlan, TransferGraph, TransferRefusal,
+    PreparedEdit, Refusal, Result, RevisionAction, RevisionKind, RevisionSelector, RunAnchor,
+    Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress, ThreeWayError,
+    ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
 };
 
 /// Explicit native identifiers for indexed document blocks.

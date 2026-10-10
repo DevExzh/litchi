@@ -504,7 +504,7 @@ fn managed_batch_late_leaf_failures_leave_the_staged_projection_unchanged() {
 
     let invalid_text = vec![
         ParagraphTextReplacement::new(Position::new(1), "second valid"),
-        ParagraphTextReplacement::new(Position::new(2), "late\nbreak"),
+        ParagraphTextReplacement::new(Position::new(2), "late\u{b}break"),
     ];
     let result = edit.replace_body_paragraph_texts(&invalid_text);
     assert!(matches!(
@@ -651,4 +651,157 @@ fn managed_signed_batch_noop_is_exact_and_change_is_refused() {
     drop(snapshot);
     drop(package);
     assert_eq!(budget.used(Resource::Memory), 0);
+}
+
+#[test]
+fn managed_scalar_paragraph_controls_preserve_projection_and_noops() {
+    let (_budget, _cancel, package) = managed(source_bytes());
+    let snapshot = package.document_snapshot().unwrap();
+    let original = snapshot.xml_bytes().to_vec();
+    let mut edit = snapshot.edit();
+    edit.replace_paragraph_text(Position::new(0), "first\tline\nsecond")
+        .unwrap();
+    assert_eq!(
+        edit.projected()
+            .paragraph(Position::new(0))
+            .unwrap()
+            .text()
+            .unwrap(),
+        "first\tline\nsecond"
+    );
+    let staged = edit.projected().xml_bytes().to_vec();
+    edit.replace_paragraph_text(Position::new(0), "first\tline\nsecond")
+        .unwrap();
+    assert_eq!(edit.projected().xml_bytes(), staged);
+    assert!(
+        edit.replace_paragraph_text(Position::new(0), "bad\u{b}text")
+            .is_err()
+    );
+    assert_eq!(edit.projected().xml_bytes(), staged);
+    assert_eq!(snapshot.xml_bytes(), original);
+}
+
+#[test]
+fn bulk_inline_controls_match_scalar_edits_and_are_reversible() {
+    use litchi_docx::document::Snapshot;
+    let (_budget, _cancel, package) = managed(source_bytes());
+    for snapshot in [
+        Snapshot::from_xml(document_xml()).unwrap(),
+        package.document_snapshot().unwrap(),
+    ] {
+        let original = snapshot.xml_bytes().to_vec();
+        let replacements = [
+            ParagraphTextReplacement::new(Position::new(0), "first\tline\nsecond"),
+            ParagraphTextReplacement::new(Position::new(2), "\nthird\t\n"),
+        ];
+        let mut batch = snapshot.edit();
+        batch.replace_body_paragraph_texts(&replacements).unwrap();
+        let mut scalar = snapshot.edit();
+        for replacement in &replacements {
+            scalar
+                .replace_paragraph_text(replacement.position(), replacement.text())
+                .unwrap();
+        }
+        assert_eq!(
+            batch.projected().xml_bytes(),
+            scalar.projected().xml_bytes()
+        );
+        let commit = batch.commit().unwrap();
+        assert_eq!(commit.snapshot().paragraph_count(), 4);
+        for replacement in &replacements {
+            assert_eq!(
+                commit
+                    .snapshot()
+                    .paragraph(replacement.position())
+                    .unwrap()
+                    .text()
+                    .unwrap(),
+                replacement.text()
+            );
+        }
+        let mut repeat = commit.snapshot().edit();
+        repeat.replace_body_paragraph_texts(&replacements).unwrap();
+        let repeat = repeat.commit().unwrap();
+        assert!(!repeat.diagnostics().changed());
+        assert_eq!(repeat.snapshot().xml_bytes(), commit.snapshot().xml_bytes());
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .unwrap()
+                .xml_bytes(),
+            original
+        );
+        assert_eq!(snapshot.xml_bytes(), original);
+    }
+}
+
+#[test]
+fn late_invalid_bulk_control_preserves_an_earlier_staged_edit() {
+    use litchi_docx::document::Snapshot;
+    let (_budget, _cancel, package) = managed(source_bytes());
+    for snapshot in [
+        Snapshot::from_xml(document_xml()).unwrap(),
+        package.document_snapshot().unwrap(),
+    ] {
+        for invalid in ["bad\rtext", "bad\u{b}text", "bad\u{1}text"] {
+            let mut edit = snapshot.edit();
+            edit.replace_paragraph_text(Position::new(1), "staged\ntext")
+                .unwrap();
+            let staged = edit.projected().xml_bytes().to_vec();
+            let replacements = [
+                ParagraphTextReplacement::new(Position::new(0), "valid\tfirst"),
+                ParagraphTextReplacement::new(Position::new(2), invalid),
+            ];
+            assert!(matches!(
+                edit.replace_body_paragraph_texts(&replacements),
+                Err(TransactionError::Refused {
+                    position: 2,
+                    reason: Refusal::StructuralText
+                })
+            ));
+            assert_eq!(edit.projected().xml_bytes(), staged);
+        }
+    }
+}
+
+#[test]
+fn managed_bulk_controls_publish_reopen_and_restore_the_exact_archive() {
+    let source = source_bytes();
+    let (budget, _cancel, package) = managed(source.clone());
+    let snapshot = package.document_snapshot().unwrap();
+    let mut edit = snapshot.edit();
+    edit.replace_body_paragraph_texts(&[
+        ParagraphTextReplacement::new(Position::new(0), "first\tline\nsecond"),
+        ParagraphTextReplacement::new(Position::new(2), "third\nline"),
+    ])
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let mut output = Vec::new();
+    let publication = package
+        .publish_document_commit_with_inverse_to_stream(&mut output, &commit)
+        .unwrap();
+    drop((package, commit, snapshot));
+    let (inverse_budget, _inverse_cancel, reopened) = managed(output);
+    let current = reopened.document_snapshot().unwrap();
+    assert_eq!(
+        current.paragraph(Position::new(0)).unwrap().text().unwrap(),
+        "first\tline\nsecond"
+    );
+    assert_eq!(
+        current.paragraph(Position::new(2)).unwrap().text().unwrap(),
+        "third\nline"
+    );
+    drop(current);
+    let mut restored = Vec::new();
+    let restored_snapshot = reopened
+        .publish_document_inverse_to_stream(&mut restored, &publication)
+        .unwrap();
+    assert_eq!(restored, source);
+    drop((reopened, restored_snapshot, publication));
+    assert_eq!(budget.used(Resource::Memory), 0);
+    assert_eq!(budget.used(Resource::Objects), 0);
+    assert_eq!(inverse_budget.used(Resource::Memory), 0);
+    assert_eq!(inverse_budget.used(Resource::Objects), 0);
 }

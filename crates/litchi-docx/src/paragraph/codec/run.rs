@@ -23,10 +23,10 @@ use std::borrow::Cow;
 use super::super::model::{
     Run, RunBreak, RunBreakClear, RunBreakType, RunProperties, RunUnderline,
 };
+use super::run_contents::{MAX_RUN_CONTENT_DEPTH, MAX_RUN_CONTENT_NODES};
 use super::run_properties::{parse_run_underline, update_run_properties};
-use super::text::extract_word_text;
-use super::xml::is_on;
-use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
+use super::text::extract_word_text_with_bindings;
+use super::xml::{is_fragment_word_name, is_on, word_attribute_value};
 
 impl Run {
     /// Get the text content of this run.
@@ -40,7 +40,7 @@ impl Run {
     /// Returns an error if the operation cannot be completed.
     pub fn text(&self) -> Result<String> {
         let _parser_admission = self.parser_admission()?;
-        extract_word_text(self.xml_bytes())
+        extract_word_text_with_bindings(self.xml_bytes(), &self.inherited_namespaces()?)
     }
 
     /// Parse all explicit break elements in this run, preserving type and clear behavior.
@@ -50,51 +50,67 @@ impl Run {
     /// Returns an error if the operation cannot be completed.
     pub fn breaks(&self) -> Result<SmallVec<[RunBreak; 2]>> {
         let _parser_admission = self.parser_admission()?;
-        let mut reader = Reader::from_reader(self.xml_bytes());
-        reader.config_mut().trim_text(true);
+        let mut reader = quick_xml::reader::NsReader::from_reader(self.xml_bytes());
+        for (prefix, namespace) in self.inherited_namespaces()?.iter() {
+            let prefix = prefix.as_deref().map_or(
+                quick_xml::name::PrefixDeclaration::Default,
+                quick_xml::name::PrefixDeclaration::Named,
+            );
+            reader
+                .resolver_mut()
+                .add(prefix, quick_xml::name::Namespace(namespace))
+                .map_err(|_| Error::Xml("invalid inherited run namespace".into()))?;
+        }
         let mut breaks = SmallVec::new();
+        let mut fragment_prefix = None;
+        let mut saw_root = false;
+        let mut depth = 0usize;
+        let mut nodes = 0usize;
         loop {
-            match reader.read_event() {
-                Ok(Event::Start(e) | Event::Empty(e)) if e.local_name().as_ref() == b"br" => {
-                    let mut run_break = RunBreak::default();
-                    for attribute in e.checked_attributes() {
-                        let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
-                        let value = attribute
-                            .decoded_and_normalized_value(XmlVersion::Explicit1_0, reader.decoder())
-                            .map_err(|error| Error::Xml(error.to_string()))?;
-                        match attribute.key.local_name().as_ref() {
-                            b"type" => {
-                                run_break.break_type = match value.as_ref() {
-                                    "textWrapping" => RunBreakType::TextWrapping,
-                                    "page" => RunBreakType::Page,
-                                    "column" => RunBreakType::Column,
-                                    _ => {
-                                        return Err(Error::InvalidFormat(format!(
-                                            "invalid Word run break type '{value}'"
-                                        )));
-                                    },
-                                };
-                            },
-                            b"clear" => {
-                                run_break.clear = match value.as_ref() {
-                                    "none" => RunBreakClear::None,
-                                    "left" => RunBreakClear::Left,
-                                    "right" => RunBreakClear::Right,
-                                    "all" => RunBreakClear::All,
-                                    _ => {
-                                        return Err(Error::InvalidFormat(format!(
-                                            "invalid Word run break clear value '{value}'"
-                                        )));
-                                    },
-                                };
-                            },
-                            _ => {},
+            let raw = reader
+                .read_event()
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let resolver = reader.resolver();
+            let (namespace, event) = resolver.resolve_event(raw);
+            if matches!(event, Event::Start(_) | Event::Empty(_)) {
+                nodes += 1;
+                if nodes > MAX_RUN_CONTENT_NODES || depth >= MAX_RUN_CONTENT_DEPTH {
+                    return Err(Error::InvalidFormat(
+                        "Word run break traversal exceeds element or depth limits".into(),
+                    ));
+                }
+            }
+            if matches!(event, Event::Start(_)) {
+                depth += 1;
+            } else if matches!(event, Event::End(_)) {
+                depth = depth
+                    .checked_sub(1)
+                    .ok_or_else(|| Error::InvalidFormat("invalid Word run nesting".into()))?;
+            }
+            match event {
+                Event::Start(element) | Event::Empty(element) => {
+                    if !saw_root {
+                        saw_root = true;
+                        if !matches!(namespace, quick_xml::name::ResolveResult::Bound(_)) {
+                            fragment_prefix = Some(
+                                element
+                                    .name()
+                                    .prefix()
+                                    .map(|prefix| prefix.as_ref().to_vec()),
+                            );
                         }
                     }
+                    if !is_fragment_word_name(&namespace, element.name(), b"br", &fragment_prefix) {
+                        continue;
+                    }
+                    let run_break =
+                        parse_break(&element, reader.decoder(), resolver, &fragment_prefix)?;
                     breaks.push(run_break);
                 },
-                Ok(Event::Eof) => break,
-                Err(error) => return Err(Error::Xml(error.to_string())),
+                Event::Eof if depth != 0 => {
+                    return Err(Error::InvalidFormat("unterminated Word run XML".into()));
+                },
+                Event::Eof => break,
                 _ => {},
             }
         }
@@ -724,3 +740,38 @@ impl OwnProperties {
 #[cfg(test)]
 #[path = "run_scope_tests.rs"]
 mod scope_tests;
+
+#[allow(clippy::ref_option, reason = "the fragment fallback has three states")]
+pub(super) fn parse_break(
+    element: &BytesStart<'_>,
+    decoder: quick_xml::encoding::Decoder,
+    resolver: &quick_xml::name::NamespaceResolver,
+    fragment_prefix: &Option<Option<Vec<u8>>>,
+) -> Result<RunBreak> {
+    let break_type = word_attribute_value(element, b"type", decoder, resolver, fragment_prefix)?;
+    let clear = word_attribute_value(element, b"clear", decoder, resolver, fragment_prefix)?;
+    let run_break = RunBreak {
+        break_type: match break_type.as_deref() {
+            None | Some("textWrapping") => RunBreakType::TextWrapping,
+            Some("page") => RunBreakType::Page,
+            Some("column") => RunBreakType::Column,
+            Some(value) => {
+                return Err(Error::InvalidFormat(format!(
+                    "invalid Word run break type '{value}'"
+                )));
+            },
+        },
+        clear: match clear.as_deref() {
+            None | Some("none") => RunBreakClear::None,
+            Some("left") => RunBreakClear::Left,
+            Some("right") => RunBreakClear::Right,
+            Some("all") => RunBreakClear::All,
+            Some(value) => {
+                return Err(Error::InvalidFormat(format!(
+                    "invalid Word run break clear value '{value}'"
+                )));
+            },
+        },
+    };
+    Ok(run_break)
+}

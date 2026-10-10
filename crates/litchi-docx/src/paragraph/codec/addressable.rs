@@ -32,6 +32,7 @@ struct Candidate {
     start: usize,
     end: usize,
     addressable: bool,
+    namespaces: Option<crate::namespace::NamespaceBindings>,
 }
 
 /// How the walk treats an element.
@@ -141,6 +142,7 @@ impl Paragraph {
         let mut stack: SmallVec<[Frame; 32]> = SmallVec::new();
         let mut candidates: SmallVec<[Candidate; 8]> = SmallVec::new();
         let mut excluding = 0usize;
+        let mut namespaces = crate::namespace::NamespaceCapture::default();
         let mut elements = 0usize;
         let mut saw_root = false;
 
@@ -240,6 +242,11 @@ impl Paragraph {
                         start: event_start,
                         end: event_end,
                         addressable: excluding == 0,
+                        namespaces: if excluding == 0 {
+                            Some(namespaces.capture(reader.resolver())?)
+                        } else {
+                            None
+                        },
                     });
                     Frame::Run(candidates.len() - 1)
                 },
@@ -270,6 +277,9 @@ impl Paragraph {
         let mut runs = SmallVec::new();
         for candidate in candidates.iter().filter(|candidate| candidate.addressable) {
             Self::push_run_slice(&mut runs, &source, candidate.start, candidate.end)?;
+            if let Some(run) = runs.last_mut() {
+                run.namespaces.clone_from(&candidate.namespaces);
+            }
         }
         Ok(runs)
     }

@@ -133,6 +133,11 @@ impl NamespaceResolverLease {
     }
 }
 
+#[cfg(test)]
+thread_local! {
+    pub(super) static NAMESPACE_OWNER_SCANS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
 impl XmlRef {
     #[inline]
     pub(super) const fn new(owner: XmlOwner, start: u32, length: u32) -> Self {
@@ -198,6 +203,8 @@ impl XmlRef {
         };
         let mut resolver = NamespaceResolver::default();
         if start != 0 {
+            #[cfg(test)]
+            NAMESPACE_OWNER_SCANS.with(|count| count.set(count.get() + 1));
             // Parse through the selected element itself.  Reading the element
             // is necessary because `NsReader` applies namespace declarations
             // on its start event; stopping at the byte immediately before the
@@ -917,6 +924,7 @@ impl RunXmlData {
 pub struct Run {
     /// The raw XML data for this run
     pub(super) xml_data: RunXmlData,
+    pub(super) namespaces: Option<NamespaceBindings>,
 }
 
 /// An ordered direct child of a `WordprocessingML` run.
@@ -992,6 +1000,7 @@ impl Run {
     pub fn new(xml_bytes: Vec<u8>) -> Self {
         Self {
             xml_data: RunXmlData::Owned(xml_bytes),
+            namespaces: None,
         }
     }
 
@@ -1001,12 +1010,14 @@ impl Run {
     pub fn from_slice(slice: XmlSlice) -> Self {
         Self {
             xml_data: RunXmlData::Shared(slice),
+            namespaces: None,
         }
     }
 
     pub(super) fn from_xml_ref(source: XmlRef) -> Self {
         Self {
             xml_data: RunXmlData::Retained(source),
+            namespaces: None,
         }
     }
 
@@ -1029,6 +1040,10 @@ impl Run {
     }
 
     pub(crate) fn inherited_namespaces(&self) -> Result<NamespaceBindings> {
+        if let Some(namespaces) = &self.namespaces {
+            let _admission = self.parser_admission()?;
+            return Ok(Arc::clone(namespaces));
+        }
         if matches!(self.xml_data, RunXmlData::Owned(_)) {
             return Ok(Arc::clone(&EMPTY_NAMESPACE_BINDINGS));
         }
@@ -1041,6 +1056,7 @@ impl Run {
 
     pub(crate) fn replace_xml(&mut self, xml_bytes: Vec<u8>) {
         self.xml_data = RunXmlData::Owned(xml_bytes);
+        self.namespaces = None;
     }
 }
 

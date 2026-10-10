@@ -487,6 +487,18 @@ impl Package {
         self.physical_package()
     }
 
+    /// Clone the execution context retained by this owner, including an
+    /// owner with an effective edited topology.
+    ///
+    /// This accessor only returns the context captured at source admission; it
+    /// never asks the effective graph to materialize or reopens the physical
+    /// package. Callers performing source-backed I/O must still use
+    /// [`Self::check_source`] around that operation.
+    #[must_use]
+    pub fn execution_context(&self) -> Option<ExecutionContext> {
+        self.execution.clone()
+    }
+
     /// Materialize this source-backed DOCX into the established owning
     /// package facade without reparsing the source catalog.
     ///
@@ -508,6 +520,24 @@ impl Package {
         // exposing either success or a constructor error so a mutation in
         // this publication window cannot yield a stale owner (or mask the
         // stale-source failure with an eager parse error).
+        self.check_source()?;
+        result
+    }
+
+    /// Materialize this source-backed DOCX for an explicit Eager owner while
+    /// retaining the exact source archive for later owning publication.
+    ///
+    /// In-memory and reader-owned sources share their existing bytes. A
+    /// positional source is copied once under its OPC input limit; the copy
+    /// retains opaque ZIP members and original framing so an owning edit can
+    /// preserve untouched members. Source freshness is checked by the OPC
+    /// conversion before and after the copy and materialization.
+    pub fn to_owned_package_preserving_source(&self) -> Result<crate::Package> {
+        let package = match &self.effective {
+            Some(effective) => effective.to_opc_package_preserving_source()?,
+            None => self.physical.to_opc_package_preserving_source()?,
+        };
+        let result = crate::Package::from_opc_package(package);
         self.check_source()?;
         result
     }

@@ -77,6 +77,7 @@ impl Paragraph {
         let mut paragraph_depth = None;
         let mut capture = None::<(Child, usize, usize)>;
         let mut inlines = Vec::new();
+        let mut namespaces = crate::namespace::NamespaceCapture::default();
         let mut saw_paragraph = false;
         let mut depth = 0usize;
         let mut nodes = 0usize;
@@ -183,6 +184,7 @@ impl Paragraph {
                             event_start,
                             event_end,
                         )?;
+                        capture_run_namespaces(&mut inlines, &mut namespaces, reader.resolver())?;
                     }
                 },
                 Event::End(element) => {
@@ -190,6 +192,7 @@ impl Paragraph {
                         && depth == capture_depth
                     {
                         push_inline(&mut inlines, &source, kind, start, event_end)?;
+                        capture_run_namespaces(&mut inlines, &mut namespaces, reader.resolver())?;
                         capture = None;
                     }
                     if paragraph_depth == Some(depth)
@@ -293,4 +296,15 @@ fn parse_bookmark(raw: &[u8]) -> Option<Bookmark> {
             _ => {},
         }
     }
+}
+
+fn capture_run_namespaces(
+    inlines: &mut [Inline],
+    capture: &mut crate::namespace::NamespaceCapture,
+    resolver: &quick_xml::name::NamespaceResolver,
+) -> Result<()> {
+    if let Some(Inline::Run(run)) = inlines.last_mut() {
+        run.namespaces = Some(capture.capture(resolver)?);
+    }
+    Ok(())
 }
