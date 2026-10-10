@@ -8659,6 +8659,15 @@ impl SourceBackedPackage {
         let mut package = OpcPackage::new();
         let result = copy_relationships(&self.catalog.package_relationships, package.rels_mut());
         self.finish_stage(result)?;
+        let mut parts = Vec::new();
+        self.finish_stage(
+            parts
+                .try_reserve_exact(self.catalog.parts.len())
+                .map_err(|source| OpcError::Allocation {
+                    resource: "source-backed OPC materialized parts",
+                    source,
+                }),
+        )?;
         let mut read_session = self.archive.read_session();
         for index in 0..self.catalog.parts.len() {
             let bytes = self.finish_stage(self.read_part_with_session(
@@ -8675,9 +8684,10 @@ impl SourceBackedPackage {
             let mut part = self.finish_stage(part_result)?;
             let result = copy_relationships(&catalog_part.relationships, part.rels_mut());
             self.finish_stage(result)?;
-            let result = package.try_add_source_part(part);
-            self.finish_stage(result)?;
+            parts.push((part, true));
         }
+        let result = package.try_add_materialized_parts(parts, || self.finish_stage(Ok(())));
+        self.finish_stage(result)?;
         package.set_non_part_members(non_part_members);
         package.set_tolerance_report(self.catalog.tolerance_report.clone());
         if let Some(source) = source {

@@ -62,6 +62,15 @@ impl PreparedTopology {
         let non_part_members = self.package.cloned_non_part_members()?;
         let mut package = OpcPackage::new();
         copy_relationships(self.rels(), package.rels_mut())?;
+        self.check_source()?;
+        let mut parts = Vec::new();
+        parts
+            .try_reserve_exact(self.state.effective_data().parts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC prepared materialized parts",
+                source,
+            })?;
+        self.check_source()?;
         let mut session = self.package.archive.read_session();
         for effective in &self.state.effective_data().parts {
             self.check_source()?;
@@ -83,16 +92,13 @@ impl PreparedTopology {
                 bytes,
             )?;
             copy_relationships(effective.relationships(&self.package), part.rels_mut())?;
-            if effective.replacement.is_some() {
-                // A replacement is authored by the candidate.  Keep it out
-                // of the source XML provenance map so the preservation writer
-                // cannot mistake the replacement allocation for the
-                // untouched source member.
-                package.try_add_part(part)?;
-            } else {
-                package.try_add_source_part(part)?;
-            }
+            // A replacement is authored by the candidate. Keep it out of the
+            // source XML provenance map so the preservation writer cannot
+            // mistake the replacement allocation for the untouched source
+            // member. Retained source parts keep their exact XML allocation.
+            parts.push((part, effective.replacement.is_none()));
         }
+        package.try_add_materialized_parts(parts, || self.check_source())?;
         package.set_non_part_members(non_part_members);
         package.set_tolerance_report(self.package.catalog.tolerance_report.clone());
         if let Some(source) = source {

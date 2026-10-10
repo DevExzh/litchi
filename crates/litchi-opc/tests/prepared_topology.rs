@@ -157,6 +157,30 @@ fn source_bytes() -> Vec<u8> {
     PackageWriter::to_bytes(&package).unwrap()
 }
 
+fn source_bytes_with_noncompact_xml() -> Vec<u8> {
+    let mut package = OpcPackage::new();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            pack(DOCUMENT),
+            ct::WML_DOCUMENT.to_owned(),
+            b"<before>\n  <child/>\n</before>".to_vec(),
+        )))
+        .unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            pack(UNTOUCHED),
+            "application/xml".to_owned(),
+            b"<untouched>\n  <child/>\n</untouched>".to_vec(),
+        )))
+        .unwrap();
+    package.relate_to("word/document.xml", rt::OFFICE_DOCUMENT);
+    package
+        .get_part_mut(&pack(DOCUMENT))
+        .unwrap()
+        .relate_to("../custom/untouched.xml", CUSTOM_REL);
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
 fn stored_member_data_range(bytes: &[u8], wanted: &str) -> Range<u64> {
     let mut offset = 0usize;
     while offset.checked_add(30).is_some_and(|end| end <= bytes.len())
@@ -2038,6 +2062,58 @@ fn owned_missing_lookup_rechecks_source_before_reporting_absence() {
         Err(OpcError::SourceChanged { .. })
     ));
     assert!(candidate.check_source().is_err());
+}
+
+#[test]
+fn direct_materialization_retains_noncompact_source_xml_provenance() {
+    let package = open(Arc::new(VersionedSource::new(
+        source_bytes_with_noncompact_xml(),
+    )));
+    let owned = package.to_opc_package().unwrap();
+
+    assert_eq!(
+        owned.source_xml_part(&pack(DOCUMENT)).unwrap().bytes(),
+        b"<before>\n  <child/>\n</before>"
+    );
+    assert_eq!(
+        owned.source_xml_part(&pack(UNTOUCHED)).unwrap().bytes(),
+        b"<untouched>\n  <child/>\n</untouched>"
+    );
+}
+
+#[test]
+fn prepared_materialization_keeps_authored_xml_separate_from_source_provenance() {
+    let package = open(Arc::new(VersionedSource::new(
+        source_bytes_with_noncompact_xml(),
+    )));
+    let source_xml = package
+        .part(&pack(UNTOUCHED))
+        .unwrap()
+        .source_xml()
+        .unwrap();
+    let mut plan = SourceTopologyPlan::new();
+    plan.try_replace_part(pack(DOCUMENT), b"<after>\n  <child/>\n</after>".to_vec())
+        .unwrap();
+    plan.try_add_source_xml_part(pack(ADDED), source_xml)
+        .unwrap();
+
+    let owned = package
+        .prepare_topology(plan)
+        .unwrap()
+        .to_opc_package()
+        .unwrap();
+    assert!(
+        owned.source_xml_part(&pack(DOCUMENT)).is_err(),
+        "an authored replacement must not acquire source XML provenance"
+    );
+    assert!(
+        owned.source_xml_part(&pack(ADDED)).is_err(),
+        "an effective addition must not acquire source XML provenance"
+    );
+    assert_eq!(
+        owned.source_xml_part(&pack(UNTOUCHED)).unwrap().bytes(),
+        b"<untouched>\n  <child/>\n</untouched>"
+    );
 }
 
 #[test]

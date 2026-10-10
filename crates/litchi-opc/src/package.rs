@@ -10,7 +10,7 @@ use crate::error::{OpcError, Result};
 use crate::execution::OpenSession;
 use crate::leniency::ToleranceReport;
 use crate::limits::SourceLimits;
-use crate::members::NonPartMember;
+use crate::members::{NonPartMember, PartNameIndex};
 use crate::packuri::{CONTENT_TYPES_URI, PACKAGE_URI, PackURI, PartNameConflict};
 use crate::part::{Part, PartFactory, PartMetadata};
 use crate::payload::PartPayload;
@@ -2189,6 +2189,104 @@ impl OpcPackage {
             self.source_xml_parts
                 .insert(partname, source_blob.payload().clone());
         }
+        Ok(())
+    }
+
+    /// Add a complete set of parts produced by source materialization.
+    ///
+    /// The ordinary insertion methods deliberately validate one name against
+    /// the package map on every call.  A materialization already has all
+    /// incoming parts in hand, so doing that would turn a package with `P`
+    /// parts into a quadratic operation.  This private seam admits the whole
+    /// batch through the same [`PartNameIndex`] used at source ingress, then
+    /// reserves every destination map before changing package state.  The
+    /// boolean paired with each part says whether its payload is retained as
+    /// source XML provenance; authored replacements must pass `false`.
+    ///
+    /// `checkpoint` is called while the indexed preflight is running and
+    /// after insertion.  Source-backed callers use it for their normal
+    /// freshness and execution-context fence, retaining the same cancellation
+    /// boundary as the per-part insertion loop.  A checkpoint that fails after
+    /// insertion may leave this destination partially populated; this seam is
+    /// crate-private and is used only with a disposable conversion-local
+    /// package, which callers discard on every error.
+    pub(crate) fn try_add_materialized_parts<F>(
+        &mut self,
+        parts: Vec<(Box<dyn Part + Send + Sync>, bool)>,
+        mut checkpoint: F,
+    ) -> Result<()>
+    where
+        F: FnMut() -> Result<()>,
+    {
+        if parts.is_empty() {
+            return Ok(());
+        }
+        checkpoint()?;
+
+        let capacity = self.parts.len().checked_add(parts.len()).ok_or_else(|| {
+            OpcError::ZipError("OPC materialized part count overflows".to_owned())
+        })?;
+        let mut part_names = PartNameIndex::try_with_capacity(capacity)?;
+        for name in self.parts.keys() {
+            checkpoint()?;
+            part_names.insert(name)?;
+        }
+
+        let mut source_xml_count = 0usize;
+        for (part, retain_source) in &parts {
+            checkpoint()?;
+            part_names.insert(part.partname())?;
+            if *retain_source
+                && xml_minifier::audit::package::is_xml_part(
+                    part.partname().as_str(),
+                    part.content_type(),
+                )
+            {
+                source_xml_count = source_xml_count.checked_add(1).ok_or_else(|| {
+                    OpcError::ZipError("OPC source XML part count overflows".to_owned())
+                })?;
+            }
+        }
+        // The index has completed the full namespace admission. Drop its
+        // temporary allocations before reserving the owning package maps so a
+        // large eager conversion does not retain two indexes while inserting.
+        drop(part_names);
+
+        self.parts
+            .try_reserve(parts.len())
+            .map_err(|source| OpcError::Allocation {
+                resource: "OPC materialized parts",
+                source,
+            })?;
+        if source_xml_count != 0 {
+            self.source_xml_parts
+                .try_reserve(source_xml_count)
+                .map_err(|source| OpcError::Allocation {
+                    resource: "OPC materialized source-preserved XML parts",
+                    source,
+                })?;
+        }
+        checkpoint()?;
+
+        self.revoke_exact_source();
+        self.signature_graph_tracked = true;
+        for (part, retain_source) in parts {
+            let partname = part.partname().clone();
+            let source_blob = if retain_source
+                && xml_minifier::audit::package::is_xml_part(partname.as_str(), part.content_type())
+            {
+                Some(part.payload_handle())
+            } else {
+                None
+            };
+            self.source_relationships_xml.remove(&partname);
+            self.parts.insert(partname.clone(), part);
+            if let Some(source_blob) = source_blob {
+                self.source_xml_parts
+                    .insert(partname, source_blob.payload().clone());
+            }
+        }
+        checkpoint()?;
         Ok(())
     }
 
@@ -4892,6 +4990,126 @@ mod tests {
             assert_eq!(package.part_count(), 1);
             assert_eq!(package.get_part(&original_uri).unwrap().blob(), b"original");
         }
+    }
+
+    #[test]
+    fn materialized_part_batch_preflights_all_name_conflicts_without_mutation() {
+        let make_part = |name: &str| -> (Box<dyn Part + Send + Sync>, bool) {
+            (
+                Box::new(BlobPart::new(
+                    PackURI::new(name).unwrap(),
+                    "application/xml".to_owned(),
+                    b"<part/>".to_vec(),
+                )),
+                true,
+            )
+        };
+        for (names, expected) in [
+            (
+                vec!["/word/document.xml", "/word/document.xml"],
+                PartNameConflict::Duplicate,
+            ),
+            (
+                vec!["/word/document.xml", "/WORD/DOCUMENT.XML"],
+                PartNameConflict::Equivalent,
+            ),
+            (
+                vec!["/word/document.xml", "/word/document.xml/image.gif"],
+                PartNameConflict::Derived,
+            ),
+            (
+                vec!["/word/document.xml/image.gif", "/word/document.xml"],
+                PartNameConflict::Derived,
+            ),
+        ] {
+            let mut package = OpcPackage::new();
+            let parts = names.into_iter().map(make_part).collect();
+            let error = package
+                .try_add_materialized_parts(parts, || Ok(()))
+                .unwrap_err();
+            assert!(matches!(
+                (expected, error),
+                (PartNameConflict::Duplicate, OpcError::DuplicatePartName(_))
+                    | (
+                        PartNameConflict::Equivalent,
+                        OpcError::EquivalentPartNames { .. }
+                    )
+                    | (PartNameConflict::Derived, OpcError::DerivedPartNames { .. })
+            ));
+            assert_eq!(package.part_count(), 0);
+            assert!(!package.exact_source_authorized);
+            assert!(!package.signature_graph_tracked);
+            assert!(!package.signature_policy_authorized);
+            assert!(!package.signature_policy_required);
+            assert!(package.source_xml_parts.is_empty());
+        }
+
+        for (candidate, expected) in [
+            ("/word/document.xml", PartNameConflict::Duplicate),
+            ("/WORD/DOCUMENT.XML", PartNameConflict::Equivalent),
+            ("/word/document.xml/image.gif", PartNameConflict::Derived),
+        ] {
+            let mut package = OpcPackage::from_vec(create_minimal_docx()).unwrap();
+            let exact_source_authorized = package.exact_source_authorized;
+            let signature_graph_tracked = package.signature_graph_tracked;
+            let signature_policy_authorized = package.signature_policy_authorized;
+            let signature_policy_required = package.signature_policy_required;
+            let source_xml_count = package.source_xml_parts.len();
+            let error = package
+                .try_add_materialized_parts(vec![make_part(candidate)], || Ok(()))
+                .unwrap_err();
+            assert!(matches!(
+                (expected, error),
+                (PartNameConflict::Duplicate, OpcError::DuplicatePartName(_))
+                    | (
+                        PartNameConflict::Equivalent,
+                        OpcError::EquivalentPartNames { .. }
+                    )
+                    | (PartNameConflict::Derived, OpcError::DerivedPartNames { .. })
+            ));
+            assert_eq!(package.part_count(), 1);
+            assert_eq!(package.exact_source_authorized, exact_source_authorized);
+            assert_eq!(package.signature_graph_tracked, signature_graph_tracked);
+            assert_eq!(
+                package.signature_policy_authorized,
+                signature_policy_authorized
+            );
+            assert_eq!(package.signature_policy_required, signature_policy_required);
+            assert_eq!(package.source_xml_parts.len(), source_xml_count);
+        }
+    }
+
+    #[test]
+    fn materialized_part_batch_retains_source_xml_provenance_only_for_source_parts() {
+        let source_name = PackURI::new("/word/document.xml").unwrap();
+        let authored_name = PackURI::new("/word/styles.xml").unwrap();
+        let mut package = OpcPackage::new();
+        package
+            .try_add_materialized_parts(
+                vec![
+                    (
+                        Box::new(BlobPart::new(
+                            source_name.clone(),
+                            "application/xml".to_owned(),
+                            b"<document/>".to_vec(),
+                        )),
+                        true,
+                    ),
+                    (
+                        Box::new(BlobPart::new(
+                            authored_name.clone(),
+                            "application/xml".to_owned(),
+                            b"<styles/>".to_vec(),
+                        )),
+                        false,
+                    ),
+                ],
+                || Ok(()),
+            )
+            .unwrap();
+
+        assert!(package.holds_original_source_xml(package.get_part(&source_name).unwrap()));
+        assert!(!package.holds_original_source_xml(package.get_part(&authored_name).unwrap()));
     }
 
     #[test]
