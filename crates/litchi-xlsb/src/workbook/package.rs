@@ -360,7 +360,7 @@ impl Workbook {
 
     /// Start a detached, exact-source transaction spanning sheet metadata and
     /// dependency-managed cross-workbook cell transfer.
-    pub fn edit_workbook_structure(&self) -> Result<cell_values::WorkbookEdit> {
+    pub fn edit_workbook_structure(&self) -> Result<cell_values::structure::Edit> {
         self.edit_workbook_structure_with_limits(cell_values::TransferLimits::DEFAULT)
     }
 
@@ -369,12 +369,15 @@ impl Workbook {
     pub fn edit_workbook_structure_with_limits(
         &self,
         limits: cell_values::TransferLimits,
-    ) -> Result<cell_values::WorkbookEdit> {
-        cell_values::WorkbookEdit::new(self, limits)
+    ) -> Result<cell_values::structure::Edit> {
+        cell_values::structure::Edit::new(self, limits)
     }
 
     /// Atomically publish a complete source-checked workbook transaction.
-    pub fn apply_workbook_structure(&mut self, commit: &cell_values::WorkbookCommit) -> Result<()> {
+    pub fn apply_workbook_structure(
+        &mut self,
+        commit: &cell_values::structure::Commit,
+    ) -> Result<()> {
         commit.patch().apply(self)
     }
 

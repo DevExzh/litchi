@@ -236,7 +236,7 @@ pub(super) fn transfer(
         ));
     }
     crate::signature_policy::ensure_unsigned(&target.package)?;
-    let source = super::root::validated_workbook_with_external_link_limits(
+    let source = super::structure::validated_workbook_with_external_link_limits(
         source_bytes,
         target.external_link_limits(),
     )?;

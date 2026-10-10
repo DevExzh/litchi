@@ -41,7 +41,7 @@ pub(super) struct StylePlan {
     pub(super) xf_tail: [u8; 6],
 }
 
-pub(super) fn plan_style(style: &super::AuthoredStyle) -> Result<StylePlan> {
+pub(super) fn plan_style(style: &super::structure::AuthoredStyle) -> Result<StylePlan> {
     let alignment = style.alignment.as_ref();
     if alignment
         .is_some_and(|value| value.rotation > 180 || value.indent > 250 || value.text_direction > 2)

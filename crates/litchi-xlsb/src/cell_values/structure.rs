@@ -1,4 +1,36 @@
 //! Durable, source-checked workbook transactions for sheet structure and cells.
+//!
+//! This family uses module-local transaction names. Worksheet-only cell edits
+//! remain in the parent module; the workbook owner supplies this family's
+//! entry point through [Workbook::edit_workbook_structure].
+//!
+//! ```
+//! # fn main() -> Result<(), Box<dyn std::error::Error>> {
+//! use std::io::Cursor;
+//! use litchi_core::sheet::traits::WorkbookTrait;
+//! use litchi_xlsb::Workbook;
+//! use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+//! use litchi_xlsb::cell_values::TransferLimits;
+//! use litchi_xlsb::cell_values::structure::{Commit, Edit, History, Patch};
+//!
+//! let mut builder = WorkbookWriter::new();
+//! builder.add_worksheet(MutableWorksheet::new("Original"));
+//! let mut bytes = Cursor::new(Vec::new());
+//! builder.save(&mut bytes)?;
+//! let mut workbook = Workbook::new(Cursor::new(bytes.into_inner()))?;
+//! let mut edit: Edit = workbook.edit_workbook_structure()?;
+//! edit.rename_sheet(0, "Renamed".to_owned())?;
+//! let commit: Commit = edit.commit()?;
+//! let wire = commit.patch().to_bytes(TransferLimits::DEFAULT)?;
+//! let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT)?;
+//! patch.apply(&mut workbook)?;
+//! let mut history = History::new(TransferLimits::DEFAULT)?;
+//! history.push(patch)?;
+//! history.undo(&mut workbook)?;
+//! assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
+//! # Ok(())
+//! # }
+//! ```
 
 #![deny(
     clippy::cast_lossless,
@@ -158,7 +190,7 @@ impl Operation {
 
 /// A detached workbook transaction planned against one exact package image.
 #[derive(Debug, Clone)]
-pub struct WorkbookEdit {
+pub struct Edit {
     before: Arc<[u8]>,
     operations: Vec<Operation>,
     limits: TransferLimits,
@@ -166,7 +198,7 @@ pub struct WorkbookEdit {
     drawing_load_policy: DrawingLoadPolicy,
 }
 
-impl WorkbookEdit {
+impl Edit {
     pub(crate) fn new(workbook: &Workbook, limits: TransferLimits) -> Result<Self> {
         validate_limits(limits)?;
         Ok(Self {
@@ -458,14 +490,14 @@ impl WorkbookEdit {
     /// # Errors
     ///
     /// Returns an error when replay, complete workbook readback, or bounds fail.
-    pub fn commit(self) -> Result<WorkbookCommit> {
+    pub fn commit(self) -> Result<Commit> {
         let after = Arc::from(replay(
             &self.before,
             &self.operations,
             self.external_link_limits,
             self.drawing_load_policy,
         )?);
-        let patch = WorkbookPatch {
+        let patch = Patch {
             before: self.before,
             after,
             operations: self.operations,
@@ -473,7 +505,7 @@ impl WorkbookEdit {
             drawing_load_policy: self.drawing_load_policy,
         };
         let _bounded_encoding = patch.to_bytes(self.limits)?;
-        Ok(WorkbookCommit { patch })
+        Ok(Commit { patch })
     }
 
     fn stage(&mut self, operation: Operation) -> Result<()> {
@@ -500,21 +532,21 @@ impl WorkbookEdit {
 
 /// A validated workbook transaction ready for atomic publication.
 #[derive(Debug, Clone)]
-pub struct WorkbookCommit {
-    patch: WorkbookPatch,
+pub struct Commit {
+    patch: Patch,
 }
 
-impl WorkbookCommit {
+impl Commit {
     /// Exact-source durable patch carried by this commit.
     #[must_use]
-    pub const fn patch(&self) -> &WorkbookPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 }
 
 /// An exact before/after workbook patch with semantic replay operations.
 #[derive(Debug, Clone)]
-pub struct WorkbookPatch {
+pub struct Patch {
     before: Arc<[u8]>,
     after: Arc<[u8]>,
     operations: Vec<Operation>,
@@ -522,7 +554,7 @@ pub struct WorkbookPatch {
     drawing_load_policy: DrawingLoadPolicy,
 }
 
-impl WorkbookPatch {
+impl Patch {
     /// Canonical exact package image required before application.
     #[must_use]
     pub fn before(&self) -> &[u8] {
@@ -587,7 +619,7 @@ impl WorkbookPatch {
     /// # Errors
     ///
     /// Returns an error for distinct exact bases or failed bounded replay.
-    pub fn merge_three_way(&self, other: &Self) -> Result<WorkbookMergeOutcome> {
+    pub fn merge_three_way(&self, other: &Self) -> Result<MergeOutcome> {
         if self.before != other.before {
             return Err(Error::UnsupportedFeature(
                 "workbook patches do not share an exact base".to_string(),
@@ -611,7 +643,7 @@ impl WorkbookPatch {
         for right in &other.operations {
             if let Some(index) = positions.get(&right.selection()).copied() {
                 if merged[index] != *right {
-                    conflicts.push(WorkbookMergeConflict {
+                    conflicts.push(MergeConflict {
                         selection: right.selection(),
                     });
                 }
@@ -621,7 +653,7 @@ impl WorkbookPatch {
             }
         }
         if !conflicts.is_empty() {
-            return Ok(WorkbookMergeOutcome {
+            return Ok(MergeOutcome {
                 patch: None,
                 conflicts,
             });
@@ -632,7 +664,7 @@ impl WorkbookPatch {
             self.external_link_limits,
             self.drawing_load_policy,
         )?);
-        Ok(WorkbookMergeOutcome {
+        Ok(MergeOutcome {
             patch: Some(Self {
                 before: Arc::clone(&self.before),
                 after,
@@ -884,11 +916,11 @@ impl WorkbookPatch {
 
 /// One divergent structural/cell selection in a workbook merge.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct WorkbookMergeConflict {
+pub struct MergeConflict {
     selection: Selection,
 }
 
-impl WorkbookMergeConflict {
+impl MergeConflict {
     /// Sheet index selected by both divergent operations.
     #[must_use]
     pub const fn sheet_index(&self) -> usize {
@@ -911,35 +943,35 @@ impl WorkbookMergeConflict {
 
 /// Atomic result of a workbook-level three-way merge.
 #[derive(Debug, Clone)]
-pub struct WorkbookMergeOutcome {
-    patch: Option<WorkbookPatch>,
-    conflicts: Vec<WorkbookMergeConflict>,
+pub struct MergeOutcome {
+    patch: Option<Patch>,
+    conflicts: Vec<MergeConflict>,
 }
 
-impl WorkbookMergeOutcome {
+impl MergeOutcome {
     /// Merged patch, present exactly when there are no conflicts.
     #[must_use]
-    pub const fn patch(&self) -> Option<&WorkbookPatch> {
+    pub const fn patch(&self) -> Option<&Patch> {
         self.patch.as_ref()
     }
 
     /// All divergent selections.
     #[must_use]
-    pub fn conflicts(&self) -> &[WorkbookMergeConflict] {
+    pub fn conflicts(&self) -> &[MergeConflict] {
         &self.conflicts
     }
 }
 
 /// Bounded exact-source workbook undo/redo history.
 #[derive(Debug, Clone)]
-pub struct WorkbookHistory {
-    entries: Vec<WorkbookPatch>,
+pub struct History {
+    entries: Vec<Patch>,
     cursor: usize,
     retained_bytes: usize,
     limits: TransferLimits,
 }
 
-impl WorkbookHistory {
+impl History {
     /// Construct an empty bounded workbook history.
     pub fn new(limits: TransferLimits) -> Result<Self> {
         validate_limits(limits)?;
@@ -964,7 +996,7 @@ impl WorkbookHistory {
     }
 
     /// Retain one contiguous committed patch and evict the oldest entries.
-    pub fn push(&mut self, patch: WorkbookPatch) -> Result<()> {
+    pub fn push(&mut self, patch: Patch) -> Result<()> {
         let bytes = patch.retained_bytes()?;
         if bytes > self.limits.history_bytes() {
             return Err(Error::InvalidLength {

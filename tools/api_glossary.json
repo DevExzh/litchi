@@ -1619,6 +1619,42 @@
           "name": "sheet_tabs",
           "scope": "litchi_xlsb::workbook::Workbook",
           "replacement": "use sheet(selector) and sheets()"
+        },
+        {
+          "name": "WorkbookEdit",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::Edit"
+        },
+        {
+          "name": "WorkbookCommit",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::Commit"
+        },
+        {
+          "name": "WorkbookPatch",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::Patch"
+        },
+        {
+          "name": "WorkbookHistory",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::History"
+        },
+        {
+          "name": "WorkbookMergeConflict",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::MergeConflict"
+        },
+        {
+          "name": "WorkbookMergeOutcome",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::MergeOutcome"
+        },
+        {
+          "name": "AuthoredStyle",
+          "scope": "litchi_xlsb::cell_values",
+          "replacement": "use cell_values::structure::AuthoredStyle",
+          "recursive": false
         }
       ],
       "families": []
@@ -1684,6 +1720,42 @@
           "name": "sheet_tabs",
           "scope": "litchi_xlsb::workbook::Workbook",
           "replacement": "use sheet(selector) and sheets()"
+        },
+        {
+          "name": "WorkbookEdit",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::Edit"
+        },
+        {
+          "name": "WorkbookCommit",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::Commit"
+        },
+        {
+          "name": "WorkbookPatch",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::Patch"
+        },
+        {
+          "name": "WorkbookHistory",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::History"
+        },
+        {
+          "name": "WorkbookMergeConflict",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::MergeConflict"
+        },
+        {
+          "name": "WorkbookMergeOutcome",
+          "scope": "litchi_xlsb",
+          "replacement": "use cell_values::structure::MergeOutcome"
+        },
+        {
+          "name": "AuthoredStyle",
+          "scope": "litchi_xlsb::cell_values",
+          "replacement": "use cell_values::structure::AuthoredStyle",
+          "recursive": false
         }
       ],
       "families": []

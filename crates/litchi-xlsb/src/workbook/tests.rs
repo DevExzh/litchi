@@ -103,7 +103,7 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
         .patch()
         .to_bytes(crate::cell_values::TransferLimits::DEFAULT)
         .unwrap();
-    let decoded = crate::cell_values::WorkbookPatch::from_bytes_without_drawing_parse(
+    let decoded = crate::cell_values::structure::Patch::from_bytes_without_drawing_parse(
         &encoded,
         crate::cell_values::TransferLimits::DEFAULT,
     )

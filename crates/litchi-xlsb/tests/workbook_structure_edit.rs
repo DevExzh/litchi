@@ -11,9 +11,9 @@
 )]
 
 use litchi_core::sheet::{CellValue, traits::WorkbookTrait};
+use litchi_xlsb::cell_values::structure::{AuthoredStyle, History, Patch};
 use litchi_xlsb::cell_values::{
-    AuthoredStyle, CellFormula, DrawingTransferRefusal, Reference, TransferLimits, Value,
-    WorkbookHistory, WorkbookPatch,
+    CellFormula, DrawingTransferRefusal, Reference, TransferLimits, Value,
 };
 use litchi_xlsb::chart::{Chart, ExternalDataPart};
 use litchi_xlsb::named_ranges::Definition as NamedRange;
@@ -287,8 +287,8 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable patch");
-    let decoded = WorkbookPatch::from_bytes(&encoded, TransferLimits::DEFAULT)
-        .expect("validated durable patch");
+    let decoded =
+        Patch::from_bytes(&encoded, TransferLimits::DEFAULT).expect("validated durable patch");
     decoded.apply(&mut target).expect("atomic publication");
 
     assert_eq!(target.worksheet_names(), &["Imported".to_string()]);
@@ -401,8 +401,8 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable resources");
-    let patch = WorkbookPatch::from_bytes(&bytes, TransferLimits::DEFAULT)
-        .expect("durable resource replay");
+    let patch =
+        Patch::from_bytes(&bytes, TransferLimits::DEFAULT).expect("durable resource replay");
     patch.apply(&mut workbook).expect("publish resources");
 
     let snapshot = workbook.cell_values(0).expect("authored snapshot");
@@ -498,7 +498,7 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable appended image");
-    WorkbookPatch::from_bytes(&append_bytes, TransferLimits::DEFAULT)
+    Patch::from_bytes(&append_bytes, TransferLimits::DEFAULT)
         .expect("decode appended image patch")
         .apply(&mut transfer_target)
         .expect("publish appended image");
@@ -548,7 +548,7 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable drawing patch");
     let drawing_patch =
-        WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT).expect("drawing patch replay");
+        Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("drawing patch replay");
 
     let mut rename_edit = target.edit_workbook_structure().expect("rename edit");
     rename_edit
@@ -594,7 +594,7 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
     assert!(connection.start.is_some());
     assert!(connection.end.is_some());
 
-    let mut history = WorkbookHistory::new(TransferLimits::DEFAULT).expect("drawing history");
+    let mut history = History::new(TransferLimits::DEFAULT).expect("drawing history");
     history.push(merged).expect("retain drawing patch");
     history.undo(&mut target).expect("undo drawing graph");
     assert_eq!(
@@ -669,7 +669,7 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable chart graph");
-    WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
+    Patch::from_bytes(&durable, TransferLimits::DEFAULT)
         .expect("chart graph replay")
         .apply(&mut target)
         .expect("publish chart graph");
@@ -742,8 +742,8 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable hyperlink patch");
-    let drawing_patch = WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
-        .expect("durable hyperlink replay");
+    let drawing_patch =
+        Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("durable hyperlink replay");
 
     let mut rename_edit = target.edit_workbook_structure().expect("rename edit");
     rename_edit
@@ -761,7 +761,7 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
         vec![("rId1".to_string(), "http://lucene.apache.org/".to_string())]
     );
 
-    let mut history = WorkbookHistory::new(TransferLimits::DEFAULT).expect("hyperlink history");
+    let mut history = History::new(TransferLimits::DEFAULT).expect("hyperlink history");
     history.push(merged).expect("retain hyperlink patch");
     history.undo(&mut target).expect("inverse hyperlink patch");
     assert!(target.sheet_drawing(0).is_none());
@@ -1000,8 +1000,8 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable dependency patch");
-    let patch = WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
-        .expect("decode dependency patch");
+    let patch =
+        Patch::from_bytes(&durable, TransferLimits::DEFAULT).expect("decode dependency patch");
     patch.apply(&mut target).expect("publish dependency patch");
 
     let cells = target.cell_values(0).expect("target cells");
@@ -1151,7 +1151,7 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
         .expect("encoded merge");
     let last = corrupt.len().checked_sub(1).expect("nonempty patch");
     corrupt[last] ^= 0x5a;
-    assert!(WorkbookPatch::from_bytes(&corrupt, TransferLimits::DEFAULT).is_err());
+    assert!(Patch::from_bytes(&corrupt, TransferLimits::DEFAULT).is_err());
     assert_eq!(target.worksheet_names(), &["Target".to_string()]);
 
     merged.apply(&mut target).expect("apply merge");
@@ -1161,7 +1161,7 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
         "stale reapply must fail"
     );
 
-    let mut history = WorkbookHistory::new(TransferLimits::DEFAULT).expect("history");
+    let mut history = History::new(TransferLimits::DEFAULT).expect("history");
     history.push(merged).expect("retain patch");
     history.undo(&mut target).expect("undo");
     assert_eq!(target.worksheet_names(), &["Target".to_string()]);

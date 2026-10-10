@@ -15,7 +15,8 @@
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{BlobPart, PackURI};
 use litchi_xlsb::Workbook;
-use litchi_xlsb::cell_values::{Reference, TransferLimits, Value, WorkbookPatch};
+use litchi_xlsb::cell_values::structure::Patch;
+use litchi_xlsb::cell_values::{Reference, TransferLimits, Value};
 use std::collections::BTreeMap;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -233,7 +234,7 @@ fn skipped_malformed_donor_transfers_to_eager_target_without_drawing_parse() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable transfer patch");
-    let decoded = WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
+    let decoded = Patch::from_bytes(&durable, TransferLimits::DEFAULT)
         .expect("decode durable transfer patch");
 
     let mut published = Workbook::new(Cursor::new(original.clone())).expect("published target");
@@ -295,7 +296,7 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable workbook patch");
-    let decoded = WorkbookPatch::from_bytes(&durable, TransferLimits::DEFAULT)
+    let decoded = Patch::from_bytes(&durable, TransferLimits::DEFAULT)
         .expect("decode valid durable workbook patch");
 
     let mut target = skipped(&original);
@@ -319,15 +320,13 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
         .to_bytes(TransferLimits::DEFAULT)
         .expect("serialize malformed-image patch");
     assert!(
-        WorkbookPatch::from_bytes(&malformed_durable, TransferLimits::DEFAULT).is_err(),
+        Patch::from_bytes(&malformed_durable, TransferLimits::DEFAULT).is_err(),
         "durable decoding remains eager and therefore rejects malformed drawing images"
     );
 
-    let decoded_skipped = WorkbookPatch::from_bytes_without_drawing_parse(
-        &malformed_durable,
-        TransferLimits::DEFAULT,
-    )
-    .expect("decode malformed-image patch through explicit skipped projection");
+    let decoded_skipped =
+        Patch::from_bytes_without_drawing_parse(&malformed_durable, TransferLimits::DEFAULT)
+            .expect("decode malformed-image patch through explicit skipped projection");
     let mut durable_skipped_target = skipped(&malformed_before);
     decoded_skipped
         .apply(&mut durable_skipped_target)

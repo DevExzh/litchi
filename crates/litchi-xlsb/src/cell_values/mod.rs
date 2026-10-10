@@ -15,15 +15,11 @@
 mod drawing_transfer;
 mod formula_transfer;
 mod resources;
-mod root;
+pub mod structure;
 pub mod workbook;
 mod worksheet;
 
 pub use drawing_transfer::DrawingTransferRefusal;
-pub use root::{
-    AuthoredStyle, WorkbookCommit, WorkbookEdit, WorkbookHistory, WorkbookMergeConflict,
-    WorkbookMergeOutcome, WorkbookPatch,
-};
 pub use worksheet::{
     CellError, CellFormula, Change, Commit, Edit, History, Limits, MergeConflict, MergeOutcome,
     Number, Patch, Reference, Snapshot, StoredCell, StyleIndex, TransferLimits, Value,
