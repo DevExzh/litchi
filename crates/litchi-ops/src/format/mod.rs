@@ -2,7 +2,7 @@
 //!
 //! Each handle is one `Arc` newtype over its format's state (record 0003 §2.2):
 //! cheap to clone, `Send + Sync`, retaining the read owner plus the shared
-//! source an editor can later be built from (§2.3). [`crate::open`] builds
+//! source an editor can later be built from (§2.3). `crate::open` builds
 //! them; the read methods here are the per-format surface, including the
 //! format-specific reads the generic family views do not cover.
 //!
@@ -39,6 +39,8 @@ pub mod rtf;
     feature = "xlsb"
 ))]
 pub(crate) mod signature;
+#[cfg(any(feature = "xlsx", feature = "xlsb"))]
+pub(crate) mod workbook;
 #[cfg(feature = "xls")]
 pub mod xls;
 #[cfg(feature = "xlsb")]

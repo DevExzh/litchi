@@ -976,14 +976,14 @@ impl<'d, K: FakeKind> Iterator for Children<'_, 'd, K> {
     }
 }
 
-impl<'d, K: FakeKind> Navigate<'d> for Nav<'d, K> {
+/// The fake adapter's children iterators count what they produce through the
+/// adapter, so the traits are implemented on a reference to it: a walk then
+/// owns the reference, and its iterators borrow the adapter.
+impl<'a, 'd, K: FakeKind> Navigate<'d> for &'a Nav<'d, K> {
     type Kind = K;
     type Node = Node<'d, K>;
     type Gap = GapSpec;
-    type Children<'a>
-        = Children<'a, 'd, K>
-    where
-        Self: 'a;
+    type Children = Children<'a, 'd, K>;
 
     const FORMAT: FileFormat = K::FORMAT;
     const ABSENT: &'static [&'static str] = K::ABSENT;
@@ -1046,7 +1046,7 @@ impl<'d, K: FakeKind> Navigate<'d> for Nav<'d, K> {
         }))
     }
 
-    fn children(&self, parent: &Node<'d, K>, kinds: KindSet<K>) -> Result<Children<'_, 'd, K>> {
+    fn children(&self, parent: &Node<'d, K>, kinds: KindSet<K>) -> Result<Children<'a, 'd, K>> {
         let (items, sheet, fail_at) = match parent.item() {
             Some(item) => (
                 item.children.iter(),
@@ -1056,7 +1056,7 @@ impl<'d, K: FakeKind> Navigate<'d> for Nav<'d, K> {
             None => ([].iter(), None, None),
         };
         Ok(Children {
-            nav: self,
+            nav: *self,
             items,
             kinds,
             sheet,
@@ -1066,7 +1066,7 @@ impl<'d, K: FakeKind> Navigate<'d> for Nav<'d, K> {
     }
 }
 
-impl<'d, K: FakeKind> Inspect<'d> for Nav<'d, K> {
+impl<'d, K: FakeKind> Inspect<'d> for &Nav<'d, K> {
     const SPEC: &'static FormatSpec<K> = K::SPEC;
     const TOP: &'static [K] = K::TOP;
 

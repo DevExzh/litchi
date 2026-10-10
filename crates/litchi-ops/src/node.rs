@@ -25,10 +25,9 @@
 //!
 //! # Status
 //!
-//! M1 step R1 provides the format-independent core. The format variants
-//! carry the uninhabited [`Pending`] placeholder until their adapters land
-//! (record 0010 §10.2: R4a–R4d, R6a–R6c, R7), so no [`Node`] value exists in
-//! a release build yet.
+//! DOCX, XLSX, XLSB and PPTX carry concrete leaf-backed nodes. Other formats retain the
+//! uninhabited [`Pending`] placeholder until their adapters land. These nodes
+//! are available through File navigation and lazy queries.
 
 use std::borrow::Cow;
 use std::convert::Infallible;
@@ -128,9 +127,16 @@ pub mod raw {
 pub use serialize::SerializeError;
 pub use value::{Key, Value};
 pub(crate) use view::Project;
-// The query engine's fake format reads properties through it; the format
-// adapters (R4-R7) will too.
-#[cfg(any(test, feature = "test-support"))]
+// The query engine's fake format and the format adapters (R4-R7) read
+// properties through it.
+#[cfg(any(
+    test,
+    feature = "test-support",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xlsb"
+))]
 pub(crate) use view::Source;
 pub use view::{
     Children, DEFAULT_MAX_NODES, Format, MAX_VIEW_DEPTH, PREVIEW_CHARS, Preview, Prop, View,
@@ -155,19 +161,23 @@ pub use view::{
 /// # let _ = outline;
 /// ```
 #[non_exhaustive]
+#[allow(
+    clippy::large_enum_variant,
+    reason = "format nodes stay inline so spreadsheet traversal does not allocate a box per cell"
+)]
 pub enum Node<'f> {
     /// A WordprocessingML node (DOCX adapter, step R4a).
     #[cfg(feature = "docx")]
-    Docx(Pending<'f, crate::format::docx::Docx>),
+    Docx(crate::format::docx::Node<'f>),
     /// A SpreadsheetML node (XLSX adapter, step R4b).
     #[cfg(feature = "xlsx")]
-    Xlsx(Pending<'f, crate::format::xlsx::Xlsx>),
+    Xlsx(crate::format::xlsx::Node<'f>),
     /// A PresentationML node (PPTX adapter, step R4c).
     #[cfg(feature = "pptx")]
-    Pptx(Pending<'f, crate::format::pptx::Pptx>),
+    Pptx(crate::format::pptx::Node<'f>),
     /// A BIFF12 workbook node (XLSB adapter, step R4d).
     #[cfg(feature = "xlsb")]
-    Xlsb(Pending<'f, crate::format::xlsb::Xlsb>),
+    Xlsb(crate::format::xlsb::Node<'f>),
     /// A legacy Word node (DOC adapter, step R6a).
     #[cfg(feature = "doc")]
     Doc(Pending<'f, crate::format::doc::Doc>),
@@ -258,6 +268,65 @@ impl<'f> Node<'f> {
     #[must_use]
     pub fn view_with(&self, options: ViewOptions) -> View<'_, 'f> {
         View::new(self, options)
+    }
+
+    /// The DOCX node, when the node belongs to a DOCX document.
+    ///
+    /// ```
+    /// use litchi_ops::format::docx::Kind;
+    /// use litchi_ops::node::Node;
+    ///
+    /// // Whether a node is a DOCX table cell.
+    /// fn is_docx_cell(node: &Node<'_>) -> bool {
+    ///     node.as_docx().is_some_and(|node| node.element_kind() == Kind::Cell)
+    /// }
+    /// # let _ = is_docx_cell;
+    /// ```
+    #[cfg(feature = "docx")]
+    #[must_use]
+    pub fn as_docx(&self) -> Option<&crate::format::docx::Node<'f>> {
+        match self {
+            Self::Docx(node) => Some(node),
+            #[allow(
+                unreachable_patterns,
+                reason = "other formats' variants exist only with their features"
+            )]
+            _ => None,
+        }
+    }
+
+    /// The XLSX node, when the node belongs to an XLSX workbook.
+    ///
+    /// ```
+    /// use litchi_ops::node::Node;
+    ///
+    /// // The sheet a workbook node belongs to.
+    /// fn sheet_of<'f>(node: &Node<'f>) -> litchi_ops::Result<Option<&'f str>> {
+    ///     match node.as_xlsx() { Some(node) => node.sheet_name(), None => Ok(None) }
+    /// }
+    /// # let _ = sheet_of;
+    /// ```
+    #[cfg(feature = "xlsx")]
+    #[must_use]
+    pub fn as_xlsx(&self) -> Option<&crate::format::xlsx::Node<'f>> {
+        match self {
+            Self::Xlsx(node) => Some(node),
+            #[allow(
+                unreachable_patterns,
+                reason = "other formats' variants exist only with their features"
+            )]
+            _ => None,
+        }
+    }
+    /// Borrow the format-specific presentation node.
+    #[cfg(feature = "pptx")]
+    #[must_use]
+    pub fn as_pptx(&self) -> Option<&crate::format::pptx::Node<'f>> {
+        match self {
+            Self::Pptx(node) => Some(node),
+            #[allow(unreachable_patterns, reason = "format variants depend on features")]
+            _ => None,
+        }
     }
 }
 

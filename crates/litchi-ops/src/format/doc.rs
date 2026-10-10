@@ -64,6 +64,11 @@ const _: () = {
 };
 
 impl Doc {
+    /// Whether this handle retains an edit source, without reading any payload.
+    pub(crate) fn retains_source(&self) -> bool {
+        !matches!(self.0.source, DocSource::Released)
+    }
+
     /// Opens the document from the OLE file detection already parsed.
     ///
     /// This is the facade's `DetectedFormat::Doc` arm: the DOC package adopts

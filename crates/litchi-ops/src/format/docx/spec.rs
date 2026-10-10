@@ -1,0 +1,1441 @@
+//! The DOCX element kinds and their spec table (record 0010 §4.2, §4.5,
+//! §7.2).
+//!
+//! [`Kind`] names every element the adapter resolves, plus the WordprocessingML
+//! elements OfficeCLI has that Litchi cannot read through this adapter yet;
+//! those carry a [`GapSpec`] with the follow-up that closes them, so path
+//! resolution and query compilation report `unsupported_capability` and
+//! `capabilities()` lists them. [`SPEC`] holds one [`ElementSpec`] per kind,
+//! at the kind's index, checked at compile time by `check_format_spec!`.
+//!
+//! The property tables use OfficeCLI's key names and order
+//! (`WordHandler.Navigation.cs`: `ParagraphToNode`, `RunToNode`,
+//! `TableToNode`, `ReadRowProps`, `ReadCellProps`, `SdtBlockToNode`,
+//! `HyperlinkToNode`, `GetRootNode`), restricted to the keys the leaf's typed
+//! direct properties answer (L-DOCX-R4).
+
+use crate::error::Code;
+use crate::node::spec::{ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec};
+use crate::path::navigate::ElementKind;
+use crate::path::vocabulary::{self, Vocabulary};
+use crate::registry::Constraint;
+use crate::value::{ColorContext, LengthContext, LengthSpec, LengthStyle, Tokens, ValueType};
+
+use super::setters::Setter;
+
+/// The element kinds of a DOCX document.
+///
+/// The first eleven are read by this adapter. The others exist in
+/// WordprocessingML and OfficeCLI but are capability gaps here: resolving
+/// one is `unsupported_capability` with its follow-up.
+///
+/// ```
+/// use litchi_ops::format::docx::Kind;
+///
+/// assert_eq!(Kind::Paragraph.type_name(), "paragraph");
+/// assert!(Kind::Header.is_gap());
+/// assert!(!Kind::Run.is_gap());
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Kind {
+    /// The document root, `/` (type `document`).
+    Document,
+    /// The main story's body, `/body`.
+    Body,
+    /// A paragraph, `p[N]`: a `w:p` that is not a display equation.
+    Paragraph,
+    /// A run, `r[N]`: one of the paragraph's addressable runs.
+    Run,
+    /// A direct `w:hyperlink` child of a paragraph, `hyperlink[N]`.
+    Hyperlink,
+    /// A table, `tbl[N]`.
+    Table,
+    /// A table row, `tr[N]`.
+    Row,
+    /// A table cell, `tc[N]`.
+    Cell,
+    /// A block content control, `sdt[N]`.
+    Sdt,
+    /// Display math, `oMathPara[N]`: an `m:oMathPara`, bare or held in a
+    /// `w:p`.
+    Equation,
+    /// A body-level section break (`w:sectPr`), `section[N]`.
+    Section,
+    /// A header story (gap).
+    Header,
+    /// A footer story (gap).
+    Footer,
+    /// The footnotes part (gap).
+    Footnotes,
+    /// A footnote story (gap).
+    Footnote,
+    /// The endnotes part (gap).
+    Endnotes,
+    /// An endnote story (gap).
+    Endnote,
+    /// The comments part (gap).
+    Comments,
+    /// A comment story (gap).
+    Comment,
+    /// The styles part (gap).
+    Styles,
+    /// One style (gap).
+    Style,
+    /// The numbering part (gap).
+    Numbering,
+    /// An abstract numbering definition (gap).
+    AbstractNum,
+    /// A numbering instance (gap).
+    Num,
+    /// A numbering level (gap).
+    Level,
+    /// The settings part (gap).
+    Settings,
+    /// The theme part (gap).
+    Theme,
+    /// A bookmark (gap).
+    Bookmark,
+    /// A field (gap).
+    Field,
+    /// A legacy form field (gap).
+    FormField,
+    /// A picture (gap).
+    Picture,
+    /// A chart (gap).
+    Chart,
+    /// An embedded OLE object (gap).
+    Ole,
+    /// A table of contents (gap).
+    Toc,
+    /// A tracked revision (gap).
+    Revision,
+    /// A watermark (gap).
+    Watermark,
+    /// A text box (gap).
+    TextBox,
+    /// A drawing shape (gap).
+    Shape,
+    /// A break (gap).
+    Break,
+    /// A tab character (gap).
+    Tab,
+}
+
+impl Kind {
+    /// The kind's spec entry.
+    pub(crate) fn spec(self) -> &'static ElementSpec<Self> {
+        &SPEC.elements[self as usize]
+    }
+
+    /// The OfficeCLI `type` of elements of this kind (`paragraph`, `cell`).
+    #[must_use]
+    pub fn type_name(self) -> &'static str {
+        self.spec().name
+    }
+
+    /// Whether the format has the kind but this adapter cannot read it yet:
+    /// resolving it is `unsupported_capability`.
+    #[must_use]
+    pub fn is_gap(self) -> bool {
+        self.spec().gap.is_some()
+    }
+
+    /// The leaf block kind of a kind that is a direct child of a block
+    /// container (the body, a cell, a content control).
+    pub(crate) const fn block_kind(self) -> Option<litchi_docx::BlockKind> {
+        Some(match self {
+            Self::Paragraph => litchi_docx::BlockKind::Paragraph,
+            Self::Table => litchi_docx::BlockKind::Table,
+            Self::Sdt => litchi_docx::BlockKind::ContentControl,
+            Self::Equation => litchi_docx::BlockKind::Equation,
+            Self::Section => litchi_docx::BlockKind::SectionProperties,
+            _ => return None,
+        })
+    }
+
+    /// The kind of a leaf block, or `None` for the blocks the adapter does
+    /// not address (`w:altChunk` anchors and unknown children).
+    pub(crate) fn of_block(kind: litchi_docx::BlockKind) -> Option<Self> {
+        match kind {
+            litchi_docx::BlockKind::Paragraph => Some(Self::Paragraph),
+            litchi_docx::BlockKind::Table => Some(Self::Table),
+            litchi_docx::BlockKind::ContentControl => Some(Self::Sdt),
+            litchi_docx::BlockKind::Equation => Some(Self::Equation),
+            litchi_docx::BlockKind::SectionProperties => Some(Self::Section),
+            _ => None,
+        }
+    }
+
+    /// The name a path step uses for the kind: the vocabulary's canonical
+    /// name, except display equations, which OfficeCLI writes `oMathPara`
+    /// (an alias of `equation`).
+    pub(crate) fn step_name(self) -> &'static str {
+        match self {
+            Self::Equation => "oMathPara",
+            _ => self.name(),
+        }
+    }
+
+    /// Whether a path step names the kind without an index (`/body`).
+    pub(crate) const fn is_singleton(self) -> bool {
+        matches!(self, Self::Body)
+    }
+}
+
+/// Declares the canonical vocabulary name of every kind.
+macro_rules! names {
+    ($($kind:ident => $canonical:literal,)+) => {
+        impl ElementKind for Kind {
+            const VOCABULARY: &'static Vocabulary = &vocabulary::WORD;
+            const ROOT: Self = Self::Document;
+
+            fn from_name(name: &str) -> Option<Self> {
+                match name {
+                    $($canonical => Some(Self::$kind),)+
+                    _ => None,
+                }
+            }
+
+            fn name(self) -> &'static str {
+                match self {
+                    $(Self::$kind => $canonical,)+
+                }
+            }
+
+            fn ordinal(self) -> u8 {
+                self as u8
+            }
+        }
+    };
+}
+
+names! {
+    Document => "document",
+    Body => "body",
+    Paragraph => "p",
+    Run => "r",
+    Hyperlink => "hyperlink",
+    Table => "tbl",
+    Row => "tr",
+    Cell => "tc",
+    Sdt => "sdt",
+    Equation => "equation",
+    Section => "section",
+    Header => "header",
+    Footer => "footer",
+    Footnotes => "footnotes",
+    Footnote => "footnote",
+    Endnotes => "endnotes",
+    Endnote => "endnote",
+    Comments => "comments",
+    Comment => "comment",
+    Styles => "styles",
+    Style => "style",
+    Numbering => "numbering",
+    AbstractNum => "abstractNum",
+    Num => "num",
+    Level => "level",
+    Settings => "settings",
+    Theme => "theme",
+    Bookmark => "bookmark",
+    Field => "field",
+    FormField => "formfield",
+    Picture => "picture",
+    Chart => "chart",
+    Ole => "ole",
+    Toc => "toc",
+    Revision => "revision",
+    Watermark => "watermark",
+    TextBox => "textbox",
+    Shape => "shape",
+    Break => "break",
+    Tab => "tab",
+}
+
+// ---------------------------------------------------------------------------
+// Closed vocabularies
+// ---------------------------------------------------------------------------
+
+/// Paragraph `align`: `ST_Jc`, with `both` read back as `justify` as
+/// OfficeCLI does.
+pub(crate) static ALIGN: Tokens = Tokens::new(
+    "paragraph alignment",
+    &[
+        "left",
+        "center",
+        "right",
+        "justify",
+        "start",
+        "end",
+        "distribute",
+        "mediumKashida",
+        "highKashida",
+        "lowKashida",
+        "thaiDistribute",
+        "numTab",
+    ],
+    &[("both", 3)],
+);
+
+/// `lineRule`: `ST_LineSpacingRule`.
+pub(crate) static LINE_RULE: Tokens = Tokens::new("line rule", &["auto", "exact", "atLeast"], &[]);
+
+/// `direction`: `rtl` or `ltr`, from `w:bidi` (paragraphs) or `w:rtl` (runs).
+pub(crate) static DIRECTION: Tokens = Tokens::new("direction", &["ltr", "rtl"], &[]);
+
+/// Run `underline`: `ST_Underline`.
+pub(crate) static UNDERLINE: Tokens = Tokens::new(
+    "underline",
+    &[
+        "none",
+        "single",
+        "words",
+        "double",
+        "thick",
+        "dotted",
+        "dottedHeavy",
+        "dash",
+        "dashedHeavy",
+        "dashLong",
+        "dashLongHeavy",
+        "dotDash",
+        "dashDotHeavy",
+        "dotDotDash",
+        "dashDotDotHeavy",
+        "wave",
+        "wavyHeavy",
+        "wavyDouble",
+    ],
+    &[],
+);
+
+/// Run `highlight`: `ST_HighlightColor`.
+pub(crate) static HIGHLIGHT: Tokens = Tokens::new(
+    "highlight",
+    &[
+        "black",
+        "blue",
+        "cyan",
+        "green",
+        "magenta",
+        "red",
+        "yellow",
+        "white",
+        "darkBlue",
+        "darkCyan",
+        "darkGreen",
+        "darkMagenta",
+        "darkRed",
+        "darkYellow",
+        "darkGray",
+        "lightGray",
+        "none",
+    ],
+    &[],
+);
+
+/// `font.hint`: `w:rFonts/@w:hint`.
+pub(crate) static FONT_HINT: Tokens = Tokens::new("font hint", &["default", "eastAsia", "cs"], &[]);
+
+/// `font.*Theme`: `ST_Theme`.
+pub(crate) static THEME_FONT: Tokens = Tokens::new(
+    "theme font",
+    &[
+        "majorEastAsia",
+        "majorBidi",
+        "majorAscii",
+        "majorHAnsi",
+        "minorEastAsia",
+        "minorBidi",
+        "minorAscii",
+        "minorHAnsi",
+    ],
+    &[],
+);
+
+/// Table `align` and row `rowAlign`: `ST_JcTable`.
+pub(crate) static TABLE_ALIGN: Tokens = Tokens::new(
+    "table alignment",
+    &["center", "end", "left", "right", "start"],
+    &[],
+);
+
+/// Table `layout`, read back as OfficeCLI writes it (`autofit`, not `auto`).
+pub(crate) static TABLE_LAYOUT: Tokens = Tokens::new("table layout", &["fixed", "autofit"], &[]);
+
+/// Row `height.rule`: `ST_HeightRule`.
+pub(crate) static HEIGHT_RULE: Tokens =
+    Tokens::new("height rule", &["auto", "exact", "atLeast"], &[]);
+
+/// Cell `valign`: `ST_VerticalJc`.
+pub(crate) static VALIGN: Tokens = Tokens::new(
+    "cell vertical alignment",
+    &["top", "center", "both", "bottom"],
+    &[],
+);
+
+/// Cell `vmerge` and `hmerge`: `ST_Merge`.
+pub(crate) static MERGE: Tokens = Tokens::new("merge", &["restart", "continue"], &[]);
+
+/// Cell `textDirection`: `ST_TextDirection`.
+pub(crate) static TEXT_DIRECTION: Tokens = Tokens::new(
+    "text direction",
+    &[
+        "tb", "rl", "lr", "tbV", "rlV", "lrV", "btLr", "lrTb", "lrTbV", "tbLrV", "tbRl", "tbRlV",
+    ],
+    &[],
+);
+
+// ---------------------------------------------------------------------------
+// Length types
+// ---------------------------------------------------------------------------
+
+/// Paragraph spacing: non-negative, printed in points (`12pt`), as
+/// OfficeCLI's `FormatWordSpacingNonNegative` prints it.
+pub(crate) const SPACING: LengthSpec = LengthSpec::new(LengthContext::Extent, LengthStyle::Points);
+
+/// Indents, baseline offsets and character spacing: signed, printed in
+/// points (`-18pt`), as `FormatWordSpacing` prints them.
+pub(crate) const SIGNED_POINTS: LengthSpec =
+    LengthSpec::new(LengthContext::Emu, LengthStyle::Points);
+
+// ---------------------------------------------------------------------------
+// Property tables
+// ---------------------------------------------------------------------------
+
+/// One writable DOCX declaration.  The same typed setter can construct a
+/// property on a newly added node and update it on an existing node, so the
+/// registry exposes both operations.  The read projection is still emitted
+/// in declaration order, so adding a write-only key at the end of a table
+/// does not change any existing node property index.
+const fn writable(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+    clear: bool,
+) -> crate::registry::Entry<Setter> {
+    crate::registry::Entry {
+        spec: PropSpec::new(name, ty),
+        access: crate::registry::Access::SetAndAdd(setter),
+        constraint,
+        clear,
+    }
+}
+
+/// A property accepted only while creating a paragraph's initial run.
+///
+/// These rows deliberately live after the paragraph's established read and
+/// write projection.  They are consumed by the structural `add` handler when
+/// it builds the first `NewRun`; an existing paragraph never exposes them as
+/// direct paragraph properties.
+const fn add_only_run(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::Add(setter),
+        constraint,
+        clear: true,
+    }
+}
+
+/// One write-only property declaration.  Text has a dedicated write handler
+/// but is intentionally absent from the read model; the appended registry
+/// row keeps all pre-existing paragraph/run read indices stable.
+const fn write_only(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::SetAndAdd(setter),
+        constraint: Constraint::None,
+        clear: true,
+    }
+}
+
+// `GetRootNode`: the core document properties.
+crate::registry::registry! {
+    pub(crate) DOCUMENT_PROPS, DOCUMENT_REGISTRY: () {
+    crate::registry::Entry::read(PropSpec::new("title", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("author", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("subject", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("keywords", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("description", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("category", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("lastModifiedBy", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("revisionNumber", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("created", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("modified", ValueType::Text)),
+    }
+}
+
+// `ParagraphToNode`, in its order. `numId` and `numLevel` are strings
+// there, `outlineLvl` an int.
+crate::registry::registry! {
+    pub(crate) PARAGRAPH_PROPS, PARAGRAPH_REGISTRY: Setter {
+    crate::registry::Entry::read(PropSpec::new("paraId", ValueType::Text)),
+    writable("style", ValueType::Text, Setter::ParagraphStyle, Constraint::NotEmpty, true),
+    crate::registry::Entry::read(PropSpec::new("styleId", ValueType::Text)),
+    writable("align", ValueType::Token(&ALIGN), Setter::ParagraphAlign, Constraint::None, true),
+    writable("spaceBefore", ValueType::Length(SPACING), Setter::ParagraphSpaceBefore, Constraint::None, true),
+    writable("spaceAfter", ValueType::Length(SPACING), Setter::ParagraphSpaceAfter, Constraint::None, true),
+    writable("lineSpacing", ValueType::Text, Setter::ParagraphLineSpacing, Constraint::NotEmpty, true),
+    writable("lineRule", ValueType::Token(&LINE_RULE), Setter::ParagraphLineRule, Constraint::None, true),
+    writable("spaceBeforeLines", ValueType::Int, Setter::ParagraphSpaceBeforeLines, Constraint::None, true),
+    writable("spaceAfterLines", ValueType::Int, Setter::ParagraphSpaceAfterLines, Constraint::None, true),
+    writable("spaceBeforeAuto", ValueType::Bool, Setter::ParagraphSpaceBeforeAuto, Constraint::None, true),
+    writable("spaceAfterAuto", ValueType::Bool, Setter::ParagraphSpaceAfterAuto, Constraint::None, true),
+    writable("firstLineIndent", ValueType::Length(SIGNED_POINTS), Setter::ParagraphFirstLineIndent, Constraint::None, true),
+    writable("hangingIndent", ValueType::Length(SIGNED_POINTS), Setter::ParagraphHangingIndent, Constraint::None, true),
+    writable("indent", ValueType::Length(SIGNED_POINTS), Setter::ParagraphIndent, Constraint::None, true),
+    writable("rightIndent", ValueType::Length(SIGNED_POINTS), Setter::ParagraphRightIndent, Constraint::None, true),
+    writable("firstLineChars", ValueType::Int, Setter::ParagraphFirstLineChars, Constraint::None, true),
+    writable("hangingChars", ValueType::Int, Setter::ParagraphHangingChars, Constraint::None, true),
+    writable("leftChars", ValueType::Int, Setter::ParagraphLeftChars, Constraint::None, true),
+    writable("rightChars", ValueType::Int, Setter::ParagraphRightChars, Constraint::None, true),
+    writable("keepNext", ValueType::Bool, Setter::ParagraphKeepNext, Constraint::None, true),
+    writable("keepLines", ValueType::Bool, Setter::ParagraphKeepLines, Constraint::None, true),
+    writable("pageBreakBefore", ValueType::Bool, Setter::ParagraphPageBreakBefore, Constraint::None, true),
+    writable("widowControl", ValueType::Bool, Setter::ParagraphWidowControl, Constraint::None, true),
+    writable("direction", ValueType::Token(&DIRECTION), Setter::ParagraphDirection, Constraint::None, true),
+    writable("contextualSpacing", ValueType::Bool, Setter::ParagraphContextualSpacing, Constraint::None, true),
+    writable("numId", ValueType::Text, Setter::ParagraphNumId, Constraint::NotEmpty, true),
+    writable("numLevel", ValueType::Text, Setter::ParagraphNumLevel, Constraint::NotEmpty, true),
+    writable("outlineLvl", ValueType::Int, Setter::ParagraphOutlineLevel, Constraint::Int { min: 0, max: 9 }, true),
+    write_only("text", ValueType::Text, Setter::ParagraphText),
+    // A paragraph may carry one initial run.  Its direct run formatting is
+    // add-only metadata: it is accepted by `add paragraph`, but is not a
+    // paragraph property for `get`, `query` or `set`.  Keep paragraph-owned
+    // `direction`, `style` and `text` authoritative above.
+    add_only_run("font.latin", ValueType::Text, Setter::RunFontLatin, Constraint::NotEmpty),
+    add_only_run("font.ascii", ValueType::Text, Setter::RunFontAscii, Constraint::NotEmpty),
+    add_only_run("font.hAnsi", ValueType::Text, Setter::RunFontHAnsi, Constraint::NotEmpty),
+    add_only_run("font.ea", ValueType::Text, Setter::RunFontEastAsia, Constraint::NotEmpty),
+    add_only_run("font.asciiTheme", ValueType::Token(&THEME_FONT), Setter::RunFontAsciiTheme, Constraint::None),
+    add_only_run("font.hAnsiTheme", ValueType::Token(&THEME_FONT), Setter::RunFontHAnsiTheme, Constraint::None),
+    add_only_run("font.eaTheme", ValueType::Token(&THEME_FONT), Setter::RunFontEastAsiaTheme, Constraint::None),
+    add_only_run("font.csTheme", ValueType::Token(&THEME_FONT), Setter::RunFontComplexScriptTheme, Constraint::None),
+    add_only_run("font.hint", ValueType::Token(&FONT_HINT), Setter::RunFontHint, Constraint::None),
+    add_only_run("lang.latin", ValueType::Text, Setter::RunLanguageLatin, Constraint::NotEmpty),
+    add_only_run("lang.ea", ValueType::Text, Setter::RunLanguageEastAsia, Constraint::NotEmpty),
+    add_only_run("lang.cs", ValueType::Text, Setter::RunLanguageComplexScript, Constraint::NotEmpty),
+    add_only_run("size", ValueType::Length(LengthSpec::FONT_SIZE), Setter::RunSize, Constraint::None),
+    add_only_run("bold", ValueType::Bool, Setter::RunBold, Constraint::None),
+    add_only_run("italic", ValueType::Bool, Setter::RunItalic, Constraint::None),
+    add_only_run("font.cs", ValueType::Text, Setter::RunFontComplexScript, Constraint::NotEmpty),
+    add_only_run("size.cs", ValueType::Length(LengthSpec::FONT_SIZE), Setter::RunSizeComplexScript, Constraint::None),
+    add_only_run("bold.cs", ValueType::Bool, Setter::RunBoldComplexScript, Constraint::None),
+    add_only_run("italic.cs", ValueType::Bool, Setter::RunItalicComplexScript, Constraint::None),
+    add_only_run("color", ValueType::Color(ColorContext::Word), Setter::RunColor, Constraint::None),
+    add_only_run("underline", ValueType::Token(&UNDERLINE), Setter::RunUnderline, Constraint::None),
+    add_only_run("underline.color", ValueType::Color(ColorContext::Word), Setter::RunUnderlineColor, Constraint::None),
+    add_only_run("strike", ValueType::Bool, Setter::RunStrike, Constraint::None),
+    add_only_run("highlight", ValueType::Token(&HIGHLIGHT), Setter::RunHighlight, Constraint::None),
+    add_only_run("caps", ValueType::Bool, Setter::RunCaps, Constraint::None),
+    add_only_run("smallcaps", ValueType::Bool, Setter::RunSmallCaps, Constraint::None),
+    add_only_run("dstrike", ValueType::Bool, Setter::RunDoubleStrike, Constraint::None),
+    add_only_run("vanish", ValueType::Bool, Setter::RunVanish, Constraint::None),
+    add_only_run("outline", ValueType::Bool, Setter::RunOutline, Constraint::None),
+    add_only_run("shadow", ValueType::Bool, Setter::RunShadow, Constraint::None),
+    add_only_run("emboss", ValueType::Bool, Setter::RunEmboss, Constraint::None),
+    add_only_run("imprint", ValueType::Bool, Setter::RunImprint, Constraint::None),
+    add_only_run("noproof", ValueType::Bool, Setter::RunNoProof, Constraint::None),
+    add_only_run("superscript", ValueType::Bool, Setter::RunSuperscript, Constraint::None),
+    add_only_run("subscript", ValueType::Bool, Setter::RunSubscript, Constraint::None),
+    add_only_run("position", ValueType::Length(SIGNED_POINTS), Setter::RunPosition, Constraint::None),
+    add_only_run("charSpacing", ValueType::Length(SIGNED_POINTS), Setter::RunCharacterSpacing, Constraint::None),
+    add_only_run("rStyle", ValueType::Text, Setter::RunStyle, Constraint::NotEmpty),
+    }
+}
+
+// `RunToNode` (with `ReadComplexScriptRunFormatting`), in its order.
+crate::registry::registry! {
+    pub(crate) RUN_PROPS, RUN_REGISTRY: Setter {
+    writable("font.latin", ValueType::Text, Setter::RunFontLatin, Constraint::NotEmpty, true),
+    writable("font.ascii", ValueType::Text, Setter::RunFontAscii, Constraint::NotEmpty, true),
+    writable("font.hAnsi", ValueType::Text, Setter::RunFontHAnsi, Constraint::NotEmpty, true),
+    writable("font.ea", ValueType::Text, Setter::RunFontEastAsia, Constraint::NotEmpty, true),
+    writable("font.asciiTheme", ValueType::Token(&THEME_FONT), Setter::RunFontAsciiTheme, Constraint::None, true),
+    writable("font.hAnsiTheme", ValueType::Token(&THEME_FONT), Setter::RunFontHAnsiTheme, Constraint::None, true),
+    writable("font.eaTheme", ValueType::Token(&THEME_FONT), Setter::RunFontEastAsiaTheme, Constraint::None, true),
+    writable("font.csTheme", ValueType::Token(&THEME_FONT), Setter::RunFontComplexScriptTheme, Constraint::None, true),
+    writable("font.hint", ValueType::Token(&FONT_HINT), Setter::RunFontHint, Constraint::None, true),
+    writable("lang.latin", ValueType::Text, Setter::RunLanguageLatin, Constraint::NotEmpty, true),
+    writable("lang.ea", ValueType::Text, Setter::RunLanguageEastAsia, Constraint::NotEmpty, true),
+    writable("lang.cs", ValueType::Text, Setter::RunLanguageComplexScript, Constraint::NotEmpty, true),
+    writable("size", ValueType::Length(LengthSpec::FONT_SIZE), Setter::RunSize, Constraint::None, true),
+    writable("bold", ValueType::Bool, Setter::RunBold, Constraint::None, true),
+    writable("italic", ValueType::Bool, Setter::RunItalic, Constraint::None, true),
+    writable("font.cs", ValueType::Text, Setter::RunFontComplexScript, Constraint::NotEmpty, true),
+    writable("size.cs", ValueType::Length(LengthSpec::FONT_SIZE), Setter::RunSizeComplexScript, Constraint::None, true),
+    writable("bold.cs", ValueType::Bool, Setter::RunBoldComplexScript, Constraint::None, true),
+    writable("italic.cs", ValueType::Bool, Setter::RunItalicComplexScript, Constraint::None, true),
+    writable("color", ValueType::Color(ColorContext::Word), Setter::RunColor, Constraint::None, true),
+    writable("underline", ValueType::Token(&UNDERLINE), Setter::RunUnderline, Constraint::None, true),
+    writable("underline.color", ValueType::Color(ColorContext::Word), Setter::RunUnderlineColor, Constraint::None, true),
+    writable("strike", ValueType::Bool, Setter::RunStrike, Constraint::None, true),
+    writable("highlight", ValueType::Token(&HIGHLIGHT), Setter::RunHighlight, Constraint::None, true),
+    writable("caps", ValueType::Bool, Setter::RunCaps, Constraint::None, true),
+    writable("smallcaps", ValueType::Bool, Setter::RunSmallCaps, Constraint::None, true),
+    writable("dstrike", ValueType::Bool, Setter::RunDoubleStrike, Constraint::None, true),
+    writable("vanish", ValueType::Bool, Setter::RunVanish, Constraint::None, true),
+    writable("outline", ValueType::Bool, Setter::RunOutline, Constraint::None, true),
+    writable("shadow", ValueType::Bool, Setter::RunShadow, Constraint::None, true),
+    writable("emboss", ValueType::Bool, Setter::RunEmboss, Constraint::None, true),
+    writable("imprint", ValueType::Bool, Setter::RunImprint, Constraint::None, true),
+    writable("noproof", ValueType::Bool, Setter::RunNoProof, Constraint::None, true),
+    writable("direction", ValueType::Token(&DIRECTION), Setter::RunDirection, Constraint::None, true),
+    writable("superscript", ValueType::Bool, Setter::RunSuperscript, Constraint::None, true),
+    writable("subscript", ValueType::Bool, Setter::RunSubscript, Constraint::None, true),
+    writable("position", ValueType::Length(SIGNED_POINTS), Setter::RunPosition, Constraint::None, true),
+    writable("charSpacing", ValueType::Length(SIGNED_POINTS), Setter::RunCharacterSpacing, Constraint::None, true),
+    writable("rStyle", ValueType::Text, Setter::RunStyle, Constraint::NotEmpty, true),
+    write_only("text", ValueType::Text, Setter::RunText),
+    }
+}
+
+// `HyperlinkToNode`, in its order: the link's attributes, then the
+// formatting of its first run that holds text.
+crate::registry::registry! {
+    pub(crate) HYPERLINK_PROPS, HYPERLINK_REGISTRY: () {
+    crate::registry::Entry::read(PropSpec::new("url", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("anchor", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("docLocation", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("tooltip", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("tgtFrame", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("font", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("font.cs", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("size", ValueType::Length(LengthSpec::FONT_SIZE))),
+    crate::registry::Entry::read(PropSpec::new("bold", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("italic", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("color", ValueType::Color(ColorContext::Word))),
+    crate::registry::Entry::read(PropSpec::new("underline", ValueType::Token(&UNDERLINE))),
+    crate::registry::Entry::read(PropSpec::new("underline.color", ValueType::Color(ColorContext::Word))),
+    crate::registry::Entry::read(PropSpec::new("strike", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("highlight", ValueType::Token(&HIGHLIGHT))),
+    crate::registry::Entry::read(PropSpec::new("rStyle", ValueType::Text)),
+    }
+}
+
+// `TableToNode`, in its order. `cols` and `rows` are strings there;
+// `width` is a string (`"5000"`, `"50%"`, `"auto"`) and `indent` a number
+// of twips or a percentage string.
+crate::registry::registry! {
+    pub(crate) TABLE_PROPS, TABLE_REGISTRY: () {
+    crate::registry::Entry::read(PropSpec::new("cols", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("rows", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("style", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("rowBandSize", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("colBandSize", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("align", ValueType::Token(&TABLE_ALIGN))),
+    crate::registry::Entry::read(PropSpec::new("indent", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("cellSpacing", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("layout", ValueType::Token(&TABLE_LAYOUT))),
+    crate::registry::Entry::read(PropSpec::new("tblLook", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("direction", ValueType::Token(&DIRECTION))),
+    crate::registry::Entry::read(PropSpec::new("padding.top", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("padding.bottom", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("padding.left", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("padding.right", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("firstRow", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("lastRow", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("firstCol", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("lastCol", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("bandedRows", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("bandedCols", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("caption", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("description", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("colWidths", ValueType::Text)),
+    }
+}
+
+// `ReadRowProps`, in its order. Heights and widths are strings with a
+// `dxa` unit there, grid counts strings.
+crate::registry::registry! {
+    pub(crate) ROW_PROPS, ROW_REGISTRY: () {
+    crate::registry::Entry::read(PropSpec::new("height", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("height.rule", ValueType::Token(&HEIGHT_RULE))),
+    crate::registry::Entry::read(PropSpec::new("header", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("cantSplit", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("hidden", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("rowAlign", ValueType::Token(&TABLE_ALIGN))),
+    crate::registry::Entry::read(PropSpec::new("gridBefore", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("wBefore", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("gridAfter", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("wAfter", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("cellSpacing", ValueType::Int)),
+    }
+}
+
+// `ReadCellProps`, in its order. `width` is a string (`"2880dxa"`,
+// `"50%"`, `"auto"`, `"nil"`) there.
+crate::registry::registry! {
+    pub(crate) CELL_PROPS, CELL_REGISTRY: () {
+    crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("valign", ValueType::Token(&VALIGN))),
+    crate::registry::Entry::read(PropSpec::new("vmerge", ValueType::Token(&MERGE))),
+    crate::registry::Entry::read(PropSpec::new("hmerge", ValueType::Token(&MERGE))),
+    crate::registry::Entry::read(PropSpec::new("colspan", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("padding.top", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("padding.bottom", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("padding.left", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("padding.right", ValueType::Int)),
+    crate::registry::Entry::read(PropSpec::new("textDirection", ValueType::Token(&TEXT_DIRECTION))),
+    crate::registry::Entry::read(PropSpec::new("nowrap", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("hideMark", ValueType::Bool)),
+    crate::registry::Entry::read(PropSpec::new("tcFitText", ValueType::Bool)),
+    }
+}
+
+// `SdtBlockToNode`: the content control's identity.
+crate::registry::registry! {
+    pub(crate) SDT_PROPS, SDT_REGISTRY: () {
+    crate::registry::Entry::read(PropSpec::new("alias", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("tag", ValueType::Text)),
+    crate::registry::Entry::read(PropSpec::new("sdtId", ValueType::Int)),
+    }
+}
+
+/// An equation's `mode`: OfficeCLI writes `display` for block equations.
+pub(crate) static EQUATION_MODE: Tokens = Tokens::new("equation mode", &["display", "inline"], &[]);
+
+// `ElementToNode` for `oMathPara`: the equation's mode.
+crate::registry::registry! {
+    pub(crate) EQUATION_PROPS, EQUATION_REGISTRY: () {
+    crate::registry::Entry::read(PropSpec::new("mode", ValueType::Token(&EQUATION_MODE))),
+    }
+}
+
+/// The index of `key` in `props`, checked at compile time.
+pub(crate) const fn index_of(props: &[PropSpec], key: &str) -> usize {
+    let wanted = key.as_bytes();
+    let mut index = 0;
+    while index < props.len() {
+        let name = props[index].name.as_bytes();
+        if name.len() == wanted.len() {
+            let mut byte = 0;
+            while byte < name.len() && name[byte] == wanted[byte] {
+                byte += 1;
+            }
+            if byte == name.len() {
+                return index;
+            }
+        }
+        index += 1;
+    }
+    panic!("the key is not in the property table");
+}
+
+// ---------------------------------------------------------------------------
+// Gaps
+// ---------------------------------------------------------------------------
+
+/// Declares one element gap per listed kind.
+macro_rules! gaps {
+    ($($name:ident: $element:literal, $follow_up:literal, $reason:literal;)+) => {
+        $(
+            static $name: GapSpec = GapSpec {
+                subject: Subject::Element($element),
+                code: Code::UnsupportedCapability,
+                follow_up: $follow_up,
+                reason: $reason,
+            };
+        )+
+    };
+}
+
+gaps! {
+    HEADER_GAP: "header", "L-DOCX-R5", "header stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
+    FOOTER_GAP: "footer", "L-DOCX-R5", "footer stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
+    FOOTNOTES_GAP: "footnotes", "L-DOCX-R5", "the footnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
+    FOOTNOTE_GAP: "footnote", "L-DOCX-R5", "footnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
+    ENDNOTES_GAP: "endnotes", "L-DOCX-R5", "the endnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
+    ENDNOTE_GAP: "endnote", "L-DOCX-R5", "endnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
+    COMMENTS_GAP: "comments", "L-DOCX-R5", "the comments part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
+    COMMENT_GAP: "comment", "L-DOCX-R5", "comment stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
+    STYLES_GAP: "styles", "L-DOCX-R6 (R4x)", "the styles part has no node adapter yet";
+    STYLE_GAP: "style", "L-DOCX-R6 (R4x)", "styles have no node adapter yet";
+    NUMBERING_GAP: "numbering", "L-DOCX-R6 (R4x)", "the numbering part has no node adapter yet";
+    ABSTRACT_NUM_GAP: "abstractNum", "L-DOCX-R6 (R4x)", "numbering definitions have no node adapter yet";
+    NUM_GAP: "num", "L-DOCX-R6 (R4x)", "numbering instances have no node adapter yet";
+    LEVEL_GAP: "level", "L-DOCX-R6 (R4x)", "numbering levels have no node adapter yet";
+    SETTINGS_GAP: "settings", "L-DOCX-R6 (R4x)", "the settings part has no node adapter yet";
+    THEME_GAP: "theme", "L-DOCX-R6 (R4x)", "the theme part has no node adapter yet";
+    BOOKMARK_GAP: "bookmark", "R4x", "bookmarks have no located reader yet";
+    FIELD_GAP: "field", "R4x", "fields have no located reader yet";
+    FORM_FIELD_GAP: "formfield", "R4x", "legacy form fields have no located reader yet";
+    PICTURE_GAP: "picture", "R4x", "pictures have no located reader yet";
+    CHART_GAP: "chart", "R4x", "charts have no located reader yet";
+    OLE_GAP: "ole", "R4x", "embedded objects have no located reader yet";
+    TOC_GAP: "toc", "R4x", "tables of contents have no located reader yet";
+    REVISION_GAP: "revision", "R4x", "tracked revisions have no located reader yet";
+    WATERMARK_GAP: "watermark", "R4x", "watermarks live in header stories, which have no node adapter yet";
+    TEXT_BOX_GAP: "textbox", "R4x", "text boxes have no located reader yet";
+    SHAPE_GAP: "shape", "R4x", "drawing shapes have no located reader yet";
+    BREAK_GAP: "break", "R4x", "breaks are read as run content, not addressed yet";
+    TAB_GAP: "tab", "R4x", "tab characters are read as run content, not addressed yet";
+}
+
+/// An element spec with the fields most kinds share.
+const fn element(
+    kind: Kind,
+    name: &'static str,
+    aliases: &'static [&'static str],
+    parents: &'static [Kind],
+    children: &'static [Kind],
+    paths: &'static [&'static str],
+    props: &'static [PropSpec],
+) -> ElementSpec<Kind> {
+    ElementSpec {
+        kind,
+        name,
+        aliases,
+        parents,
+        children,
+        identities: &[],
+        paths,
+        props,
+        gap: None,
+    }
+}
+
+/// An element the leaf cannot answer yet.
+const fn gap(
+    kind: Kind,
+    name: &'static str,
+    aliases: &'static [&'static str],
+    parents: &'static [Kind],
+    paths: &'static [&'static str],
+    gap: &'static GapSpec,
+) -> ElementSpec<Kind> {
+    ElementSpec {
+        kind,
+        name,
+        aliases,
+        parents,
+        children: &[],
+        identities: &[],
+        paths,
+        props: &[],
+        gap: Some(gap),
+    }
+}
+
+const fn identities(
+    mut spec: ElementSpec<Kind>,
+    identities: &'static [&'static str],
+) -> ElementSpec<Kind> {
+    spec.identities = identities;
+    spec
+}
+
+/// The containers whose direct block children are paragraphs, tables,
+/// content controls and equations.
+const CONTAINERS: &[Kind] = &[Kind::Body, Kind::Cell, Kind::Sdt];
+
+/// The block children of a cell or content control (a section break occurs
+/// only in the body).
+const BLOCKS: &[Kind] = &[Kind::Paragraph, Kind::Table, Kind::Sdt, Kind::Equation];
+
+/// The DOCX spec table.
+pub(crate) static SPEC: FormatSpec<Kind> = {
+    use Kind as K;
+    FormatSpec {
+        root: K::Document,
+        elements: &[
+            element(
+                K::Document,
+                "document",
+                &["document"],
+                &[],
+                &[K::Body],
+                &["/"],
+                DOCUMENT_PROPS,
+            ),
+            element(
+                K::Body,
+                "body",
+                &["body"],
+                &[K::Document],
+                &[K::Paragraph, K::Table, K::Sdt, K::Equation, K::Section],
+                &["/body"],
+                &[],
+            ),
+            identities(
+                element(
+                    K::Paragraph,
+                    "paragraph",
+                    &["p", "paragraph"],
+                    CONTAINERS,
+                    &[K::Run, K::Hyperlink],
+                    &[
+                        "/body/p[N]",
+                        "/body/p[@paraId=X]",
+                        "/body/tbl[N]/tr[M]/tc[K]/p[J]",
+                        "/body/sdt[N]/p[M]",
+                    ],
+                    PARAGRAPH_PROPS,
+                ),
+                &["paraId", "textId"],
+            ),
+            element(
+                K::Run,
+                "run",
+                &["r", "run"],
+                &[K::Paragraph],
+                &[],
+                &["/body/p[N]/r[M]"],
+                RUN_PROPS,
+            ),
+            element(
+                K::Hyperlink,
+                "hyperlink",
+                &["hyperlink"],
+                &[K::Paragraph],
+                &[],
+                &["/body/p[N]/hyperlink[M]"],
+                HYPERLINK_PROPS,
+            ),
+            element(
+                K::Table,
+                "table",
+                &["table", "tbl"],
+                CONTAINERS,
+                &[K::Row],
+                &["/body/tbl[N]", "/body/tbl[N]/tr[M]/tc[K]/tbl[J]"],
+                TABLE_PROPS,
+            ),
+            element(
+                K::Row,
+                "row",
+                &["row", "tr"],
+                &[K::Table],
+                &[K::Cell],
+                &["/body/tbl[N]/tr[M]"],
+                ROW_PROPS,
+            ),
+            element(
+                K::Cell,
+                "cell",
+                &["cell", "tc"],
+                &[K::Row],
+                BLOCKS,
+                &["/body/tbl[N]/tr[M]/tc[K]"],
+                CELL_PROPS,
+            ),
+            identities(
+                element(
+                    K::Sdt,
+                    "sdt",
+                    &["contentcontrol", "sdt"],
+                    CONTAINERS,
+                    BLOCKS,
+                    &["/body/sdt[N]", "/body/sdt[@sdtId=X]"],
+                    SDT_PROPS,
+                ),
+                &["sdtId"],
+            ),
+            element(
+                K::Equation,
+                "equation",
+                &["equation", "formula", "math", "omath", "omathpara"],
+                CONTAINERS,
+                &[],
+                &["/body/oMathPara[N]"],
+                EQUATION_PROPS,
+            ),
+            element(
+                K::Section,
+                "section",
+                &["section"],
+                &[K::Body],
+                &[],
+                &["/body/section[N]"],
+                &[],
+            ),
+            gap(
+                K::Header,
+                "header",
+                &["header"],
+                &[K::Document],
+                &["/header[N]"],
+                &HEADER_GAP,
+            ),
+            gap(
+                K::Footer,
+                "footer",
+                &["footer"],
+                &[K::Document],
+                &["/footer[N]"],
+                &FOOTER_GAP,
+            ),
+            gap(
+                K::Footnotes,
+                "footnotes",
+                &["footnotes"],
+                &[K::Document],
+                &["/footnotes"],
+                &FOOTNOTES_GAP,
+            ),
+            gap(
+                K::Footnote,
+                "footnote",
+                &["footnote"],
+                &[K::Document, K::Footnotes],
+                &["/footnote[N]", "/footnotes/footnote[N]"],
+                &FOOTNOTE_GAP,
+            ),
+            gap(
+                K::Endnotes,
+                "endnotes",
+                &["endnotes"],
+                &[K::Document],
+                &["/endnotes"],
+                &ENDNOTES_GAP,
+            ),
+            gap(
+                K::Endnote,
+                "endnote",
+                &["endnote"],
+                &[K::Document, K::Endnotes],
+                &["/endnote[N]", "/endnotes/endnote[N]"],
+                &ENDNOTE_GAP,
+            ),
+            gap(
+                K::Comments,
+                "comments",
+                &["comments"],
+                &[K::Document],
+                &["/comments"],
+                &COMMENTS_GAP,
+            ),
+            gap(
+                K::Comment,
+                "comment",
+                &["comment"],
+                &[K::Comments],
+                &["/comments/comment[N]"],
+                &COMMENT_GAP,
+            ),
+            gap(
+                K::Styles,
+                "styles",
+                &["styles"],
+                &[K::Document],
+                &["/styles"],
+                &STYLES_GAP,
+            ),
+            gap(
+                K::Style,
+                "style",
+                &["style"],
+                &[K::Styles],
+                &["/styles/<id>"],
+                &STYLE_GAP,
+            ),
+            gap(
+                K::Numbering,
+                "numbering",
+                &["numbering"],
+                &[K::Document],
+                &["/numbering"],
+                &NUMBERING_GAP,
+            ),
+            gap(
+                K::AbstractNum,
+                "abstractNum",
+                &["abstractnum"],
+                &[K::Numbering],
+                &["/numbering/abstractNum[@id=N]"],
+                &ABSTRACT_NUM_GAP,
+            ),
+            gap(
+                K::Num,
+                "num",
+                &["num"],
+                &[K::Numbering],
+                &["/numbering/num[@id=N]"],
+                &NUM_GAP,
+            ),
+            gap(
+                K::Level,
+                "level",
+                &["level", "lvl"],
+                &[K::AbstractNum],
+                &["/numbering/abstractNum[@id=N]/level[L]"],
+                &LEVEL_GAP,
+            ),
+            gap(
+                K::Settings,
+                "settings",
+                &["settings"],
+                &[K::Document],
+                &["/settings"],
+                &SETTINGS_GAP,
+            ),
+            gap(
+                K::Theme,
+                "theme",
+                &["theme"],
+                &[K::Document],
+                &["/theme"],
+                &THEME_GAP,
+            ),
+            gap(
+                K::Bookmark,
+                "bookmark",
+                &["bookmark"],
+                &[K::Paragraph],
+                &["/bookmark[@name=X]"],
+                &BOOKMARK_GAP,
+            ),
+            gap(
+                K::Field,
+                "field",
+                &["field"],
+                &[K::Paragraph],
+                &["/field[N]"],
+                &FIELD_GAP,
+            ),
+            gap(
+                K::FormField,
+                "formfield",
+                &["formfield"],
+                &[K::Paragraph],
+                &["/formfield[NAME]"],
+                &FORM_FIELD_GAP,
+            ),
+            gap(
+                K::Picture,
+                "picture",
+                &["image", "img", "picture"],
+                &[K::Paragraph],
+                &["/body/p[N]/picture[M]"],
+                &PICTURE_GAP,
+            ),
+            gap(
+                K::Chart,
+                "chart",
+                &["chart"],
+                &[K::Paragraph],
+                &["/chart[N]"],
+                &CHART_GAP,
+            ),
+            gap(
+                K::Ole,
+                "ole",
+                &["embed", "object", "ole", "oleobject"],
+                &[K::Paragraph],
+                &["/body/p[N]/ole[M]"],
+                &OLE_GAP,
+            ),
+            gap(
+                K::Toc,
+                "toc",
+                &["tableofcontents", "toc"],
+                &[K::Body],
+                &["/toc[N]"],
+                &TOC_GAP,
+            ),
+            gap(
+                K::Revision,
+                "revision",
+                &["revision"],
+                &[K::Document],
+                &["/revision[N]"],
+                &REVISION_GAP,
+            ),
+            gap(
+                K::Watermark,
+                "watermark",
+                &["watermark"],
+                &[K::Document],
+                &["/watermark"],
+                &WATERMARK_GAP,
+            ),
+            gap(
+                K::TextBox,
+                "textbox",
+                &["textbox"],
+                &[K::Paragraph],
+                &["/body/p[N]/textbox[M]"],
+                &TEXT_BOX_GAP,
+            ),
+            gap(
+                K::Shape,
+                "shape",
+                &["shape"],
+                &[K::Paragraph],
+                &["/body/p[N]/shape[M]"],
+                &SHAPE_GAP,
+            ),
+            gap(
+                K::Break,
+                "break",
+                &["br", "break", "pagebreak"],
+                &[K::Paragraph],
+                &["/body/p[N]/break[M]"],
+                &BREAK_GAP,
+            ),
+            gap(
+                K::Tab,
+                "tab",
+                &["tab"],
+                &[K::Paragraph],
+                &["/body/p[N]/tab[M]"],
+                &TAB_GAP,
+            ),
+        ],
+        gaps: &[
+            GapSpec {
+                subject: Subject::Property {
+                    element: "paragraph",
+                    key: "styleName",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-R6 (R4x)",
+                reason: "a style's display name needs the styles part, which the node view does not read yet; `style` is the style id (M1-Δ4)",
+            },
+            GapSpec {
+                subject: Subject::Property {
+                    element: "paragraph",
+                    key: "numFmt",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-R6 (R4x)",
+                reason: "list formats need the numbering part, which the node view does not read yet",
+            },
+            GapSpec {
+                subject: Subject::Property {
+                    element: "paragraph",
+                    key: "listStyle",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-R6 (R4x)",
+                reason: "list kinds need the numbering part, which the node view does not read yet",
+            },
+            GapSpec {
+                subject: Subject::Property {
+                    element: "sdt",
+                    key: "type",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "R4x",
+                reason: "the leaf reads a content control's id, tag and alias only",
+            },
+            GapSpec {
+                subject: Subject::Property {
+                    element: "sdt",
+                    key: "lock",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "R4x",
+                reason: "the leaf reads a content control's id, tag and alias only",
+            },
+            GapSpec {
+                subject: Subject::Property {
+                    element: "section",
+                    key: "pageWidth",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "R4x",
+                reason: "section properties are read through the section inventory, which the node view does not wire yet",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "set",
+                    element: "paragraph",
+                    context: "nested-or-unproven-selection",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W3",
+                reason: "paragraphs in cells, content controls or wrappers are readable, but their raw transaction position is not proven for editing",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "set",
+                    element: "run",
+                    context: "nested-or-unproven-selection",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W2",
+                reason: "the editor addresses only direct runs whose raw ordinal is proven against the paragraph; nested and wrapped run selections are refused",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "set",
+                    element: "paragraph/run",
+                    context: "mixed-paragraph-run-fanout",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "M2 (homogeneous mutation fanout)",
+                reason: "one DOCX mutation admits one target kind, so a paragraph/run union is refused before staging rather than applying a descendant ordinal to the wrong leaf",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "set",
+                    element: "paragraph/run",
+                    context: "managed-transaction",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W5",
+                reason: "the formatting transaction has not proven edit admission and publication for execution-context-managed DOCX owners; the read projection remains available",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "set",
+                    element: "paragraph/run",
+                    context: "complex-leaf-content",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W2 / record 0011",
+                reason: "fields, hyperlinks, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "add",
+                    element: "paragraph/run",
+                    context: "managed-transaction",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W5",
+                reason: "structural insertion uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "add",
+                    element: "paragraph",
+                    context: "nested-or-unproven-parent",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W3",
+                reason: "paragraph creation is admitted only under the direct main body, so cells, content controls and other nested parents are refused",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "add",
+                    element: "run",
+                    context: "nested-or-unproven-parent",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W2",
+                reason: "run creation is admitted only under a proven direct body paragraph and refuses wrapped or nested paragraph parents",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "remove",
+                    element: "paragraph/run",
+                    context: "managed-transaction",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W5",
+                reason: "structural removal uses the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "remove",
+                    element: "paragraph/run",
+                    context: "nested-or-unproven-selection",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W2 / L-DOCX-W3",
+                reason: "only direct body paragraphs and their direct runs have transaction positions proven for removal; nested selections are refused",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "remove",
+                    element: "paragraph/run",
+                    context: "complex-leaf-content",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W2 / record 0011",
+                reason: "paragraph and run dependency scans refuse open ranges, field interiors, tracked changes and story references rather than dropping their relationships",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "move",
+                    element: "paragraph/run",
+                    context: "managed-transaction",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W5",
+                reason: "paragraph and direct-run movement use the unmanaged DOCX transaction path; execution-context-managed owners refuse the leaf splice until managed admission is proven",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "move",
+                    element: "paragraph/run",
+                    context: "nested-or-unproven-selection",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W3",
+                reason: "only direct main-body paragraphs and their direct runs can be moved; nested and wrapped selections have no proven body or run anchor",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "move",
+                    element: "paragraph/run",
+                    context: "complex-leaf-content",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W2 / record 0011",
+                reason: "paragraph and direct-run movement preserves exact source fragments but refuses open ranges, field interiors, namespace changes, tracked changes and unmodeled dependencies",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "swap",
+                    element: "paragraph/run",
+                    context: "managed-transaction",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W5",
+                reason: "paragraph and direct-run swapping compose unmanaged fragment moves; execution-context-managed owners refuse the leaf splice until managed admission is proven",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "swap",
+                    element: "paragraph/run",
+                    context: "nested-or-unproven-selection",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W3",
+                reason: "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "swap",
+                    element: "paragraph/run",
+                    context: "complex-leaf-content",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "L-DOCX-W2 / record 0011",
+                reason: "paragraph and direct-run swapping preserves exact source fragments but refuses field interiors, namespace changes, tracked changes and unmodeled dependencies",
+            },
+            GapSpec {
+                subject: Subject::View("html"),
+                code: Code::UnsupportedCapability,
+                follow_up: "design §10",
+                reason: "rendering is outside the unified layer",
+            },
+        ],
+    }
+};
+
+check_format_spec!(SPEC);
+
+const _: () = assert!(
+    SPEC.elements.len() <= 128,
+    "a query kind set holds 128 kinds"
+);

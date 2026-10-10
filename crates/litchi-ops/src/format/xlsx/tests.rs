@@ -10,7 +10,7 @@ use litchi_core::sheet::{CellValue, WorkbookTrait};
 use litchi_opc::SourceBackedPackage;
 use litchi_xlsx::{Cell, Value};
 
-use super::{SelectedCellView, Xlsx, XlsxEditor, XlsxOwner};
+use super::{SelectedCellView, Xlsx, XlsxOwner};
 use crate::error::{Code, Error, Source};
 use crate::options::{OpenOptions, SourceMode};
 
@@ -254,6 +254,42 @@ fn assert_workbook_trait_surface(workbook: &dyn WorkbookTrait) {
         &CellValue::Int(7)
     );
     assert_eq!(
+        by_name
+            .cell(0, 1)
+            .map(drop)
+            .unwrap_err()
+            .downcast_ref::<Error>()
+            .map(Error::code),
+        Some(Code::OutOfRange)
+    );
+    assert_eq!(
+        by_name
+            .cell(1, 0)
+            .map(drop)
+            .unwrap_err()
+            .downcast_ref::<Error>()
+            .map(Error::code),
+        Some(Code::OutOfRange)
+    );
+    assert_eq!(
+        by_name
+            .cell_value(0, 1)
+            .map(drop)
+            .unwrap_err()
+            .downcast_ref::<Error>()
+            .map(Error::code),
+        Some(Code::OutOfRange)
+    );
+    assert_eq!(
+        by_name
+            .cell_value(1, 0)
+            .map(drop)
+            .unwrap_err()
+            .downcast_ref::<Error>()
+            .map(Error::code),
+        Some(Code::OutOfRange)
+    );
+    assert_eq!(
         by_name.cell_by_coordinate("B2").unwrap().value(),
         &CellValue::String("second".to_owned())
     );
@@ -327,6 +363,7 @@ fn selector_workbook(first_value: &str, second_sheet: &[u8]) -> Vec<u8> {
 }
 
 const VALID_SECOND: &[u8] = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1"><c r="A1"><v>9</v></c></row></sheetData></worksheet>"#;
+const EMPTY_SECOND: &[u8] = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData/></worksheet>"#;
 
 fn xlsx_leaf(error: &Error) -> &litchi_xlsx::Error {
     match error.leaf() {
@@ -476,6 +513,27 @@ fn sheet_trait_coordinates_are_argument_errors_and_payload_coordinates_corruptio
 }
 
 #[test]
+fn generic_sheet_validates_rows_on_an_empty_worksheet() {
+    let bytes = selector_workbook("7", EMPTY_SECOND);
+    for handle in [
+        open_bytes(bytes.clone(), &OpenOptions::new()),
+        open_eager(bytes.clone(), &OpenOptions::new()),
+    ] {
+        let sheet = WorkbookTrait::worksheet_by_name(&handle, "Broken").unwrap();
+        assert_eq!(sheet.dimensions(), None);
+        assert!(sheet.row(0).unwrap().is_empty());
+        let error = sheet.row(1_048_576).map(drop).unwrap_err();
+        assert_eq!(
+            error
+                .downcast_ref::<Error>()
+                .expect("a unified error")
+                .code(),
+            Code::OutOfRange
+        );
+    }
+}
+
+#[test]
 fn selected_access_defers_an_unselected_malformed_worksheet() {
     let malformed = br#"<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData><row r="1">"#;
     let handle = open_bytes(selector_workbook("7", malformed), &OpenOptions::new());
@@ -518,7 +576,13 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     std::fs::write(file.path(), selector_workbook("7", VALID_SECOND)).unwrap();
     let handle = open_path(file.path(), &OpenOptions::new());
     let selected = handle.sheet("Data").unwrap().unwrap();
+    let generic = WorkbookTrait::worksheet_by_index(&handle, 0).unwrap();
+    let mut sheets = WorkbookTrait::worksheets(&handle);
+    assert!(sheets.next().unwrap().is_ok());
     assert_eq!(handle.text().unwrap(), handle.clone().text().unwrap());
+    handle
+        .editor()
+        .expect("the source can be promoted before it changes");
 
     std::fs::write(
         file.path(),
@@ -537,71 +601,138 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     changed(handle.tolerance_report().unwrap_err());
     changed(handle.worksheet_names().unwrap_err());
     changed(handle.worksheet_count().unwrap_err());
-    let generic = WorkbookTrait::worksheet_by_index(&handle, 0)
-        .unwrap()
-        .cell_value(1, 1)
-        .unwrap_err();
-    changed(*generic.downcast::<Error>().expect("typed trait error"));
+    let error = generic.cell_value(1, 1).unwrap_err();
+    changed(*error.downcast::<Error>().expect("typed trait error"));
+    for result in [
+        WorkbookTrait::worksheet_by_index(&handle, 0),
+        WorkbookTrait::worksheet_by_index(&handle, usize::MAX),
+        WorkbookTrait::worksheet_by_name(&handle, "Data"),
+        WorkbookTrait::worksheet_by_name(&handle, "missing"),
+        WorkbookTrait::active_worksheet(&handle),
+    ] {
+        changed(
+            *result
+                .err()
+                .expect("selection refuses stale source")
+                .downcast::<Error>()
+                .expect("typed trait error"),
+        );
+    }
     changed(
-        handle
-            .into_editor()
+        *sheets
+            .next()
+            .unwrap()
             .err()
-            .expect("editor refuses a changed source"),
+            .expect("iterator refuses stale source")
+            .downcast::<Error>()
+            .expect("typed trait error"),
     );
+    assert!(sheets.next().is_none());
+    assert!(sheets.next().is_none());
+    drop(sheets);
+    drop(generic);
+    for _ in 0..2 {
+        changed(
+            handle
+                .editor()
+                .expect_err("editor refuses a changed source"),
+        );
+    }
 }
 
-// --- Editor construction (L-XLSX-1) --------------------------------------
+// --- Editor promotion -----------------------------------------------------
 
 #[cfg(any(unix, windows))]
 #[test]
-fn sole_owner_editor_reuses_the_package_indexed_at_open() {
+fn source_editor_promotion_reuses_exact_snapshot_for_clones_and_selections() {
+    let bytes = fixture("xlsx/DateFormatTests.xlsx");
     let handle = open_path(
         &fixture_path("xlsx/DateFormatTests.xlsx"),
         &OpenOptions::new(),
     );
-    let XlsxOwner::Source(workbook) = &handle.0.owner else {
-        panic!("path route is source-backed");
-    };
-    let lineage = workbook.source_backed_package().source_lineage();
-    let Ok(XlsxEditor::Source(package)) = handle.into_editor() else {
-        panic!("a sole owner hands over its package");
-    };
+    assert!(handle.is_source_backed());
+
+    let first = handle.editor().expect("promote source-backed workbook");
+    assert_eq!(first.to_bytes().expect("promoted bytes"), bytes);
+
+    let clone = handle.clone();
+    let selected = clone.sheet(0_usize).unwrap().unwrap();
+    assert_eq!(selected.name(), "Flags");
+    let second = clone.editor().expect("reuse promoted workbook");
     assert!(
-        package.source_lineage() == lineage,
-        "the editor adopts the package indexed at open, not a re-index"
+        first
+            .sheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .same_workbook(&second.sheet(0_usize).unwrap().unwrap()),
+        "promotion is memoized per open"
     );
-    let editor = litchi_xlsx::tab_state::SourceBackedEditor::from_source_backed_package(*package)
-        .expect("a per-feature source editor adopts the package");
-    editor.snapshot().expect("tab-state snapshot");
+    assert_eq!(second.to_bytes().expect("cloned promoted bytes"), bytes);
+
+    let third = handle.editor().expect("reuse after selection");
+    assert!(
+        first
+            .sheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .same_workbook(&third.sheet(0_usize).unwrap().unwrap())
+    );
+}
+
+#[cfg(any(unix, windows))]
+#[test]
+fn concurrent_source_promotions_share_one_native_snapshot() {
+    let handle = open_path(
+        &fixture_path("xlsx/DateFormatTests.xlsx"),
+        &OpenOptions::new(),
+    );
+    let barrier = std::sync::Arc::new(std::sync::Barrier::new(8));
+    let workers = (0..8)
+        .map(|_| {
+            let handle = handle.clone();
+            let barrier = barrier.clone();
+            std::thread::spawn(move || {
+                barrier.wait();
+                handle.editor().expect("concurrent promotion")
+            })
+        })
+        .collect::<Vec<_>>();
+    let snapshots = workers
+        .into_iter()
+        .map(|worker| worker.join().expect("promotion worker"))
+        .collect::<Vec<_>>();
+    assert!(!snapshots.is_empty(), "all promotion workers completed");
+    for snapshot in snapshots.iter().skip(1) {
+        assert!(
+            snapshots[0]
+                .sheet(0_usize)
+                .unwrap()
+                .unwrap()
+                .same_workbook(&snapshot.sheet(0_usize).unwrap().unwrap())
+        );
+    }
 }
 
 #[test]
-fn shared_handles_materialize_an_eager_editor_and_stay_readable() {
-    let bytes = fixture("xlsx/DateFormatTests.xlsx");
-    let handle = open_bytes(bytes, &OpenOptions::new());
+fn eager_editor_is_non_consuming_and_handles_remain_readable() {
+    let handle = open_bytes(fixture("xlsx/DateFormatTests.xlsx"), &OpenOptions::new());
     let clone = handle.clone();
-    let Ok(XlsxEditor::Eager(workbook)) = handle.into_editor() else {
-        panic!("a shared handle materializes the owning snapshot");
-    };
+    let workbook = handle.editor().expect("eager editor snapshot");
     workbook.edit().expect("eager edit transaction");
     assert_eq!(clone.worksheet_names().unwrap(), ["Flags", "Tests"]);
 
     // A selected worksheet also shares the source catalog.
     let selected = clone.sheet(0_usize).unwrap().unwrap();
-    let Ok(XlsxEditor::Eager(_)) = clone.into_editor() else {
-        panic!("a selected worksheet keeps the catalog shared");
-    };
+    clone.editor().expect("selected handle remains editable");
     assert_eq!(selected.name(), "Flags");
 }
 
 #[test]
 fn eager_owner_editor_is_the_snapshot_and_retention_can_be_refused() {
     let bytes = fixture("xlsx/InlineStrings.xlsx");
-    let Ok(XlsxEditor::Eager(workbook)) =
-        open_eager(bytes.clone(), &OpenOptions::new()).into_editor()
-    else {
-        panic!("an eager handle hands over its snapshot");
-    };
+    let workbook = open_eager(bytes.clone(), &OpenOptions::new())
+        .editor()
+        .expect("an eager handle hands over its snapshot");
     workbook.edit().expect("eager edit transaction");
 
     for handle in [
@@ -609,10 +740,7 @@ fn eager_owner_editor_is_the_snapshot_and_retention_can_be_refused() {
         open_eager(bytes.clone(), &OpenOptions::new().retain_source(false)),
     ] {
         assert_eq!(handle.text().unwrap().len(), 169, "reads still work");
-        let error = handle
-            .into_editor()
-            .err()
-            .expect("editing was not retained");
+        let error = handle.editor().expect_err("editing was not retained");
         assert_eq!(error.code(), Code::UnsupportedCapability);
         assert!(error.suggestion().is_some());
     }
@@ -627,4 +755,52 @@ fn clones_share_one_state() {
     std::thread::spawn(move || clone.text().unwrap())
         .join()
         .unwrap();
+}
+
+#[test]
+fn transient_promotion_read_failure_can_retry_the_same_source() {
+    use litchi_core::{OwnedSource, ReadAt, SourceVersion};
+    use std::sync::Arc;
+    use std::sync::atomic::{AtomicBool, Ordering};
+
+    struct FlakySource {
+        source: OwnedSource,
+        fail_next: AtomicBool,
+    }
+    impl ReadAt for FlakySource {
+        fn len(&self) -> std::io::Result<u64> {
+            self.source.len()
+        }
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            self.source.version()
+        }
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            if self.fail_next.swap(false, Ordering::SeqCst) {
+                return Err(std::io::Error::other("injected transient read failure"));
+            }
+            self.source.read_at(offset, output)
+        }
+    }
+    let bytes = fixture("xlsx/DateFormatTests.xlsx");
+    let source = Arc::new(FlakySource {
+        source: OwnedSource::new(bytes.clone()),
+        fail_next: AtomicBool::new(false),
+    });
+    let package = SourceBackedPackage::from_read_at(source.clone()).unwrap();
+    let handle = Xlsx::from_source_package(package, &OpenOptions::new()).unwrap();
+    source.fail_next.store(true, Ordering::SeqCst);
+    let error = handle.editor().expect_err("first promotion read fails");
+    assert_eq!(error.code(), Code::IoError);
+    assert_eq!(error.format(), Some(litchi_core::FileFormat::Xlsx));
+    assert!(handle.0.promotion.get().unwrap().lock().unwrap().is_none());
+    let promoted = handle.editor().expect("retry unchanged source");
+    assert_eq!(promoted.to_bytes().unwrap(), bytes);
+    let repeated = handle.editor().unwrap();
+    assert!(
+        promoted
+            .sheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .same_workbook(&repeated.sheet(0_usize).unwrap().unwrap())
+    );
 }

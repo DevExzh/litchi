@@ -124,6 +124,55 @@ const ROW_PROPERTIES: &[&str] = &[
 /// `AttributeFilter.ResolveValue`'s fallbacks).
 const PSEUDO_KEYS: &[&str] = &["style", "text", "type"];
 
+/// The element whose `value` key reads its text, as OfficeCLI's Excel
+/// selector reads a cell's value.
+const VALUE_ELEMENT: &str = "cell";
+
+/// The keys a selector compares on an element of the canonical vocabulary
+/// name `canonical` besides its declared properties: what `capabilities()`
+/// reports as the element's predicate keys.
+pub(crate) fn pseudo_keys(canonical: &str) -> impl Iterator<Item = &'static str> + Clone {
+    PSEUDO_KEYS
+        .iter()
+        .copied()
+        .chain((canonical == VALUE_ELEMENT).then_some("value"))
+}
+
+/// The selector spellings that read a declared key of an element of the
+/// canonical name `canonical` in `family` (`bold` for a cell's
+/// `font.bold`), with the key each one reads: what `capabilities()` reports
+/// as the element's predicate aliases.
+pub(crate) fn key_aliases(
+    family: Family,
+    canonical: &'static str,
+) -> impl Iterator<Item = (&'static str, &'static str)> + Clone {
+    KEY_ALIASES
+        .iter()
+        .filter(move |(owner, element, _, _)| *owner == family && *element == canonical)
+        .map(|(_, _, alias, key)| (*alias, *key))
+}
+
+/// Native-key admission shared by query compilation and capability reporting.
+pub(crate) fn native_key<K: ElementKind>(spec: &ElementSpec<K>, name: &str) -> bool {
+    let semantic = ["name", "role", "type"]
+        .iter()
+        .any(|key| key.eq_ignore_ascii_case(name));
+    !semantic
+        && (spec
+            .identities
+            .iter()
+            .any(|key| key.eq_ignore_ascii_case(name))
+            || spec
+                .props
+                .iter()
+                .any(|prop| prop.raw && prop.name.eq_ignore_ascii_case(name))
+            || K::VOCABULARY
+                .canonical(spec.name)
+                .and_then(|canonical| K::VOCABULARY.rule(canonical))
+                .and_then(|rule| rule.identity(name))
+                .is_some_and(|identity| identity.is_native()))
+}
+
 struct Compiler<'q, 'f, N> {
     plan: Plan<'q>,
     /// The kinds a query can select: every kind without an element gap.
@@ -250,20 +299,7 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
     }
 
     fn native_key(&self, ordinal: usize, name: &str) -> bool {
-        let spec = self.spec(ordinal);
-        let semantic = ["name", "role", "type"]
-            .iter()
-            .any(|key| key.eq_ignore_ascii_case(name));
-        !semantic
-            && (spec
-                .identities
-                .iter()
-                .any(|key| key.eq_ignore_ascii_case(name))
-                || N::Kind::VOCABULARY
-                    .canonical(spec.name)
-                    .and_then(|canonical| N::Kind::VOCABULARY.rule(canonical))
-                    .and_then(|rule| rule.identity(name))
-                    .is_some_and(|identity| identity.is_native()))
+        native_key(self.spec(ordinal), name)
     }
 
     fn scope(&self, scope: Option<&Scope<'q>>) -> Result<ScopePlan<'q>> {
@@ -887,7 +923,7 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
             ));
         }
         if name.eq_ignore_ascii_case("text")
-            || (name.eq_ignore_ascii_case("value") && spec.kind.name() == "cell")
+            || (name.eq_ignore_ascii_case("value") && spec.kind.name() == VALUE_ELEMENT)
         {
             return Ok((TargetKey::Text, Target::Text(test(None))));
         }
@@ -910,9 +946,10 @@ impl<'q, 'f, N: Inspect<'f>> Compiler<'q, 'f, N> {
         let mut available: Vec<&'static str> = PSEUDO_KEYS.to_vec();
         for ordinal in ordinals(kinds) {
             for prop in self.spec(ordinal).props {
-                if !available
-                    .iter()
-                    .any(|seen| seen.eq_ignore_ascii_case(prop.name))
+                if prop.access.get
+                    && !available
+                        .iter()
+                        .any(|seen| seen.eq_ignore_ascii_case(prop.name))
                 {
                     available.push(prop.name);
                 }
@@ -1069,7 +1106,7 @@ enum TargetKey {
 fn find_prop<K>(spec: &ElementSpec<K>, name: &str) -> Option<(u16, &'static PropSpec)> {
     spec.props
         .iter()
-        .position(|prop| prop.name.eq_ignore_ascii_case(name))
+        .position(|prop| prop.access.get && prop.name.eq_ignore_ascii_case(name))
         .and_then(|index| Some((u16::try_from(index).ok()?, &spec.props[index])))
 }
 

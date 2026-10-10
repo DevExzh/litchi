@@ -3,9 +3,9 @@ use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use litchi_core::detection::FileFormat;
-use litchi_core::{Metadata, ReadAt};
+use litchi_core::{Metadata, Position, ReadAt};
 
-use super::{EditorRefused, Pptx, PptxEditor, PptxSlide, SlideDescriptor};
+use super::{Editable, Pptx, PptxSlide, SlideDescriptor};
 use crate::error::{Code, Error, Source};
 use crate::options::OpenOptions;
 use crate::{opc, pptx};
@@ -368,60 +368,207 @@ fn cancellation_is_typed() {
     let handle = Pptx::from_source(presentation, &options());
     assert!(handle.metadata().unwrap().is_some());
 
+    let _promoted = source_owner(&handle);
     cancellation_source.cancel();
+    assert_eq!(handle.editable().err().unwrap().code(), Code::Cancelled);
     assert_eq!(handle.slide_catalog().unwrap_err().code(), Code::Cancelled);
     assert_eq!(handle.metadata().unwrap_err().code(), Code::Cancelled);
 }
 
 // ---- editor construction (L-PPTX-1) -------------------------------------
 
-fn expect_editor(result: Result<PptxEditor, EditorRefused>) -> PptxEditor {
-    match result {
-        Ok(editor) => editor,
-        Err(refused) => panic!("no editor: {:?}", refused.error),
+fn source_owner(handle: &Pptx) -> pptx::source::Package {
+    match handle.editable().expect("editable native owner") {
+        Editable::Source(package) => package,
+        Editable::Eager(_) => panic!("expected deferred source"),
     }
 }
 
-fn expect_refused(result: Result<PptxEditor, EditorRefused>) -> EditorRefused {
-    match result {
-        Ok(_) => panic!("an editor was built"),
-        Err(refused) => refused,
+/// Build a source-backed deck whose every ordered slide owns distinct related
+/// parts.  The comments are intentionally added through the native package
+/// graph so this fixture exercises the same relationship resolution as a
+/// producer-authored presentation.
+fn related_order_fixture() -> Vec<u8> {
+    let slides = [
+        ("Slide A", "Notes A", "Comment A", "Modern A"),
+        ("Slide B", "Notes B", "Comment B", "Modern B"),
+        ("Slide C", "Notes C", "Comment C", "Modern C"),
+    ];
+    let mut builder = pptx::builder::Builder::new().unwrap();
+    {
+        let presentation = builder.presentation().unwrap();
+        for (name, notes, _, _) in slides {
+            let slide = presentation.add_slide().unwrap();
+            slide.set_title(name);
+            slide.set_notes(notes);
+            slide.add_text_box(name, 0, 0, 914_400, 914_400);
+        }
     }
+    let mut package = builder.build().unwrap();
+    package
+        .edit_opc(|opc| {
+            // The builder's title is shape text; authored slide facts are the
+            // independent p:cSld@name values exposed by the unified node.
+            for (index, (name, _, _, _)) in slides.iter().enumerate() {
+                let slide_name =
+                    opc::PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).unwrap();
+                let part = opc.get_part_mut(&slide_name)?;
+                let xml = String::from_utf8(part.blob().to_vec()).unwrap();
+                let root = xml.find("<p:cSld ").unwrap();
+                let open_end = root + xml[root..].find('>').unwrap();
+                let marker = " name=\"";
+                let name_start = root + xml[root..open_end].find(marker).unwrap() + marker.len();
+                let name_end = name_start + xml[name_start..open_end].find('"').unwrap();
+                let mut named = xml.clone();
+                named.replace_range(name_start..name_end, name);
+                assert_ne!(named, xml, "builder slide has no cSld element");
+                part.set_blob(named.into_bytes());
+            }
+
+            let conformance = pptx::comments::Conformance::Transitional;
+            pptx::comments::add_presentation_comment_author(
+                opc,
+                pptx::comments::Author::new(1, "Ada", "AD"),
+                conformance,
+            )?;
+            for (index, (_, _, text, _)) in slides.iter().enumerate() {
+                let slide_name = format!("/ppt/slides/slide{}.xml", index + 1);
+                pptx::comments::add_presentation_comment(
+                    opc,
+                    &slide_name,
+                    pptx::comments::Comment::new(1, *text, 100, 200).with_index(index as u32 + 1),
+                    conformance,
+                )?;
+            }
+
+            const MODERN_AUTHOR: &str = "{11111111-1111-4111-8111-111111111111}";
+            pptx::modern_comments::add_modern_comment_author(
+                opc,
+                pptx::modern_comments::Author {
+                    id: MODERN_AUTHOR.into(),
+                    name: "Grace".into(),
+                    initials: Some("GR".into()),
+                    user_id: "grace@example.test".into(),
+                    provider_id: "litchi-test".into(),
+                    namespace_declarations: Vec::new(),
+                    extension_xml: None,
+                },
+            )?;
+            for (index, (_, _, _, title)) in slides.iter().enumerate() {
+                let slide_name =
+                    opc::PackURI::new(format!("/ppt/slides/slide{}.xml", index + 1)).unwrap();
+                pptx::modern_comments::add_modern_comment(
+                    opc,
+                    &slide_name,
+                    pptx::modern_comments::Comment {
+                        id: format!("{{22222222-2222-4222-8222-22222222220{}}}", index + 1),
+                        author_id: MODERN_AUTHOR.into(),
+                        status: None,
+                        created: format!("2026-10-10T10:0{}:00Z", index),
+                        start_date: None,
+                        due_date: None,
+                        assigned_to: None,
+                        complete: None,
+                        title: Some((*title).into()),
+                        namespace_declarations: Vec::new(),
+                        anchors: Vec::new(),
+                        position: None,
+                        reply_list_namespace_declarations: Vec::new(),
+                        replies: Vec::new(),
+                        reply_list_present: false,
+                        text_body_xml: None,
+                        extension_xml: None,
+                    },
+                )?;
+            }
+            Ok(())
+        })
+        .unwrap();
+    package.to_bytes().unwrap()
+}
+
+fn node_property(node: &crate::node::Node<'_>, key: &str) -> Option<String> {
+    node.view()
+        .format()
+        .unwrap()
+        .find(|property| property.key() == key)
+        .map(|property| property.to_string())
+}
+
+fn node_text(node: &crate::node::Node<'_>) -> Option<String> {
+    node.view().text().unwrap().map(|text| text.into_owned())
 }
 
 #[test]
-fn unique_source_handle_becomes_a_source_editor_without_reindexing() {
+fn source_promotion_reuses_admitted_catalog_and_preserves_exact_noop() {
     let bytes = std::fs::read(fixture("sample.pptx")).unwrap();
     let handle = open_bytes(bytes.clone());
-    let PptxEditor::Source(editor) = expect_editor(handle.into_editor()) else {
-        panic!("the source owner yields the source-backed editor");
-    };
-    assert_eq!(editor.slide_count(), 2);
-    // The editor's package is the one indexed at open: its cache already
-    // holds the presentation root, and an exact no-op republishes the input.
-    let mut edit = editor.edit_slide(0).expect("edit slide");
-    assert!(!edit.clear_transition().expect("no transition to clear"));
-    let commit = edit.commit();
-    let mut output = Vec::new();
-    editor
-        .publish_slide_commit_to_stream(&mut output, &commit)
-        .expect("publish");
-    assert_eq!(output, bytes);
+    let cold = handle.cold_loads();
+    let package = source_owner(&handle);
+    assert_eq!(handle.cold_loads(), cold);
+    assert_eq!(package.presentation().unwrap().slide_count().unwrap(), 2);
+    assert_eq!(
+        package
+            .edit()
+            .unwrap()
+            .commit()
+            .unwrap()
+            .into_package()
+            .to_bytes()
+            .unwrap(),
+        bytes
+    );
+    assert_eq!(handle.slide_count().unwrap(), 2);
 }
 
 #[test]
-fn shared_source_handle_is_returned_readable() {
+fn shared_source_promotion_retains_one_lineage_and_live_readers() {
     let handle = open_bytes(std::fs::read(fixture("sample.pptx")).unwrap());
     let snapshot = handle.clone();
-    let refused = expect_refused(handle.into_editor());
-    assert!(refused.error.is_none(), "sharing is not an error");
-    assert_eq!(refused.handle.slide_count().unwrap(), 2);
-    assert_eq!(snapshot.slide_count().unwrap(), 2);
-    drop(snapshot);
-    assert!(matches!(
-        expect_editor(refused.handle.into_editor()),
-        PptxEditor::Source(_)
-    ));
+    let original = snapshot.text().unwrap();
+    let package = source_owner(&handle);
+    let repeated = source_owner(&snapshot);
+    let slide = package.presentation().unwrap().slide(0).unwrap();
+    let scene = slide.scene().unwrap();
+    let shape = scene
+        .iter()
+        .position(|shape| shape.view().common().text().is_some())
+        .unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.set_shape_text(0, shape, "promoted edit").unwrap();
+    let commit = edit.commit().unwrap();
+    let replayed = repeated.apply(commit.patch()).unwrap();
+    assert_eq!(
+        replayed.to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    assert_eq!(snapshot.text().unwrap(), original);
+    assert_eq!(handle.text().unwrap(), original);
+    assert_eq!(slide.scene().unwrap().len(), scene.len());
+}
+
+#[test]
+fn concurrent_source_promotion_shares_native_patch_lineage() {
+    let handle = open_bytes(std::fs::read(fixture("sample.pptx")).unwrap());
+    let packages = std::thread::scope(|scope| {
+        let tasks: Vec<_> = (0..8)
+            .map(|_| scope.spawn(|| source_owner(&handle)))
+            .collect();
+        tasks
+            .into_iter()
+            .map(|task| task.join().unwrap())
+            .collect::<Vec<_>>()
+    });
+    let patch = packages[0]
+        .edit()
+        .unwrap()
+        .commit()
+        .unwrap()
+        .patch()
+        .clone();
+    for package in &packages {
+        assert!(package.apply(&patch).is_ok());
+    }
 }
 
 #[cfg(any(unix, windows))]
@@ -437,6 +584,7 @@ fn changed_source_refuses_the_editor_with_a_typed_error() {
     )
     .expect("write fixture");
     let handle = open_path(temporary.path(), &options());
+    let _promoted = source_owner(&handle);
     let mut file = std::fs::OpenOptions::new()
         .append(true)
         .open(temporary.path())
@@ -444,19 +592,22 @@ fn changed_source_refuses_the_editor_with_a_typed_error() {
     file.write_all(b"source mutation").expect("mutate source");
     drop(file);
 
-    let refused = expect_refused(handle.into_editor());
-    assert_source_changed::<()>(Err(refused.error.expect("typed error")), "into_editor");
-    assert!(refused.handle.is_source_backed());
+    assert_source_changed(handle.editable().map(|_| ()), "editable");
+    assert!(handle.is_source_backed());
 }
 
 #[test]
 fn eager_handle_becomes_an_opened_transaction() {
     let handle = open_eager(std::fs::read(fixture("sample.pptx")).unwrap());
     let snapshot = handle.clone();
-    let PptxEditor::Eager(transaction) = expect_editor(handle.into_editor()) else {
+    let Editable::Eager(package) = handle.editable().unwrap() else {
         panic!("the eager owner yields an opened transaction");
     };
-    drop(transaction);
+    let Editable::Eager(repeated) = snapshot.editable().unwrap() else {
+        panic!("eager");
+    };
+    assert!(Arc::ptr_eq(&package, &repeated));
+    drop(package.edit().unwrap());
     // The eager editor is detached, so the snapshot stays readable.
     assert_eq!(snapshot.slide_count().unwrap(), 2);
 }
@@ -467,11 +618,10 @@ fn editor_needs_the_retained_source() {
     let source: Arc<dyn ReadAt> = Arc::new(litchi_core::OwnedSource::from_arc(Arc::new(bytes)));
     let presentation = pptx::SourceBackedPresentation::from_read_at(source).unwrap();
     let handle = Pptx::from_source(presentation, &OpenOptions::new().retain_source(false));
-    let refused = expect_refused(handle.into_editor());
-    let error = refused.error.expect("typed refusal");
+    let error = handle.editable().err().expect("typed refusal");
     assert_eq!(error.code(), Code::UnsupportedCapability);
     assert!(error.suggestion().is_some());
-    assert_eq!(refused.handle.slide_count().unwrap(), 2);
+    assert_eq!(handle.slide_count().unwrap(), 2);
 }
 
 // ---- handle shape ---------------------------------------------------------
@@ -482,4 +632,325 @@ fn handle_is_one_pointer_and_shares_state_on_clone() {
     let handle = open_bytes(std::fs::read(fixture("sample.pptx")).unwrap());
     let clone = handle.clone();
     assert!(Arc::ptr_eq(&handle.0, &clone.0));
+}
+
+#[test]
+fn transient_promotion_fence_failure_can_retry_without_reopening() {
+    use litchi_core::{OwnedSource, SourceVersion};
+    use std::sync::atomic::{AtomicUsize, Ordering};
+    struct FlakySource {
+        source: OwnedSource,
+        fail_version: AtomicUsize,
+    }
+    impl ReadAt for FlakySource {
+        fn len(&self) -> std::io::Result<u64> {
+            self.source.len()
+        }
+        fn version(&self) -> std::io::Result<SourceVersion> {
+            if self
+                .fail_version
+                .fetch_update(Ordering::SeqCst, Ordering::SeqCst, |n| n.checked_sub(1))
+                == Ok(1)
+            {
+                return Err(std::io::Error::other("injected transient version failure"));
+            }
+            self.source.version()
+        }
+        fn read_at(&self, offset: u64, output: &mut [u8]) -> std::io::Result<usize> {
+            self.source.read_at(offset, output)
+        }
+    }
+    let bytes = std::fs::read(fixture("sample.pptx")).unwrap();
+    let source = Arc::new(FlakySource {
+        source: OwnedSource::new(bytes.clone()),
+        fail_version: AtomicUsize::new(0),
+    });
+    let projection = pptx::SourceBackedPresentation::from_read_at(source.clone()).unwrap();
+    let handle = Pptx::from_source(projection, &options());
+    source.fail_version.store(2, Ordering::SeqCst);
+    assert_eq!(handle.editable().err().unwrap().code(), Code::IoError);
+    assert_eq!(source_owner(&handle).to_bytes().unwrap(), bytes);
+    source.fail_version.store(2, Ordering::SeqCst);
+    assert_eq!(handle.editable().err().unwrap().code(), Code::IoError);
+    assert_eq!(source_owner(&handle).to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn adopted_source_revision_drives_text_nodes_and_subsequent_edits() {
+    let bytes = std::fs::read(fixture("sample.pptx")).unwrap();
+    let before = open_bytes(bytes.clone());
+    let original_text = before.text().unwrap();
+    let package = source_owner(&before);
+    let mut edit = package.edit().unwrap();
+    edit.set_shape_text(0, 0_usize, "revised title").unwrap();
+    let committed = edit.commit().unwrap().into_package();
+    let reopened = open_bytes(committed.to_bytes().unwrap());
+    let after = before.adopt_source(committed).unwrap();
+    assert!(after.is_source_backed());
+    assert_eq!(after.text().unwrap(), reopened.text().unwrap());
+    assert!(after.text().unwrap().contains("revised title"));
+    assert_eq!(after.slides().unwrap(), reopened.slides().unwrap());
+    assert_eq!(
+        after.tolerance_report().unwrap(),
+        reopened.tolerance_report().unwrap()
+    );
+    assert_eq!(after.slide(0).unwrap(), reopened.slide(0).unwrap());
+    assert!(after.slide(usize::MAX).unwrap().is_none());
+    assert_eq!(
+        after.slide_catalog().unwrap(),
+        before.slide_catalog().unwrap()
+    );
+    assert_eq!(
+        serde_json::to_value(after.metadata().unwrap()).unwrap(),
+        serde_json::to_value(before.metadata().unwrap()).unwrap()
+    );
+    assert_eq!(after.slide_size().unwrap(), before.slide_size().unwrap());
+    let file = crate::File::Pptx(after.clone());
+    let reopened_file = crate::File::Pptx(reopened);
+    for path in [
+        "/slide[1]",
+        "/slide[1]/shape[1]",
+        "/slide[1]/shape[1]/paragraph[1]/run[1]",
+    ] {
+        assert_eq!(
+            file.get(path).unwrap().view().text().unwrap(),
+            reopened_file.get(path).unwrap().view().text().unwrap()
+        );
+    }
+    let current = source_owner(&after);
+    let mut next = current.edit().unwrap();
+    next.set_shape_text(1, 0_usize, "second revision").unwrap();
+    let final_handle = after
+        .adopt_source(next.commit().unwrap().into_package())
+        .unwrap();
+    let text = final_handle.text().unwrap();
+    assert!(text.contains("revised title"));
+    assert!(text.contains("second revision"));
+    assert_eq!(before.text().unwrap(), original_text);
+    assert_eq!(source_owner(&before).to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn unsigned_managed_source_respects_native_materialization_policy() {
+    use litchi_core::{Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits};
+    use std::num::{NonZeroU64, NonZeroUsize};
+    let budget = Budget::root(
+        "pptx-unsigned-policy",
+        Limits::new(u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX, u64::MAX),
+    );
+    let (_, cancellation) = CancellationSource::pair();
+    let limits =
+        ExecutionLimits::new(NonZeroUsize::MIN, NonZeroUsize::MIN, NonZeroU64::MAX, 0).unwrap();
+    let presentation = pptx::SourceBackedPresentation::from_path_with_limits_and_execution_context(
+        fixture("sample.pptx"),
+        pptx::SourceLimits::default(),
+        ExecutionContext::new(budget, cancellation, limits),
+    )
+    .unwrap();
+    let handle = Pptx::from_source(presentation, &options())
+        .with_signature(super::Signature::RemovalAuthorized);
+    let cold = handle.cold_loads();
+    let error = handle.unsigned_package().unwrap_err();
+    assert!(matches!(
+        error.leaf(),
+        Source::Opc(opc::OpcError::ManagedPackageMaterialization)
+    ));
+    assert_eq!(handle.cold_loads(), cold);
+}
+
+#[test]
+fn source_order_rebinds_slide_facts_and_all_related_parts() {
+    let bytes = related_order_fixture();
+    let before = open_source_package(bytes);
+    let before_ids: Vec<_> = before
+        .slide_catalog()
+        .unwrap()
+        .into_iter()
+        .map(|descriptor| descriptor.slide_id())
+        .collect();
+    assert_eq!(before_ids, [256, 257, 258]);
+
+    let mut edit = source_owner(&before).edit().unwrap();
+    assert!(edit.move_slide(Position::new(0), Position::new(2)).unwrap());
+    let after = before
+        .adopt_source(edit.commit().unwrap().into_package())
+        .unwrap();
+    let after_ids: Vec<_> = after
+        .slide_catalog()
+        .unwrap()
+        .into_iter()
+        .map(|descriptor| descriptor.slide_id())
+        .collect();
+    assert_eq!(after_ids, [257, 258, 256]);
+
+    let file = crate::File::Pptx(after.clone());
+    for (position, (name, notes, comment, modern_title)) in [
+        ("Slide B", "Notes B", "Comment B", "Modern B"),
+        ("Slide C", "Notes C", "Comment C", "Modern C"),
+        ("Slide A", "Notes A", "Comment A", "Modern A"),
+    ]
+    .into_iter()
+    .enumerate()
+    {
+        let slide_number = position + 1;
+        let slide_path = format!("/slide[{slide_number}]");
+        let slide = file.get(slide_path.as_str()).unwrap();
+        assert_eq!(node_property(&slide, "name"), Some(name.into()));
+
+        let notes_path = format!("/slide[{slide_number}]/notes");
+        let notes_node = file.get(notes_path.as_str()).unwrap();
+        assert_eq!(node_text(&notes_node), Some(notes.into()));
+
+        let comment_path = format!("/slide[{slide_number}]/comment[1]");
+        let comment_node = file.get(comment_path.as_str()).unwrap();
+        assert_eq!(node_text(&comment_node), Some(comment.into()));
+
+        let modern_path = format!("/slide[{slide_number}]/modernComment[1]");
+        let modern_node = file.get(modern_path.as_str()).unwrap();
+        assert_eq!(
+            node_property(&modern_node, "title"),
+            Some(modern_title.into())
+        );
+    }
+
+    assert!(after.slide(3).unwrap().is_none());
+    assert!(after.slide(usize::MAX).unwrap().is_none());
+}
+
+#[test]
+fn stock_builder_source_order_preserves_presentation_properties() {
+    let bytes = related_order_fixture();
+    let before_opc = opc::OpcPackage::from_bytes(&bytes).unwrap();
+    let pres_props_uri = opc::PackURI::new("/ppt/presProps.xml").unwrap();
+    let before_pres_props = before_opc
+        .get_part(&pres_props_uri)
+        .unwrap()
+        .blob()
+        .to_vec();
+
+    let source = open_source_package(bytes);
+    let moved = crate::File::Pptx(source)
+        .move_to("/slide[1]", crate::Placement::End)
+        .unwrap();
+    let after_opc = opc::OpcPackage::from_bytes(&moved.to_bytes().unwrap()).unwrap();
+    let after_pres_props = after_opc.get_part(&pres_props_uri).unwrap().blob().to_vec();
+    assert_eq!(after_pres_props, before_pres_props);
+}
+
+fn unknown_pres_props_extension_fixture() -> Vec<u8> {
+    let bytes = related_order_fixture();
+    let mut package = opc::OpcPackage::from_bytes(&bytes).unwrap();
+    let pres_props_uri = opc::PackURI::new("/ppt/presProps.xml").unwrap();
+    let part = package.get_part_mut(&pres_props_uri).unwrap();
+    let xml = String::from_utf8(part.blob().to_vec()).unwrap();
+    let marker = "</p:extLst>";
+    let marker_start = xml.find(marker).unwrap();
+    let extension =
+        r#"<p:ext uri="urn:litchi:test:unknown"><x:payload xmlns:x="urn:litchi:test"/></p:ext>"#;
+    let mut updated = xml;
+    updated.insert_str(marker_start, extension);
+    part.set_blob(updated.into_bytes());
+    opc::PackageWriter::to_bytes(&package).unwrap()
+}
+
+#[test]
+fn unknown_presentation_properties_extension_remains_refused() {
+    let source = open_source_package(unknown_pres_props_extension_fixture());
+    let error = match crate::File::Pptx(source).move_to("/slide[1]", crate::Placement::End) {
+        Ok(_) => panic!("unknown presentation-properties extension was silently rewritten"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    assert!(matches!(
+        error.leaf(),
+        Source::Pptx(pptx::Error::SlideOrderPlan {
+            kind: pptx::SlideOrderRefusal::PresentationProperties,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn source_adoption_rejects_a_revision_from_an_independently_opened_owner() {
+    let bytes = related_order_fixture();
+    let original = open_source_package(bytes.clone());
+    let foreign = open_source_package(bytes);
+    let error = match original.adopt_source(source_owner(&foreign)) {
+        Ok(_) => panic!("independently opened source owner was adopted"),
+        Err(error) => error,
+    };
+    assert_eq!(error.code(), Code::IoError);
+    assert!(matches!(
+        error.leaf(),
+        Source::Pptx(pptx::Error::StaleSource)
+    ));
+}
+
+#[test]
+fn reopened_structural_inverse_drives_effective_catalog_and_related_reads() {
+    let mut builder = pptx::builder::Builder::new().unwrap();
+    for text in ["A", "B", "C"] {
+        builder
+            .presentation()
+            .unwrap()
+            .add_slide()
+            .unwrap()
+            .add_text_box(text, 0, 0, 914_400, 914_400);
+    }
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let original = open_source_package(bytes);
+    let native = source_owner(&original);
+    let mut edit = native.edit().unwrap();
+    edit.remove_slide(Position::new(1)).unwrap();
+    let (removed, patch) = edit.commit().unwrap().into_parts();
+    let inverse = pptx::source::Patch::from_bytes(&patch.inverse().to_bytes().unwrap()).unwrap();
+    let reopened = open_source_package(removed.to_bytes().unwrap());
+    let restored_native = source_owner(&reopened).apply(&inverse).unwrap();
+    assert!(restored_native.source_position(Position::new(1)).is_err());
+    let restored = reopened.adopt_source(restored_native).unwrap();
+
+    let cold = restored.cold_loads();
+    assert_eq!(
+        restored.slide_catalog().unwrap(),
+        original.slide_catalog().unwrap()
+    );
+    assert_eq!(
+        restored.cold_loads(),
+        cold,
+        "catalog must not decode slide payloads"
+    );
+    assert_eq!(restored.slides().unwrap(), original.slides().unwrap());
+    for position in 0..3 {
+        assert_eq!(
+            restored.slide_facts(position).unwrap(),
+            original.slide_facts(position).unwrap()
+        );
+        assert_eq!(restored.slide_notes(position).unwrap(), None);
+        assert!(restored.slide_comments(position).unwrap().is_none());
+        assert!(restored.slide_modern_comments(position).unwrap().is_none());
+    }
+    assert!(restored.slide_facts(3).unwrap().is_none());
+    assert!(restored.slide_notes(3).unwrap().is_none());
+    assert!(restored.slide_comments(3).unwrap().is_none());
+    assert!(restored.slide_modern_comments(3).unwrap().is_none());
+    let file = crate::File::Pptx(restored);
+    assert_eq!(
+        node_text(&file.get("/slide[2]/shape[1]").unwrap()),
+        Some("B".into())
+    );
+    let changed = file
+        .set(
+            "/slide[2]/shape[1]",
+            crate::props! { "text" => "restored B" },
+        )
+        .unwrap();
+    assert_eq!(
+        node_text(&changed.get("/slide[2]/shape[1]").unwrap()),
+        Some("restored B".into())
+    );
+    let removed_again = file.remove("/slide[2]").unwrap();
+    assert_eq!(
+        removed_again.to_bytes().unwrap(),
+        source_owner(&reopened).to_bytes().unwrap()
+    );
 }

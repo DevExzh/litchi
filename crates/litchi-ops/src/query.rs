@@ -76,10 +76,11 @@
 
 mod arg;
 mod bounds;
-mod compile;
+pub(crate) mod compile;
 #[cfg(any(test, feature = "test-support"))]
 mod fake;
 pub(crate) mod inspect;
+mod matches;
 mod plan;
 #[cfg(test)]
 mod tests;
@@ -87,6 +88,7 @@ pub(crate) mod walk;
 
 pub use arg::{IntoQuery, QueryArg};
 pub use litchi_core::selector::Query;
+pub use matches::Matches;
 pub use plan::{Diagnostic, DiagnosticKind, Plan};
 
 use crate::Result;
@@ -95,12 +97,9 @@ use walk::Walk;
 
 /// Runs `selector` over the document the adapter `nav` reads: the entry
 /// point `File::query` dispatches to (M1 step R5).
-pub(crate) fn run<'a, 'q, 'f, N>(
-    nav: &'a N,
-    selector: impl IntoQuery<'q>,
-) -> Result<Walk<'a, 'q, 'f, N>>
+pub(crate) fn run<'q, 'f, N>(nav: N, selector: impl IntoQuery<'q>) -> Result<Walk<'q, 'f, N>>
 where
-    N: Inspect<'f> + 'a,
+    N: Inspect<'f>,
     N::Node: Clone,
 {
     let plan = selector.into_query()?.into_plan::<N>()?;
@@ -288,9 +287,9 @@ pub mod __fake {
     /// As [`Plan::compile`] does for a real format.
     pub fn compile_for<'q>(family: Family, query: &Query<'q>) -> Result<Plan<'q>> {
         match family {
-            Family::Word => compile::<Nav<'_, WordKind>>(query),
-            Family::Presentation => compile::<Nav<'_, SlideKind>>(query),
-            Family::Workbook => compile::<Nav<'_, SheetKind>>(query),
+            Family::Word => compile::<&Nav<'_, WordKind>>(query),
+            Family::Presentation => compile::<&Nav<'_, SlideKind>>(query),
+            Family::Workbook => compile::<&Nav<'_, SheetKind>>(query),
         }
     }
 

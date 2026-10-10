@@ -82,6 +82,9 @@ pub(crate) struct LockedState {
     encryption: EncryptionKind,
     source: LockedSource,
     options: OpenOptions,
+    /// Stable path origin, when the encrypted container was opened by path.
+    /// It is metadata only and is intentionally omitted from `Debug`.
+    origin: Option<Arc<std::path::Path>>,
 }
 
 /// The kind of container an encrypted input arrived in.
@@ -130,13 +133,39 @@ impl Locked {
         source: LockedSource,
         options: &OpenOptions,
     ) -> Self {
+        Self::new_with_origin(container, format, encryption, source, options, None)
+    }
+
+    /// Build a locked handle while retaining the stable path origin of the
+    /// open. In-memory routes continue to use [`Self::new`] and leave it
+    /// unset.
+    pub(crate) fn new_with_origin(
+        container: Container,
+        format: Option<FileFormat>,
+        encryption: EncryptionKind,
+        source: LockedSource,
+        options: &OpenOptions,
+        origin: Option<Arc<std::path::Path>>,
+    ) -> Self {
         Self(Arc::new(LockedState {
             container,
             format,
             encryption,
             source,
             options: options.clone(),
+            origin,
         }))
+    }
+
+    /// A locked handle carrying the same source and a path origin supplied by
+    /// the path route after content classification.
+    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+    #[allow(
+        dead_code,
+        reason = "used by the OOXML path-origin route when that feature is enabled"
+    )]
+    pub(crate) fn with_origin(&self, origin: Option<Arc<std::path::Path>>) -> Self {
+        Self(Arc::new(self.0.clone_with_origin(origin)))
     }
 
     /// The format of the encrypted content.
@@ -188,6 +217,39 @@ impl Locked {
         match self.family() {
             Some(known) if known != family => Error::unsupported_format(self.0.format),
             _ => self.read_error(),
+        }
+    }
+}
+
+impl LockedState {
+    /// Clone the state envelope while sharing positional sources and
+    /// preserving the open policy. Owned bytes are cloned only when a caller
+    /// needs an independent locked handle.
+    #[cfg(any(
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "encryption"
+    ))]
+    #[allow(
+        dead_code,
+        reason = "used by the OOXML path-origin transition in feature-enabled builds"
+    )]
+    fn clone_with_origin(&self, origin: Option<Arc<std::path::Path>>) -> Self {
+        Self {
+            container: self.container,
+            format: self.format,
+            encryption: self.encryption,
+            source: match &self.source {
+                LockedSource::Owned(bytes) => LockedSource::Owned(bytes.clone()),
+                #[cfg(any(unix, windows))]
+                LockedSource::Positional { source, version } => LockedSource::Positional {
+                    source: Arc::clone(source),
+                    version: *version,
+                },
+            },
+            options: self.options.clone(),
+            origin,
         }
     }
 }
@@ -248,12 +310,13 @@ impl Locked {
             Err(shared) => shared.duplicate(),
         };
         let bytes = state.source.into_bytes(&state.options)?;
-        crate::open::unlock(
+        crate::open::unlock_with_origin(
             state.container,
             bytes,
             password.as_str(),
             state.format,
             &state.options,
+            state.origin,
         )
     }
 }
@@ -281,20 +344,7 @@ impl LockedState {
     /// A copy of a state another clone still shares. Only an in-memory
     /// source is copied; a positional source is shared.
     fn duplicate(&self) -> Self {
-        Self {
-            container: self.container,
-            format: self.format,
-            encryption: self.encryption,
-            source: match &self.source {
-                LockedSource::Owned(bytes) => LockedSource::Owned(bytes.clone()),
-                #[cfg(any(unix, windows))]
-                LockedSource::Positional { source, version } => LockedSource::Positional {
-                    source: Arc::clone(source),
-                    version: *version,
-                },
-            },
-            options: self.options.clone(),
-        }
+        self.clone_with_origin(self.origin.clone())
     }
 }
 

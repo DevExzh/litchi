@@ -372,7 +372,7 @@ pub(super) fn open_path(
         Host::Xls => xls_source(shared, &source, version, options)?,
         Host::EncryptedOoxml => {
             let kind = ooxml_kind(&mut &shared);
-            File::Locked(Locked::new(
+            File::Locked(Locked::new_with_origin(
                 Container::Ooxml,
                 ooxml_hint,
                 kind,
@@ -381,6 +381,7 @@ pub(super) fn open_path(
                     version,
                 },
                 options,
+                Some(crate::open::path::stable_origin(path)?),
             ))
         },
         Host::Unknown => return Err(Error::unsupported_format(None)),

@@ -287,14 +287,17 @@ impl fmt::Display for Code {
 
 /// The typed leaf error an [`Error`] was converted from.
 ///
-/// Each variant exists only when the cargo feature of its format is enabled.
+/// Each format-specific variant exists only when its cargo feature is enabled.
 /// ODT, ODS and ODP report [`litchi_core::Error`] and arrive as
 /// [`Source::Core`].
-#[derive(Debug)]
 #[non_exhaustive]
 pub enum Source {
     /// The error was raised by the unified layer itself.
     None,
+    /// A bounded batch JSON ingress error.
+    Batch(crate::batch::Error),
+    /// An explicit transaction admission or replay error.
+    Transaction(crate::transaction::Error),
     /// An I/O error.
     Io(io::Error),
     /// A shared Litchi core error.
@@ -366,11 +369,21 @@ pub enum Source {
     Formula(litchi_formula::FormulaError),
 }
 
+// Leaf diagnostic payloads can contain authored document text. Typed access
+// remains explicit through `leaf()` and the standard error source chain.
+impl fmt::Debug for Source {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Source").finish_non_exhaustive()
+    }
+}
+
 impl Source {
     /// The leaf error as a standard error, or `None` for [`Source::None`].
     fn as_error(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
             Self::None => None,
+            Self::Batch(error) => Some(error),
+            Self::Transaction(error) => Some(error),
             Self::Io(error) => Some(error),
             Self::Core(error) => Some(error),
             Self::Execution(error) => Some(error),
@@ -428,7 +441,8 @@ impl Source {
 /// Its [`Display`](fmt::Display) form is facade-level: the code and its
 /// summary for an error converted from a leaf error, or the code and the
 /// message for an error the unified layer raised itself, followed by the
-/// format and the suggestion when there are any. The leaf error's own text is
+/// format, the failing property and batch item, and the suggestion when there
+/// are any. The leaf error's own text is
 /// [`Error::message`], and the leaf error is [`std::error::Error::source`], so
 /// an error-chain printer shows it once, as the cause.
 #[derive(Clone)]
@@ -441,6 +455,10 @@ struct Inner {
     suggestion: Option<Cow<'static, str>>,
     format: Option<FileFormat>,
     detected: Option<FileFormat>,
+    /// The zero-based index of the batch item that failed.
+    item: Option<usize>,
+    /// The property key that failed, as the caller wrote it.
+    property: Option<Cow<'static, str>>,
     /// Shared so that cloning an error never copies or loses its leaf error.
     source: Arc<Source>,
 }
@@ -458,6 +476,8 @@ impl Error {
             suggestion: None,
             format: None,
             detected: None,
+            item: None,
+            property: None,
             source: Arc::new(Source::None),
         }))
     }
@@ -553,13 +573,18 @@ impl Error {
 
     /// Reclassifies a leaf error that the caller's own argument caused,
     /// keeping its typed leaf and message: [`Code::InvalidArgument`] for
-    /// input that does not parse, [`Code::OutOfRange`] for a position outside
+    /// input that does not parse, [`Code::InvalidValue`] for an authored property,
+    /// [`Code::DuplicateName`] for a conflicting authored name, and
+    /// [`Code::OutOfRange`] for a position outside
     /// its collection. A leaf crate reports such input with the same error it
     /// reports for malformed file content, so only the call site that
     /// received the argument can tell the two apart.
-    #[cfg(feature = "xlsx")]
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
     pub(crate) fn caused_by_argument(mut self, code: Code) -> Self {
-        debug_assert!(matches!(code, Code::InvalidArgument | Code::OutOfRange));
+        debug_assert!(matches!(
+            code,
+            Code::InvalidArgument | Code::InvalidValue | Code::OutOfRange | Code::DuplicateName
+        ));
         self.0.code = code;
         self.0.suggestion = None;
         self
@@ -597,6 +622,34 @@ impl Error {
         self.0.detected
     }
 
+    /// Sets the zero-based index of the batch item that failed.
+    #[must_use]
+    pub fn with_item(mut self, item: usize) -> Self {
+        self.0.item = Some(item);
+        self
+    }
+
+    /// Sets the property key that failed, as the caller wrote it.
+    #[must_use]
+    pub fn with_property(mut self, property: impl Into<Cow<'static, str>>) -> Self {
+        self.0.property = Some(property.into());
+        self
+    }
+
+    /// The zero-based index of the batch item that failed, when this error was
+    /// attributed to one.
+    #[must_use]
+    pub fn item(&self) -> Option<usize> {
+        self.0.item
+    }
+
+    /// The property key that failed, as the caller wrote it, when one was
+    /// responsible for the error.
+    #[must_use]
+    pub fn property(&self) -> Option<&str> {
+        self.0.property.as_deref()
+    }
+
     /// The typed leaf error this error was converted from. Clones of an error
     /// share it.
     #[must_use]
@@ -616,6 +669,8 @@ impl Error {
             suggestion: class.suggestion,
             format,
             detected: class.detected,
+            item: None,
+            property: None,
             source: Arc::new(source),
         }))
     }
@@ -626,8 +681,6 @@ impl fmt::Debug for Error {
         formatter
             .debug_struct("Error")
             .field("code", &self.0.code)
-            .field("message", &self.0.message)
-            .field("suggestion", &self.0.suggestion)
             .field("format", &self.0.format)
             .field("detected", &self.0.detected)
             .field("source", &self.0.source)
@@ -649,6 +702,12 @@ impl fmt::Display for Error {
             if let Some(format) = self.0.format.or(self.0.detected) {
                 write!(formatter, " [{format:?}]")?;
             }
+        }
+        if let Some(property) = &self.0.property {
+            write!(formatter, " (property: {property})")?;
+        }
+        if let Some(item) = self.0.item {
+            write!(formatter, " (item: {item})")?;
         }
         if let Some(suggestion) = &self.0.suggestion {
             write!(formatter, " (suggestion: {suggestion})")?;
@@ -717,6 +776,28 @@ trait Classify {
     fn classify(&self) -> Class;
 }
 
+impl Classify for crate::transaction::Error {
+    fn classify(&self) -> Class {
+        Class::of(match self {
+            Self::PatchConflict => Code::InvalidInput,
+            Self::InvalidLimit { .. } => Code::InvalidArgument,
+            Self::Limit { .. } => Code::LimitExceeded,
+            Self::Allocation { .. } => Code::InternalError,
+        })
+    }
+}
+
+impl Classify for crate::batch::Error {
+    fn classify(&self) -> Class {
+        Class::of(match self {
+            Self::InvalidLimit { .. } => Code::InvalidArgument,
+            Self::Limit { .. } => Code::LimitExceeded,
+            Self::Malformed { .. } => Code::CorruptBatch,
+            Self::Allocation { .. } => Code::InternalError,
+        })
+    }
+}
+
 impl Classify for io::Error {
     fn classify(&self) -> Class {
         // Format-owned cooperative adapters carry cancellation and budget
@@ -729,6 +810,7 @@ impl Classify for io::Error {
         }
         match self.kind() {
             io::ErrorKind::NotFound => Class::of(Code::FileNotFound),
+            io::ErrorKind::AlreadyExists => Class::of(Code::FileExists),
             _ => Class::of(Code::IoError),
         }
     }
@@ -895,6 +977,10 @@ impl Classify for litchi_docx::document::Error {
         match self {
             Self::Document(error) => error.classify(),
             Self::OutOfBounds { .. } => Class::of(Code::OutOfRange),
+            Self::Refused {
+                reason: litchi_docx::document::Refusal::InvalidPropertyValue,
+                ..
+            } => Class::of(Code::InvalidValue),
             Self::Refused { .. } | Self::Transfer(_) => Class::of(Code::UnsupportedCapability),
             Self::Limit { .. } => Class::of(Code::LimitExceeded),
             // The patch target no longer holds the bytes the edit captured:
@@ -913,8 +999,16 @@ impl Classify for litchi_docx::document::Error {
 impl Classify for litchi_pptx::Error {
     fn classify(&self) -> Class {
         match self {
+            #[cfg(feature = "encryption")]
+            Self::Encryption(error) => error.classify(),
+            #[cfg(feature = "encryption")]
+            Self::EncryptionPolicy { source, .. } => match source {
+                litchi_ooxml_common::package_encryption::PolicyError::OrdinaryOutputWouldRemoveEncryption { .. } => Class::of(Code::DocumentProtected),
+                litchi_ooxml_common::package_encryption::PolicyError::NoRetainedMode => Class::of(Code::UnsupportedCapability),
+            },
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
+            Self::StaleSource => Class::of(Code::IoError),
             // The core-properties reader reports its OPC failures, among them
             // a source change or cancellation during the read, through the
             // shared OOXML error.
@@ -923,8 +1017,27 @@ impl Classify for litchi_pptx::Error {
             Self::IndexOutOfBounds { .. }
             | Self::SlideIndexOutOfBounds { .. }
             | Self::FontIndexOutOfBounds { .. } => Class::of(Code::OutOfRange),
-            Self::NameNotFound(_) | Self::SlideNameNotFound(_) | Self::FontNotFound(_) => {
+            Self::NameNotFound(_) | Self::SlideNameNotFound(_) | Self::SlideLayoutNameNotFound(_) | Self::FontNotFound(_) => {
                 Class::of(Code::NotFound)
+            },
+            Self::SlideOrderPlan { kind, .. } => match kind {
+                litchi_pptx::SlideOrderRefusal::ModifyVerifier => {
+                    Class::of(Code::DocumentProtected)
+                },
+                litchi_pptx::SlideOrderRefusal::AmbiguousBindings => Class::of(Code::CorruptFile),
+                _ => Class::of(Code::UnsupportedCapability),
+            },
+            Self::SlideRemovalPlan { kind, .. } => match kind {
+                litchi_pptx::SlideRemovalRefusal::SignedPackage => {
+                    Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
+                },
+                litchi_pptx::SlideRemovalRefusal::ProtectedPresentation => {
+                    Class::of(Code::DocumentProtected)
+                },
+                litchi_pptx::SlideRemovalRefusal::FinalSlide => {
+                    Class::of(Code::InvalidArgument)
+                },
+                _ => Class::of(Code::UnsupportedCapability),
             },
             Self::UnsafeEdit { .. } => Class::of(Code::UnsupportedCapability),
             Self::Allocation { .. } => Class::of(Code::InternalError),
@@ -938,12 +1051,72 @@ impl Classify for litchi_xlsx::Error {
     fn classify(&self) -> Class {
         match self {
             Self::Package(error) => error.classify(),
+            #[cfg(feature = "encryption")]
+            Self::Encryption(error) => error.classify(),
+            #[cfg(feature = "encryption")]
+            Self::EncryptionPolicy { source, .. } => match source {
+                litchi_ooxml_common::package_encryption::PolicyError::OrdinaryOutputWouldRemoveEncryption { .. } => Class::suggest(Code::DocumentProtected, "use SaveOptions::reencrypt for encrypted publication"),
+                litchi_ooxml_common::package_encryption::PolicyError::NoRetainedMode => Class::of(Code::UnsupportedCapability),
+            },
             Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
             Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
             Self::Unsupported { .. } | Self::UnsupportedSelector => {
                 Class::of(Code::UnsupportedCapability)
             },
             Self::NotWorksheet { .. } => Class::of(Code::UnsupportedType),
+            Self::EditBlocked { reason, .. } => match reason {
+                litchi_xlsx::EditBlock::ProtectedSheet => Class::of(Code::DocumentProtected),
+                litchi_xlsx::EditBlock::CoveredMerge
+                | litchi_xlsx::EditBlock::GroupFormula
+                | litchi_xlsx::EditBlock::DataValidation
+                | litchi_xlsx::EditBlock::UnknownCell
+                | litchi_xlsx::EditBlock::MarkupCompatibility => Class::of(Code::UnsupportedCapability),
+                _ => Class::of(Code::CorruptFile),
+            },
+            Self::MergeEditBlocked { reason, .. } => match reason {
+                litchi_xlsx::MergeEditBlock::ProtectedSheet => Class::of(Code::DocumentProtected),
+                litchi_xlsx::MergeEditBlock::SingleCell => Class::of(Code::InvalidValue),
+                litchi_xlsx::MergeEditBlock::Overlap { .. }
+                | litchi_xlsx::MergeEditBlock::TableOverlap { .. }
+                | litchi_xlsx::MergeEditBlock::FollowerContent { .. }
+                | litchi_xlsx::MergeEditBlock::GroupFormula
+                | litchi_xlsx::MergeEditBlock::MarkupCompatibility
+                | litchi_xlsx::MergeEditBlock::UnmodeledPayload => Class::of(Code::UnsupportedCapability),
+                _ => Class::of(Code::CorruptFile),
+            },
+            Self::RowEditBlocked { reason, .. } => match reason {
+                litchi_xlsx::RowEditBlock::ProtectedSheet => Class::of(Code::DocumentProtected),
+                _ => Class::of(Code::CorruptFile),
+            },
+            Self::ColumnEditBlocked { reason, .. } => match reason {
+                litchi_xlsx::ColumnEditBlock::ProtectedSheet => Class::of(Code::DocumentProtected),
+                litchi_xlsx::ColumnEditBlock::MarkupCompatibility
+                | litchi_xlsx::ColumnEditBlock::StyleNeedsWidth => Class::of(Code::UnsupportedCapability),
+                _ => Class::of(Code::CorruptFile),
+            },
+            Self::TabEditBlocked { reason, .. } => match reason {
+                litchi_xlsx::TabEditBlock::ProtectedWorkbook => Class::of(Code::DocumentProtected),
+                litchi_xlsx::TabEditBlock::LastVisibleTab | litchi_xlsx::TabEditBlock::NotVisible => {
+                    Class::of(Code::InvalidArgument)
+                },
+                litchi_xlsx::TabEditBlock::SheetLimit | litchi_xlsx::TabEditBlock::ActiveTabLimit => {
+                    Class::of(Code::LimitExceeded)
+                },
+                litchi_xlsx::TabEditBlock::TrackedWorkbook
+                | litchi_xlsx::TabEditBlock::MarkupCompatibility => Class::of(Code::UnsupportedCapability),
+                _ => Class::of(Code::CorruptFile),
+            },
+            Self::RenameBlocked { .. } => Class::of(Code::UnsupportedCapability),
+            Self::SheetRemoveBlocked { reason, .. } => match reason {
+                litchi_xlsx::RemoveBlock::LastSheet => Class::of(Code::InvalidArgument),
+                litchi_xlsx::RemoveBlock::MixedEdit
+                | litchi_xlsx::RemoveBlock::IncomingReference
+                | litchi_xlsx::RemoveBlock::UnmodeledReference
+                | litchi_xlsx::RemoveBlock::MarkupCompatibility
+                | litchi_xlsx::RemoveBlock::MacroProject
+                | litchi_xlsx::RemoveBlock::IncomingRelationship => Class::of(Code::UnsupportedCapability),
+                _ => Class::of(Code::CorruptFile),
+            },
             Self::Allocation { .. } => Class::of(Code::InternalError),
             // A coordinate or range the leaf read from the file. One the
             // caller passed is reclassified where it was received
@@ -1244,6 +1417,8 @@ macro_rules! from_leaf {
 }
 
 from_leaf!(io::Error => Io, None);
+from_leaf!(crate::batch::Error => Batch, None);
+from_leaf!(crate::transaction::Error => Transaction, None);
 from_leaf!(litchi_core::Error => Core, None);
 from_leaf!(ExecutionError => Execution, None);
 from_leaf!(litchi_core::selector::ParseError => Selector, None);
@@ -1267,11 +1442,30 @@ from_leaf!(
 );
 from_leaf!(#[cfg(feature = "pptx")] litchi_pptx::Error => Pptx, Some(FileFormat::Pptx));
 from_leaf!(#[cfg(feature = "xlsx")] litchi_xlsx::Error => Xlsx, Some(FileFormat::Xlsx));
-from_leaf!(
-    #[cfg(feature = "xlsb")]
-    litchi_xlsb::package::PackageError => Xlsb, Some(FileFormat::Xlsb)
-);
-from_leaf!(#[cfg(feature = "xlsb")] litchi_xlsb::Error => XlsbRaw, Some(FileFormat::Xlsb));
+// XLSB formula and relationship errors may retain authored values. Keep the
+// typed cause, but expose only a content-free classification in diagnostics.
+#[cfg(feature = "xlsb")]
+impl From<litchi_xlsb::package::PackageError> for Error {
+    fn from(error: litchi_xlsb::package::PackageError) -> Self {
+        let class = error.classify();
+        let message = class.code.summary();
+        Self::from_class(class, message, Some(FileFormat::Xlsb), Source::Xlsb(error))
+    }
+}
+
+#[cfg(feature = "xlsb")]
+impl From<litchi_xlsb::Error> for Error {
+    fn from(error: litchi_xlsb::Error) -> Self {
+        let class = error.classify();
+        let message = class.code.summary();
+        Self::from_class(
+            class,
+            message,
+            Some(FileFormat::Xlsb),
+            Source::XlsbRaw(error),
+        )
+    }
+}
 from_leaf!(#[cfg(feature = "doc")] litchi_doc::Error => Doc, Some(FileFormat::Doc));
 from_leaf!(
     #[cfg(feature = "doc")]

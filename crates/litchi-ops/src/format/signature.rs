@@ -13,11 +13,14 @@
 //! signature parts. Nothing else in the unified layer removes a signature.
 
 use std::ops::Deref;
+use std::path::Path;
 use std::sync::Arc;
 
 use litchi_core::FileFormat;
 
-use crate::error::{Error, Result};
+use crate::error::Error;
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls", feature = "xlsb"))]
+use crate::error::Result;
 
 /// What a handle may do with the signature of the input it was opened from.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -42,17 +45,30 @@ pub(crate) enum Signature {
 pub(crate) struct Opened<S> {
     signature: Signature,
     state: Arc<S>,
+    /// Stable path origin, when this state came from a path opener. This is
+    /// handle metadata rather than format state, so signature transitions and
+    /// immutable owner replacements can carry it without duplicating fields
+    /// in every format-specific state.
+    origin: Option<Arc<Path>>,
 }
 
 impl<S> Opened<S> {
     /// The handle of a fresh open, which found no signature yet: the opener
     /// re-marks it when the container turns out to be signed.
     pub(crate) fn new(state: S) -> Arc<Self> {
-        Self::from_parts(Signature::Unsigned, Arc::new(state))
+        Self::from_parts_with_origin(Signature::Unsigned, Arc::new(state), None)
     }
 
-    fn from_parts(signature: Signature, state: Arc<S>) -> Arc<Self> {
-        Arc::new(Self { signature, state })
+    fn from_parts_with_origin(
+        signature: Signature,
+        state: Arc<S>,
+        origin: Option<Arc<Path>>,
+    ) -> Arc<Self> {
+        Arc::new(Self {
+            signature,
+            state,
+            origin,
+        })
     }
 
     /// This handle's signature disposition.
@@ -62,25 +78,21 @@ impl<S> Opened<S> {
 
     /// A handle over the same state with another disposition.
     pub(crate) fn with_signature(&self, signature: Signature) -> Arc<Self> {
-        Self::from_parts(signature, Arc::clone(&self.state))
+        Self::from_parts_with_origin(signature, Arc::clone(&self.state), self.origin.clone())
     }
 
-    /// Move the state out of a handle that nothing else shares: no clone of
-    /// the handle and no other disposition of the same open. Otherwise the
-    /// handle comes back unchanged.
-    #[cfg(any(feature = "pptx", feature = "xlsx"))]
-    pub(crate) fn try_unwrap(this: Arc<Self>) -> std::result::Result<(Signature, S), Arc<Self>> {
-        let opened = Arc::try_unwrap(this)?;
-        match Arc::try_unwrap(opened.state) {
-            Ok(state) => Ok((opened.signature, state)),
-            Err(state) => Err(Self::from_parts(opened.signature, state)),
-        }
+    /// A handle over the same state with a stable path origin. The origin is
+    /// deliberately absent from `Debug`; it is persistence metadata, not a
+    /// document value.
+    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+    pub(crate) fn with_origin(&self, origin: Option<Arc<Path>>) -> Arc<Self> {
+        Self::from_parts_with_origin(self.signature, Arc::clone(&self.state), origin)
     }
 
-    /// A handle over state moved out with [`Self::try_unwrap`].
-    #[cfg(feature = "pptx")]
-    pub(crate) fn rebuild(signature: Signature, state: S) -> Arc<Self> {
-        Self::from_parts(signature, Arc::new(state))
+    /// The stable path origin retained by this open, if any.
+    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+    pub(crate) fn origin(&self) -> Option<Arc<Path>> {
+        self.origin.clone()
     }
 }
 
@@ -103,7 +115,7 @@ pub(crate) fn refusal(format: FileFormat) -> Error {
 /// over these bytes (record 0009 D4: promote through the exact source), so
 /// every ZIP member the edit and the signature removal do not touch is
 /// published byte for byte.
-#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+#[cfg(feature = "xlsb")]
 pub(crate) fn exact_source(package: &litchi_opc::SourceBackedPackage) -> Result<Vec<u8>> {
     let artifact = package.source_artifact();
     let mut bytes = Vec::new();
@@ -157,6 +169,7 @@ pub(crate) fn unsign_compound_file(
 
 /// Reserve exactly `length` bytes and return the length, or fail with a
 /// typed limit or allocation error.
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls", feature = "xlsb"))]
 fn reserve(bytes: &mut Vec<u8>, length: u64, resource: &'static str) -> Result<usize> {
     let Ok(length) = usize::try_from(length) else {
         return Err(

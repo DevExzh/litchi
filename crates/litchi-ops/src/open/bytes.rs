@@ -113,21 +113,26 @@ fn ooxml(
 
     let limits = options.ooxml_limits.unwrap_or_default();
     if options.source_mode == crate::SourceMode::Eager {
-        // The eager detection route: the owning package keeps the input's
-        // ZIP layout (record 0008 A5).
+        // The eager detection route retains the caller's owned archive.  A
+        // borrowed `from_bytes` package has no preservation records, so an
+        // eager no-op would silently canonicalize the ZIP on publication.
         #[cfg(any(test, feature = "test-support"))]
         crate::detect::record_opc_probe();
-        return match litchi_opc::OpcPackage::from_bytes_with_limits(&bytes, limits) {
+        let shared = Arc::new(bytes);
+        return match litchi_opc::OpcPackage::from_shared_vec_with_limits(
+            Arc::clone(&shared),
+            limits,
+        ) {
             Ok(package) => match crate::detect::ooxml::detect_ooxml_format_from_package(&package) {
-                Some(format) => {
-                    drop(bytes);
-                    Ok(Ok(super::ooxml_from_eager_package(
-                        format, package, options,
-                    )?))
+                Some(format) => Ok(Ok(super::ooxml_from_eager_package(
+                    format, package, options,
+                )?)),
+                None => {
+                    drop(package);
+                    Ok(Err(reclaim(shared)))
                 },
-                None => Ok(Err(bytes)),
             },
-            Err(error) if super::ooxml_probe_falls_back(&error, odf) => Ok(Err(bytes)),
+            Err(error) if super::ooxml_probe_falls_back(&error, odf) => Ok(Err(reclaim(shared))),
             Err(error) => Err(error.into()),
         };
     }

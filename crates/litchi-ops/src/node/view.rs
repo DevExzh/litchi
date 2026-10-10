@@ -348,6 +348,7 @@ impl<'n, 'f> View<'n, 'f> {
 /// ```
 pub struct Format<'a> {
     props: &'static [PropSpec],
+    hidden: &'static [&'static str],
     next: usize,
     source: Source<'a>,
 }
@@ -365,6 +366,16 @@ pub(crate) enum Source<'a> {
     /// The fake format: values aligned with the property table.
     #[cfg(any(test, feature = "test-support"))]
     Fake(&'a [Option<Value<'static>>]),
+    /// A DOCX node's parsed property set.
+    #[cfg(feature = "docx")]
+    Docx(crate::format::docx::Props<'a>),
+    /// An XLSX node's leaf values.
+    #[cfg(feature = "xlsx")]
+    Xlsx(crate::format::xlsx::Props<'a>),
+    #[cfg(feature = "pptx")]
+    Pptx(crate::format::pptx::Props<'a>),
+    #[cfg(feature = "xlsb")]
+    Xlsb(crate::format::xlsb::Props<'a>),
 }
 
 impl<'a> Source<'a> {
@@ -380,6 +391,14 @@ impl<'a> Source<'a> {
             },
             #[cfg(any(test, feature = "test-support"))]
             Self::Fake(values) => values.get(index)?.as_ref().map(Value::borrowed),
+            #[cfg(feature = "docx")]
+            Self::Docx(ref props) => props.get(index),
+            #[cfg(feature = "xlsx")]
+            Self::Xlsx(ref props) => props.get(index),
+            #[cfg(feature = "pptx")]
+            Self::Pptx(ref props) => props.get(index),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(ref props) => props.get(index),
         }
     }
 }
@@ -393,9 +412,17 @@ impl<'a> Format<'a> {
     pub(crate) const fn new(props: &'static [PropSpec], source: Source<'a>) -> Self {
         Self {
             props,
+            hidden: &[],
             next: 0,
             source,
         }
+    }
+
+    /// Omit raw properties from ordinary projection; indexed query access remains explicit.
+    #[cfg(feature = "docx")]
+    pub(crate) const fn without(mut self, hidden: &'static [&'static str]) -> Self {
+        self.hidden = hidden;
+        self
     }
 
     /// No entries.
@@ -423,6 +450,9 @@ impl<'a> Iterator for Format<'a> {
         while let Some(spec) = self.props.get(self.next) {
             let index = self.next;
             self.next += 1;
+            if spec.raw || self.hidden.contains(&spec.name) {
+                continue;
+            }
             if let Some(value) = self.source.get(index) {
                 return Some(Prop { spec, value });
             }
@@ -545,6 +575,16 @@ enum Inner<'n, 'f> {
     Failed(Option<Error>),
     #[cfg(any(test, feature = "test-support"))]
     Fake(super::fake::Children<'n, 'f>),
+    /// Boxed: the DOCX iterator carries its parent's address.
+    #[cfg(feature = "docx")]
+    Docx(Box<crate::format::docx::Children<'f>>),
+    /// The XLSX iterator carries the workbook handle through its nodes.
+    #[cfg(feature = "xlsx")]
+    Xlsx(crate::format::xlsx::Children<'f>),
+    #[cfg(feature = "pptx")]
+    Pptx(crate::format::pptx::Children<'f>),
+    #[cfg(feature = "xlsb")]
+    Xlsb(crate::format::xlsb::Children<'f>),
 }
 
 impl<'n, 'f> Children<'n, 'f> {
@@ -573,6 +613,34 @@ impl<'n, 'f> Children<'n, 'f> {
             inner: Inner::Fake(children),
         }
     }
+
+    /// A DOCX node's children.
+    #[cfg(feature = "docx")]
+    pub(crate) fn docx(children: crate::format::docx::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Docx(Box::new(children)),
+        }
+    }
+
+    /// An XLSX node's children.
+    #[cfg(feature = "xlsx")]
+    pub(crate) const fn xlsx(children: crate::format::xlsx::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Xlsx(children),
+        }
+    }
+    #[cfg(feature = "pptx")]
+    pub(crate) const fn pptx(children: crate::format::pptx::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Pptx(children),
+        }
+    }
+    #[cfg(feature = "xlsb")]
+    pub(crate) const fn xlsb(children: crate::format::xlsb::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Xlsb(children),
+        }
+    }
 }
 
 impl<'f> Iterator for Children<'_, 'f> {
@@ -584,6 +652,14 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Failed(error) => error.take().map(Err),
             #[cfg(any(test, feature = "test-support"))]
             Inner::Fake(children) => children.next(),
+            #[cfg(feature = "docx")]
+            Inner::Docx(children) => children.next().map(|child| child.map(Node::Docx)),
+            #[cfg(feature = "xlsx")]
+            Inner::Xlsx(children) => children.next().map(|child| child.map(Node::Xlsx)),
+            #[cfg(feature = "pptx")]
+            Inner::Pptx(children) => children.next().map(|child| child.map(Node::Pptx)),
+            #[cfg(feature = "xlsb")]
+            Inner::Xlsb(children) => children.next().map(|child| child.map(Node::Xlsb)),
         };
         if matches!(item, Some(Err(_)) | None) {
             self.inner = Inner::Empty(PhantomData);

@@ -143,6 +143,68 @@ pub(crate) trait Inspect<'f>: Navigate<'f> {
     }
 }
 
+/// A shared reference reads as the adapter it points to (see the
+/// forwarding [`Navigate`] implementation).
+impl<'f, N: Inspect<'f>> Inspect<'f> for &N {
+    const SPEC: &'static FormatSpec<Self::Kind> = N::SPEC;
+    const TOP: &'static [Self::Kind] = N::TOP;
+
+    fn kind(&self, node: &Self::Node) -> Self::Kind {
+        (**self).kind(node)
+    }
+
+    fn type_name(&self, node: &Self::Node) -> &'static str {
+        (**self).type_name(node)
+    }
+
+    fn text<'n>(&'n self, node: &'n Self::Node) -> Result<Option<Cow<'n, str>>> {
+        (**self).text(node)
+    }
+
+    fn style<'n>(&'n self, node: &'n Self::Node) -> Result<Option<Cow<'n, str>>> {
+        (**self).style(node)
+    }
+
+    fn format<'n>(&'n self, node: &'n Self::Node) -> Result<Format<'n>> {
+        (**self).format(node)
+    }
+
+    fn number(&self, node: &Self::Node) -> Option<usize> {
+        (**self).number(node)
+    }
+
+    fn cell(&self, node: &Self::Node) -> Option<CellRef> {
+        (**self).cell(node)
+    }
+
+    fn write_step(
+        &self,
+        node: &Self::Node,
+        kind: Self::Kind,
+        ordinal: Position,
+        out: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        (**self).write_step(node, kind, ordinal, out)
+    }
+
+    fn bind_header(&self, scope: &Self::Node, keys: &[HeaderKey<'_>]) -> Result<HeaderBinding> {
+        (**self).bind_header(scope, keys)
+    }
+
+    fn names_column(&self, scope: &Self::Node, key: &str) -> Result<bool> {
+        (**self).names_column(scope, key)
+    }
+
+    fn row_cell<'n>(
+        &'n self,
+        row: &'n Self::Node,
+        column: u32,
+        raw: bool,
+    ) -> Result<Option<Value<'n>>> {
+        (**self).row_cell(row, column, raw)
+    }
+}
+
 /// One table column a header-row predicate names (record 0010 §5.4).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct HeaderKey<'k> {

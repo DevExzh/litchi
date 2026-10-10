@@ -6,10 +6,52 @@
 //! other targets the file is read once and takes the byte route.
 
 use std::path::Path;
+#[cfg(any(
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    all(
+        any(unix, windows),
+        any(
+            feature = "doc",
+            feature = "ppt",
+            feature = "xls",
+            feature = "encryption"
+        )
+    )
+))]
+use std::sync::Arc;
 
 use crate::detect::tail::ZipTail;
 use crate::error::Result;
 use crate::{File, OpenOptions};
+
+/// Resolve a path origin once, at open time, so later saves do not depend on
+/// the caller's current working directory. This deliberately makes no
+/// filename or extension decision and does not canonicalize through the
+/// filesystem: a path's symlink spelling remains the path the caller opened.
+#[cfg(any(
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    all(
+        any(unix, windows),
+        any(
+            feature = "doc",
+            feature = "ppt",
+            feature = "xls",
+            feature = "encryption"
+        )
+    )
+))]
+pub(crate) fn stable_origin(path: &Path) -> Result<Arc<Path>> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir()?.join(path)
+    };
+    Ok(Arc::from(absolute.into_boxed_path()))
+}
 
 /// Open `path` through the route the content selects.
 #[cfg(any(unix, windows))]
@@ -58,12 +100,27 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
 
     if options.source_mode == crate::SourceMode::Eager || !(ole2 || zip) {
         let bytes = super::read_whole_source(source.as_ref(), version, ceiling)?;
-        return super::bytes::open(
+        let file = super::bytes::open(
             bytes,
             options,
             tail,
             super::ooxml_format_for_extension(path),
-        );
+        )?;
+        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+        let file = if matches!(
+            file.format(),
+            Some(
+                litchi_core::FileFormat::Docx
+                    | litchi_core::FileFormat::Xlsx
+                    | litchi_core::FileFormat::Pptx
+            )
+        ) || matches!(&file, File::Locked(_))
+        {
+            super::attach_origin(file, stable_origin(path)?)
+        } else {
+            file
+        };
+        return Ok(file);
     }
 
     if ole2 {
@@ -116,12 +173,27 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         .take(ceiling.saturating_add(1))
         .read_to_end(&mut bytes)?;
     super::check_input_len(u64::try_from(bytes.len()).unwrap_or(u64::MAX), ceiling)?;
-    super::bytes::open(
+    let opened = super::bytes::open(
         bytes,
         options,
         tail,
         super::ooxml_format_for_extension(path),
-    )
+    )?;
+    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+    let opened = if matches!(
+        opened.format(),
+        Some(
+            litchi_core::FileFormat::Docx
+                | litchi_core::FileFormat::Xlsx
+                | litchi_core::FileFormat::Pptx
+        )
+    ) || matches!(&opened, File::Locked(_))
+    {
+        super::attach_origin(opened, stable_origin(path)?)
+    } else {
+        opened
+    };
+    Ok(opened)
 }
 
 /// Fill `header` from the start of `source`, stopping at its end.
@@ -235,8 +307,25 @@ mod zip {
                         );
                     ensure_path_source_current(source.as_ref(), version)?;
                     if let Some(format) = format? {
-                        let file =
-                            super::super::ooxml_from_source_package(format, package, options)?;
+                        let origin = {
+                            #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+                            {
+                                matches!(
+                                    format,
+                                    FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx
+                                )
+                                .then(|| super::stable_origin(path))
+                                .transpose()?
+                            }
+                            #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx")))]
+                            {
+                                let _ = (format, path);
+                                None
+                            }
+                        };
+                        let file = super::super::ooxml_from_source_package_with_origin(
+                            format, package, options, origin,
+                        )?;
                         ensure_path_source_current(source.as_ref(), version)?;
                         return Ok(file);
                     }

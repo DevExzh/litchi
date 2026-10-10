@@ -37,7 +37,7 @@ use crate::value::compare::Compiled;
 /// let query = Query::parse("paragraph[style=Heading1]")?;
 /// // Format adapters register their query support in M1 step R4; until a
 /// // format has one, compiling for it is `unsupported_capability`.
-/// let error = Plan::compile(&query, FileFormat::Docx).unwrap_err();
+/// let error = Plan::compile(&query, FileFormat::Odt).unwrap_err();
 /// assert_eq!(error.code(), litchi_ops::Code::UnsupportedCapability);
 /// # Ok::<(), litchi_ops::Error>(())
 /// ```
@@ -107,20 +107,43 @@ impl<'q> Plan<'q> {
     pub fn compile(query: &Query<'q>, format: FileFormat) -> Result<Self> {
         super::bounds::validate(query)?;
         // Each format adapter (M1 steps R4-R7) adds an arm compiling for its
-        // `Inspect` implementation; none is registered yet.
-        let _ = query;
-        Err(Error::new(
-            Code::UnsupportedCapability,
-            format!("querying {format:?} documents is not supported yet"),
-        )
-        .with_format(format)
-        .with_suggestion("query support arrives with each format's adapter (record 0010, step R4)"))
+        // `Inspect` implementation.
+        match format {
+            #[cfg(feature = "docx")]
+            FileFormat::Docx => super::compile::compile::<crate::format::docx::Nav<'static>>(query),
+            #[cfg(feature = "xlsx")]
+            FileFormat::Xlsx => super::compile::compile::<crate::format::xlsx::Nav<'static>>(query),
+            #[cfg(feature = "xlsb")]
+            FileFormat::Xlsb => super::compile::compile::<crate::format::xlsb::Nav<'static>>(query),
+            #[cfg(feature = "pptx")]
+            FileFormat::Pptx => super::compile::compile::<crate::format::pptx::Nav<'static>>(query),
+            _ => {
+                let _ = query;
+                Err(Error::new(
+                    Code::UnsupportedCapability,
+                    format!("querying {format:?} documents is not supported yet"),
+                )
+                .with_format(format)
+                .with_suggestion(
+                    "query support arrives with each format's adapter (record 0010, step R4)",
+                ))
+            },
+        }
     }
 
     /// The format the plan is bound to.
     #[must_use]
     pub fn format(&self) -> FileFormat {
         self.format
+    }
+
+    /// Whether this plan has a document-wide scope suitable for a mutation.
+    pub(crate) fn is_scoped(&self) -> bool {
+        match &self.scope {
+            ScopePlan::Root => false,
+            ScopePlan::Path(path) => path.is_absolute(),
+            ScopePlan::Sheet(_) => true,
+        }
     }
 
     /// The compile-time findings that do not stop the query, in selector

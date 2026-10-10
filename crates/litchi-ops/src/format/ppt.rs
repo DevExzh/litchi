@@ -87,6 +87,11 @@ pub(crate) fn password_required(error: &litchi_ppt::Error) -> bool {
 }
 
 impl Ppt {
+    /// Whether this handle retains an edit source, without reading any payload.
+    pub(crate) fn retains_source(&self) -> bool {
+        !matches!(self.0.owner, PptOwner::Released)
+    }
+
     /// Opens the presentation over the positional package filesystem
     /// detection opened (the facade's `from_native_ppt_package`).
     ///

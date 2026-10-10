@@ -21,9 +21,9 @@
 //!
 //! # Sheet names
 //!
-//! XLSB sheet names match exactly (record 0003 finding F15): unlike
-//! [`Xlsx`](super::xlsx::Xlsx), `worksheet_by_name("simple")` does not find a
-//! sheet named `Simple`. This handle keeps that leaf semantics unchanged.
+//! Unified paths match sheet names with Unicode caseless normalization.
+//! Ambiguous names are refused while positional paths remain available.
+//! The legacy `worksheet_by_name` trait retains exact leaf-name matching.
 //!
 //! # Editing
 //!
@@ -32,7 +32,7 @@
 //! materializes from the package indexed at open (L-XLSB-1).
 
 use std::ops::Deref;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::sheet::{
     Result as SheetResult, WorkbookTrait, Worksheet as CoreWorksheet, WorksheetIterator,
@@ -47,7 +47,23 @@ use crate::detect::workbook_metadata::{MetadataRepairs, read_source_backed_metad
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
 
+mod children;
+mod header;
+mod nav;
+mod node;
+mod owner;
+#[cfg(test)]
+mod read_tests;
 mod source;
+mod spec;
+mod views;
+
+pub(crate) use children::Children;
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub(crate) use node::Props;
+pub(crate) use spec::SPEC;
+pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
 use source::{SourceWorkbook, SourceWorksheets, internal};
 
@@ -75,6 +91,10 @@ pub struct Xlsb(Arc<Opened<XlsbState>>);
 /// Shared state behind an [`Xlsb`] handle.
 struct XlsbState {
     owner: XlsbOwner,
+    /// Semantic catalog and Unicode name index; contains no worksheet payload.
+    catalog: OnceLock<Arc<owner::Catalog>>,
+    /// Shared semantic workbook names; child reads borrow one owner snapshot.
+    defined_names: OnceLock<Arc<[String]>>,
     /// Core properties, read at open as the facade does.
     metadata: Metadata,
     /// Repairs of that core-properties read, folded into
@@ -138,6 +158,11 @@ impl XlsbOwner {
 }
 
 impl Xlsb {
+    /// Whether this handle retains an edit source, without reading any payload.
+    pub(crate) fn retains_source(&self) -> bool {
+        self.0.retain_source
+    }
+
     /// Adopt the source-backed package detection validated: read its core
     /// properties, then build the deferred catalog over it. Only the
     /// workbook catalog is read.
@@ -198,6 +223,8 @@ impl Xlsb {
     ) -> Self {
         Self(Opened::new(XlsbState {
             owner,
+            catalog: OnceLock::new(),
+            defined_names: OnceLock::new(),
             metadata,
             metadata_repairs,
             retain_source: options.retain_source,
@@ -239,7 +266,9 @@ impl Xlsb {
     /// Returns [`Code::IoError`] when a source-backed workbook's file changed.
     pub fn worksheet_names(&self) -> Result<Vec<String>> {
         self.0.owner.ensure_current()?;
-        Ok(WorkbookTrait::worksheet_names(self).to_vec())
+        let names = WorkbookTrait::worksheet_names(self).to_vec();
+        self.0.owner.ensure_current()?;
+        Ok(names)
     }
 
     /// The number of worksheets.
@@ -249,7 +278,9 @@ impl Xlsb {
     /// Returns [`Code::IoError`] when a source-backed workbook's file changed.
     pub fn worksheet_count(&self) -> Result<usize> {
         self.0.owner.ensure_current()?;
-        Ok(WorkbookTrait::worksheet_count(self))
+        let count = WorkbookTrait::worksheet_count(self);
+        self.0.owner.ensure_current()?;
+        Ok(count)
     }
 
     /// All worksheet text: each row on its own line, cells separated by
@@ -305,8 +336,9 @@ impl Xlsb {
         match &self.0.owner {
             XlsbOwner::Source(workbook) => {
                 workbook.ensure_current()?;
-                let mut report = workbook.tolerance_report();
+                let mut report = workbook.tolerance_report()?;
                 report.append_properties(&self.0.metadata_repairs);
+                workbook.ensure_current()?;
                 Ok(report)
             },
             XlsbOwner::Eager(workbook) => {

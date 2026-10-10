@@ -305,6 +305,28 @@ mod locked {
         }
     }
 
+    #[test]
+    fn unified_reads_refuse_locked_files_before_parsing_inputs() {
+        let file = crate::open_bytes(super::cfb::encrypted_ooxml([4, 0, 4, 0])).unwrap();
+        assert_eq!(file.root().unwrap_err().code(), Code::DocumentProtected);
+        assert_eq!(
+            file.get("INVALID SECRET").unwrap_err().code(),
+            Code::DocumentProtected
+        );
+        assert_eq!(
+            file.find("INVALID SECRET").unwrap_err().code(),
+            Code::DocumentProtected
+        );
+        assert_eq!(
+            file.query("INVALID SECRET").unwrap_err().code(),
+            Code::DocumentProtected
+        );
+        assert_eq!(
+            file.view(crate::view::Mode::Text).unwrap_err().code(),
+            Code::DocumentProtected
+        );
+    }
+
     /// Clones of a locked handle share it; unlocking one leaves the others.
     #[test]
     fn locked_handles_are_cheap_clones() {

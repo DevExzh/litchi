@@ -10,7 +10,7 @@
 //!
 //! # Opening and reading
 //!
-//! [`open`] and [`open_bytes`] detect the format from the content in one
+//! `open` and `open_bytes` detect the format from the content in one
 //! pass and return a [`File`]: a flat enum with one variant per format, plus
 //! [`File::Locked`] for encrypted and [`File::Signed`] for signed inputs.
 //! [`OpenOptions`] carries limits and policy; the common case needs none.
@@ -80,19 +80,24 @@
 //! # Status
 //!
 //! M0a delivers the open and read surface: [`File`], the family views
-//! ([`DocumentView`], [`PresentationView`], [`WorkbookView`]), the
-//! [`ToleranceReport`], Markdown output, and [`detect`]. The element
+//! (`DocumentView`, `PresentationView`, `WorkbookView`), the
+//! [`ToleranceReport`], Markdown output, and `detect`. The element
 //! wrappers in [`compat`] are scheduled for deletion in M1, when the node
 //! view replaces them. The generic [`node`] projection and [`value`] coercion
-//! primitives are now available; concrete node adapters and File query/read
-//! entry points remain pending. Edit verbs, the property registry, batches and saving
-//! arrive in later milestones.
+//! primitives and DOCX/XLSX/PPTX/XLSB read adapters are available. Property
+//! inputs ([`PropValue`], [`IntoProps`], [`props!`]) and strict registry
+//! admission support immutable DOCX paragraph/run edits through [`File::set`].
+//! DOCX snapshots publish through [`File::to_bytes`] and [`File::write_to`].
+//! DOCX creation, structural edits and atomic path saving are available.
+//! Batch payloads use [`BatchItem`]. Batch execution and other format write handlers
+//! remain under implementation; capability reports list the current gaps.
 
 #![forbid(unsafe_code)]
 
-mod batch;
-mod capabilities;
+pub mod batch;
+pub mod capabilities;
 pub mod compat;
+mod create;
 pub mod error;
 mod file;
 pub mod format;
@@ -100,6 +105,7 @@ mod handler;
 mod locked;
 #[cfg(feature = "markdown")]
 mod markdown;
+pub mod new_node;
 pub mod node;
 #[cfg(any(
     feature = "doc",
@@ -120,19 +126,29 @@ pub mod node;
 mod open;
 mod options;
 pub mod path;
+pub mod placement;
+pub mod props;
 pub mod query;
+mod read;
 mod registry;
+mod save;
 mod signed;
+pub mod target;
 mod tolerance;
+pub mod transaction;
 pub mod value;
-mod view;
+pub mod view;
+mod write;
 
 #[cfg(test)]
 mod tests;
 
+pub use batch::{Applied, BatchCommit, BatchItem, BatchMode, ItemResult};
+pub use create::{Conformance, CreateOptions, Flavor, create, create_with};
 pub use error::{Code, Error, Result};
 pub use file::{Family, File};
 pub use locked::{EncryptionKind, Locked};
+pub use new_node::{Added, IntoNode, NewNode};
 #[cfg(any(
     feature = "doc",
     feature = "docx",
@@ -160,7 +176,11 @@ pub use open::{open_prepared, open_prepared_with};
 #[cfg(feature = "doc")]
 pub use options::DocOptions;
 pub use options::{OpenOptions, SourceMode};
+pub use placement::{IntoPlacement, Placement};
+pub use props::{IntoProps, Key, PropValue, Props};
+pub use save::{Overwrite, SaveOptions, SaveTo, Saved};
 pub use signed::{SignatureOrigin, Signed};
+pub use target::{IntoTarget, TargetArg};
 pub use tolerance::ToleranceReport;
 #[cfg(any(feature = "doc", feature = "docx", feature = "rtf", feature = "odt"))]
 pub use view::DocumentView;

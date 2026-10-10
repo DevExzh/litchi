@@ -199,7 +199,7 @@ impl<'f, F: Fixture> Navigate<'f> for Fake<F> {
     type Kind = Kind<F>;
     type Node = Node;
     type Gap = Gap;
-    type Children<'a> = Children<F>;
+    type Children = Children<F>;
 
     const FORMAT: FileFormat = F::FORMAT;
     const ABSENT: &'static [&'static str] = F::ABSENT;

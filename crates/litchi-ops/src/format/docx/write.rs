@@ -1,0 +1,723 @@
+//! DOCX `set` (record 0015 W5a).
+//!
+//! The handler resolves the target once, proves every node against the main
+//! story's direct transaction positions, admits every property before it
+//! touches an editor, and then applies one isolated leaf edit.  A failed
+//! admission or edit drops that transaction, so the input handle remains an
+//! immutable snapshot in every case.
+
+pub(crate) mod coalesce;
+
+use litchi_core::{FileFormat, Position};
+use litchi_docx::source_backed;
+
+use super::Docx;
+use super::DocxEditor;
+use super::Nav;
+use super::node::{Node, WriteSelection};
+use super::setters::Setter;
+use super::spec::{Kind, PARAGRAPH_REGISTRY, RUN_REGISTRY};
+use crate::error::{Code, Error, Result};
+use crate::props::{IntoProps, Key, PropValue, Props};
+use crate::registry::{Entry, Operation, Table};
+use crate::target::TargetArg;
+
+/// Complete result of one DOCX leaf transaction.
+///
+/// Single-operation sugar takes only the file. The transaction executor can
+/// retain the exact patch and diagnostics without reconstructing a change from
+/// the read projection or serializing the package.
+pub(crate) struct Commit {
+    file: Docx,
+    patch: litchi_docx::document::Patch,
+    diagnostics: litchi_docx::document::Diagnostics,
+}
+
+impl Commit {
+    pub(crate) fn into_parts(
+        self,
+    ) -> (
+        Docx,
+        litchi_docx::document::Patch,
+        litchi_docx::document::Diagnostics,
+    ) {
+        (self.file, self.patch, self.diagnostics)
+    }
+
+    pub(crate) fn into_file(self) -> Docx {
+        self.into_parts().0
+    }
+}
+
+impl std::fmt::Debug for Commit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Commit")
+            .field("diagnostics", &self.diagnostics)
+            .finish_non_exhaustive()
+    }
+}
+
+/// One admitted property. Immediate edits borrow the original input; deferred
+/// formatting plans explicitly take ownership before retaining assignments.
+#[derive(Clone)]
+struct Assignment<'a> {
+    key: Key<'a>,
+    value: PropValue<'a>,
+    entry: Entry<Setter>,
+}
+
+impl Assignment<'_> {
+    fn into_owned(self) -> Assignment<'static> {
+        Assignment {
+            key: self.key.into_owned(),
+            value: self.value.into_owned(),
+            entry: self.entry,
+        }
+    }
+}
+
+#[derive(Clone, Copy)]
+enum TargetKind {
+    Paragraph,
+    Run,
+}
+
+#[derive(Clone, Copy)]
+struct Target {
+    selection: WriteSelection,
+    kind: TargetKind,
+}
+
+/// The two leaf edit types have the same operation surface but different
+/// package owners.  Keeping this small enum local avoids serializing and
+/// reopening a committed package merely to regain a `Docx` handle.
+pub(super) enum WorkEdit {
+    Eager(Box<litchi_docx::document::Edit>),
+    Source(Box<litchi_docx::document::Edit<source_backed::Package>>),
+}
+
+impl Docx {
+    /// Apply ordered properties to one path or every match of a scoped query.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed target, registry, leaf, protection or source-freshness
+    /// error.  A failed operation never publishes a partial edit.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: TargetArg<'p>,
+        props: impl IntoProps<'v>,
+    ) -> Result<Commit> {
+        // The final source fence belongs outside the whole operation.  This
+        // makes a source revision win over every failure path too: target
+        // resolution, property admission, leaf staging, and commit errors
+        // cannot leak a stale leaf error after the input changed.
+        let result = self.set_inner(target, props, false);
+        self.owner().finish(result)
+    }
+
+    pub(crate) fn set_command<'p, 'v>(
+        &self,
+        target: TargetArg<'p>,
+        props: impl IntoProps<'v>,
+    ) -> Result<Commit> {
+        self.owner().finish(self.set_inner(target, props, true))
+    }
+
+    fn set_inner<'p, 'v>(
+        &self,
+        target: TargetArg<'p>,
+        props: impl IntoProps<'v>,
+        command_text: bool,
+    ) -> Result<Commit> {
+        // Build the editor first.  Besides refusing signed/read-only handles,
+        // this makes an empty property list honor the same security policy as
+        // a non-empty write.
+        let editor = self.edit()?;
+        let targets = self.resolve_targets(&target)?;
+        let props = Props::from_props(props)?;
+        let controls = command_text && crate::batch::has_text_controls(&props);
+        if controls
+            && targets
+                .iter()
+                .any(|node| !matches!(node.element_kind(), Kind::Paragraph | Kind::Run))
+        {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "OfficeCLI text controls require paragraph or run targets",
+            )
+            .with_format(FileFormat::Docx));
+        }
+        let targets = admit_targets(targets)?;
+        let props = if controls && matches!(targets[0].kind, TargetKind::Paragraph) {
+            crate::batch::inline_text_props(&props)
+        } else {
+            std::borrow::Cow::Borrowed(&props)
+        };
+
+        if props.is_empty() {
+            return WorkEdit::from(editor)?.commit(self);
+        }
+        let assignments = admit_assignments(targets[0].kind, &props)?;
+        self.owner().check_source()?;
+
+        let mut editor = WorkEdit::from(editor)?;
+        if editor.bulk_paragraph_text(&targets, &assignments)? {
+            return editor.commit(self);
+        }
+        for target in &targets {
+            for assignment in &assignments {
+                editor.apply_with_policy(target.selection, assignment, command_text)?;
+            }
+        }
+        editor.commit(self)
+    }
+
+    pub(super) fn resolve_targets<'f>(&'f self, target: &TargetArg<'_>) -> Result<Vec<Node<'f>>> {
+        let nav = Nav::new(self);
+        let nodes = if let Some(path) = target.path() {
+            vec![crate::path::resolve::get(&nav, path)?]
+        } else if let Some(query) = target.query() {
+            let walk = crate::query::run(nav, query.clone())?;
+            // Query diagnostics are harmless for reads because an unknown
+            // predicate simply evaluates as absent.  A mutation must refuse
+            // them: otherwise a typo could silently widen or empty a write.
+            if !walk.plan().diagnostics().is_empty() {
+                return Err(Error::new(
+                    Code::InvalidSelector,
+                    "the mutation selector contains an unsupported predicate",
+                )
+                .with_format(FileFormat::Docx));
+            }
+            walk.collect::<Result<Vec<_>>>()?
+        } else {
+            return Err(
+                Error::new(Code::InvalidArgument, "the mutation target is empty")
+                    .with_format(FileFormat::Docx),
+            );
+        };
+        self.owner().check_source()?;
+        if nodes.is_empty() {
+            return Err(Error::new(
+                Code::ZeroMatches,
+                "the mutation selector matched no element",
+            )
+            .with_format(FileFormat::Docx));
+        }
+        Ok(nodes)
+    }
+}
+
+impl WorkEdit {
+    pub(super) fn from(editor: DocxEditor) -> Result<Self> {
+        Ok(match editor {
+            DocxEditor::Edit(edit) => Self::Eager(edit),
+            DocxEditor::Source(edit) => Self::Source(edit),
+            DocxEditor::Unsigned(package) => {
+                Self::Eager(Box::new(package.edit().map_err(Error::from)?))
+            },
+        })
+    }
+
+    /// Canonical homogeneous fanout can use one native reconstruction. Preserve
+    /// ordered fallback for mixed assignments and noncanonical target order.
+    fn bulk_paragraph_text(
+        &mut self,
+        targets: &[Target],
+        assignments: &[Assignment<'_>],
+    ) -> Result<bool> {
+        let [assignment] = assignments else {
+            return Ok(false);
+        };
+        if targets.len() < 2
+            || !matches!(assignment.entry.access,
+                crate::registry::Access::Set(setter) | crate::registry::Access::SetAndAdd(setter)
+                if setter.is_text())
+        {
+            return Ok(false);
+        }
+        let mut previous = None;
+        for target in targets {
+            let WriteSelection::Paragraph(position) = target.selection else {
+                return Ok(false);
+            };
+            if previous.is_some_and(|prior| position.get() <= prior) {
+                return Ok(false);
+            }
+            previous = Some(position.get());
+        }
+        let text = assignment
+            .entry
+            .prepare(Operation::Set, &assignment.value, |setter, value| {
+                if setter.is_text() {
+                    text_value(value).map(Some)
+                } else {
+                    Ok(None)
+                }
+            })
+            .map_err(|error| property_error(error, &assignment.key))?;
+        let Some(text) = text else {
+            return Ok(false);
+        };
+        let mut replacements = Vec::new();
+        replacements
+            .try_reserve_exact(targets.len())
+            .map_err(|source| Error::from(crate::transaction::Error::Allocation { source }))?;
+        for target in targets {
+            if let WriteSelection::Paragraph(position) = target.selection {
+                replacements.push(litchi_docx::document::ParagraphTextReplacement::new(
+                    position,
+                    text.clone(),
+                ));
+            }
+        }
+        let result = match self {
+            Self::Eager(edit) => edit
+                .replace_body_paragraph_texts(&replacements)
+                .map(|_| ())
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .replace_body_paragraph_texts(&replacements)
+                .map(|_| ())
+                .map_err(Error::from),
+        };
+        result.map_err(|error| property_error(error, &assignment.key))?;
+        Ok(true)
+    }
+
+    fn apply(&mut self, selection: WriteSelection, assignment: &Assignment<'_>) -> Result<()> {
+        self.apply_with_policy(selection, assignment, false)
+    }
+
+    fn apply_with_policy(
+        &mut self,
+        selection: WriteSelection,
+        assignment: &Assignment<'_>,
+        command_text: bool,
+    ) -> Result<()> {
+        let result = match selection {
+            WriteSelection::Paragraph(position) => {
+                assignment
+                    .entry
+                    .prepare(Operation::Set, &assignment.value, |setter, value| {
+                        if setter.is_text() {
+                            let text = text_value(value)?;
+                            self.replace_paragraph_text(position, text)
+                        } else {
+                            self.format_paragraph(position, setter, value)
+                        }
+                    })
+            },
+            WriteSelection::Run { paragraph, run } => {
+                assignment
+                    .entry
+                    .prepare(Operation::Set, &assignment.value, |setter, value| {
+                        if setter.is_text() {
+                            let text = text_value(value)?;
+                            if command_text {
+                                self.replace_run_text_node(paragraph, run, text)
+                            } else {
+                                self.replace_run_text(paragraph, run, text)
+                            }
+                        } else {
+                            self.format_run(paragraph, run, setter, value)
+                        }
+                    })
+            },
+        };
+        result.map_err(|error| property_error(error, &assignment.key))
+    }
+
+    fn replace_paragraph_text(&mut self, position: Position, text: String) -> Result<()> {
+        match self {
+            Self::Eager(edit) => edit
+                .replace_paragraph_text(position, text)
+                .map(|_| ())
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .replace_paragraph_text(position, text)
+                .map(|_| ())
+                .map_err(Error::from),
+        }
+    }
+
+    fn replace_run_text_node(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        text: String,
+    ) -> Result<()> {
+        match self {
+            Self::Eager(edit) => {
+                edit.replace_run_text_node(paragraph, run, text)?;
+                edit.mark_cached_run_field_dirty(paragraph, run)?;
+            },
+            Self::Source(edit) => {
+                edit.replace_run_text_node(paragraph, run, text)?;
+                edit.mark_cached_run_field_dirty(paragraph, run)?;
+            },
+        }
+        Ok(())
+    }
+
+    fn replace_run_text(&mut self, paragraph: Position, run: Position, text: String) -> Result<()> {
+        match self {
+            Self::Eager(edit) => edit
+                .replace_run_text(paragraph, run, text)
+                .map(|_| ())
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .replace_run_text(paragraph, run, text)
+                .map(|_| ())
+                .map_err(Error::from),
+        }
+    }
+
+    fn format_paragraph(
+        &mut self,
+        position: Position,
+        setter: Setter,
+        value: Option<crate::value::Scalar<'_>>,
+    ) -> Result<()> {
+        let mut failure = None;
+        match self {
+            Self::Eager(edit) => {
+                edit.format_paragraph(position, |paragraph| {
+                    if let Err(error) = setter.apply_paragraph(paragraph, value) {
+                        failure = Some(error);
+                    }
+                })
+                .map_err(Error::from)?;
+            },
+            Self::Source(edit) => {
+                edit.format_paragraph(position, |paragraph| {
+                    if let Err(error) = setter.apply_paragraph(paragraph, value) {
+                        failure = Some(error);
+                    }
+                })
+                .map_err(Error::from)?;
+            },
+        }
+        failure.map_or(Ok(()), Err)
+    }
+
+    fn format_run(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        setter: Setter,
+        value: Option<crate::value::Scalar<'_>>,
+    ) -> Result<()> {
+        let mut failure = None;
+        match self {
+            Self::Eager(edit) => {
+                edit.format_run(paragraph, run, |run| {
+                    if let Err(error) = setter.apply_run(run, value) {
+                        failure = Some(error);
+                    }
+                })
+                .map_err(Error::from)?;
+            },
+            Self::Source(edit) => {
+                edit.format_run(paragraph, run, |run| {
+                    if let Err(error) = setter.apply_run(run, value) {
+                        failure = Some(error);
+                    }
+                })
+                .map_err(Error::from)?;
+            },
+        }
+        failure.map_or(Ok(()), Err)
+    }
+
+    pub(super) fn insert_paragraph(
+        &mut self,
+        anchor: litchi_docx::document::BodyAnchor,
+        paragraph: &litchi_docx::document::NewParagraph,
+    ) -> Result<Position> {
+        match self {
+            Self::Eager(edit) => edit
+                .insert_formatted_paragraph(anchor, paragraph)
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .insert_formatted_paragraph(anchor, paragraph)
+                .map_err(Error::from),
+        }
+    }
+
+    pub(super) fn remove_paragraph(&mut self, position: Position) -> Result<()> {
+        match self {
+            Self::Eager(edit) => edit
+                .remove_paragraph(position)
+                .map(|_| ())
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .remove_paragraph(position)
+                .map(|_| ())
+                .map_err(Error::from),
+        }
+    }
+
+    pub(super) fn move_paragraph(
+        &mut self,
+        position: Position,
+        anchor: litchi_docx::document::BodyAnchor,
+    ) -> Result<Position> {
+        match self {
+            Self::Eager(edit) => edit.move_paragraph(position, anchor).map_err(Error::from),
+            Self::Source(edit) => edit.move_paragraph(position, anchor).map_err(Error::from),
+        }
+    }
+
+    pub(super) fn swap_paragraphs(&mut self, first: Position, second: Position) -> Result<()> {
+        match self {
+            Self::Eager(edit) => edit
+                .swap_paragraphs(first, second)
+                .map(|_| ())
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .swap_paragraphs(first, second)
+                .map(|_| ())
+                .map_err(Error::from),
+        }
+    }
+
+    pub(super) fn insert_run(
+        &mut self,
+        paragraph: Position,
+        run: Option<Position>,
+        new_run: &litchi_docx::document::NewRun,
+    ) -> Result<Position> {
+        match self {
+            Self::Eager(edit) => match run {
+                Some(run) => edit
+                    .insert_run(paragraph, run, new_run)
+                    .map_err(Error::from),
+                None => edit.append_run(paragraph, new_run).map_err(Error::from),
+            },
+            Self::Source(edit) => match run {
+                Some(run) => edit
+                    .insert_run(paragraph, run, new_run)
+                    .map_err(Error::from),
+                None => edit.append_run(paragraph, new_run).map_err(Error::from),
+            },
+        }
+    }
+
+    pub(super) fn remove_run(&mut self, paragraph: Position, run: Position) -> Result<()> {
+        match self {
+            Self::Eager(edit) => edit
+                .remove_run(paragraph, run)
+                .map(|_| ())
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .remove_run(paragraph, run)
+                .map(|_| ())
+                .map_err(Error::from),
+        }
+    }
+
+    pub(super) fn move_run(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        anchor: litchi_docx::document::RunAnchor,
+    ) -> Result<Position> {
+        match self {
+            Self::Eager(edit) => edit.move_run(paragraph, run, anchor).map_err(Error::from),
+            Self::Source(edit) => edit.move_run(paragraph, run, anchor).map_err(Error::from),
+        }
+    }
+
+    pub(super) fn move_run_to(
+        &mut self,
+        from_paragraph: Position,
+        run: Position,
+        to_paragraph: Position,
+        anchor: litchi_docx::document::RunAnchor,
+    ) -> Result<Position> {
+        match self {
+            Self::Eager(edit) => edit
+                .move_run_to(from_paragraph, run, to_paragraph, anchor)
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .move_run_to(from_paragraph, run, to_paragraph, anchor)
+                .map_err(Error::from),
+        }
+    }
+
+    pub(super) fn swap_runs(
+        &mut self,
+        paragraph: Position,
+        first: Position,
+        second: Position,
+    ) -> Result<()> {
+        match self {
+            Self::Eager(edit) => edit
+                .swap_runs(paragraph, first, second)
+                .map(|_| ())
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .swap_runs(paragraph, first, second)
+                .map(|_| ())
+                .map_err(Error::from),
+        }
+    }
+
+    pub(super) fn swap_runs_to(
+        &mut self,
+        first_paragraph: Position,
+        first: Position,
+        second_paragraph: Position,
+        second: Position,
+    ) -> Result<()> {
+        match self {
+            Self::Eager(edit) => edit
+                .swap_runs_to(first_paragraph, first, second_paragraph, second)
+                .map(|_| ())
+                .map_err(Error::from),
+            Self::Source(edit) => edit
+                .swap_runs_to(first_paragraph, first, second_paragraph, second)
+                .map(|_| ())
+                .map_err(Error::from),
+        }
+    }
+
+    pub(super) fn commit(self, source: &Docx) -> Result<Commit> {
+        match self {
+            Self::Eager(edit) => {
+                let commit = edit.commit().map_err(Error::from)?;
+                let diagnostics = commit.diagnostics();
+                let (package, patch) = commit.into_parts();
+                Ok(Commit {
+                    file: source.adopt_eager_package(package),
+                    patch,
+                    diagnostics,
+                })
+            },
+            Self::Source(edit) => {
+                let commit = edit.commit().map_err(Error::from)?;
+                let diagnostics = commit.diagnostics();
+                let (package, patch) = commit.into_parts();
+                Ok(Commit {
+                    file: source.adopt_source_package(package),
+                    patch,
+                    diagnostics,
+                })
+            },
+        }
+    }
+}
+
+fn admit_targets(nodes: Vec<Node<'_>>) -> Result<Vec<Target>> {
+    let mut targets = Vec::with_capacity(nodes.len());
+    // Every node comes from one resolve_targets call on one immutable owner.
+    // Cache only within this admission; later operations may have a new body.
+    let mut body = None;
+    for node in nodes {
+        let (kind, selection) = match node.element_kind() {
+            Kind::Paragraph => (
+                TargetKind::Paragraph,
+                node.write_selection_cached(&mut body)?,
+            ),
+            Kind::Run => (TargetKind::Run, node.write_selection_cached(&mut body)?),
+            _ => {
+                return Err(Error::new(
+                    Code::UnsupportedElement,
+                    "the DOCX write target must be a paragraph or run",
+                )
+                .with_format(FileFormat::Docx));
+            },
+        };
+        targets.push(Target { selection, kind });
+    }
+    let first = targets[0].kind;
+    if targets
+        .iter()
+        .any(|target| !same_target_kind(target.kind, first))
+    {
+        return Err(Error::new(
+            Code::UnsupportedCapability,
+            "one DOCX mutation cannot mix paragraph and run targets",
+        )
+        .with_format(FileFormat::Docx));
+    }
+    Ok(targets)
+}
+
+fn same_target_kind(left: TargetKind, right: TargetKind) -> bool {
+    matches!(
+        (left, right),
+        (TargetKind::Paragraph, TargetKind::Paragraph) | (TargetKind::Run, TargetKind::Run)
+    )
+}
+
+fn admit_assignments<'a>(kind: TargetKind, props: &'a Props<'_>) -> Result<Vec<Assignment<'a>>> {
+    match kind {
+        TargetKind::Paragraph => admit_table(&PARAGRAPH_REGISTRY, kind, props),
+        TargetKind::Run => admit_table(&RUN_REGISTRY, kind, props),
+    }
+}
+
+fn admit_table<'a, const N: usize, const A: usize>(
+    table: &Table<Setter, N, A>,
+    kind: TargetKind,
+    props: &'a Props<'_>,
+) -> Result<Vec<Assignment<'a>>> {
+    let mut assignments = Vec::with_capacity(props.len());
+    for (key, value) in props.iter() {
+        let (_, entry) = table
+            .resolve(key.as_str())
+            .map_err(|error| property_error(error, key))?;
+        let entry = *entry;
+        entry
+            .prepare(Operation::Set, value, |setter, value| {
+                // Run the format conversion on a disposable typed property
+                // now.  This keeps leaf-domain failures before any editor
+                // operation, preserving all-or-nothing assignment admission.
+                if setter.is_text() {
+                    Ok(setter)
+                } else {
+                    match kind {
+                        TargetKind::Paragraph => {
+                            let mut probe = litchi_docx::properties::Paragraph::default();
+                            setter.apply_paragraph(&mut probe, value)?;
+                        },
+                        TargetKind::Run => {
+                            let mut probe = litchi_docx::properties::Run::default();
+                            setter.apply_run(&mut probe, value)?;
+                        },
+                    }
+                    Ok(setter)
+                }
+            })
+            .map_err(|error| property_error(error, key))?;
+        assignments.push(Assignment {
+            key: key.reborrow(),
+            value: value.reborrow(),
+            entry,
+        });
+    }
+    Ok(assignments)
+}
+
+fn text_value(value: Option<crate::value::Scalar<'_>>) -> Result<String> {
+    match value {
+        None => Ok(String::new()),
+        Some(crate::value::Scalar::Text(value) | crate::value::Scalar::Token(value)) => {
+            Ok(value.to_owned())
+        },
+        Some(_) => Err(Error::new(Code::InvalidValue, "the text value is invalid")),
+    }
+}
+
+fn property_error(error: Error, key: &Key<'_>) -> Error {
+    error
+        .with_property(key.as_str().to_owned())
+        .with_format(FileFormat::Docx)
+}
+
+#[cfg(test)]
+#[path = "commit_tests.rs"]
+mod commit_tests;

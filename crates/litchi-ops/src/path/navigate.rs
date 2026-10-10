@@ -66,13 +66,9 @@ pub(crate) trait Navigate<'f> {
     /// The format's capability-gap descriptor (R1's `GapSpec`).
     type Gap: GapInfo;
 
-    /// The iterator [`Navigate::children`] returns. It borrows the adapter,
-    /// never the parent node, so the query walker (record 0010 §5.3) can
-    /// keep a node and the iterator over its children in the same stack
-    /// frame.
-    type Children<'a>: Iterator<Item = Result<Self::Node>>
-    where
-        Self: 'a;
+    /// Children borrow the retained document, not this adapter value.
+    /// Reference adapters may borrow their owner through that reference.
+    type Children: Iterator<Item = Result<Self::Node>>;
 
     /// The format reported in errors.
     const FORMAT: FileFormat;
@@ -80,6 +76,11 @@ pub(crate) trait Navigate<'f> {
     /// concept (`sdt` in DOC); a step naming one is `unsupported_path`. Any
     /// other name the format does not model is `unsupported_capability`.
     const ABSENT: &'static [&'static str] = &[];
+
+    /// Validate retained source revisions around each public read.
+    fn check_source(&self) -> Result<()> {
+        Ok(())
+    }
 
     /// The document root (`/`).
     fn root(&self) -> Result<Self::Node>;
@@ -94,11 +95,7 @@ pub(crate) trait Navigate<'f> {
     /// The children of `parent` whose kinds are in `kinds`, in document
     /// order (for the query walker and the node view). The iterator is lazy:
     /// a walk that stops early decodes no later sibling.
-    fn children(
-        &self,
-        parent: &Self::Node,
-        kinds: KindSet<Self::Kind>,
-    ) -> Result<Self::Children<'_>>;
+    fn children(&self, parent: &Self::Node, kinds: KindSet<Self::Kind>) -> Result<Self::Children>;
 
     /// Describes what exists under `parent` for a `path_not_found` or
     /// ambiguity suggestion: counts per kind, or the names of named children.
@@ -111,6 +108,49 @@ pub(crate) trait Navigate<'f> {
     ) -> Result<()> {
         let _ = (parent, step, out);
         Ok(())
+    }
+}
+
+/// A shared reference reads as the adapter it points to, so code that holds
+/// an adapter by reference (`query::run(&nav, ..)`) and code that owns a
+/// copy (`File::query`, whose walk owns its adapter) run the same resolver
+/// and walker.
+impl<'f, N: Navigate<'f>> Navigate<'f> for &N {
+    type Kind = N::Kind;
+    type Node = N::Node;
+    type Gap = N::Gap;
+    type Children = N::Children;
+
+    const FORMAT: FileFormat = N::FORMAT;
+    const ABSENT: &'static [&'static str] = N::ABSENT;
+
+    fn check_source(&self) -> Result<()> {
+        (**self).check_source()
+    }
+
+    fn root(&self) -> Result<Self::Node> {
+        (**self).root()
+    }
+
+    fn child(
+        &self,
+        parent: &Self::Node,
+        step: &Resolved<'_, Self::Kind>,
+    ) -> Result<Lookup<Self::Node, Self::Gap>> {
+        (**self).child(parent, step)
+    }
+
+    fn children(&self, parent: &Self::Node, kinds: KindSet<Self::Kind>) -> Result<Self::Children> {
+        (**self).children(parent, kinds)
+    }
+
+    fn available(
+        &self,
+        parent: &Self::Node,
+        step: &Resolved<'_, Self::Kind>,
+        out: &mut Available,
+    ) -> Result<()> {
+        (**self).available(parent, step, out)
     }
 }
 

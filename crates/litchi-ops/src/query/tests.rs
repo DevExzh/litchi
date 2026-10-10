@@ -255,7 +255,7 @@ fn book() -> Doc<SheetKind> {
 
 fn compile_text<K: FakeKind>(text: &str) -> Result<Plan<'_>> {
     let query = Query::parse(text)?;
-    compile::<Nav<'static, K>>(&query)
+    compile::<&Nav<'static, K>>(&query)
 }
 
 fn compiled<K: FakeKind>(text: &str) -> Plan<'_> {
@@ -350,7 +350,7 @@ fn every_match_path_resolves_back_to_the_match() {
             let hit = hit.expect("hit");
             let path = hit.path().to_string();
             let arg = PathArg::parse(&path).unwrap_or_else(|error| panic!("{path}: {error}"));
-            let found = resolve::get(&nav, &arg).unwrap_or_else(|error| panic!("{path}: {error}"));
+            let found = resolve::get(&&nav, &arg).unwrap_or_else(|error| panic!("{path}: {error}"));
             let (Node::Item { item: a, .. }, Node::Item { item: b, .. }) = (found, *hit.node())
             else {
                 panic!("{path} is not an element");
@@ -447,7 +447,7 @@ fn title_and_textbox_narrow_presentation_shapes() {
     // `title` and `textbox` keep their path meaning: plain shapes.
     let nav = Nav::new(&doc);
     let found = resolve::get(
-        &nav,
+        &&nav,
         &PathArg::parse("/slide[1]/textbox[1]").expect("parses"),
     )
     .expect("resolves");
@@ -1336,7 +1336,7 @@ const REFUSED: &[&str] = &[
 /// Compiles `query` for `doc`'s family and runs it; `true` when it
 /// compiled, `false` for a typed refusal.
 fn check<K: FakeKind>(doc: &Doc<K>, query: &Query<'_>, line: &str) -> bool {
-    let plan = match compile::<Nav<'static, K>>(query) {
+    let plan = match compile::<&Nav<'static, K>>(query) {
         Ok(plan) => plan,
         Err(error) => {
             assert_typed(&error, line);
@@ -1565,7 +1565,7 @@ fn typed_queries_are_bounded_before_recursive_compilation() {
     };
     let query = Query::new([]);
     assert_eq!(
-        compile::<Nav<'_, WordKind>>(&query).unwrap_err().code(),
+        compile::<&Nav<'_, WordKind>>(&query).unwrap_err().code(),
         Code::LimitExceeded
     );
     let mut expr = Expr::Condition(Condition::Exists(Key::new("bold")));
@@ -1576,7 +1576,7 @@ fn typed_queries_are_bounded_before_recursive_compilation() {
         Compound::new(Element::Named("r".into())).with(Predicate::Filter(expr)),
     )]);
     assert_eq!(
-        compile::<Nav<'_, WordKind>>(&query).unwrap_err().code(),
+        compile::<&Nav<'_, WordKind>>(&query).unwrap_err().code(),
         Code::MaxDepthExceeded
     );
     let query = Query::new([Complex::new(
@@ -1584,7 +1584,7 @@ fn typed_queries_are_bounded_before_recursive_compilation() {
             .with_pseudo(Pseudo::Contains("x".repeat(16 * 1024 + 1).into())),
     )]);
     assert_eq!(
-        compile::<Nav<'_, WordKind>>(&query).unwrap_err().code(),
+        compile::<&Nav<'_, WordKind>>(&query).unwrap_err().code(),
         Code::LimitExceeded
     );
 }
@@ -1611,7 +1611,7 @@ fn query_debug_and_diagnostics_omit_authored_content() {
     ] {
         let query = Query::parse(text).unwrap();
         assert!(!format!("{query:?}").contains("SENSITIVE"));
-        if let Err(error) = compile::<Nav<'_, WordKind>>(&query) {
+        if let Err(error) = compile::<&Nav<'_, WordKind>>(&query) {
             assert!(!format!("{error:?} {error}").contains("SENSITIVE"));
         }
         assert!(!format!("{:?}", text.into_query().unwrap()).contains("SENSITIVE"));
@@ -1634,15 +1634,15 @@ fn scope_admission_precedes_document_reads_and_raw_plans_reuse_it() {
     use litchi_core::selector::{Path, Scope, Step};
     let query = Query::parse("/body/p[@paraId=1A2B3C4D]/r").unwrap();
     assert_eq!(
-        compile::<Nav<'_, WordKind>>(&query).unwrap_err().code(),
+        compile::<&Nav<'_, WordKind>>(&query).unwrap_err().code(),
         Code::InvalidSelector
     );
     let arg = super::raw::query(&query).unwrap();
-    assert!(arg.into_plan::<Nav<'_, WordKind>>().unwrap().raw);
+    assert!(arg.into_plan::<&Nav<'_, WordKind>>().unwrap().raw);
     let ordinary = compiled::<WordKind>("p");
     let promoted = super::raw::query(&ordinary)
         .unwrap()
-        .into_plan::<Nav<'_, WordKind>>()
+        .into_plan::<&Nav<'_, WordKind>>()
         .unwrap();
     assert!(promoted.raw);
     assert!(!ordinary.raw);
@@ -1650,7 +1650,7 @@ fn scope_admission_precedes_document_reads_and_raw_plans_reuse_it() {
         .unwrap()
         .with_scope(Scope::Path(Box::new(Path::relative([Step::new("body")]))));
     assert_eq!(
-        compile::<Nav<'_, WordKind>>(&relative).unwrap_err().code(),
+        compile::<&Nav<'_, WordKind>>(&relative).unwrap_err().code(),
         Code::InvalidSelector
     );
     let deep = Query::parse("p")
@@ -1659,7 +1659,7 @@ fn scope_admission_precedes_document_reads_and_raw_plans_reuse_it() {
             (0..65).map(|_| Step::new("body")),
         ))));
     assert_eq!(
-        compile::<Nav<'_, WordKind>>(&deep).unwrap_err().code(),
+        compile::<&Nav<'_, WordKind>>(&deep).unwrap_err().code(),
         Code::MaxDepthExceeded
     );
     let unknown = compiled::<SheetKind>("cell[paraId=x]");

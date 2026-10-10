@@ -11,6 +11,7 @@
 //! `litchi` facade's tail can name; RTF is recognized by its header.
 
 use std::path::Path;
+use std::sync::Arc;
 
 use litchi_core::FileFormat;
 
@@ -237,6 +238,7 @@ pub fn open_prepared_with(
     options: &OpenOptions,
 ) -> Result<File> {
     check_cancelled(options)?;
+    let origin = detection.origin();
     let (format, prepared) = detection.into_parts();
     let Some(prepared) = prepared else {
         return Err(Error::new(
@@ -247,7 +249,7 @@ pub fn open_prepared_with(
         .with_suggestion("open the path with `litchi_ops::open`"));
     };
     let package = prepared.into_package()?;
-    let file = ooxml_from_source_package(format, package, options)?;
+    let file = ooxml_from_source_package_with_origin(format, package, options, origin)?;
     check_cancelled(options)?;
     Ok(file)
 }
@@ -266,7 +268,7 @@ fn check_input_len(observed: u64, limit: u64) -> Result<()> {
                 resource: litchi_core::Resource::InputBytes,
                 observed,
                 limit,
-                scope: std::sync::Arc::from("unified open input"),
+                scope: Arc::from("unified open input"),
             })
             .into(),
         );
@@ -362,6 +364,31 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
     }
 }
 
+/// Attach a path origin to a publishable owner returned by a byte fallback. The eager path
+/// route reaches the byte classifier before it knows the package's format;
+/// this helper applies metadata only after classification and preserves a
+/// signed wrapper by temporarily using its existing explicit disposition.
+#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx"))]
+pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
+    match file {
+        #[cfg(feature = "docx")]
+        File::Docx(docx) => File::Docx(docx.with_origin(Some(origin))),
+        #[cfg(feature = "xlsx")]
+        File::Xlsx(xlsx) => File::Xlsx(xlsx.with_origin(Some(origin))),
+        #[cfg(feature = "pptx")]
+        File::Pptx(pptx) => File::Pptx(pptx.with_origin(Some(origin))),
+        File::Signed(signed) => {
+            let format = signed.format();
+            let signature_origin = signed.origin();
+            let file = attach_origin(signed.unsign(), origin);
+            File::Signed(crate::Signed::new(file, format, signature_origin))
+        },
+        File::Locked(locked) => File::Locked(locked.with_origin(Some(origin))),
+        #[allow(unreachable_patterns)]
+        other => other,
+    }
+}
+
 /// Whether a failed OPC probe leaves the ZIP to the lower-precedence
 /// candidates: the package has no OPC content-types catalog. An
 /// ODT-marked package falls back only when the catalog part is missing
@@ -392,21 +419,37 @@ fn ooxml_from_source_package(
     package: litchi_opc::SourceBackedPackage,
     options: &OpenOptions,
 ) -> Result<File> {
+    ooxml_from_source_package_with_origin(format, package, options, None)
+}
+
+/// Build a source-backed OOXML handle while retaining the path origin which
+/// produced it. The origin is metadata only; package classification still
+/// comes from the already-indexed package.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub(crate) fn ooxml_from_source_package_with_origin(
+    format: FileFormat,
+    package: litchi_opc::SourceBackedPackage,
+    options: &OpenOptions,
+    origin: Option<Arc<Path>>,
+) -> Result<File> {
+    #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx")))]
+    let _ = &origin;
     let signed = package.has_signature_infrastructure();
     let file = match format {
         #[cfg(feature = "docx")]
-        FileFormat::Docx => File::Docx(crate::format::docx::Docx::from_source(
+        FileFormat::Docx => File::Docx(crate::format::docx::Docx::from_source_with_origin(
             litchi_docx::source_backed::Package::from_source_backed_package(package)?,
             options,
+            origin,
         )?),
         #[cfg(feature = "pptx")]
-        FileFormat::Pptx => File::Pptx(crate::format::pptx::Pptx::from_source_package(
-            package, options,
-        )?),
+        FileFormat::Pptx => File::Pptx(
+            crate::format::pptx::Pptx::from_source_package(package, options)?.with_origin(origin),
+        ),
         #[cfg(feature = "xlsx")]
-        FileFormat::Xlsx => File::Xlsx(crate::format::xlsx::Xlsx::from_source_package(
-            package, options,
-        )?),
+        FileFormat::Xlsx => File::Xlsx(
+            crate::format::xlsx::Xlsx::from_source_package(package, options)?.with_origin(origin),
+        ),
         #[cfg(feature = "xlsb")]
         FileFormat::Xlsb => File::Xlsb(crate::format::xlsb::Xlsb::from_source_package(
             package, options,
@@ -424,20 +467,35 @@ fn ooxml_from_eager_package(
     package: litchi_opc::OpcPackage,
     options: &OpenOptions,
 ) -> Result<File> {
+    ooxml_from_eager_package_with_origin(format, package, options, None)
+}
+
+/// Build an eager OOXML handle while retaining the path origin which
+/// produced it. DOCX and XLSX store this value; the other format
+/// handles keep their existing state until their save wave lands.
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
+pub(crate) fn ooxml_from_eager_package_with_origin(
+    format: FileFormat,
+    package: litchi_opc::OpcPackage,
+    options: &OpenOptions,
+    origin: Option<Arc<Path>>,
+) -> Result<File> {
+    #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx")))]
+    let _ = &origin;
     let signed = package.is_signed();
     let file = match format {
         #[cfg(feature = "docx")]
-        FileFormat::Docx => File::Docx(crate::format::docx::Docx::from_opc_package(
-            package, options,
+        FileFormat::Docx => File::Docx(crate::format::docx::Docx::from_opc_package_with_origin(
+            package, options, origin,
         )?),
         #[cfg(feature = "pptx")]
-        FileFormat::Pptx => File::Pptx(crate::format::pptx::Pptx::from_opc_package(
-            package, options,
-        )?),
+        FileFormat::Pptx => File::Pptx(
+            crate::format::pptx::Pptx::from_opc_package(package, options)?.with_origin(origin),
+        ),
         #[cfg(feature = "xlsx")]
-        FileFormat::Xlsx => File::Xlsx(crate::format::xlsx::Xlsx::from_opc_package(
-            package, options,
-        )?),
+        FileFormat::Xlsx => File::Xlsx(
+            crate::format::xlsx::Xlsx::from_opc_package(package, options)?.with_origin(origin),
+        ),
         #[cfg(feature = "xlsb")]
         FileFormat::Xlsb => File::Xlsb(crate::format::xlsb::Xlsb::from_opc_package(
             package, options,
@@ -475,34 +533,39 @@ fn flat_odf_unsupported(format: FileFormat) -> Error {
     .with_format(format)
 }
 
-/// Open the content of a [`Locked`](crate::Locked) handle with `password`.
+/// Unlock a container while carrying the origin captured by a path opener.
+/// Byte-opened locked handles pass `None`; path-opened DOCX wrappers pass the
+/// stable path they retained in their locked state.
 #[cfg(feature = "encryption")]
-pub(crate) fn unlock(
+pub(crate) fn unlock_with_origin(
     container: crate::locked::Container,
     bytes: Vec<u8>,
     password: &str,
     format: Option<FileFormat>,
     options: &OpenOptions,
+    origin: Option<Arc<Path>>,
 ) -> Result<File> {
     use crate::locked::Container;
 
     match container {
-        Container::Ooxml => unlock_ooxml(bytes, password, format, options),
+        Container::Ooxml => unlock_ooxml_with_origin(bytes, password, format, options, origin),
         Container::Doc | Container::Ppt | Container::Xls => {
             cfb::unlock(container, bytes, password, options)
         },
     }
 }
 
-/// Decrypt an OOXML package once, classify the clear package and open it
-/// with the leaf's eager owner, which keeps the encryption profile.
+/// Decrypt an OOXML package with an optional path origin for DOCX.
 #[cfg(feature = "encryption")]
-fn unlock_ooxml(
+fn unlock_ooxml_with_origin(
     bytes: Vec<u8>,
     password: &str,
     format: Option<FileFormat>,
     options: &OpenOptions,
+    origin: Option<Arc<Path>>,
 ) -> Result<File> {
+    #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx")))]
+    let _ = &origin;
     let opened =
         litchi_crypto::ooxml::open_with(bytes, password, &litchi_crypto::ooxml::Limits::default())?;
     #[cfg(any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"))]
@@ -519,7 +582,9 @@ fn unlock_ooxml(
             FileFormat::Docx => {
                 let package = litchi_docx::Package::from_decrypted(opened, litchi_docx::OpenOptions::default().source_limits(limits))?;
                 let signed = package.is_signed();
-                let docx = crate::format::docx::Docx::from_owned_package(package, options)?;
+                let docx = crate::format::docx::Docx::from_owned_package_with_origin(
+                    package, options, origin,
+                )?;
                 Ok(signed_if(
                     File::Docx(docx),
                     FileFormat::Docx,
@@ -531,7 +596,7 @@ fn unlock_ooxml(
             FileFormat::Pptx => {
                 let package = litchi_pptx::Package::from_decrypted(opened, limits)?;
                 let signed = package.opc()?.is_signed();
-                let pptx = crate::format::pptx::Pptx::from_package(package, options)?;
+                let pptx = crate::format::pptx::Pptx::from_package(package, options)?.with_origin(origin);
                 Ok(signed_if(
                     File::Pptx(pptx),
                     FileFormat::Pptx,
@@ -543,7 +608,7 @@ fn unlock_ooxml(
             FileFormat::Xlsx => {
                 let package = litchi_xlsx::Package::from_decrypted(opened, limits)?;
                 let signed = package.is_signed();
-                let xlsx = crate::format::xlsx::Xlsx::from_package(package, options)?;
+                let xlsx = crate::format::xlsx::Xlsx::from_package(package, options)?.with_origin(origin);
                 Ok(signed_if(
                     File::Xlsx(xlsx),
                     FileFormat::Xlsx,

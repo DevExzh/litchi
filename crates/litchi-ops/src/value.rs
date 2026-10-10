@@ -61,7 +61,7 @@ pub(crate) mod compare;
 mod error;
 mod length;
 mod number;
-mod suggest;
+pub(crate) mod suggest;
 pub(crate) mod text;
 mod token;
 mod ty;

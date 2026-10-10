@@ -68,13 +68,13 @@ impl<'q> Deref for PlanRef<'q> {
 ///
 /// Each item is fallible because a lazily read part can fail mid-walk; after
 /// the first error, and after `limit` matches, the iterator is fused.
-pub(crate) struct Walk<'a, 'q, 'f, N>
+pub(crate) struct Walk<'q, 'f, N>
 where
     N: Inspect<'f>,
 {
-    nav: &'a N,
+    nav: N,
     plan: PlanRef<'q>,
-    state: State<'a, 'f, N>,
+    state: State<'f, N>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -93,12 +93,12 @@ struct Alt {
     done: bool,
 }
 
-struct State<'a, 'f, N>
+struct State<'f, N>
 where
     N: Inspect<'f>,
 {
     phase: Phase,
-    frames: Vec<Frame<'a, 'f, N>>,
+    frames: Vec<Frame<'f, N>>,
     /// `(kind ordinal, children so far)` per frame, each frame's entries
     /// starting at its `counters` index.
     counters: Vec<(u8, u32)>,
@@ -124,7 +124,7 @@ where
     visited: u64,
 }
 
-struct Frame<'a, 'f, N>
+struct Frame<'f, N>
 where
     N: Inspect<'f>,
 {
@@ -134,7 +134,7 @@ where
     ordinal: u32,
     /// The kinds to ask the adapter for.
     kinds: u128,
-    source: Source<'a, 'f, N>,
+    source: Source<'f, N>,
     /// Where this frame's child counters start.
     counters: usize,
     /// A number unique to this push, for caches keyed by frame.
@@ -145,13 +145,13 @@ where
     parent: Option<usize>,
 }
 
-enum Source<'a, 'f, N>
+enum Source<'f, N>
 where
-    N: Inspect<'f> + 'a,
+    N: Inspect<'f>,
 {
     /// The adapter's iterator, created when the first child is needed.
     Lazy,
-    Open(N::Children<'a>),
+    Open(N::Children),
     /// Worksheet rows by number, records or not (header-row queries).
     Rows {
         next: u32,
@@ -253,14 +253,14 @@ fn is_empty(value: &Value<'_>) -> bool {
     value.as_str().is_some_and(str::is_empty)
 }
 
-impl<'a, 'q, 'f, N> Walk<'a, 'q, 'f, N>
+impl<'q, 'f, N> Walk<'q, 'f, N>
 where
-    N: Inspect<'f> + 'a,
+    N: Inspect<'f>,
     N::Node: Clone,
 {
     /// A walk of `plan` over the document `nav` reads. Nothing is read until
     /// the first match is pulled.
-    pub(crate) fn new(nav: &'a N, plan: PlanRef<'q>) -> Result<Self> {
+    pub(crate) fn new(nav: N, plan: PlanRef<'q>) -> Result<Self> {
         if plan.format != N::FORMAT {
             return Err(Error::new(
                 Code::InvalidArgument,
@@ -325,7 +325,7 @@ where
     }
 
     /// The next match, with access to its path.
-    pub(crate) fn next_hit(&mut self) -> Option<Result<Hit<'_, 'a, 'q, 'f, N>>> {
+    pub(crate) fn next_hit(&mut self) -> Option<Result<Hit<'_, 'q, 'f, N>>> {
         match self.advance() {
             Ok(Some(found)) => Some(Ok(Hit { walk: self, found })),
             Ok(None) => None,
@@ -333,15 +333,32 @@ where
         }
     }
 
-    fn engine(&mut self) -> Engine<'_, 'a, 'q, 'f, N> {
+    fn engine(&mut self) -> Engine<'_, 'q, 'f, N> {
         Engine {
             plan: &self.plan,
-            nav: self.nav,
+            nav: &self.nav,
             state: &mut self.state,
         }
     }
 
     fn advance(&mut self) -> Result<Option<Found<'f, N>>> {
+        if matches!(self.state.phase, Phase::Done) || self.state.yielded >= self.state.limit {
+            self.finish();
+            return Ok(None);
+        }
+        let result = self
+            .nav
+            .check_source()
+            .and_then(|()| self.advance_checked());
+        let result = self.nav.check_source().and(result);
+        if result.is_err() {
+            self.finish();
+            self.state.pending_path.clear();
+        }
+        result
+    }
+
+    fn advance_checked(&mut self) -> Result<Option<Found<'f, N>>> {
         match self.state.phase {
             Phase::Done => return Ok(None),
             Phase::Start => {
@@ -391,7 +408,7 @@ where
     }
 }
 
-impl<'f, N> Iterator for Walk<'_, '_, 'f, N>
+impl<'f, N> Iterator for Walk<'_, 'f, N>
 where
     N: Inspect<'f>,
     N::Node: Clone,
@@ -403,7 +420,7 @@ where
     }
 }
 
-impl<'f, N> FusedIterator for Walk<'_, '_, 'f, N>
+impl<'f, N> FusedIterator for Walk<'_, 'f, N>
 where
     N: Inspect<'f>,
     N::Node: Clone,
@@ -411,17 +428,17 @@ where
 }
 
 /// One match, borrowed from its walk until the next is pulled.
-pub(crate) struct Hit<'w, 'a, 'q, 'f, N>
+pub(crate) struct Hit<'w, 'q, 'f, N>
 where
     N: Inspect<'f>,
 {
-    walk: &'w Walk<'a, 'q, 'f, N>,
+    walk: &'w Walk<'q, 'f, N>,
     found: Found<'f, N>,
 }
 
-impl<'w, 'a, 'q, 'f, N> Hit<'w, 'a, 'q, 'f, N>
+impl<'w, 'q, 'f, N> Hit<'w, 'q, 'f, N>
 where
-    N: Inspect<'f> + 'a,
+    N: Inspect<'f>,
 {
     /// The matching node.
     pub(crate) fn node(&self) -> &N::Node {
@@ -441,26 +458,26 @@ where
     /// The match's path, written from the walk's stack: the scope as the
     /// query wrote it, then one step per ancestor and the match itself, each
     /// written by the adapter ([`Inspect::write_step`]).
-    pub(crate) fn path(&self) -> HitPath<'_, 'w, 'a, 'q, 'f, N> {
+    pub(crate) fn path(&self) -> HitPath<'_, 'w, 'q, 'f, N> {
         HitPath { hit: self }
     }
 }
 
 /// The path of a [`Hit`], written on demand without allocating.
-pub(crate) struct HitPath<'h, 'w, 'a, 'q, 'f, N>
+pub(crate) struct HitPath<'h, 'w, 'q, 'f, N>
 where
     N: Inspect<'f>,
 {
-    hit: &'h Hit<'w, 'a, 'q, 'f, N>,
+    hit: &'h Hit<'w, 'q, 'f, N>,
 }
 
-impl<'f, N> fmt::Display for HitPath<'_, '_, '_, '_, 'f, N>
+impl<'f, N> fmt::Display for HitPath<'_, '_, '_, 'f, N>
 where
     N: Inspect<'f>,
 {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let walk = self.hit.walk;
-        let nav = walk.nav;
+        let nav = &walk.nav;
         match &walk.plan.scope {
             ScopePlan::Root => {},
             ScopePlan::Path(path) => {
@@ -496,18 +513,18 @@ where
 
 /// The plan, the adapter and the walk state, borrowed separately so the
 /// evaluation can read the plan while it updates the stack.
-struct Engine<'e, 'a, 'q, 'f, N>
+struct Engine<'e, 'q, 'f, N>
 where
     N: Inspect<'f>,
 {
     plan: &'e Plan<'q>,
-    nav: &'a N,
-    state: &'e mut State<'a, 'f, N>,
+    nav: &'e N,
+    state: &'e mut State<'f, N>,
 }
 
-impl<'e, 'a, 'q, 'f, N> Engine<'e, 'a, 'q, 'f, N>
+impl<'e, 'q, 'f, N> Engine<'e, 'q, 'f, N>
 where
-    N: Inspect<'f> + 'a,
+    N: Inspect<'f>,
     N::Node: Clone,
 {
     fn kind_at(&self, ordinal: u8) -> Result<N::Kind> {
@@ -825,7 +842,7 @@ where
         floor: usize,
     ) -> Result<bool>
     where
-        'a: 'c,
+        'e: 'c,
     {
         let plan = self.plan;
         let chain = plan.chains[chain_id as usize];
@@ -919,7 +936,7 @@ where
         probe: &mut Probe<'c>,
     ) -> Result<bool>
     where
-        'a: 'c,
+        'e: 'c,
     {
         Ok(self.structure_matches(id, candidate)? && self.content_matches(id, candidate, probe)?)
     }
@@ -954,7 +971,7 @@ where
         probe: &mut Probe<'c>,
     ) -> Result<bool>
     where
-        'a: 'c,
+        'e: 'c,
     {
         let plan = self.plan;
         let nav: &'c N = self.nav;
@@ -1102,7 +1119,7 @@ where
         probe: &mut Probe<'c>,
     ) -> Result<bool>
     where
-        'a: 'c,
+        'e: 'c,
     {
         let plan = self.plan;
         match plan.exprs[id as usize] {
@@ -1134,7 +1151,7 @@ where
         probe: &mut Probe<'c>,
     ) -> Result<bool>
     where
-        'a: 'c,
+        'e: 'c,
     {
         let plan = self.plan;
         let nav: &'c N = self.nav;
@@ -1288,7 +1305,7 @@ where
         kind: N::Kind,
         ordinal: u32,
         kinds: u128,
-        source: Source<'a, 'f, N>,
+        source: Source<'f, N>,
     ) -> Result<()> {
         let parent = self.state.frames.len().checked_sub(1);
         self.push_with_parent(node, kind, ordinal, kinds, source, parent)
@@ -1300,7 +1317,7 @@ where
         kind: N::Kind,
         ordinal: u32,
         kinds: u128,
-        source: Source<'a, 'f, N>,
+        source: Source<'f, N>,
         parent: Option<usize>,
     ) -> Result<()> {
         let state = &mut *self.state;

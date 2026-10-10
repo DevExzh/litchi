@@ -41,7 +41,7 @@ pub(super) fn distance(a: &str, b: &str) -> usize {
 /// `max(2, len / 3)`, or `None` when nothing is that close, when the best
 /// distance is shared by two candidates, or when `input` already equals a
 /// candidate (OfficeCLI `AttributeFilter.NearestMatch`).
-pub(super) fn nearest<'c>(
+pub(crate) fn nearest<'c>(
     input: &str,
     candidates: impl IntoIterator<Item = &'c str>,
 ) -> Option<&'c str> {
@@ -53,7 +53,7 @@ pub(super) fn nearest<'c>(
 
 /// [`nearest`] over `(spelling, key)` pairs, returning the key. Spellings
 /// that share a key (aliases of one value) are not a tie.
-pub(super) fn nearest_keyed<'c>(
+pub(crate) fn nearest_keyed<'c>(
     input: &str,
     candidates: impl IntoIterator<Item = (&'c str, &'c str)>,
 ) -> Option<&'c str> {

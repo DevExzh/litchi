@@ -20,13 +20,18 @@ use crate::{Family, Result};
 /// Resolves an absolute path from the document root; a miss is
 /// `path_not_found`.
 pub(crate) fn get<'f, N: Navigate<'f>>(nav: &N, path: &PathArg<'_>) -> Result<N::Node> {
-    let outcome = walk(nav, path, None)?;
-    found(nav, path, outcome)
+    nav.check_source()?;
+    let result = walk(nav, path, None).and_then(|outcome| found(nav, path, outcome));
+    nav.check_source()?;
+    result
 }
 
 /// Resolves an absolute path from the document root; a miss is `Ok(None)`.
 pub(crate) fn find<'f, N: Navigate<'f>>(nav: &N, path: &PathArg<'_>) -> Result<Option<N::Node>> {
-    Ok(walk(nav, path, None)?.into_found())
+    nav.check_source()?;
+    let result = walk(nav, path, None).map(Outcome::into_found);
+    nav.check_source()?;
+    result
 }
 
 /// Resolves a relative path from `start`, a node of kind `kind`; an absolute
@@ -37,8 +42,10 @@ pub(crate) fn get_from<'f, N: Navigate<'f>>(
     kind: N::Kind,
     path: &PathArg<'_>,
 ) -> Result<N::Node> {
-    let outcome = walk(nav, path, Some((start, kind)))?;
-    found(nav, path, outcome)
+    nav.check_source()?;
+    let result = walk(nav, path, Some((start, kind))).and_then(|outcome| found(nav, path, outcome));
+    nav.check_source()?;
+    result
 }
 
 /// As [`get_from`], with a miss as `Ok(None)`.
@@ -48,7 +55,10 @@ pub(crate) fn find_from<'f, N: Navigate<'f>>(
     kind: N::Kind,
     path: &PathArg<'_>,
 ) -> Result<Option<N::Node>> {
-    Ok(walk(nav, path, Some((start, kind)))?.into_found())
+    nav.check_source()?;
+    let result = walk(nav, path, Some((start, kind))).map(Outcome::into_found);
+    nav.check_source()?;
+    result
 }
 
 /// Where a walk ended.

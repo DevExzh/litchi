@@ -14,6 +14,22 @@ use litchi_core::{ExecutionError, FileFormat, Resource, ResourceLimit, SourceVer
 use super::PASSWORD_SUGGESTION;
 use super::{Code, Error, LIMIT_SUGGESTION, SIGNED_SUGGESTION, Source};
 
+#[test]
+fn atomic_destination_conflicts_keep_their_typed_source_and_file_exists_code() {
+    let error = Error::from(io::Error::from(io::ErrorKind::AlreadyExists));
+    assert_eq!(error.code(), Code::FileExists);
+    assert!(matches!(error.0.source.as_ref(), Source::Io(_)));
+
+    #[cfg(feature = "docx")]
+    {
+        let error = Error::from(litchi_opc::OpcError::IoError(io::Error::from(
+            io::ErrorKind::AlreadyExists,
+        )));
+        assert_eq!(error.code(), Code::FileExists);
+        assert!(matches!(error.0.source.as_ref(), Source::Opc(_)));
+    }
+}
+
 fn allocation_failure() -> TryReserveError {
     Vec::<u8>::new()
         .try_reserve_exact(usize::MAX)
@@ -172,6 +188,63 @@ fn clones_share_the_leaf_error() {
         std::ptr::eq(error.leaf(), clone.leaf()),
         "the leaf is shared"
     );
+}
+
+#[test]
+fn attribution_metadata_defaults_and_round_trips() {
+    let plain = Error::new(Code::InvalidPath, "bad path");
+    assert_eq!(plain.item(), None);
+    assert_eq!(plain.property(), None);
+
+    let error = plain
+        .with_item(17)
+        .with_property(String::from("font.bolld"));
+    assert_eq!(error.item(), Some(17));
+    assert_eq!(error.property(), Some("font.bolld"));
+    assert_eq!(
+        error.to_string(),
+        "invalid_path: bad path (property: font.bolld) (item: 17)"
+    );
+}
+
+#[test]
+fn attribution_metadata_preserves_classification_source_and_clone() {
+    let error = Error::from(litchi_core::Error::ResourceLimit(resource_limit()))
+        .with_item(usize::MAX)
+        .with_property("worksheet.cells");
+    let clone = error.clone();
+
+    assert_eq!(error.code(), Code::LimitExceeded);
+    assert_eq!(clone.code(), Code::LimitExceeded);
+    assert_eq!(clone.item(), Some(usize::MAX));
+    assert_eq!(clone.property(), Some("worksheet.cells"));
+    assert!(matches!(error.leaf(), Source::Core(_)));
+    assert!(std::ptr::eq(error.leaf(), clone.leaf()));
+}
+
+#[test]
+fn debug_redacts_authored_messages_and_attribution_payloads() {
+    let secret = "private-property-name";
+    let error = Error::new(
+        Code::UnsupportedProperty,
+        format!("unknown property {secret}"),
+    )
+    .with_item(9_876_543)
+    .with_property(secret.to_owned())
+    .with_suggestion(format!("try {secret}"));
+    let debug = format!("{error:?}");
+
+    assert!(
+        !debug.contains(secret),
+        "debug leaked authored input: {debug}"
+    );
+    assert!(
+        !debug.contains("9_876_543"),
+        "debug leaked the item attribution: {debug}"
+    );
+    assert!(debug.contains("UnsupportedProperty"));
+    assert_eq!(error.property(), Some(secret));
+    assert_eq!(error.item(), Some(9_876_543));
 }
 
 // Row: `io::ErrorKind::NotFound` -> `file_not_found`.
@@ -709,6 +782,10 @@ fn caller_errors_are_classified_by_kind() {
             litchi_pptx::Error::SlideNameNotFound("intro".into()),
             Code::NotFound,
         );
+        assert_code(
+            litchi_pptx::Error::SlideLayoutNameNotFound("Blank".into()),
+            Code::NotFound,
+        );
     }
     #[cfg(feature = "xlsx")]
     assert_code(
@@ -992,4 +1069,188 @@ fn docx_encryption_policy_refusal_retains_typed_source() {
         error.leaf(),
         Source::Docx(litchi_docx::Error::EncryptionPolicy { .. })
     ));
+}
+
+#[cfg(feature = "xlsb")]
+#[test]
+fn xlsb_diagnostics_hide_authored_payloads_but_retain_typed_causes() {
+    let secret = "private workbook formula and sheet name";
+    let error = Error::from(litchi_xlsb::package::PackageError::InvalidFormat(
+        secret.into(),
+    ));
+    for diagnostic in [
+        error.message().to_owned(),
+        error.to_string(),
+        format!("{error:?}"),
+        format!("{:?}", error.leaf()),
+    ] {
+        assert!(!diagnostic.contains(secret));
+    }
+    assert!(matches!(error.leaf(), Source::Xlsb(_)));
+    assert!(std::error::Error::source(&error).is_some());
+}
+
+#[cfg(feature = "docx")]
+#[test]
+fn docx_schema_property_refusal_is_an_invalid_value() {
+    let error = Error::from(litchi_docx::document::Error::Refused {
+        position: 0,
+        reason: litchi_docx::document::Refusal::InvalidPropertyValue,
+    });
+    assert_eq!(error.code(), Code::InvalidValue);
+    assert!(matches!(error.leaf(), Source::DocxTransaction(_)));
+}
+
+#[cfg(all(feature = "xlsx", feature = "encryption"))]
+#[test]
+fn xlsx_output_policy_retains_the_typed_cause() {
+    use litchi_ooxml_common::package_encryption::PolicyError;
+    let error = assert_code(
+        litchi_xlsx::Error::EncryptionPolicy {
+            operation: "write_to",
+            source: PolicyError::OrdinaryOutputWouldRemoveEncryption {
+                mode: litchi_xlsx::encryption::Mode::Agile,
+            },
+        },
+        Code::DocumentProtected,
+    );
+    assert!(matches!(
+        error.leaf(),
+        Source::Xlsx(litchi_xlsx::Error::EncryptionPolicy { .. })
+    ));
+    assert!(error.suggestion().is_some());
+    assert_code(
+        litchi_xlsx::Error::EncryptionPolicy {
+            operation: "to_reencrypted",
+            source: PolicyError::NoRetainedMode,
+        },
+        Code::UnsupportedCapability,
+    );
+}
+
+#[cfg(feature = "xlsx")]
+#[test]
+fn xlsx_edit_guards_preserve_protection_and_capability_categories() {
+    use litchi_xlsx::{ColumnEditBlock, EditBlock, RowEditBlock};
+    for (native, code) in [
+        (
+            litchi_xlsx::Error::RowEditBlocked {
+                sheet: "Sheet1".into(),
+                row: litchi_xlsx::RowIndex::new(0).unwrap(),
+                reason: RowEditBlock::ProtectedSheet,
+            },
+            Code::DocumentProtected,
+        ),
+        (
+            litchi_xlsx::Error::ColumnEditBlocked {
+                sheet: "Sheet1".into(),
+                column: litchi_xlsx::ColumnIndex::new(0).unwrap(),
+                reason: ColumnEditBlock::ProtectedSheet,
+            },
+            Code::DocumentProtected,
+        ),
+        (
+            litchi_xlsx::Error::ColumnEditBlocked {
+                sheet: "Sheet1".into(),
+                column: litchi_xlsx::ColumnIndex::new(0).unwrap(),
+                reason: ColumnEditBlock::MarkupCompatibility,
+            },
+            Code::UnsupportedCapability,
+        ),
+        (
+            litchi_xlsx::Error::EditBlocked {
+                sheet: "Sheet1".into(),
+                address: litchi_xlsx::Address::new(
+                    litchi_xlsx::RowIndex::new(0).unwrap(),
+                    litchi_xlsx::ColumnIndex::new(0).unwrap(),
+                ),
+                reason: EditBlock::ProtectedSheet,
+            },
+            Code::DocumentProtected,
+        ),
+        (
+            litchi_xlsx::Error::EditBlocked {
+                sheet: "Sheet1".into(),
+                address: litchi_xlsx::Address::new(
+                    litchi_xlsx::RowIndex::new(0).unwrap(),
+                    litchi_xlsx::ColumnIndex::new(0).unwrap(),
+                ),
+                reason: EditBlock::CoveredMerge,
+            },
+            Code::UnsupportedCapability,
+        ),
+    ] {
+        let error = assert_code(native, code);
+        assert!(matches!(error.leaf(), Source::Xlsx(_)));
+    }
+}
+
+#[cfg(all(feature = "pptx", feature = "encryption"))]
+#[test]
+fn pptx_crypto_errors_keep_their_classification() {
+    let error = Error::from(litchi_pptx::Error::Encryption(
+        litchi_pptx::encryption::Error::Limit {
+            resource: "plaintext",
+            actual: 2,
+            maximum: 1,
+        },
+    ));
+    assert_eq!(error.code(), Code::LimitExceeded);
+    assert_eq!(error.format(), Some(FileFormat::Pptx));
+    let error = Error::from(litchi_pptx::Error::Encryption(
+        litchi_pptx::encryption::Error::PasswordRequired,
+    ));
+    assert_eq!(error.code(), Code::InvalidArgument);
+}
+
+#[cfg(feature = "pptx")]
+#[test]
+fn pptx_slide_removal_refusals_preserve_semantic_classification() {
+    use litchi_pptx::SlideRemovalRefusal as Refusal;
+    for (kind, code) in [
+        (Refusal::SignedPackage, Code::DocumentProtected),
+        (Refusal::ProtectedPresentation, Code::DocumentProtected),
+        (Refusal::FinalSlide, Code::InvalidArgument),
+        (Refusal::MacroEnabledPackage, Code::UnsupportedCapability),
+        (Refusal::MarkupCompatibility, Code::UnsupportedCapability),
+        (Refusal::UnknownSemanticSurface, Code::UnsupportedCapability),
+        (Refusal::SharedOwner, Code::UnsupportedCapability),
+        (
+            Refusal::UnsupportedRelationship,
+            Code::UnsupportedCapability,
+        ),
+        (Refusal::AmbiguousTopology, Code::UnsupportedCapability),
+        (Refusal::UnknownPhysicalMember, Code::UnsupportedCapability),
+    ] {
+        assert_code(
+            litchi_pptx::Error::SlideRemovalPlan {
+                kind,
+                detail: "removal guard".into(),
+            },
+            code,
+        );
+    }
+}
+
+#[cfg(feature = "pptx")]
+#[test]
+fn pptx_slide_order_refusals_distinguish_protection_capability_and_corruption() {
+    use litchi_pptx::SlideOrderRefusal as Refusal;
+    for (kind, code) in [
+        (Refusal::ModifyVerifier, Code::DocumentProtected),
+        (Refusal::AmbiguousBindings, Code::CorruptFile),
+        (Refusal::MarkupCompatibility, Code::UnsupportedCapability),
+        (Refusal::Sections, Code::UnsupportedCapability),
+        (Refusal::ViewProperties, Code::UnsupportedCapability),
+        (Refusal::PresentationProperties, Code::UnsupportedCapability),
+        (Refusal::PositionalOwner, Code::UnsupportedCapability),
+    ] {
+        assert_code(
+            litchi_pptx::Error::SlideOrderPlan {
+                kind,
+                detail: "order guard".into(),
+            },
+            code,
+        );
+    }
 }

@@ -1,10 +1,11 @@
 //! Node addresses and their canonical path text (record 0010 §2.6).
 //!
 //! A node keeps a compact address: [`PathStep`]s naming a kind or a sheet,
-//! each with at most one selector (a position or a stable identity). Its
-//! [`NodePath`] renders the address on demand through the selector grammar's
-//! own `Step` display, one step at a time, so the text is the grammar's
-//! canonical spelling (quoting included) and parses back to an equal
+//! each with at most one selector (a position or a stable identity), or a
+//! worksheet cell or range written in A1 notation. Its [`NodePath`] renders
+//! the address on demand through the selector grammar's own `Step` display,
+//! one step at a time, so the text is the grammar's canonical spelling
+//! (quoting included) and parses back to an equal
 //! [`Path`](litchi_core::selector::Path). Rendering allocates nothing and
 //! builds no `String`.
 
@@ -16,7 +17,8 @@ use litchi_core::selector::{
     CompareOp, Condition, Expr, Key, Path, Predicate, Step, Value as Operand,
 };
 
-/// The canonical path of a node: `/`, `/body/p[3]`, `/body/p[@paraId=1A2B3C4D]`,
+/// A node address: ordinary adapters emit positional paths such as `/body/p[3]`.
+/// Explicit raw construction can also represent `/body/p[@paraId=1A2B3C4D]`,
 /// `/Sheet1/A1`, `/slide[1]/shape[@id=5]`.
 ///
 /// A `NodePath` borrows the steps its node stores. `Display` writes the
@@ -72,7 +74,7 @@ impl<'a> NodePath<'a> {
     }
 
     /// The equal grammar value. It allocates where a [`Path`] does: past six
-    /// steps, and for each numeric identity.
+    /// steps, for numeric identities, and for A1 cell, range or column text.
     ///
     /// ```
     /// use litchi_ops::node::{NodePath, PathStep};
@@ -165,6 +167,39 @@ impl<'a> PathStep<'a> {
         }
     }
 
+    /// The worksheet cell step `B3`, written in A1 notation from its
+    /// zero-based `column` and `row`.
+    #[must_use]
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    pub(crate) const fn cell(column: u32, row: u32) -> Self {
+        Self {
+            name: "",
+            select: Select::Cell { column, row },
+        }
+    }
+
+    /// The worksheet range step `A1:C5` from its first and last cells, each
+    /// a zero-based `(column, row)`.
+    #[must_use]
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    pub(crate) const fn range(first: (u32, u32), last: (u32, u32)) -> Self {
+        Self {
+            name: "",
+            select: Select::Range { first, last },
+        }
+    }
+
+    /// The step `name[B]`: a worksheet column by its letters, for the
+    /// zero-based `column`.
+    #[must_use]
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    pub(crate) const fn column(name: &'a str, column: u32) -> Self {
+        Self {
+            name,
+            select: Select::Column(column),
+        }
+    }
+
     /// The step's grammar counterpart, when it has at most one selector of a
     /// kind an ordinary node address uses (a position). Native identities
     /// require [`super::raw::step_from_grammar`].
@@ -220,7 +255,8 @@ impl<'a> PathStep<'a> {
         self.select
     }
 
-    /// The equal grammar step. It allocates only for a numeric identity.
+    /// The equal grammar step. It allocates for numeric identities and A1
+    /// cell, range or column text.
     #[must_use]
     pub fn to_step(self) -> Step<'a> {
         let step = Step::new(self.name);
@@ -234,6 +270,12 @@ impl<'a> PathStep<'a> {
                 };
                 step.with(identity(key, value))
             },
+            Select::Cell { .. } | Select::Range { .. } => Step::new(Cow::Owned(self.to_string())),
+            Select::Column(column) => {
+                let mut letters = A1::default();
+                let letters = letters.column(column).to_owned();
+                step.with(bare(Cow::Owned(letters)))
+            },
         }
     }
 }
@@ -241,6 +283,7 @@ impl<'a> PathStep<'a> {
 impl fmt::Display for PathStep<'_> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let mut digits = Digits::default();
+        let mut a1 = A1::default();
         let step = Step::new(self.name);
         let step = match self.select {
             Select::Bare => step,
@@ -252,6 +295,11 @@ impl fmt::Display for PathStep<'_> {
                 };
                 step.with(identity(key, Cow::Borrowed(value)))
             },
+            // A1 text is always a plain name in the grammar: letters, digits
+            // and one colon.
+            Select::Cell { column, row } => return f.write_str(a1.cell(column, row)),
+            Select::Range { first, last } => return f.write_str(a1.range(first, last)),
+            Select::Column(column) => step.with(bare(Cow::Borrowed(a1.column(column)))),
         };
         fmt::Display::fmt(&step, f)
     }
@@ -272,6 +320,34 @@ pub(crate) enum Select<'a> {
         /// The identity value.
         value: Ident<'a>,
     },
+    /// A worksheet cell, written `B3`: the whole step, with no name.
+    #[cfg_attr(
+        not(feature = "xlsx"),
+        allow(dead_code, reason = "constructed only by the XLSX adapter")
+    )]
+    Cell {
+        /// The zero-based column.
+        column: u32,
+        /// The zero-based row.
+        row: u32,
+    },
+    /// A worksheet range, written `A1:C5`: the whole step, with no name.
+    #[cfg_attr(
+        not(feature = "xlsx"),
+        allow(dead_code, reason = "constructed only by the XLSX adapter")
+    )]
+    Range {
+        /// The first cell: zero-based `(column, row)`.
+        first: (u32, u32),
+        /// The last cell: zero-based `(column, row)`.
+        last: (u32, u32),
+    },
+    /// `[B]`: a worksheet column by its letters, for the zero-based column.
+    #[cfg_attr(
+        not(feature = "xlsx"),
+        allow(dead_code, reason = "constructed only by the XLSX adapter")
+    )]
+    Column(u32),
 }
 
 /// The value of an identity selector.
@@ -315,6 +391,81 @@ fn identity<'a>(key: &'a str, value: Cow<'a, str>) -> Predicate<'a> {
         op: CompareOp::Eq,
         value: Operand::Text(value),
     }))
+}
+
+/// The bare-token predicate `[B]`.
+fn bare(token: Cow<'_, str>) -> Predicate<'_> {
+    Predicate::Filter(Expr::Condition(Condition::Exists(Key::new(token))))
+}
+
+/// A stack buffer for A1 text: column letters, a cell (`XFD1048576`) or a
+/// range of two cells.
+#[derive(Default)]
+struct A1 {
+    bytes: [u8; 24],
+    len: usize,
+}
+
+impl A1 {
+    /// The letters of the zero-based `column`: `A` for 0.
+    fn column(&mut self, column: u32) -> &str {
+        self.len = 0;
+        self.push_column(column);
+        self.text()
+    }
+
+    /// `B3` for the cell at zero-based column 1, row 2.
+    fn cell(&mut self, column: u32, row: u32) -> &str {
+        self.len = 0;
+        self.push_cell(column, row);
+        self.text()
+    }
+
+    /// `A1:C5` for zero-based `(column, row)` corners, as given; a one-cell
+    /// range writes one cell.
+    fn range(&mut self, first: (u32, u32), last: (u32, u32)) -> &str {
+        self.len = 0;
+        self.push_cell(first.0, first.1);
+        if last != first {
+            self.push(b':');
+            self.push_cell(last.0, last.1);
+        }
+        self.text()
+    }
+
+    fn push(&mut self, byte: u8) {
+        if let Some(slot) = self.bytes.get_mut(self.len) {
+            *slot = byte;
+            self.len += 1;
+        }
+    }
+
+    fn push_column(&mut self, column: u32) {
+        let mut letters = [0_u8; 7];
+        let mut start = letters.len();
+        let mut number = u64::from(column) + 1;
+        while number > 0 && start > 0 {
+            start -= 1;
+            letters[start] = b'A' + ((number - 1) % 26) as u8;
+            number = (number - 1) / 26;
+        }
+        for &letter in &letters[start..] {
+            self.push(letter);
+        }
+    }
+
+    fn push_cell(&mut self, column: u32, row: u32) {
+        self.push_column(column);
+        let mut digits = Digits::default();
+        for &digit in digits.write(u64::from(row) + 1).as_bytes() {
+            self.push(digit);
+        }
+    }
+
+    fn text(&self) -> &str {
+        // Letters, digits and a colon are always UTF-8.
+        std::str::from_utf8(&self.bytes[..self.len]).unwrap_or_default()
+    }
 }
 
 /// A stack buffer for the decimal text of a `u64`.

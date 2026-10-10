@@ -42,8 +42,22 @@
 //! changed file is reported as [`Code::IoError`] instead of being answered
 //! from the stale package. This is the facade's former `DocxSourceCache`,
 //! moved onto the handle.
+//!
+//! # Unified reads
+//!
+//! The handle's typed nodes ([`Node`], [`Kind`]) are what `File::get`,
+//! `File::find` and `File::query` return for a DOCX document (record 0010
+//! §4.5). Paths address the main story on the markup-compatibility-visible
+//! view (decision D4): `/body/p[N]` is the Nth direct body paragraph, with
+//! `w:customXml` wrappers flattened and display equations counted as
+//! `oMathPara[N]` instead; `/body/tbl[N]/tr[M]/tc[K]/p[J]`, `/body/sdt[N]`,
+//! `/body/p[N]/r[M]` (OfficeCLI's run set) and `/body/p[N]/hyperlink[M]`
+//! follow the same rules, and `p[@paraId=…]`/`sdt[@sdtId=…]` select by
+//! identity. A node keeps the leaf values it was read from and nothing
+//! else, so the leaf's memos stay the only caches (record 0010 §3.3).
 
 use std::fmt;
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use litchi_core::{FileFormat, Metadata};
@@ -54,6 +68,32 @@ use litchi_opc::{OpcPackage, SourceLimits};
 use super::signature::{self, Opened, Signature};
 use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
+
+// The unified read adapter (M1 step R4a): element kinds and spec table,
+// typed nodes, path resolution and query access, the node view's members,
+// and the view modes.
+#[cfg(feature = "test-support")]
+#[doc(hidden)]
+#[path = "docx/support.rs"]
+pub mod __unified;
+mod children;
+pub(crate) mod create;
+mod nav;
+mod node;
+mod props;
+mod publish;
+pub(crate) mod setters;
+mod spec;
+mod structure;
+pub(crate) mod views;
+pub(crate) mod write;
+
+pub(crate) use children::Children;
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub(crate) use props::Props;
+pub use spec::Kind;
+pub(crate) use spec::SPEC;
 
 /// An opened Word OOXML document.
 ///
@@ -70,6 +110,9 @@ pub(crate) struct DocxState {
     /// at open; the source owner reads the selected part once and is then
     /// bound to the opened revision by [`DocxOwner::finish`].
     metadata: OnceLock<Metadata>,
+    /// Successful explicit signature removal, shared by repeated publications.
+    /// Failures are not cached, and source fences guard every use.
+    unsigned: OnceLock<litchi_docx::Package>,
     /// The eager owner's open-time report. A source-backed report keeps
     /// growing as deferred parts are read, so it is never cached.
     tolerance: OnceLock<ToleranceReport>,
@@ -87,7 +130,6 @@ pub(crate) struct DocxState {
 }
 
 /// What a DOCX write starts from (M2).
-#[cfg_attr(not(test), expect(dead_code, reason = "write verbs arrive in M2"))]
 pub(crate) enum DocxEditor {
     /// An isolated main-document edit over the handle's own owner, whose
     /// commit publishes through that owner.
@@ -136,26 +178,30 @@ impl DocxOwner {
     pub(crate) fn finish<T>(&self, result: Result<T>) -> Result<T> {
         match self {
             Self::Source(package) => {
-                package.source_version()?;
+                package.check_source()?;
                 result
             },
             Self::Eager(_) => result,
         }
     }
 
-    /// Check that a source-backed owner's file is unchanged: the facade's
-    /// `check_source_freshness_after_markdown`, which the Markdown adapter
-    /// runs after a whole conversion.
-    #[cfg_attr(
-        not(any(test, feature = "markdown")),
-        expect(dead_code, reason = "used by the Markdown adapter")
-    )]
+    /// Validate every retained source before or after a public read.
     pub(crate) fn check_source(&self) -> Result<()> {
         self.finish(Ok(()))
     }
 }
 
 impl Docx {
+    /// Identity includes signature disposition, origin and other sidecars.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// Whether this handle retains an edit source, without reading any payload.
+    pub(crate) fn retains_source(&self) -> bool {
+        self.0.retain_source
+    }
+
     /// Adopt the source-backed package detection built for a path or a
     /// byte buffer. No part payload is read.
     ///
@@ -163,15 +209,33 @@ impl Docx {
     /// owning form instead, with the eager route's validation pass. The
     /// openers reach this only from `open_prepared`; their other eager
     /// routes call [`Self::from_opc_package`].
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "compatibility constructor used by tests and byte callers"
+        )
+    )]
     pub(crate) fn from_source(
         package: source_backed::Package,
         options: &OpenOptions,
     ) -> Result<Self> {
+        Self::from_source_with_origin(package, options, None)
+    }
+
+    /// Build a source-backed owner and retain the path which supplied it.
+    /// `origin` is already resolved by the path opener; this constructor does
+    /// not inspect a filename or change format detection.
+    pub(crate) fn from_source_with_origin(
+        package: source_backed::Package,
+        options: &OpenOptions,
+        origin: Option<Arc<Path>>,
+    ) -> Result<Self> {
         if options.source_mode == SourceMode::Eager {
-            // The conversion re-checks the source revision before it returns.
-            return Self::from_owned_package(package.to_owned_package()?, options);
+            let owned = package.to_owned_package_preserving_source()?;
+            return Self::from_owned_package_with_origin(owned, options, origin);
         }
-        Ok(Self::with_owner(DocxOwner::Source(package), None, options))
+        Ok(Self::with_owner(DocxOwner::Source(package), None, options).with_origin(origin))
     }
 
     /// Build the eager owner from the OPC package detection already parsed
@@ -179,8 +243,29 @@ impl Docx {
     ///
     /// As on the facade's eager route, the main story is validated by one
     /// text pass now, and that pass's repairs become the tolerance report.
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "compatibility constructor used by tests and byte callers"
+        )
+    )]
     pub(crate) fn from_opc_package(package: OpcPackage, options: &OpenOptions) -> Result<Self> {
-        Self::from_owned_package(litchi_docx::Package::from_opc_package(package)?, options)
+        Self::from_opc_package_with_origin(package, options, None)
+    }
+
+    /// Build an eager owner and retain a path origin supplied by the path
+    /// opener. The package itself remains the sole source of format truth.
+    pub(crate) fn from_opc_package_with_origin(
+        package: OpcPackage,
+        options: &OpenOptions,
+        origin: Option<Arc<Path>>,
+    ) -> Result<Self> {
+        Self::from_owned_package_with_origin(
+            litchi_docx::Package::from_opc_package(package)?,
+            options,
+            origin,
+        )
     }
 
     /// Adopt an owning package, validating its main story with one text pass
@@ -190,6 +275,17 @@ impl Docx {
         package: litchi_docx::Package,
         options: &OpenOptions,
     ) -> Result<Self> {
+        Self::from_owned_package_with_origin(package, options, None)
+    }
+
+    /// Adopt an owning package with an optional path origin. This is used by
+    /// the encrypted OOXML unlock path once its security wrapper forwards the
+    /// origin captured at path open.
+    pub(crate) fn from_owned_package_with_origin(
+        package: litchi_docx::Package,
+        options: &OpenOptions,
+        origin: Option<Arc<Path>>,
+    ) -> Result<Self> {
         let package = Box::new(package);
         // `document()` pins the main payload but defers XML traversal; the
         // eager route keeps its historical validation boundary with one
@@ -198,11 +294,10 @@ impl Docx {
         let document = package.document()?;
         document.text()?;
         let tolerance = document.tolerance_report();
-        Ok(Self::with_owner(
-            DocxOwner::Eager(package),
-            Some(tolerance),
-            options,
-        ))
+        Ok(
+            Self::with_owner(DocxOwner::Eager(package), Some(tolerance), options)
+                .with_origin(origin),
+        )
     }
 
     fn with_owner(
@@ -213,6 +308,7 @@ impl Docx {
         let state = DocxState {
             owner,
             metadata: OnceLock::new(),
+            unsigned: OnceLock::new(),
             tolerance: tolerance.map_or_else(OnceLock::new, OnceLock::from),
             retain_source: options.retain_source,
             #[cfg(feature = "markdown")]
@@ -220,6 +316,49 @@ impl Docx {
             ooxml_limits: options.ooxml_limits.unwrap_or_default(),
         };
         Self(Opened::new(state))
+    }
+
+    /// Adopt a committed owning package without serializing and reopening it.
+    ///
+    /// The edit transaction has already validated the package's changed
+    /// parts.  Keeping the package graph here preserves the source/eager
+    /// publication boundary and carries the original limits and retention
+    /// policy onto the new immutable handle.
+    pub(crate) fn adopt_eager_package(&self, package: litchi_docx::Package) -> Self {
+        self.adopt_owner(DocxOwner::Eager(Box::new(package)))
+    }
+
+    /// Adopt a committed source-backed package without serializing and
+    /// reopening it.
+    pub(crate) fn adopt_source_package(&self, package: source_backed::Package) -> Self {
+        self.adopt_owner(DocxOwner::Source(package))
+    }
+
+    fn adopt_owner(&self, owner: DocxOwner) -> Self {
+        let options = OpenOptions::new()
+            .retain_source(self.0.retain_source)
+            .ooxml_limits(self.0.ooxml_limits);
+        let tolerance = self.0.tolerance.get().cloned();
+        let signature = match self.signature() {
+            // `Docx::edit` only creates an unsigned editor for this state
+            // after the leaf has removed the signature parts.
+            Signature::RemovalAuthorized => Signature::Unsigned,
+            signature => signature,
+        };
+        Self::with_owner(owner, tolerance, &options)
+            .with_origin(self.0.origin())
+            .with_signature(signature)
+    }
+
+    /// The stable path origin captured by a path open, if any.
+    pub(crate) fn origin(&self) -> Option<Arc<Path>> {
+        self.0.origin()
+    }
+
+    /// Attach path metadata to a handle after a path route has finished
+    /// classification. Byte and create routes leave this unset.
+    pub(crate) fn with_origin(&self, origin: Option<Arc<Path>>) -> Self {
+        Self(self.0.with_origin(origin))
     }
 
     /// The same document under another signature disposition (record 0013).
@@ -434,7 +573,6 @@ impl Docx {
     /// `retain_source(false)`, or when an unlocked encrypted document would
     /// lose its encryption profile in the unsigned copy; [`Code::IoError`]
     /// when the source changed; and the leaf's typed failures otherwise.
-    #[cfg_attr(not(test), expect(dead_code, reason = "write verbs arrive in M2"))]
     pub(crate) fn edit(&self) -> Result<DocxEditor> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Docx));
@@ -467,6 +605,15 @@ impl Docx {
     /// An owning copy of the document whose signature the leaf removed
     /// explicitly ([`litchi_docx::Package::unsign`]).
     fn unsigned_package(&self) -> Result<litchi_docx::Package> {
+        self.owner().check_source()?;
+        let result = self.unsigned_package_inner();
+        self.owner().finish(result)
+    }
+
+    fn unsigned_package_inner(&self) -> Result<litchi_docx::Package> {
+        if let Some(package) = self.0.unsigned.get() {
+            return Ok(package.clone());
+        }
         let mut package = match &self.0.owner {
             DocxOwner::Eager(package) => {
                 // A copy of the graph would drop the encryption profile the
@@ -482,15 +629,13 @@ impl Docx {
                 }
                 litchi_docx::Package::from_opc_package(package.opc_package().clone())?
             },
-            DocxOwner::Source(package) => {
-                let bytes = signature::exact_source(package.source_backed_package()?)?;
-                litchi_docx::Package::from_opc_package(OpcPackage::from_vec_with_limits(
-                    bytes,
-                    self.0.ooxml_limits,
-                )?)?
-            },
+            DocxOwner::Source(package) => package.to_owned_package_preserving_source()?,
         };
         package.unsign();
+        self.owner().check_source()?;
+        // Concurrent first users may each build a candidate; only a complete
+        // successfully fenced result is retained. Each writer gets a clone.
+        let _ = self.0.unsigned.set(package.clone());
         Ok(package)
     }
 }
@@ -548,3 +693,5 @@ const PARAGRAPH_SEPARATOR: &str = "\n";
 
 #[cfg(test)]
 mod tests;
+#[cfg(test)]
+mod unified_tests;

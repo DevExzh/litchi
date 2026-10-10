@@ -3,11 +3,12 @@
 //!
 //! Each format declares one `static FormatSpec<Kind>` whose `ElementSpec`s sit
 //! at their kind's index. The node view's `format` member is produced from an
-//! element's `PropSpec` table; resolution (R2) normalizes step names through
-//! the alias lists; the query walker (R3) prunes with the child lists; and
-//! `capabilities()` (R5) reports the same entries, so the report cannot claim
+//! element's `PropSpec` table; resolution normalizes step names through the
+//! alias lists; the query walker prunes with the child lists; and
+//! `capabilities()` reports the same entries, so the report cannot claim
 //! what the code does not do. M2 widens `PropSpec` into a registry entry
-//! (constraints, coercion, typed setter) without changing these shapes.
+//! (constraints, coercion, typed setter) through its access flags, without
+//! changing these shapes.
 //!
 //! Drift is caught at compile time by [`check_format_spec!`], which a format
 //! invokes once on its table: each element must sit at its kind's index, alias
@@ -15,16 +16,15 @@
 //! keys must be unique per element, every child must list its parent, and
 //! every gap must carry a gap code and a follow-up.
 
-// Until the format adapters land (R4-R7), only the test-only fake format
-// declares a table, and only this crate's tests read every part of it.
+// The format adapters declare the tables; a build without any adapter
+// declares none, and only this crate's tests read every part of them.
 #![cfg_attr(
     not(test),
     allow(
         dead_code,
         unused_imports,
         unused_macros,
-        reason = "read by the format adapters (R4-R7), resolution (R2), the query walker (R3) \
-                  and capabilities() (R5) once they land"
+        reason = "read through the format adapters' tables, which a build may not have"
     )
 )]
 
@@ -33,10 +33,16 @@ use std::fmt;
 use crate::error::{Code, Error};
 use crate::value::ValueType;
 
-/// One readable property of an element kind: its key and value type.
+/// One readable property of an element kind: its key, value type and the
+/// verbs that read and write it.
 ///
 /// M1's `PropSpec` is the read-only subset of an M2 registry entry (record
-/// 0010 §7.3); M2 adds constraints, coercion and the typed setter.
+/// 0010 §7.3). The seam where the registry's write side attaches is
+/// [`PropSpec::access`]: M2 builds entries that also carry constraints,
+/// coercion and the typed setter, and turns the `set` and `add` flags on, so
+/// `capabilities()` reports them without changing its shape or this table's
+/// readers (resolution, the query compiler and the node view read `name`
+/// and `ty` only).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct PropSpec {
     /// The OfficeCLI property name, which is also the key `set` accepts in
@@ -48,13 +54,54 @@ pub(crate) struct PropSpec {
     /// [`Length`](crate::value::Length) prints the way OfficeCLI prints that
     /// key; record 0010 §2.3).
     pub(crate) ty: ValueType,
+    /// Which verbs read and write the key: [`Access::READ`] in M1.
+    pub(crate) access: Access,
+    /// Native metadata available only through explicit raw operations.
+    pub(crate) raw: bool,
 }
 
 impl PropSpec {
-    /// A property with the given key and value type.
-    pub(crate) const fn new(name: &'static str, ty: ValueType) -> Self {
-        Self { name, ty }
+    /// Mark a property as native metadata without making it a path identity.
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    pub(crate) const fn raw(mut self) -> Self {
+        self.raw = true;
+        self
     }
+
+    /// A readable property with the given key and value type.
+    pub(crate) const fn new(name: &'static str, ty: ValueType) -> Self {
+        Self {
+            name,
+            ty,
+            access: Access::READ,
+            raw: false,
+        }
+    }
+}
+
+/// Which verbs read and write a property: the `get`, `set` and `add` flags
+/// of OfficeCLI's help schema (record 0010 §7.1).
+///
+/// M1 reads only. M2's registry entries set `set` and `add` where the write
+/// kernel has a typed setter (record 0010 §7.3); `capabilities()` reports
+/// the flags as they are.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct Access {
+    /// `get` and `query` read the key.
+    pub(crate) get: bool,
+    /// `set` writes it (M2).
+    pub(crate) set: bool,
+    /// `add` accepts it when it creates the element (M2).
+    pub(crate) add: bool,
+}
+
+impl Access {
+    /// Read only: every M1 property.
+    pub(crate) const READ: Self = Self {
+        get: true,
+        set: false,
+        add: false,
+    };
 }
 
 /// One element kind of a format: its OfficeCLI type, names, structure,
@@ -106,9 +153,18 @@ pub(crate) struct FormatSpec<K: 'static> {
     pub(crate) gaps: &'static [GapSpec],
 }
 
-/// What a capability gap is about.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum Subject {
+/// What a capability gap is about: an element, a path axis, one property or
+/// operation context of an element, or a view mode.
+///
+/// ```
+/// use litchi_ops::capabilities::Subject;
+///
+/// let subject = Subject::Property { element: "cell", key: "computedValue" };
+/// assert_eq!(subject.to_string(), "the `computedValue` property of `cell`");
+/// ```
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum Subject {
     /// An element kind (`comment`).
     Element(&'static str),
     /// A path axis (`/header`).
@@ -119,6 +175,20 @@ pub(crate) enum Subject {
         element: &'static str,
         /// The property key.
         key: &'static str,
+    },
+    /// One operation on an element in a context the handler cannot admit.
+    ///
+    /// `verb` is the canonical lower-case spelling from
+    /// [`crate::capabilities::Verb`].  The strings are static because gap
+    /// subjects are part of format specification tables and must remain
+    /// allocation-free during capability discovery.
+    Operation {
+        /// The unified operation (`set`, `add`, `remove`, ...).
+        verb: &'static str,
+        /// The element kind whose operation is conditional.
+        element: &'static str,
+        /// The selection or leaf context that is refused.
+        context: &'static str,
     },
     /// A `view` mode (`html`).
     View(&'static str),
@@ -132,20 +202,27 @@ impl fmt::Display for Subject {
             Self::Property { element, key } => {
                 write!(f, "the `{key}` property of `{element}`")
             },
+            Self::Operation {
+                verb,
+                element,
+                context,
+            } => write!(f, "the `{verb}` operation on `{element}` in `{context}`"),
             Self::View(mode) => write!(f, "the `{mode}` view"),
         }
     }
 }
 
-/// An element, axis, property or view mode the format lacks or the leaf
-/// cannot answer yet, with the follow-up that closes it (record 0010 §4.4,
-/// §7.1).
+/// An element, axis, property, operation context or view mode the format lacks
+/// or the leaf cannot answer yet, with the follow-up that closes it (record
+/// 0010 §4.4, §7.1).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct GapSpec {
     /// What is missing.
     pub(crate) subject: Subject,
     /// [`Code::UnsupportedPath`] when the format lacks the concept,
-    /// [`Code::UnsupportedCapability`] when the leaf has no model yet.
+    /// [`Code::UnsupportedCapability`] when the leaf has no model yet, or
+    /// [`Code::DocumentProtected`] when the operation would violate file
+    /// protection.
     pub(crate) code: Code,
     /// The leaf request or milestone that closes the gap (`L-DOCX-R4`, `M6`).
     pub(crate) follow_up: &'static str,
@@ -265,11 +342,21 @@ pub(crate) const fn gaps_valid(gaps: &[GapSpec]) -> bool {
 
 /// Whether one gap carries a gap code and a follow-up.
 pub(crate) const fn gap_valid(gap: &GapSpec) -> bool {
-    matches!(
-        gap.code,
-        Code::UnsupportedPath | Code::UnsupportedCapability
-    ) && !gap.follow_up.is_empty()
-        && !gap.reason.is_empty()
+    let subject_valid = match gap.subject {
+        Subject::Element(name) | Subject::Axis(name) | Subject::View(name) => !name.is_empty(),
+        Subject::Property { element, key } => !element.is_empty() && !key.is_empty(),
+        Subject::Operation {
+            verb,
+            element,
+            context,
+        } => !verb.is_empty() && !element.is_empty() && !context.is_empty(),
+    };
+    let code_valid = match gap.code {
+        Code::UnsupportedPath | Code::UnsupportedCapability => true,
+        Code::DocumentProtected => matches!(gap.subject, Subject::Operation { .. }),
+        _ => false,
+    };
+    subject_valid && code_valid && !gap.follow_up.is_empty() && !gap.reason.is_empty()
 }
 
 /// Checks a format's spec table at compile time.

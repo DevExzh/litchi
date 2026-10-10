@@ -1,0 +1,501 @@
+//! The DOCX adapter's read access for path resolution and queries (record
+//! 0010 §4.1, §4.5, §5.3): [`Nav`] implements `Navigate` and `Inspect` over
+//! a [`Docx`] handle.
+//!
+//! Each step reads only its own axis:
+//!
+//! | Step | Leaf read | Cost |
+//! |---|---|---|
+//! | `/body` | the visible main part and its body block index (L-DOCX-R1/R2) | once per part generation, then shared |
+//! | `p[N]`, `tbl[N]`, `sdt[N]`, `oMathPara[N]`, `section[N]` | the container's block index by kind and ordinal | O(1) |
+//! | `p[@paraId=X]` | the index's identifier table (L-DOCX-R7) | one start-tag pass per index, then O(log n) |
+//! | `sdt[@sdtId=N]` | each content control's `w:sdtPr` | O(content controls) |
+//! | `tr[N]`, `tc[N]` | the table's rows, the row's cells | the table's range |
+//! | `tc[K]/p[J]`, `sdt[N]/p[M]` | the cell's or control's own block index | the cell or control |
+//! | `r[N]` | the paragraph's addressable runs (L-DOCX-R8) | one pass over the paragraph |
+//! | `hyperlink[N]` | the paragraph's direct hyperlinks and the main part's relationships | one pass over the paragraph |
+//!
+//! Nothing else is decoded: a `get` reads the main document part only.
+
+use std::borrow::Cow;
+use std::fmt;
+use std::sync::{Arc, OnceLock};
+
+use litchi_core::FileFormat;
+use litchi_core::selector::Position;
+use litchi_docx::{BlockKind, Blocks, IndexedBlock, Inline, InlineHyperlink, Paragraph};
+
+use super::Docx;
+use super::DocxOwner;
+use super::children::Children;
+use super::node::{Address, Block, Node, Step, Value, first_control_with_id};
+use super::props;
+use super::spec::{Kind, SPEC};
+use crate::error::{Error, Result};
+use crate::node::spec::{FormatSpec, GapSpec};
+use crate::node::{Format, PathStep};
+use crate::path::navigate::{Available, KindSet, Lookup, Navigate, Resolved, Select};
+use crate::path::vocabulary::Identity;
+use crate::query::inspect::Inspect;
+
+/// The DOCX adapter over one handle.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct Nav<'f> {
+    docx: &'f Docx,
+}
+
+impl<'f> Nav<'f> {
+    pub(crate) const fn new(docx: &'f Docx) -> Self {
+        Self { docx }
+    }
+}
+
+#[cfg(test)]
+thread_local! {
+    pub(super) static BODY_LOADS: std::cell::Cell<usize> = const { std::cell::Cell::new(0) };
+}
+
+/// The body's block index of `docx`, shared with every other view of the
+/// same main-part generation (L-DOCX-R1/R2).
+pub(super) fn load_body(docx: &Docx) -> Result<Blocks> {
+    #[cfg(test)]
+    BODY_LOADS.with(|loads| loads.set(loads.get() + 1));
+    Ok(match docx.owner() {
+        DocxOwner::Eager(package) => package.document()?.body_blocks()?,
+        DocxOwner::Source(package) => package.document()?.body_blocks()?,
+    })
+}
+
+/// The body's node, with its block index read.
+pub(super) fn body_node(docx: &Docx) -> Result<Node<'_>> {
+    let blocks = load_body(docx)?;
+    Ok(Node::new(
+        docx,
+        Kind::Body,
+        Value::Body(OnceLock::from(blocks)),
+        Address::root().with(Step::new(Kind::Body, 0)),
+    ))
+}
+
+/// The direct hyperlinks of a main-story paragraph, with their targets
+/// resolved through the main part's relationships.
+pub(super) fn hyperlinks(docx: &Docx, paragraph: &Paragraph) -> Result<Vec<InlineHyperlink>> {
+    let inlines = match docx.owner() {
+        DocxOwner::Eager(package) => {
+            let document = package.document()?;
+            paragraph.inlines_with_relationships(document.part().part().rels())?
+        },
+        DocxOwner::Source(package) => package.paragraph_inlines(paragraph)?,
+    };
+    Ok(inlines
+        .into_iter()
+        .filter_map(|inline| match inline {
+            Inline::Hyperlink(link) => Some(*link),
+            _ => None,
+        })
+        .collect())
+}
+
+/// What a container selection picked.
+enum Pick {
+    /// The block, from the container's index.
+    Found(IndexedBlock),
+    Missing,
+    NotApplicable,
+}
+
+/// The child of a block container (the body, a cell, a content control)
+/// that `step` selects.
+fn pick_block(container: &Blocks, kind: Kind, select: &Select<'_>) -> Result<Pick> {
+    let Some(block_kind) = kind.block_kind() else {
+        return Ok(Pick::NotApplicable);
+    };
+    let nth = |ordinal: usize| {
+        container
+            .nth(block_kind, Position::new(ordinal))
+            .map_or(Pick::Missing, Pick::Found)
+    };
+    Ok(match *select {
+        Select::None => nth(0),
+        Select::Ordinal(position) => nth(position.get()),
+        Select::Last => match container.count(block_kind).checked_sub(1) {
+            Some(last) => nth(last),
+            None => Pick::Missing,
+        },
+        Select::Identity(identities) => match kind {
+            Kind::Paragraph => paragraph_by_identity(container, identities.iter())?,
+            Kind::Sdt => sdt_by_identity(container, identities.iter())?,
+            _ => Pick::Missing,
+        },
+        _ => Pick::NotApplicable,
+    })
+}
+
+/// The first paragraph whose identities all match: `paraId` through the
+/// index's identifier table, `textId` by reading start tags.
+fn paragraph_by_identity<'s>(
+    container: &Blocks,
+    identities: impl Iterator<Item = (Identity, &'s str)>,
+) -> Result<Pick> {
+    let mut para_id = None;
+    let mut text_id = None;
+    for (identity, value) in identities {
+        let id = litchi_docx::paragraph::Id::parse(value).map_err(|_| {
+            Error::new(
+                crate::Code::InvalidPath,
+                "invalid native paragraph identifier",
+            )
+        })?;
+        let slot = if identity.key.eq_ignore_ascii_case("paraId") {
+            &mut para_id
+        } else {
+            &mut text_id
+        };
+        if slot.is_some_and(|held| held != id) {
+            return Ok(Pick::Missing);
+        }
+        *slot = Some(id);
+    }
+    if let Some(id) = para_id {
+        if let Some(block) = litchi_docx::document::raw::by_para_id(container, id)?
+            && block.kind() == BlockKind::Paragraph
+        {
+            let paragraph = block.paragraph().ok_or_else(|| {
+                Error::new(
+                    crate::Code::InternalError,
+                    "paragraph index has no paragraph",
+                )
+            })?;
+            if text_id.is_none()
+                || litchi_docx::document::raw::paragraph_ids(&paragraph)?.text_id() == text_id
+            {
+                return Ok(Pick::Found(block));
+            }
+        }
+        return Ok(Pick::Missing);
+    }
+    for block in container
+        .iter()
+        .filter(|block| block.kind() == BlockKind::Paragraph)
+    {
+        if let Some(paragraph) = block.paragraph()
+            && litchi_docx::document::raw::paragraph_ids(&paragraph)?.text_id() == text_id
+        {
+            return Ok(Pick::Found(block));
+        }
+    }
+    Ok(Pick::Missing)
+}
+
+fn sdt_by_identity<'s>(
+    container: &Blocks,
+    identities: impl Iterator<Item = (Identity, &'s str)>,
+) -> Result<Pick> {
+    let mut wanted = None;
+    for (_, value) in identities {
+        let id = value.trim().parse::<i32>().map_err(|_| {
+            Error::new(
+                crate::Code::InvalidPath,
+                "invalid native content-control identifier",
+            )
+        })?;
+        if wanted.is_some_and(|held| held != id) {
+            return Ok(Pick::Missing);
+        }
+        wanted = Some(id);
+    }
+    let Some(id) = wanted else {
+        return Ok(Pick::Missing);
+    };
+    Ok(first_control_with_id(container, id)?
+        .and_then(|position| container.get(position))
+        .map_or(Pick::Missing, Pick::Found))
+}
+
+/// The block node of `kind` for `indexed`, a block of `container`.
+pub(super) fn block_node<'f>(
+    docx: &'f Docx,
+    kind: Kind,
+    container: &Blocks,
+    indexed: &IndexedBlock,
+    parent: &Address,
+) -> Result<Node<'f>> {
+    let ordinal = u32::try_from(indexed.ordinal().get()).unwrap_or(u32::MAX);
+    let block = Block {
+        container: container.clone(),
+        position: indexed.position(),
+    };
+    let value = match kind {
+        Kind::Paragraph => Value::Paragraph {
+            paragraph: indexed.paragraph().ok_or_else(|| {
+                Error::new(
+                    crate::Code::InternalError,
+                    "a DOCX paragraph block holds no paragraph",
+                )
+            })?,
+            block,
+        },
+        Kind::Table => Value::Table(block),
+        Kind::Sdt => Value::Sdt(block),
+        Kind::Equation => Value::Equation(block),
+        _ => Value::Section(block),
+    };
+    Ok(Node::new(
+        docx,
+        kind,
+        value,
+        parent.with(Step::new(kind, ordinal)),
+    ))
+}
+
+/// The block container a node holds its block children in, if it is one.
+pub(super) fn container_of(node: &Node<'_>) -> Result<Option<Blocks>> {
+    Ok(match &node.value {
+        Value::Body(lock) => Some(node.body_blocks(lock)?),
+        Value::Cell(cell) => Some(cell.blocks()?),
+        Value::Sdt(block) => match block.indexed()?.content_control() {
+            Some(control) => Some(control.blocks()?),
+            None => None,
+        },
+        _ => None,
+    })
+}
+
+impl<'f> Nav<'f> {
+    /// The rows of a table node, in order.
+    pub(super) fn rows(node: &Node<'_>) -> Result<Vec<litchi_docx::Row>> {
+        match &node.value {
+            Value::Table(block) => match block.indexed()?.table() {
+                Some(table) => Ok(table.rows()?.into_vec()),
+                None => Ok(Vec::new()),
+            },
+            _ => Ok(Vec::new()),
+        }
+    }
+}
+
+impl<'f> Navigate<'f> for Nav<'f> {
+    type Kind = Kind;
+    type Node = Node<'f>;
+    type Gap = GapSpec;
+    type Children = Children<'f>;
+
+    const FORMAT: FileFormat = FileFormat::Docx;
+    /// `w:customXml` wrappers are flattened (record 0010 D4): their content
+    /// is addressed as the container's own children, and the wrappers are
+    /// not elements of the visible view.
+    const ABSENT: &'static [&'static str] = &["customXml"];
+
+    fn check_source(&self) -> Result<()> {
+        self.docx.owner().check_source()
+    }
+
+    fn root(&self) -> Result<Node<'f>> {
+        Ok(Node::root(self.docx))
+    }
+
+    fn child(
+        &self,
+        parent: &Node<'f>,
+        step: &Resolved<'_, Kind>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let kind = step.kind;
+        if let Some(gap) = kind.spec().gap {
+            return Ok(Lookup::Gap(gap));
+        }
+        let address = parent.child_address();
+        match (&parent.value, kind) {
+            (Value::Document, Kind::Body) => {
+                let found = match step.select {
+                    Select::None | Select::Last => true,
+                    Select::Ordinal(position) => position.get() == 0,
+                    _ => return Ok(Lookup::NotApplicable),
+                };
+                if !found {
+                    return Ok(Lookup::Missing);
+                }
+                Ok(Lookup::Found(body_node(self.docx)?))
+            },
+            (Value::Body(_) | Value::Cell(_) | Value::Sdt(_), _) if kind.block_kind().is_some() => {
+                let Some(container) = container_of(parent)? else {
+                    return Ok(Lookup::Missing);
+                };
+                Ok(match pick_block(&container, kind, &step.select)? {
+                    Pick::Found(indexed) => {
+                        Lookup::Found(block_node(self.docx, kind, &container, &indexed, &address)?)
+                    },
+                    Pick::Missing => Lookup::Missing,
+                    Pick::NotApplicable => Lookup::NotApplicable,
+                })
+            },
+            (Value::Table(_), Kind::Row) => {
+                let rows = Self::rows(parent)?;
+                Ok(match pick_index(rows.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let row = rows.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Row,
+                            Value::Row(Arc::new(row)),
+                            address.with(Step::new(Kind::Row, ordinal(index))),
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Value::Row(row), Kind::Cell) => {
+                let cells = row.cells()?;
+                Ok(match pick_index(cells.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let cell = cells.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Cell,
+                            Value::Cell(cell),
+                            address.with(Step::new(Kind::Cell, ordinal(index))),
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Value::Paragraph { paragraph, .. }, Kind::Run) => {
+                let runs = paragraph.addressable_runs()?;
+                Ok(match pick_index(runs.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let run = runs.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Run,
+                            Value::Run(run),
+                            address.with(Step::new(Kind::Run, ordinal(index))),
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            (Value::Paragraph { paragraph, .. }, Kind::Hyperlink) => {
+                let links = hyperlinks(self.docx, paragraph)?;
+                Ok(match pick_index(links.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let link = links.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Hyperlink,
+                            Value::Hyperlink(Arc::new(link)),
+                            address.with(Step::new(Kind::Hyperlink, ordinal(index))),
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
+            _ => Ok(Lookup::NotApplicable),
+        }
+    }
+
+    fn children(&self, parent: &Node<'f>, kinds: KindSet<Kind>) -> Result<Children<'f>> {
+        Children::of(parent, kinds)
+    }
+
+    fn available(
+        &self,
+        parent: &Node<'f>,
+        step: &Resolved<'_, Kind>,
+        out: &mut Available,
+    ) -> Result<()> {
+        let _ = step;
+        match &parent.value {
+            Value::Document => out.name("body"),
+            Value::Body(_) | Value::Cell(_) | Value::Sdt(_) => {
+                if let Some(container) = container_of(parent)? {
+                    for kind in [
+                        Kind::Paragraph,
+                        Kind::Table,
+                        Kind::Sdt,
+                        Kind::Equation,
+                        Kind::Section,
+                    ] {
+                        if let Some(block_kind) = kind.block_kind() {
+                            out.kind(kind.step_name(), container.count(block_kind));
+                        }
+                    }
+                }
+            },
+            Value::Table(_) => out.kind("tr", Self::rows(parent)?.len()),
+            Value::Row(row) => out.kind("tc", row.cell_count()?),
+            Value::Paragraph { paragraph, .. } => {
+                out.kind("r", paragraph.addressable_runs()?.len());
+                out.kind("hyperlink", hyperlinks(self.docx, paragraph)?.len());
+            },
+            _ => {},
+        }
+        Ok(())
+    }
+}
+
+/// The index `select` picks among `len` children: `Some(None)` when there
+/// is nothing at that index, `None` when the selection does not apply.
+fn pick_index(len: usize, select: &Select<'_>) -> Option<Option<usize>> {
+    Some(match *select {
+        Select::None => (len > 0).then_some(0),
+        Select::Ordinal(position) => (position.get() < len).then(|| position.get()),
+        Select::Last => len.checked_sub(1),
+        _ => return None,
+    })
+}
+
+fn ordinal(index: usize) -> u32 {
+    u32::try_from(index).unwrap_or(u32::MAX)
+}
+
+fn missing_child() -> Error {
+    Error::new(
+        crate::Code::InternalError,
+        "a DOCX child vanished between counting and reading",
+    )
+}
+
+impl<'f> Inspect<'f> for Nav<'f> {
+    const SPEC: &'static FormatSpec<Kind> = &SPEC;
+    const TOP: &'static [Kind] = &[Kind::Body];
+
+    fn kind(&self, node: &Node<'f>) -> Kind {
+        node.kind
+    }
+
+    fn type_name(&self, node: &Node<'f>) -> &'static str {
+        node.kind.type_name()
+    }
+
+    fn text<'n>(&'n self, node: &'n Node<'f>) -> Result<Option<Cow<'n, str>>> {
+        props::text(node)
+    }
+
+    fn style<'n>(&'n self, node: &'n Node<'f>) -> Result<Option<Cow<'n, str>>> {
+        props::style(node)
+    }
+
+    fn format<'n>(&'n self, node: &'n Node<'f>) -> Result<Format<'n>> {
+        props::format(node)
+    }
+
+    fn write_step(
+        &self,
+        node: &Node<'f>,
+        kind: Kind,
+        ordinal: Position,
+        out: &mut fmt::Formatter<'_>,
+    ) -> fmt::Result {
+        let step = node.last_step().unwrap_or_else(|| {
+            if kind.is_singleton() {
+                PathStep::new(kind.step_name())
+            } else {
+                PathStep::at(kind.step_name(), ordinal)
+            }
+        });
+        fmt::Display::fmt(&step, out)
+    }
+}

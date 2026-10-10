@@ -31,7 +31,7 @@ default = []
 doc     = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common", "dep:litchi-sign"]
 docx    = ["dep:litchi-docx", "opc"]
 ppt     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-ppt", "dep:litchi-sign"]
-pptx    = ["dep:litchi-ooxml-common", "dep:litchi-pptx", "opc"]
+pptx    = ["dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-pptx", "opc"]
 xls     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-sign", "dep:litchi-xls"]
 xlsx    = ["dep:litchi-ooxml-common", "dep:litchi-xlsx", "opc"]
 xlsb    = ["dep:litchi-ooxml-common", "dep:litchi-xlsb", "opc"]
@@ -76,6 +76,7 @@ test-support = []
 caseless = { workspace = true }
 unicode-normalization = { workspace = true }
 serde = { workspace = true }
+serde_json = { workspace = true }
 base64              = { workspace = true, optional = true } # Markdown image data URIs
 chrono              = { workspace = true, optional = true } # RTF metadata timestamps
 litchi-cfb          = { workspace = true, optional = true }
@@ -83,6 +84,7 @@ litchi-core         = { workspace = true }
 litchi-crypto       = { workspace = true, optional = true, features = ["ooxml"] }
 litchi-doc          = { workspace = true, optional = true }
 litchi-docx         = { workspace = true, optional = true }
+litchi-drawingml    = { workspace = true, optional = true }
 litchi-formula      = { workspace = true, optional = true }
 litchi-markdown     = { workspace = true, optional = true }
 litchi-odf-common   = { workspace = true, optional = true }
@@ -103,7 +105,6 @@ memchr              = { workspace = true, optional = true } # Markdown HTML esca
 serde-saphyr        = { workspace = true, optional = true } # Markdown YAML front matter
 
 [dev-dependencies]
-serde_json = { workspace = true }
 tempfile = { workspace = true }
 zip      = { version = "8", default-features = false, features = ["deflate"] }
 

@@ -98,7 +98,7 @@ impl Family {
 ///
 /// Every variant is one `Arc`-backed handle, so a `File` is a tag and one
 /// pointer, is `Send + Sync`, and clones with one reference-count increment.
-/// [`open`](crate::open), [`open_bytes`](crate::open_bytes) and their
+/// `open`, `open_bytes` and their
 /// variants produce it; detection decides the variant from the content. A
 /// file name never selects a variant: an OOXML name only refuses content
 /// that is not an OOXML package, and names the format of an encrypted one,
@@ -110,8 +110,8 @@ impl Family {
 /// variant exists only when its cargo feature is enabled.
 ///
 /// The format-neutral reads are methods on `File` itself; family-specific
-/// reads go through [`File::document`], [`File::presentation`] and
-/// [`File::workbook`], and format-specific ones through the handle a variant
+/// reads go through `File::document`, `File::presentation` and
+/// `File::workbook`, and format-specific ones through the handle a variant
 /// carries.
 ///
 /// ```no_run

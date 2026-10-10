@@ -34,6 +34,9 @@ pub enum ValueType {
     Number,
     /// Free text, taken as given.
     Text,
+    /// Text, boolean, 64-bit integer or finite number, preserving the supplied scalar kind.
+    /// Text input stays literal; it is never inferred as a number or formula.
+    Scalar,
     /// A closed vocabulary.
     Token(&'static Tokens),
     /// A length, read and printed per the [`LengthSpec`].
@@ -44,7 +47,8 @@ pub enum ValueType {
 
 impl ValueType {
     /// The type name OfficeCLI's help schemas use: `bool`, `int`, `number`,
-    /// `string`, `enum`, `length`, `font-size` or `color`.
+    /// `string`, `enum`, `length`, `font-size` or `color`; `scalar` describes
+    /// the typed text/boolean/integer/number union.
     #[must_use]
     pub const fn schema_type(self) -> &'static str {
         match self {
@@ -52,6 +56,7 @@ impl ValueType {
             Self::Int => "int",
             Self::Number => "number",
             Self::Text => "string",
+            Self::Scalar => "scalar",
             Self::Token(_) => "enum",
             Self::Length(spec) => match spec.context {
                 super::LengthContext::FontSize => "font-size",
@@ -72,7 +77,7 @@ impl ValueType {
             Self::Bool => Scalar::Bool(parse_bool(text)?),
             Self::Int => Scalar::Int(parse_integer(text)?),
             Self::Number => Scalar::Number(parse_number(text)?),
-            Self::Text => Scalar::Text(text),
+            Self::Text | Self::Scalar => Scalar::Text(text),
             Self::Token(tokens) => Scalar::Token(tokens.parse(text)?),
             Self::Length(spec) => Scalar::Length(Length::parse_in(text, spec.context)?),
             Self::Color(context) => Scalar::Color(Color::parse(text, context)?),

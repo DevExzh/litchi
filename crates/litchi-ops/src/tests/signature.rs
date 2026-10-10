@@ -283,15 +283,9 @@ fn builder_refusal(file: &File) -> Error {
         #[cfg(feature = "docx")]
         File::Docx(handle) => refused(handle.edit(), "DOCX"),
         #[cfg(feature = "pptx")]
-        File::Pptx(handle) => refused(
-            handle
-                .clone()
-                .into_editor()
-                .map_err(|refused| refused.error.expect("a typed PPTX refusal")),
-            "PPTX",
-        ),
+        File::Pptx(handle) => refused(handle.editable(), "PPTX"),
         #[cfg(feature = "xlsx")]
-        File::Xlsx(handle) => refused(handle.clone().into_editor(), "XLSX"),
+        File::Xlsx(handle) => refused(handle.editor(), "XLSX"),
         #[cfg(feature = "xlsb")]
         File::Xlsb(handle) => refused(handle.editor(), "XLSB"),
         #[cfg(feature = "doc")]
@@ -355,25 +349,35 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
         },
         #[cfg(feature = "pptx")]
         File::Pptx(handle) => {
-            let Ok(crate::format::pptx::PptxEditor::Unsigned(mut package)) =
-                handle.clone().into_editor()
-            else {
+            let Ok(crate::format::pptx::Editable::Eager(package)) = handle.editable() else {
                 panic!("an unsigned PPTX builds an owning unsigned copy");
             };
-            let mut transaction = package.opened_presentation_transaction().unwrap();
+            let Ok(crate::format::pptx::Editable::Eager(repeated)) = handle.editable() else {
+                panic!("repeated unsigned promotion");
+            };
+            assert!(Arc::ptr_eq(&package, &repeated));
+            let mut transaction = package.edit().unwrap();
             transaction
                 .add_text_box(0_usize, MARKER, (0, 0, 914_400, 914_400))
                 .unwrap();
             let commit = transaction.commit().unwrap();
-            package.apply_opened_presentation_commit(commit).unwrap();
+            let mut package = commit.into_package();
             (package.to_bytes().unwrap(), MARKER.to_owned())
         },
         #[cfg(feature = "xlsx")]
         File::Xlsx(handle) => {
-            let Ok(crate::format::xlsx::XlsxEditor::Eager(workbook)) = handle.clone().into_editor()
-            else {
+            let Ok(workbook) = handle.editor() else {
                 panic!("an unsigned XLSX builds an owning unsigned copy");
             };
+            let repeated = handle.editor().expect("reuse unsigned XLSX owner");
+            assert!(
+                workbook
+                    .sheet(0_usize)
+                    .unwrap()
+                    .unwrap()
+                    .same_workbook(&repeated.sheet(0_usize).unwrap().unwrap()),
+                "signature-authorized promotion is shared"
+            );
             let mut edit = workbook.edit().unwrap();
             edit.sheet(0_usize)
                 .unwrap()
@@ -562,13 +566,9 @@ fn assert_exact_noop(input: &Input) {
             assert_eq!(&output, bytes, "{label}: source-backed no-op");
 
             let mut package = litchi_pptx::Package::from_vec(bytes.clone()).unwrap();
-            let commit = package
-                .opened_presentation_transaction()
-                .unwrap()
-                .commit()
-                .unwrap();
-            assert!(!commit.is_changed(), "{label}");
-            package.apply_opened_presentation_commit(commit).unwrap();
+            let commit = package.edit().unwrap().commit().unwrap();
+            assert!(!commit.diagnostics().changed(), "{label}");
+            package = commit.into_package();
             assert_eq!(&package.to_bytes().unwrap(), bytes, "{label}: eager no-op");
         },
         #[cfg(feature = "xlsx")]
@@ -664,6 +664,12 @@ fn every_signed_input_follows_the_explicit_signature_policy() {
             assert_signed_refusal(&builder_refusal(signed.file()), input.format, &what);
             let (output, expected) = changed_commit(&unsigned);
             assert_unsigned_output(input.format, &output, &expected, &what);
+            assert_signed_refusal(&builder_refusal(signed.file()), input.format, &what);
+            assert_eq!(
+                file.text().unwrap(),
+                text,
+                "{what}: signed snapshot changed"
+            );
         }
 
         // 4. An exact no-op keeps the signed input, signature included.

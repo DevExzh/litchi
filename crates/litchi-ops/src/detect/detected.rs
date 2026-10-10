@@ -601,6 +601,9 @@ fn ensure_odt_source_current(
 pub struct PreparedDetection {
     format: litchi_core::detection::FileFormat,
     prepared: Option<crate::opc::PreparedOoxmlSource>,
+    /// Stable path origin for the prepared path route. This is metadata for
+    /// the adopter; it is intentionally only reported as presence in Debug.
+    origin: Option<std::sync::Arc<std::path::Path>>,
 }
 
 #[cfg(all(
@@ -613,6 +616,7 @@ impl std::fmt::Debug for PreparedDetection {
             .debug_struct("PreparedDetection")
             .field("format", &self.format)
             .field("prepared", &self.prepared.is_some())
+            .field("origin", &self.origin.is_some())
             .finish()
     }
 }
@@ -627,6 +631,7 @@ impl PreparedDetection {
         Self {
             format,
             prepared: None,
+            origin: None,
         }
     }
 
@@ -660,6 +665,12 @@ impl PreparedDetection {
     #[must_use]
     pub fn into_prepared(self) -> Option<crate::opc::PreparedOoxmlSource> {
         self.prepared
+    }
+
+    /// The stable path origin to carry into the unified handle, if this
+    /// detection retained a prepared package from a path.
+    pub(crate) fn origin(&self) -> Option<std::sync::Arc<std::path::Path>> {
+        self.origin.clone()
     }
 
     /// Split into the neutral classification and the prepared handle.
@@ -785,7 +796,24 @@ pub(crate) fn detect_and_prepare_path_with_limits<T: ZipTail>(
     Some(PreparedDetection {
         format,
         prepared: Some(prepared),
+        origin: stable_path_origin(path),
     })
+}
+
+/// Resolve a prepared path's origin against the open-time working directory.
+/// Keep the caller's symlink spelling so the save layer can apply its normal
+/// symlink refusal policy; no filename is consulted for format detection.
+#[cfg(all(
+    any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
+    any(unix, windows)
+))]
+fn stable_path_origin(path: &std::path::Path) -> Option<std::sync::Arc<std::path::Path>> {
+    let absolute = if path.is_absolute() {
+        path.to_path_buf()
+    } else {
+        std::env::current_dir().ok()?.join(path)
+    };
+    Some(std::sync::Arc::from(absolute.into_boxed_path()))
 }
 
 #[cfg(test)]

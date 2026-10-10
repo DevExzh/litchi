@@ -389,6 +389,55 @@ fn source_owner_defers_a_malformed_unselected_worksheet() {
     assert!(handle.text().is_err());
 }
 
+#[test]
+fn one_based_trait_cell_reads_reject_zero_and_out_of_grid_before_materialization() {
+    let (reads, handle) = counted();
+    let worksheet = WorkbookTrait::worksheet_by_index(&handle, 0).unwrap();
+    let before = reads.load(Ordering::SeqCst);
+
+    for &(row, column) in &[
+        (0, 1),
+        (1, 0),
+        (1_048_577, 1),
+        (1, 16_385),
+        (u32::MAX, u32::MAX),
+    ] {
+        let error = worksheet
+            .cell(row, column)
+            .err()
+            .expect("invalid cell must fail");
+        let error = error
+            .downcast::<Error>()
+            .expect("invalid cell keeps the typed ops error");
+        assert_eq!(error.code(), Code::OutOfRange);
+
+        let error = worksheet
+            .cell_value(row, column)
+            .expect_err("invalid cell value must fail");
+        let error = error
+            .downcast::<Error>()
+            .expect("invalid cell value keeps the typed ops error");
+        assert_eq!(error.code(), Code::OutOfRange);
+    }
+
+    let private_reference = "private-reference!A1";
+    let error = worksheet
+        .cell_by_coordinate(private_reference)
+        .err()
+        .unwrap()
+        .downcast::<Error>()
+        .unwrap();
+    assert_eq!(error.code(), Code::InvalidArgument);
+    assert!(!error.to_string().contains(private_reference));
+    assert!(!format!("{error:?}").contains(private_reference));
+
+    assert_eq!(
+        reads.load(Ordering::SeqCst),
+        before,
+        "invalid coordinates must be rejected before grid materialization"
+    );
+}
+
 // --- Source freshness ----------------------------------------------------
 
 #[cfg(any(unix, windows))]
@@ -398,6 +447,7 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     std::fs::write(file.path(), fixture("xlsb/Simple.xlsb")).unwrap();
     let handle = open_path(file.path(), &OpenOptions::new());
     let first = WorkbookTrait::worksheet_by_index(&handle, 0).unwrap();
+    let mut worksheets = WorkbookTrait::worksheets(&handle);
     assert!(first.cell_value(1, 1).is_ok());
 
     std::fs::write(file.path(), mixed_chart_tabs()).unwrap();
@@ -411,6 +461,21 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
     changed(handle.tolerance_report().unwrap_err());
     changed(handle.worksheet_names().unwrap_err());
     changed(handle.worksheet_count().unwrap_err());
+    for result in [
+        WorkbookTrait::worksheet_by_index(&handle, 0),
+        WorkbookTrait::worksheet_by_index(&handle, usize::MAX),
+        WorkbookTrait::worksheet_by_name(&handle, "Sheet1"),
+        WorkbookTrait::worksheet_by_name(&handle, "missing"),
+        WorkbookTrait::active_worksheet(&handle),
+    ] {
+        changed(
+            *result
+                .err()
+                .expect("stale selector refuses before catalog lookup")
+                .downcast::<Error>()
+                .expect("typed trait error"),
+        );
+    }
     changed(
         *first
             .cell_value(1, 1)
@@ -418,13 +483,37 @@ fn a_changed_source_is_a_typed_io_error_on_every_read() {
             .downcast::<Error>()
             .unwrap(),
     );
+    let mut cells = first.cells();
     changed(
-        *WorkbookTrait::active_worksheet(&handle)
-            .err()
+        *cells
+            .next()
             .unwrap()
+            .err()
+            .expect("stale cell iterator reports one error")
             .downcast::<Error>()
             .unwrap(),
     );
+    assert!(cells.next().is_none());
+    let mut rows = first.rows();
+    changed(
+        *rows
+            .next()
+            .unwrap()
+            .expect_err("stale row iterator reports one error")
+            .downcast::<Error>()
+            .unwrap(),
+    );
+    assert!(rows.next().is_none());
+    changed(
+        *worksheets
+            .next()
+            .unwrap()
+            .err()
+            .expect("stale worksheet iterator reports one error")
+            .downcast::<Error>()
+            .unwrap(),
+    );
+    assert!(worksheets.next().is_none());
     changed(handle.editor().err().expect("materialization refuses"));
 }
 

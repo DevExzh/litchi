@@ -82,6 +82,11 @@ const _: () = {
 };
 
 impl Xls {
+    /// Whether this handle retains an edit source, without reading any payload.
+    pub(crate) fn retains_source(&self) -> bool {
+        true
+    }
+
     /// Adopts the positional owner filesystem detection opened (the facade's
     /// `WorkbookSourcePathDetection::Xls` arm). Nothing is read here.
     ///

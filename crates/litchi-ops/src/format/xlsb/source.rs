@@ -2,15 +2,13 @@
 //! traits, moved from the facade's `sheet::adapters::xlsb`.
 //!
 //! The catalog (names, date system, active sheet) is read once at open, as
-//! the facade adapter did. Each worksheet is materialized on first use and
-//! shared by every handle to it; one lock per worksheet makes concurrent
-//! first uses materialize once.
+//! the facade adapter did. Decoded worksheet snapshots are retained by the
+//! leaf workbook’s bounded cache and borrowed for each trait operation.
 //!
 //! Errors raised here are typed [`crate::Error`] values; trait methods box
 //! them, because the trait's error type is `Box<dyn Error + Send + Sync>`.
 
 use std::borrow::Cow;
-use std::sync::{Arc, Mutex, OnceLock};
 
 use litchi_core::FileFormat;
 use litchi_core::sheet::{
@@ -39,34 +37,21 @@ pub(super) struct SourceWorkbook {
     date1904: bool,
     active_catalog_position: Option<usize>,
     active_worksheet_ordinal: Option<usize>,
-    worksheets: Box<[OnceLock<Arc<xlsb::Worksheet>>]>,
-    worksheet_init: Box<[Mutex<()>]>,
 }
 
 impl SourceWorkbook {
     /// Read the catalog of `workbook`; no worksheet payload is read.
     pub(super) fn new(workbook: xlsb::SourceBackedWorkbook) -> Result<Self> {
         let names = workbook.worksheet_names()?.into_boxed_slice();
-        let catalog_count = workbook.sheet_count()?;
         let date1904 = workbook.is_1904_date_system()?;
         let active_catalog_position = workbook.active_catalog_position()?;
         let active_worksheet_ordinal = workbook.active_worksheet_index()?;
-        let worksheets = std::iter::repeat_with(OnceLock::new)
-            .take(catalog_count)
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
-        let worksheet_init = std::iter::repeat_with(|| Mutex::new(()))
-            .take(catalog_count)
-            .collect::<Vec<_>>()
-            .into_boxed_slice();
         Ok(Self {
             workbook,
             names,
             date1904,
             active_catalog_position,
             active_worksheet_ordinal,
-            worksheets,
-            worksheet_init,
         })
     }
 
@@ -88,18 +73,18 @@ impl SourceWorkbook {
 
     /// The facade's `ensure_source_current`.
     pub(super) fn ensure_current(&self) -> Result<()> {
+        self.workbook
+            .source_backed_package()
+            .check_execution()
+            .map_err(|error| Error::from(xlsb::package::PackageError::from(error)))?;
         self.workbook.source_version()?;
         Ok(())
     }
 
     /// The workbook-scope repairs so far, followed by those of every
     /// worksheet this owner has materialized, in catalog order.
-    pub(super) fn tolerance_report(&self) -> xlsb::ToleranceReport {
-        let mut report = self.workbook.tolerance_report();
-        for worksheet in self.worksheets.iter().filter_map(OnceLock::get) {
-            report.append(worksheet.tolerance_report());
-        }
-        report
+    pub(super) fn tolerance_report(&self) -> Result<xlsb::ToleranceReport> {
+        self.workbook.read_tolerance_report().map_err(Into::into)
     }
 
     fn materialize<'a, T>(
@@ -108,56 +93,20 @@ impl SourceWorkbook {
         operation: impl FnOnce(&dyn CoreWorksheet) -> SheetResult<T>,
     ) -> SheetResult<T> {
         self.ensure_current().map_err(boxed)?;
-        let source = self
-            .worksheets
-            .get(handle.catalog_position)
-            .ok_or_else(|| {
-                boxed(internal(
-                    "XLSB source worksheet cache position is out of bounds",
-                ))
-            })?;
-        let init = self
-            .worksheet_init
-            .get(handle.catalog_position)
-            .ok_or_else(|| {
-                boxed(internal(
-                    "XLSB source worksheet lock position is out of bounds",
-                ))
-            })?;
-        let result = match source.get() {
-            Some(worksheet) => operation(worksheet.as_ref()),
-            None => {
-                let _guard = init.lock().map_err(|_| {
-                    boxed(internal("XLSB worksheet initialization lock was poisoned"))
-                })?;
-                if let Some(worksheet) = source.get() {
-                    operation(worksheet.as_ref())
-                } else {
-                    match handle.handle.materialize() {
-                        Ok(worksheet) => {
-                            self.ensure_current().map_err(boxed)?;
-                            source.set(Arc::new(worksheet)).map_err(|_| {
-                                boxed(internal("XLSB source worksheet was already published"))
-                            })?;
-                            operation(
-                                source
-                                    .get()
-                                    .ok_or_else(|| {
-                                        boxed(internal("XLSB source worksheet was not published"))
-                                    })?
-                                    .as_ref(),
-                            )
-                        },
-                        Err(error) => Err(boxed(error.into())),
-                    }
-                }
-            },
-        };
+        let grid = handle.handle.grid().map_err(|error| boxed(error.into()))?;
+        let result = operation(grid.worksheet());
         self.ensure_current().map_err(boxed)?;
         result
     }
 
     pub(super) fn worksheet(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+        self.ensure_current().map_err(boxed)?;
+        let result = self.worksheet_current(index);
+        self.ensure_current().map_err(boxed)?;
+        result
+    }
+
+    fn worksheet_current(&self, index: usize) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
         let handle = self
             .workbook
             .worksheet_by_index(index)
@@ -171,42 +120,44 @@ impl SourceWorkbook {
                     .with_format(FileFormat::Xlsb),
                 )
             })?;
-        let catalog_position = handle
-            .workbook_position()
-            .map_err(|error| boxed(error.into()))?;
-        Ok(Box::new(SourceSheet::new(self, catalog_position, handle)?))
+        Ok(Box::new(SourceSheet::new(self, handle)?))
     }
 
     pub(super) fn worksheet_named(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
+        self.ensure_current().map_err(boxed)?;
+        let result = self.worksheet_named_current(name);
+        self.ensure_current().map_err(boxed)?;
+        result
+    }
+
+    fn worksheet_named_current(&self, name: &str) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
         let handle = self
             .workbook
             .worksheet_by_name(name)
             .map_err(|error| boxed(error.into()))?
             .ok_or_else(|| {
                 boxed(
-                    Error::new(
-                        Code::NotFound,
-                        format!("XLSB worksheet '{name}' was not found"),
-                    )
-                    .with_format(FileFormat::Xlsb),
+                    Error::new(Code::NotFound, "XLSB worksheet was not found")
+                        .with_format(FileFormat::Xlsb),
                 )
             })?;
-        let catalog_position = handle
-            .workbook_position()
-            .map_err(|error| boxed(error.into()))?;
-        Ok(Box::new(SourceSheet::new(self, catalog_position, handle)?))
+        Ok(Box::new(SourceSheet::new(self, handle)?))
     }
 
     pub(super) fn active_worksheet(&self) -> SheetResult<Box<dyn CoreWorksheet + '_>> {
         self.ensure_current().map_err(boxed)?;
-        let index = self.active_worksheet_ordinal.ok_or_else(|| {
-            boxed(Error::from(
-                xlsb::package::PackageError::UnsupportedFeature(
-                    "XLSB active sheet is not a worksheet".to_string(),
-                ),
-            ))
-        })?;
-        self.worksheet(index)
+        let result = self
+            .active_worksheet_ordinal
+            .ok_or_else(|| {
+                boxed(Error::from(
+                    xlsb::package::PackageError::UnsupportedFeature(
+                        "XLSB active sheet is not a worksheet".to_string(),
+                    ),
+                ))
+            })
+            .and_then(|index| self.worksheet_current(index));
+        self.ensure_current().map_err(boxed)?;
+        result
     }
 }
 
@@ -229,19 +180,37 @@ pub(super) struct SourceWorksheets<'a> {
 
 impl<'a> WorksheetIterator<'a> for SourceWorksheets<'a> {
     fn next(&mut self) -> Option<SheetResult<Box<dyn CoreWorksheet + 'a>>> {
-        if self.index >= self.workbook.names.len() {
+        if self.index == usize::MAX {
             return None;
+        }
+        if let Err(error) = self.workbook.ensure_current() {
+            self.index = usize::MAX;
+            return Some(Err(boxed(error)));
+        }
+        if self.index >= self.workbook.names.len() {
+            self.index = usize::MAX;
+            return match self.workbook.ensure_current().map_err(boxed) {
+                Ok(()) => None,
+                Err(error) => Some(Err(error)),
+            };
         }
         let index = self.index;
         self.index += 1;
-        Some(self.workbook.worksheet(index))
+        let result = self.workbook.worksheet_current(index);
+        let freshness = self.workbook.ensure_current().map_err(boxed);
+        if result.is_err() || freshness.is_err() {
+            self.index = usize::MAX;
+        }
+        match freshness {
+            Err(error) => Some(Err(error)),
+            Ok(()) => Some(result),
+        }
     }
 }
 
 struct SourceSheet<'a> {
     workbook: &'a SourceWorkbook,
     handle: xlsb::SourceBackedWorksheet,
-    catalog_position: usize,
     name: String,
 }
 
@@ -249,12 +218,50 @@ fn overflow(message: &'static str) -> BoxError {
     boxed(internal(message))
 }
 
+const XLSB_ROWS: u32 = 1_048_576;
+const XLSB_COLUMNS: u32 = 16_384;
+
+/// Resolve the generic worksheet trait's one-based cell coordinates to the
+/// zero-based XLSB grid. The check happens before source materialization, so
+/// zero or out-of-grid inputs cannot silently select A1 or trigger a payload
+/// read.
+fn zero_based_cell(row: u32, column: u32) -> SheetResult<(u32, u32)> {
+    if !(1..=XLSB_ROWS).contains(&row) || !(1..=XLSB_COLUMNS).contains(&column) {
+        return Err(boxed(
+            Error::new(
+                Code::OutOfRange,
+                "XLSB worksheet cell coordinates are outside the one-based grid",
+            )
+            .with_format(FileFormat::Xlsb),
+        ));
+    }
+    Ok((row - 1, column - 1))
+}
+
+fn zero_based_row(row: usize) -> SheetResult<u32> {
+    let row = u32::try_from(row).map_err(|_| {
+        boxed(
+            Error::new(
+                Code::OutOfRange,
+                "XLSB worksheet row is outside the zero-based grid",
+            )
+            .with_format(FileFormat::Xlsb),
+        )
+    })?;
+    if row >= XLSB_ROWS {
+        return Err(boxed(
+            Error::new(
+                Code::OutOfRange,
+                "XLSB worksheet row is outside the zero-based grid",
+            )
+            .with_format(FileFormat::Xlsb),
+        ));
+    }
+    Ok(row)
+}
+
 impl<'a> SourceSheet<'a> {
-    fn new(
-        workbook: &'a SourceWorkbook,
-        catalog_position: usize,
-        handle: xlsb::SourceBackedWorksheet,
-    ) -> SheetResult<Self> {
+    fn new(workbook: &'a SourceWorkbook, handle: xlsb::SourceBackedWorksheet) -> SheetResult<Self> {
         let name = handle
             .name()
             .map_err(|error| boxed(error.into()))?
@@ -262,21 +269,19 @@ impl<'a> SourceSheet<'a> {
         Ok(Self {
             workbook,
             handle,
-            catalog_position,
             name,
         })
     }
 
     fn value_at(&self, row: u32, column: u32) -> SheetResult<CellValue> {
+        let (row, column) = zero_based_cell(row, column)?;
         self.workbook.materialize(self, |worksheet| {
-            Ok(worksheet
-                .cell(row.saturating_sub(1), column.saturating_sub(1))?
-                .value()
-                .clone())
+            Ok(worksheet.cell(row, column)?.value().clone())
         })
     }
 
     fn row_values(&self, row: usize) -> SheetResult<Vec<CellValue>> {
+        zero_based_row(row)?;
         self.workbook
             .materialize(self, |worksheet| Ok(worksheet.row(row)?.into_owned()))
     }
@@ -352,16 +357,25 @@ impl CoreWorksheet for SourceSheet<'_> {
     }
 
     fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn CoreCell + '_>> {
+        let (row, column) = zero_based_cell(row, column)?;
         let cell = self.workbook.materialize(self, |worksheet| {
-            let cell = worksheet.cell(row.saturating_sub(1), column.saturating_sub(1))?;
+            let cell = worksheet.cell(row, column)?;
             Self::copy_cell(cell.as_ref())
         })?;
         Ok(Box::new(cell))
     }
 
     fn cell_by_coordinate(&self, coordinate: &str) -> SheetResult<Box<dyn CoreCell + '_>> {
+        let at = xlsb::sheet::At::from(coordinate)
+            .resolve()
+            .map_err(|error| {
+                boxed(
+                    Error::from(xlsb::package::PackageError::from(error))
+                        .caused_by_argument(Code::InvalidArgument),
+                )
+            })?;
         let cell = self.workbook.materialize(self, |worksheet| {
-            let cell = worksheet.cell_by_coordinate(coordinate)?;
+            let cell = worksheet.cell(at.row().get(), at.column().get())?;
             Self::copy_cell(cell.as_ref())
         })?;
         Ok(Box::new(cell))
@@ -439,7 +453,11 @@ impl<'a> RowIterator<'a> for Rows<'a, '_> {
         }
         let index = self.index;
         self.index += 1;
-        Some(self.worksheet.row_values(index).map(Cow::Owned))
+        let result = self.worksheet.row_values(index).map(Cow::Owned);
+        if result.is_err() {
+            self.index = self.end;
+        }
+        Some(result)
     }
 }
 

@@ -66,6 +66,21 @@ fn coordinate(row: u32, column: u32) -> Address {
     Address::at(row, column).expect("validated XLSX grid coordinate")
 }
 
+/// Resolve the generic worksheet trait's one-based cell coordinates to the
+/// zero-based coordinates used by the XLSX leaf. Zero is outside the
+/// one-based worksheet grid and must be rejected before the leaf is asked to
+/// read its payload (including on an empty worksheet).
+fn zero_based_cell(row: u32, column: u32) -> Result<(u32, u32)> {
+    if row == 0 || column == 0 {
+        return Err(Error::new(
+            Code::OutOfRange,
+            "XLSX worksheet cell coordinates are one-based",
+        )
+        .with_format(litchi_core::FileFormat::Xlsx));
+    }
+    Ok((row - 1, column - 1))
+}
+
 /// One worksheet of an [`Xlsx`](super::Xlsx) workbook, eager or
 /// source-backed.
 #[derive(Clone)]
@@ -151,10 +166,13 @@ impl Sheet {
     /// The values of one zero-based row, from column 0 to the last stored
     /// column of the sheet. A row outside the grid is [`Code::OutOfRange`].
     pub(super) fn row_values(&self, row: u32) -> Result<Vec<CellValue>> {
+        // Validate the zero-based row before checking the stored extent. An
+        // empty or non-grid worksheet still has the finite XLSX row grid, so
+        // an impossible row must not silently become an empty result.
+        super::selection::resolve_cell((row, 0).into())?;
         let Some((_, _, _, end_column)) = self.dimensions_typed()? else {
             return Ok(Vec::new());
         };
-        super::selection::resolve_cell((row, 0).into())?;
         match &self.model {
             SheetModel::Owned(_) => (0..=end_column)
                 .map(|column| self.value_at(row, column))
@@ -250,11 +268,11 @@ impl CoreWorksheet for Sheet {
     }
 
     fn cell(&self, row: u32, column: u32) -> SheetResult<Box<dyn CoreCell + '_>> {
+        let (row, column) = zero_based_cell(row, column).map_err(boxed)?;
         Ok(Box::new(XlsxCell::new(
-            row.saturating_sub(1),
-            column.saturating_sub(1),
-            self.value_at(row.saturating_sub(1), column.saturating_sub(1))
-                .map_err(boxed)?,
+            row,
+            column,
+            self.value_at(row, column).map_err(boxed)?,
         )))
     }
 
@@ -297,10 +315,8 @@ impl CoreWorksheet for Sheet {
     }
 
     fn cell_value(&self, row: u32, column: u32) -> SheetResult<Cow<'_, CellValue>> {
-        Ok(Cow::Owned(
-            self.value_at(row.saturating_sub(1), column.saturating_sub(1))
-                .map_err(boxed)?,
-        ))
+        let (row, column) = zero_based_cell(row, column).map_err(boxed)?;
+        Ok(Cow::Owned(self.value_at(row, column).map_err(boxed)?))
     }
 }
 
