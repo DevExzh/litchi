@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0158 | [PPTX chunk publication](0158-pptx-chunk-publication.md) | Native multi-chunk publication and facade adoption; 1,688 native and 1,108 facade tests/doctests passed; 1k/10k ratios below 2x and unified 10k/1k growth 9.66–10.05x; Clippy/glossary/boundaries passed; full goal remains open |
 | 0157 | [PPTX slide-root admission](0157-pptx-slide-root-admission.md) | Distinct slide/notes node limits and preserved typed resource errors; 1,665 native and 1,107 facade tests/doctests passed; eager 10k workloads pass with 1.016–1.022 ratios; Clippy/glossary/boundaries passed; artifacts cleaned; commit blocked by read-only Git metadata; linear scaling and full goal remain open |
 | 0156 | [PPTX command coalescing](0156-pptx-command-coalescing.md) | 1,000 direct shape commands share one native commit; 1,107 combined tests/doctests plus Clippy passed; 1k paired ratios 1.005–1.224; linear scaling fails and eager 10k exposes masked native node limit; artifacts cleaned; commit blocked by read-only Git metadata; full goal remains open |
 | 0155 | [One eager edit per PPTX setter](0155-pptx-single-edit.md) | Removed discarded native edit; paired eager one-shape overhead is 4–5% in the measured generated corpus; 1,097 facade tests/doctests and Clippy passed; artifacts cleaned; commit blocked by read-only Git metadata; command coalescing, wider performance acceptance and full goal remain open |
