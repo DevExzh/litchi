@@ -5,6 +5,7 @@ use super::{Edit, MergeIntent, SheetActions};
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::fmt;
+use std::mem::{size_of, size_of_val};
 use std::sync::Arc;
 
 use litchi_ooxml_common::web as common_web;
@@ -16,7 +17,7 @@ use litchi_sheet::{Cell as Address, Column as ColumnIndex, Rect, Row as RowIndex
 use quick_xml::events::Event;
 use quick_xml::reader::Reader;
 
-use super::{Visibility, Workbook};
+use super::{Visibility, Workbook, Worksheet};
 use crate::cell::{Cell, SharedStringKey, Stored};
 use crate::column::{Flags as ColumnFlags, Outline, Props as ColumnProps, State as ColumnState};
 use crate::drawing::DrawingAnchor;
@@ -473,6 +474,7 @@ fn follower_content(
 
 pub(super) fn project_merges(
     sheet: &str,
+    worksheet: Option<&Worksheet>,
     store: Option<&crate::cell::Store>,
     intents: Vec<MergeIntent>,
     cells: &BTreeMap<Address, Action>,
@@ -483,12 +485,38 @@ pub(super) fn project_merges(
         .try_reserve_exact(base.len())
         .map_err(|source| allocation("merged-range projection", source))?;
     projected.extend_from_slice(base);
+    let mut table_ranges = None;
     for intent in intents {
         match intent {
             MergeIntent::Add(range) => {
                 ensure_merge_area(sheet, range)?;
                 if projected.contains(&range) {
                     continue;
+                }
+                if let Some(worksheet) = worksheet {
+                    if table_ranges.is_none() {
+                        let tables = worksheet.tables()?;
+                        let mut ranges = Vec::new();
+                        ranges
+                            .try_reserve_exact(tables.len())
+                            .map_err(|source| allocation("worksheet table ranges", source))?;
+                        for table in tables {
+                            ranges.push(table.table().range()?);
+                        }
+                        table_ranges = Some(ranges);
+                    }
+                    let ranges = table_ranges.as_deref().unwrap_or_default();
+                    if let Some(table) = ranges
+                        .iter()
+                        .copied()
+                        .find(|table| crate::merge::overlaps(*table, range))
+                    {
+                        return Err(Error::MergeEditBlocked {
+                            sheet: sheet.to_owned(),
+                            range,
+                            reason: MergeEditBlock::TableOverlap { table },
+                        });
+                    }
                 }
                 if let Some(existing) = projected
                     .iter()
@@ -1818,6 +1846,8 @@ pub enum JoinFailure {
     DifferentSnapshot,
     /// Both edits write at least one of the same effect facets.
     Overlap(ConflictSet),
+    /// Joining the edits would exceed a bounded resource budget.
+    ResourceLimit(litchi_core::ResourceLimit),
     /// Both edits replace the workbook's one persisted task-pane graph.
     TaskPanes,
     /// Both edits replace the complete workbook defined-name catalog.
@@ -1849,12 +1879,13 @@ impl JoinError {
         &self.failure
     }
 
-    /// Overlapping effects, or `None` for a lineage mismatch.
+    /// Overlapping effects, or `None` when the failure is not an effect conflict.
     #[must_use]
     pub fn conflicts(&self) -> Option<&ConflictSet> {
         match &self.failure {
             JoinFailure::Overlap(conflicts) => Some(conflicts),
             JoinFailure::DifferentSnapshot
+            | JoinFailure::ResourceLimit(_)
             | JoinFailure::TaskPanes
             | JoinFailure::DefinedNames
             | JoinFailure::DrawingTransfer => None,
@@ -1888,6 +1919,9 @@ impl fmt::Display for JoinError {
             },
             JoinFailure::Overlap(conflicts) => {
                 write!(formatter, "edit effects overlap: {conflicts}")
+            },
+            JoinFailure::ResourceLimit(limit) => {
+                write!(formatter, "edit join resource limit: {limit}")
             },
             JoinFailure::TaskPanes => {
                 formatter.write_str("both edits replace the persisted task-pane graph")
@@ -2636,9 +2670,160 @@ impl Patch {
             && self.svg_final_guards.is_empty()
     }
 
+    /// The immutable source workbook retained by this patch.
+    ///
+    /// A patch built by a successful native commit always has both endpoints.
+    /// The fallible accessor keeps a manually constructed default patch from
+    /// turning a missing proof into a panic.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-operation error when this patch has no source
+    /// endpoint.
+    pub fn source(&self) -> Result<&Workbook> {
+        self.source.as_ref().ok_or(Error::Unsupported {
+            feature: "patch has no source workbook endpoint",
+        })
+    }
+
+    /// The immutable target workbook retained by this patch.
+    ///
+    /// # Errors
+    ///
+    /// Returns an unsupported-operation error when this patch has no target
+    /// endpoint.
+    pub fn target(&self) -> Result<&Workbook> {
+        self.target.as_ref().ok_or(Error::Unsupported {
+            feature: "patch has no target workbook endpoint",
+        })
+    }
+
+    /// Whether the retained endpoints have the same native OPC content.
+    ///
+    /// This compares the complete native package graph and does not infer a
+    /// no-op from the semantic change list: a staged `A -> B -> A` sequence
+    /// can have non-empty changes while its final endpoints are identical.
+    ///
+    /// # Errors
+    ///
+    /// Propagates payload decode failures and explicit refusals for opaque
+    /// package state whose equality cannot be proved.
+    pub fn is_noop(&self) -> Result<bool> {
+        self.source()?.same_content(self.target()?)
+    }
+
+    /// Conservative retained-data charge for this patch.
+    ///
+    /// Both complete native endpoints are charged, even when their payload
+    /// allocations are shared, because an operations history may retain both
+    /// owners independently. Changed part and graph closures are then added
+    /// on top of the endpoint charge for the patch's own delta buffers. Every
+    /// addition saturates so this accounting cannot wrap on hostile input.
+    /// The result is a bounded retained-data charge for the native owners and
+    /// patch buffers; it is not a claim about allocator overhead or every
+    /// lazily derived cache allocation.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        let archive_hint = self
+            .source
+            .as_ref()
+            .and_then(|workbook| workbook.inner.package.exact_source_len())
+            .into_iter()
+            .chain(
+                self.target
+                    .as_ref()
+                    .and_then(|workbook| workbook.inner.package.exact_source_len()),
+            )
+            .max()
+            .unwrap_or(0);
+
+        let mut bytes = 0usize;
+        if let Some(source) = &self.source {
+            bytes = bytes.saturating_add(workbook_retained_bytes(source, archive_hint));
+        }
+        if let Some(target) = &self.target {
+            bytes = bytes.saturating_add(workbook_retained_bytes(target, archive_hint));
+        }
+
+        // The endpoint payloads account for the package's complete graph.
+        // These terms account for patch-owned transition buffers and their
+        // private source guards, including payloads that are also shared by an
+        // endpoint. Counting them twice is intentional and conservative.
+        bytes = bytes.saturating_add(self.changes.len().saturating_mul(size_of::<Change>()));
+        bytes = bytes.saturating_add(
+            self.package_changes
+                .len()
+                .saturating_mul(size_of::<PackageChange>()),
+        );
+        bytes = bytes.saturating_add(self.parts.len().saturating_mul(size_of::<PartChange>()));
+        for change in &self.parts {
+            bytes = bytes
+                .saturating_add(change.uri.as_str().len())
+                .saturating_add(change.before.capacity())
+                .saturating_add(change.after.capacity());
+        }
+        bytes = bytes.saturating_add(
+            self.relationships
+                .len()
+                .saturating_mul(size_of::<RelationshipChange>()),
+        );
+        for change in &self.relationships {
+            bytes = bytes.saturating_add(change.owner.as_str().len());
+            for relationship in [&change.before, &change.after].into_iter().flatten() {
+                bytes = bytes
+                    .saturating_add(size_of::<Relationship>())
+                    .saturating_add(relationship.r_id().len())
+                    .saturating_add(relationship.reltype().len())
+                    .saturating_add(relationship.target_ref().len())
+                    .saturating_add(relationship.base_uri().len())
+                    .saturating_add(relationship.source_uri().map_or(0, str::len));
+            }
+        }
+        if let Some(change) = &self.content_types {
+            bytes = bytes
+                .saturating_add(size_of::<ContentTypesChange>())
+                .saturating_add(change.before.bytes().len())
+                .saturating_add(change.after.bytes().len());
+        }
+        bytes = bytes.saturating_add(
+            self.svg_parts
+                .len()
+                .saturating_mul(size_of::<SvgPartChange>()),
+        );
+        for change in &self.svg_parts {
+            bytes = bytes
+                .saturating_add(change.part.partname().as_str().len())
+                .saturating_add(change.part.content_type().len())
+                .saturating_add(change.part.blob().len());
+        }
+        bytes = bytes.saturating_add(self.graph.len().saturating_mul(size_of::<GraphChange>()));
+        for change in &self.graph {
+            bytes = bytes
+                .saturating_add(change.source.as_str().len())
+                .saturating_add(size_of::<Relationship>())
+                .saturating_add(change.relationship.r_id().len())
+                .saturating_add(change.relationship.reltype().len())
+                .saturating_add(change.relationship.target_ref().len())
+                .saturating_add(change.relationship.base_uri().len())
+                .saturating_add(change.relationship.source_uri().map_or(0, str::len))
+                .saturating_add(change.part.partname().as_str().len())
+                .saturating_add(change.part.content_type().len())
+                .saturating_add(change.part.blob().len());
+        }
+        bytes
+    }
+
     /// Build the inverse without copying part payloads.
     #[must_use]
     pub fn inverse(&self) -> Self {
+        // A stylesheet PartChange already checks the exact source bytes. A
+        // standalone StyleGuard is intentionally retained only for patches
+        // whose stylesheet is unchanged; keeping the old guard on an inverse
+        // stylesheet patch would validate the wrong endpoint.
+        let style_part_changed = self
+            .style_guard
+            .as_ref()
+            .is_some_and(|guard| self.parts.iter().any(|part| part.uri == guard.uri));
         Self {
             changes: self
                 .changes
@@ -2716,7 +2901,9 @@ impl Patch {
                 .collect::<Vec<_>>()
                 .into_boxed_slice(),
             web: self.web.as_ref().map(common_web::Patch::inverse),
-            style_guard: self.style_guard.clone(),
+            style_guard: (!style_part_changed)
+                .then(|| self.style_guard.clone())
+                .flatten(),
             source: self.target.clone(),
             target: self.source.clone(),
             authority: self.authority.as_ref().map(PatchAuthority::inverse),
@@ -2902,6 +3089,113 @@ impl Patch {
         patch.target = Some(workbook.clone());
         Ok(Commit { workbook, patch })
     }
+}
+
+/// Count one immutable workbook owner's retained native data. The optional
+/// archive hint is charged for every endpoint: source-backed descendants can
+/// share a retained ZIP, but a history budget must account for each endpoint
+/// independently. Fields that are private lazy caches and cannot be observed
+/// without forcing work are represented by their owner/container sizes rather
+/// than by an allocator-footprint claim.
+fn workbook_retained_bytes(workbook: &Workbook, archive_hint: usize) -> usize {
+    let package = &workbook.inner.package;
+    let mut bytes = size_of_val(workbook)
+        .saturating_add(size_of_val(workbook.inner.as_ref()))
+        .saturating_add(size_of_val(package))
+        .saturating_add(archive_hint);
+
+    bytes = bytes
+        .saturating_add(workbook.inner.workbook_uri.as_str().len())
+        .saturating_add(
+            workbook
+                .inner
+                .shared_strings_uri
+                .as_ref()
+                .map_or(0, |uri| uri.as_str().len()),
+        )
+        .saturating_add(
+            workbook
+                .inner
+                .styles_uri
+                .as_ref()
+                .map_or(0, |uri| uri.as_str().len()),
+        );
+
+    for sheet in &workbook.inner.sheets {
+        bytes = bytes
+            .saturating_add(size_of_val(sheet.as_ref()))
+            .saturating_add(sheet.name.capacity())
+            .saturating_add(sheet.name_key.len())
+            .saturating_add(sheet.part_uri.as_str().len())
+            .saturating_add(sheet.relationship_id.capacity());
+        if let Some(store) = sheet.cells.get() {
+            // The sparse store's payload vectors are private to the cell
+            // module. Its value is still a retained owner allocation, so
+            // count the fixed store and record counts here; the XML payload
+            // itself is charged below through the package part.
+            bytes = bytes.saturating_add(size_of_val(store)).saturating_add(
+                store
+                    .stored_cell_count()
+                    .saturating_mul(size_of::<Stored>()),
+            );
+        }
+    }
+
+    if let Some(strings) = workbook.inner.shared_strings.get() {
+        bytes = bytes.saturating_add(size_of_val(strings.as_ref()));
+        for text in strings.iter() {
+            bytes = bytes.saturating_add(text.as_str().len());
+        }
+    }
+    for name in &workbook.inner.external_reference_ids {
+        bytes = bytes.saturating_add(name.capacity());
+    }
+    bytes = bytes.saturating_add(
+        workbook
+            .inner
+            .defined_names
+            .len()
+            .saturating_mul(size_of::<crate::raw::DefinedName>()),
+    );
+    bytes = bytes.saturating_add(
+        workbook
+            .inner
+            .pivot_caches
+            .len()
+            .saturating_mul(size_of::<crate::raw::PivotCache>()),
+    );
+
+    for metadata in package.iter_parts() {
+        bytes = bytes
+            .saturating_add(size_of_val(&metadata))
+            .saturating_add(metadata.partname().as_str().len())
+            .saturating_add(metadata.content_type().len())
+            .saturating_add(relationship_retained_bytes(metadata.rels()));
+        if metadata.payload_is_decoded() {
+            // `payload_is_decoded` makes this lookup non-blocking and
+            // infallible in the normal built-in package. Keep a failed
+            // lookup conservative by retaining the endpoint overhead; the
+            // archive hint covers deferred source payloads.
+            if let Ok(part) = package.get_part(metadata.partname()) {
+                bytes = bytes.saturating_add(part.blob_arc().capacity());
+            }
+        }
+    }
+    bytes.saturating_add(relationship_retained_bytes(package.rels()))
+}
+
+fn relationship_retained_bytes(relationships: &Relationships) -> usize {
+    let mut bytes = size_of_val(relationships);
+    for relationship in relationships.iter() {
+        bytes = bytes
+            .saturating_add(size_of::<Relationship>())
+            .saturating_add(relationship.r_id().len())
+            .saturating_add(relationship.reltype().len())
+            .saturating_add(relationship.target_ref().len())
+            .saturating_add(relationship.base_uri().len())
+            .saturating_add(relationship.source_uri().map_or(0, str::len));
+    }
+    bytes
 }
 
 /// Successful atomic transaction result.

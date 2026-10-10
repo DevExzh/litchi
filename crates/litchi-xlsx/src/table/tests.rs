@@ -388,3 +388,105 @@ fn rejects_invalid_writable_table_models() {
     table.columns.clear();
     assert!(serialize_table(&table).is_err());
 }
+
+fn rect(reference: &str) -> litchi_sheet::Rect {
+    litchi_sheet::Rect::from_a1(reference).expect("test range")
+}
+
+#[test]
+fn table_bands_apply_schema_default_row_counts() {
+    let mut table = Table::new(1, "Sales", "B2:D6");
+    table.header_row_count = None;
+    assert_eq!(table.range().unwrap(), rect("B2:D6"));
+    assert_eq!(table.header_range().unwrap(), Some(rect("B2:D2")));
+    assert_eq!(table.data_range().unwrap(), Some(rect("B3:D6")));
+    assert_eq!(table.totals_range().unwrap(), None);
+
+    table.header_row_count = Some(0);
+    table.totals_row_count = Some(2);
+    assert_eq!(table.header_range().unwrap(), None);
+    assert_eq!(table.data_range().unwrap(), Some(rect("B2:D4")));
+    assert_eq!(table.totals_range().unwrap(), Some(rect("B5:D6")));
+}
+
+#[test]
+fn table_bands_accept_absolute_references_and_empty_data() {
+    let mut table = Table::new(1, "Header", "$A$1:$C$1");
+    assert_eq!(table.range().unwrap(), rect("A1:C1"));
+    assert_eq!(table.header_range().unwrap(), Some(rect("A1:C1")));
+    assert_eq!(table.data_range().unwrap(), None);
+    assert_eq!(table.totals_range().unwrap(), None);
+
+    table.ref_range = "A1:C2".into();
+    table.totals_row_count = Some(1);
+    assert_eq!(table.data_range().unwrap(), None);
+    assert_eq!(table.totals_range().unwrap(), Some(rect("A2:C2")));
+}
+
+#[test]
+fn table_bands_refuse_invalid_ranges_and_row_counts() {
+    let mut table = Table::new(1, "Broken", "A1:C2");
+    table.totals_row_count = Some(2);
+    for band in [
+        table.header_range(),
+        table.data_range(),
+        table.totals_range(),
+    ] {
+        assert!(band.is_err(), "three rows of edges in a two-row range");
+    }
+    table.totals_row_count = Some(u32::MAX);
+    assert!(table.data_range().is_err());
+
+    for reference in ["", "A0:B2", "B2:A1", "A1:B2:C3", "Sheet1!A1:B2"] {
+        let table = Table::new(1, "Broken", reference);
+        assert!(table.range().is_err(), "accepted {reference:?}");
+        assert!(table.header_range().is_err(), "accepted {reference:?}");
+    }
+}
+
+#[test]
+fn table_columns_resolve_without_regard_to_case() {
+    let mut table = Table::new(1, "Names", "A1:B3");
+    table.columns = vec![TableColumn::new(1, "Straße"), TableColumn::new(2, "Amount")];
+    assert_eq!(
+        table.column("AMOUNT").unwrap().map(|column| column.id),
+        Some(2)
+    );
+    assert_eq!(
+        table.column("STRASSE").unwrap().map(|column| column.id),
+        Some(1)
+    );
+    assert_eq!(
+        table.column("strasse").unwrap().map(|column| column.id),
+        Some(1)
+    );
+    assert!(table.column("Amounts").unwrap().is_none());
+}
+
+#[test]
+fn table_column_lookup_refuses_unicode_ambiguity() {
+    let mut table = Table::new(1, "Names", "A1:B3");
+    table.columns = vec![
+        TableColumn::new(1, "Straße"),
+        TableColumn::new(2, "STRASSE"),
+    ];
+    assert!(matches!(
+        table.column("strasse"),
+        Err(crate::Error::Ambiguous {
+            kind: "table column",
+            matches: 2
+        })
+    ));
+}
+
+#[test]
+fn unicode_duplicate_column_names_are_rejected_at_admission() {
+    let mut table = Table::new(1, "Names", "A1:B3");
+    table.columns = vec![
+        TableColumn::new(1, "Straße"),
+        TableColumn::new(2, "STRASSE"),
+    ];
+    assert!(serialize_table(&table).is_err());
+    let xml = r#"<table xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" id="1" name="Names" displayName="Names" ref="A1:B3"><tableColumns count="2"><tableColumn id="1" name="Straße"/><tableColumn id="2" name="STRASSE"/></tableColumns></table>"#;
+    assert!(parse_table_xml(xml).is_err());
+}

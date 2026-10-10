@@ -47,6 +47,7 @@ pub use fill::Fill;
 pub use font::{
     Font, FontColor, FontColorKind, ParseError as FontParseError, Scheme, Script, Underline,
 };
+pub(crate) use number_format::builtin_format_code;
 pub use number_format::{FIRST_CUSTOM_ID, InvalidNumberFormat, NumberFormat, is_date_format};
 pub use parser::parse_styles;
 

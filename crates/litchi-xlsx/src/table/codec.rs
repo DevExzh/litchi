@@ -306,10 +306,12 @@ impl TableParser {
                 )));
             }
             let name = required_string(element, b"name", decoder, "table column name")?;
-            if name.is_empty() || !self.column_names.insert(name.to_ascii_lowercase()) {
-                return Err(invalid(format!(
-                    "empty or duplicate table column name '{name}'"
-                )));
+            if name.is_empty()
+                || !self
+                    .column_names
+                    .insert(crate::sheet::key(&name).into_string())
+            {
+                return Err(invalid("empty or duplicate table column name"));
             }
             let totals_row_function = attribute_value(element, b"totalsRowFunction", decoder)?
                 .map(|value| {

@@ -269,6 +269,15 @@ pub(super) fn create_sheets(
             defaults,
             web,
             cells,
+            fonts,
+            alignments,
+            fills,
+            staged_fill_bytes: _,
+            borders,
+            staged_border_bytes: _,
+            protections,
+            quote_prefixes,
+            number_formats,
             rows,
             columns,
             merges,
@@ -279,6 +288,41 @@ pub(super) fn create_sheets(
             hyperlinks,
             form_control_scalars,
         } = actions;
+        if !fonts.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "font changes on newly created worksheets",
+            });
+        }
+        if !alignments.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "alignment changes on newly created worksheets",
+            });
+        }
+        if !fills.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "fill changes on newly created worksheets",
+            });
+        }
+        if !borders.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "border changes on newly created worksheets",
+            });
+        }
+        if !protections.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "protection changes on newly created worksheets",
+            });
+        }
+        if !quote_prefixes.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "quote-prefix changes on newly created worksheets",
+            });
+        }
+        if !number_formats.is_empty() {
+            return Err(Error::Unsupported {
+                feature: "number-format changes on newly created worksheets",
+            });
+        }
         if !hyperlinks.is_empty() {
             return Err(Error::Unsupported {
                 feature: "hyperlink actions on newly created worksheets",
@@ -299,7 +343,7 @@ pub(super) fn create_sheets(
                 after: after.clone(),
             });
         }
-        let merge_projection = project_merges(name.as_str(), None, merges, &cells)?;
+        let merge_projection = project_merges(name.as_str(), None, None, merges, &cells)?;
         for (range, change) in &merge_projection.changes {
             changes.push(Change::Merge {
                 sheet: name.as_str().into(),

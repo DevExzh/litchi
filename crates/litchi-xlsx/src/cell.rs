@@ -1045,10 +1045,18 @@ impl Store {
     }
 
     pub(crate) fn cells(&self, range: Rect) -> Cells<'_> {
+        Cells {
+            entries: self.entries_in(range),
+        }
+    }
+
+    /// Stored records inside `range`, in row-major order, with their
+    /// record-level metadata.
+    pub(crate) fn entries_in(&self, range: Rect) -> Entries<'_> {
         let start = self
             .cell_rows
             .partition_point(|entry| entry.row < range.start().row());
-        Cells {
+        Entries {
             cells: &self.cells,
             rows: &self.cell_rows[start..],
             current: &[],
@@ -1059,6 +1067,87 @@ impl Store {
     pub(crate) const fn extents(&self) -> &Extents {
         &self.extents
     }
+
+    /// Logical retained weight of this parsed store, in bytes.
+    ///
+    /// The weight counts the store's record arrays, its merge index, its
+    /// repair report, and the payload text each record owns. Shared-string
+    /// text belongs to the workbook's shared-string table and is not counted
+    /// again. Allocator rounding is ignored, so this is a cache weight, not a
+    /// resident-memory measurement.
+    pub(crate) fn weight_bytes(&self) -> usize {
+        let arrays = [
+            (self.cells.len(), size_of::<Stored>()),
+            (self.cell_rows.len(), size_of::<CellRowStart>()),
+            (self.rows.len(), size_of::<row::Stored>()),
+            (self.columns.len(), size_of::<column::Stored>()),
+            (
+                self.tolerance.defects().len(),
+                size_of::<crate::leniency::ToleratedDefect>(),
+            ),
+        ];
+        let mut weight = size_of::<Self>().saturating_add(self.merges.weight_bytes());
+        for (count, size) in arrays {
+            weight = weight.saturating_add(count.saturating_mul(size));
+        }
+        self.cells.iter().fold(weight, |weight, entry| {
+            weight.saturating_add(entry.owned_bytes())
+        })
+    }
+}
+
+/// Modeled header of one shared text allocation (its strong and weak counts).
+const SHARED_TEXT_HEADER_BYTES: usize = 2 * size_of::<usize>();
+
+impl Stored {
+    /// Payload bytes this record owns outside its inline size.
+    fn owned_bytes(&self) -> usize {
+        let cell = match &self.cell {
+            Cell::Empty => 0,
+            Cell::Value(value) => value_owned_bytes(value, self.shared_string.is_some()),
+            Cell::Formula(formula) => formula_owned_bytes(formula),
+            Cell::Unknown(unknown) => text_owned_bytes(&unknown.kind)
+                .saturating_add(unknown.value.as_ref().map_or(0, text_owned_bytes))
+                .saturating_add(unknown.formula.as_ref().map_or(0, text_owned_bytes)),
+        };
+        cell.saturating_add(
+            self.shared_formula
+                .as_ref()
+                .map_or(0, |shared| shared.reference.len()),
+        )
+    }
+}
+
+fn text_owned_bytes(text: &Text) -> usize {
+    text.len().saturating_add(SHARED_TEXT_HEADER_BYTES)
+}
+
+/// `shared` text is owned by the shared-string table, not by the record.
+fn value_owned_bytes(value: &Value, shared: bool) -> usize {
+    match value {
+        Value::Bool(_) => 0,
+        Value::Number(number) => number.as_str().len(),
+        Value::Text(_) if shared => 0,
+        Value::Text(text) => text_owned_bytes(text),
+        Value::Date(date) => text_owned_bytes(&date.0),
+        Value::Error(ErrorValue::Unknown(text)) => text_owned_bytes(text),
+        Value::Error(_) => 0,
+    }
+}
+
+fn formula_owned_bytes(formula: &Formula) -> usize {
+    let kind = match formula.kind() {
+        Kind::Scalar => 0,
+        Kind::Array { range } | Kind::DataTable { range } => {
+            range.as_ref().map_or(0, text_owned_bytes)
+        },
+        Kind::Unknown(text) => text_owned_bytes(text),
+    };
+    formula.text().len().saturating_add(kind).saturating_add(
+        formula
+            .cached()
+            .map_or(0, |cache| value_owned_bytes(cache.value(), false)),
+    )
 }
 
 fn omitted_ranges_are_ordered(ranges: &[Rect]) -> bool {
@@ -1136,20 +1225,37 @@ impl Bounds {
 /// Borrowed sparse cells inside a half-open range.
 #[derive(Debug)]
 pub struct Cells<'a> {
+    entries: Entries<'a>,
+}
+
+impl<'a> Iterator for Cells<'a> {
+    type Item = (Address, &'a Cell);
+
+    #[inline]
+    fn next(&mut self) -> Option<Self::Item> {
+        self.entries
+            .next()
+            .map(|entry| (entry.address, &entry.cell))
+    }
+}
+
+/// Borrowed stored records inside a half-open range, in row-major order.
+#[derive(Debug)]
+pub(crate) struct Entries<'a> {
     cells: &'a [Stored],
     rows: &'a [CellRowStart],
     current: &'a [Stored],
     range: Rect,
 }
 
-impl<'a> Iterator for Cells<'a> {
-    type Item = (Address, &'a Cell);
+impl<'a> Iterator for Entries<'a> {
+    type Item = &'a Stored;
 
     fn next(&mut self) -> Option<Self::Item> {
         loop {
             if let Some((entry, remaining)) = self.current.split_first() {
                 self.current = remaining;
-                return Some((entry.address, &entry.cell));
+                return Some(entry);
             }
 
             let (row, remaining_rows) = self.rows.split_first()?;

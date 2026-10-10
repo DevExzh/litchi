@@ -4719,3 +4719,188 @@ fn escaped_markup_compatibility_takes_the_rewritten_admission() {
         Some(SourceAdmission::Borrowed)
     );
 }
+
+/// M1 L-XLSX-R1: read scans admit the worksheet children the materialized
+/// parser does not interpret for cells, so typical generated worksheets stay
+/// on the bounded streaming route.
+#[cfg(test)]
+mod inert_children_m1_tests {
+    use std::io::Cursor;
+
+    use litchi_ooxml_common::mce::{Capabilities, StreamError, StreamLimits};
+    use litchi_sheet::{Cell as Address, Rect};
+
+    use super::super::selected::{NotEligibleReason, RangeScanOutcome, scan_range, scan_targets};
+    use super::{
+        BoxedStreamResult, S, box_stream_result, materialized_answer, parse, selected_record_cell,
+    };
+
+    const X14AC: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/ac";
+
+    fn worksheet(body: &str) -> String {
+        format!(r#"<worksheet xmlns="{S}" xmlns:x14ac="{X14AC}">{body}</worksheet>"#)
+    }
+
+    fn range(xml: &str, reference: &str) -> BoxedStreamResult<RangeScanOutcome> {
+        box_stream_result(scan_range(
+            &mut Cursor::new(xml.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            Rect::from_a1(reference).unwrap(),
+        ))
+    }
+
+    fn typical(merges: &str) -> String {
+        worksheet(&format!(
+            r#"<dimension ref="A1:D2"/><sheetViews><sheetView tabSelected="1" workbookViewId="0"><pane xSplit="1" topLeftCell="B1" activePane="topRight" state="frozen"/><selection pane="topRight" activeCell="B2" sqref="B2"/></sheetView></sheetViews><sheetFormatPr baseColWidth="10" defaultColWidth="9.5" defaultRowHeight="15" outlineLevelRow="1" thickTop="false" x14ac:dyDescent="0.25"/><sheetData><row r="1" spans="1:4" x14ac:dyDescent="0.25"><c r="A1"><v>1</v></c><c r="B1" t="str"><v>two</v></c><c r="C1"><v>3</v></c></row><row r="2" spans="1:4"><c r="D2" t="b"><v>1</v></c></row></sheetData>{merges}<pageMargins left="0.7" right="0.7" top="0.75" bottom="0.75" header="0.3" footer="0.3"/>"#
+        ))
+    }
+
+    #[test]
+    fn read_scans_admit_inert_children_with_materialized_parity() {
+        for xml in [
+            typical(""),
+            typical(r#"<mergeCells count="1"><mergeCell ref="C1:D1"/></mergeCells>"#),
+        ] {
+            let selected = match range(&xml, "A1:D2").unwrap() {
+                RangeScanOutcome::Eligible(selected) => selected,
+                other => panic!("expected an eligible read scan, got {other:?}"),
+            };
+            let store = parse(xml.as_bytes(), || Ok(None)).expect("materialized parse");
+            assert!(store.tolerance_report().is_clean());
+            let expected = store
+                .cells(Rect::from_a1("A1:D2").unwrap())
+                .collect::<Vec<_>>();
+            assert_eq!(selected.cells.len(), expected.len());
+            for (record, (address, cell)) in selected.cells.iter().zip(expected) {
+                assert_eq!(record.address, address);
+                assert_eq!(selected_record_cell(record), Some(cell));
+            }
+        }
+    }
+
+    #[test]
+    fn target_scans_keep_the_original_slice() {
+        let xml = typical("");
+        let targets = [Address::at(0, 0).unwrap()];
+        match scan_targets(
+            &mut Cursor::new(xml.as_bytes()),
+            &Capabilities::default(),
+            &StreamLimits::default(),
+            &targets,
+        )
+        .unwrap()
+        {
+            RangeScanOutcome::NotEligible(NotEligibleReason::UnsupportedStructure) => {},
+            other => panic!("edit verification must keep its slice, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn irregular_sheet_format_defers_to_the_materialized_parser() {
+        let rows = r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#;
+        for (format, materialized_accepts) in [
+            (r#"<sheetFormatPr/>"#, false),
+            (r#"<sheetFormatPr defaultRowHeight="x"/>"#, false),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15" outlineLevelRow="8"/>"#,
+                false,
+            ),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15" customHeight="yes"/>"#,
+                false,
+            ),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15" future="1"/>"#,
+                false,
+            ),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15"><future/></sheetFormatPr>"#,
+                false,
+            ),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15">text</sheetFormatPr>"#,
+                false,
+            ),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15"><![CDATA[ ]]></sheetFormatPr>"#,
+                false,
+            ),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15">&#32;</sheetFormatPr>"#,
+                false,
+            ),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15"/><sheetFormatPr defaultRowHeight="16"/>"#,
+                false,
+            ),
+            // Out-of-domain values are repaired and recorded by the parser.
+            (r#"<sheetFormatPr defaultRowHeight="-1"/>"#, true),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15" baseColWidth="256"/>"#,
+                true,
+            ),
+            (
+                r#"<sheetFormatPr defaultRowHeight="15" defaultColWidth="65536"/>"#,
+                true,
+            ),
+        ] {
+            let xml = worksheet(&format!("{format}{rows}"));
+            match range(&xml, "A1") {
+                Ok(RangeScanOutcome::NotEligible(NotEligibleReason::UnsupportedStructure)) => {},
+                other => panic!("{format}: expected a deferred scan, got {other:?}"),
+            }
+            assert_eq!(
+                materialized_answer(&xml).is_ok(),
+                materialized_accepts,
+                "{format}"
+            );
+        }
+
+        // A sheetFormatPr after the cell data is repaired by the parser.
+        let late = worksheet(&format!(r#"{rows}<sheetFormatPr defaultRowHeight="15"/>"#));
+        assert!(matches!(
+            range(&late, "A1"),
+            Ok(RangeScanOutcome::NotEligible(
+                NotEligibleReason::UnsupportedStructure
+            ))
+        ));
+        let store = parse(late.as_bytes(), || Ok(None)).unwrap();
+        assert!(!store.tolerance_report().is_clean());
+    }
+
+    #[test]
+    fn merge_markup_inside_an_inert_subtree_is_refused_like_the_materialized_parser() {
+        for inert in [
+            r#"<sheetViews><sheetView workbookViewId="0"><mergeCell ref="A1:B1"/></sheetView></sheetViews>"#,
+            r#"<pageMargins left="1"><mergeCells/></pageMargins>"#,
+        ] {
+            let xml = worksheet(&format!(
+                r#"{inert}<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData>"#
+            ));
+            let expected = materialized_answer(&xml).unwrap_err();
+            match range(&xml, "A1").map_err(|error| *error) {
+                Err(StreamError::Callback {
+                    active_error: Some(error),
+                    ..
+                }) => assert_eq!(error.to_string(), expected),
+                other => panic!("expected the merge-markup refusal, got {other:?}"),
+            }
+        }
+    }
+
+    #[test]
+    fn page_margins_after_sheet_data_close_the_merge_window_as_before() {
+        let xml = worksheet(
+            r#"<sheetData><row r="1"><c r="A1"><v>1</v></c></row></sheetData><pageMargins left="1"/><mergeCells count="1"><mergeCell ref="A1:B1"/></mergeCells>"#,
+        );
+        assert!(matches!(
+            range(&xml, "A1"),
+            Ok(RangeScanOutcome::NotEligible(
+                NotEligibleReason::MergeSemantics
+            ))
+        ));
+        let store = parse(xml.as_bytes(), || Ok(None)).unwrap();
+        assert!(!store.tolerance_report().is_clean());
+    }
+}

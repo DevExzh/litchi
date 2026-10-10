@@ -1027,9 +1027,7 @@ fn column_layout_is_selector_first_typed_reversible_and_facet_composable() {
     let mut sheet = invalid.sheet(0usize).expect("lookup").expect("sheet");
     assert!(matches!(
         sheet.column("XFE"),
-        Err(Error::Coordinate(
-            litchi_sheet::CoordinateError::ColumnA1 { .. }
-        ))
+        Err(Error::Coordinate(litchi_sheet::CoordinateError::ColumnA1))
     ));
     assert!(matches!(
         sheet.column("B").expect("B").width(f64::NAN),

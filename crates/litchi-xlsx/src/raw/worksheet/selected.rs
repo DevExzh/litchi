@@ -22,6 +22,19 @@
 //! The verified OPC reader still drains and CRC/size-verifies the whole part,
 //! because that fence belongs to the reader and not to this scan.
 //!
+//! # Inert worksheet children (M1 L-XLSX-R1)
+//!
+//! A read scan (a coordinate or a rectangle, not an edit verifier's target
+//! list) also admits the worksheet children the materialized parser does not
+//! interpret for cells: a `sheetViews` or `pageMargins` subtree, whose only
+//! checked content is the merge markup that parser refuses everywhere, a
+//! `sheetFormatPr` whose attributes it would read without a repair or a
+//! refusal, and the `spans` hint on a row. Anything else about these children
+//! still settles an ineligible verdict, so the materialized parser keeps its
+//! repairs and refusals. Target scans keep the original slice: a commit's
+//! readback never depends on this stream validating markup the complete
+//! verifier only skips.
+//!
 //! The implementation retains only physical records inside the requested
 //! rectangle, one active-cell lexical scratch area, and bounded parser state.
 //! It makes no fixed-memory, RSS, or OOM-safety claim. quick-xml, the MCE
@@ -1036,6 +1049,12 @@ enum Frame {
     Value,
     Inline,
     InlineText,
+    /// `sheetFormatPr`, admitted by a read scan with checked attributes.
+    SheetFormat,
+    /// A `sheetViews` or `pageMargins` subtree, admitted by a read scan.
+    /// The materialized parser models neither, so nothing inside changes a
+    /// cell; only the merge markup it refuses everywhere is checked here.
+    Inert,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1180,12 +1199,16 @@ fn append_bounded(
 struct Scanner<'a> {
     requested: Rect,
     targets: Option<&'a [Address]>,
+    /// Whether this scan admits the inert worksheet children and row spans
+    /// (see [`Scanner::new`]).
+    admit_inert: bool,
     stack: Vec<Frame>,
     row: Option<(u32, u32)>,
     previous_row: u32,
     root_seen: bool,
     root_closed: bool,
     seen_dimension: bool,
+    seen_sheet_format: bool,
     seen_sheet_data: bool,
     seen_merge_cells: bool,
     merge_window_closed: bool,
@@ -1200,16 +1223,26 @@ struct Scanner<'a> {
 }
 
 impl<'a> Scanner<'a> {
+    /// Build a scanner for a rectangle or for sorted targets.
+    ///
+    /// Read scans (no targets) admit the children the materialized parser
+    /// does not interpret for cells: a `sheetViews` or `pageMargins`
+    /// subtree, a `sheetFormatPr` whose attributes it would read without a
+    /// repair, and a row's `spans` hint. Target scans verify an edit's output
+    /// and keep the original slice, so a commit never depends on the stream
+    /// validating markup the full verifier would only skip.
     fn new(requested: Rect, targets: Option<&'a [Address]>) -> Self {
         Self {
             requested,
             targets,
+            admit_inert: targets.is_none(),
             stack: Vec::new(),
             row: None,
             previous_row: 0,
             root_seen: false,
             root_closed: false,
             seen_dimension: false,
+            seen_sheet_format: false,
             seen_sheet_data: false,
             seen_merge_cells: false,
             merge_window_closed: false,
@@ -1310,6 +1343,14 @@ impl<'a> Scanner<'a> {
             SemanticEvent::Start(element) => self.start(element, false),
             SemanticEvent::Empty(element) => self.start(element, true),
             SemanticEvent::End(element) => self.end(element),
+            // The materialized parser refuses CDATA and references inside
+            // `sheetFormatPr`; it owns that refusal.
+            SemanticEvent::CData(_) | SemanticEvent::GeneralRef(_)
+                if self.stack.last() == Some(&Frame::SheetFormat) =>
+            {
+                self.mark(NotEligibleReason::UnsupportedStructure);
+                Ok(())
+            },
             SemanticEvent::Text(text) | SemanticEvent::CData(text) => self.text(text.text()),
             SemanticEvent::GeneralRef(reference) if self.in_payload() => {
                 self.general_reference(reference)
@@ -1371,6 +1412,20 @@ impl<'a> Scanner<'a> {
                 None
             },
             Frame::Inline => self.start_inline_child(element)?,
+            Frame::SheetFormat => {
+                // A leaf property with a child element is refused by the
+                // materialized parser, which owns that refusal.
+                self.mark(NotEligibleReason::UnsupportedStructure);
+                None
+            },
+            Frame::Inert => {
+                if is_merge_markup(element) {
+                    return Err(invalid(
+                        "worksheet merge markup appears outside its schema context",
+                    ));
+                }
+                Some(Frame::Inert)
+            },
         };
         if let Some(frame) = frame {
             if empty {
@@ -1417,12 +1472,44 @@ impl<'a> Scanner<'a> {
         {
             self.merge_window_closed = true;
         }
+        if self.admit_inert {
+            if is_spreadsheetml_element(element, "sheetViews")
+                || is_spreadsheetml_element(element, "pageMargins")
+            {
+                return Ok(Some(Frame::Inert));
+            }
+            if is_spreadsheetml_element(element, "sheetFormatPr") {
+                return Ok(self.start_sheet_format(element));
+            }
+        }
         if is_spreadsheetml_element(element, "cols") || is_spreadsheetml_element(element, "col") {
             self.mark(NotEligibleReason::Styles);
         } else {
             self.mark(NotEligibleReason::UnsupportedStructure);
         }
         Ok(None)
+    }
+
+    /// Admit a `sheetFormatPr` the materialized parser would read without a
+    /// repair or a refusal; defer any other one to that parser.
+    ///
+    /// The parser refuses a duplicate element and malformed attribute
+    /// values, and repairs an element placed after the cell data or values
+    /// outside their domains. Namespaced attributes are extension values it
+    /// does not interpret; `x14ac:dyDescent` is validated by the extension
+    /// observer of this stream exactly as the parser's extension capture
+    /// validates it.
+    fn start_sheet_format(&mut self, element: &SemanticElement<'_>) -> Option<Frame> {
+        if self.seen_sheet_format || self.seen_sheet_data {
+            self.mark(NotEligibleReason::UnsupportedStructure);
+            return None;
+        }
+        self.seen_sheet_format = true;
+        if !regular_sheet_format(element) {
+            self.mark(NotEligibleReason::UnsupportedStructure);
+            return None;
+        }
+        Some(Frame::SheetFormat)
     }
 
     /// A misplaced, repeated, or unusable `dimension` is repaired and
@@ -1622,7 +1709,13 @@ impl<'a> Scanner<'a> {
         {
             self.mark(NotEligibleReason::Styles);
         }
-        self.validate_attributes(element, &["r"], true)?;
+        // `spans` is an optimization hint the materialized parser never reads.
+        let allowed: &[&str] = if self.admit_inert {
+            &["r", "spans"]
+        } else {
+            &["r"]
+        };
+        self.validate_attributes(element, allowed, true)?;
         let number = match unqualified_attribute(element, "r") {
             Some(value) => parse_one_based_row(value)?,
             None => self
@@ -1788,7 +1881,12 @@ impl<'a> Scanner<'a> {
             Frame::MergeCell => {},
             Frame::Row => self.finish_row()?,
             Frame::Cell => self.finish_cell()?,
-            Frame::Formula | Frame::Value | Frame::InlineText | Frame::Inline => {},
+            Frame::Formula
+            | Frame::Value
+            | Frame::InlineText
+            | Frame::Inline
+            | Frame::SheetFormat
+            | Frame::Inert => {},
         }
         Ok(())
     }
@@ -1802,7 +1900,12 @@ impl<'a> Scanner<'a> {
             Frame::MergeCell => {},
             Frame::Row => self.finish_row()?,
             Frame::Cell => self.finish_cell()?,
-            Frame::Formula | Frame::Value | Frame::InlineText | Frame::Inline => {},
+            Frame::Formula
+            | Frame::Value
+            | Frame::InlineText
+            | Frame::Inline
+            | Frame::SheetFormat
+            | Frame::Inert => {},
         }
         Ok(())
     }
@@ -1991,6 +2094,16 @@ impl<'a> Scanner<'a> {
                     Ok(())
                 }
             },
+            // Text inside `sheetFormatPr` is refused by the materialized
+            // parser, which owns that refusal.
+            Frame::SheetFormat => {
+                if !text.trim().is_empty() {
+                    self.mark(NotEligibleReason::UnsupportedStructure);
+                }
+                Ok(())
+            },
+            // The materialized parser reads no text in an unmodelled subtree.
+            Frame::Inert => Ok(()),
             Frame::Worksheet
             | Frame::Dimension
             | Frame::SheetData
@@ -2114,6 +2227,44 @@ fn regular_lexical(kind: CellKind, value: &str) -> bool {
     }
 }
 
+/// Whether the materialized parser reads this `sheetFormatPr` without a
+/// repair or a refusal: `defaultRowHeight` is present, and every unqualified
+/// attribute is a modeled one whose value is in its checked domain.
+fn regular_sheet_format(element: &SemanticElement<'_>) -> bool {
+    let mut row_height = false;
+    for attribute in &element.attributes {
+        if !attribute.expanded_name.namespace.is_empty() {
+            continue;
+        }
+        let value: &str = attribute.decoded_value.as_ref();
+        let regular = match attribute.expanded_name.local_name.as_str() {
+            "baseColWidth" => value
+                .parse::<u32>()
+                .is_ok_and(|value| u8::try_from(value).is_ok()),
+            "defaultColWidth" => value
+                .parse::<f64>()
+                .is_ok_and(|value| crate::layout::Width::new(value).is_ok()),
+            "defaultRowHeight" => {
+                row_height = true;
+                value
+                    .parse::<f64>()
+                    .is_ok_and(|value| crate::layout::Height::new(value).is_ok())
+            },
+            "outlineLevelRow" | "outlineLevelCol" => value
+                .parse::<u32>()
+                .is_ok_and(|value| crate::row::OutlineAt::from(value).resolve().is_ok()),
+            "customHeight" | "zeroHeight" | "thickTop" | "thickBottom" => {
+                matches!(value, "1" | "0" | "true" | "false")
+            },
+            _ => false,
+        };
+        if !regular {
+            return false;
+        }
+    }
+    row_height
+}
+
 fn parse_value(kind: CellKind, value: &str) -> Result<Option<Value>> {
     match kind {
         CellKind::Untyped | CellKind::Numeric => {
@@ -2182,6 +2333,10 @@ fn matches_frame(frame: Frame, element: &litchi_ooxml_common::mce::SemanticEnd<'
     let local = element.expanded_name.local_name.as_str();
     let namespace = element.expanded_name.namespace.as_bytes();
     let expected = match frame {
+        // Any element closes an inert frame: the stream has already matched
+        // the end tag to its start, whatever the element is.
+        Frame::Inert => return true,
+        Frame::SheetFormat => "sheetFormatPr",
         Frame::Worksheet => "worksheet",
         Frame::Dimension => "dimension",
         Frame::SheetData => "sheetData",

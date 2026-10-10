@@ -121,6 +121,14 @@ pub enum Error {
         first: usize,
         second: usize,
     },
+    /// A semantic name selects multiple candidates under its identity policy.
+    #[error("ambiguous {kind} selection: {matches} candidates")]
+    Ambiguous {
+        /// Structural kind of the selected object.
+        kind: &'static str,
+        /// Number of candidates satisfying the name.
+        matches: usize,
+    },
     /// A shared-style handle belongs to an unrelated resource-table lineage.
     #[error("shared style belongs to a different resource-table lineage")]
     ForeignStyle,
@@ -293,8 +301,16 @@ pub enum DefaultsEditBlock {
 pub enum MergeEditBlock {
     ProtectedSheet,
     SingleCell,
-    Overlap { existing: Rect },
-    FollowerContent { address: Address },
+    /// The requested merge intersects a worksheet-owned Excel table.
+    TableOverlap {
+        table: Rect,
+    },
+    Overlap {
+        existing: Rect,
+    },
+    FollowerContent {
+        address: Address,
+    },
     GroupFormula,
     MarkupCompatibility,
     UnmodeledPayload,
@@ -425,6 +441,9 @@ impl std::fmt::Display for MergeEditBlock {
         match self {
             Self::ProtectedSheet => formatter.write_str("the worksheet is protected"),
             Self::SingleCell => formatter.write_str("a merge must contain at least two cells"),
+            Self::TableOverlap { table } => {
+                write!(formatter, "it overlaps Excel table range {table}")
+            },
             Self::Overlap { existing } => {
                 write!(formatter, "it overlaps existing merged range {existing}")
             },

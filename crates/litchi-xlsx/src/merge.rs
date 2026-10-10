@@ -171,6 +171,15 @@ impl Index {
     pub(crate) fn iter(&self) -> Merges<'_> {
         Merges::new(&self.ranges)
     }
+
+    /// Logical heap weight of the index arrays, in bytes.
+    pub(crate) fn weight_bytes(&self) -> usize {
+        self.ranges
+            .len()
+            .saturating_mul(size_of::<Rect>())
+            .saturating_add(self.nodes.len().saturating_mul(size_of::<Node>()))
+            .saturating_add(self.spans.len().saturating_mul(size_of::<u32>()))
+    }
 }
 
 fn build(

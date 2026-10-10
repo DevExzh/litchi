@@ -8,6 +8,7 @@ use std::sync::Arc;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_sheet::Rect;
+use soapberry_zip::office::StreamingArchiveWriter;
 
 use super::*;
 use crate::Cell;
@@ -116,6 +117,243 @@ fn new_workbook_is_deterministic_and_selector_first() {
         reopened.active_sheet().map(|sheet| sheet.name().to_owned()),
         Some("Sheet1".into())
     );
+}
+
+#[test]
+fn same_content_ignores_zip_framing_when_native_graph_matches() {
+    let bytes = Workbook::new()
+        .expect("valid workbook")
+        .to_bytes()
+        .expect("serialize workbook");
+    let left = Workbook::from_bytes(bytes.clone()).expect("left workbook");
+    let right = Workbook::from_bytes(with_eocd_comment(bytes, b"different ZIP comment"))
+        .expect("right workbook");
+
+    assert_ne!(
+        left.inner.package.exact_source_sha256(),
+        right.inner.package.exact_source_sha256(),
+        "the test must exercise the native graph comparison"
+    );
+    assert!(left.same_content(&right).expect("compare native graph"));
+}
+
+#[test]
+fn same_content_uses_shared_source_proof_for_opaque_members() {
+    let source =
+        Workbook::from_bytes(workbook_with_opaque_member()).expect("workbook with opaque member");
+    assert_eq!(source.inner.package.non_part_members().len(), 1);
+
+    // Replacing a part with the same bytes revokes exact-source publication,
+    // while the cloned package still shares the immutable source archive and
+    // therefore retains a proof for the opaque member's bytes.
+    let worksheet = PackURI::new("/xl/worksheets/sheet1.xml").expect("worksheet URI");
+    let mut package = source.inner.package.clone();
+    let bytes = package
+        .get_part(&worksheet)
+        .expect("worksheet part")
+        .blob()
+        .to_vec();
+    package
+        .get_part_mut(&worksheet)
+        .expect("mutable worksheet part")
+        .set_blob(bytes);
+    let target = Workbook::from_package(package).expect("target workbook");
+
+    assert!(!target.inner.package.is_unmodified_owned_source());
+    assert!(source.same_content(&target).expect("compare opaque graph"));
+}
+
+#[test]
+fn same_content_refuses_unshared_opaque_members() {
+    let left = Workbook::from_bytes(workbook_with_opaque_member()).expect("left workbook");
+    let right = Workbook::from_bytes(workbook_with_opaque_payload(b"different opaque bytes"))
+        .expect("right workbook");
+
+    assert!(matches!(
+        left.same_content(&right),
+        Err(Error::Unsupported {
+            feature: "content comparison of opaque OPC members"
+        })
+    ));
+}
+
+#[test]
+fn same_content_rejects_unmodeled_publication_manifests() {
+    let manifest_left =
+        Workbook::from_bytes(workbook_with_unmodeled_metadata("one", "same", "same"))
+            .expect("manifest-left workbook");
+    let manifest_right =
+        Workbook::from_bytes(workbook_with_unmodeled_metadata("two", "same", "same"))
+            .expect("manifest-right workbook");
+    assert!(
+        !manifest_left
+            .same_content(&manifest_right)
+            .expect("compare content-type manifests")
+    );
+
+    let relationship_left =
+        Workbook::from_bytes(workbook_with_unmodeled_metadata("same", "one", "same"))
+            .expect("relationship-left workbook");
+    let relationship_right =
+        Workbook::from_bytes(workbook_with_unmodeled_metadata("same", "two", "same"))
+            .expect("relationship-right workbook");
+    assert!(
+        !relationship_left
+            .same_content(&relationship_right)
+            .expect("compare relationship manifests")
+    );
+
+    let part_relationship_left =
+        Workbook::from_bytes(workbook_with_unmodeled_metadata("same", "same", "one"))
+            .expect("part-relationship-left workbook");
+    let part_relationship_right =
+        Workbook::from_bytes(workbook_with_unmodeled_metadata("same", "same", "two"))
+            .expect("part-relationship-right workbook");
+    assert!(
+        !part_relationship_left
+            .same_content(&part_relationship_right)
+            .expect("compare part relationship manifests")
+    );
+}
+
+#[test]
+fn patch_exposes_endpoints_and_conservative_retention() {
+    let source = Workbook::new().expect("source workbook");
+    let mut edit = source.edit().expect("start edit");
+    edit.sheet("Sheet1")
+        .expect("sheet lookup")
+        .expect("Sheet1")
+        .set("A1", "changed")
+        .expect("set cell");
+    let commit = edit.commit().expect("commit edit");
+    let patch = commit.patch().clone();
+
+    assert!(
+        patch
+            .source()
+            .expect("patch source")
+            .same_content(&source)
+            .unwrap()
+    );
+    assert!(!patch.is_noop().expect("patch no-op comparison"));
+    assert!(patch.retained_bytes() > 0);
+    assert!(Patch::default().source().is_err());
+    assert_eq!(Patch::default().retained_bytes(), 0);
+}
+
+fn workbook_with_opaque_member() -> Vec<u8> {
+    workbook_with_opaque_payload(b"opaque member bytes")
+}
+
+fn workbook_with_opaque_payload(payload: &[u8]) -> Vec<u8> {
+    const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const PACKAGE_REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
+    let mut writer = StreamingArchiveWriter::new();
+    writer
+        .write_stored(
+            "[Content_Types].xml",
+            format!(
+                r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="{workbook}"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="{worksheet}"/></Types>"#,
+                workbook = ct::SML_SHEET_MAIN,
+                worksheet = ct::SML_WORKSHEET,
+            )
+            .as_bytes(),
+        )
+        .expect("content types");
+    writer
+        .write_stored(
+            "_rels/.rels",
+            format!(
+                r#"<Relationships xmlns="{PACKAGE_REL}"><Relationship Id="rId1" Type="{REL}/officeDocument" Target="xl/workbook.xml"/></Relationships>"#
+            )
+            .as_bytes(),
+        )
+        .expect("package relationships");
+    writer
+        .write_stored(
+            "xl/workbook.xml",
+            format!(
+                r#"<workbook xmlns="{MAIN}" xmlns:r="{REL}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#
+            )
+            .as_bytes(),
+        )
+        .expect("workbook");
+    writer
+        .write_stored(
+            "xl/_rels/workbook.xml.rels",
+            format!(
+                r#"<Relationships xmlns="{PACKAGE_REL}"><Relationship Id="rId1" Type="{REL}/worksheet" Target="worksheets/sheet1.xml"/></Relationships>"#
+            )
+            .as_bytes(),
+        )
+        .expect("workbook relationships");
+    writer
+        .write_stored(
+            "xl/worksheets/sheet1.xml",
+            format!(r#"<worksheet xmlns="{MAIN}"><sheetData/></worksheet>"#).as_bytes(),
+        )
+        .expect("worksheet");
+    writer
+        .write_stored("opaque.bin", payload)
+        .expect("opaque member");
+    writer.finish_to_bytes().expect("finish workbook")
+}
+
+fn workbook_with_unmodeled_metadata(
+    content_marker: &str,
+    relationship_marker: &str,
+    part_relationship_marker: &str,
+) -> Vec<u8> {
+    const MAIN: &str = "http://schemas.openxmlformats.org/spreadsheetml/2006/main";
+    const REL: &str = "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+    const PACKAGE_REL: &str = "http://schemas.openxmlformats.org/package/2006/relationships";
+    let mut writer = StreamingArchiveWriter::new();
+    writer
+        .write_stored(
+            "[Content_Types].xml",
+            format!(
+                r#"<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types" xmlns:x="urn:litchi:test"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml" x:marker="{content_marker}"/><Override PartName="/xl/workbook.xml" ContentType="{workbook}"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="{worksheet}"/></Types>"#,
+                workbook = ct::SML_SHEET_MAIN,
+                worksheet = ct::SML_WORKSHEET,
+            )
+            .as_bytes(),
+        )
+        .expect("content types");
+    writer
+        .write_stored(
+            "_rels/.rels",
+            format!(
+                r#"<Relationships xmlns="{PACKAGE_REL}" xmlns:x="urn:litchi:test"><Relationship Id="rId1" Type="{REL}/officeDocument" Target="xl/workbook.xml" x:marker="{relationship_marker}"/></Relationships>"#
+            )
+            .as_bytes(),
+        )
+        .expect("package relationships");
+    writer
+        .write_stored(
+            "xl/workbook.xml",
+            format!(
+                r#"<workbook xmlns="{MAIN}" xmlns:r="{REL}"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>"#
+            )
+            .as_bytes(),
+        )
+        .expect("workbook");
+    writer
+        .write_stored(
+            "xl/_rels/workbook.xml.rels",
+            format!(
+                r#"<Relationships xmlns="{PACKAGE_REL}" xmlns:x="urn:litchi:test"><Relationship Id="rId1" Type="{REL}/worksheet" Target="worksheets/sheet1.xml" x:marker="{part_relationship_marker}"/></Relationships>"#
+            )
+            .as_bytes(),
+        )
+        .expect("workbook relationships");
+    writer
+        .write_stored(
+            "xl/worksheets/sheet1.xml",
+            format!(r#"<worksheet xmlns="{MAIN}"><sheetData/></worksheet>"#).as_bytes(),
+        )
+        .expect("worksheet");
+    writer.finish_to_bytes().expect("finish workbook")
 }
 
 #[test]

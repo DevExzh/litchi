@@ -6,6 +6,7 @@ mod order;
 mod snapshot;
 
 use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet, btree_map::Entry};
+use std::mem::size_of;
 use std::sync::Arc;
 
 use litchi_ooxml_common::mce::{Capabilities, StreamError, StreamLimits};
@@ -32,6 +33,7 @@ use crate::raw::worksheet::edit::{
 use crate::row::{HeightAt, State as RowState};
 use crate::sheet::Name;
 use crate::style::StyleLineage;
+use crate::style::{AlignmentChange, BorderChange, FillChange, FontChange, ProtectionChange};
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 use super::super::model::{
@@ -65,6 +67,14 @@ pub(crate) struct SvgLifecycleIntent {
 }
 
 const MAX_CELL_TRANSFER: u64 = 65_536;
+const MAX_STYLE_REQUESTS: usize = 65_536;
+const MAX_STYLE_NUMBER_FORMATS: usize = 65_534;
+const MAX_STYLE_FONTS: usize = 65_534;
+const MAX_STYLE_FILLS: usize = 65_534;
+const MAX_STYLE_BORDERS: usize = 65_534;
+const MAX_STYLE_CELL_XFS: usize = 65_430;
+const BORDER_STAGED_COPY_HEADROOM: usize = 3;
+const BORDER_STAGED_NODE_BYTES: usize = 64;
 const MAX_CELL_DEPENDENCY_SCAN: usize = 1_048_576;
 const MAX_VALIDATED_STORE_HANDOFF_CELLS: usize = 4_096;
 const MAX_VALIDATED_STORE_HANDOFF_BYTES: usize = 1_048_576;
@@ -359,6 +369,150 @@ impl Edit {
         if self.svg_base_part_bytes.is_none() {
             self.svg_base_part_bytes = Some(svg_plan::materialized_part_bytes(&self.base)?);
         }
+        Ok(())
+    }
+
+    /// Stage one fill after checking the aggregate retained gradient payload.
+    ///
+    /// The native stylesheet rewrite has its own output and staged-resource
+    /// guards. This admission closes the earlier semantic gap where many
+    /// cloned `Arc`-backed gradient requests could accumulate in a transaction
+    /// before lowering reached that codec. The incoming request is checked
+    /// before it is cloned; the merged request is checked again after a
+    /// replacement or property merge has settled its retained payload.
+    pub(super) fn stage_fill(
+        &mut self,
+        position: usize,
+        address: Address,
+        change: &FillChange,
+    ) -> Result<()> {
+        let maximum = style_staged_memory_limit(&self.base);
+        let incoming = change.retained_bytes();
+        enforce_style_staged_memory(incoming, maximum, "worksheet fill staged bytes")?;
+
+        let previous_bytes = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.fills.get(&address))
+            .map(FillChange::retained_bytes)
+            .unwrap_or(0);
+        let previous = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.fills.get(&address))
+            .cloned();
+        let mut merged = previous.unwrap_or_else(FillChange::new);
+        merged.merge(change);
+
+        let merged_bytes = merged.retained_bytes();
+        let current_sheet_bytes = self
+            .sheets
+            .get(&position)
+            .map_or(0, |actions| actions.staged_fill_bytes);
+        let updated_sheet_bytes = current_sheet_bytes
+            .checked_sub(previous_bytes)
+            .and_then(|bytes| bytes.checked_add(merged_bytes))
+            .ok_or_else(|| invalid("worksheet fill retained bytes overflow"))?;
+        let current_total = staged_style_bytes(&self.sheets)?;
+        let retained = current_total
+            .checked_sub(previous_bytes)
+            .and_then(|bytes| bytes.checked_add(merged_bytes))
+            .ok_or_else(|| invalid("worksheet fill retained bytes overflow"))?;
+        enforce_style_staged_memory(retained, maximum, "worksheet style staged bytes")?;
+
+        let actions = self.sheets.entry(position).or_default();
+        actions.fills.insert(address, merged);
+        actions.staged_fill_bytes = updated_sheet_bytes;
+        Ok(())
+    }
+
+    /// Stage one border after admitting the fixed border value, map node, and
+    /// lowering-copy charge against the aggregate deferred-style budget.
+    pub(super) fn stage_border(
+        &mut self,
+        position: usize,
+        address: Address,
+        change: &BorderChange,
+    ) -> Result<()> {
+        let maximum = style_staged_memory_limit(&self.base);
+        let is_new = self
+            .sheets
+            .get(&position)
+            .is_none_or(|actions| !actions.borders.contains_key(&address));
+        if is_new {
+            let retained = staged_style_bytes(&self.sheets)?
+                .checked_add(border_staged_entry_bytes())
+                .ok_or_else(|| invalid("worksheet border retained bytes overflow"))?;
+            enforce_style_staged_memory(retained, maximum, "worksheet style staged bytes")?;
+        }
+        let added_border_bytes = if is_new {
+            border_staged_entry_bytes()
+        } else {
+            0
+        };
+        let updated_border_bytes = self
+            .sheets
+            .get(&position)
+            .map_or(0, |actions| actions.staged_border_bytes)
+            .checked_add(added_border_bytes)
+            .ok_or_else(|| invalid("worksheet border retained bytes overflow"))?;
+        let previous = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.borders.get(&address))
+            .cloned();
+        let mut merged = previous.unwrap_or_else(BorderChange::new);
+        merged.merge(change);
+        let actions = self.sheets.entry(position).or_default();
+        actions.borders.insert(address, merged);
+        actions.staged_border_bytes = updated_border_bytes;
+        Ok(())
+    }
+
+    /// Discard one deferred fill before a complete style, reset, or removal
+    /// action supersedes that cell. The counter is adjusted before the map is
+    /// mutated so a failed invariant check cannot partially change the edit.
+    pub(super) fn discard_fill(&mut self, position: usize, address: Address) -> Result<()> {
+        let Some(previous_bytes) = self
+            .sheets
+            .get(&position)
+            .and_then(|actions| actions.fills.get(&address))
+            .map(FillChange::retained_bytes)
+        else {
+            return Ok(());
+        };
+        let actions = self
+            .sheets
+            .get_mut(&position)
+            .ok_or_else(|| invalid("worksheet fill staging disappeared"))?;
+        let updated = actions
+            .staged_fill_bytes
+            .checked_sub(previous_bytes)
+            .ok_or_else(|| invalid("worksheet fill retained bytes underflow"))?;
+        actions.fills.remove(&address);
+        actions.staged_fill_bytes = updated;
+        Ok(())
+    }
+
+    /// Discard one deferred border before a complete style, reset, or removal
+    /// action supersedes that cell.
+    pub(super) fn discard_border(&mut self, position: usize, address: Address) -> Result<()> {
+        if !self
+            .sheets
+            .get(&position)
+            .is_some_and(|actions| actions.borders.contains_key(&address))
+        {
+            return Ok(());
+        }
+        let actions = self
+            .sheets
+            .get_mut(&position)
+            .ok_or_else(|| invalid("worksheet border staging disappeared"))?;
+        actions.staged_border_bytes = actions
+            .staged_border_bytes
+            .checked_sub(border_staged_entry_bytes())
+            .ok_or_else(|| invalid("worksheet border retained bytes underflow"))?;
+        actions.borders.remove(&address);
         Ok(())
     }
 
@@ -1184,13 +1338,19 @@ impl Edit {
             self.drawings.insert(target_sheet.position(), drawing);
         }
         if matches!(mode, CellTransfer::Move) {
+            for (source_address, _, _) in &staged {
+                self.discard_fill(source_sheet.position(), *source_address)?;
+                self.discard_border(source_sheet.position(), *source_address)?;
+            }
             let source_actions = self.actions(source_sheet.position());
             for (source_address, _, _) in &staged {
                 source_actions.insert(*source_address, Action::Remove);
             }
         }
-        let target_actions = self.actions(target_sheet.position());
         for (_, target_address, action) in staged {
+            self.discard_fill(target_sheet.position(), target_address)?;
+            self.discard_border(target_sheet.position(), target_address)?;
+            let target_actions = self.actions(target_sheet.position());
             target_actions.insert(target_address, action);
         }
         Ok(Some(self))
@@ -1244,6 +1404,13 @@ impl Edit {
                 .saturating_add(usize::from(added.actions.defaults.is_some()))
                 .saturating_add(usize::from(added.actions.web.is_some()))
                 .saturating_add(added.actions.cells.len())
+                .saturating_add(added.actions.fonts.len())
+                .saturating_add(added.actions.alignments.len())
+                .saturating_add(added.actions.fills.len())
+                .saturating_add(added.actions.borders.len())
+                .saturating_add(added.actions.protections.len())
+                .saturating_add(added.actions.quote_prefixes.len())
+                .saturating_add(added.actions.number_formats.len())
                 .saturating_add(added.actions.rows.len())
                 .saturating_add(added.actions.columns.len())
                 .saturating_add(added.actions.merges.len())
@@ -1330,6 +1497,72 @@ impl Edit {
         if !conflicts.is_empty() {
             return Err(JoinError {
                 failure: JoinFailure::Overlap(conflicts),
+                rejected: Box::new(other),
+            });
+        }
+        let projected_fill_bytes = match projected_fill_retained_bytes(&self.sheets, &other.sheets)
+        {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                return Err(JoinError {
+                    failure: JoinFailure::ResourceLimit(fill_join_resource_limit(
+                        u64::MAX,
+                        style_staged_memory_limit(&self.base),
+                    )),
+                    rejected: Box::new(other),
+                });
+            },
+        };
+        let projected_border_bytes =
+            match projected_border_staged_bytes(&self.sheets, &other.sheets) {
+                Ok(bytes) => bytes,
+                Err(_) => {
+                    return Err(JoinError {
+                        failure: JoinFailure::ResourceLimit(border_join_resource_limit(
+                            u64::MAX,
+                            style_staged_memory_limit(&self.base),
+                        )),
+                        rejected: Box::new(other),
+                    });
+                },
+            };
+        let maximum = style_staged_memory_limit(&self.base);
+        if projected_fill_bytes > maximum {
+            return Err(JoinError {
+                failure: JoinFailure::ResourceLimit(fill_join_resource_limit(
+                    u64::try_from(projected_fill_bytes).unwrap_or(u64::MAX),
+                    maximum,
+                )),
+                rejected: Box::new(other),
+            });
+        }
+        if projected_border_bytes > maximum {
+            return Err(JoinError {
+                failure: JoinFailure::ResourceLimit(border_join_resource_limit(
+                    u64::try_from(projected_border_bytes).unwrap_or(u64::MAX),
+                    maximum,
+                )),
+                rejected: Box::new(other),
+            });
+        }
+        let projected_style_bytes = match projected_fill_bytes.checked_add(projected_border_bytes) {
+            Some(bytes) => bytes,
+            None => {
+                return Err(JoinError {
+                    failure: JoinFailure::ResourceLimit(style_join_resource_limit(
+                        u64::MAX,
+                        maximum,
+                    )),
+                    rejected: Box::new(other),
+                });
+            },
+        };
+        if projected_style_bytes > maximum {
+            return Err(JoinError {
+                failure: JoinFailure::ResourceLimit(style_join_resource_limit(
+                    u64::try_from(projected_style_bytes).unwrap_or(u64::MAX),
+                    maximum,
+                )),
                 rejected: Box::new(other),
             });
         }
@@ -1455,6 +1688,90 @@ impl Edit {
                             },
                         }
                     }
+                    for (address, change) in actions.fonts {
+                        match accepted.fonts.entry(address) {
+                            Entry::Vacant(entry) => {
+                                entry.insert(change);
+                            },
+                            Entry::Occupied(mut entry) => {
+                                entry.get_mut().merge(&change);
+                            },
+                        }
+                    }
+                    for (address, change) in actions.alignments {
+                        match accepted.alignments.entry(address) {
+                            Entry::Vacant(entry) => {
+                                entry.insert(change);
+                            },
+                            Entry::Occupied(mut entry) => {
+                                entry.get_mut().merge(&change);
+                            },
+                        }
+                    }
+                    for (address, change) in actions.fills {
+                        if let Some(current) = accepted.fills.get(&address).cloned() {
+                            let previous = current.retained_bytes();
+                            let mut merged = current;
+                            merged.merge(&change);
+                            let retained = merged.retained_bytes();
+                            accepted.fills.insert(address, merged);
+                            accepted.staged_fill_bytes = accepted
+                                .staged_fill_bytes
+                                .saturating_sub(previous)
+                                .saturating_add(retained);
+                        } else {
+                            accepted.staged_fill_bytes = accepted
+                                .staged_fill_bytes
+                                .saturating_add(change.retained_bytes());
+                            accepted.fills.insert(address, change);
+                        }
+                    }
+                    for (address, change) in actions.borders {
+                        let is_new = !accepted.borders.contains_key(&address);
+                        match accepted.borders.entry(address) {
+                            Entry::Vacant(entry) => {
+                                entry.insert(change);
+                            },
+                            Entry::Occupied(mut entry) => {
+                                entry.get_mut().merge(&change);
+                            },
+                        }
+                        if is_new {
+                            accepted.staged_border_bytes = accepted
+                                .staged_border_bytes
+                                .saturating_add(border_staged_entry_bytes());
+                        }
+                    }
+                    for (address, change) in actions.protections {
+                        match accepted.protections.entry(address) {
+                            Entry::Vacant(entry) => {
+                                entry.insert(change);
+                            },
+                            Entry::Occupied(mut entry) => {
+                                entry.get_mut().merge(&change);
+                            },
+                        }
+                    }
+                    for (address, value) in actions.quote_prefixes {
+                        match accepted.quote_prefixes.entry(address) {
+                            Entry::Vacant(entry) => {
+                                entry.insert(value);
+                            },
+                            Entry::Occupied(mut entry) => {
+                                *entry.get_mut() = value;
+                            },
+                        }
+                    }
+                    for (address, value) in actions.number_formats {
+                        match accepted.number_formats.entry(address) {
+                            Entry::Vacant(entry) => {
+                                entry.insert(value);
+                            },
+                            Entry::Occupied(mut entry) => {
+                                *entry.get_mut() = value;
+                            },
+                        }
+                    }
                     for (row, action) in actions.rows {
                         match accepted.rows.entry(row) {
                             Entry::Vacant(entry) => {
@@ -1550,6 +1867,8 @@ impl Edit {
         let mut drawing_graph = Vec::new();
         let mut svg_parts = Vec::new();
         let mut content_types = None;
+        let (styles_part_changed, projected_style_count) =
+            lower_style_requests(&base, &mut sheets, &mut parts)?;
 
         let effective_renames = take_effective_renames(&base, &mut sheets)?;
         if let Some((position, _)) = effective_renames.first() {
@@ -1815,6 +2134,15 @@ impl Edit {
                 defaults,
                 web,
                 cells,
+                fonts,
+                alignments,
+                fills,
+                staged_fill_bytes: _,
+                borders,
+                staged_border_bytes: _,
+                protections,
+                quote_prefixes,
+                number_formats,
                 rows,
                 columns,
                 merges,
@@ -1856,6 +2184,13 @@ impl Edit {
             if defaults.is_none()
                 && web.is_none()
                 && cells.is_empty()
+                && fonts.is_empty()
+                && alignments.is_empty()
+                && fills.is_empty()
+                && borders.is_empty()
+                && protections.is_empty()
+                && quote_prefixes.is_empty()
+                && number_formats.is_empty()
                 && rows.is_empty()
                 && columns.is_empty()
                 && merges.is_empty()
@@ -1974,7 +2309,8 @@ impl Edit {
                 },
                 None => None,
             };
-            let merge_projection = project_merges(&data.name, Some(store), merges, &cells)?;
+            let merge_projection =
+                project_merges(&data.name, Some(&sheet), Some(store), merges, &cells)?;
             for (range, change) in &merge_projection.changes {
                 changes.push(Change::Merge {
                     sheet: data.name.clone().into_boxed_str(),
@@ -2321,7 +2657,11 @@ impl Edit {
             // Compaction may already prove that an ordinary worksheet has no bindings.
             let (after, parsed_web) = compacted.into_bytes_and_web()?;
             if let Some(parsed) = parsed.as_ref() {
-                base.inner.validate_styles(parsed.store())?;
+                if let Some(style_count) = projected_style_count {
+                    validate_store_style_count(parsed.store(), style_count)?;
+                } else {
+                    base.inner.validate_styles(parsed.store())?;
+                }
             }
             for change in &changes[change_start..] {
                 match change {
@@ -2660,7 +3000,11 @@ impl Edit {
                 let parsed = raw::worksheet::parse(created_sheet.graph.part.blob(), || {
                     base.inner.shared_strings()
                 })?;
-                base.inner.validate_styles(&parsed)?;
+                if let Some(style_count) = projected_style_count {
+                    validate_store_style_count(&parsed, style_count)?;
+                } else {
+                    base.inner.validate_styles(&parsed)?;
+                }
                 for change in &mut changes {
                     if let Change::Cell {
                         sheet,
@@ -2745,9 +3089,7 @@ impl Edit {
             }
         }
 
-        let style_guard = changes
-            .iter()
-            .any(Change::uses_shared_style)
+        let style_guard = (!styles_part_changed && changes.iter().any(Change::uses_shared_style))
             .then(|| {
                 let uri = base
                     .inner
@@ -3303,6 +3645,12 @@ impl Edit {
         } else {
             Box::new([])
         };
+        // A stylesheet edit creates a fresh style lineage. Rebind both
+        // semantic endpoints before publishing the patch so target states do
+        // not retain keys owned by the source snapshot.
+        for change in &mut changes {
+            change.rebind_style(&workbook);
+        }
         // A paired control edit depends on its complete owner graph, including
         // incoming edges. Pin this bounded profile to the validated immutable
         // source; matching only the two changed payloads is insufficient.
@@ -3876,6 +4224,134 @@ impl Edit {
                 conflicts::overlapping_keys(&left.cells, &right.cells, |left, right| {
                     left.overlaps(right)
                 });
+            let mut addresses = addresses;
+            for (address, left_font) in &left.fonts {
+                if let Some(right_font) = right.fonts.get(address)
+                    && left_font.overlaps(right_font)
+                {
+                    addresses.push(*address);
+                }
+                if right
+                    .cells
+                    .get(address)
+                    .is_some_and(action_has_style_effect)
+                {
+                    addresses.push(*address);
+                }
+            }
+            for address in right.fonts.keys() {
+                if left.cells.get(address).is_some_and(action_has_style_effect) {
+                    addresses.push(*address);
+                }
+            }
+            for (address, left_alignment) in &left.alignments {
+                if let Some(right_alignment) = right.alignments.get(address)
+                    && left_alignment.overlaps(right_alignment)
+                {
+                    addresses.push(*address);
+                }
+                if right
+                    .cells
+                    .get(address)
+                    .is_some_and(action_has_style_effect)
+                {
+                    addresses.push(*address);
+                }
+            }
+            for address in right.alignments.keys() {
+                if left.cells.get(address).is_some_and(action_has_style_effect) {
+                    addresses.push(*address);
+                }
+            }
+            for (address, left_fill) in &left.fills {
+                if let Some(right_fill) = right.fills.get(address)
+                    && left_fill.overlaps(right_fill)
+                {
+                    addresses.push(*address);
+                }
+                if right
+                    .cells
+                    .get(address)
+                    .is_some_and(action_has_style_effect)
+                {
+                    addresses.push(*address);
+                }
+            }
+            for address in right.fills.keys() {
+                if left.cells.get(address).is_some_and(action_has_style_effect) {
+                    addresses.push(*address);
+                }
+            }
+            for (address, left_border) in &left.borders {
+                if let Some(right_border) = right.borders.get(address)
+                    && left_border.overlaps(right_border)
+                {
+                    addresses.push(*address);
+                }
+                if right
+                    .cells
+                    .get(address)
+                    .is_some_and(action_has_style_effect)
+                {
+                    addresses.push(*address);
+                }
+            }
+            for address in right.borders.keys() {
+                if left.cells.get(address).is_some_and(action_has_style_effect) {
+                    addresses.push(*address);
+                }
+            }
+            for (address, left_protection) in &left.protections {
+                if let Some(right_protection) = right.protections.get(address)
+                    && left_protection.overlaps(right_protection)
+                {
+                    addresses.push(*address);
+                }
+                if right
+                    .cells
+                    .get(address)
+                    .is_some_and(action_has_style_effect)
+                {
+                    addresses.push(*address);
+                }
+            }
+            for address in right.protections.keys() {
+                if left.cells.get(address).is_some_and(action_has_style_effect) {
+                    addresses.push(*address);
+                }
+            }
+            for address in left.quote_prefixes.keys() {
+                if right.quote_prefixes.contains_key(address)
+                    || right
+                        .cells
+                        .get(address)
+                        .is_some_and(action_has_style_effect)
+                {
+                    addresses.push(*address);
+                }
+            }
+            for address in right.quote_prefixes.keys() {
+                if left.cells.get(address).is_some_and(action_has_style_effect) {
+                    addresses.push(*address);
+                }
+            }
+            for address in left.number_formats.keys() {
+                if right.number_formats.contains_key(address)
+                    || right
+                        .cells
+                        .get(address)
+                        .is_some_and(action_has_style_effect)
+                {
+                    addresses.push(*address);
+                }
+            }
+            for address in right.number_formats.keys() {
+                if left.cells.get(address).is_some_and(action_has_style_effect) {
+                    addresses.push(*address);
+                }
+            }
+            addresses.sort_unstable();
+            addresses.dedup();
             if !addresses.is_empty() {
                 conflicts.push(Conflict::Cells {
                     sheet: sheet.into(),
@@ -3968,6 +4444,434 @@ impl Edit {
             reason,
         }
     }
+}
+
+fn action_has_style_effect(action: &Action) -> bool {
+    matches!(
+        action,
+        Action::Update { style: Some(_), .. } | Action::Remove
+    )
+}
+
+fn style_staged_memory_limit(base: &Workbook) -> usize {
+    let read_limit =
+        usize::try_from(base.inner.package.read_limits().max_part_bytes()).unwrap_or(usize::MAX);
+    read_limit.min(raw::styles_edit::StyleEditLimits::default().max_staged_bytes)
+}
+
+fn border_staged_entry_bytes() -> usize {
+    size_of::<BorderChange>()
+        .saturating_add(size_of::<Address>())
+        .saturating_mul(BORDER_STAGED_COPY_HEADROOM)
+        .saturating_add(BORDER_STAGED_NODE_BYTES)
+}
+
+fn staged_style_bytes(sheets: &BTreeMap<usize, SheetActions>) -> Result<usize> {
+    sheets.values().try_fold(0usize, |retained, actions| {
+        retained
+            .checked_add(actions.staged_fill_bytes)
+            .and_then(|retained| retained.checked_add(actions.staged_border_bytes))
+            .ok_or_else(|| invalid("worksheet style retained bytes overflow"))
+    })
+}
+
+fn retained_fill_bytes(sheets: &BTreeMap<usize, SheetActions>) -> Result<usize> {
+    sheets.values().try_fold(0usize, |retained, actions| {
+        actions.fills.values().try_fold(retained, |retained, fill| {
+            retained
+                .checked_add(fill.retained_bytes())
+                .ok_or_else(|| invalid("worksheet fill retained bytes overflow"))
+        })
+    })
+}
+
+fn projected_fill_retained_bytes(
+    left: &BTreeMap<usize, SheetActions>,
+    right: &BTreeMap<usize, SheetActions>,
+) -> Result<usize> {
+    let mut retained = left.values().try_fold(0usize, |retained, actions| {
+        retained
+            .checked_add(actions.staged_fill_bytes)
+            .ok_or_else(|| invalid("worksheet fill retained bytes overflow"))
+    })?;
+    for (position, actions) in right {
+        for (address, incoming) in &actions.fills {
+            let Some(current) = left
+                .get(position)
+                .and_then(|actions| actions.fills.get(address))
+            else {
+                retained = retained
+                    .checked_add(incoming.retained_bytes())
+                    .ok_or_else(|| invalid("worksheet fill retained bytes overflow"))?;
+                continue;
+            };
+            let mut merged = current.clone();
+            merged.merge(incoming);
+            retained = retained
+                .checked_sub(current.retained_bytes())
+                .and_then(|retained| retained.checked_add(merged.retained_bytes()))
+                .ok_or_else(|| invalid("worksheet fill retained bytes overflow"))?;
+        }
+    }
+    Ok(retained)
+}
+
+fn projected_border_staged_bytes(
+    left: &BTreeMap<usize, SheetActions>,
+    right: &BTreeMap<usize, SheetActions>,
+) -> Result<usize> {
+    let mut retained = left.values().try_fold(0usize, |retained, actions| {
+        retained
+            .checked_add(actions.staged_border_bytes)
+            .ok_or_else(|| invalid("worksheet border retained bytes overflow"))
+    })?;
+    for (position, actions) in right {
+        for address in actions.borders.keys() {
+            let already_present = left
+                .get(position)
+                .is_some_and(|actions| actions.borders.contains_key(address));
+            if !already_present {
+                retained = retained
+                    .checked_add(border_staged_entry_bytes())
+                    .ok_or_else(|| invalid("worksheet border retained bytes overflow"))?;
+            }
+        }
+    }
+    Ok(retained)
+}
+
+fn enforce_style_staged_memory(observed: usize, maximum: usize, scope: &str) -> Result<()> {
+    if observed > maximum {
+        return Err(Error::ResourceLimit(litchi_core::ResourceLimit {
+            resource: litchi_core::Resource::Memory,
+            observed: u64::try_from(observed).unwrap_or(u64::MAX),
+            limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+            scope: Arc::from(scope),
+        }));
+    }
+    Ok(())
+}
+
+fn fill_join_resource_limit(observed: u64, maximum: usize) -> litchi_core::ResourceLimit {
+    litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::Memory,
+        observed,
+        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+        scope: Arc::from("worksheet fill staged bytes"),
+    }
+}
+
+fn border_join_resource_limit(observed: u64, maximum: usize) -> litchi_core::ResourceLimit {
+    litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::Memory,
+        observed,
+        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+        scope: Arc::from("worksheet border staged bytes"),
+    }
+}
+
+fn style_join_resource_limit(observed: u64, maximum: usize) -> litchi_core::ResourceLimit {
+    litchi_core::ResourceLimit {
+        resource: litchi_core::Resource::Memory,
+        observed,
+        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+        scope: Arc::from("worksheet style staged bytes"),
+    }
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PendingStyleRequest {
+    position: usize,
+    address: Address,
+    source_style: u32,
+    request_index: usize,
+}
+
+/// Lower all property-level style requests before any worksheet part is
+/// rewritten. The stylesheet codec allocates/deduplicates the private native
+/// records in one bounded pass; worksheet actions then carry only final
+/// `StyleEffect::Set` values into the existing lossless worksheet writer.
+fn lower_style_requests(
+    base: &Workbook,
+    sheets: &mut BTreeMap<usize, SheetActions>,
+    parts: &mut Vec<PartChange>,
+) -> Result<(bool, Option<u32>)> {
+    let retained_style_bytes = retained_fill_bytes(sheets)?
+        .checked_add(sheets.values().try_fold(0usize, |retained, actions| {
+            retained
+                .checked_add(actions.staged_border_bytes)
+                .ok_or_else(|| invalid("worksheet border retained bytes overflow"))
+        })?)
+        .ok_or_else(|| invalid("worksheet style retained bytes overflow"))?;
+    enforce_style_staged_memory(
+        retained_style_bytes,
+        style_staged_memory_limit(base),
+        "worksheet style staged bytes",
+    )?;
+    let mut requests = Vec::new();
+    let mut pending = Vec::new();
+    let mut request_indices = HashMap::<
+        (
+            u32,
+            FontChange,
+            AlignmentChange,
+            FillChange,
+            BorderChange,
+            ProtectionChange,
+            Option<Option<bool>>,
+            Option<Option<Arc<str>>>,
+        ),
+        usize,
+    >::new();
+    for (position, actions) in sheets.iter() {
+        if actions.fonts.is_empty()
+            && actions.alignments.is_empty()
+            && actions.fills.is_empty()
+            && actions.borders.is_empty()
+            && actions.protections.is_empty()
+            && actions.quote_prefixes.is_empty()
+            && actions.number_formats.is_empty()
+        {
+            continue;
+        }
+        let data = base
+            .inner
+            .sheets
+            .get(*position)
+            .ok_or_else(|| invalid("style edit worksheet disappeared during planning"))?;
+        if data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: data.name.clone(),
+            });
+        }
+        let sheet = Worksheet {
+            owner: Arc::clone(&base.inner),
+            data: Arc::clone(data),
+        };
+        let store = sheet.store()?;
+        let request_count = actions
+            .fonts
+            .len()
+            .checked_add(actions.alignments.len())
+            .and_then(|count| count.checked_add(actions.fills.len()))
+            .and_then(|count| count.checked_add(actions.borders.len()))
+            .and_then(|count| count.checked_add(actions.protections.len()))
+            .and_then(|count| count.checked_add(actions.quote_prefixes.len()))
+            .and_then(|count| count.checked_add(actions.number_formats.len()))
+            .ok_or_else(|| invalid("style edit request count overflows"))?;
+        let mut addresses = Vec::new();
+        addresses
+            .try_reserve_exact(request_count)
+            .map_err(|source| allocation("style edit request addresses", source))?;
+        addresses.extend(actions.fonts.keys().copied());
+        addresses.extend(actions.alignments.keys().copied());
+        addresses.extend(actions.fills.keys().copied());
+        addresses.extend(actions.borders.keys().copied());
+        addresses.extend(actions.protections.keys().copied());
+        addresses.extend(actions.quote_prefixes.keys().copied());
+        addresses.extend(actions.number_formats.keys().copied());
+        addresses.sort_unstable();
+        addresses.dedup();
+        requests
+            .try_reserve(addresses.len())
+            .map_err(|source| allocation("style edit requests", source))?;
+        pending
+            .try_reserve(addresses.len())
+            .map_err(|source| allocation("style edit request locations", source))?;
+        request_indices
+            .try_reserve(addresses.len())
+            .map_err(|source| allocation("style edit request index", source))?;
+        for address in addresses {
+            let source_style = match actions.cells.get(&address) {
+                Some(Action::Update {
+                    style: Some(StyleEffect::Set(style)),
+                    ..
+                }) => *style,
+                Some(Action::Update {
+                    style: Some(StyleEffect::Reset),
+                    ..
+                }) => 0,
+                _ => store
+                    .entry(address)
+                    .and_then(|stored| stored.style)
+                    .unwrap_or(0),
+            };
+            let change = actions
+                .fonts
+                .get(&address)
+                .cloned()
+                .unwrap_or_else(FontChange::new);
+            let alignment = actions
+                .alignments
+                .get(&address)
+                .cloned()
+                .unwrap_or_else(AlignmentChange::new);
+            let fill = actions
+                .fills
+                .get(&address)
+                .cloned()
+                .unwrap_or_else(FillChange::new);
+            let border = actions
+                .borders
+                .get(&address)
+                .cloned()
+                .unwrap_or_else(BorderChange::new);
+            let protection = actions
+                .protections
+                .get(&address)
+                .cloned()
+                .unwrap_or_else(ProtectionChange::new);
+            let quote_prefix = actions.quote_prefixes.get(&address).copied();
+            let number_format = actions.number_formats.get(&address).cloned();
+            let key = (
+                source_style,
+                change.clone(),
+                alignment,
+                fill.clone(),
+                border.clone(),
+                protection,
+                quote_prefix,
+                number_format.clone(),
+            );
+            let request_index = if let Some(index) = request_indices.get(&key).copied() {
+                index
+            } else {
+                let index = requests.len();
+                requests.push(raw::styles_edit::StyleRequest {
+                    style: source_style,
+                    change: change.clone(),
+                    alignment,
+                    fill,
+                    border,
+                    protection,
+                    quote_prefix,
+                    number_format,
+                });
+                request_indices.insert(key, index);
+                index
+            };
+            pending.push(PendingStyleRequest {
+                position: *position,
+                address,
+                source_style,
+                request_index,
+            });
+        }
+    }
+    if requests.is_empty() {
+        return Ok((false, None));
+    }
+    let uri = base
+        .inner
+        .styles_uri
+        .as_ref()
+        .ok_or(Error::Unsupported {
+            feature: "style edits require a workbook styles part",
+        })?
+        .clone();
+    let before = base.inner.package.get_part(&uri)?.blob_arc();
+    let read_limits = base.inner.package.read_limits();
+    let max_part_bytes = usize::try_from(read_limits.max_part_bytes()).unwrap_or(usize::MAX);
+    let limits = raw::styles_edit::StyleEditLimits {
+        max_changes: MAX_STYLE_REQUESTS,
+        max_fonts: MAX_STYLE_FONTS,
+        max_fills: MAX_STYLE_FILLS,
+        max_borders: MAX_STYLE_BORDERS,
+        max_number_formats: MAX_STYLE_NUMBER_FORMATS,
+        max_cell_xfs: MAX_STYLE_CELL_XFS,
+        max_depth: read_limits.max_depth(),
+        max_input_bytes: max_part_bytes,
+        max_output_bytes: max_part_bytes,
+        max_staged_bytes: style_staged_memory_limit(base),
+    };
+    let rewritten = raw::styles_edit::rewrite_with_limits(before.as_slice(), &requests, limits)?;
+    if rewritten.styles.len() != requests.len() {
+        return Err(invalid(
+            "style stylesheet planning returned incomplete results",
+        ));
+    }
+    let projected_style_count = raw::styles::parse(&rewritten.bytes)?.len();
+    for pending in pending {
+        let style = *rewritten
+            .styles
+            .get(pending.request_index)
+            .ok_or_else(|| invalid("style stylesheet planning returned an invalid result index"))?;
+        let actions = sheets
+            .get_mut(&pending.position)
+            .ok_or_else(|| invalid("style edit worksheet disappeared after planning"))?;
+        actions.fonts.remove(&pending.address);
+        actions.alignments.remove(&pending.address);
+        actions.fills.remove(&pending.address);
+        actions.borders.remove(&pending.address);
+        if actions.fills.is_empty() {
+            actions.staged_fill_bytes = 0;
+        }
+        if actions.borders.is_empty() {
+            actions.staged_border_bytes = 0;
+        }
+        actions.protections.remove(&pending.address);
+        actions.quote_prefixes.remove(&pending.address);
+        actions.number_formats.remove(&pending.address);
+        if style == pending.source_style {
+            continue;
+        }
+        match actions.cells.entry(pending.address) {
+            Entry::Vacant(entry) => {
+                entry.insert(Action::style(style));
+            },
+            Entry::Occupied(mut entry) => {
+                entry.get_mut().set_style(StyleEffect::Set(style));
+            },
+        }
+    }
+    if rewritten.bytes.as_slice() == before.as_slice() {
+        return Ok((false, Some(projected_style_count)));
+    }
+    parts.push(PartChange {
+        uri,
+        before,
+        after: Arc::new(rewritten.bytes),
+        before_source: None,
+        after_source: None,
+    });
+    Ok((true, Some(projected_style_count)))
+}
+
+fn validate_store_style_count(store: &crate::cell::Store, len: u32) -> Result<()> {
+    if let Some(entry) = store
+        .entries()
+        .iter()
+        .find(|entry| entry.style.is_some_and(|style| style >= len))
+    {
+        return Err(invalid(format!(
+            "worksheet cell {} references shared style {}, but the workbook contains {len} cell formats",
+            entry.address,
+            entry.style.unwrap_or_default()
+        )));
+    }
+    if let Some(entry) = store
+        .row_entries()
+        .iter()
+        .find(|entry| entry.properties.style.is_some_and(|style| style >= len))
+    {
+        return Err(invalid(format!(
+            "worksheet row {} references shared style {}, but the workbook contains {len} cell formats",
+            entry.index,
+            entry.properties.style.unwrap_or_default()
+        )));
+    }
+    if let Some(entry) = store
+        .column_entries()
+        .iter()
+        .find(|entry| entry.properties.style.is_some_and(|style| style >= len))
+    {
+        return Err(invalid(format!(
+            "worksheet column {} references shared style {}, but the workbook contains {len} cell formats",
+            entry.first,
+            entry.properties.style.unwrap_or_default()
+        )));
+    }
+    Ok(())
 }
 
 struct HyperlinkRewrite {

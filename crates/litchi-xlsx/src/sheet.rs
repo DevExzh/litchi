@@ -176,6 +176,12 @@ pub enum NameError {
 }
 
 pub(crate) fn key(value: &str) -> Box<str> {
+    // ASCII is already normalized and full case folding is ASCII lowercase.
+    // Allocate its exact byte count rather than growing then shrinking the
+    // general Unicode iterator's String for every admitted table column.
+    if value.is_ascii() {
+        return value.to_ascii_lowercase().into_boxed_str();
+    }
     folded(value).collect::<String>().into_boxed_str()
 }
 

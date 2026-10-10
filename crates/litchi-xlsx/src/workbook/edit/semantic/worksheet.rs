@@ -23,6 +23,7 @@ use crate::raw::worksheet::edit::{
 use crate::row::{HeightAt, State as RowState};
 use crate::sheet::Name;
 use crate::style::StyleLineage;
+use crate::style::{AlignmentChange, BorderChange, FillChange, FontChange, ProtectionChange};
 use crate::web::{Binding as WebBinding, Bindings as WebBindings};
 
 use super::super::model::{
@@ -390,6 +391,90 @@ impl WorksheetEdit<'_> {
         Ok(self)
     }
 
+    /// Return the projected semantic cell state at one address.
+    ///
+    /// The projection combines the immutable source cell with the pending
+    /// payload/style action for this worksheet. It is intentionally a
+    /// cell-local staging view: commit-time validation, worksheet structure,
+    /// and deferred style lowering are not projected here. A cell with any
+    /// pending style request is therefore refused until the request has been
+    /// lowered by commit planning. Shared-string keys are retained by the same
+    /// state reader used by native patch generation.
+    ///
+    /// A worksheet scheduled for removal cannot produce a meaningful final
+    /// cell state and is refused. Tab reordering does not change the base
+    /// worksheet identity used by this handle, so it does not affect the
+    /// returned cell state.
+    ///
+    /// ```
+    /// # fn main() -> litchi_xlsx::Result<()> {
+    /// use litchi_xlsx::{Cell, State, Value, Workbook};
+    ///
+    /// let workbook = Workbook::create()?;
+    /// let mut edit = workbook.edit()?;
+    /// let mut sheet = edit.sheet("Sheet1")?.expect("worksheet");
+    /// sheet.set("A1", "draft")?;
+    /// assert!(matches!(
+    ///     sheet.state("A1")?,
+    ///     State::Cell {
+    ///         content: Cell::Value(Value::Text(value)),
+    ///         ..
+    ///     } if value.as_str() == "draft"
+    /// ));
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// Formula/reference rewrites staged by other transaction operations and
+    /// commit-time formula validation are not projected; callers must treat
+    /// this as the cell-local payload/style view at the current staging point.
+    ///
+    /// # Errors
+    ///
+    /// Returns the coordinate error for an invalid address, the source
+    /// worksheet/package error when the cell store cannot be read, or a typed
+    /// unsupported error when the worksheet is scheduled for removal or the
+    /// selected cell has deferred style lowering.
+    pub fn state<'a>(&self, at: impl Into<At<'a>>) -> Result<State> {
+        let address = at.into().resolve()?;
+        if self.edit.removed.contains(&self.position) {
+            return Err(Error::Unsupported {
+                feature: "projecting cell state for a worksheet scheduled for removal",
+            });
+        }
+        let Some(actions) = self.edit.sheets.get(&self.position) else {
+            let sheet = self
+                .edit
+                .base
+                .sheet(self.position)?
+                .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
+            let stored = sheet.store()?.entry(address);
+            return Ok(State::read(stored, &self.edit.base));
+        };
+        if actions.fonts.contains_key(&address)
+            || actions.alignments.contains_key(&address)
+            || actions.fills.contains_key(&address)
+            || actions.borders.contains_key(&address)
+            || actions.protections.contains_key(&address)
+            || actions.quote_prefixes.contains_key(&address)
+            || actions.number_formats.contains_key(&address)
+        {
+            return Err(Error::Unsupported {
+                feature: "projecting cell state with pending style changes",
+            });
+        }
+        let sheet = self
+            .edit
+            .base
+            .sheet(self.position)?
+            .ok_or_else(|| invalid("worksheet edit target disappeared"))?;
+        let stored = sheet.store()?.entry(address);
+        Ok(actions.cells.get(&address).map_or_else(
+            || State::read(stored, &self.edit.base),
+            |action| State::after(stored, action, &self.edit.base),
+        ))
+    }
+
     /// Apply an existing shared style without copying its formatting payload.
     ///
     /// The handle must belong to this edit's shared-style table lineage.
@@ -402,6 +487,41 @@ impl WorksheetEdit<'_> {
             return Err(Error::ForeignStyle);
         }
         let address = at.into().resolve()?;
+        // An explicit shared-style assignment is the later, complete style
+        // operation. It supersedes any deferred property-level style request
+        // staged for the same cell.
+        self.edit.discard_fill(self.position, address)?;
+        self.edit.discard_border(self.position, address)?;
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .fonts
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .alignments
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .protections
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .quote_prefixes
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .number_formats
+            .remove(&address);
         let effect = StyleEffect::Set(style.raw());
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
@@ -417,6 +537,38 @@ impl WorksheetEdit<'_> {
     /// A missing cell remains missing and resolves as a no-op at commit.
     pub fn reset_style<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.edit.discard_fill(self.position, address)?;
+        self.edit.discard_border(self.position, address)?;
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .fonts
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .alignments
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .protections
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .quote_prefixes
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .number_formats
+            .remove(&address);
         match self.edit.actions(self.position).entry(address) {
             Entry::Vacant(entry) => {
                 entry.insert(Action::reset_style());
@@ -426,9 +578,253 @@ impl WorksheetEdit<'_> {
         Ok(self)
     }
 
+    /// Stage typed font properties for one cell.
+    ///
+    /// The request is resolved against the workbook's shared stylesheet at
+    /// commit. No native font or cell-format identifier is exposed, and the
+    /// source worksheet remains unchanged until the transaction publishes.
+    pub fn font<'a>(&mut self, at: impl Into<At<'a>>, change: &FontChange) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        if change.is_empty() {
+            return Ok(self);
+        }
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .fonts
+            .entry(address)
+            .and_modify(|current| current.merge(change))
+            .or_insert_with(|| change.clone());
+        Ok(self)
+    }
+
+    /// Stage typed cell-alignment properties for one cell.
+    ///
+    /// The request is resolved against the workbook's shared stylesheet at
+    /// commit. Font, alignment, and border requests for one address are
+    /// composed into one native cell style, while unrelated properties remain
+    /// independently joinable.
+    pub fn alignment<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        change: &AlignmentChange,
+    ) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        if change.is_empty() {
+            return Ok(self);
+        }
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .alignments
+            .entry(address)
+            .and_modify(|current| current.merge(change))
+            .or_insert(*change);
+        Ok(self)
+    }
+
+    /// Stage typed cell-border properties for one cell.
+    ///
+    /// The request is resolved against the workbook's shared stylesheet at
+    /// commit. Font, alignment, fill, border, protection, quote-prefix, and
+    /// number-format requests for one address are composed into one native
+    /// cell style, while unrelated properties remain independently joinable.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use litchi_xlsx::{
+    ///     style::{cell_format::{Line, Side}, BorderChange},
+    ///     Workbook,
+    /// };
+    ///
+    /// let workbook = Workbook::create()?;
+    /// let mut edit = workbook.edit()?;
+    /// let change = BorderChange::new().left(Some(Side::new(Line::Thin)));
+    /// edit.sheet("Sheet1")?.expect("initial worksheet")
+    ///     .border("A1", &change)?;
+    /// # Ok::<(), litchi_xlsx::Error>(())
+    /// ```
+    pub fn border<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        change: &BorderChange,
+    ) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        if change.is_empty() {
+            return Ok(self);
+        }
+        self.edit.stage_border(self.position, address, change)?;
+        Ok(self)
+    }
+
+    /// Stage typed cell-fill properties for one cell.
+    ///
+    /// The request is resolved against the workbook's shared stylesheet at
+    /// commit. Font, alignment, fill, protection, quote-prefix, and
+    /// number-format requests for one address are composed into one native
+    /// cell style, while unrelated properties remain independently joinable.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use litchi_xlsx::{style::{cell_format::Pattern, FillChange}, Workbook};
+    ///
+    /// let workbook = Workbook::create()?;
+    /// let mut edit = workbook.edit()?;
+    /// let change = FillChange::new().pattern(Some(Pattern::Solid));
+    /// edit.sheet("Sheet1")?.expect("initial worksheet")
+    ///     .fill("A1", &change)?;
+    /// # Ok::<(), litchi_xlsx::Error>(())
+    /// ```
+    ///
+    /// A complete gradient fill can be supplied as a validated replacement:
+    ///
+    /// ```
+    /// use litchi_xlsx::{
+    ///     style::{cell_format::{Color, Fill, GradientFill, GradientStop}, FillChange},
+    ///     Workbook,
+    /// };
+    ///
+    /// let workbook = Workbook::create()?;
+    /// let mut edit = workbook.edit()?;
+    /// let gradient = GradientFill::linear(
+    ///     0.0,
+    ///     vec![
+    ///         GradientStop::new(0.0, Color::rgb(0xFF, 0x00, 0x00))?,
+    ///         GradientStop::new(1.0, Color::rgb(0x00, 0x00, 0xFF))?,
+    ///     ]
+    ///     .into_boxed_slice(),
+    /// )?;
+    /// let change = FillChange::replace(Fill::Gradient(gradient));
+    /// edit.sheet("Sheet1")?.expect("initial worksheet")
+    ///     .fill("A1", &change)?;
+    /// # Ok::<(), litchi_xlsx::Error>(())
+    /// ```
+    pub fn fill<'a>(&mut self, at: impl Into<At<'a>>, change: &FillChange) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        if let Some(replacement) = change.replacement() {
+            replacement.validate()?;
+        }
+        if change.is_empty() {
+            return Ok(self);
+        }
+        self.edit.stage_fill(self.position, address, change)?;
+        Ok(self)
+    }
+
+    /// Stage typed cell-protection properties for one cell.
+    ///
+    /// The request is resolved against the workbook's shared stylesheet at
+    /// commit and composed with any pending font or alignment request for the
+    /// same address.
+    pub fn protection<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        change: &ProtectionChange,
+    ) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        if change.is_empty() {
+            return Ok(self);
+        }
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .protections
+            .entry(address)
+            .and_modify(|current| current.merge(change))
+            .or_insert(*change);
+        Ok(self)
+    }
+
+    /// Stage the authored `quotePrefix` value for one cell. `None` removes an
+    /// authored attribute; `Some(false)` remains distinct from removal.
+    pub fn quote_prefix<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        value: Option<bool>,
+    ) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .quote_prefixes
+            .insert(address, value);
+        Ok(self)
+    }
+
+    /// Stage an authored number-format code for one cell. `None` removes the
+    /// local number-format attribute; a code is copied into transaction-owned
+    /// storage after the native authoring validation succeeds.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use litchi_xlsx::Workbook;
+    ///
+    /// let workbook = Workbook::create()?;
+    /// let mut edit = workbook.edit()?;
+    /// let mut sheet = edit.sheet("Sheet1")?.expect("the minimal workbook has Sheet1");
+    /// sheet.number_format("A1", Some("0.00"))?;
+    /// # Ok::<(), litchi_xlsx::Error>(())
+    /// ```
+    pub fn number_format<'a>(
+        &mut self,
+        at: impl Into<At<'a>>,
+        code: Option<&str>,
+    ) -> Result<&mut Self> {
+        let address = at.into().resolve()?;
+        let code = code
+            .map(crate::style::validate_number_format_code)
+            .transpose()?;
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .number_formats
+            .insert(address, code);
+        Ok(self)
+    }
+
     /// Remove the cell record without shifting surrounding cells.
     pub fn remove<'a>(&mut self, at: impl Into<At<'a>>) -> Result<&mut Self> {
         let address = at.into().resolve()?;
+        self.edit.discard_fill(self.position, address)?;
+        self.edit.discard_border(self.position, address)?;
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .fonts
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .alignments
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .protections
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .quote_prefixes
+            .remove(&address);
+        self.edit
+            .sheets
+            .entry(self.position)
+            .or_default()
+            .number_formats
+            .remove(&address);
         self.edit
             .actions(self.position)
             .insert(address, Action::Remove);

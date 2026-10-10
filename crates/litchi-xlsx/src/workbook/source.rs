@@ -4,6 +4,10 @@
 //! snapshot owns a mutable OPC graph, while this type must keep ordinary part
 //! payloads deferred. It exposes only semantic catalog and worksheet reads.
 //!
+//! Parsed worksheet values (a sheet's grid and the XML outside its
+//! `sheetData`) are built once per worksheet and kept in a bounded, weighted
+//! clean-value cache; see [`SourceBackedWorkbook::semantic_cache_diagnostics`].
+//!
 //! Managed [`ExecutionContext`] opens are supported for this read-only
 //! facade. Focused source-backed editors retain managed
 //! [`litchi_opc::PartData`] handles in their immutable snapshots and expose
@@ -13,9 +17,10 @@
 
 use std::collections::HashMap;
 use std::io::Read;
+use std::ops::ControlFlow;
 #[cfg(any(unix, windows))]
 use std::path::Path;
-use std::sync::{Arc, OnceLock};
+use std::sync::{Arc, Mutex, MutexGuard, OnceLock, PoisonError};
 
 #[cfg(any(unix, windows))]
 use litchi_core::FileSource;
@@ -36,6 +41,19 @@ use crate::error::{Error, Result, allocation, invalid};
 use crate::leniency::{Leniency, ToleranceReport};
 use crate::raw;
 use crate::raw::selected_worksheet::SelectedPayload;
+
+mod styles;
+mod tables;
+
+mod blocks;
+mod grid;
+#[cfg(test)]
+mod m1_tests;
+mod values;
+
+pub use grid::Grid;
+pub use styles::Record;
+pub use values::CacheDiagnostics;
 
 const CHARTSHEET_REL: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/chartsheet";
@@ -71,7 +89,24 @@ struct SourceSheetData {
     kind: WorksheetKind,
     visibility: Visibility,
     part_uri: PackURI,
-    cells: OnceLock<Store>,
+    /// Repairs made by the first successful parse of this worksheet's grid.
+    ///
+    /// The parsed grid itself lives in the workbook's evictable semantic
+    /// cache; its repair report is kept here so the workbook's report stays
+    /// independent of what the cache currently retains. A report holds at
+    /// most a bounded number of entries.
+    tolerance: OnceLock<ToleranceReport>,
+    /// Serializes the builds of this worksheet's parsed values, so readers
+    /// racing for the same cold value share one build instead of parsing the
+    /// part once each. Reads of other worksheets are never blocked.
+    build: Mutex<()>,
+}
+
+impl SourceSheetData {
+    fn lock_build(&self) -> MutexGuard<'_, ()> {
+        // The guarded value is empty, so a poisoned lock carries no state.
+        self.build.lock().unwrap_or_else(PoisonError::into_inner)
+    }
 }
 
 struct SourceInner {
@@ -90,6 +125,8 @@ struct SourceInner {
     shared_strings_tolerance: OnceLock<ToleranceReport>,
     styles_uri: Option<PackURI>,
     styles: OnceLock<raw::styles::Catalog>,
+    formats: crate::style::cell_format::FormatCache,
+    style_lineage: Arc<crate::style::StyleLineage>,
     flavor: Flavor,
     date_system: DateSystem,
     active_sheet: Option<usize>,
@@ -102,6 +139,13 @@ struct SourceInner {
     sheet_name_order: Box<[usize]>,
     /// Repairs made while the workbook catalog was parsed at open time.
     tolerance: ToleranceReport,
+    /// Defined names parsed with the mandatory workbook catalog at open.
+    defined_names: Box<[raw::DefinedName]>,
+    /// Weighted clean-value cache of parsed worksheet values.
+    values: values::ValueCache,
+    /// Number of differential formats in the styles part, parsed once for
+    /// conditional-format reads.
+    differential_format_count: OnceLock<usize>,
 }
 
 /// Read-only XLSX catalog and worksheet access over a positional source.
@@ -119,10 +163,18 @@ pub struct SourceBackedWorkbook {
 }
 
 /// A lifetime-free read-only worksheet handle from [`SourceBackedWorkbook`].
+///
+/// The first read that needs the worksheet's parsed grid builds it in one
+/// pass over the part and offers it to the workbook's bounded semantic cache
+/// (see [`SourceBackedWorkbook::semantic_cache_diagnostics`]). The handle then
+/// pins that grid: its later reads, and those of its clones, are lookups in
+/// the pinned grid, and the grid stays resident until the handle and its
+/// clones are dropped, whatever the cache evicts meanwhile.
 #[derive(Clone)]
 pub struct SourceWorksheet {
     owner: Arc<SourceInner>,
     data: Arc<SourceSheetData>,
+    grid: OnceLock<Grid>,
 }
 
 // Shared handles: the unified operations layer keeps these in `Arc`-backed,
@@ -519,6 +571,7 @@ impl SourceBackedWorkbook {
         check_execution(execution.as_ref())?;
 
         let active_sheet = (!catalog.sheets.is_empty()).then_some(catalog.active_sheet_index);
+        let defined_names = catalog.defined_names.into_boxed_slice();
         let mut sheets = Vec::new();
         sheets
             .try_reserve_exact(catalog.sheets.len())
@@ -531,7 +584,8 @@ impl SourceBackedWorkbook {
                 kind: part.kind,
                 visibility: codec::visibility(sheet.visibility),
                 part_uri: part.uri,
-                cells: OnceLock::new(),
+                tolerance: OnceLock::new(),
+                build: Mutex::new(()),
             }));
         }
         let sheets = sheets.into_boxed_slice();
@@ -567,6 +621,8 @@ impl SourceBackedWorkbook {
                 shared_strings_tolerance: OnceLock::new(),
                 styles_uri,
                 styles: OnceLock::new(),
+                formats: crate::style::cell_format::FormatCache::new(),
+                style_lineage: Arc::new(crate::style::StyleLineage),
                 flavor,
                 date_system: if catalog.uses_1904_date_system {
                     DateSystem::Excel1904
@@ -577,6 +633,9 @@ impl SourceBackedWorkbook {
                 sheets,
                 sheet_name_order,
                 tolerance,
+                defined_names,
+                values: values::ValueCache::new(),
+                differential_format_count: OnceLock::new(),
             }),
         })
     }
@@ -585,10 +644,13 @@ impl SourceBackedWorkbook {
     ///
     /// The report merges the repairs made when the workbook was opened with
     /// those of every worksheet whose cells have been materialized, each
-    /// stamped with its sheet position. Worksheets parse lazily; a cold
-    /// selected read that meets an irregular dependency falls back to the
-    /// materializing parse, which records. An empty report means everything
-    /// parsed so far conformed. See [`crate::leniency`] for the contract.
+    /// stamped with its sheet position. Worksheets parse lazily: a worksheet
+    /// joins the report once a read has parsed its grid, and stays in it even
+    /// after the semantic cache releases the grid. A read of a part too large
+    /// to retain goes through the streaming scan, which never repairs, and
+    /// falls back to the materializing parse, which records, when the
+    /// worksheet needs a repair. An empty report means everything parsed so
+    /// far conformed. See [`crate::leniency`] for the contract.
     #[must_use]
     pub fn tolerance_report(&self) -> ToleranceReport {
         let mut report = self.inner.tolerance.clone();
@@ -596,11 +658,42 @@ impl SourceBackedWorkbook {
             report.append(strings);
         }
         for sheet in self.inner.sheets.iter() {
-            if let Some(store) = sheet.cells.get() {
-                report.append_sheet(store.tolerance_report(), sheet.position);
+            if let Some(tolerance) = sheet.tolerance.get() {
+                report.append_sheet(tolerance, sheet.position);
             }
         }
         report
+    }
+
+    /// Low-level inert defined-name records retained from the workbook
+    /// catalog parsed at open.
+    ///
+    /// These are the records [`crate::Workbook::defined_names`] returns for
+    /// the same workbook part; reading them performs no I/O.
+    #[must_use]
+    pub fn defined_names(&self) -> &[raw::DefinedName] {
+        &self.inner.defined_names
+    }
+
+    /// Content-free diagnostics of the workbook's semantic cache.
+    ///
+    /// The cache retains parsed worksheet grids and the projections of their
+    /// blocks outside `sheetData` under a bounded logical weight, releasing
+    /// the least-recently-used values no worksheet handle pins. It is
+    /// separate from the deferred-part payload cache reported by
+    /// [`Self::cache_diagnostics`].
+    #[must_use]
+    pub fn semantic_cache_diagnostics(&self) -> CacheDiagnostics {
+        self.inner.values.diagnostics()
+    }
+
+    /// Release every parsed worksheet value the semantic cache retains that
+    /// no worksheet handle pins, returning the logical weight released.
+    ///
+    /// Reads are unaffected apart from cost: a released value is parsed
+    /// again from the same source snapshot when a read next needs it.
+    pub fn trim_semantic_cache(&self) -> usize {
+        self.inner.values.trim_clean()
     }
 
     /// Workbook flavor derived from the mandatory workbook catalog.
@@ -644,7 +737,8 @@ impl SourceBackedWorkbook {
     /// per-feature `SourceBackedEditor` (for example
     /// [`crate::cell_values::SourceBackedEditor::from_source_backed_package`])
     /// can adopt it without a second container index. The lazily parsed
-    /// catalog, shared strings and styles are released.
+    /// catalog, shared strings and styles, and every parsed worksheet value
+    /// the semantic cache retains, are released.
     ///
     /// # Errors
     ///
@@ -678,10 +772,7 @@ impl SourceBackedWorkbook {
             .sheets
             .iter()
             .cloned()
-            .map(|data| SourceWorksheet {
-                owner: Arc::clone(&self.inner),
-                data,
-            })
+            .map(|data| SourceWorksheet::new(Arc::clone(&self.inner), data))
     }
 
     /// Look up a sheet by developer-facing name or checked zero-based position.
@@ -706,10 +797,7 @@ impl SourceBackedWorkbook {
             CoreSelector::Id(never) => match never {},
             _ => return Err(Error::UnsupportedSelector),
         };
-        Ok(data.map(|data| SourceWorksheet {
-            owner: Arc::clone(&self.inner),
-            data,
-        }))
+        Ok(data.map(|data| SourceWorksheet::new(Arc::clone(&self.inner), data)))
     }
 
     /// Return the active sheet, if the workbook catalog contains one.
@@ -720,10 +808,7 @@ impl SourceBackedWorkbook {
             .active_sheet
             .and_then(|position| self.inner.sheets.get(position))
             .cloned()?;
-        Some(SourceWorksheet {
-            owner: Arc::clone(&self.inner),
-            data,
-        })
+        Some(SourceWorksheet::new(Arc::clone(&self.inner), data))
     }
 }
 
@@ -735,6 +820,14 @@ fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
 }
 
 impl SourceWorksheet {
+    const fn new(owner: Arc<SourceInner>, data: Arc<SourceSheetData>) -> Self {
+        Self {
+            owner,
+            data,
+            grid: OnceLock::new(),
+        }
+    }
+
     /// Developer-facing sheet name.
     #[must_use]
     pub fn name(&self) -> &str {
@@ -830,15 +923,41 @@ impl SourceWorksheet {
     }
 
     /// Look up an exact logical cell state, returning an owning semantic value.
+    ///
+    /// A retained parsed grid answers by lookup. Otherwise the bounded
+    /// selected scan retains only requested records, falling back to a parsed
+    /// grid when the worksheet needs the full parser. [`Self::grid`] explicitly
+    /// materializes and pins a grid for repeated or structural reads.
     pub fn cell<'a>(&self, at: impl Into<At<'a>>) -> Result<SourceCellView> {
         let address = at.into().resolve()?;
-        let value = if self.data.cells.get().is_some() || self.data.kind != WorksheetKind::Worksheet
-        {
-            self.eager_cell(address)
-        } else {
-            self.stream_cell(address)
+        let value = match self.streams_cells() {
+            Ok(true) => self.stream_cell(address),
+            Ok(false) => self.eager_cell(address),
+            Err(error) => Err(error),
         };
         self.finish_result(value)
+    }
+
+    /// Whether a cell read of this worksheet streams its part instead of
+    /// reading the parsed grid.
+    ///
+    /// A resident grid (pinned by this handle or retained by the workbook)
+    /// always answers. A cold eligible worksheet keeps the selected streaming
+    /// route; materialization is explicit or a parser fallback.
+    fn streams_cells(&self) -> Result<bool> {
+        if self.data.kind != WorksheetKind::Worksheet || self.grid.get().is_some() {
+            return Ok(false);
+        }
+        // A retained grid is pinned here, in the one lookup this read makes;
+        // the store read that follows runs the resident fences. A miss is
+        // counted by that store read, not by this probe.
+        if let Some(store) = self.cached_grid(false) {
+            let _publish_result = self.grid.set(Grid::new(store));
+            return Ok(false);
+        }
+        self.owner.execution_check()?;
+        self.owner.package.source_version()?;
+        Ok(true)
     }
 
     fn eager_cell(&self, address: Address) -> Result<SourceCellView> {
@@ -932,10 +1051,10 @@ impl SourceWorksheet {
 
     /// Read every stored cell selected by a checked range into owning values.
     ///
-    /// A cold worksheet uses the bounded sparse selection route when its
-    /// structure is eligible; unsupported worksheet semantics fall back to
-    /// the materialized store. The returned cells are independent of the
-    /// source and may outlive this worksheet handle.
+    /// The range takes the route [`Self::cell`] describes: the worksheet's
+    /// resident parsed grid, or the bounded sparse selection route when a
+    /// cold worksheet's structure is eligible. The returned cells are independent of
+    /// the source and may outlive this worksheet handle.
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Vec<SourceCell>> {
         let range = area.into().resolve()?;
         let values = self
@@ -962,11 +1081,13 @@ impl SourceWorksheet {
     /// values as [`Self::cells`], but each selected cell is produced as it is
     /// visited instead of after a whole-range vector of owning cells has been
     /// built. Callbacks still receive references into local values, so no
-    /// callback runs while a source reader is active: the bounded selected
-    /// scan reaches worksheet EOF, resolves its shared-string and style
-    /// dependencies and validates every retained record before the first
-    /// callback, so every refusal [`Self::cells`] raises for this range is
-    /// still raised before any cell is visited.
+    /// callback runs while a source reader is active: the parsed grid is
+    /// complete, or the bounded selected scan has reached worksheet EOF,
+    /// resolved its shared-string and style dependencies and validated every
+    /// retained record, before the first callback, so every refusal
+    /// [`Self::cells`] raises for this range is still raised before any cell
+    /// is visited. [`Self::visit_cells_until`] is the variant whose callback
+    /// can stop the walk without an error.
     ///
     /// Cancellation is checked before each callback. Final source and
     /// execution fences run even when a callback fails, so a source mutation
@@ -975,84 +1096,13 @@ impl SourceWorksheet {
     where
         F: FnMut(Address, &Cell) -> Result<()>,
     {
-        let range = match area.into().resolve() {
-            Ok(range) => range,
-            Err(error) => return self.finish_result(Err(error.into())),
-        };
-        // `cells` publishes its values through `finish_result` before any
-        // caller can observe them; keep that fence ahead of the first visit.
-        let selection = match self.finish_result(self.select_cells(range)) {
-            Ok(selection) => selection,
-            Err(error) => return self.finish_result(Err(error)),
-        };
-        let mut visited = 0usize;
-        let mut result = Ok(());
-        match selection {
-            Selection::Stored(store) => {
-                for (address, cell) in store.cells(range) {
-                    if !self.visit_one(&mut visit, address, cell, &mut visited, &mut result) {
-                        break;
-                    }
-                }
-            },
-            Selection::Selected { cells, shared_text } => {
-                for record in cells {
-                    let source_cell = match resolve_selected_record(record, shared_text.as_deref())
-                    {
-                        Ok(source_cell) => source_cell,
-                        Err(error) => {
-                            result = Err(error);
-                            break;
-                        },
-                    };
-                    if !self.visit_one(
-                        &mut visit,
-                        source_cell.address,
-                        &source_cell.cell,
-                        &mut visited,
-                        &mut result,
-                    ) {
-                        break;
-                    }
-                }
-            },
-        }
-        self.finish_result(result.map(|()| visited))
-    }
-
-    /// Hand one produced cell to a range visitor.
-    ///
-    /// Cancellation is checked before the callback and the visited count is
-    /// bounded. `false` stops the walk, with `result` carrying the primary
-    /// error.
-    fn visit_one<F>(
-        &self,
-        visit: &mut F,
-        address: Address,
-        cell: &Cell,
-        visited: &mut usize,
-        result: &mut Result<()>,
-    ) -> bool
-    where
-        F: FnMut(Address, &Cell) -> Result<()>,
-    {
-        if let Err(error) = self.owner.execution_check() {
-            *result = Err(error);
-            return false;
-        }
-        if let Err(error) = visit(address, cell) {
-            *result = Err(error);
-            return false;
-        }
-        match visited.checked_add(1) {
-            Some(count) => {
-                *visited = count;
-                true
-            },
-            None => {
-                *result = Err(invalid("source-backed cell visit count overflow"));
-                false
-            },
+        let flow = self.visit_cells_until(area, |address, cell| match visit(address, cell) {
+            Ok(()) => ControlFlow::Continue(()),
+            Err(error) => ControlFlow::Break(error),
+        })?;
+        match flow {
+            ControlFlow::Continue(visited) => Ok(visited),
+            ControlFlow::Break(error) => Err(error),
         }
     }
 
@@ -1064,10 +1114,10 @@ impl SourceWorksheet {
     /// whole-range read of this rectangle can raise has already been raised
     /// when this returns.
     fn select_cells(&self, range: Rect) -> Result<Selection<'_>> {
-        if self.data.cells.get().is_some() || self.data.kind != WorksheetKind::Worksheet {
-            return Ok(Selection::Stored(self.store()?));
+        if self.streams_cells()? {
+            return self.stream_selection(range);
         }
-        self.stream_selection(range)
+        Ok(Selection::Stored(self.store()?))
     }
 
     #[expect(
@@ -1220,6 +1270,13 @@ impl SourceWorksheet {
         Ok(extent)
     }
 
+    /// The parsed grid of this worksheet, pinned by this handle.
+    ///
+    /// A grid this handle already pins is returned after the source and
+    /// execution fences. Otherwise the workbook's semantic cache is asked,
+    /// and on a miss the part is parsed once, under this worksheet's build
+    /// lock so racing readers share one build, and the result is offered to
+    /// the cache. Only a complete, successfully parsed grid is published.
     fn store(&self) -> Result<&Store> {
         self.owner.execution_check()?;
         if self.data.kind != WorksheetKind::Worksheet {
@@ -1228,32 +1285,93 @@ impl SourceWorksheet {
             });
         }
         // `SourceBackedPackage::part` checks the captured source version even
-        // when this worksheet's parsed semantic store is already retained.
+        // when this worksheet's parsed semantic store is already resident.
         // Never return cached semantic data after a caller-visible source
         // change has invalidated the snapshot.
         let part = self.owner.package.part(&self.data.part_uri)?;
-        if let Some(store) = self.data.cells.get() {
-            // A cached semantic Store must still honor the managed package's
-            // cancellation and source-version checks. `PartView::data()` is
-            // deliberately not requested here: the semantic Store is already
-            // the validated worksheet snapshot, and its retained value must
-            // remain usable even when the bounded payload cache evicted or
-            // bypassed the original worksheet bytes.
-            self.owner.package.check_execution()?;
-            self.owner.execution_check()?;
-            self.owner.package.source_version()?;
-            return Ok(store);
+        if let Some(grid) = self.grid.get() {
+            return self.resident_store(grid);
+        }
+        if let Some(store) = self.cached_grid(true) {
+            return self.pin(store);
+        }
+        let _build = self.data.lock_build();
+        if let Some(store) = self.cached_grid(false) {
+            return self.pin(store);
         }
 
         let data = part.data()?;
         let mut parsed = raw::worksheet::parse(data.as_bytes(), || self.owner.shared_strings())?;
+        drop(data);
         self.owner.repair_styles(&mut parsed)?;
         self.owner.execution_check()?;
         self.owner.package.source_version()?;
-        let _publish_result = self.data.cells.set(parsed);
-        self.data.cells.get().ok_or_else(|| {
+        let _publish_result = self.data.tolerance.set(parsed.tolerance_report().clone());
+        let weight = parsed.weight_bytes();
+        let store = match self.owner.values.publish(
+            self.data.position,
+            values::Cached::Grid(Arc::new(parsed)),
+            weight,
+        ) {
+            values::Cached::Grid(store) => store,
+            values::Cached::Blocks(_) => {
+                return Err(invalid(
+                    "source-backed worksheet grid cache returned another value kind",
+                ));
+            },
+        };
+        let _publish_result = self.grid.set(Grid::new(store));
+        self.grid.get().map(Grid::store).ok_or_else(|| {
             invalid("source-backed worksheet cache initialization did not publish a value")
         })
+    }
+
+    /// Return a resident store after the fences every cached read runs.
+    fn resident_store<'a>(&self, grid: &'a Grid) -> Result<&'a Store> {
+        // A cached semantic Store must still honor the managed package's
+        // cancellation and source-version checks. `PartView::data()` is
+        // deliberately not requested here: the semantic Store is already
+        // the validated worksheet snapshot, and its retained value must
+        // remain usable even when the bounded payload cache evicted or
+        // bypassed the original worksheet bytes.
+        self.owner.package.check_execution()?;
+        self.owner.execution_check()?;
+        self.owner.package.source_version()?;
+        Ok(grid.store())
+    }
+
+    /// Pin a store the workbook's cache retains and return it.
+    fn pin(&self, store: Arc<Store>) -> Result<&Store> {
+        // A concurrent reader of this same handle may have pinned the same
+        // cached store first; either value is the one the cache holds.
+        let _publish_result = self.grid.set(Grid::new(store));
+        let grid = self
+            .grid
+            .get()
+            .ok_or_else(|| invalid("source-backed worksheet grid was not pinned"))?;
+        self.resident_store(grid)
+    }
+
+    fn cached_grid(&self, record_miss: bool) -> Option<Arc<Store>> {
+        match self
+            .owner
+            .values
+            .get(self.data.position, values::Axis::Grid, record_miss)?
+        {
+            values::Cached::Grid(store) => Some(store),
+            values::Cached::Blocks(_) => None,
+        }
+    }
+
+    /// Whether this handle pins, or the workbook's cache retains, the parsed
+    /// grid of this worksheet.
+    #[cfg(test)]
+    fn store_resident(&self) -> bool {
+        self.grid.get().is_some()
+            || self
+                .owner
+                .values
+                .holds(self.data.position, values::Axis::Grid)
     }
 }
 
@@ -2325,20 +2443,20 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
 
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(
                 sheet.cell("A1").unwrap(),
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
                     if value.as_str() == "7"
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(sheet.cell("C1").unwrap(), SourceCellView::Missing));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(
                 sheet.cell("B1").unwrap(),
                 SourceCellView::Stored(Cell::Empty)
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let after = workbook.cache_diagnostics();
             assert_eq!(after.successful_loads, cold.successful_loads);
@@ -2352,7 +2470,7 @@ mod tests {
             let sheet = workbook.sheet("First").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
 
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(
                 sheet.cell("A1").unwrap(),
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
@@ -2360,7 +2478,7 @@ mod tests {
             ));
             let first_reads = source.first_body_marker_reads.load(Ordering::SeqCst);
             assert!(first_reads > 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2372,7 +2490,7 @@ mod tests {
                     if value.as_str() == "7"
             ));
             assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > first_reads);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2387,23 +2505,23 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
 
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(matches!(
                 sheet.cell("B2").unwrap(),
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
                     if value.as_str() == "-0.000"
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let selected = sheet.cells("A1:F9").unwrap();
             assert_eq!(selected.len(), 2);
             assert_eq!(selected[0].address.a1(), "B2");
             assert_eq!(selected[1].address.a1(), "F2");
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let extent = sheet.stored_extent().unwrap().expect("declared extent");
             assert_eq!(extent.a1(), "B2:F2");
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
         }
 
         #[test]
@@ -2419,7 +2537,7 @@ mod tests {
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
                     if value.as_str() == "7"
             ));
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
         }
 
         #[test]
@@ -2430,13 +2548,13 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(bytes)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             assert!(matches!(
                 sheet.cell("B1").unwrap(),
                 SourceCellView::Covered(range) if range.a1() == "A1:B1"
             ));
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             assert!(matches!(
                 sheet.cell("A1").unwrap(),
                 SourceCellView::Stored(Cell::Value(Value::Number(ref value)))
@@ -2455,7 +2573,7 @@ mod tests {
             let cold = workbook.cache_diagnostics();
 
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2476,7 +2594,7 @@ mod tests {
             let cold = workbook.cache_diagnostics();
 
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2495,7 +2613,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::SourceChanged { .. }))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2520,7 +2638,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::Cancelled))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2681,7 +2799,7 @@ mod tests {
             let cold = workbook.cache_diagnostics();
 
             assert_text(sheet.cell("A1").unwrap(), "plain");
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             let after = workbook.cache_diagnostics();
@@ -2700,7 +2818,7 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(valid)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "selected");
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let invalid = dependency_xlsx(
                 &worksheet(r#"<c r="A1" t="s"><v>0</v></c><c r="B1" t="s"><v>1</v></c>"#),
@@ -2712,7 +2830,7 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(invalid)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "selected");
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             assert_eq!(sheet.tolerance_report().unwrap().total(), 1);
         }
 
@@ -2726,7 +2844,7 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(plain)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
 
             let rich = dependency_xlsx(
@@ -2737,7 +2855,7 @@ mod tests {
             let workbook = SourceBackedWorkbook::from_reader(Cursor::new(rich)).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_some());
         }
 
@@ -2789,7 +2907,7 @@ mod tests {
                 } else {
                     assert_text(view, "");
                 }
-                let store = sheet.data.cells.get().expect("fallback published a store");
+                let store = sheet.grid.get().expect("fallback pinned a store").store();
                 assert_eq!(store.entries()[0].style, style);
                 let report = sheet.tolerance_report().unwrap();
                 assert_eq!(report.total(), 1);
@@ -2814,7 +2932,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -2833,7 +2951,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.styles.get().is_none());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -2858,7 +2976,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -2880,7 +2998,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cold = workbook.cache_diagnostics();
             assert!(sheet.cell("A1").is_err());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.styles.get().is_none());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -2904,7 +3022,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::SourceChanged { .. }))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2925,7 +3043,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::Cancelled))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 cold.successful_loads
@@ -2948,7 +3066,7 @@ mod tests {
             assert!(first_reads > 0);
             assert_text(sheet.cell("A1").unwrap(), "repeat");
             assert!(source.first_body_marker_reads.load(Ordering::SeqCst) > first_reads);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             assert_eq!(
@@ -2970,7 +3088,7 @@ mod tests {
                 SourceBackedWorkbook::from_read_at_with_cache_limits(source, cache_limits).unwrap();
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             assert_text(sheet.cell("A1").unwrap(), "rich text");
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_some());
             assert!(workbook.inner.styles.get().is_some());
 
@@ -3029,7 +3147,7 @@ mod tests {
                 sheet.cell("A1"),
                 Err(Error::Package(OpcError::SourceChanged { .. }))
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
     }
 
@@ -3112,7 +3230,7 @@ mod tests {
 
             assert!(result.is_err());
             assert!(callbacks.is_empty());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             let after = workbook.cache_diagnostics();
             assert_eq!(after.cold_loads, before.cold_loads);
             assert_eq!(after.successful_loads, before.successful_loads);
@@ -3139,7 +3257,7 @@ mod tests {
                 &all[0].cell,
                 Cell::Value(Value::Number(value)) if value.as_str() == "7"
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let subset = sheet.cells("B1:C2").unwrap();
             assert_eq!(addresses(&subset), vec!["C1".to_owned(), "B2".to_owned()]);
@@ -3150,7 +3268,7 @@ mod tests {
             ));
 
             assert!(sheet.cells("Z10:AA11").unwrap().is_empty());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
 
         #[test]
@@ -3173,7 +3291,7 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(count, expected.len());
             assert_eq!(visited, expected);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
 
         #[test]
@@ -3222,7 +3340,7 @@ mod tests {
                 &cells[3].cell,
                 Cell::Value(Value::Text(value)) if value.as_str() == "one"
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             let after = workbook.cache_diagnostics();
@@ -3245,7 +3363,7 @@ mod tests {
             assert_eq!(first, second);
             assert!(first_reads > 0);
             assert!(second_reads > first_reads);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 before.successful_loads
@@ -3258,9 +3376,9 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
 
             let cold = sheet.cells("A1:D4").unwrap();
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(sheet.stored_extent().unwrap().is_some());
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             let warm = sheet.cells("A1:D4").unwrap();
 
             assert_eq!(warm, cold);
@@ -3275,7 +3393,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             let cells = sheet.cells("A1:B1").unwrap();
             assert_eq!(addresses(&cells), vec!["A1".to_owned()]);
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
             assert!(matches!(
                 sheet.cell("B1").unwrap(),
                 SourceCellView::Covered(range) if range.a1() == "A1:B1"
@@ -3293,7 +3411,7 @@ mod tests {
             assert_eq!(addresses(&cells), vec!["A1".to_owned(), "A2".to_owned()]);
             assert!(matches!(&cells[0].cell, Cell::Formula(_)));
             assert!(matches!(&cells[1].cell, Cell::Formula(_)));
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
         }
 
         #[test]
@@ -3344,7 +3462,7 @@ mod tests {
 
             assert!(result.is_err());
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
@@ -3371,7 +3489,7 @@ mod tests {
                 Error::Package(OpcError::SourceChanged { .. })
             ));
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 before.successful_loads
@@ -3402,7 +3520,7 @@ mod tests {
 
             assert!(matches!(error, Error::Package(OpcError::Cancelled)));
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_eq!(
                 workbook.cache_diagnostics().successful_loads,
                 before.successful_loads
@@ -3426,7 +3544,7 @@ mod tests {
                 other => panic!("callback error changed type: {other:?}"),
             }
             assert_eq!(callbacks, 1);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
 
         #[test]
@@ -3460,7 +3578,7 @@ mod tests {
 
             assert!(matches!(error, Error::Package(OpcError::Cancelled)));
             assert_eq!(callbacks, vec!["A1".to_owned()]);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
 
         #[test]
@@ -3494,7 +3612,7 @@ mod tests {
                 Error::Package(OpcError::SourceChanged { .. })
             ));
             assert_eq!(callbacks, 1);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
         }
     }
 
@@ -3592,7 +3710,7 @@ mod tests {
                 SourceCellView::Stored(Cell::Value(Value::Number(value)))
                     if value.as_str() == "42.25"
             ));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
@@ -3622,7 +3740,7 @@ mod tests {
                     "D3".to_owned(),
                 ]
             );
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
@@ -3660,7 +3778,7 @@ mod tests {
                     "D3".to_owned(),
                 ]
             );
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
@@ -3687,7 +3805,7 @@ mod tests {
 
             let actual = fallback_sheet.cell("A1").unwrap();
             assert_eq!(actual, expected);
-            assert!(fallback_sheet.data.cells.get().is_some());
+            assert!(fallback_sheet.store_resident());
             let after = fallback_workbook.cache_diagnostics();
             assert!(after.successful_loads > before.successful_loads);
             assert!(after.retained_entries > before.retained_entries);
@@ -3727,7 +3845,7 @@ mod tests {
 
             assert!(result.is_err());
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
@@ -3834,7 +3952,7 @@ mod tests {
 
             assert!(result.is_err());
             assert!(callbacks.is_empty());
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
@@ -3870,7 +3988,7 @@ mod tests {
             ));
             assert!(matches!(&cold[3], SourceCellView::Missing));
             assert!(matches!(&cold[4], SourceCellView::Stored(Cell::Empty)));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
@@ -3907,7 +4025,7 @@ mod tests {
                 Cell::Value(Value::Number(value)) if value.as_str() == "8"
             ));
             assert!(matches!(&cold[2].cell, Cell::Empty));
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
 
             let mut visited = Vec::new();
             let count = sheet
@@ -3922,7 +4040,7 @@ mod tests {
                 .collect::<Vec<_>>();
             assert_eq!(count, expected.len());
             assert_eq!(visited, expected);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert!(workbook.inner.shared_strings.get().is_none());
             assert!(workbook.inner.styles.get().is_none());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
@@ -3984,7 +4102,7 @@ mod tests {
                 Error::Package(OpcError::SourceChanged { .. })
             ));
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
 
             let source = Arc::new(CountingSource::new(dependency_xlsx(&valid, None, None)));
@@ -4007,7 +4125,7 @@ mod tests {
                 .unwrap_err();
             assert!(matches!(error, Error::Package(OpcError::Cancelled)));
             assert_eq!(callbacks, 0);
-            assert!(sheet.data.cells.get().is_none());
+            assert!(!sheet.store_resident());
             assert_no_part_cache_admission(before, workbook.cache_diagnostics());
         }
 
@@ -4024,7 +4142,7 @@ mod tests {
                 .iter()
                 .map(|reference| fallback_sheet.cell(*reference).unwrap())
                 .collect::<Vec<_>>();
-            assert!(fallback_sheet.data.cells.get().is_some());
+            assert!(fallback_sheet.store_resident());
             let after = fallback_workbook.cache_diagnostics();
             assert!(after.successful_loads > before.successful_loads);
 
@@ -4129,7 +4247,7 @@ mod tests {
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             if warm {
                 sheet.stored_extent().unwrap();
-                assert!(sheet.data.cells.get().is_some());
+                assert!(sheet.store_resident());
             }
             let mut cells = Vec::new();
             let count = sheet
@@ -4210,7 +4328,7 @@ mod tests {
             let (_source, workbook) = source_workbook(&stored_fixture(), Some(&strings));
             let sheet = workbook.sheet("Sheet1").unwrap().unwrap();
             sheet.stored_extent().unwrap();
-            assert!(sheet.data.cells.get().is_some());
+            assert!(sheet.store_resident());
 
             let mut callbacks = 0usize;
             let error = sheet

@@ -15,6 +15,7 @@ pub mod shared_strings;
 pub(crate) mod sheet_view_edit;
 pub(crate) mod strings;
 pub(crate) mod styles;
+pub(crate) mod styles_edit;
 pub mod web;
 pub(crate) mod worksheet;
 pub(crate) mod worksheet_property;

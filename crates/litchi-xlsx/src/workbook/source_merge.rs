@@ -22,7 +22,7 @@ use quick_xml::Reader;
 use quick_xml::XmlVersion;
 use quick_xml::events::{BytesStart, Event};
 
-use super::source::validate_sheet_graph;
+use super::source::{SourceBackedWorkbook, validate_sheet_graph};
 use crate::cell::{Cell, Store, Text};
 use crate::error::{Error, MergeEditBlock, Result, allocation, invalid};
 use crate::merge;
@@ -46,6 +46,7 @@ pub struct SourceEdit {
     staged: Vec<Rect>,
     store: Store,
     shared_strings: Option<Arc<[Text]>>,
+    package: SourceBackedPackage,
 }
 
 /// Immutable merged-range state and the private source closure required for
@@ -182,7 +183,12 @@ impl SourceBackedEditor {
         else {
             return Ok(None);
         };
-        Ok(Some(SourceEdit::new(snapshot, store, shared_strings)))
+        Ok(Some(SourceEdit::new(
+            snapshot,
+            store,
+            shared_strings,
+            self.package.clone(),
+        )))
     }
 
     /// Publish a source-checked commit to a sequential sink.
@@ -221,12 +227,18 @@ impl SourceBackedEditor {
 }
 
 impl SourceEdit {
-    fn new(before: Snapshot, store: Store, shared_strings: Option<Arc<[Text]>>) -> Self {
+    fn new(
+        before: Snapshot,
+        store: Store,
+        shared_strings: Option<Arc<[Text]>>,
+        package: SourceBackedPackage,
+    ) -> Self {
         Self {
             staged: before.ranges.to_vec(),
             before,
             store,
             shared_strings,
+            package,
         }
     }
 
@@ -289,7 +301,12 @@ impl SourceEdit {
             return Ok(Commit::new(self.before, patch, false));
         }
 
-        validate_structural_preconditions(&self.before, &add, &remove)?;
+        let table_ranges = if add.is_empty() {
+            Vec::new()
+        } else {
+            source_table_ranges(&self.package, self.before.sheet_position())?
+        };
+        validate_structural_preconditions(&self.before, &add, &remove, &table_ranges)?;
         let output = raw::worksheet::edit::rewrite_merges(
             self.before.source_xml(),
             self.before.sheet_name(),
@@ -1054,6 +1071,22 @@ fn plan_changes(before: &[Rect], staged: &[Rect]) -> Result<(Vec<Rect>, Vec<Rect
     Ok((add, remove))
 }
 
+fn source_table_ranges(package: &SourceBackedPackage, position: usize) -> Result<Vec<Rect>> {
+    let workbook = SourceBackedWorkbook::from_source_backed_package(package.clone())?;
+    let sheet = workbook
+        .sheet(position)?
+        .ok_or_else(|| invalid("merged-range worksheet disappeared while reading tables"))?;
+    let tables = sheet.tables()?;
+    let mut ranges = Vec::new();
+    ranges
+        .try_reserve_exact(tables.len())
+        .map_err(|source| allocation("source-backed worksheet table ranges", source))?;
+    for table in tables {
+        ranges.push(table.table().range()?);
+    }
+    Ok(ranges)
+}
+
 #[derive(Debug, Default)]
 struct StructuralScan {
     protected: bool,
@@ -1073,6 +1106,7 @@ fn validate_structural_preconditions(
     source: &Snapshot,
     add: &[Rect],
     remove: &[Rect],
+    table_ranges: &[Rect],
 ) -> Result<()> {
     let requested = add
         .first()
@@ -1096,6 +1130,17 @@ fn validate_structural_preconditions(
     }
     let formula_ranges = structural_formula_ranges(&scan.formulas);
     for range in add {
+        if let Some(table) = table_ranges
+            .iter()
+            .copied()
+            .find(|table| merge::overlaps(*table, *range))
+        {
+            return Err(Error::MergeEditBlocked {
+                sheet: source.sheet_name.to_string(),
+                range: *range,
+                reason: MergeEditBlock::TableOverlap { table },
+            });
+        }
         if formula_ranges
             .iter()
             .copied()

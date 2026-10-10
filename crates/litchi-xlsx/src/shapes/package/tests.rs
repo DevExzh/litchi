@@ -141,8 +141,8 @@ fn poi_fixture_text_boxes_parse() {
     assert_eq!(body.properties.insets.left.as_emu(), Some(27432));
     assert_eq!(body.text(), "State-Owned Enterprise");
     let run = &body.paragraphs[0].runs[0];
-    assert_eq!(run.bold, Some(false));
-    assert_eq!(run.font_size.map(TextSize::get), Some(900));
+    assert_eq!(run.properties.bold, Some(false));
+    assert_eq!(run.properties.size.map(TextSize::get), Some(900));
     // All four fixture text boxes anchor with two-cell anchors.
     assert!(
         all.iter()

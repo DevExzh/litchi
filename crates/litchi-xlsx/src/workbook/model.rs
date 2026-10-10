@@ -12,7 +12,7 @@ use super::edit::{Commit, Edit, Patch};
 use super::worksheet;
 use super::{codec, package};
 use litchi_core::Selector as CoreSelector;
-use litchi_opc::{OpcPackage, PackURI, SourceLimits};
+use litchi_opc::{OpcPackage, PackURI, Relationships, SourceLimits};
 use litchi_sheet::{Area, At, ColumnAt, Rect, RowAt};
 use once_cell::sync::OnceCell;
 
@@ -21,6 +21,7 @@ use crate::error::{Error, Result, invalid};
 use crate::leniency::{Leniency, ToleranceReport};
 use crate::raw;
 use crate::style::StyleLineage;
+use crate::style::cell_format::{Format, FormatCache, FormatKey, FormatTable};
 use crate::{Cells, Column, Columns, LocalStyle, Row, Rows, Style, Styles};
 
 #[cfg(feature = "encryption")]
@@ -377,6 +378,25 @@ fn page_break_cache(
     }
 }
 
+/// Compare the public semantic fields of one OPC relationship collection.
+///
+/// The collection's source-preservation handle is intentionally ignored: it
+/// describes how the value was admitted, not the value itself.
+fn same_relationships(left: &Relationships, right: &Relationships) -> bool {
+    left.base_uri() == right.base_uri()
+        && left.source_uri() == right.source_uri()
+        && left.len() == right.len()
+        && left.iter().all(|relationship| {
+            right.get(relationship.r_id()).is_some_and(|candidate| {
+                candidate.reltype() == relationship.reltype()
+                    && candidate.target_ref() == relationship.target_ref()
+                    && candidate.target_mode() == relationship.target_mode()
+                    && candidate.base_uri() == relationship.base_uri()
+                    && candidate.source_uri() == relationship.source_uri()
+            })
+        })
+}
+
 #[derive(Debug)]
 pub(crate) struct Inner {
     pub(super) package: OpcPackage,
@@ -411,6 +431,10 @@ pub(crate) struct Inner {
     pub(super) pivot_caches: Box<[raw::PivotCache]>,
     pub(super) external_reference_ids: Box<[String]>,
     pub(super) page_break_cache: Arc<PageBreakProjectionCache>,
+    /// Weighted clean-value cache of the parsed format table, shared by the
+    /// lineage's descendant snapshots and keyed by the styles payload
+    /// allocation.
+    pub(super) format_cache: Arc<FormatCache>,
     /// Repairs made while the workbook catalog was parsed at open time.
     pub(super) tolerance: ToleranceReport,
     /// The opt-in repairs this workbook was opened with; snapshots derived
@@ -701,6 +725,12 @@ impl Workbook {
             |source| Arc::clone(&source.inner.page_break_cache),
         );
         let source_page_break_caches = page_break_caches(source);
+        // A descendant reuses the lineage's cache; its allocation key keeps a
+        // rewritten styles payload from reusing an earlier table.
+        let format_cache = source.map_or_else(
+            || Arc::new(FormatCache::new()),
+            |source| Arc::clone(&source.inner.format_cache),
+        );
         let sheets = catalog
             .sheets
             .into_iter()
@@ -767,6 +797,7 @@ impl Workbook {
                 pivot_caches: catalog.pivot_caches.into_boxed_slice(),
                 external_reference_ids: catalog.external_reference_ids.into_boxed_slice(),
                 page_break_cache: lineage_page_break_cache,
+                format_cache,
                 tolerance,
                 leniency,
             }),
@@ -868,6 +899,101 @@ impl Workbook {
         self.inner.sheets.is_empty()
     }
 
+    /// Compare two snapshots' native OPC content without serializing either
+    /// workbook.
+    ///
+    /// The comparison walks the package relationship graph and compares every
+    /// accepted part's content type, payload bytes, and relationships.  It is
+    /// therefore suitable for deciding whether a sequence of immutable edits
+    /// returned to its original state (for example `A -> B -> A`) is a logical
+    /// no-op.  Derived workbook caches and parser tolerance reports are not
+    /// package content and are intentionally excluded.
+    ///
+    /// # Errors
+    ///
+    /// Returns the native package error when a deferred payload cannot be
+    /// decoded. Packages containing caller-defined OPC part implementations,
+    /// or separately opened opaque non-part ZIP members, return an explicit
+    /// unsupported error because their behavior or bytes cannot be proved
+    /// through the typed OPC graph.
+    pub fn same_content(&self, other: &Self) -> Result<bool> {
+        if Arc::ptr_eq(&self.inner, &other.inner) {
+            return Ok(true);
+        }
+
+        // An equal authorized exact source digest is stronger than the
+        // semantic walk below: it includes the complete archive, including
+        // ZIP members which the OPC graph does not expose. A differing digest
+        // is not enough to prove different logical content because ZIP
+        // framing, member order, and archive comments may vary.
+        if let (Some(left), Some(right)) = (
+            self.inner.package.exact_source_sha256(),
+            other.inner.package.exact_source_sha256(),
+        ) {
+            if left == right {
+                return Ok(true);
+            }
+        }
+
+        let left_package = &self.inner.package;
+        let right_package = &other.inner.package;
+
+        // A custom Part can carry behavior that is not represented by its
+        // public byte/relationship view. Equality of that view would not be
+        // a proof of equality of the package we publish.
+        if !left_package.holds_only_built_in_parts() || !right_package.holds_only_built_in_parts() {
+            return Err(Error::Unsupported {
+                feature: "content comparison of custom OPC parts",
+            });
+        }
+
+        // Non-part members are deliberately kept opaque by litchi-opc. A
+        // difference in their names/reasons proves inequality. Descendants
+        // of one immutable source archive retain a shared-owner proof for
+        // their bytes; separately opened archives need an explicit refusal
+        // because their non-part payloads are outside the typed graph.
+        if left_package.non_part_members() != right_package.non_part_members() {
+            return Ok(false);
+        }
+        if !left_package.non_part_members().is_empty()
+            && !left_package.shares_source_archive(right_package)
+        {
+            return Err(Error::Unsupported {
+                feature: "content comparison of opaque OPC members",
+            });
+        }
+
+        if left_package.part_count() != right_package.part_count()
+            || !same_relationships(left_package.rels(), right_package.rels())
+        {
+            return Ok(false);
+        }
+
+        for metadata in left_package.iter_parts() {
+            let left = left_package.get_part(metadata.partname())?;
+            let right = match right_package.get_part(metadata.partname()) {
+                Ok(part) => part,
+                Err(litchi_opc::OpcError::PartNotFound(_)) => return Ok(false),
+                Err(error) => return Err(error.into()),
+            };
+            if right.partname() != metadata.partname()
+                || right.content_type() != metadata.content_type()
+                || right.blob() != left.blob()
+                || !same_relationships(metadata.rels(), right.rels())
+            {
+                return Ok(false);
+            }
+        }
+
+        // Content types and relationship members are package-level
+        // publication manifests rather than ordinary OPC parts. Their
+        // modeled fields were covered above; retained source bytes are the
+        // remaining proof against producer extensions and skipped markup.
+        left_package
+            .same_retained_publication_manifests(right_package)
+            .map_err(Into::into)
+    }
+
     /// Iterate lightweight sheet handles in workbook order.
     #[must_use]
     pub fn sheets(&self) -> impl ExactSizeIterator<Item = Worksheet> + DoubleEndedIterator + '_ {
@@ -922,6 +1048,31 @@ impl Workbook {
     #[must_use]
     pub fn defined_names(&self) -> &[raw::DefinedName] {
         &self.inner.defined_names
+    }
+
+    /// The worksheet table whose display name, or failing that whose name,
+    /// equals `name` without regard to case, with the worksheet that owns it.
+    ///
+    /// Every worksheet is checked for ambiguous matches. A name match is
+    /// used only when no worksheet has a display-name match. Worksheets are
+    /// searched in workbook order and non-cell sheets are skipped.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Worksheet::tables`] on each worksheet searched, or
+    /// [`Error::Ambiguous`] when multiple names match.
+    pub fn table(&self, name: &str) -> Result<Option<(Worksheet, worksheet::TablePart)>> {
+        worksheet::find_workbook_table(
+            self.sheets(),
+            |sheet| {
+                if sheet.kind() == WorksheetKind::Worksheet {
+                    sheet.tables().map(Some)
+                } else {
+                    Ok(None)
+                }
+            },
+            name,
+        )
     }
 
     /// Low-level workbook pivot-cache references.
@@ -1150,6 +1301,17 @@ impl Workbook {
     pub fn styles(&self) -> Result<Styles> {
         let len = self.inner.style_count()?;
         Ok(Styles::new(Arc::clone(&self.inner), len))
+    }
+
+    /// Release the parsed format table retained for [`Style::format`],
+    /// unless an active [`crate::style::Format`] still uses it, and return
+    /// whether a table was released.
+    ///
+    /// The table is a clean cached value: releasing it changes no result, and
+    /// the next formatting read parses the styles part again. Snapshots
+    /// derived from this workbook by edits share the same cache.
+    pub fn release_cached_formats(&self) -> bool {
+        self.inner.format_cache.trim_clean()
     }
 
     /// Serialize the immutable package snapshot to bytes.
@@ -1616,6 +1778,20 @@ impl Worksheet {
         worksheet::tables(self)
     }
 
+    /// The table whose display name, or failing that whose name, equals
+    /// `name` without regard to case.
+    ///
+    /// Display names are unique in a workbook, and table names within a
+    /// sheet, both compared without regard to case, so a well-formed
+    /// package has at most one match.
+    ///
+    /// # Errors
+    ///
+    /// As for [`Self::tables`], or [`Error::Ambiguous`] when multiple names match.
+    pub fn table(&self, name: &str) -> Result<Option<worksheet::TablePart>> {
+        worksheet::find_table(self.tables()?, name)
+    }
+
     /// Load and validate every query-table part owned by this worksheet.
     pub fn query_tables(&self) -> Result<Vec<crate::query_table::Part>> {
         worksheet::query_tables(self)
@@ -1854,6 +2030,23 @@ impl Inner {
 
     pub(crate) fn style_count(&self) -> Result<u32> {
         Ok(self.style_catalog()?.map_or(0, raw::styles::Catalog::len))
+    }
+
+    /// Readable formatting of shared cell format `key`, read through the
+    /// lineage's format-table cache.
+    pub(crate) fn format(&self, key: u32) -> Result<Format> {
+        let uri = self
+            .styles_uri
+            .as_ref()
+            .ok_or_else(|| invalid("workbook has no styles part"))?;
+        let payload = self.package.get_part(uri)?.blob_arc();
+        let limits = self.package.read_limits();
+        let table = self
+            .format_cache
+            .get_or_build(FormatKey::allocation(&payload), || {
+                FormatTable::parse_with_limits(&payload, limits)
+            })?;
+        Format::new(table, key)
     }
 
     fn require_style(&self, key: u32) -> Result<()> {

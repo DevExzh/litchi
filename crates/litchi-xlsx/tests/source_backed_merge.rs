@@ -242,6 +242,38 @@ fn ordinary_sheet() -> String {
     )
 }
 
+fn table_fixture(with_existing_merge: bool) -> Vec<u8> {
+    let merge_cells = if with_existing_merge {
+        r#"<mergeCells count="1"><mergeCell ref="B2:C3"/></mergeCells>"#
+    } else {
+        ""
+    };
+    let sheet = format!(r#"<worksheet xmlns="{SML}"><sheetData/>{merge_cells}</worksheet>"#);
+    let mut package = OpcPackage::from_bytes(&fixture(&sheet)).unwrap();
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            PackURI::new("/xl/tables/table1.xml").unwrap(),
+            ct::SML_TABLE.to_owned(),
+            format!(
+                r#"<table xmlns="{SML}" id="1" name="Table1" displayName="Table1" ref="B2:C3"><tableColumns count="2"><tableColumn id="1" name="One"/><tableColumn id="2" name="Two"/></tableColumns></table>"#
+            )
+            .into_bytes(),
+        )))
+        .unwrap();
+    package
+        .get_part_mut(&PackURI::new(SHEET).unwrap())
+        .unwrap()
+        .rels_mut()
+        .try_add_relationship(
+            rt::TABLE.to_owned(),
+            "../tables/table1.xml".to_owned(),
+            "rIdTable".to_owned(),
+            TargetMode::Internal,
+        )
+        .unwrap();
+    PackageWriter::to_bytes(&package).unwrap()
+}
+
 fn part_bytes(bytes: &[u8], name: &str) -> Vec<u8> {
     OpcPackage::from_bytes(bytes)
         .unwrap()
@@ -640,6 +672,38 @@ fn source_merge_refuses_array_data_table_and_shared_formula_groups() {
             })
         ));
     }
+}
+
+#[test]
+fn source_merge_addition_refuses_typed_table_overlap() {
+    let source = Arc::new(VersionedSource::new(table_fixture(false)));
+    let editor = SourceBackedMergeEditor::from_read_at(source).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap().unwrap();
+    edit.merge("A1:B2").unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::MergeEditBlocked {
+            range,
+            reason: MergeEditBlock::TableOverlap { table },
+            ..
+        }) if range == rect("A1:B2") && table == rect("B2:C3")
+    ));
+}
+
+#[test]
+fn source_exact_existing_merge_remains_a_noop_inside_a_table() {
+    let source_bytes = table_fixture(true);
+    let source = Arc::new(VersionedSource::new(source_bytes.clone()));
+    let editor = SourceBackedMergeEditor::from_read_at(source).unwrap();
+    let mut edit = editor.edit("Sheet1").unwrap().unwrap();
+    edit.merge("B2:C3").unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.changed());
+    let mut output = Vec::new();
+    editor
+        .publish_commit_to_stream(&mut output, &commit)
+        .unwrap();
+    assert_eq!(output, source_bytes);
 }
 
 #[test]
