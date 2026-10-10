@@ -154,16 +154,10 @@ pub enum SlideRemovalRefusal {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum SlideOrderRefusal {
-    /// No positional move was staged before commit.
-    NoMove,
-    /// More than one positional move was requested from one snapshot.
-    MultipleMoves,
     /// Markup-compatibility input would require choosing or rewriting a branch.
     MarkupCompatibility,
     /// PowerPoint section metadata would retain the old slide positions.
     Sections,
-    /// Custom-show metadata could not be retained as stable relationship selections.
-    CustomShows,
     /// The presentation view-properties part owns positional state.
     ViewProperties,
     /// The presentation-properties part owns positional state.
@@ -214,11 +208,8 @@ impl std::fmt::Display for SlideRemovalRefusal {
 impl std::fmt::Display for SlideOrderRefusal {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter.write_str(match self {
-            Self::NoMove => "no slide-order move",
-            Self::MultipleMoves => "multiple slide-order moves",
             Self::MarkupCompatibility => "markup-compatibility surface",
             Self::Sections => "presentation sections",
-            Self::CustomShows => "custom shows",
             Self::ViewProperties => "presentation view properties",
             Self::PresentationProperties => "presentation properties",
             Self::PositionalOwner => "positional semantic owner",
@@ -373,6 +364,19 @@ pub enum Error {
         /// Selector spelling supplied by the caller.
         name: String,
         /// Number of matching slides.
+        matches: usize,
+    },
+
+    /// No registered slide layout has the requested exact name.
+    #[error("slide layout name '{0}' was not found")]
+    SlideLayoutNameNotFound(String),
+
+    /// Multiple registered slide layouts have the requested exact name.
+    #[error("slide layout name '{name}' is ambiguous ({matches} matches)")]
+    AmbiguousSlideLayoutName {
+        /// Selector spelling supplied by the caller.
+        name: String,
+        /// Number of matching layouts.
         matches: usize,
     },
 

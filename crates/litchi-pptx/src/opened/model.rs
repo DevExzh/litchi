@@ -12,8 +12,12 @@ use crate::notes::SlideRootMemo;
 use crate::parts::{MceCapture, PresentationPart, RetainedMce};
 use crate::{Error, Result};
 
-/// Maximum selector/value pairs in one atomic same-slide text batch.
+/// Maximum selector/value pairs in one same-slide text input chunk.
 pub const MAX_SHAPE_TEXT_REPLACEMENTS: usize = 256;
+
+/// Maximum selector/property pairs accepted by one same-slide shape-property
+/// input chunk.
+pub const MAX_SHAPE_PROPERTIES_REPLACEMENTS: usize = MAX_SHAPE_TEXT_REPLACEMENTS;
 
 /// One borrowed selector/value pair in an atomic same-slide text batch.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -51,6 +55,76 @@ impl<'a> ShapeTextReplacement<'a> {
     #[must_use]
     pub const fn text(self) -> &'a str {
         self.text
+    }
+}
+
+/// One borrowed positional shape-property update in an atomic same-slide
+/// batch.
+///
+/// The update may carry visible text, complete local transform bounds, or
+/// both.  The selector is a zero-based depth-first shape position captured
+/// against one immutable scene; it is resolved for the whole batch before any
+/// bytes are staged.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub struct ShapePropertiesReplacement<'a> {
+    position: litchi_core::Position,
+    text: Option<&'a str>,
+    bounds: Option<(i64, i64, i64, i64)>,
+}
+
+impl fmt::Debug for ShapePropertiesReplacement<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("ShapePropertiesReplacement")
+            .field("position", &self.position)
+            .field("has_text", &self.text.is_some())
+            .field("has_bounds", &self.bounds.is_some())
+            .finish()
+    }
+}
+
+impl<'a> ShapePropertiesReplacement<'a> {
+    /// Start a property update for one checked depth-first shape position.
+    #[must_use]
+    pub const fn new(position: litchi_core::Position) -> Self {
+        Self {
+            position,
+            text: None,
+            bounds: None,
+        }
+    }
+
+    /// Supply a replacement for the shape's visible text body.
+    #[must_use]
+    pub const fn with_text(mut self, text: &'a str) -> Self {
+        self.text = Some(text);
+        self
+    }
+
+    /// Supply complete local transform bounds `(x, y, width, height)` in
+    /// English Metric Units.
+    #[must_use]
+    pub const fn with_bounds(mut self, bounds: (i64, i64, i64, i64)) -> Self {
+        self.bounds = Some(bounds);
+        self
+    }
+
+    /// Checked zero-based depth-first shape position selected by this update.
+    #[must_use]
+    pub const fn position(self) -> litchi_core::Position {
+        self.position
+    }
+
+    /// Replacement visible text, when supplied.
+    #[must_use]
+    pub const fn text(self) -> Option<&'a str> {
+        self.text
+    }
+
+    /// Replacement complete local transform bounds, when supplied.
+    #[must_use]
+    pub const fn bounds(self) -> Option<(i64, i64, i64, i64)> {
+        self.bounds
     }
 }
 
@@ -201,7 +275,7 @@ impl Default for Limits {
 }
 
 /// Stable identity of one slide in current presentation order.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Slide {
     pub(crate) id: u32,
     pub(crate) relationship_id: String,
@@ -258,7 +332,7 @@ impl SlideNameIndex {
         Ok(Self { by_name })
     }
 
-    pub(crate) fn resolve(&self, slides: &[Slide], name: &str) -> Result<Slide> {
+    pub(crate) fn position(&self, name: &str) -> Result<usize> {
         let Some(matched) = self.by_name.get(name) else {
             return Err(Error::SlideNameNotFound(name.to_owned()));
         };
@@ -268,10 +342,20 @@ impl SlideNameIndex {
                 matches: matched.count,
             });
         }
+        Ok(matched.first)
+    }
+
+    pub(crate) fn resolve(&self, slides: &[Slide], name: &str) -> Result<Slide> {
         slides
-            .get(matched.first)
+            .get(self.position(name)?)
             .cloned()
             .ok_or_else(|| invalid("opened-presentation slide name index lost its position"))
+    }
+}
+
+impl fmt::Debug for Slide {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Slide").finish_non_exhaustive()
     }
 }
 
@@ -298,6 +382,7 @@ impl Slide {
 /// Immutable root snapshot for an opened presentation.
 #[derive(Clone)]
 pub struct Snapshot {
+    pub(crate) owner_state: Arc<crate::package::OpenedOwnerState>,
     pub(crate) package: Arc<OpcPackage>,
     pub(crate) presentation_name: PackURI,
     pub(crate) slides: Vec<Slide>,
@@ -522,9 +607,7 @@ impl fmt::Debug for Snapshot {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Snapshot")
-            .field("presentation_name", &self.presentation_name)
-            .field("slides", &self.slides)
-            .field("revision", &self.revision)
+            .field("slide_count", &self.slides.len())
             .field("limits", &self.limits)
             .field("retained_mce_bytes", &self.retained_mce_bytes())
             .finish_non_exhaustive()
@@ -546,8 +629,8 @@ impl Snapshot {
 
     /// Start one detached atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> super::Transaction {
-        super::Transaction::new(self.clone())
+    pub fn edit(&self) -> super::Edit {
+        super::Edit::new(self.clone())
     }
 
     /// Rebind this snapshot's validated state onto a package that carries
@@ -630,9 +713,10 @@ impl Snapshot {
         self.limits
     }
 
-    pub(crate) fn resolve_slide(&self, key: crate::slide::Key<'_>) -> Result<Slide> {
+    pub(crate) fn resolve_slide(&self, key: crate::slide::Selector<'_>) -> Result<Slide> {
         match key {
-            crate::slide::Key::Index(index) => {
+            crate::slide::Selector::Position(position) => {
+                let index = position.get();
                 self.slides
                     .get(index)
                     .cloned()
@@ -641,7 +725,9 @@ impl Snapshot {
                         len: self.slides.len(),
                     })
             },
-            crate::slide::Key::Name(name) => self.slide_name_index.resolve(&self.slides, name),
+            crate::slide::Selector::Name(name) => {
+                self.slide_name_index.resolve(&self.slides, &name)
+            },
         }
     }
 }
@@ -863,6 +949,7 @@ fn capture_internal(
     )?);
     drop(slide_root_proofs);
     Ok(Snapshot {
+        owner_state: Arc::default(),
         package: owned,
         presentation_name,
         slides,
@@ -1088,8 +1175,8 @@ pub(crate) fn package_fingerprint_v1(package: &OpcPackage) -> Result<[u8; 32]> {
 /// content rather than by digest. A `false` result proves nothing at all, so
 /// every caller falls back to the ordinary capture.
 ///
-/// Payload comparison short-circuits on `Arc` pointer identity, which the
-/// opened-transaction path preserves for every part an edit did not rewrite.
+/// Payload comparison short-circuits on visible slice identity. Foreign
+/// shared-owner methods cannot vouch for bytes they do not actually expose.
 pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
     if left.part_count() != right.part_count()
         || !relationships_equal(left.rels(), right.rels())
@@ -1118,11 +1205,13 @@ pub(crate) fn packages_equal(left: &OpcPackage, right: &OpcPackage) -> bool {
     })
 }
 
-fn blobs_equal(left: &dyn litchi_opc::Part, right: &dyn litchi_opc::Part) -> bool {
-    Arc::ptr_eq(&left.blob_arc(), &right.blob_arc()) || left.blob() == right.blob()
+pub(super) fn blobs_equal(left: &dyn litchi_opc::Part, right: &dyn litchi_opc::Part) -> bool {
+    let left = left.blob();
+    let right = right.blob();
+    std::ptr::eq(left, right) || left == right
 }
 
-fn relationships_equal(
+pub(super) fn relationships_equal(
     left: &litchi_opc::Relationships,
     right: &litchi_opc::Relationships,
 ) -> bool {

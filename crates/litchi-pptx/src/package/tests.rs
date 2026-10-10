@@ -48,15 +48,16 @@ fn task_panes() -> Panes {
 
 #[test]
 fn new_writer_round_trips_the_bounded_slide_graph() {
-    let mut package = Package::new().expect("new package");
+    let mut builder = crate::builder::Builder::new().expect("new package");
     {
-        let presentation = package.presentation_mut().expect("mutable presentation");
+        let presentation = builder.presentation().expect("mutable presentation");
         let slide = presentation.add_slide().expect("slide");
         slide.set_title("Canonical owner");
         slide.add_text_box("Hello & goodbye", 914_400, 914_400, 2_743_200, 914_400);
         presentation.set_widescreen_slide_size();
     }
 
+    let mut package = builder.build().expect("new package");
     let bytes = package.to_bytes().expect("serialize package");
     let reopened = Package::from_bytes(&bytes).expect("reopen package");
     let presentation = reopened.presentation().expect("presentation");
@@ -79,16 +80,27 @@ fn new_writer_round_trips_the_bounded_slide_graph() {
 }
 
 #[test]
-fn opened_package_refuses_unsafe_mutable_hydration() {
+fn fresh_and_opened_packages_have_canonical_edit_roots() {
     let mut package = Package::new().expect("new package");
+    assert!(package.mutable_pres.is_none());
+    assert!(
+        package
+            .edit()
+            .expect("edit")
+            .commit()
+            .expect("commit")
+            .patch()
+            .is_noop()
+    );
     let bytes = package.to_bytes().expect("serialize package");
-    let mut opened = Package::from_bytes(&bytes).expect("reopen package");
-    assert!(opened.presentation_mut().is_err());
+    let opened = Package::from_bytes(&bytes).expect("reopen package");
+    assert!(opened.mutable_pres.is_none());
+    assert!(package.same_content(&opened).expect("same content"));
 }
 
 #[test]
-fn failed_typed_edit_restores_pending_presentation_state() {
-    let mut package = Package::new().expect("new package");
+fn failed_internal_edit_restores_builder_authoring_state() {
+    let mut package = Package::new_authoring().expect("new package");
     let presentation_part = PackURI::new("/ppt/presentation.xml").expect("part URI");
     let before = package
         .opc
@@ -98,7 +110,9 @@ fn failed_typed_edit_restores_pending_presentation_state() {
         .to_vec();
 
     {
-        let presentation = package.presentation_mut().expect("mutable presentation");
+        let presentation = package
+            .authoring_presentation()
+            .expect("mutable presentation");
         presentation
             .add_slide()
             .expect("pending slide")

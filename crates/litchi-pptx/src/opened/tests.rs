@@ -526,10 +526,9 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
 -> Result<()> {
     let slide = PackURI::new("/ppt/slides/slide1.xml").map_err(Error::Invalid)?;
 
-    // root_conformance retries both dialects and intentionally maps both
-    // scan_xml limit failures to the generic root refusal. The raw payload is
-    // still below the broader PresentationML-part ceiling, so capture reaches
-    // this notes-stage result.
+    // Root classification preserves the typed byte-limit refusal across
+    // dialect retries. The raw payload is still below the broader
+    // PresentationML-part ceiling, so capture reaches this notes-stage check.
     let mut notes_limited = opened_two_slide_package()?;
     pad_part_blob(&mut notes_limited, &slide, crate::notes::MAX_SLIDE_XML + 1)?;
     let error = notes_limited
@@ -537,7 +536,10 @@ fn notes_capture_matrix_keeps_the_16m_notes_root_limit_distinct_from_the_64m_par
         .expect_err("the 16 MiB slide root limit must refuse capture");
     assert!(matches!(
         error,
-        Error::Invalid(message) if message == "invalid sld root or namespace"
+        Error::Limit {
+            resource: "notes XML bytes",
+            limit: crate::notes::MAX_SLIDE_XML,
+        }
     ));
     assert_capture_matches_legacy(&notes_limited)?;
 
@@ -631,9 +633,9 @@ fn capture_projection_preserves_relationship_and_part_identity_error_order() -> 
 }
 
 fn opened_two_slide_package() -> Result<Package> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         let first = presentation.add_slide()?;
         first.set_title("First title");
         first.add_text_box("First body", 10, 20, 300, 400);
@@ -643,16 +645,18 @@ fn opened_two_slide_package() -> Result<Package> {
         second.add_text_box("Second body", 10, 20, 300, 400);
         second.set_notes("Second notes");
     }
+    let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_vec(bytes)
 }
 
 fn opened_plain_slide_package() -> Result<Package> {
-    let mut package = Package::new()?;
-    package
-        .presentation_mut()?
+    let mut builder = crate::builder::Builder::new()?;
+    builder
+        .presentation()?
         .add_slide()?
         .set_title("Copy source");
+    let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_vec(bytes)
 }
@@ -663,11 +667,12 @@ fn borrowed_plain_slide_package() -> Result<Package> {
 }
 
 fn opened_plain_slides_package(count: usize) -> Result<Package> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     for index in 0..count {
         let title = format!("Removal source {index}");
-        package.presentation_mut()?.add_slide()?.set_title(&title);
+        builder.presentation()?.add_slide()?.set_title(&title);
     }
+    let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_vec(bytes)
 }
@@ -682,7 +687,7 @@ fn opened_slide_name_index_preserves_identity_after_reorder() -> Result<()> {
     let first_part = snapshot.slides()[0].part_name().clone();
 
     let mut edit = snapshot.edit();
-    edit.move_slide(0, 2)?;
+    edit.move_slide(0, litchi_core::Position::new(2))?;
     assert!(edit.set_shape_text("first", 0usize, "indexed")?);
     let committed = edit.commit()?;
     let first_xml = committed.snapshot().package.get_part(&first_part)?.blob();
@@ -704,6 +709,21 @@ fn opened_slide_name_index_preserves_ambiguity() -> Result<()> {
         snapshot.plan_slide_removal("same"),
         Err(Error::AmbiguousSlideName { matches: 2, .. })
     ));
+    let mut edit = snapshot.edit();
+    assert!(matches!(
+        edit.move_slide("same", litchi_core::Position::new(0)),
+        Err(Error::AmbiguousSlideName { matches: 2, .. })
+    ));
+    assert!(matches!(
+        edit.swap_slides(0usize, "same"),
+        Err(Error::AmbiguousSlideName { matches: 2, .. })
+    ));
+    assert!(matches!(
+        edit.reorder_slides(&["same".into(), 1usize.into()]),
+        Err(Error::AmbiguousSlideName { matches: 2, .. })
+    ));
+    assert!(edit.swap_slides(litchi_core::Position::new(0), litchi_core::Position::new(1))?);
+    assert_eq!(edit.slides()[0].id(), snapshot.slides()[1].id());
     Ok(())
 }
 
@@ -714,11 +734,12 @@ fn borrowed_plain_slides_package(count: usize) -> Result<Package> {
 
 #[test]
 fn cross_slide_copy_is_source_exact_reversible_and_reopens() -> Result<()> {
-    let mut authored_source = Package::new()?;
-    authored_source
-        .presentation_mut()?
+    let mut builder = crate::builder::Builder::new()?;
+    builder
+        .presentation()?
         .add_slide()?
         .set_title("cross-source");
+    let mut authored_source = builder.build()?;
     let mut source = Package::from_bytes(&authored_source.to_bytes()?)?;
     rename_slide(&mut source, 0, "cross-source")?;
     let source_bytes = source.to_bytes()?;
@@ -801,11 +822,9 @@ fn opened_transaction_does_not_upgrade_borrowed_physical_provenance() -> Result<
 
 #[test]
 fn cross_slide_copy_refuses_slide_name_and_unknown_physical_collisions() -> Result<()> {
-    let mut authored_source = Package::new()?;
-    authored_source
-        .presentation_mut()?
-        .add_slide()?
-        .set_title("same-name");
+    let mut builder = crate::builder::Builder::new()?;
+    builder.presentation()?.add_slide()?.set_title("same-name");
+    let mut authored_source = builder.build()?;
     let mut source = Package::from_bytes(&authored_source.to_bytes()?)?;
     rename_slide(&mut source, 0, "same-name")?;
     attach_copy_ole(&mut source)?;
@@ -2614,7 +2633,7 @@ fn slide_copy_plan_applies_atomically_rewrites_ownership_and_reopens() -> Result
     let reopened_root = reopened.opened_presentation()?;
     assert_eq!(reopened_root.slides().len(), 2);
     assert_eq!(reopened_root.slides()[1].part_name(), &copied_slide);
-    reopened.apply_opened_presentation_patch(&durable_inverse)?;
+    reopened = reopened.apply(&durable_inverse)?;
     assert_eq!(part_states(&reopened), before);
     assert_eq!(reopened.to_bytes()?, source_bytes);
     Ok(())
@@ -3260,9 +3279,15 @@ fn slide_removal_plan_refuses_policy_surfaces_bounds_and_stale_graphs() -> Resul
     let owner = PackURI::new("/ppt/customXml/forged-owner.bin").map_err(Error::Invalid)?;
     let mut forged_target = opened_plain_slides_package(2)?;
     add_inbound_slide_owner(&mut forged_target, &selected, &owner)?;
-    let target_revision = forged_target
-        .apply_opened_presentation_patch(&inner)?
-        .revision();
+    // The general patch now rejects surviving incoming owners too. Build the
+    // malicious target directly so the wrapper's forged-revision defense is
+    // still tested independently of that strengthened publication guard.
+    let before_generic = part_states(&forged_target);
+    assert!(forged_target.apply(&inner).is_err());
+    assert_eq!(part_states(&forged_target), before_generic);
+    let mut forged_target = template.apply(&inner)?;
+    add_inbound_slide_owner(&mut forged_target, &selected, &owner)?;
+    let target_revision = forged_target.opened_presentation()?.revision();
     let mut forged_source = opened_plain_slides_package(2)?;
     add_inbound_slide_owner(&mut forged_source, &selected, &owner)?;
     let source_revision = forged_source.opened_presentation()?.revision();
@@ -3330,7 +3355,7 @@ fn composes_order_shape_and_notes_in_one_durable_inverse_commit() -> Result<()> 
     let source_revision = source.revision();
     let before = part_states(&package);
     let mut edit = source.edit();
-    assert!(edit.move_slide(0, 1)?);
+    assert!(edit.move_slide(0, litchi_core::Position::new(1))?);
     assert!(edit.set_shape_text(0_usize, 0_usize, "Edited <second> & title")?);
     assert!(edit.set_notes_text(0_usize, "Edited & second notes")?);
     let commit = edit.commit()?;
@@ -3344,7 +3369,8 @@ fn composes_order_shape_and_notes_in_one_durable_inverse_commit() -> Result<()> 
         .map(|name| name.as_str().to_owned())
         .collect();
 
-    let published = package.apply_opened_presentation_patch(&decoded)?;
+    package = package.apply(&decoded)?;
+    let published = package.opened_presentation()?;
     assert_eq!(published.slides()[0].name(), "Slide 257");
     let presentation = package.presentation()?;
     assert_eq!(
@@ -3371,7 +3397,8 @@ fn composes_order_shape_and_notes_in_one_durable_inverse_commit() -> Result<()> 
     let bytes = package.to_bytes()?;
     let mut reopened = Package::from_bytes(&bytes)?;
     assert_eq!(reopened.opened_presentation()?.slides()[0].id(), 257);
-    let restored = reopened.apply_opened_presentation_patch(&inverse)?;
+    reopened = reopened.apply(&inverse)?;
+    let restored = reopened.opened_presentation()?;
     assert_eq!(restored.revision(), source_revision);
     assert_eq!(part_states(&reopened), before);
     Ok(())
@@ -3393,7 +3420,7 @@ fn atomic_shape_text_batch_composes_in_one_opened_transaction() -> Result<()> {
         2
     );
     let commit = edit.commit()?;
-    package.apply_opened_presentation_patch(commit.patch())?;
+    package = package.apply(commit.patch())?;
     let slide = package
         .presentation()?
         .slide(0)?
@@ -3419,7 +3446,7 @@ fn disjoint_patches_join_and_same_part_edits_conflict() -> Result<()> {
     assert!(!shape_patch.conflicts_with(&notes_patch));
     let joined = shape_patch.join(&notes_patch)?;
     assert_eq!(joined.resource_count(), 2);
-    package.apply_opened_presentation_patch(&joined)?;
+    package = package.apply(&joined)?;
     assert!(
         package
             .presentation()?
@@ -3453,7 +3480,7 @@ fn stale_and_unsupported_raw_xml_fail_before_publication() -> Result<()> {
         .opc
         .get_part_mut(&slide_name)?
         .set_blob(changed.clone());
-    assert!(package.apply_opened_presentation_patch(&patch).is_err());
+    assert!(package.apply(&patch).is_err());
     assert_eq!(package.opc.get_part(&slide_name)?.blob(), changed);
 
     let mut package = opened_two_slide_package()?;
@@ -3486,7 +3513,7 @@ fn stale_and_unsupported_raw_xml_fail_before_publication() -> Result<()> {
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
     assert!(edit.set_shape_text(0_usize, 0_usize, "rejected").is_err());
-    assert!(!edit.is_changed());
+    assert!(!edit.clone().commit()?.diagnostics().changed());
     Ok(())
 }
 
@@ -3547,11 +3574,11 @@ fn real_powerpoint_fixture_round_trips_an_exact_no_op() -> Result<()> {
         })
         .ok_or_else(|| Error::Invalid("fixture slide has no text shape".into()))?;
     let mut edit = source.edit();
-    assert!(!edit.move_slide(0, 0)?);
+    assert!(!edit.move_slide(0, litchi_core::Position::new(0))?);
     assert!(!edit.set_shape_text(0_usize, shape_position, &original_text)?);
     let patch = Patch::from_bytes(&edit.commit()?.into_patch().to_bytes()?)?;
-    assert!(patch.is_empty());
-    package.apply_opened_presentation_patch(&patch)?;
+    assert!(patch.is_noop());
+    package = package.apply(&patch)?;
     let saved = package.to_bytes()?;
     let reopened = Package::from_bytes(&saved)?;
     assert_eq!(
@@ -3575,7 +3602,7 @@ fn one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen() -> Re
     )?)?;
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
-    edit.move_slide(0, 1)?;
+    edit.move_slide(0, litchi_core::Position::new(1))?;
     edit.set_shape_text(0_usize, 0_usize, "Complex transaction title")?;
     edit.set_notes_text(0_usize, "Complex transaction notes")?;
     assert!(edit.put_table_styles(styles)?);
@@ -3648,7 +3675,7 @@ fn one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen() -> Re
     assert!(commit.patch().resource_count() >= 10);
     let durable = Patch::from_bytes(&commit.patch().to_bytes()?)?;
     let inverse = durable.inverse();
-    package.apply_opened_presentation_patch(&durable)?;
+    package = package.apply(&durable)?;
     let bytes = package.to_bytes()?;
     let mut reopened = Package::from_bytes(&bytes)?;
 
@@ -3682,7 +3709,7 @@ fn one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen() -> Re
     );
     crate::master_layout::validate_master_layout_graph(&reopened.opc)?;
 
-    reopened.apply_opened_presentation_patch(&inverse)?;
+    reopened = reopened.apply(&inverse)?;
     assert_eq!(part_states(&reopened), before);
     Ok(())
 }
@@ -3709,7 +3736,7 @@ fn three_way_plan_is_immutable_and_history_supports_redo() -> Result<()> {
     let selected = plan.resolve(0, Resolution::Right)?;
     assert_eq!(plan.unresolved_count(), 1);
     let merged = selected.finish()?;
-    package.apply_opened_presentation_patch(&merged)?;
+    package = package.apply(&merged)?;
     assert!(
         package
             .presentation()?
@@ -3732,11 +3759,16 @@ fn three_way_plan_is_immutable_and_history_supports_redo() -> Result<()> {
         .pop_undo()
         .ok_or_else(|| Error::Invalid("undo disappeared".into()))?;
     assert_eq!(history.redo_len(), 1);
-    package.apply_opened_presentation_patch(&undo)?;
+    package = package.apply(&undo)?;
     let redo = history
         .pop_redo()
         .ok_or_else(|| Error::Invalid("redo disappeared".into()))?;
-    package.apply_opened_presentation_patch(&redo)?;
+    package = package.apply(&redo)?;
+    assert!(
+        package.presentation()?.slides()?[0]
+            .text()?
+            .contains("Right title")
+    );
     assert_eq!(history.redo_len(), 0);
     Ok(())
 }
@@ -3774,7 +3806,7 @@ fn slide_removal_and_dependency_transfer_are_durable_and_reversible() -> Result<
     )?;
     assert!(!copied_relationship.is_empty());
     let transfer_patch = transfer.commit()?.into_patch();
-    destination.apply_opened_presentation_patch(&transfer_patch)?;
+    destination = destination.apply(&transfer_patch)?;
     let opened = destination.opened_presentation()?;
     let slide = destination.opc.get_part(opened.slides()[0].part_name())?;
     let related = crate::chart::related(&destination.opc, slide)?;
@@ -3792,17 +3824,17 @@ fn slide_removal_and_dependency_transfer_are_durable_and_reversible() -> Result<
                 .contains_part(&relationship.target_partname()?)
         );
     }
-    destination.apply_opened_presentation_patch(&transfer_patch.inverse())?;
+    destination = destination.apply(&transfer_patch.inverse())?;
     assert_eq!(part_states(&destination), destination_before);
 
     let mut removal = destination.opened_presentation()?.edit();
     let removed = removal.remove_slide(1_usize)?;
     let removed_part = removed.part_name().clone();
     let removal_patch = removal.commit()?.into_patch();
-    destination.apply_opened_presentation_patch(&removal_patch)?;
+    destination = destination.apply(&removal_patch)?;
     assert_eq!(destination.opened_presentation()?.slides().len(), 1);
     assert!(!destination.opc.contains_part(&removed_part));
-    destination.apply_opened_presentation_patch(&removal_patch.inverse())?;
+    destination = destination.apply(&removal_patch.inverse())?;
     assert_eq!(part_states(&destination), destination_before);
     Ok(())
 }
@@ -3841,7 +3873,7 @@ fn real_complex_chart_deck_survives_transaction_and_full_reopen() -> Result<()> 
     )?;
     let patch = edit.commit()?.into_patch();
     let inverse = patch.inverse();
-    package.apply_opened_presentation_patch(&patch)?;
+    package = package.apply(&patch)?;
     let saved = package.to_bytes()?;
     let mut reopened = Package::from_bytes(&saved)?;
     let reopened_root = reopened.opened_presentation()?;
@@ -3853,7 +3885,7 @@ fn real_complex_chart_deck_survives_transaction_and_full_reopen() -> Result<()> 
         crate::comments::load_presentation_comments(&reopened.opc)?
             .is_some_and(|comments| comments.slides[0].comments[0].text == "Fixture transaction")
     );
-    reopened.apply_opened_presentation_patch(&inverse)?;
+    reopened = reopened.apply(&inverse)?;
     assert_eq!(part_states(&reopened), before);
     Ok(())
 }
@@ -3991,8 +4023,8 @@ fn general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible(
             .to_bytes()?,
     )?;
     assert!(patch.resource_count() >= 5);
-    package
-        .apply_opened_presentation_patch(&patch)
+    package = package
+        .apply(&patch)
         .map_err(|error| Error::Invalid(format!("apply modern patch: {error}")))?;
     let bytes = package
         .to_bytes()
@@ -4042,12 +4074,12 @@ fn general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible(
     let undo = history
         .pop_undo()
         .ok_or_else(|| Error::Invalid("shape/comment undo disappeared".into()))?;
-    reopened.apply_opened_presentation_patch(&undo)?;
+    reopened = reopened.apply(&undo)?;
     assert_eq!(part_states(&reopened), before);
     let redo = history
         .pop_redo()
         .ok_or_else(|| Error::Invalid("shape/comment redo disappeared".into()))?;
-    reopened.apply_opened_presentation_patch(&redo)?;
+    reopened = reopened.apply(&redo)?;
     assert!(
         crate::modern_comments::load_modern_comment_graph(&reopened.opc)?
             .authors
@@ -4059,11 +4091,11 @@ fn general_shapes_picture_parts_and_modern_extensions_are_atomic_and_reversible(
     assert!(cleanup.remove_modern_comment(1_usize, COMMENT)?);
     assert!(cleanup.remove_modern_comment_author(AUTHOR)?);
     let cleanup = cleanup.commit()?.into_patch();
-    reopened.apply_opened_presentation_patch(&cleanup)?;
+    reopened = reopened.apply(&cleanup)?;
     let empty_graph = crate::modern_comments::load_modern_comment_graph(&reopened.opc)?;
     assert!(empty_graph.authors.is_none());
     assert!(empty_graph.comments.is_empty());
-    reopened.apply_opened_presentation_patch(&cleanup.inverse())?;
+    reopened = reopened.apply(&cleanup.inverse())?;
     assert_eq!(part_states(&reopened), with_modern_graph);
     Ok(())
 }
@@ -4084,7 +4116,7 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
         (100, 100, 900_000, 600_000),
     )?;
     let source_patch = source_edit.commit()?.into_patch();
-    source_package.apply_opened_presentation_patch(&source_patch)?;
+    source_package = source_package.apply(&source_patch)?;
     let source_bytes = source_package.to_bytes()?;
     let source_package = Package::from_bytes(&source_bytes)?;
     let source_root = source_package.opened_presentation()?;
@@ -4103,7 +4135,7 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
     let transferred_id =
         transfer.transfer_shape(&source_root, 0_usize, source_position, 1_usize)?;
     let transfer_patch = transfer.commit()?.into_patch();
-    destination.apply_opened_presentation_patch(&transfer_patch)?;
+    destination = destination.apply(&transfer_patch)?;
     let bytes = destination.to_bytes()?;
     let mut reopened = Package::from_bytes(&bytes)?;
     let opened = reopened.opened_presentation()?;
@@ -4136,10 +4168,10 @@ fn picture_shape_transfer_copies_relationship_closure_and_remaps_identity() -> R
     let mut removal = reopened.opened_presentation()?.edit();
     assert!(removal.remove_shape(1_usize, transferred_name.as_str())?);
     let removal_patch = removal.commit()?.into_patch();
-    reopened.apply_opened_presentation_patch(&removal_patch)?;
+    reopened = reopened.apply(&removal_patch)?;
     assert!(!reopened.opc.contains_part(&image_target));
-    reopened.apply_opened_presentation_patch(&removal_patch.inverse())?;
-    reopened.apply_opened_presentation_patch(&transfer_patch.inverse())?;
+    reopened = reopened.apply(&removal_patch.inverse())?;
+    reopened = reopened.apply(&transfer_patch.inverse())?;
     assert_eq!(part_states(&reopened), before);
     Ok(())
 }
@@ -4163,7 +4195,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
         );
     let _chart_relationship_id = authored_shapes.add_chart(0_usize, &chart)?;
     let authored_patch = authored_shapes.commit()?.into_patch();
-    source_package.apply_opened_presentation_patch(&authored_patch)?;
+    source_package = source_package.apply(&authored_patch)?;
     add_group_connector_transfer_fixture(&mut source_package)?;
     let source_package = Package::from_bytes(&source_package.to_bytes()?)?;
     let source_root = source_package.opened_presentation()?;
@@ -4230,7 +4262,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
             ..
         }
     ));
-    assert!(!refusal.is_changed());
+    assert!(!refusal.clone().commit()?.diagnostics().changed());
     let mut unresolved_refusal = destination_root.edit();
     let unresolved_error = unresolved_refusal
         .transfer_shape(
@@ -4247,7 +4279,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
             ..
         }
     ));
-    assert!(!unresolved_refusal.is_changed());
+    assert!(!unresolved_refusal.clone().commit()?.diagnostics().changed());
     let mut content_refusal = destination_root.edit();
     let content_error = content_refusal
         .transfer_shape(&source_root, 0_usize, content_position, 1_usize)
@@ -4259,11 +4291,12 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
             ..
         }
     ));
-    assert!(!content_refusal.is_changed());
+    assert!(!content_refusal.clone().commit()?.diagnostics().changed());
     let mut frame_refusal = destination_root.edit();
     let frame_error = frame_refusal
         .transfer_shape(&source_root, 0_usize, frame_position, 1_usize)
         .expect_err("unclassified frame transfer must be classified");
+    assert!(!format!("{frame_error} {frame_error:?}").contains("Opaque frame"));
     assert!(matches!(
         frame_error,
         Error::ShapeTransfer {
@@ -4271,7 +4304,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
             ..
         }
     ));
-    assert!(!frame_refusal.is_changed());
+    assert!(!frame_refusal.clone().commit()?.diagnostics().changed());
     let mut nested_refusal = destination_root.edit();
     let nested_error = nested_refusal
         .transfer_shape(&source_root, 0_usize, nested_position, 1_usize)
@@ -4283,7 +4316,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
             ..
         }
     ));
-    assert!(!nested_refusal.is_changed());
+    assert!(!nested_refusal.clone().commit()?.diagnostics().changed());
 
     let mut transfer = destination_root.edit();
     let transferred_external_connector_id =
@@ -4306,7 +4339,7 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
     assert!(!transfer_patch.conflicts_with(&notes_patch));
     let merged = Patch::three_way(&destination_root, &transfer_patch, &notes_patch)?.finish()?;
     let durable = Patch::from_bytes(&merged.to_bytes()?)?;
-    destination.apply_opened_presentation_patch(&durable)?;
+    destination = destination.apply(&durable)?;
 
     let mut reopened = Package::from_bytes(&destination.to_bytes()?)?;
     let opened = reopened.opened_presentation()?;
@@ -4513,12 +4546,12 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
         .pop_undo()
         .ok_or_else(|| Error::Invalid("group transfer undo disappeared".into()))?;
     assert_eq!(undo, durable.inverse());
-    reopened.apply_opened_presentation_patch(&undo)?;
+    reopened = reopened.apply(&undo)?;
     assert_eq!(part_states(&reopened), before);
     let redo = history
         .pop_redo()
         .ok_or_else(|| Error::Invalid("group transfer redo disappeared".into()))?;
-    reopened.apply_opened_presentation_patch(&redo)?;
+    reopened = reopened.apply(&redo)?;
     assert_eq!(part_states(&reopened), after);
     Ok(())
 }
@@ -4538,7 +4571,7 @@ fn disjoint_new_shape_and_modern_comment_changes_merge_automatically() -> Result
     let modern = modern.commit()?.into_patch();
     assert!(!shape.conflicts_with(&modern));
     let merged = Patch::three_way(&base, &shape, &modern)?.finish()?;
-    package.apply_opened_presentation_patch(&merged)?;
+    package = package.apply(&merged)?;
     let reopened = Package::from_bytes(&package.to_bytes()?)?;
     assert!(
         crate::modern_comments::load_modern_comment_graph(&reopened.opc)?
@@ -4611,7 +4644,8 @@ fn changed_commit_refuses_a_signed_package_until_it_is_unsigned() -> Result<()> 
     );
     assert_ne!(committed, source.revision());
 
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
     assert!(!package.opc.is_signed());
     assert_eq!(published.revision(), committed);
     assert_eq!(
@@ -4675,11 +4709,12 @@ fn published_commit_snapshot_equals_a_fresh_capture() -> Result<()> {
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
     assert!(edit.set_shape_text(0_usize, 0_usize, "Published text")?);
-    edit.move_slide(0, 1)?;
+    edit.move_slide(0, litchi_core::Position::new(1))?;
     edit.set_notes_text(0_usize, "Published notes")?;
     let commit = edit.commit()?;
     let committed = commit.snapshot().revision();
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
     let fresh = package.opened_presentation()?;
     assert_eq!(published.revision(), committed);
     assert_snapshot_fields_match(&published, &fresh)?;
@@ -4688,15 +4723,16 @@ fn published_commit_snapshot_equals_a_fresh_capture() -> Result<()> {
     // route and must still agree with a fresh capture.
     let unchanged = package.opened_presentation()?;
     let noop = unchanged.edit().commit()?;
-    assert!(!noop.is_changed());
-    let published = package.apply_opened_presentation_commit(noop)?;
+    assert!(!noop.diagnostics().changed());
+    let published = noop.snapshot().clone();
+    package = noop.into_package();
     let fresh = package.opened_presentation()?;
     assert_snapshot_fields_match(&published, &fresh)?;
     Ok(())
 }
 
 #[test]
-fn commit_publication_captures_a_package_that_drifted_outside_the_write_set() -> Result<()> {
+fn committed_package_is_independent_of_later_source_drift() -> Result<()> {
     let mut package = opened_two_slide_package()?;
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
@@ -4712,13 +4748,15 @@ fn commit_publication_captures_a_package_that_drifted_outside_the_write_set() ->
         b"drift".to_vec(),
     )))?;
 
-    let published = package.apply_opened_presentation_commit(commit)?;
-    assert_ne!(published.revision(), committed);
+    assert!(package.opc.get_part(&drifted).is_ok());
+    let published = commit.snapshot().clone();
+    let package = commit.into_package();
+    assert_eq!(published.revision(), committed);
     assert_eq!(
         published.revision(),
         super::model::package_fingerprint(&package.opc)?
     );
-    assert!(published.package.get_part(&drifted).is_ok());
+    assert!(published.package.get_part(&drifted).is_err());
     let fresh = package.opened_presentation()?;
     assert_snapshot_fields_match(&published, &fresh)?;
     Ok(())
@@ -4742,7 +4780,7 @@ fn stale_write_set_still_refuses_a_committed_publication() -> Result<()> {
     package.opc.get_part_mut(&slide)?.set_blob(changed.clone());
     let before = super::model::package_fingerprint(&package.opc)?;
 
-    assert!(package.apply_opened_presentation_commit(commit).is_err());
+    assert!(package.apply(commit.patch()).is_err());
     assert_eq!(package.opc.get_part(&slide)?.blob(), changed);
     assert_eq!(super::model::package_fingerprint(&package.opc)?, before);
     Ok(())
@@ -5092,7 +5130,8 @@ fn memoized_recapture_equals_a_cold_recapture() -> Result<()> {
     assert_memo_names_only_its_own_package("commit", commit.snapshot());
 
     // The publication rebinds the committed capture onto the facade's package.
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
     assert_eq!(
         published.revision(),
         super::model::package_fingerprint(&package.opc)?
@@ -5103,7 +5142,8 @@ fn memoized_recapture_equals_a_cold_recapture() -> Result<()> {
     // A bare durable-patch replay runs through the facade's retained memo: it
     // holds no snapshot, so without the carry it would hash from cold.
     let inverse = Patch::from_bytes(&forward.inverse().to_bytes()?)?;
-    let replayed = package.apply_opened_presentation_patch(&inverse)?;
+    package = package.apply(&inverse)?;
+    let replayed = package.opened_presentation()?;
     assert_eq!(replayed.revision(), source.revision());
     assert_memo_names_only_its_own_package("replay", &replayed);
     Ok(())
@@ -5390,11 +5430,12 @@ fn a_superseded_slide_removal_patch_is_refused_by_name() -> Result<()> {
 /// superseded magics, `LPCP0002` and `LPCP0003`.
 #[test]
 fn a_superseded_cross_slide_copy_patch_is_refused_by_name() -> Result<()> {
-    let mut authored_source = Package::new()?;
-    authored_source
-        .presentation_mut()?
+    let mut builder = crate::builder::Builder::new()?;
+    builder
+        .presentation()?
         .add_slide()?
         .set_title("cross-source");
+    let mut authored_source = builder.build()?;
     let mut source = Package::from_vec(authored_source.to_bytes()?)?;
     rename_slide(&mut source, 0, "cross-source")?;
     let mut destination = opened_plain_slides_package(2)?;
@@ -5491,7 +5532,7 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
     let mut edit = source.edit();
     edit.set_shape_text(0, crate::shape::Key::Index(0), "facade memo")?;
     let commit = edit.commit()?;
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     assert!(facade_memo_len(&package) > 0, "publication fills the memo");
     assert_facade_memo_names_only_its_own_package("after publication", &package);
 
@@ -5539,11 +5580,12 @@ fn the_facade_memo_never_outlives_the_graph_it_describes() -> Result<()> {
 
     // The cross-copy route into such a destination records the recompressing
     // route and publishes by clone-and-apply, by plan and by durable patch.
-    let mut authored = Package::new()?;
-    authored
-        .presentation_mut()?
+    let mut builder = crate::builder::Builder::new()?;
+    builder
+        .presentation()?
         .add_slide()?
         .set_title("memo-cross-source");
+    let mut authored = builder.build()?;
     let mut source = Package::from_bytes(&authored.to_bytes()?)?;
     rename_slide(&mut source, 0, "memo-cross-source")?;
     let source = Package::from_vec(source.to_bytes()?)?;

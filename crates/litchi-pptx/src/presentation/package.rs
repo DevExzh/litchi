@@ -12,7 +12,7 @@ use std::io::Write;
 
 use crate::notes::SlideRootProof;
 use crate::parts::{MceCapture, PresentationPart, SlideMasterPart, SlidePart, SlideReference};
-use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
+use crate::slide::{Selector, Slide, SlideLayout, SlideMaster};
 use crate::{Error, Result};
 
 use super::Presentation;
@@ -279,11 +279,11 @@ pub(super) fn slide<'a>(
 
 pub(super) fn find_slide<'a>(
     presentation: &Presentation<'a>,
-    key: Key<'_>,
+    key: Selector<'_>,
 ) -> Result<Option<Slide<'a>>> {
     match key {
-        Key::Index(index) => slide(presentation, index),
-        Key::Name(name) => {
+        Selector::Position(position) => slide(presentation, position.get()),
+        Selector::Name(name) => {
             let mut found = None;
             let mut matches = 0usize;
             for slide in slides(presentation)? {

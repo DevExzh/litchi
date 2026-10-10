@@ -13,4 +13,5 @@ pub(crate) mod signature;
 #[cfg(test)]
 mod tests;
 
+pub(crate) use model::OpenedOwnerState;
 pub use model::Package;

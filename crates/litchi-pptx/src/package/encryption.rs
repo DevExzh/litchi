@@ -248,6 +248,53 @@ impl Package {
         Ok(bytes)
     }
 
+    /// Write an immutable opened package encrypted in its retained mode.
+    ///
+    /// The clear ZIP is staged under `limits.max_plaintext_bytes` before the
+    /// native crypto writer runs. The writer receives ciphertext only after
+    /// encryption succeeds.
+    /// This does not change encryption provenance or flush mutable authoring.
+    ///
+    /// # Errors
+    /// Refuses pending authoring state, a stale graph or absent retained mode.
+    /// Crypto policy, allocation and sink failures retain their typed sources.
+    pub fn write_reencrypted(
+        &self,
+        mut writer: impl Write,
+        password: &str,
+        limits: Limits,
+    ) -> Result<()> {
+        self.ensure_graph_current("write_reencrypted")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "write_reencrypted",
+                reason: "immutable publication requires an already-opened package",
+            });
+        }
+        let mode =
+            self.encryption
+                .require_retained_mode()
+                .map_err(|source| Error::EncryptionPolicy {
+                    operation: "write_reencrypted",
+                    source,
+                })?;
+        let mut clear = ClearBuffer {
+            bytes: zeroize::Zeroizing::new(Vec::new()),
+            limit: limits.max_plaintext_bytes,
+            failure: None,
+        };
+        let staged = PackageWriter::write_to_stream(&mut clear, &self.opc);
+        if let Some(error) = clear.failure.take() {
+            return Err(error);
+        }
+        staged?;
+        let encrypted =
+            ooxml::encrypt_with(std::mem::take(&mut *clear.bytes), password, mode, &limits)?;
+        writer.write_all(&encrypted)?;
+        writer.flush()?;
+        Ok(())
+    }
+
     /// Compatibility alias for [`Self::to_reencrypted`].
     ///
     /// # Errors
@@ -363,4 +410,48 @@ fn atomic_replace(path: &Path, bytes: &[u8]) -> Result<()> {
         Ok(())
     })?;
     Ok(())
+}
+
+/// Fallible, bounded clear staging; failed serialization erases staged bytes.
+struct ClearBuffer {
+    bytes: zeroize::Zeroizing<Vec<u8>>,
+    limit: usize,
+    failure: Option<Error>,
+}
+impl Write for ClearBuffer {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        let next = self.bytes.len().checked_add(bytes.len());
+        if next.is_none_or(|next| next > self.limit) {
+            self.failure = Some(Error::from(ooxml::Error::Limit {
+                resource: "plaintext",
+                actual: next.unwrap_or(usize::MAX) as u64,
+                maximum: self.limit as u64,
+            }));
+            return Err(std::io::Error::other(
+                "clear package exceeds encryption limit",
+            ));
+        }
+        let next = next.unwrap_or(self.limit);
+        if next > self.bytes.capacity() {
+            let capacity = self
+                .bytes
+                .capacity()
+                .saturating_mul(2)
+                .max(next)
+                .min(self.limit);
+            let additional = capacity - self.bytes.len();
+            if let Err(source) = self.bytes.try_reserve_exact(additional) {
+                self.failure = Some(Error::Allocation {
+                    resource: "clear encryption staging",
+                    source,
+                });
+                return Err(std::io::Error::other("clear package allocation failed"));
+            }
+        }
+        self.bytes.extend_from_slice(bytes);
+        Ok(bytes.len())
+    }
+    fn flush(&mut self) -> std::io::Result<()> {
+        Ok(())
+    }
 }

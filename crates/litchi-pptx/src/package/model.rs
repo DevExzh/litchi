@@ -48,6 +48,27 @@ pub struct Package {
     pub(crate) font_embedding_dirty: bool,
 }
 
+impl std::fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("part_count", &self.opc.part_count())
+            .field("pending_authoring", &self.mutable_pres.is_some())
+            .field("physical_source_retained", &self.physical_source_provenance)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Package policy that must survive snapshot-derived edits without reopening.
+#[derive(Clone, Default)]
+pub(crate) struct OpenedOwnerState {
+    tolerance: crate::leniency::ToleranceReport,
+    #[cfg(feature = "encryption")]
+    encryption: litchi_ooxml_common::package_encryption::PackageEncryption,
+    #[cfg(feature = "automatic-fonts")]
+    font_embedding_dirty: bool,
+}
+
 impl Package {
     /// Every non-structural defect the reader repaired while opening this
     /// package, in discovery order.
@@ -247,23 +268,23 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn presentation_mut(&mut self) -> Result<&mut MutablePresentation> {
-        self.ensure_plain_mutation("presentation_mut")?;
+    pub(crate) fn authoring_presentation(&mut self) -> Result<&mut MutablePresentation> {
+        self.ensure_plain_mutation("authoring_presentation")?;
         self.mutable_pres.as_mut().ok_or(Error::UnsafeEdit {
-            operation: "presentation_mut",
+            operation: "authoring_presentation",
             reason: "the lossless facade cannot hydrate an opened package into the mutable writer",
         })
     }
 
-    /// Capture one immutable transaction root for an opened presentation.
+    /// Capture one immutable transaction root for a canonical presentation.
     ///
     /// The root composes existing slide ordering, checked shape text, and
     /// existing notes text without hydrating the legacy mutable writer.
     ///
     /// # Errors
     ///
-    /// Returns an error for a newly authored or dirty mutable presentation,
-    /// malformed package topology, unsupported notes dependencies, or bounds.
+    /// Returns an error for malformed package topology, unsupported notes
+    /// dependencies, or bounds. Fresh and reopened packages use the same root.
     pub fn opened_presentation(&self) -> Result<crate::opened::Snapshot> {
         self.opened_presentation_with_limits(crate::opened::Limits::default())
     }
@@ -272,7 +293,7 @@ impl Package {
     ///
     /// # Errors
     ///
-    /// Returns an error when the package is not a coherent, already-opened
+    /// Returns an error when the package is not a coherent canonical
     /// presentation under the supplied finite policy.
     pub fn opened_presentation_with_limits(
         &self,
@@ -282,10 +303,10 @@ impl Package {
         if self.mutable_pres.is_some() {
             return Err(Error::UnsafeEdit {
                 operation: "opened_presentation",
-                reason: "save and reopen the authored presentation before starting an opened-package transaction",
+                reason: "finish the builder before starting a package transaction",
             });
         }
-        let snapshot = match self.part_digest_memo() {
+        let mut snapshot = match self.part_digest_memo() {
             Some(parent) => crate::opened::capture_with_parent_digests(
                 &self.opc,
                 limits,
@@ -298,16 +319,38 @@ impl Package {
                 self.physical_source_provenance,
             )?,
         };
+        snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.offer_part_digests(&snapshot);
         Ok(snapshot)
     }
 
-    /// Start one detached transaction over an immutable opened root.
+    /// Start one detached [`Edit`](crate::opened::Edit) over an immutable opened root.
+    ///
+    /// Dropping the edit discards its staged changes. The source package remains
+    /// unchanged until a committed result is explicitly published.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use litchi_pptx::{Package, opened::Edit};
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// let mut builder = litchi_pptx::builder::Builder::new()?;
+    /// builder.presentation()?.add_slide()?
+    ///     .add_text_box("original", 0, 0, 914_400, 914_400);
+    /// let bytes = builder.build()?.to_bytes()?;
+    /// let mut package = Package::from_vec(bytes.clone())?;
+    /// let mut edit: Edit = package.edit()?;
+    /// edit.set_shape_text(0_usize, 0_usize, "staged")?;
+    /// drop(edit);
+    /// assert_eq!(package.to_bytes()?, bytes);
+    /// # Ok(())
+    /// # }
+    /// ```
     ///
     /// # Errors
     ///
     /// Returns an error under the same conditions as [`Self::opened_presentation`].
-    pub fn opened_presentation_transaction(&self) -> Result<crate::opened::Transaction> {
+    pub fn edit(&self) -> Result<crate::opened::Edit> {
         Ok(self.opened_presentation()?.edit())
     }
 
@@ -344,8 +387,9 @@ impl Package {
                 reason: "the complete package graph changed after slide-copy planning",
             });
         }
-        let snapshot =
+        let mut snapshot =
             crate::opened::apply(&mut self.opc, plan.patch(), self.physical_source_provenance)?;
+        snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
@@ -406,7 +450,7 @@ impl Package {
         }
         source.ensure_plain_mutation("apply_cross_slide_copy_plan")?;
         self.ensure_plain_mutation("apply_cross_slide_copy_plan")?;
-        let snapshot = crate::opened::cross_copy_plan::apply_plan(
+        let mut snapshot = crate::opened::cross_copy_plan::apply_plan(
             &source.opc,
             &mut self.opc,
             plan,
@@ -418,6 +462,7 @@ impl Package {
                 destination: self.part_digests.get().map(std::sync::Arc::as_ref),
             },
         )?;
+        snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
@@ -471,7 +516,7 @@ impl Package {
         }
         source.ensure_plain_mutation("apply_cross_slide_copy_patch")?;
         self.ensure_plain_mutation("apply_cross_slide_copy_patch")?;
-        let snapshot = crate::opened::cross_copy_plan::apply_patch(
+        let mut snapshot = crate::opened::cross_copy_plan::apply_patch(
             &source.opc,
             &mut self.opc,
             patch,
@@ -483,6 +528,7 @@ impl Package {
                 destination: self.part_digests.get().map(std::sync::Arc::as_ref),
             },
         )?;
+        snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
@@ -512,7 +558,7 @@ impl Package {
             });
         }
         self.ensure_plain_mutation("apply_slide_removal_plan")?;
-        let snapshot = crate::opened::apply_removal_patch(
+        let mut snapshot = crate::opened::apply_removal_patch(
             &mut self.opc,
             plan.patch(),
             "apply_slide_removal_plan",
@@ -521,6 +567,7 @@ impl Package {
         // Like every other publication, adopt the published snapshot's memo,
         // so the memo of the graph this removal replaced (which a capture may
         // have offered, change 0751) is not kept.
+        snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
@@ -544,91 +591,123 @@ impl Package {
             });
         }
         self.ensure_plain_mutation("apply_slide_removal_patch")?;
-        let snapshot = crate::opened::apply_removal_patch(
+        let mut snapshot = crate::opened::apply_removal_patch(
             &mut self.opc,
             patch,
             "apply_slide_removal_patch",
             self.physical_source_provenance,
         )?;
+        snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
         self.adopt_part_digests(&snapshot);
         self.mutable_pres = None;
         Ok(snapshot)
     }
 
-    /// Publish one opened-presentation commit atomically.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when any write-set resource is stale, package policy
-    /// rejects mutation, or the candidate graph cannot be fully validated.
-    pub fn apply_opened_presentation_commit(
-        &mut self,
-        commit: crate::opened::Commit,
-    ) -> Result<crate::opened::Snapshot> {
-        // The commit already captured and validated the staged result. The
-        // candidate is still built, validated and assigned exactly as for a
-        // bare patch; that capture is reused only when the candidate carries
-        // byte-identical complete-package content.
-        let (snapshot, patch) = commit.into_parts();
-        self.publish_opened_presentation_patch(&patch, Some(&snapshot))
-    }
-
-    /// Publish one durable opened-presentation patch atomically.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for stale resources, malformed topology, unsupported
-    /// dependencies, or rejected package mutation policy.
-    pub fn apply_opened_presentation_patch(
-        &mut self,
-        patch: &crate::opened::Patch,
-    ) -> Result<crate::opened::Snapshot> {
-        self.publish_opened_presentation_patch(patch, None)
-    }
-
-    /// Shared publication for opened-presentation patches, with the optional
-    /// already-captured snapshot of the committing transaction.
-    ///
-    /// Every policy refusal keeps the `apply_opened_presentation_patch`
-    /// operation identity both routes reported before.
-    fn publish_opened_presentation_patch(
-        &mut self,
-        patch: &crate::opened::Patch,
-        committed: Option<&crate::opened::Snapshot>,
-    ) -> Result<crate::opened::Snapshot> {
-        self.ensure_graph_current("apply_opened_presentation_patch")?;
-        if self.mutable_pres.is_some() {
+    /// Compare exact visible OPC content using the native revision proof.
+    /// Pending mutable authoring state is refused; ZIP record encoding is not compared.
+    pub fn same_content(&self, other: &Self) -> Result<bool> {
+        self.ensure_graph_current("same_content")?;
+        other.ensure_graph_current("same_content")?;
+        if self.mutable_pres.is_some() || other.mutable_pres.is_some() {
             return Err(Error::UnsafeEdit {
-                operation: "apply_opened_presentation_patch",
-                reason: "opened-presentation patches require an already-opened package",
+                operation: "same_content",
+                reason: "comparison requires already-opened packages",
             });
         }
-        self.ensure_plain_mutation("apply_opened_presentation_patch")?;
-        let changed = !patch.is_empty();
-        // The opened owner validates and captures a detached complete candidate
-        // before one assignment, so the facade's clone-and-rollback wrapper
-        // would only duplicate the entire OPC graph without adding atomicity.
+        let left =
+            crate::opened::package_fingerprint_with_memo(&self.opc, self.part_digest_memo())?.0;
+        let right =
+            crate::opened::package_fingerprint_with_memo(&other.opc, other.part_digest_memo())?.0;
+        Ok(left == right)
+    }
+
+    /// Publish an immutable opened package without flushing mutable authoring state.
+    pub fn write_to(&self, writer: impl std::io::Write) -> Result<()> {
+        self.ensure_graph_current("write_to")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "write_to",
+                reason: "publication requires an already-opened package",
+            });
+        }
+        #[cfg(feature = "encryption")]
+        self.encryption
+            .ordinary_output()
+            .map_err(|source| Error::EncryptionPolicy {
+                operation: "write_to",
+                source,
+            })?;
+        litchi_opc::PackageWriter::write_to_stream(writer, &self.opc)?;
+        Ok(())
+    }
+
+    /// Apply a durable presentation patch to a new package, preserving this source.
+    ///
+    /// Patch replay validates its exact write set. Unrelated resources retain
+    /// this package's state; a stale write-set resource refuses the whole apply.
+    /// Encryption provenance is retained, so ordinary plaintext output stays
+    /// refused until the caller explicitly selects an output policy.
+    /// See [`opened::Commit`](crate::opened::Commit) for a replay/inverse example.
+    ///
+    /// # Errors
+    ///
+    /// Refuses pending authoring state, signed changes,
+    /// stale resources, and invalid or unbounded candidate graphs.
+    pub fn apply(&self, patch: &crate::opened::Patch) -> Result<Self> {
+        self.ensure_graph_current("apply")?;
+        if self.mutable_pres.is_some() {
+            return Err(Error::UnsafeEdit {
+                operation: "apply",
+                reason: "presentation patches require an already-opened package",
+            });
+        }
+        if !patch.is_noop() {
+            super::signature::refuse_signed_change(&self.opc)?;
+        }
         let no_memo = crate::opened::PartDigests::default();
         let parent = self
             .part_digests
             .get()
             .map_or(&no_memo, std::sync::Arc::as_ref);
-        let snapshot = crate::opened::apply_committed(
-            &mut self.opc,
-            patch,
-            committed,
-            self.physical_source_provenance,
-            parent,
-        )?;
-        // The published snapshot describes the package now held in `self.opc`,
-        // and every entry of its memo names one of that package's own payload
-        // allocations, so adopting it retains nothing this facade does not
-        // already own.
-        self.adopt_part_digests(&snapshot);
-        if changed {
-            self.mutable_pres = None;
+        let (candidate, mut snapshot) =
+            crate::opened::apply_to_new(&self.opc, patch, self.physical_source_provenance, parent)?;
+        if !patch.is_noop() {
+            super::signature::refuse_signed_change(&candidate)?;
+            candidate.validate_signature_edit_from(&self.opc)?;
         }
-        Ok(snapshot)
+        snapshot.owner_state = std::sync::Arc::new(self.opened_owner_state());
+        Ok(Self::from_opened_candidate(candidate, &snapshot))
+    }
+
+    fn opened_owner_state(&self) -> OpenedOwnerState {
+        OpenedOwnerState {
+            tolerance: self.tolerance.clone(),
+            #[cfg(feature = "encryption")]
+            encryption: self.encryption,
+            #[cfg(feature = "automatic-fonts")]
+            font_embedding_dirty: self.font_embedding_dirty,
+        }
+    }
+
+    /// Publish already-validated native state without parsing or serialization.
+    pub(crate) fn from_opened_candidate(
+        opc: OpcPackage,
+        snapshot: &crate::opened::Snapshot,
+    ) -> Self {
+        let state = &snapshot.owner_state;
+        let mut package = Self {
+            opc,
+            mutable_pres: None,
+            physical_source_provenance: snapshot.physical_source_provenance,
+            tolerance: state.tolerance.clone(),
+            part_digests: std::sync::OnceLock::new(),
+            #[cfg(feature = "encryption")]
+            encryption: state.encryption,
+            #[cfg(feature = "automatic-fonts")]
+            font_embedding_dirty: state.font_embedding_dirty,
+        };
+        package.adopt_part_digests(snapshot);
+        package
     }
 
     /// Capture one slide's inert `[MS-PPTX]` change-tracking identifiers.
@@ -644,7 +723,7 @@ impl Package {
     /// remain readable for checked-position repair but cannot be committed.
     pub fn change_tracking<'a>(
         &self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<crate::change_tracking::Snapshot> {
         self.ensure_graph_current("change_tracking")?;
         let owner = self.resolve_slide(slide.into())?;
@@ -825,7 +904,10 @@ impl Package {
     ///
     /// Returns an error for a missing, ambiguous, or out-of-range selector,
     /// malformed ownership, shared descendants, or rejected package policy.
-    pub fn remove_notes<'a>(&mut self, slide: impl Into<crate::slide::Key<'a>>) -> Result<bool> {
+    pub fn remove_notes<'a>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'a>>,
+    ) -> Result<bool> {
         self.ensure_graph_current("remove_notes")?;
         let slide_name = self.resolve_slide(slide.into())?;
         let Some(source) = self.notes_snapshot()? else {
@@ -955,7 +1037,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn tags<'a>(
         &self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Option<crate::tag::List>> {
         self.ensure_graph_current("tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
@@ -978,7 +1060,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_tags<'a>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
         list: crate::tag::List,
     ) -> Result<Option<crate::tag::List>> {
         self.ensure_graph_current("put_tags")?;
@@ -1002,7 +1084,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_tags<'a>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Option<crate::tag::List>> {
         self.ensure_graph_current("remove_tags")?;
         let slide_name = self.resolve_slide(slide.into())?;
@@ -1016,7 +1098,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn slide_designer_tags<'a>(
         &self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
         self.slide_designer_tags_with_limits(slide, crate::shape::designer::Limits::default())
     }
@@ -1028,7 +1110,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn slide_designer_tags_with_limits<'a>(
         &self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
         limits: crate::shape::designer::Limits,
     ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
         self.ensure_graph_current("slide_designer_tags")?;
@@ -1051,7 +1133,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_slide_designer_tags<'a>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
         tags: crate::shape::designer::Tags,
     ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
         self.put_slide_designer_tags_with_limits(
@@ -1074,7 +1156,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_slide_designer_tags_with_limits<'a>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
         tags: crate::shape::designer::Tags,
         limits: crate::shape::designer::Limits,
     ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
@@ -1104,7 +1186,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_slide_designer_tags<'a>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
         self.remove_slide_designer_tags_with_limits(
             slide,
@@ -1125,7 +1207,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_slide_designer_tags_with_limits<'a>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
         limits: crate::shape::designer::Limits,
     ) -> Result<crate::presentation_properties::metadata::designer_tags::Snapshot> {
         self.ensure_graph_current("remove_slide_designer_tags")?;
@@ -1347,7 +1429,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn zooms<'a>(
         &self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<crate::shape::zoom::Owner> {
         self.ensure_graph_current("zooms")?;
         let slide_name = self.resolve_slide(slide.into())?;
@@ -1367,7 +1449,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_zooms<'a>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
         owner: crate::shape::zoom::Owner,
     ) -> Result<Option<crate::shape::zoom::Owner>> {
         self.ensure_graph_current("put_zooms")?;
@@ -1388,7 +1470,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_zooms<'a>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Option<crate::shape::zoom::Owner>> {
         self.ensure_graph_current("remove_zooms")?;
         let slide_name = self.resolve_slide(slide.into())?;
@@ -1402,7 +1484,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn shape_tags<'s, 'k>(
         &self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
         self.ensure_graph_current("shape_tags")?;
@@ -1424,7 +1506,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_shape_tags<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         list: crate::tag::List,
     ) -> Result<Option<crate::tag::List>> {
@@ -1446,7 +1528,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_shape_tags<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::tag::List>> {
         self.ensure_graph_current("remove_shape_tags")?;
@@ -1463,7 +1545,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn shape_classification<'s, 'k>(
         &self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::classification::Snapshot>> {
         self.ensure_graph_current("shape_classification")?;
@@ -1485,7 +1567,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_shape_classification<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         outcome: crate::shape::classification::Outcome,
     ) -> Result<Option<crate::shape::classification::Snapshot>> {
@@ -1510,7 +1592,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_shape_classification<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::classification::Snapshot>> {
         self.ensure_graph_current("remove_shape_classification")?;
@@ -1527,7 +1609,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn shape_design_element<'s, 'k>(
         &self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::designer::Snapshot>> {
         self.ensure_graph_current("shape_design_element")?;
@@ -1549,7 +1631,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_shape_design_element<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         value: bool,
     ) -> Result<Option<crate::shape::designer::Snapshot>> {
@@ -1571,7 +1653,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_shape_design_element<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::shape::designer::Snapshot>> {
         self.ensure_graph_current("remove_shape_design_element")?;
@@ -1586,7 +1668,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn shape_designer_properties<'s, 'k>(
         &self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<crate::shape::designer::PropertiesSnapshot> {
         self.shape_designer_properties_with_limits(
@@ -1603,7 +1685,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn shape_designer_properties_with_limits<'s, 'k>(
         &self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         limits: crate::shape::designer::Limits,
     ) -> Result<crate::shape::designer::PropertiesSnapshot> {
@@ -1625,7 +1707,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_shape_designer_properties<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         properties: crate::shape::designer::DrawingProperties,
     ) -> Result<crate::shape::designer::PropertiesSnapshot> {
@@ -1652,7 +1734,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_shape_designer_properties_with_limits<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         properties: crate::shape::designer::DrawingProperties,
         limits: crate::shape::designer::Limits,
@@ -1687,7 +1769,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_shape_designer_properties<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<crate::shape::designer::PropertiesSnapshot> {
         self.ensure_graph_current("remove_shape_designer_properties")?;
@@ -1713,7 +1795,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_shape_designer_properties_with_limits<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         limits: crate::shape::designer::Limits,
     ) -> Result<crate::shape::designer::PropertiesSnapshot> {
@@ -1741,7 +1823,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn model3ds<'a>(
         &self,
-        slide: impl Into<crate::slide::Key<'a>>,
+        slide: impl Into<crate::slide::Selector<'a>>,
     ) -> Result<Vec<crate::model3d::Model>> {
         self.ensure_graph_current("model3ds")?;
         let slide_name = self.resolve_slide(slide.into())?;
@@ -1755,7 +1837,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn model3d<'s, 'k>(
         &self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::model3d::Model>> {
         self.ensure_graph_current("model3d")?;
@@ -1776,7 +1858,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn put_model3d<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         model: crate::model3d::Model,
     ) -> Result<Option<crate::model3d::Model>> {
@@ -1800,7 +1882,7 @@ impl Package {
     /// Returns an error if the operation fails.
     pub fn remove_model3d<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<Option<crate::model3d::Model>> {
         self.ensure_graph_current("remove_model3d")?;
@@ -2093,7 +2175,7 @@ impl Package {
     /// resulting unsigned graph is authorized for publication
     /// ([`OpcPackage::unsign`]). A changed edit refuses a signed package,
     /// because the change invalidates every signature: a changed
-    /// opened-presentation commit ([`crate::opened::Transaction::commit`]),
+    /// opened-presentation commit ([`crate::opened::Edit::commit`]),
     /// the package-level edit families of this crate (their methods on this
     /// facade and their functions on an [`OpcPackage`]), and a changed
     /// [`Self::edit_opc`]. Call this first to edit one. A signed package that
@@ -2273,7 +2355,7 @@ impl Package {
         self.flush_presentation()
     }
 
-    fn ensure_graph_current(&self, operation: &'static str) -> Result<()> {
+    pub(super) fn ensure_graph_current(&self, operation: &'static str) -> Result<()> {
         if self.is_modified() {
             return Err(Error::UnsafeEdit {
                 operation,
@@ -2295,11 +2377,12 @@ impl Package {
         Ok(value)
     }
 
-    fn resolve_slide_identity(&self, key: crate::slide::Key<'_>) -> Result<(PackURI, u32)> {
+    fn resolve_slide_identity(&self, key: crate::slide::Selector<'_>) -> Result<(PackURI, u32)> {
         let presentation = self.presentation()?;
         let references = presentation.slide_references()?;
         match key {
-            crate::slide::Key::Index(index) => {
+            crate::slide::Selector::Position(position) => {
+                let index = position.get();
                 let reference = references.get(index).ok_or(Error::SlideIndexOutOfBounds {
                     index,
                     len: references.len(),
@@ -2312,7 +2395,7 @@ impl Package {
                     })?;
                 Ok((slide.part().part().partname().clone(), reference.id()))
             },
-            crate::slide::Key::Name(name) => {
+            crate::slide::Selector::Name(name) => {
                 let slides = presentation.slides()?;
                 let mut selected = None;
                 let mut matches = 0usize;
@@ -2323,10 +2406,10 @@ impl Package {
                     }
                 }
                 match (matches, selected) {
-                    (0, _) => Err(Error::SlideNameNotFound(name.to_owned())),
+                    (0, _) => Err(Error::SlideNameNotFound(name.into_owned())),
                     (1, Some(value)) => Ok(value),
                     _ => Err(Error::AmbiguousSlideName {
-                        name: name.to_owned(),
+                        name: name.into_owned(),
                         matches,
                     }),
                 }
@@ -2334,20 +2417,21 @@ impl Package {
         }
     }
 
-    fn resolve_slide(&self, key: crate::slide::Key<'_>) -> Result<PackURI> {
+    fn resolve_slide(&self, key: crate::slide::Selector<'_>) -> Result<PackURI> {
         let presentation = self.presentation()?;
         match key {
-            crate::slide::Key::Index(index) => {
+            crate::slide::Selector::Position(position) => {
+                let index = position.get();
                 let length = presentation.slide_count()?;
                 let slide = presentation
                     .slide(index)?
                     .ok_or(Error::SlideIndexOutOfBounds { index, len: length })?;
                 Ok(slide.part().part().partname().clone())
             },
-            crate::slide::Key::Name(name) => {
+            crate::slide::Selector::Name(name) => {
                 let slide = presentation
-                    .find_slide(name)?
-                    .ok_or_else(|| Error::SlideNameNotFound(name.to_owned()))?;
+                    .find_slide(name.as_ref())?
+                    .ok_or_else(|| Error::SlideNameNotFound(name.into_owned()))?;
                 Ok(slide.part().part().partname().clone())
             },
         }

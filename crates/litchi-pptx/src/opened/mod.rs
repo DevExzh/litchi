@@ -7,10 +7,14 @@
 //! Publication uses an exact finite OPC resource patch and classifies shape
 //! transfer refusals before mutation.
 
+mod chunks;
 mod copy_plan;
 pub(crate) mod cross_copy_plan;
+mod geometry;
+mod insert;
 mod model;
 mod patch;
+mod properties;
 mod remove_plan;
 mod transaction;
 mod xml;
@@ -26,16 +30,39 @@ mod text_run_tests;
 
 pub use copy_plan::{SlideCopyPart, SlideCopyPlan};
 pub use cross_copy_plan::{CrossSlideCopyPatch, CrossSlideCopyPlan};
-pub use model::{Limits, MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement, Slide, Snapshot};
+pub use model::{
+    Limits, MAX_SHAPE_PROPERTIES_REPLACEMENTS, MAX_SHAPE_TEXT_REPLACEMENTS,
+    ShapePropertiesReplacement, ShapeTextReplacement, Slide, Snapshot,
+};
 pub use patch::{Conflict, History, Patch, Resolution, ThreeWayPlan};
 pub use remove_plan::{SlideRemovalPatch, SlideRemovalPlan};
-pub use transaction::{Commit, Transaction};
+pub use transaction::{Commit, Diagnostics, Edit};
 
+pub(crate) use chunks::{
+    ChunkAdmission, admit_shape_property_chunks, admit_shape_text_chunks,
+    stage_shape_property_chunks, stage_shape_property_chunks_admitted, stage_shape_text_chunks,
+    stage_shape_text_chunks_admitted,
+};
+pub(crate) use geometry::geometry_skeleton;
 pub(crate) use model::{
     PartDigests, capture_with_parent_digests, capture_with_provenance, package_fingerprint,
+    package_fingerprint_with_memo,
 };
-pub(crate) use patch::{apply, apply_committed};
+pub(crate) use patch::{apply, apply_to_new};
+pub(crate) use properties::stage_shape_properties;
 pub(crate) use remove_plan::apply_patch as apply_removal_patch;
-pub(crate) use xml::{
-    insert_slide_binding, reorder_slide_bindings, stage_shape_texts, validate_slide_bindings,
+pub(crate) use remove_plan::{
+    validate_insertion_owner, validate_removal_presentation_owner, validate_removal_slide_surface,
 };
+pub(crate) use transaction::{
+    next_shape_id, stage_text_box, text_box_fragment, text_box_output_bound,
+    validate_text_box_input,
+};
+pub(crate) use xml::{
+    insert_slide_binding, reorder_slide_bindings, shape_text_skeleton, stage_shape_texts,
+    strip_appended_text_boxes, validate_slide_bindings,
+};
+pub(crate) use xml::{remove_slide_binding, validate_slide_catalog_delta};
+
+#[cfg(test)]
+mod owner_commit_tests;

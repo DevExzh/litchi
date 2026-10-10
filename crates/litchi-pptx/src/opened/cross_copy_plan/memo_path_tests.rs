@@ -48,19 +48,20 @@ fn noisy(len: usize, mut state: u32) -> Vec<u8> {
 }
 
 fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
-    let mut package = Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = crate::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for index in 0..slides {
         presentation
             .add_slide()?
             .set_title(&format!("change-0751-memo-{prefix}-{index}"));
     }
+    let mut package = builder.build()?;
     package.to_bytes()
 }
 
 fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &[u8])]) -> Result<Vec<u8>> {
     let mut package = Package::from_bytes(bytes)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut edit = package.edit()?;
     for (index, (part_name, data)) in pictures.iter().enumerate() {
         edit.add_picture(
             slide,
@@ -70,7 +71,7 @@ fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &[u8])]) -> Resu
         )?;
     }
     let commit = edit.commit()?;
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     package.to_bytes()
 }
 

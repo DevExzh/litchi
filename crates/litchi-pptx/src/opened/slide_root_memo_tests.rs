@@ -42,8 +42,8 @@ use crate::{Error, Package, Result};
 const MEMO_RESOURCE: &str = "opened-presentation slide-root memo";
 
 fn text_box_package(slides: usize, boxes: usize) -> Result<Package> {
-    let mut package = Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = crate::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..slides {
         let slide = presentation.add_slide()?;
         for box_index in 0..boxes {
@@ -57,6 +57,7 @@ fn text_box_package(slides: usize, boxes: usize) -> Result<Package> {
             );
         }
     }
+    let mut package = builder.build()?;
     Package::from_vec(package.to_bytes()?)
 }
 
@@ -229,7 +230,7 @@ fn a_no_op_commit_and_an_all_slide_commit_keep_their_exact_meaning() -> Result<(
     let source = package.opened_presentation()?;
     take_proved_root_hits();
     let no_op = source.edit().commit()?;
-    assert!(!no_op.is_changed());
+    assert!(!no_op.diagnostics().changed());
     assert_eq!(no_op.snapshot().revision(), source.revision());
     assert!(
         Arc::ptr_eq(&no_op.snapshot().slide_roots, &source.slide_roots),
@@ -327,7 +328,12 @@ fn a_published_snapshot_keeps_classifications_only_for_its_own_allocations() -> 
     let mut edit = source.edit();
     assert!(edit.set_shape_text(1, 0, "published")?);
     let commit = edit.commit()?;
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
+    assert!(super::model::packages_equal(
+        &package.opc,
+        published.package.as_ref()
+    ));
     assert_eq!(published.slide_roots.len(), 4);
     for index in 0..4 {
         assert!(
@@ -652,12 +658,13 @@ fn collect_pptx_fixtures(directory: &std::path::Path, found: &mut Vec<std::path:
 
 #[test]
 fn the_notes_owning_deck_reuses_proofs_and_keeps_its_notes_graph() -> Result<()> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     for index in 0..3 {
-        let slide = package.presentation_mut()?.add_slide()?;
+        let slide = builder.presentation()?.add_slide()?;
         slide.set_title(&format!("notes slide {index}"));
         slide.set_notes(&format!("speaker notes {index}"));
     }
+    let mut package = builder.build()?;
     let package = Package::from_vec(package.to_bytes()?)?;
     let source = package.opened_presentation()?;
     let mut edit = source.edit();
@@ -796,7 +803,12 @@ fn every_entry_names_an_allocation_its_snapshots_package_holds() -> Result<()> {
             .retained()
             .all(|(_key, raw, _)| !Arc::ptr_eq(raw, &replaced))
     );
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
+    assert!(super::model::packages_equal(
+        &package.opc,
+        published.package.as_ref()
+    ));
     assert_eq!(assert_entries_owned_by("published", &published), 6);
     let mut moved = published.package.as_ref().clone();
     reallocate_slide(&mut moved, &published.slides[5].part_name)?;
@@ -990,12 +1002,13 @@ fn a_refused_memo_reservation_is_a_typed_allocation_error_and_leaves_no_partial_
     let patch = commit.patch().clone();
     assert_memo_refusal(
         "publication",
-        with_refused_slide_root_reservation(|| package.apply_opened_presentation_patch(&patch)),
+        with_refused_slide_root_reservation(|| package.apply(&patch)),
     );
     assert_eq!(package.to_bytes()?, published_before);
 
     // Without the refusal every step succeeds and equals the cold path.
-    let published = package.apply_opened_presentation_patch(&patch)?;
+    package = package.apply(&patch)?;
+    let published = package.opened_presentation()?;
     assert_same_snapshot("published", &published, &cold_capture(&published)?);
     assert_same_snapshot(
         "commit",
@@ -1040,9 +1053,8 @@ fn published_bytes_patches_and_revisions_never_depend_on_memo_contents() -> Resu
             let mut next = commit.snapshot().edit();
             assert!(next.set_shape_text(4, 0, format!("second {index}"))?);
             let second = next.commit()?;
-            let mut facade = text_box_package(6, 3)?;
-            facade.apply_opened_presentation_commit(commit)?;
-            facade.apply_opened_presentation_commit(second.clone())?;
+            let _first = commit.into_package();
+            let mut facade = second.clone().into_package();
             outcomes.push((
                 label,
                 patch,
@@ -1112,7 +1124,12 @@ fn a_memo_is_built_or_projected_and_never_mutated() -> Result<()> {
         "a rebind projects a new memo"
     );
     assert_eq!(memo_content(&rebound.slide_roots), committed_content);
-    let published = package.apply_opened_presentation_commit(commit.clone())?;
+    let published = commit.clone().snapshot().clone();
+    package = commit.clone().into_package();
+    assert!(super::model::packages_equal(
+        &package.opc,
+        published.package.as_ref()
+    ));
     let mut again = published.edit();
     assert!(again.set_shape_text(4, 1, "again")?);
     let _second = again.commit()?;
@@ -1231,7 +1248,12 @@ fn the_facade_retains_no_slide_root_memo() -> Result<()> {
     let mut edit = source.edit();
     assert!(edit.set_shape_text(0, 0, "facade")?);
     let commit = edit.commit()?;
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
+    assert!(super::model::packages_equal(
+        &package.opc,
+        published.package.as_ref()
+    ));
     let names: Vec<PackURI> = published
         .slides
         .iter()

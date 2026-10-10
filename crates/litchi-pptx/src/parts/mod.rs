@@ -442,20 +442,6 @@ pub(crate) fn parse_u32(value: &str, field: &str) -> Result<u32> {
         .map_err(|_err| invalid(format!("invalid {field} value '{value}'")))
 }
 
-pub(crate) fn parse_i64(value: &str, field: &str) -> Result<i64> {
-    value
-        .parse()
-        .map_err(|_err| invalid(format!("invalid {field} value '{value}'")))
-}
-
-pub(crate) fn parse_bool(value: &str, field: &str) -> Result<bool> {
-    match value {
-        "1" | "true" | "on" => Ok(true),
-        "0" | "false" | "off" => Ok(false),
-        _ => Err(invalid(format!("invalid {field} value '{value}'"))),
-    }
-}
-
 pub(crate) fn validate_content_type(part: &dyn Part, expected: &str) -> Result<()> {
     if part.content_type() == expected {
         return Ok(());
@@ -478,6 +464,23 @@ pub(crate) fn related_part_by_type<'a>(
     local_type: &str,
     content_type: &str,
 ) -> Result<Option<&'a dyn Part>> {
+    Ok(
+        related_by_type(package, source, relationship_type, local_type, content_type)?
+            .map(|(_, part)| part),
+    )
+}
+
+/// [`related_part_by_type`], also returning the relationship selected from the
+/// source part. The relationship ID is part of detached related snapshots;
+/// callers still receive the same duplicate, external-target, target, and
+/// content-type checks as the original helper.
+pub(crate) fn related_by_type<'a, 's>(
+    package: &'a OpcPackage,
+    source: &'s dyn Part,
+    relationship_type: &str,
+    local_type: &str,
+    content_type: &str,
+) -> Result<Option<(&'s Relationship, &'a dyn Part)>> {
     let mut matching = source.rels().iter().filter(|relationship| {
         is_relationship_type(relationship.reltype(), relationship_type, local_type)
     });
@@ -498,7 +501,7 @@ pub(crate) fn related_part_by_type<'a>(
     let target = relationship.target_partname()?;
     let part = package.get_part(&target)?;
     validate_content_type(part, content_type)?;
-    Ok(Some(part))
+    Ok(Some((relationship, part)))
 }
 
 pub(crate) fn expected_main_content_type(content_type: &str) -> bool {

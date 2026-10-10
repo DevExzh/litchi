@@ -5,13 +5,14 @@
 //! does not duplicate its XML subtrees.
 
 use litchi_core::xml::ReaderOrigin;
+use litchi_ooxml_common::mce::{InScopeNamespaces, Limits as MceLimits};
 use litchi_ooxml_common::xml::{
     DRAWINGML_NAMESPACE, STRICT_DRAWINGML_NAMESPACE, decode_xml_reference,
     unqualified_attribute_value,
 };
 use quick_xml::XmlVersion;
 use quick_xml::events::Event;
-use quick_xml::name::{Namespace, QName, ResolveResult};
+use quick_xml::name::{Namespace, NamespaceResolver, PrefixDeclaration, QName, ResolveResult};
 use quick_xml::reader::NsReader;
 
 use crate::{Error, Result};
@@ -35,6 +36,49 @@ impl Span {
     }
 }
 
+/// The namespace scope at the root of a fragment cut from an owner XML.
+///
+/// Table rows and cells are indexed from progressively smaller borrowed
+/// fragments. Keeping the owner and the absolute start of each fragment lets
+/// every scan restore the declarations that fragment inherits before its own
+/// root declarations are processed. The shared bounded owner walk is repeated
+/// for nested projections; this keeps the bridge allocation-free while leaving
+/// scope caching as a separate optimization.
+#[derive(Debug, Clone, Copy)]
+struct NamespaceContext<'a> {
+    owner: &'a [u8],
+    offset: usize,
+}
+
+impl NamespaceContext<'_> {
+    fn resolver(self) -> Result<NamespaceResolver> {
+        let scope = InScopeNamespaces::at_offset(self.owner, self.offset, &MceLimits::default())?;
+        let mut resolver = NamespaceResolver::default();
+        for (prefix, namespace) in scope.iter() {
+            let declaration = if prefix.is_empty() {
+                PrefixDeclaration::Default
+            } else {
+                PrefixDeclaration::Named(prefix)
+            };
+            resolver
+                .add(declaration, Namespace(namespace))
+                .map_err(|_| invalid("table XML namespace scope is invalid"))?;
+        }
+        Ok(resolver)
+    }
+
+    fn child(self, relative: usize) -> Result<Self> {
+        let offset = self
+            .offset
+            .checked_add(relative)
+            .ok_or_else(|| invalid("table XML namespace scope offset overflows usize"))?;
+        Ok(Self {
+            owner: self.owner,
+            offset,
+        })
+    }
+}
+
 /// Table style switches and the referenced table-style GUID.
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct Properties {
@@ -52,6 +96,7 @@ pub struct Properties {
 pub struct Table<'a> {
     xml: &'a [u8],
     span: Span,
+    context: Option<NamespaceContext<'a>>,
 }
 
 impl<'a> Table<'a> {
@@ -61,11 +106,18 @@ impl<'a> Table<'a> {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_xml(xml: &'a [u8]) -> Result<Self> {
-        let span = scan(xml, b"tbl")?
+        Self::from_xml_with_context(xml, None)
+    }
+
+    fn from_xml_with_context(xml: &'a [u8], context: Option<NamespaceContext<'a>>) -> Result<Self> {
+        let span = scan_with_context(xml, b"tbl", context)?
             .into_iter()
             .next()
             .ok_or_else(|| Error::PartNotFound("DrawingML table not found".into()))?;
-        Ok(Self { xml, span })
+        let context = context
+            .map(|context| context.child(span.start))
+            .transpose()?;
+        Ok(Self { xml, span, context })
     }
 
     /// Locate the first `DrawingML` table inside a graphic-frame owner.
@@ -75,6 +127,22 @@ impl<'a> Table<'a> {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn from_graphic_frame(xml: &'a [u8]) -> Result<Self> {
         Self::from_xml(xml)
+    }
+
+    /// Locate a `DrawingML` table while retaining the namespace scope of the
+    /// graphic-frame fragment in its owner XML.
+    pub(crate) fn from_graphic_frame_with_context(
+        xml: &'a [u8],
+        owner: &'a [u8],
+        owner_offset: usize,
+    ) -> Result<Self> {
+        Self::from_xml_with_context(
+            xml,
+            Some(NamespaceContext {
+                owner,
+                offset: owner_offset,
+            }),
+        )
     }
 
     /// Borrow the exact table element.
@@ -94,7 +162,7 @@ impl<'a> Table<'a> {
     /// Returns an error if the operation fails.
     pub fn row_count(self) -> Result<usize> {
         let table = self.xml()?;
-        let count = scan(table, b"tr")?.len();
+        let count = scan_with_context(table, b"tr", self.context)?.len();
         if count > MAX_ROWS {
             return Err(limit("table row count", MAX_ROWS));
         }
@@ -117,13 +185,23 @@ impl<'a> Table<'a> {
     /// Returns an error if the operation fails.
     pub fn rows(self) -> Result<Vec<Row<'a>>> {
         let table = self.xml()?;
-        let spans = scan(table, b"tr")?;
+        let spans = scan_with_context(table, b"tr", self.context)?;
         if spans.len() > MAX_ROWS {
             return Err(limit("table row count", MAX_ROWS));
         }
         spans
             .into_iter()
-            .map(|span| Ok(Row { xml: table, span }))
+            .map(|span| {
+                let context = self
+                    .context
+                    .map(|context| context.child(span.start))
+                    .transpose()?;
+                Ok(Row {
+                    xml: table,
+                    span,
+                    context,
+                })
+            })
             .collect()
     }
 
@@ -145,7 +223,7 @@ impl<'a> Table<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn properties(self) -> Result<Option<Properties>> {
-        parse_properties(self.xml()?)
+        parse_properties(self.xml()?, self.context)
     }
 }
 
@@ -154,6 +232,7 @@ impl<'a> Table<'a> {
 pub struct Row<'a> {
     xml: &'a [u8],
     span: Span,
+    context: Option<NamespaceContext<'a>>,
 }
 
 impl<'a> Row<'a> {
@@ -167,7 +246,8 @@ impl<'a> Row<'a> {
 
     #[must_use]
     pub fn cell_count(self) -> usize {
-        scan(self.xml().unwrap_or_default(), b"tc").map_or(0, |spans| spans.len())
+        scan_with_context(self.xml().unwrap_or_default(), b"tc", self.context)
+            .map_or(0, |spans| spans.len())
     }
 
     /// # Errors
@@ -175,13 +255,23 @@ impl<'a> Row<'a> {
     /// Returns an error if the operation fails.
     pub fn cells(self) -> Result<Vec<Cell<'a>>> {
         let row = self.xml()?;
-        let spans = scan(row, b"tc")?;
+        let spans = scan_with_context(row, b"tc", self.context)?;
         if spans.len() > MAX_CELLS {
             return Err(limit("table cell count", MAX_CELLS));
         }
         spans
             .into_iter()
-            .map(|span| Ok(Cell { xml: row, span }))
+            .map(|span| {
+                let context = self
+                    .context
+                    .map(|context| context.child(span.start))
+                    .transpose()?;
+                Ok(Cell {
+                    xml: row,
+                    span,
+                    context,
+                })
+            })
             .collect()
     }
 }
@@ -191,6 +281,7 @@ impl<'a> Row<'a> {
 pub struct Cell<'a> {
     xml: &'a [u8],
     span: Span,
+    context: Option<NamespaceContext<'a>>,
 }
 
 impl<'a> Cell<'a> {
@@ -208,7 +299,7 @@ impl<'a> Cell<'a> {
     ///
     /// Returns an error if the operation fails.
     pub fn text(self) -> Result<String> {
-        extract_text(self.xml()?)
+        extract_text(self.xml()?, self.context)
     }
 }
 
@@ -225,6 +316,7 @@ fn is_drawingml(
     name: QName<'_>,
     local: &[u8],
     fragment_prefix: &Option<Option<Vec<u8>>>,
+    allow_fragment_fallback: bool,
 ) -> bool {
     if name.local_name().as_ref() != local {
         return false;
@@ -233,15 +325,20 @@ fn is_drawingml(
         ResolveResult::Bound(Namespace(value)) => {
             *value == DRAWINGML_NAMESPACE || *value == STRICT_DRAWINGML_NAMESPACE
         },
-        ResolveResult::Unknown(prefix) => {
+        ResolveResult::Unknown(prefix) if allow_fragment_fallback => {
             prefix.as_slice() == b"a"
                 || fragment_prefix.as_ref().and_then(Option::as_deref) == Some(prefix.as_slice())
         },
-        ResolveResult::Unbound => fragment_prefix == &Some(None),
+        ResolveResult::Unbound if allow_fragment_fallback => fragment_prefix == &Some(None),
+        ResolveResult::Unknown(_) | ResolveResult::Unbound => false,
     }
 }
 
-fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
+fn scan_with_context(
+    xml: &[u8],
+    target: &[u8],
+    context: Option<NamespaceContext<'_>>,
+) -> Result<Vec<Span>> {
     enum ScanEvent {
         Start { local: Vec<u8>, matched: bool },
         Empty { matched: bool },
@@ -254,7 +351,11 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("table XML bytes", MAX_XML_BYTES));
     }
+    let allow_fragment_fallback = context.is_none();
     let mut reader = NsReader::from_reader(xml);
+    if let Some(context) = context {
+        *reader.resolver_mut() = context.resolver()?;
+    }
     let origin = ReaderOrigin::of(xml);
     let mut stack: Vec<(usize, Vec<u8>, bool)> = Vec::new();
     let mut fragment_prefix: Option<Option<Vec<u8>>> = None;
@@ -275,8 +376,13 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
                         fragment_prefix =
                             Some(element.name().prefix().map(|p| p.into_inner().to_vec()));
                     }
-                    let matched =
-                        is_drawingml(&namespace, element.name(), target, &fragment_prefix);
+                    let matched = is_drawingml(
+                        &namespace,
+                        element.name(),
+                        target,
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    );
                     ScanEvent::Start {
                         local: element.local_name().as_ref().to_vec(),
                         matched,
@@ -288,7 +394,13 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
                             Some(element.name().prefix().map(|p| p.into_inner().to_vec()));
                     }
                     ScanEvent::Empty {
-                        matched: is_drawingml(&namespace, element.name(), target, &fragment_prefix),
+                        matched: is_drawingml(
+                            &namespace,
+                            element.name(),
+                            target,
+                            &fragment_prefix,
+                            allow_fragment_fallback,
+                        ),
                     }
                 },
                 Event::End(element) => ScanEvent::End {
@@ -347,8 +459,15 @@ fn scan(xml: &[u8], target: &[u8]) -> Result<Vec<Span>> {
     Ok(spans)
 }
 
-fn parse_properties(xml: &[u8]) -> Result<Option<Properties>> {
+fn parse_properties(
+    xml: &[u8],
+    context: Option<NamespaceContext<'_>>,
+) -> Result<Option<Properties>> {
+    let allow_fragment_fallback = context.is_none();
     let mut reader = NsReader::from_reader(xml);
+    if let Some(context) = context {
+        *reader.resolver_mut() = context.resolver()?;
+    }
     let mut fragment_prefix = None;
     let mut depth = 0usize;
     let mut properties = None;
@@ -370,12 +489,25 @@ fn parse_properties(xml: &[u8]) -> Result<Option<Properties>> {
                 depth = depth
                     .checked_add(1)
                     .ok_or_else(|| invalid("table XML depth overflow"))?;
-                if depth == 1 && !is_drawingml(&namespace, element.name(), b"tbl", &fragment_prefix)
+                if depth == 1
+                    && !is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"tbl",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
                 {
                     return Ok(None);
                 }
                 if depth == 2
-                    && is_drawingml(&namespace, element.name(), b"tblPr", &fragment_prefix)
+                    && is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"tblPr",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
                 {
                     if properties.is_some() {
                         return Err(invalid("table has multiple tblPr elements"));
@@ -396,6 +528,7 @@ fn parse_properties(xml: &[u8]) -> Result<Option<Properties>> {
                         element.name(),
                         b"tableStyleId",
                         &fragment_prefix,
+                        allow_fragment_fallback,
                     )
                     && style_depth.replace(depth).is_some()
                 {
@@ -411,12 +544,24 @@ fn parse_properties(xml: &[u8]) -> Result<Option<Properties>> {
                     .checked_add(1)
                     .ok_or_else(|| invalid("table XML depth overflow"))?;
                 if child_depth == 1
-                    && !is_drawingml(&namespace, element.name(), b"tbl", &fragment_prefix)
+                    && !is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"tbl",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
                 {
                     return Ok(None);
                 }
                 if child_depth == 2
-                    && is_drawingml(&namespace, element.name(), b"tblPr", &fragment_prefix)
+                    && is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"tblPr",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
                 {
                     if properties.is_some() {
                         return Err(invalid("table has multiple tblPr elements"));
@@ -448,6 +593,7 @@ fn parse_properties(xml: &[u8]) -> Result<Option<Properties>> {
                         element.name(),
                         b"tableStyleId",
                         &fragment_prefix,
+                        allow_fragment_fallback,
                     )
                 {
                     let value = style.trim();
@@ -461,7 +607,13 @@ fn parse_properties(xml: &[u8]) -> Result<Option<Properties>> {
                     style.clear();
                 }
                 if property_depth == Some(depth)
-                    && is_drawingml(&namespace, element.name(), b"tblPr", &fragment_prefix)
+                    && is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"tblPr",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
                 {
                     property_depth = None;
                 }
@@ -497,14 +649,20 @@ fn on_off(
     }
 }
 
-fn extract_text(xml: &[u8]) -> Result<String> {
+fn extract_text(xml: &[u8], context: Option<NamespaceContext<'_>>) -> Result<String> {
     if xml.len() > MAX_XML_BYTES {
         return Err(limit("table cell XML bytes", MAX_XML_BYTES));
     }
+    let allow_fragment_fallback = context.is_none();
     let mut reader = NsReader::from_reader(xml);
+    if let Some(context) = context {
+        *reader.resolver_mut() = context.resolver()?;
+    }
     let mut fragment_prefix = None;
     let mut depth = 0usize;
     let mut text_depth = None;
+    // Depth of an open `a:tabLst`: its `a:tab` children are tab stops.
+    let mut tab_list_depth = None;
     let mut result = String::new();
     let mut paragraph_seen = false;
 
@@ -524,18 +682,54 @@ fn extract_text(xml: &[u8]) -> Result<String> {
                 if depth > MAX_DEPTH {
                     return Err(limit("table cell XML depth", MAX_DEPTH));
                 }
-                if is_drawingml(&namespace, element.name(), b"p", &fragment_prefix) {
+                if is_drawingml(
+                    &namespace,
+                    element.name(),
+                    b"p",
+                    &fragment_prefix,
+                    allow_fragment_fallback,
+                ) {
                     if paragraph_seen && !result.is_empty() && !result.ends_with(' ') {
                         result.push(' ');
                     }
                     paragraph_seen = true;
                 } else if text_depth.is_none()
-                    && is_drawingml(&namespace, element.name(), b"t", &fragment_prefix)
+                    && is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
                 {
                     text_depth = Some(depth);
-                } else if is_drawingml(&namespace, element.name(), b"br", &fragment_prefix) {
+                } else if is_drawingml(
+                    &namespace,
+                    element.name(),
+                    b"br",
+                    &fragment_prefix,
+                    allow_fragment_fallback,
+                ) {
                     result.push('\n');
-                } else if is_drawingml(&namespace, element.name(), b"tab", &fragment_prefix) {
+                } else if tab_list_depth.is_none()
+                    && is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"tabLst",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
+                {
+                    tab_list_depth = Some(depth);
+                } else if tab_list_depth.is_none()
+                    && is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"tab",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
+                {
                     result.push('\t');
                 }
             },
@@ -544,9 +738,25 @@ fn extract_text(xml: &[u8]) -> Result<String> {
                     fragment_prefix =
                         Some(element.name().prefix().map(|p| p.into_inner().to_vec()));
                 }
-                if is_drawingml(&namespace, element.name(), b"br", &fragment_prefix) {
+                if is_drawingml(
+                    &namespace,
+                    element.name(),
+                    b"br",
+                    &fragment_prefix,
+                    allow_fragment_fallback,
+                ) {
                     result.push('\n');
-                } else if is_drawingml(&namespace, element.name(), b"tab", &fragment_prefix) {
+                } else if tab_list_depth.is_none()
+                    && is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"tab",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
+                {
+                    // An `a:tab` of an `a:tabLst` defines a tab stop; only
+                    // run content is a tab character.
                     result.push('\t');
                 }
             },
@@ -571,9 +781,18 @@ fn extract_text(xml: &[u8]) -> Result<String> {
             },
             Event::End(element) => {
                 if text_depth == Some(depth)
-                    && is_drawingml(&namespace, element.name(), b"t", &fragment_prefix)
+                    && is_drawingml(
+                        &namespace,
+                        element.name(),
+                        b"t",
+                        &fragment_prefix,
+                        allow_fragment_fallback,
+                    )
                 {
                     text_depth = None;
+                }
+                if tab_list_depth == Some(depth) {
+                    tab_list_depth = None;
                 }
                 depth = depth
                     .checked_sub(1)
@@ -616,6 +835,18 @@ mod tests {
             "A & B"
         );
         assert!(table.properties().unwrap().unwrap().first_row);
+    }
+
+    #[test]
+    fn cell_tab_stops_are_not_text() {
+        let xml = format!(
+            r#"<a:tbl xmlns:a="{DML}"><a:tr><a:tc><a:txBody><a:bodyPr/><a:p><a:pPr><a:tabLst><a:tab pos="914400" algn="l"/></a:tabLst></a:pPr><a:r><a:t>x</a:t></a:r><a:r><a:tab/><a:t>y</a:t></a:r></a:p></a:txBody></a:tc></a:tr></a:tbl>"#
+        );
+        let table = Table::from_xml(xml.as_bytes()).unwrap();
+        assert_eq!(
+            table.rows().unwrap()[0].cells().unwrap()[0].text().unwrap(),
+            "x\ty"
+        );
     }
 
     #[test]

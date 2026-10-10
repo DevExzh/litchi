@@ -133,6 +133,20 @@ pub(crate) fn slide_comments<'a>(
     part.comments(package)
 }
 
+pub(crate) fn slide_comment_snapshot<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+) -> Result<Option<crate::presentation::related::Comments>> {
+    crate::presentation::related::load_eager_comments(package, part)
+}
+
+pub(crate) fn slide_notes<'a>(
+    package: &'a OpcPackage,
+    part: &SlidePart<'a>,
+) -> Result<Option<crate::presentation::related::Notes>> {
+    crate::presentation::related::load_eager_notes(package, part)
+}
+
 pub(crate) fn slide_zooms<'a>(
     package: &'a OpcPackage,
     part: &SlidePart<'a>,

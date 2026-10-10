@@ -187,7 +187,7 @@ impl Snapshot {
     /// limit/allocation/OPC/XML error while constructing the bounded inventory.
     pub fn plan_slide_copy<'s>(
         &self,
-        source: impl Into<crate::slide::Key<'s>>,
+        source: impl Into<crate::slide::Selector<'s>>,
         position: usize,
     ) -> Result<SlideCopyPlan> {
         if position > self.slides.len() {
@@ -1298,7 +1298,7 @@ fn validate_slide_ids(slides: &[Slide]) -> Result<()> {
     Ok(())
 }
 
-fn next_slide_id(slides: &[Slide]) -> Result<u32> {
+pub(super) fn next_slide_id(slides: &[Slide]) -> Result<u32> {
     let maximum = slides.iter().map(|slide| slide.id).max().unwrap_or(255);
     if maximum < MAX_SLIDE_ID {
         return maximum
@@ -1332,7 +1332,7 @@ fn next_slide_id(slides: &[Slide]) -> Result<u32> {
     )
 }
 
-fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<String> {
+pub(super) fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<String> {
     let mut used = Vec::new();
     used.try_reserve_exact(relationships.len())
         .map_err(|source| Error::Allocation {
@@ -1363,7 +1363,7 @@ fn next_relationship_id(relationships: &litchi_opc::Relationships) -> Result<Str
     Ok(format!("rId{candidate}"))
 }
 
-pub(super) fn resolve_slide(snapshot: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {
+pub(super) fn resolve_slide(snapshot: &Snapshot, key: crate::slide::Selector<'_>) -> Result<Slide> {
     snapshot.resolve_slide(key)
 }
 

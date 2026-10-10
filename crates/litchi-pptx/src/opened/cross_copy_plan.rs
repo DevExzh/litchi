@@ -766,8 +766,8 @@ impl Snapshot {
     pub fn plan_cross_slide_copy<'s, 'd>(
         &self,
         source: &Snapshot,
-        source_slide: impl Into<crate::slide::Key<'s>>,
-        destination_slide: impl Into<crate::slide::Key<'d>>,
+        source_slide: impl Into<crate::slide::Selector<'s>>,
+        destination_slide: impl Into<crate::slide::Selector<'d>>,
         position: usize,
     ) -> Result<CrossSlideCopyPlan> {
         let source_slide = resolve_slide(source, source_slide.into())?;
@@ -789,8 +789,8 @@ impl Snapshot {
     pub fn plan_cross_presentation_slide_copy<'s, 'd>(
         &self,
         source: &Snapshot,
-        source_slide: impl Into<crate::slide::Key<'s>>,
-        destination_slide: impl Into<crate::slide::Key<'d>>,
+        source_slide: impl Into<crate::slide::Selector<'s>>,
+        destination_slide: impl Into<crate::slide::Selector<'d>>,
         position: usize,
     ) -> Result<CrossSlideCopyPlan> {
         self.plan_cross_slide_copy(source, source_slide, destination_slide, position)
@@ -3199,7 +3199,7 @@ fn validate_patch_descriptor(
             "cross-slide durable patch has invalid destination identity",
         ));
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Err(invalid(
             "cross-slide durable patch has no destination change",
         ));

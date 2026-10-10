@@ -51,15 +51,16 @@ const MCE_NAMESPACE: &str = "http://schemas.openxmlformats.org/markup-compatibil
 const PRESENTATION_NAMESPACE: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 
 fn marked_slides_package(count: usize, marked: &[usize]) -> Result<Package> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     for index in 0..count {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         let slide = presentation.add_slide()?;
         slide.set_title(&format!("retention slide {index}"));
         if index == 0 {
             slide.set_notes("First notes");
         }
     }
+    let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
     let mut package = Package::from_vec(bytes)?;
     for &index in marked {
@@ -275,7 +276,7 @@ fn transaction_and_commit_release_hooks_are_value_preserving() -> Result<()> {
     transaction.release_retained_mce();
     assert_eq!(transaction.retained_mce_bytes(), 0);
     let mut commit = transaction.commit()?;
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().revision(), revision);
     assert_eq!(commit.snapshot().slides(), slides.as_slice());
     assert_eq!(commit.snapshot().retained_mce_bytes(), 0);
@@ -283,12 +284,12 @@ fn transaction_and_commit_release_hooks_are_value_preserving() -> Result<()> {
     let mut changed = source.edit();
     changed.set_shape_text(0, crate::shape::Key::Index(0), "release candidate")?;
     let mut changed_commit = changed.commit()?;
-    assert!(changed_commit.is_changed());
+    assert!(changed_commit.diagnostics().changed());
     let changed_revision = changed_commit.snapshot().revision();
     changed_commit.release_retained_mce();
     assert_eq!(changed_commit.snapshot().retained_mce_bytes(), 0);
     assert_eq!(changed_commit.snapshot().revision(), changed_revision);
-    assert!(changed_commit.is_changed());
+    assert!(changed_commit.diagnostics().changed());
     commit.release_retained_mce();
     Ok(())
 }
@@ -299,7 +300,7 @@ fn no_op_commit_returns_the_same_retained_snapshot_and_publication_preserves_it(
     let source = package.opened_presentation_with_limits(Limits::default())?;
 
     let commit = source.edit().commit()?;
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().revision(), source.revision());
     assert_eq!(
         commit.snapshot().retained_mce_bytes(),
@@ -308,7 +309,12 @@ fn no_op_commit_returns_the_same_retained_snapshot_and_publication_preserves_it(
     assert_same_output(&source, commit.snapshot(), 0);
     assert_same_output(&source, commit.snapshot(), 1);
 
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
+    assert!(super::model::packages_equal(
+        &package.opc,
+        published.package.as_ref()
+    ));
     assert_eq!(published.revision(), source.revision());
     assert_same_output(&source, &published, 0);
     assert_same_output(&source, &published, 1);
@@ -324,12 +330,17 @@ fn one_edit_misses_the_changed_slide_but_shares_the_untouched_slide_through_publ
     let mut transaction = source.edit();
     assert!(transaction.set_shape_text(0, crate::shape::Key::Index(0), "changed once")?);
     let commit = transaction.commit()?;
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert_distinct_output(&source, commit.snapshot(), 0);
     assert_same_output(&source, commit.snapshot(), 1);
 
     let candidate = commit.snapshot().clone();
-    let published = package.apply_opened_presentation_commit(commit)?;
+    let published = commit.snapshot().clone();
+    package = commit.into_package();
+    assert!(super::model::packages_equal(
+        &package.opc,
+        published.package.as_ref()
+    ));
     assert_distinct_output(&source, &published, 0);
     assert_same_output(&candidate, &published, 1);
     assert_eq!(
@@ -369,7 +380,7 @@ fn a_root_relationship_edit_runs_capture_validation_while_slide_outputs_hit() ->
     let second_name = source.slides[1].part_name.clone();
 
     let mut transaction = source.edit();
-    assert!(transaction.move_slide(0, 1)?);
+    assert!(transaction.move_slide(0, litchi_core::Position::new(1))?);
     let commit = transaction.commit()?;
     let candidate = commit.snapshot();
     assert_eq!(candidate.slides[0].part_name, second_name);

@@ -6,7 +6,7 @@ use litchi_core::OwnedSource;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, PackageWriter, TargetMode};
 
-use crate::{Error, Package, Result, SourceBackedPresentation, SourceBackedPresentationEditor};
+use crate::{Error, Result, SourceBackedPresentation, SourceBackedPresentationEditor};
 
 type TestResult<T = ()> = Result<T>;
 
@@ -173,15 +173,16 @@ fn chart_payload() -> Vec<u8> {
 }
 
 fn authored_fixture(slide_titles: &[&str]) -> TestResult<Vec<u8>> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         for title in slide_titles {
             let slide = presentation.add_slide()?;
             slide.set_title(title);
             slide.add_text_box(&format!("body:{title}"), 10, 20, 300, 400);
         }
     }
+    let mut package = builder.build()?;
     let mut archive = OpcPackage::from_vec(package.to_bytes()?)?;
     for (index, title) in slide_titles.iter().enumerate() {
         let uri =

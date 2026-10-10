@@ -76,19 +76,20 @@ fn flat(len: usize) -> Vec<u8> {
 }
 
 fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
-    let mut package = Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = crate::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for index in 0..slides {
         presentation
             .add_slide()?
             .set_title(&format!("change-0751-{prefix}-{index}"));
     }
+    let mut package = builder.build()?;
     package.to_bytes()
 }
 
 fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &str, &[u8])]) -> Result<Vec<u8>> {
     let mut package = Package::from_bytes(bytes)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut edit = package.edit()?;
     for (index, (part_name, content_type, data)) in pictures.iter().enumerate() {
         edit.add_picture(
             slide,
@@ -98,7 +99,7 @@ fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &str, &[u8])]) -
         )?;
     }
     let commit = edit.commit()?;
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     package.to_bytes()
 }
 
@@ -312,10 +313,10 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     // A destination that moved after planning is refused.
     let mut moved = Package::from_vec(destination_bytes.to_vec())?;
     {
-        let mut edit = moved.opened_presentation_transaction()?;
+        let mut edit = moved.edit()?;
         edit.set_shape_text(0, crate::shape::Key::Index(0), "change-0751 moved")?;
         let commit = edit.commit()?;
-        moved.apply_opened_presentation_commit(commit)?;
+        moved = commit.into_package();
     }
     let outcome = moved.apply_cross_slide_copy_plan(&source, &plan);
     record_outcome(
@@ -328,10 +329,10 @@ fn pair_transcript(label: &str, source_bytes: &[u8], destination_bytes: &[u8]) -
     // A source that moved after planning, and a foreign source, are refused.
     let mut moved_source = Package::from_vec(source_bytes.to_vec())?;
     {
-        let mut edit = moved_source.opened_presentation_transaction()?;
+        let mut edit = moved_source.edit()?;
         edit.set_shape_text(0, crate::shape::Key::Index(0), "change-0751 moved source")?;
         let commit = edit.commit()?;
-        moved_source.apply_opened_presentation_commit(commit)?;
+        moved_source = commit.into_package();
     }
     let mut target = Package::from_vec(destination_bytes.to_vec())?;
     let outcome = target.apply_cross_slide_copy_plan(&moved_source, &plan);
@@ -811,14 +812,25 @@ plain.limits.destination-exact.patch.untouched=6cdd00f339051b5f0a35d4809233fd3f6
 plain.limits.destination-exact.plan.refused=Limit { resource: "cross-slide serialized archive bytes", limit: 30461 }
 "#;
 
-/// Every durable patch byte, recorded revision, published byte, snapshot
-/// revision and refusal of the scenarios equals the base's. Debug and test
-/// builds also re-derive every memoized digest these routes reuse.
+/// LPTX0003 changes wire hashes and size-dependent refusal points. The original
+/// transcript remains frozen; all its non-wire, non-limit outcomes still agree.
+/// The versioned transcript checks every current wire and refusal outcome too.
 #[test]
-fn every_patch_revision_output_and_refusal_matches_the_base() -> Result<()> {
+fn versioned_patch_wire_preserves_base_revisions_and_publication() -> Result<()> {
     let transcript = full_transcript()?;
     let actual: Vec<&str> = transcript.lines().collect();
-    let expected: Vec<&str> = GOLDEN.lines().collect();
+    let expected: Vec<&str> = include_str!("digest_reuse_lptx0003.golden.txt")
+        .lines()
+        .collect();
+    for legacy in GOLDEN.lines() {
+        let (key, _) = legacy.split_once('=').expect("golden row");
+        if !key.contains(".limits.") && !key.ends_with(".bytes") && !key.ends_with(".inverse") {
+            assert!(
+                actual.contains(&legacy),
+                "non-wire legacy outcome changed: {key}"
+            );
+        }
+    }
     for (index, (actual, expected)) in actual.iter().zip(&expected).enumerate() {
         assert_eq!(
             actual, expected,

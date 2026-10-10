@@ -77,6 +77,7 @@
 pub mod actions;
 pub mod animations;
 pub mod backgrounds;
+pub mod builder;
 pub mod change_tracking;
 pub mod chart;
 pub mod comments;
@@ -102,6 +103,7 @@ pub mod presentation;
 pub mod presentation_properties;
 pub mod shape;
 pub mod slide;
+mod source_limits;
 pub mod table;
 pub mod tag;
 pub mod time;
@@ -180,8 +182,9 @@ pub use media_parts::{
 };
 pub use modern_comments::*;
 pub use opened::{
-    CrossSlideCopyPatch, CrossSlideCopyPlan, MAX_SHAPE_TEXT_REPLACEMENTS, ShapeTextReplacement,
-    SlideCopyPart, SlideCopyPlan, SlideRemovalPatch, SlideRemovalPlan,
+    CrossSlideCopyPatch, CrossSlideCopyPlan, MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+    MAX_SHAPE_TEXT_REPLACEMENTS, ShapePropertiesReplacement, ShapeTextReplacement, SlideCopyPart,
+    SlideCopyPlan, SlideRemovalPatch, SlideRemovalPlan,
 };
 pub use package::Package;
 pub use presentation::embedded::ink_actions;
@@ -192,11 +195,12 @@ pub use presentation::{
     SourceBackedSlideBatchPatch, SourceBackedSlideBatchSnapshot, SourceBackedSlideCommit,
     SourceBackedSlideEdit, SourceBackedSlideOrderCommit, SourceBackedSlideOrderEdit,
     SourceBackedSlideOrderPatch, SourceBackedSlideOrderSnapshot, SourceBackedSlidePatch,
-    SourceBackedSlideSnapshot, SourceBackedSvgAttachmentCommit, SourceBackedSvgAttachmentEdit,
-    SourceBackedSvgAttachmentPatch, SourceBackedSvgAttachmentSnapshot, SourceBackedSvgCommit,
-    SourceBackedSvgEdit, SourceBackedSvgPatch, SourceBackedSvgSnapshot, SourceImage,
-    SourceImageDescriptor, SourceImageTarget, SourceSlide, SourceSvgAttachment,
-    SourceSvgAttachmentReplacement, SourceSvgDescriptor, SourceSvgImage, SourceSvgReplacement,
+    SourceBackedSlideRemovalPlan, SourceBackedSlideSnapshot, SourceBackedSvgAttachmentCommit,
+    SourceBackedSvgAttachmentEdit, SourceBackedSvgAttachmentPatch,
+    SourceBackedSvgAttachmentSnapshot, SourceBackedSvgCommit, SourceBackedSvgEdit,
+    SourceBackedSvgPatch, SourceBackedSvgSnapshot, SourceImage, SourceImageDescriptor,
+    SourceImageTarget, SourceSlide, SourceSvgAttachment, SourceSvgAttachmentReplacement,
+    SourceSvgDescriptor, SourceSvgImage, SourceSvgReplacement,
 };
 pub use presentation_properties::{
     BrowserSupport, Color, ColorKind, Extension, HtmlPublish, HtmlTarget, OpaqueExtension, Print,
@@ -204,7 +208,7 @@ pub use presentation_properties::{
     WebColor, WebScreenSize, load_from_package as load_presentation_properties,
     load_from_package_with_tolerance as load_presentation_properties_with_tolerance,
 };
-pub use slide::{Key, Slide, SlideLayout, SlideMaster};
+pub use slide::{Slide, SlideLayout, SlideMaster};
 pub use validation::{
     PptxValidationError, PptxValidationLimits, validate_source, validate_source_backed,
     validate_source_backed_with_limits, validate_source_with_limits,
@@ -220,3 +224,6 @@ pub use writer::{
     StreamingPresentationOptions, StreamingPresentationScratchLimits, StreamingPresentationWriter,
     StreamingSlideWriter, TextBoxSpec,
 };
+
+/// Immutable source-backed PPTX package ownership and primary editing.
+pub use presentation::source::primary as source;

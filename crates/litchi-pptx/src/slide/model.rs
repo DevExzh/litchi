@@ -13,24 +13,38 @@ use crate::shape::Scene;
 
 use super::{codec, package};
 
-/// Checked selector for an ordered slide graph.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Key<'a> {
-    /// Select by exact producer-visible name.
-    Name(&'a str),
+/// Semantic slide selection by exact producer-visible name or checked position.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum Selector<'a> {
+    /// Select by exact producer-visible name; ambiguous names are refused.
+    Name(std::borrow::Cow<'a, str>),
     /// Select by zero-based presentation order.
-    Index(usize),
+    Position(litchi_core::Position),
 }
 
-impl<'a> From<&'a str> for Key<'a> {
+impl<'a> From<&'a str> for Selector<'a> {
     fn from(value: &'a str) -> Self {
-        Self::Name(value)
+        Self::Name(value.into())
     }
 }
-
-impl From<usize> for Key<'_> {
+impl From<String> for Selector<'_> {
+    fn from(value: String) -> Self {
+        Self::Name(value.into())
+    }
+}
+impl<'a> From<&'a String> for Selector<'a> {
+    fn from(value: &'a String) -> Self {
+        Self::Name(value.as_str().into())
+    }
+}
+impl From<litchi_core::Position> for Selector<'_> {
+    fn from(value: litchi_core::Position) -> Self {
+        Self::Position(value)
+    }
+}
+impl From<usize> for Selector<'_> {
     fn from(value: usize) -> Self {
-        Self::Index(value)
+        Self::Position(litchi_core::Position::new(value))
     }
 }
 
@@ -102,6 +116,15 @@ impl<'a> Slide<'a> {
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
         codec::slide_shapes(&self.part)
+    }
+
+    /// Retain an independently owned shape scene sharing this part's payload.
+    /// Handles from the scene remain valid after the package and slide view drop.
+    ///
+    /// # Errors
+    /// Returns the same validation and parse errors as [`Self::shapes`].
+    pub fn scene(&self) -> Result<crate::shape::owned::Scene> {
+        crate::shape::owned::Scene::from_parsed(self.part.shapes()?, self.part.part().blob_arc())
     }
 
     /// Parse this slide's animation timing tree and build list.
@@ -287,6 +310,49 @@ impl<'a> Slide<'a> {
         package::slide_comments(self.package, &self.part)
     }
 
+    /// Resolve the optional legacy comments part into a detached semantic
+    /// snapshot.  Only this slide's comments relationship and, when present,
+    /// the presentation-level comment-author part are read; the package-wide
+    /// comments graph is not materialized.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the selected relationships, content types,
+    /// author closure, or comments XML are malformed.
+    pub fn comment_snapshot(&self) -> Result<Option<crate::presentation::related::Comments>> {
+        package::slide_comment_snapshot(self.package, &self.part)
+    }
+
+    /// Resolve the optional modern-comment list attached to this slide.
+    ///
+    /// Only this slide's modern-comment part and, when required, the
+    /// presentation-level author part are read. The package-wide modern
+    /// comment graph is not materialized.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the selected relationships, content types, author
+    /// closure, or modern-comment XML are malformed.
+    pub fn modern_comments(&self) -> Result<Option<crate::presentation::modern_comments::List>> {
+        crate::presentation::modern_comments::acquire_eager(self.package, &self.part)
+    }
+
+    /// Read this slide's optional speaker-notes part as a detached snapshot.
+    ///
+    /// The selected notes relationship and its bounded owning-slide,
+    /// notes-master, theme, and presentation-root closure are read. The
+    /// presentation-wide notes graph and other slides are not traversed. The
+    /// returned snapshot retains its owned scene and remains usable after the
+    /// package and slide view are dropped.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the relationship is duplicated, external, or
+    /// points to a missing, mistyped, malformed, or non-strict notes part.
+    pub fn notes(&self) -> Result<Option<crate::presentation::related::Notes>> {
+        package::slide_notes(self.package, &self.part)
+    }
+
     /// Read typed section, slide, and summary zoom metadata in this slide.
     ///
     /// # Errors
@@ -374,6 +440,15 @@ impl<'a> SlideLayout<'a> {
         codec::layout_shapes(&self.part)
     }
 
+    /// Retain an independently owned shape scene sharing this part's payload.
+    /// Handles from the scene remain valid after the package and slide view drop.
+    ///
+    /// # Errors
+    /// Returns the same validation and parse errors as [`Self::shapes`].
+    pub fn scene(&self) -> Result<crate::shape::owned::Scene> {
+        crate::shape::owned::Scene::from_parsed(self.part.shapes()?, self.part.part().blob_arc())
+    }
+
     /// Read the optional theme override attached to this layout.
     ///
     /// # Errors
@@ -439,6 +514,15 @@ impl<'a> SlideMaster<'a> {
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<Scene<'a>> {
         codec::master_shapes(&self.part)
+    }
+
+    /// Retain an independently owned shape scene sharing this part's payload.
+    /// Handles from the scene remain valid after the package and slide view drop.
+    ///
+    /// # Errors
+    /// Returns the same validation and parse errors as [`Self::shapes`].
+    pub fn scene(&self) -> Result<crate::shape::owned::Scene> {
+        crate::shape::owned::Scene::from_parsed(self.part.shapes()?, self.part.part().blob_arc())
     }
 
     /// Read the theme reached from this slide master.

@@ -128,10 +128,11 @@ fn strict_aliases_round_trip_without_transitional_namespace_leakage() {
 
 #[test]
 fn facade_publishes_and_reverses_exact_source_checked_commit() {
-    let mut authored = Package::new().unwrap();
-    let slide = authored.presentation_mut().unwrap().add_slide().unwrap();
+    let mut builder = crate::builder::Builder::new().unwrap();
+    let slide = builder.presentation().unwrap().add_slide().unwrap();
     slide.add_text_box("Title", 0, 0, 100, 100);
     slide.add_ellipse(0, 0, 100, 100, None);
+    let mut authored = builder.build().unwrap();
     let bytes = authored.to_bytes().unwrap();
     let mut package = Package::from_bytes(&bytes).unwrap();
 

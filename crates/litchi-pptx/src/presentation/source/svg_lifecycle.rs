@@ -1457,7 +1457,9 @@ fn build_attachment_topology_plan(
                 svg.part_uri.clone(),
                 "image/svg+xml".to_owned(),
                 match &svg.payload {
-                    SourcePayload::Edited(bytes) => Arc::clone(bytes),
+                    SourcePayload::Edited(bytes) | SourcePayload::ReservedEdit { bytes, .. } => {
+                        Arc::clone(bytes)
+                    },
                     SourcePayload::Original(_) => {
                         return Err(Error::Invalid(
                             "new SVG attachment payload is not edit-owned".into(),

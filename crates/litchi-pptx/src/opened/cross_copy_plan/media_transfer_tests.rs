@@ -60,13 +60,14 @@ fn flat(len: usize) -> Vec<u8> {
 const SVG: &[u8] = br#"<?xml version="1.0" encoding="UTF-8"?><svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>"#;
 
 fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
-    let mut package = Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = crate::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for index in 0..slides {
         presentation
             .add_slide()?
             .set_title(&format!("change-0742-{prefix}-{index}"));
     }
+    let mut package = builder.build()?;
     package.to_bytes()
 }
 
@@ -74,7 +75,7 @@ fn authored(prefix: &str, slides: usize) -> Result<Vec<u8>> {
 /// would, and serialize the result.
 fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &str, &[u8])]) -> Result<Vec<u8>> {
     let mut package = Package::from_bytes(bytes)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut edit = package.edit()?;
     for (index, (part_name, content_type, data)) in pictures.iter().enumerate() {
         edit.add_picture(
             slide,
@@ -84,7 +85,7 @@ fn with_pictures(bytes: &[u8], slide: usize, pictures: &[(&str, &str, &[u8])]) -
         )?;
     }
     let commit = edit.commit()?;
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     package.to_bytes()
 }
 
@@ -729,7 +730,7 @@ fn legacy_lpcp0003_patches_are_refused_by_name() -> Result<()> {
     // The generator's inputs, rebuilt with the same authoring steps.
     let source_bytes = {
         let mut package = Package::from_bytes(&authored("source", 3)?)?;
-        let mut edit = package.opened_presentation_transaction()?;
+        let mut edit = package.edit()?;
         edit.add_picture(
             SOURCE_SLIDE,
             "change-0742-legacy-picture",
@@ -741,7 +742,7 @@ fn legacy_lpcp0003_patches_are_refused_by_name() -> Result<()> {
             (800, 800, 72, 72),
         )?;
         let commit = edit.commit()?;
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
         package.to_bytes()?
     };
     let destination_bytes = authored("destination", 2)?;

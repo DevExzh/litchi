@@ -22,12 +22,13 @@ use crate::{Error, Package, Result};
 const SLIDE: &str = "/ppt/slides/slide1.xml";
 
 fn text_box_package(texts: &[&str]) -> Result<Package> {
-    let mut package = Package::new()?;
-    let slide = package.presentation_mut()?.add_slide()?;
+    let mut builder = crate::builder::Builder::new()?;
+    let slide = builder.presentation()?.add_slide()?;
     for (index, text) in texts.iter().enumerate() {
         let offset = i64::try_from(index).map_err(|_| Error::Invalid("offset".into()))?;
         slide.add_text_box(text, 10, 20 + offset * 500, 300, 400);
     }
+    let mut package = builder.build()?;
     Package::from_vec(package.to_bytes()?)
 }
 
@@ -255,5 +256,29 @@ fn a_byte_order_marked_slide_is_edited_correctly_and_keeps_its_mark() -> Result<
         .text()
         .map(str::to_owned);
     assert_eq!(text.as_deref(), Some("edited"));
+    Ok(())
+}
+
+#[test]
+fn explicit_empty_text_body_can_be_cleared_and_filled_through_both_verbs() -> Result<()> {
+    let source = text_box_package(&["original"])?;
+    let mut edit = source.edit()?;
+    assert!(edit.set_shape_text(0_usize, 0_usize, "")?);
+    let cleared = edit.commit()?.into_package();
+    let root = cleared.opened_presentation()?;
+    let part = cleared.opc.get_part(root.slides()[0].part_name())?;
+    let scene = crate::shape::Scene::read(part.blob())?;
+    assert_eq!(scene.at(0)?.common().text(), Some(""));
+    let mut edit = cleared.edit()?;
+    assert!(!edit.set_shape_text(0_usize, 0_usize, "")?);
+    assert_eq!(
+        edit.set_shape_texts(
+            0_usize,
+            &[ShapeTextReplacement::new(0_usize.into(), "refilled")]
+        )?,
+        1
+    );
+    let filled = edit.commit()?.into_package();
+    assert_eq!(filled.presentation()?.slides()?[0].text()?, "refilled");
     Ok(())
 }

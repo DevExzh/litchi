@@ -3,6 +3,9 @@
 //! [`Scene`] indexes the full owner XML once, preserving inherited namespace
 //! aliases and markup-compatibility branch selection. Shape XML is exposed by
 //! checked spans into that processed owner; no element subtree is copied.
+//! A shape's local `DrawingML` story is decoded lazily by
+//! [`Common::text_body`]. Physical text-body coordinates remain in
+//! [`raw::text_body_span`], alongside the other source metadata accessors.
 //!
 //! ```
 //! use litchi_pptx::shape::{Scene, Shape};
@@ -24,6 +27,8 @@
 pub mod classification;
 pub mod designer;
 pub mod diagram;
+pub mod owned;
+pub mod raw;
 pub mod text;
 pub mod theme;
 pub mod zoom;
@@ -32,7 +37,7 @@ mod model;
 mod reader;
 
 pub use model::{
-    Auto, Bounds, Chart, Common, Connector, Content, Diagram, Frame, Group, Ole,
+    Auto, Bounds, Chart, Common, Connector, Content, Diagram, Frame, Group, NonVisual, Ole,
     PLACEHOLDER_TYPE_EXTENSION_URI, Picture, Placeholder, PlaceholderTypeExtension, Shape, Shapes,
     Span, Table, Unknown,
 };

@@ -24,10 +24,11 @@ use crate::opened::model::Limits;
 use crate::{Error, Package, Result};
 
 fn owned_slides(titles: &[&str]) -> Result<Package> {
-    let mut package = Package::new()?;
+    let mut builder = crate::builder::Builder::new()?;
     for title in titles {
-        package.presentation_mut()?.add_slide()?.set_title(title);
+        builder.presentation()?.add_slide()?.set_title(title);
     }
+    let mut package = builder.build()?;
     let bytes = package.to_bytes()?;
     Package::from_vec(bytes)
 }

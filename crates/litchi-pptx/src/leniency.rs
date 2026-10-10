@@ -1119,6 +1119,30 @@ impl ToleranceReport {
         }
     }
 
+    /// The logical number of heap bytes this report keeps: its defect slots,
+    /// consecutive shared part names once, and the item and value text.
+    /// Nonconsecutive shared names may be counted repeatedly. This is a
+    /// conservative cache weight, not an allocator measurement.
+    pub(crate) fn heap_bytes(&self) -> usize {
+        let mut total = self
+            .defects
+            .capacity()
+            .saturating_mul(size_of::<ToleratedDefect>());
+        let mut last_part: Option<&Arc<str>> = None;
+        for tolerated in &self.defects {
+            if let Some(part) = tolerated.part.as_ref()
+                && !last_part.is_some_and(|last| Arc::ptr_eq(last, part))
+            {
+                total = total.saturating_add(part.len());
+                last_part = Some(part);
+            }
+            total = total
+                .saturating_add(tolerated.item.as_deref().map_or(0, str::len))
+                .saturating_add(tolerated.value.as_deref().map_or(0, str::len));
+        }
+        total
+    }
+
     /// Merge another parse's report into this one, keeping discovery order.
     ///
     /// The stored-entry bound applies to the merged report as a whole; entries

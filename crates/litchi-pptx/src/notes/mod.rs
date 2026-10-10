@@ -7,7 +7,10 @@ mod transaction;
 mod validation;
 
 pub use codec::{master_xml, write_text, write_text_with};
-pub(crate) use codec::{rewrite_text, root_conformance_from_processed};
+pub(crate) use codec::{
+    rewrite_text, root_conformance, root_conformance_from_processed, scan_xml,
+    validate_resource_xml,
+};
 pub use model::{Conformance, Graph, Link, Master, Slide, Theme};
 pub(crate) use package::{
     SlideRootMemo, SlideRootProof, apply_commit, apply_patch, clear_checked, load, load_snapshot,
@@ -16,6 +19,7 @@ pub(crate) use package::{
 #[cfg(test)]
 pub(crate) use package::{clear, put, remove, with_refused_slide_root_reservation};
 pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub(crate) use validation::validate_id;
 
 pub(crate) const P: &str = "http://schemas.openxmlformats.org/presentationml/2006/main";
 pub(crate) const PS: &str = "http://purl.oclc.org/ooxml/presentationml/main";
@@ -35,6 +39,10 @@ pub(crate) const MAX_TOTAL_BYTES: usize = 64 * 1024 * 1024;
 pub(crate) const MAX_NOTES_SLIDES: usize = 4096;
 pub(crate) const MAX_OWNED_PARTS: usize = 4_096;
 pub(crate) const MAX_NODES: usize = 100_000;
+/// The complete slide-root classifier shares the one-million-node admission
+/// used by the bounded slide readers. Notes parts retain their narrower
+/// [`MAX_NODES`] ceiling.
+pub(crate) const MAX_SLIDE_ROOT_NODES: usize = 1_000_000;
 pub(crate) const MAX_DEPTH: usize = 128;
 pub(crate) const MAX_ATTRIBUTES: usize = 500_000;
 pub(crate) const MAX_ATTRIBUTE_BYTES: usize = 8 * 1024 * 1024;

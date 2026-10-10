@@ -4,6 +4,9 @@ use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Weak};
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
+use quick_xml::events::Event;
+use quick_xml::name::{Namespace, ResolveResult};
+use quick_xml::reader::NsReader;
 
 use super::model::{Slide, SlideNameIndex, Snapshot, capture, invalid};
 use super::patch::Patch;
@@ -12,6 +15,9 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 /// One failure-atomic edit rooted in an immutable opened-package snapshot.
 ///
+/// Start with [`Package::edit`](crate::Package::edit) or [`Snapshot::edit`].
+/// Dropping this value discards all staged changes without changing its source.
+///
 /// A signed package is edited only after its signature is removed
 /// explicitly with [`Package::unsign`](crate::Package::unsign) (ADR 0006):
 /// [`Self::commit`] refuses a changed commit over a signed package, and the
@@ -19,7 +25,7 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 /// modern comments, table styles, charts, masters and layouts) refuse it
 /// while staging.
 #[derive(Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     working: OpcPackage,
     slides: Vec<Slide>,
@@ -35,17 +41,17 @@ pub struct Transaction {
     scene_read: HashMap<PackURI, Weak<Vec<u8>>>,
 }
 
-impl std::fmt::Debug for Transaction {
+impl std::fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
-            .debug_struct("Transaction")
+            .debug_struct("Edit")
             .field("source", &self.source)
-            .field("slides", &self.slides)
+            .field("slide_count", &self.slides.len())
             .finish_non_exhaustive()
     }
 }
 
-impl Transaction {
+impl Edit {
     pub(crate) fn new(source: Snapshot) -> Self {
         Self {
             working: source.package.as_ref().clone(),
@@ -85,13 +91,6 @@ impl Transaction {
         &self.slides
     }
 
-    /// Whether any managed resource differs from the source root.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        super::model::package_fingerprint_with_memo(&self.working, Some(&self.source.part_digests))
-            .is_ok_and(|(revision, _digests)| revision != self.source.revision)
-    }
-
     /// Aggregate charged bytes held by the source snapshot's optional MCE
     /// projection table. Cloned snapshots may report the same shared charge,
     /// so per-owner values are not additive physical-memory measurements.
@@ -107,43 +106,146 @@ impl Transaction {
         self.source.release_retained_mce();
     }
 
-    /// Move one slide between checked zero-based positions.
+    /// Insert an empty slide at a checked zero-based position using an exact
+    /// registered layout name. The position may equal the current slide count.
+    ///
+    /// The layout is shared; its placeholder shapes are not copied into the
+    /// new slide. Add shapes through this transaction after insertion. Existing
+    /// presentation and metadata XML retain their source spelling.
+    ///
+    /// ```
+    /// let source = litchi_pptx::Package::new()?;
+    /// let mut edit = source.edit()?;
+    /// let slide = edit.insert_slide(litchi_core::Position::new(0), "Blank")?;
+    /// edit.add_text_box(slide.name(), "Hello", (0, 0, 914_400, 914_400))?;
+    /// let presentation = edit.commit()?.into_package();
+    /// # Ok::<(), litchi_pptx::Error>(())
+    /// ```
     ///
     /// # Errors
+    /// Returns an error for a missing or ambiguous layout, an invalid position,
+    /// unsupported source topology, signatures/protection, or exceeded limits.
+    /// Failure leaves every previously staged change intact.
+    pub fn insert_slide(
+        &mut self,
+        position: litchi_core::Position,
+        layout_name: &str,
+    ) -> Result<Slide> {
+        let current = capture(
+            &self.working,
+            self.source.limits,
+            self.source.physical_source_provenance,
+        )?;
+        let patch = super::insert::plan(&current, position.get(), layout_name)?;
+        let (working, published) = super::patch::apply_to_new(
+            &self.working,
+            &patch,
+            self.source.physical_source_provenance,
+            &current.part_digests,
+        )?;
+        let selected = published
+            .slides
+            .get(position.get())
+            .cloned()
+            .ok_or_else(|| invalid("slide insertion lost its checked position"))?;
+        self.working = working;
+        self.slides = published.slides;
+        self.slide_name_index = published.slide_name_index;
+        Ok(selected)
+    }
+
+    /// Move a slide selected by exact name or position to a checked slot.
     ///
-    /// Returns an error for an out-of-range position or an unsupported
-    /// slide-list dependency in the raw presentation XML.
-    pub fn move_slide(&mut self, from: usize, to: usize) -> Result<bool> {
-        let length = self.slides.len();
-        if from >= length {
-            return Err(Error::SlideIndexOutOfBounds {
-                index: from,
-                len: length,
-            });
-        }
-        if to >= length {
+    /// Both selection and destination refer to the currently staged order.
+    /// The destination is the final zero-based position after detachment.
+    /// Missing/ambiguous selectors and unsupported slide-list dependencies
+    /// fail before changing this edit.
+    pub fn move_slide<'s>(
+        &mut self,
+        from: impl Into<crate::slide::Selector<'s>>,
+        to: litchi_core::Position,
+    ) -> Result<bool> {
+        let from = self.resolve_slide_position(from.into())?;
+        let to = to.get();
+        if to >= self.slides.len() {
             return Err(Error::SlideIndexOutOfBounds {
                 index: to,
-                len: length,
+                len: self.slides.len(),
             });
         }
         if from == to {
             return Ok(false);
         }
-        let mut order: Vec<_> = self.slides.iter().map(Slide::id).collect();
+        let mut order = self.slide_order_ids()?;
         let id = order.remove(from);
         order.insert(to, id);
-        self.reorder_slides(&order)
+        self.reorder_slide_ids(&order)
     }
 
-    /// Replace the complete slide order by stable slide IDs.
+    /// Exchange two selected slides in one failure-atomic order edit.
+    pub fn swap_slides<'a, 'b>(
+        &mut self,
+        left: impl Into<crate::slide::Selector<'a>>,
+        right: impl Into<crate::slide::Selector<'b>>,
+    ) -> Result<bool> {
+        let left = self.resolve_slide_position(left.into())?;
+        let right = self.resolve_slide_position(right.into())?;
+        if left == right {
+            return Ok(false);
+        }
+        let mut order = self.slide_order_ids()?;
+        order.swap(left, right);
+        self.reorder_slide_ids(&order)
+    }
+
+    /// Replace the complete order by semantic slide selectors.
     ///
-    /// # Errors
-    ///
-    /// Returns an error unless the IDs are an exact permutation of the
-    /// currently staged slide identities.
-    pub fn reorder_slides(&mut self, ordered_ids: &[u32]) -> Result<bool> {
-        if ordered_ids == self.slides.iter().map(Slide::id).collect::<Vec<_>>() {
+    /// All selectors resolve against the same currently staged order. They
+    /// must name every slide exactly once; raw slide IDs remain internal.
+    pub fn reorder_slides(&mut self, selectors: &[crate::slide::Selector<'_>]) -> Result<bool> {
+        if selectors.len() != self.slides.len() {
+            return Err(invalid(
+                "slide order must select every staged slide exactly once",
+            ));
+        }
+        let mut order = Vec::new();
+        order
+            .try_reserve_exact(selectors.len())
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation selected slide order",
+                source,
+            })?;
+        for selector in selectors {
+            let selector = match selector {
+                crate::slide::Selector::Name(name) => crate::slide::Selector::from(name.as_ref()),
+                crate::slide::Selector::Position(position) => {
+                    crate::slide::Selector::from(*position)
+                },
+            };
+            order.push(self.slides[self.resolve_slide_position(selector)?].id);
+        }
+        self.reorder_slide_ids(&order)
+    }
+
+    fn slide_order_ids(&self) -> Result<Vec<u32>> {
+        let mut order = Vec::new();
+        order
+            .try_reserve_exact(self.slides.len())
+            .map_err(|source| Error::Allocation {
+                resource: "opened-presentation slide order identities",
+                source,
+            })?;
+        order.extend(self.slides.iter().map(Slide::id));
+        Ok(order)
+    }
+
+    fn reorder_slide_ids(&mut self, ordered_ids: &[u32]) -> Result<bool> {
+        if ordered_ids.len() == self.slides.len()
+            && ordered_ids
+                .iter()
+                .zip(&self.slides)
+                .all(|(id, slide)| *id == slide.id)
+        {
             return Ok(false);
         }
         let main = self.working.get_part(&self.source.presentation_name)?;
@@ -185,7 +287,10 @@ impl Transaction {
     ///
     /// Returns an error for a missing selector, the final remaining slide, or
     /// an unsupported slide-list or relationship topology.
-    pub fn remove_slide<'s>(&mut self, slide: impl Into<crate::slide::Key<'s>>) -> Result<Slide> {
+    pub fn remove_slide<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+    ) -> Result<Slide> {
         let snapshot = capture(
             &self.working,
             self.source.limits,
@@ -216,7 +321,7 @@ impl Transaction {
     /// text body, malformed raw XML, invalid characters, or exceeded bounds.
     pub fn set_shape_text<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
         text: impl AsRef<str>,
     ) -> Result<bool> {
@@ -269,7 +374,7 @@ impl Transaction {
     /// byte limit are accepted.
     pub fn set_shape_texts<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         replacements: &[super::ShapeTextReplacement<'_>],
     ) -> Result<usize> {
         let selected_slide = self.resolve_slide(slide.into())?;
@@ -291,6 +396,99 @@ impl Transaction {
         Ok(changed)
     }
 
+    /// Atomically replace text from several already bounded same-slide
+    /// batches in one scene read, rewrite, and read-back.
+    ///
+    /// Each inner slice keeps the ordinary 256-selector and aggregate text
+    /// limits of [`Self::set_shape_texts`]. The chunks are intended for a
+    /// caller that has already established a globally disjoint target set;
+    /// the codec still validates that invariant before publishing anything.
+    /// This is the bounded chunked transaction form for adapters that retain
+    /// the per-call contract while avoiding an O(chunks * slide-size) walk.
+    /// At most 100,000 chunks and selections are accepted, with aggregate
+    /// replacement text bounded by the default shape output-byte limit.
+    pub fn set_shape_text_chunks<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        chunks: &[&[super::ShapeTextReplacement<'_>]],
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let (xml, changed) = super::stage_shape_text_chunks(
+            owner.blob(),
+            chunks,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working
+                .get_part_mut(&selected_slide.part_name)?
+                .set_blob(xml);
+            self.note_scene_read(&selected_slide.part_name);
+        }
+        Ok(changed)
+    }
+
+    /// Atomically replace visible text and/or complete local transform bounds
+    /// in a bounded set of positional shapes on one slide.
+    ///
+    /// Every target is resolved against the same immutable scene. Duplicate
+    /// targets are refused, text and geometry are staged against one local
+    /// candidate, and the transaction is changed only after the complete
+    /// candidate reads back with the requested values. The return value is
+    /// the number of shapes whose supplied properties changed.
+    pub fn set_shape_properties<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        replacements: &[super::ShapePropertiesReplacement<'_>],
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let (xml, changed) = super::properties::stage_shape_properties(
+            owner.blob(),
+            replacements,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working
+                .get_part_mut(&selected_slide.part_name)?
+                .set_blob(xml);
+            self.note_scene_read(&selected_slide.part_name);
+        }
+        Ok(changed)
+    }
+
+    /// Atomically replace text and/or bounds from several already bounded
+    /// same-slide property batches in one scene read, rewrite, and read-back.
+    /// Each inner slice retains the ordinary per-call property limits.
+    /// Chunk count and total selections are limited to 100,000; aggregate
+    /// replacement text cannot exceed the default shape output-byte limit.
+    pub fn set_shape_property_chunks<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        chunks: &[&[super::ShapePropertiesReplacement<'_>]],
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let (xml, changed) = super::stage_shape_property_chunks(
+            owner.blob(),
+            chunks,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working
+                .get_part_mut(&selected_slide.part_name)?
+                .set_blob(xml);
+            self.note_scene_read(&selected_slide.part_name);
+        }
+        Ok(changed)
+    }
+
     /// Add a plain `DrawingML` text box without rebuilding the surrounding slide.
     ///
     /// # Errors
@@ -299,7 +497,7 @@ impl Transaction {
     /// exhausted non-visual shape-ID space.
     pub fn add_text_box<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         text: impl AsRef<str>,
         bounds: (i64, i64, i64, i64),
     ) -> Result<u32> {
@@ -327,7 +525,7 @@ impl Transaction {
     /// exhausted non-visual shape-ID space.
     pub fn add_rectangle<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         bounds: (i64, i64, i64, i64),
         fill_color: Option<&str>,
     ) -> Result<u32> {
@@ -342,7 +540,7 @@ impl Transaction {
     /// exhausted non-visual shape-ID space.
     pub fn add_ellipse<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         bounds: (i64, i64, i64, i64),
         fill_color: Option<&str>,
     ) -> Result<u32> {
@@ -360,7 +558,7 @@ impl Transaction {
     /// invalid geometry, malformed slide XML, or an exhausted shape-ID space.
     pub fn add_picture<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         name: impl AsRef<str>,
         resource: &crate::media_parts::Resource,
         bounds: (i64, i64, i64, i64),
@@ -384,7 +582,8 @@ impl Transaction {
                 "opened-presentation picture resource must use an image content type",
             ));
         }
-        let preferred = PackURI::new(&resource.part_name).map_err(Error::Invalid)?;
+        let preferred = PackURI::new(&resource.part_name)
+            .map_err(|_error| invalid("opened-presentation resource part name is invalid"))?;
         if !preferred.as_str().starts_with("/ppt/media/") {
             return Err(invalid(
                 "opened-presentation picture resource must use a /ppt/media/ part name",
@@ -438,7 +637,7 @@ impl Transaction {
     /// relationship topology.
     pub fn remove_shape<'s, 'k>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         shape: impl Into<crate::shape::Key<'k>>,
     ) -> Result<bool> {
         let selected = self.resolve_slide(slide.into())?;
@@ -493,9 +692,9 @@ impl Transaction {
     pub fn transfer_shape<'ss, 'sk, 'ds>(
         &mut self,
         source: &Snapshot,
-        source_slide: impl Into<crate::slide::Key<'ss>>,
+        source_slide: impl Into<crate::slide::Selector<'ss>>,
         source_shape: impl Into<crate::shape::Key<'sk>>,
-        destination_slide: impl Into<crate::slide::Key<'ds>>,
+        destination_slide: impl Into<crate::slide::Selector<'ds>>,
     ) -> Result<u32> {
         let source_slide = resolve_snapshot_slide(source, source_slide.into())?;
         let destination = self.resolve_slide(destination_slide.into())?;
@@ -519,9 +718,9 @@ impl Transaction {
             collect_routable_shape_ids(root, &mut root_ids)?;
             for shape_id in root_ids {
                 if root_by_shape_id.insert(shape_id, root_index).is_some() {
-                    return Err(invalid(format!(
-                        "opened-presentation source slide repeats shape identity {shape_id}"
-                    )));
+                    return Err(invalid(
+                        "opened-presentation source slide repeats a shape identity",
+                    ));
                 }
             }
         }
@@ -552,14 +751,16 @@ impl Transaction {
             let fragment = super::xml::span_bytes(source_owner.blob(), span.clone())?;
             relationship_ids.extend(shape_relationship_ids(fragment, source_owner.rels())?);
             for connected_id in super::xml::connector_connection_ids(fragment)? {
-                let endpoint_root = root_by_shape_id.get(&connected_id).copied().ok_or_else(|| {
-                    shape_transfer_refusal(
-                        crate::ShapeTransferRefusal::UnresolvedConnectorEndpoint,
-                        format!(
-                            "connector endpoint {connected_id} does not identify a transferable source shape"
-                        ),
-                    )
-                })?;
+                let endpoint_root =
+                    root_by_shape_id
+                        .get(&connected_id)
+                        .copied()
+                        .ok_or_else(|| {
+                            shape_transfer_refusal(
+                                crate::ShapeTransferRefusal::UnresolvedConnectorEndpoint,
+                                "connector endpoint does not identify a transferable source shape",
+                            )
+                        })?;
                 pending.push_back(endpoint_root);
             }
             planned_roots.push((root_index, root, span));
@@ -580,9 +781,7 @@ impl Transaction {
         let mut relationships = Vec::new();
         for relationship_id in relationship_ids {
             let relationship = source_owner.rels().get(&relationship_id).ok_or_else(|| {
-                invalid(format!(
-                    "opened-presentation transferred shape relationship {relationship_id} is missing"
-                ))
+                invalid("opened-presentation transferred shape relationship is missing")
             })?;
             if !relationship.is_external() {
                 roots.push(relationship.target_partname()?);
@@ -656,7 +855,7 @@ impl Transaction {
     /// unsupported dependency, or the replacement is malformed or unbounded.
     pub fn set_notes_text<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         text: impl AsRef<str>,
     ) -> Result<bool> {
         let selected_slide = self.resolve_slide(slide.into())?;
@@ -677,7 +876,8 @@ impl Transaction {
                 limit: self.source.limits.max_text_bytes(),
             });
         }
-        let part_name = PackURI::new(note.part()).map_err(Error::Invalid)?;
+        let part_name = PackURI::new(note.part())
+            .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
         let xml = crate::notes::rewrite_text(note.xml(), text)?;
         self.working.get_part_mut(&part_name)?.set_blob(xml);
         let staged = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?
@@ -689,9 +889,9 @@ impl Transaction {
             .ok_or_else(|| invalid("opened-presentation staged notes owner disappeared"))?;
         let actual = staged_note.text()?;
         if actual.as_deref() != (!text.is_empty()).then_some(text) {
-            return Err(invalid(format!(
-                "opened-presentation notes text did not round-trip semantically: requested {text:?}, read {actual:?}"
-            )));
+            return Err(invalid(
+                "opened-presentation notes text did not round-trip semantically",
+            ));
         }
         Ok(true)
     }
@@ -737,7 +937,7 @@ impl Transaction {
     /// exceeded text bounds, malformed slide XML, or exhausted shape IDs.
     pub fn add_table<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         cells: &[Vec<String>],
         bounds: (i64, i64, i64, i64),
     ) -> Result<u32> {
@@ -775,7 +975,7 @@ impl Transaction {
     /// chart, or exhausted non-visual shape IDs.
     pub fn add_chart<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         chart: &crate::chart::Chart,
     ) -> Result<String> {
         let selected = self.resolve_slide(slide.into())?;
@@ -806,7 +1006,7 @@ impl Transaction {
     /// media graph is invalid.
     pub fn store_media<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         media: &crate::media_parts::List,
         conformance: crate::media_parts::Conformance,
     ) -> Result<()> {
@@ -900,7 +1100,7 @@ impl Transaction {
     /// Returns an error for a missing author, duplicate identity, or invalid graph.
     pub fn add_comment<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment: crate::comments::Comment,
         conformance: crate::comments::Conformance,
     ) -> Result<()> {
@@ -926,7 +1126,7 @@ impl Transaction {
     /// Returns an error when the comment graph is malformed.
     pub fn remove_comment<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         author_id: u32,
         index: u32,
         conformance: crate::comments::Conformance,
@@ -1054,7 +1254,7 @@ impl Transaction {
     /// extension payloads, or a malformed package graph.
     pub fn add_modern_comment<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment: crate::modern_comments::Comment,
     ) -> Result<crate::modern_comments::Part> {
         let selected = self.resolve_slide(slide.into())?;
@@ -1083,7 +1283,7 @@ impl Transaction {
     /// references, or a malformed package graph.
     pub fn replace_modern_comment<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment_id: &str,
         replacement: crate::modern_comments::Comment,
     ) -> Result<bool> {
@@ -1113,7 +1313,7 @@ impl Transaction {
     /// Returns an error for unknown, duplicate, or incomplete identities.
     pub fn reorder_modern_comments<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         ordered_comment_ids: &[String],
     ) -> Result<Vec<crate::modern_comments::Comment>> {
         let selected = self.resolve_slide(slide.into())?;
@@ -1142,7 +1342,7 @@ impl Transaction {
     /// invalid extensions, or a malformed package graph.
     pub fn add_modern_comment_reply<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment_id: &str,
         reply: crate::modern_comments::Reply,
     ) -> Result<bool> {
@@ -1173,7 +1373,7 @@ impl Transaction {
     /// extensions, or a malformed graph.
     pub fn replace_modern_comment_reply<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment_id: &str,
         reply_id: &str,
         replacement: crate::modern_comments::Reply,
@@ -1206,7 +1406,7 @@ impl Transaction {
     /// Returns an error for a missing/malformed thread or invalid extension.
     pub fn update_modern_comment_extensions<'s, F>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment_id: &str,
         update: F,
     ) -> Result<bool>
@@ -1240,7 +1440,7 @@ impl Transaction {
     /// Returns an error for a missing/malformed reply or invalid extension.
     pub fn update_modern_comment_reply_extensions<'s, F>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment_id: &str,
         reply_id: &str,
         update: F,
@@ -1275,7 +1475,7 @@ impl Transaction {
     /// Returns an error when the modern-comment graph is malformed.
     pub fn remove_modern_comment<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment_id: &str,
     ) -> Result<bool> {
         let selected = self.resolve_slide(slide.into())?;
@@ -1303,7 +1503,7 @@ impl Transaction {
     /// Returns an error when the modern-comment graph is malformed.
     pub fn remove_modern_comment_reply<'s>(
         &mut self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
         comment_id: &str,
         reply_id: &str,
     ) -> Result<bool> {
@@ -1338,7 +1538,7 @@ impl Transaction {
         source: &Snapshot,
         source_owner: &PackURI,
         relationship_id: &str,
-        destination_slide: impl Into<crate::slide::Key<'s>>,
+        destination_slide: impl Into<crate::slide::Selector<'s>>,
     ) -> Result<String> {
         let destination = self.resolve_slide(destination_slide.into())?;
         let owner = source.package.get_part(source_owner)?;
@@ -1409,8 +1609,13 @@ impl Transaction {
             self.source.presentation_name.clone(),
             self.source.limits,
         )?;
-        if patch.is_empty() {
+        if patch.is_noop() {
+            let package = crate::Package::from_opened_candidate(
+                self.source.package.as_ref().clone(),
+                &self.source,
+            );
             return Ok(Commit {
+                package: Arc::new(package),
                 snapshot: self.source,
                 patch,
             });
@@ -1419,7 +1624,7 @@ impl Transaction {
         // transaction did not rewrite, so the source snapshot's proved
         // notes-root classifications answer for those slides and only the
         // rewritten ones are rescanned; every other validation still runs.
-        let snapshot = super::model::capture_with_revision_and_digests_and_mce(
+        let mut snapshot = super::model::capture_with_revision_and_digests_and_mce(
             &working,
             self.source.limits,
             self.source.physical_source_provenance,
@@ -1428,18 +1633,18 @@ impl Transaction {
             self.source.retained_mce.as_deref(),
             Some(self.source.slide_roots.as_ref()),
         )?;
-        Ok(Commit { snapshot, patch })
-    }
-
-    /// Discard all staged edits and recover the immutable source root.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
+        snapshot.owner_state = Arc::clone(&self.source.owner_state);
+        let package = crate::Package::from_opened_candidate(working, &snapshot);
+        Ok(Commit {
+            package: Arc::new(package),
+            snapshot,
+            patch,
+        })
     }
 
     fn add_preset_shape(
         &mut self,
-        slide: crate::slide::Key<'_>,
+        slide: crate::slide::Selector<'_>,
         preset: &str,
         label: &str,
         bounds: (i64, i64, i64, i64),
@@ -1469,9 +1674,24 @@ impl Transaction {
         Ok(())
     }
 
-    fn resolve_slide(&self, key: crate::slide::Key<'_>) -> Result<Slide> {
+    fn resolve_slide_position(&self, selector: crate::slide::Selector<'_>) -> Result<usize> {
+        let position = match selector {
+            crate::slide::Selector::Position(position) => position.get(),
+            crate::slide::Selector::Name(name) => self.slide_name_index.position(&name)?,
+        };
+        if position >= self.slides.len() {
+            return Err(Error::SlideIndexOutOfBounds {
+                index: position,
+                len: self.slides.len(),
+            });
+        }
+        Ok(position)
+    }
+
+    fn resolve_slide(&self, key: crate::slide::Selector<'_>) -> Result<Slide> {
         match key {
-            crate::slide::Key::Index(index) => {
+            crate::slide::Selector::Position(position) => {
+                let index = position.get();
                 self.slides
                     .get(index)
                     .cloned()
@@ -1480,7 +1700,9 @@ impl Transaction {
                         len: self.slides.len(),
                     })
             },
-            crate::slide::Key::Name(name) => self.slide_name_index.resolve(&self.slides, name),
+            crate::slide::Selector::Name(name) => {
+                self.slide_name_index.resolve(&self.slides, &name)
+            },
         }
     }
 }
@@ -1661,14 +1883,161 @@ fn remove_unreferenced_dependencies(package: &mut OpcPackage, roots: Vec<PackURI
     Ok(())
 }
 
-fn next_shape_id(scene: &crate::shape::Scene<'_>, label: &str) -> Result<u32> {
-    scene
+pub(crate) fn next_shape_id(scene: &crate::shape::Scene<'_>, label: &str) -> Result<u32> {
+    if scene.is_rewritten() {
+        return Err(invalid(
+            "opened-presentation shape authoring refuses an MCE-rewritten scene",
+        ));
+    }
+    let maximum_shape_id = scene
         .iter()
         .filter_map(crate::shape::Shape::id)
         .max()
-        .unwrap_or(1)
+        .unwrap_or(1);
+    let maximum_reference_id = max_shape_reference_id(scene.xml())?;
+    maximum_shape_id
+        .max(maximum_reference_id.unwrap_or(1))
         .checked_add(1)
         .ok_or_else(|| invalid(format!("opened-presentation {label} shape ID overflow")))
+}
+
+/// Find shape identities that are referenced outside the scene's ordinary
+/// `cNvPr/@id` records.  Office uses these values for timing targets and
+/// connector endpoints, so allocating only above visible shape IDs can still
+/// activate a dangling reference or retarget an existing animation.
+fn max_shape_reference_id(xml: &[u8]) -> Result<Option<u32>> {
+    const P14: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+    let mut reader = NsReader::from_reader(xml);
+    reader.config_mut().trim_text(false);
+    let mut maximum = None;
+    loop {
+        let (namespace, event) = reader
+            .read_resolved_event()
+            .map_err(|error| Error::Xml(error.to_string()))?;
+        let (Event::Start(element) | Event::Empty(element)) = event else {
+            if matches!(event, Event::Eof) {
+                break;
+            }
+            continue;
+        };
+        let local = element.local_name();
+        let namespace = match namespace {
+            ResolveResult::Bound(Namespace(value)) => value,
+            _ => continue,
+        };
+        let (accepted_namespace, attribute_name) = if (namespace
+            == crate::namespace::PRESENTATIONML_NAMESPACE
+            || namespace == crate::namespace::STRICT_PRESENTATIONML_NAMESPACE)
+            && matches!(
+                local.as_ref(),
+                b"spTgt" | b"bldP" | b"bldDgm" | b"bldOleChart" | b"bldGraphic"
+            ) {
+            (true, b"spid".as_slice())
+        } else if namespace == P14 && local.as_ref() == b"bmkTgt" {
+            (true, b"spid".as_slice())
+        } else if (namespace == litchi_ooxml_common::xml::DRAWINGML_NAMESPACE
+            || namespace == litchi_ooxml_common::xml::STRICT_DRAWINGML_NAMESPACE)
+            && matches!(local.as_ref(), b"stCxn" | b"endCxn")
+        {
+            (true, b"id".as_slice())
+        } else {
+            (false, &[][..])
+        };
+        if !accepted_namespace {
+            continue;
+        }
+        for attribute in element.checked_attributes() {
+            let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+            if attribute.key.as_ref() != attribute_name {
+                continue;
+            }
+            let value = attribute
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Implicit1_0, reader.decoder())
+                .map_err(|error| Error::Xml(error.to_string()))?;
+            let value = value
+                .parse::<u32>()
+                .map_err(|_| invalid("opened-presentation shape reference identity is invalid"))?;
+            maximum = Some(maximum.map_or(value, |current: u32| current.max(value)));
+        }
+    }
+    Ok(maximum)
+}
+
+/// Bound the serialized text-box payload before allocating its escaped text,
+/// fragment, or appended slide buffers. Six bytes per input byte covers every
+/// XML character escape emitted by the native writer with a small margin for
+/// UTF-8 and formatting; the fixed envelope covers namespaces, geometry, and
+/// the surrounding DrawingML elements.
+pub(crate) fn text_box_output_bound(
+    input_bytes: usize,
+    text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<usize> {
+    const ESCAPED_TEXT_MULTIPLIER: usize = 6;
+    const FRAGMENT_OVERHEAD: usize = 4096;
+    let fragment = text_bytes
+        .checked_mul(ESCAPED_TEXT_MULTIPLIER)
+        .and_then(|bytes| bytes.checked_add(FRAGMENT_OVERHEAD))
+        .ok_or(Error::Limit {
+            resource: "opened-presentation appended shape XML",
+            limit: max_output_bytes,
+        })?;
+    input_bytes
+        .checked_add(fragment)
+        .filter(|bytes| *bytes <= max_output_bytes)
+        .ok_or(Error::Limit {
+            resource: "opened-presentation appended shape XML",
+            limit: max_output_bytes,
+        })
+}
+
+/// Stage one plain text-box fragment against an already selected slide.
+///
+/// The source-backed primary editor uses this small native path instead of
+/// constructing an eager package.  It shares the eager editor's identity
+/// allocation, conformance-aware authoring, lexical shape-tree splice, and
+/// scene readback checks.
+pub(crate) fn stage_text_box(
+    xml: &[u8],
+    text: &str,
+    bounds: (i64, i64, i64, i64),
+    max_output_bytes: usize,
+) -> Result<(Vec<u8>, u32)> {
+    // Reject cheap caller errors before scene indexing or any fragment
+    // allocation. The fragment builder repeats these checks at its own
+    // boundary so future callers cannot bypass them.
+    validate_text_box_input(text, bounds)?;
+    // Admit the worst-case escaped fragment before parsing the scene or
+    // allocating the exact fragment. The exact post-escape length is checked
+    // again below before the lexical append.
+    let _output_bound = text_box_output_bound(xml.len(), text.len(), max_output_bytes)?;
+    let scene = crate::shape::Scene::read(xml)?;
+    let shape_id = next_shape_id(&scene, "text box")?;
+    let conformance = crate::media_parts::document_conformance(xml)?;
+    let fragment = text_box_fragment(
+        text,
+        bounds,
+        shape_id,
+        conformance,
+        super::Limits::default(),
+    )?;
+    let output_len = xml
+        .len()
+        .checked_add(fragment.len())
+        .filter(|length| *length <= max_output_bytes)
+        .ok_or(Error::Limit {
+            resource: "opened-presentation appended shape XML",
+            limit: max_output_bytes,
+        })?;
+    let output = super::xml::append_shape(xml, fragment.as_bytes())?;
+    if output.len() != output_len {
+        return Err(Error::Limit {
+            resource: "opened-presentation appended shape XML",
+            limit: max_output_bytes,
+        });
+    }
+    ensure_shape_id(&output, shape_id, "text box")?;
+    Ok((output, shape_id))
 }
 
 fn collect_transfer_shape_ids(
@@ -1680,22 +2049,13 @@ fn collect_transfer_shape_ids(
             crate::ShapeTransferRefusal::ContentPart,
             "p:contentPart has no common non-visual identity; use its typed content owner",
         )),
-        crate::shape::Shape::Unknown(value) => Err(shape_transfer_refusal(
+        crate::shape::Shape::Unknown(_) => Err(shape_transfer_refusal(
             crate::ShapeTransferRefusal::UnknownExtensionShape,
-            format!(
-                "unknown source element {} is retained but cannot be dependency-closed",
-                value
-                    .common()
-                    .source_name()
-                    .unwrap_or("without a source name")
-            ),
+            "unknown source element is retained but cannot be dependency-closed",
         )),
-        crate::shape::Shape::Frame(value) => Err(shape_transfer_refusal(
+        crate::shape::Shape::Frame(_) => Err(shape_transfer_refusal(
             crate::ShapeTransferRefusal::UnclassifiedGraphicFrame,
-            format!(
-                "graphic frame {} has no recognized table, chart, diagram, or OLE payload",
-                value.common().name().unwrap_or("without a name")
-            ),
+            "graphic frame has no recognized table, chart, diagram, or OLE payload",
         )),
         crate::shape::Shape::Group(group) => {
             insert_transfer_shape_id(shape, identities)?;
@@ -1715,9 +2075,9 @@ fn collect_routable_shape_ids(
     if let Some(identity) = shape.id()
         && !identities.insert(identity)
     {
-        return Err(invalid(format!(
-            "opened-presentation source shape root repeats identity {identity}"
-        )));
+        return Err(invalid(
+            "opened-presentation source shape root repeats an identity",
+        ));
     }
     if let crate::shape::Shape::Group(group) = shape {
         for child in group.shapes() {
@@ -1734,18 +2094,15 @@ fn insert_transfer_shape_id(
     let identity = shape.id().ok_or_else(|| {
         shape_transfer_refusal(
             crate::ShapeTransferRefusal::MissingIdentity,
-            format!(
-                "shape {} has no non-visual identity",
-                shape.name().unwrap_or("without a name")
-            ),
+            "shape has no non-visual identity",
         )
     })?;
     if identities.insert(identity) {
         Ok(())
     } else {
-        Err(invalid(format!(
-            "opened-presentation transferred shape repeats identity {identity}"
-        )))
+        Err(invalid(
+            "opened-presentation transferred shape repeats an identity",
+        ))
     }
 }
 
@@ -1786,7 +2143,7 @@ fn plan_shape_identity_transfer(
     Ok(mapping)
 }
 
-fn resolve_snapshot_slide(source: &Snapshot, key: crate::slide::Key<'_>) -> Result<Slide> {
+fn resolve_snapshot_slide(source: &Snapshot, key: crate::slide::Selector<'_>) -> Result<Slide> {
     source.resolve_slide(key)
 }
 
@@ -1809,6 +2166,14 @@ fn validate_bounds((_, _, width, height): (i64, i64, i64, i64), label: &str) -> 
     } else {
         Ok(())
     }
+}
+
+/// Validate the caller-owned text-box inputs without reading the slide scene.
+/// Source-backed admission uses this before reserving managed resources so an
+/// invalid request fails without consuming parser or output budget.
+pub(crate) fn validate_text_box_input(text: &str, bounds: (i64, i64, i64, i64)) -> Result<()> {
+    validate_bounds(bounds, "text box")?;
+    validate_shape_text(text, super::Limits::default(), "text box")
 }
 
 fn validate_shape_text(text: &str, limits: super::Limits, label: &str) -> Result<()> {
@@ -1854,7 +2219,7 @@ fn conformance_image_relationship(conformance: crate::media_parts::Conformance) 
     }
 }
 
-fn text_box_fragment(
+pub(crate) fn text_box_fragment(
     text: &str,
     bounds: (i64, i64, i64, i64),
     shape_id: u32,
@@ -1867,7 +2232,7 @@ fn text_box_fragment(
     let (x, y, width, height) = bounds;
     Ok(format!(
         "<p:sp xmlns:p=\"{pml}\" xmlns:a=\"{dml}\"><p:nvSpPr><p:cNvPr id=\"{shape_id}\" name=\"Text Box {shape_id}\"/><p:cNvSpPr txBox=\"1\"/><p:nvPr/></p:nvSpPr><p:spPr><a:xfrm><a:off x=\"{x}\" y=\"{y}\"/><a:ext cx=\"{width}\" cy=\"{height}\"/></a:xfrm><a:prstGeom prst=\"rect\"><a:avLst/></a:prstGeom><a:noFill/></p:spPr><p:txBody><a:bodyPr wrap=\"square\"/><a:lstStyle/><a:p><a:r><a:t xml:space=\"preserve\">{}</a:t></a:r><a:endParaRPr/></a:p></p:txBody></p:sp>",
-        quick_xml::escape::escape(text)
+        super::xml::escape_character_data(text, limits.max_patch_bytes())?
     ))
 }
 
@@ -1920,17 +2285,18 @@ fn shape_relationship_ids(
     fragment: &[u8],
     owner_relationships: &litchi_opc::Relationships,
 ) -> Result<BTreeSet<String>> {
-    let mut reader = quick_xml::reader::NsReader::from_reader(fragment);
+    let mut reader = NsReader::from_reader(fragment);
     reader.config_mut().trim_text(false);
     let mut relationships = BTreeSet::new();
     loop {
         match reader
             .read_event()
-            .map_err(|error| Error::Xml(error.to_string()))?
+            .map_err(|_error| Error::Xml("invalid transferred shape XML".into()))?
         {
-            quick_xml::events::Event::Start(element) | quick_xml::events::Event::Empty(element) => {
+            Event::Start(element) | Event::Empty(element) => {
                 for attribute in element.checked_attributes() {
-                    let attribute = attribute.map_err(|error| Error::Xml(error.to_string()))?;
+                    let attribute = attribute
+                        .map_err(|_error| Error::Xml("invalid transferred shape XML".into()))?;
                     let key = attribute.key.as_ref();
                     if key == b"xmlns" || key.starts_with(b"xmlns:") {
                         continue;
@@ -1940,17 +2306,17 @@ fn shape_relationship_ids(
                             quick_xml::XmlVersion::Implicit1_0,
                             reader.decoder(),
                         )
-                        .map_err(|error| Error::Xml(error.to_string()))?;
+                        .map_err(|_error| Error::Xml("invalid transferred shape XML".into()))?;
                     let (namespace, _) = reader.resolver().resolve_attribute(attribute.key);
                     let is_relationship_namespace = matches!(
                         &namespace,
-                        quick_xml::name::ResolveResult::Bound(quick_xml::name::Namespace(value))
+                        ResolveResult::Bound(Namespace(value))
                             if *value == litchi_ooxml_common::relationships::TRANSITIONAL_NAMESPACE
                                 || *value == litchi_ooxml_common::relationships::STRICT_NAMESPACE
                     );
                     let is_inherited_relationship_alias = matches!(
                         &namespace,
-                        quick_xml::name::ResolveResult::Unknown(prefix)
+                        ResolveResult::Unknown(prefix)
                             if prefix.as_slice() == b"r"
                                 || owner_relationships.get(value.as_ref()).is_some()
                     );
@@ -1959,12 +2325,12 @@ fn shape_relationship_ids(
                     }
                 }
             },
-            quick_xml::events::Event::DocType(_) => {
+            Event::DocType(_) => {
                 return Err(invalid(
                     "opened-presentation shape contains an unsupported document type",
                 ));
             },
-            quick_xml::events::Event::Eof => break,
+            Event::Eof => break,
             _ => {},
         }
     }
@@ -2039,7 +2405,10 @@ fn table_fragment(
         xml.push_str(&format!("<a:tr h=\"{row_height}\">"));
         for cell in row {
             xml.push_str("<a:tc><a:txBody><a:bodyPr/><a:lstStyle/><a:p><a:r><a:t>");
-            xml.push_str(&quick_xml::escape::escape(cell));
+            xml.push_str(&super::xml::escape_character_data(
+                cell,
+                limits.max_patch_bytes(),
+            )?);
             xml.push_str("</a:t></a:r><a:endParaRPr/></a:p></a:txBody><a:tcPr/></a:tc>");
         }
         xml.push_str("</a:tr>");
@@ -2113,8 +2482,8 @@ fn available_transfer_name(source: &PackURI, reserved: &HashSet<PackURI>) -> Res
         .rfind('.')
         .map_or((value, ""), |position| value.split_at(position));
     for index in 1..=u32::MAX {
-        let candidate =
-            PackURI::new(format!("{stem}-transfer{index}{extension}")).map_err(Error::Invalid)?;
+        let candidate = PackURI::new(format!("{stem}-transfer{index}{extension}"))
+            .map_err(|_error| invalid("opened-presentation transferred part name is invalid"))?;
         if !reserved.contains(&candidate) {
             return Ok(candidate);
         }
@@ -2171,50 +2540,112 @@ fn publish_transfer(
     Ok(())
 }
 
-/// Validated result of one opened-presentation transaction.
-#[derive(Debug, Clone)]
+/// Content-free summary of a committed presentation edit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+}
+
+impl Diagnostics {
+    /// Whether any managed OPC resource changed.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+}
+
+/// Validated immutable package and durable patch from a presentation edit.
+///
+/// ```
+/// use litchi_pptx::Package;
+/// # fn main() -> litchi_pptx::Result<()> {
+/// let mut builder = litchi_pptx::builder::Builder::new()?;
+/// builder.presentation()?.add_slide()?
+///     .add_text_box("before", 0, 0, 914_400, 914_400);
+/// let bytes = builder.build()?.to_bytes()?;
+/// let source = Package::from_vec(bytes.clone())?;
+/// let mut edit = source.edit()?;
+/// edit.set_shape_text(0_usize, 0_usize, "after")?;
+/// let commit = edit.commit()?;
+/// assert!(commit.diagnostics().changed());
+/// assert!(!commit.patch().is_noop());
+/// let (changed, patch) = commit.into_parts();
+/// let mut restored = changed.apply(&patch.inverse())?;
+/// assert_eq!(restored.to_bytes()?, bytes);
+/// # Ok(())
+/// # }
+/// ```
+#[derive(Clone)]
 pub struct Commit {
+    package: Arc<crate::Package>,
     snapshot: Snapshot,
     patch: Patch,
 }
 
+impl std::fmt::Debug for Commit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Commit")
+            .field("diagnostics", &self.diagnostics())
+            .field("resource_count", &self.patch.resource_count())
+            .finish_non_exhaustive()
+    }
+}
+
 impl Commit {
-    /// Candidate snapshot after atomic publication.
+    /// The immutable package produced by this edit.
     #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub fn package(&self) -> &crate::Package {
+        &self.package
+    }
+
+    /// Consume the committed package without replaying its patch.
+    ///
+    /// A uniquely owned commit moves its package. When another commit clone
+    /// shares it, the OPC graph is cloned while retained source buffers remain
+    /// shared; native owner policy and tolerance evidence are preserved.
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        self.into_parts().0
+    }
+
+    /// Content-free commit diagnostics.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: !self.patch.is_noop(),
+        }
+    }
+
+    #[cfg(test)]
+    pub(crate) const fn snapshot(&self) -> &Snapshot {
         &self.snapshot
     }
 
-    /// Aggregate charged bytes held by the candidate snapshot's optional MCE
-    /// projection table. Cloned snapshots may report the same shared charge,
-    /// so per-owner values are not additive physical-memory measurements.
+    /// Aggregate charge for retained transformed slide projections.
     #[must_use]
     pub fn retained_mce_bytes(&self) -> usize {
         self.snapshot.retained_mce_bytes()
     }
 
-    /// Release this commit's reference to retained transformed slide
-    /// projections without changing its semantic or physical meaning.
+    /// Release this commit's retained transformed slide projections.
     pub fn release_retained_mce(&mut self) {
         self.snapshot.release_retained_mce();
     }
 
-    /// Durable exact-source patch for this commit.
+    /// Durable exact-write-set patch for this commit.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
-    /// Whether publication changes any OPC resource.
+    /// Consume the result into its package and durable patch.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.patch.is_empty()
-    }
-
-    /// Consume the commit into its candidate snapshot and patch.
-    #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch) {
-        (self.snapshot, self.patch)
+    pub fn into_parts(self) -> (crate::Package, Patch) {
+        let package = Arc::try_unwrap(self.package).unwrap_or_else(|package| {
+            crate::Package::from_opened_candidate(package.opc.clone(), &self.snapshot)
+        });
+        (package, self.patch)
     }
 
     /// Consume the commit into the durable patch.
@@ -2242,20 +2673,22 @@ mod compaction_tests {
     }
 
     fn three_slide_snapshot() -> Result<super::Snapshot> {
-        let mut package = Package::new()?;
+        let mut builder = crate::builder::Builder::new()?;
         for index in 0..3 {
-            let slide = package.presentation_mut()?.add_slide()?;
+            let slide = builder.presentation()?.add_slide()?;
             slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
         }
+        let mut package = builder.build()?;
         Package::from_vec(package.to_bytes()?)?.opened_presentation()
     }
 
     fn three_slide_snapshot_with_outer_crlf() -> Result<super::Snapshot> {
-        let mut package = Package::new()?;
+        let mut builder = crate::builder::Builder::new()?;
         for index in 0..3 {
-            let slide = package.presentation_mut()?.add_slide()?;
+            let slide = builder.presentation()?.add_slide()?;
             slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
         }
+        let mut package = builder.build()?;
         let mut package = Package::from_vec(package.to_bytes()?)?;
         let part_name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let original = package.opc.get_part(&part_name)?.blob().to_vec();
@@ -2498,10 +2931,11 @@ mod compaction_tests {
 
     #[test]
     fn a_payload_replaced_after_its_scene_read_is_read_again_at_commit() -> Result<()> {
-        let mut package = Package::new()?;
-        let slide = package.presentation_mut()?.add_slide()?;
+        let mut builder = crate::builder::Builder::new()?;
+        let slide = builder.presentation()?.add_slide()?;
         slide.add_text_box("first", 10, 20, 300, 400);
         slide.add_text_box("second", 10, 500, 300, 400);
+        let mut package = builder.build()?;
         let snapshot = Package::from_vec(package.to_bytes()?)?.opened_presentation()?;
         let mut edit = snapshot.edit();
         assert!(edit.set_shape_text(0, 0, "recorded")?);

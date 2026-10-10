@@ -281,7 +281,7 @@ impl Snapshot {
     /// limit/allocation/OPC/XML error while constructing the exact candidate.
     pub fn plan_slide_removal<'s>(
         &self,
-        slide: impl Into<crate::slide::Key<'s>>,
+        slide: impl Into<crate::slide::Selector<'s>>,
     ) -> Result<SlideRemovalPlan> {
         let selected = resolve_slide(self, slide.into())?;
         let position = self
@@ -337,7 +337,7 @@ impl Snapshot {
 
         let owner = self.package.get_part(&selected.part_name)?;
         crate::parts::validate_content_type(owner, ct::PML_SLIDE)?;
-        map_copy_refusal(validate_slide_surface(owner.blob()))?;
+        validate_removal_slide_surface(owner.blob())?;
         let layout = dependency_free_layout(self.package.as_ref(), owner)?;
         crate::master_layout::validate_master_layout_graph(self.package.as_ref())?;
         map_copy_refusal(validate_registered_layout(
@@ -668,6 +668,28 @@ fn checked_relationship_count(current: usize, limit: usize) -> Result<usize> {
 }
 
 fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
+    validate_removal_presentation_owner(xml, &selected.relationship_id)
+}
+
+pub(crate) fn validate_removal_presentation_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
+    validate_presentation_bindings(xml, relationship_id, 1)
+}
+
+pub(crate) fn validate_removal_slide_surface(xml: &[u8]) -> Result<()> {
+    map_copy_refusal(validate_slide_surface(xml))
+}
+
+// Insertion must not activate an existing XML binding or shift a positional
+// slideshow range. Share the conservative source schema used for deletion.
+pub(crate) fn validate_insertion_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
+    validate_presentation_bindings(xml, relationship_id, 0)
+}
+
+fn validate_presentation_bindings(
+    xml: &[u8],
+    relationship_id: &str,
+    expected_bindings: usize,
+) -> Result<()> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
     let mut selected_bindings = 0_usize;
@@ -738,7 +760,7 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
                                     reader.decoder(),
                                 )
                                 .map_err(|error| Error::Xml(error.to_string()))?;
-                            if value.as_ref() == selected.relationship_id {
+                            if value.as_ref() == relationship_id {
                                 if element.local_name().as_ref() != b"sldId" {
                                     return refusal(
                                         SlideRemovalRefusal::SharedOwner,
@@ -783,7 +805,7 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
             _ => {},
         }
     }
-    if selected_bindings != 1 {
+    if selected_bindings != expected_bindings {
         return refusal(
             SlideRemovalRefusal::AmbiguousTopology,
             "the selected presentation relationship is not bound exactly once",

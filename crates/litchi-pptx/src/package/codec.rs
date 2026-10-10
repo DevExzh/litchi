@@ -27,15 +27,37 @@ const NOTES_MASTER_RELATIONSHIP_ID: &str = "rIdNotesMaster";
 const CORE_PROPERTIES_PART: &str = "/docProps/core.xml";
 const EXTENDED_PROPERTIES_PART: &str = "/docProps/app.xml";
 
-pub(super) const STALE_PRESENTATION_GRAPH_REASON: &str = "the mutable presentation model has unflushed changes; save and reopen before reading the canonical package graph";
+pub(super) const STALE_PRESENTATION_GRAPH_REASON: &str = "the mutable presentation model has unflushed changes; finish the builder before reading the canonical package graph";
 
 impl Package {
-    /// Create a minimal valid, mutable `PresentationML` package.
+    pub(crate) fn finish_creation(mut self) -> Result<Self> {
+        self.flush_presentation()?;
+        self.mutable_pres = None;
+        Ok(self)
+    }
+
+    /// Create a minimal valid canonical `PresentationML` package.
+    ///
+    /// Use [`crate::builder::Builder`] to configure a fresh presentation.
+    ///
+    /// ```
+    /// let package = litchi_pptx::Package::new()?;
+    /// assert_eq!(package.presentation()?.slide_count()?, 0);
+    /// let commit = package.edit()?.commit()?;
+    /// assert!(commit.patch().is_noop());
+    /// let mut bytes = Vec::new();
+    /// commit.into_package().write_to(&mut bytes)?;
+    /// # Ok::<(), litchi_pptx::Error>(())
+    /// ```
     ///
     /// # Errors
     ///
     /// Returns an error if the operation fails.
     pub fn new() -> Result<Self> {
+        Self::new_authoring()?.finish_creation()
+    }
+
+    pub(crate) fn new_authoring() -> Result<Self> {
         let mut package = OpcPackage::new();
         let presentation_name = pack_uri(PRESENTATION_PART)?;
         let master_name = pack_uri(MASTER_PART)?;

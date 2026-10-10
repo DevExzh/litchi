@@ -4,6 +4,8 @@
 //! OPC catalog and mandatory presentation root, then resolves only slide
 //! metadata. A slide body is loaded when a selected [`SourceSlide`] is read.
 
+pub mod primary;
+
 use litchi_core::xml::ReaderOrigin;
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 use std::io::{Read, Write};
@@ -34,6 +36,12 @@ use crate::shape::{Bounds, Shape};
 use crate::{Error, Result};
 
 use litchi_drawingml::svg_blip::SvgBlip;
+
+pub mod modern_comments;
+pub mod raw;
+pub mod related;
+pub mod scenes;
+pub mod sections;
 
 mod svg_lifecycle;
 
@@ -111,6 +119,7 @@ pub(super) struct SourceSlideData {
 
 pub(super) struct SourceInner {
     pub(super) package: SourceBackedPackage,
+    scenes: scenes::SceneCache,
     // Retain the pinned mandatory root without relying on the OPC payload cache.
     _presentation: SourcePart,
     pub(super) slides: Box<[Arc<SourceSlideData>]>,
@@ -358,13 +367,17 @@ struct SlideClosure {
 enum SourcePayload {
     Original(PartData),
     Edited(Arc<Vec<u8>>),
+    ReservedEdit {
+        bytes: Arc<Vec<u8>>,
+        reservation: Arc<litchi_core::Reservation>,
+    },
 }
 
 impl SourcePayload {
     fn as_bytes(&self) -> &[u8] {
         match self {
             Self::Original(data) => data.as_bytes(),
-            Self::Edited(data) => data.as_slice(),
+            Self::Edited(data) | Self::ReservedEdit { bytes: data, .. } => data.as_slice(),
         }
     }
 
@@ -376,12 +389,12 @@ impl SourcePayload {
     fn edited_bytes(&self) -> Option<Arc<Vec<u8>>> {
         match self {
             Self::Original(_) => None,
-            Self::Edited(data) => Some(Arc::clone(data)),
+            Self::Edited(data) | Self::ReservedEdit { bytes: data, .. } => Some(Arc::clone(data)),
         }
     }
 
     fn is_edited(&self) -> bool {
-        matches!(self, Self::Edited(_))
+        matches!(self, Self::Edited(_) | Self::ReservedEdit { .. })
     }
 }
 
@@ -395,6 +408,237 @@ fn check_execution_context(context: Option<&ExecutionContext>) -> Result<()> {
             error => litchi_opc::OpcError::Execution(error),
         })
     })
+}
+
+/// Reserve the full transient envelope of a source-backed text-box edit
+/// before parsing or authoring. The scene is indexed once before authoring and
+/// the candidate is indexed again during semantic readback, so both bounded
+/// scene policies plus the escaped fragment and lexical output stay inside
+/// the caller's admission. The reservation is deliberately conservative and
+/// capped by the same 128 MiB default patch ceiling used by source proofs.
+fn reserve_source_text_box(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    text_bytes: usize,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    // Physical output policy applies even without a managed context. Reject
+    // an impossible output before charging the shared execution budget.
+    let output_bound =
+        crate::opened::text_box_output_bound(input_bytes, text_bytes, max_output_bytes)?;
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let input_scene = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            resource: "source-backed text-box admission bytes",
+            limit: maximum,
+        })?;
+    let output_scene = output_bound
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            resource: "source-backed text-box admission bytes",
+            limit: maximum,
+        })?;
+    let fragment_bound = output_bound.checked_sub(input_bytes).ok_or(Error::Limit {
+        resource: "source-backed text-box admission bytes",
+        limit: maximum,
+    })?;
+    let transient = output_bound
+        .checked_add(fragment_bound)
+        .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
+        .ok_or(Error::Limit {
+            resource: "source-backed text-box admission bytes",
+            limit: maximum,
+        })?;
+    let amount = input_scene
+        .checked_add(output_scene)
+        .and_then(|size| size.checked_add(transient))
+        .filter(|amount| *amount <= maximum)
+        .ok_or(Error::Limit {
+            resource: "source-backed text-box admission bytes",
+            limit: maximum,
+        })?;
+    let amount = u64::try_from(amount).map_err(|_| Error::Limit {
+        resource: "source-backed text-box admission bytes",
+        limit: maximum,
+    })?;
+    context
+        .reserve(litchi_core::Resource::Memory, amount)
+        .map(|reservation| Some(Arc::new(reservation)))
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                error => litchi_opc::OpcError::Execution(error),
+            })
+        })
+}
+
+fn reserve_source_shape_properties(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    replacements: &[crate::opened::ShapePropertiesReplacement<'_>],
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    if replacements.len() > crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS {
+        return Err(Error::Limit {
+            resource: "source-backed shape property replacements",
+            limit: crate::opened::MAX_SHAPE_PROPERTIES_REPLACEMENTS,
+        });
+    }
+    let refusal = || Error::Limit {
+        resource: "source-backed shape property admission bytes",
+        limit: maximum,
+    };
+    let text_bytes = replacements.iter().try_fold(0usize, |sum, replacement| {
+        sum.checked_add(replacement.text().map_or(0, str::len))
+            .ok_or_else(refusal)
+    })?;
+    let text_maximum = crate::opened::Limits::default().max_text_bytes();
+    if text_bytes > text_maximum {
+        return Err(Error::Limit {
+            resource: "source-backed shape property text bytes",
+            limit: text_maximum,
+        });
+    }
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    // Three simultaneously live scene indexes, replacement plans, escaped
+    // text, and intermediate/output buffers fit inside this conservative
+    // envelope. Geometry stages release their prior candidate before the next
+    // shape. The reservation follows the final immutable payload.
+    let output_bound = text_bytes
+        .checked_mul(6)
+        .and_then(|size| size.checked_add(input_bytes))
+        .and_then(|size| size.checked_add(replacements.len().checked_mul(512)?))
+        .ok_or_else(refusal)?
+        .min(max_output_bytes);
+    let amount = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(output_bound.checked_mul(196)?))
+        .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
+        .and_then(|size| size.checked_add(4096))
+        .filter(|size| *size <= maximum)
+        .ok_or_else(refusal)?;
+    context
+        .reserve(litchi_core::Resource::Memory, amount as u64)
+        .map(|reservation| Some(Arc::new(reservation)))
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                other => litchi_opc::OpcError::Execution(other),
+            })
+        })
+}
+
+fn reserve_source_shape_text_chunks(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    admission: crate::opened::ChunkAdmission,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let replacements = admission.selections();
+    let text_bytes = admission.text_bytes();
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let output_bound = input_bytes
+        .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
+            resource: "source-backed shape text admission bytes",
+            limit: maximum,
+        })?)
+        .and_then(|size| size.checked_add(replacements.checked_mul(256)?))
+        .ok_or(Error::Limit {
+            resource: "source-backed shape text admission bytes",
+            limit: maximum,
+        })?
+        .min(max_output_bytes);
+    let input_scene = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            resource: "source-backed shape text admission bytes",
+            limit: maximum,
+        })?;
+    let output_scene = output_bound
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(1024))
+        .ok_or(Error::Limit {
+            resource: "source-backed shape text admission bytes",
+            limit: maximum,
+        })?;
+    let amount = input_scene
+        .checked_add(output_scene)
+        .and_then(|size| size.checked_add(output_bound))
+        .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
+        .and_then(|size| size.checked_add(replacements.checked_mul(256)?))
+        .and_then(|size| size.checked_add(4096))
+        .filter(|size| *size <= maximum)
+        .ok_or(Error::Limit {
+            resource: "source-backed shape text admission bytes",
+            limit: maximum,
+        })?;
+    context
+        .reserve(litchi_core::Resource::Memory, amount as u64)
+        .map(|reservation| Some(Arc::new(reservation)))
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                other => litchi_opc::OpcError::Execution(other),
+            })
+        })
+}
+
+fn reserve_source_shape_property_chunks(
+    context: Option<&ExecutionContext>,
+    input_bytes: usize,
+    admission: crate::opened::ChunkAdmission,
+    max_output_bytes: usize,
+) -> Result<Option<Arc<litchi_core::Reservation>>> {
+    let maximum = crate::opened::Limits::default().max_patch_bytes();
+    let replacements = admission.selections();
+    let text_bytes = admission.text_bytes();
+    let Some(context) = context else {
+        return Ok(None);
+    };
+    let output_bound = input_bytes
+        .checked_add(text_bytes.checked_mul(6).ok_or(Error::Limit {
+            resource: "source-backed shape property admission bytes",
+            limit: maximum,
+        })?)
+        .and_then(|size| size.checked_add(replacements.checked_mul(512)?))
+        .ok_or(Error::Limit {
+            resource: "source-backed shape property admission bytes",
+            limit: maximum,
+        })?
+        .min(max_output_bytes);
+    let amount = input_bytes
+        .checked_mul(64)
+        .and_then(|size| size.checked_add(output_bound.checked_mul(196)?))
+        .and_then(|size| size.checked_add(text_bytes.checked_mul(6)?))
+        .and_then(|size| size.checked_add(replacements.checked_mul(512)?))
+        .and_then(|size| size.checked_add(4096))
+        .filter(|size| *size <= maximum)
+        .ok_or(Error::Limit {
+            resource: "source-backed shape property admission bytes",
+            limit: maximum,
+        })?;
+    context
+        .reserve(litchi_core::Resource::Memory, amount as u64)
+        .map(|reservation| Some(Arc::new(reservation)))
+        .map_err(|error| {
+            Error::Opc(match error {
+                ExecutionError::Cancelled => litchi_opc::OpcError::Cancelled,
+                other => litchi_opc::OpcError::Execution(other),
+            })
+        })
 }
 
 #[cfg(any(unix, windows))]
@@ -1178,6 +1422,7 @@ impl SourceBackedPresentation {
 
         Ok(Self {
             inner: Arc::new(SourceInner {
+                scenes: scenes::SceneCache::for_package(&package),
                 package,
                 _presentation: catalog.presentation,
                 slides: catalog.slides,
@@ -1247,6 +1492,7 @@ impl SourceBackedPresentation {
             },
         };
         let SourceInner {
+            scenes: _,
             package,
             _presentation,
             slides,
@@ -1376,11 +1622,16 @@ impl SourceBackedPresentation {
     /// The mandatory presentation root was loaded and retained while the
     /// source catalog was opened; this method parses only that pinned root.
     pub fn slide_size(&self) -> Result<(i64, i64)> {
-        self.inner.package.check_execution()?;
-        let size = PresentationPart::from_part(&self.inner._presentation)?.slide_size()?;
-        self.inner.package.check_execution()?;
-        self.inner.package.source_version()?;
-        Ok(size)
+        related::with_fences(&self.inner, || {
+            let root = &self.inner._presentation;
+            let part = related::load_part(
+                &self.inner,
+                root.partname(),
+                root.content_type(),
+                crate::notes::MAX_PRESENTATION_XML,
+            )?;
+            PresentationPart::from_part(&part)?.slide_size()
+        })
     }
 
     /// Iterate lightweight slide handles without reading slide payloads.
@@ -2365,6 +2616,7 @@ impl SourceBackedPresentationEditor {
         let context = self.package.execution_context();
         #[cfg(test)]
         record_test_semantic_scene_read();
+        crate::source_limits::validate_xml_limits(raw.as_bytes(), self.limits)?;
         crate::presentation::transition::validate_source(raw.as_bytes(), operation)?;
         let part = SourcePart::from_view(&view, raw)?;
         #[cfg(test)]
@@ -2563,6 +2815,208 @@ impl SourceBackedSlideEdit {
         self.operation_used = true;
         self.check_execution()?;
         Ok(changed)
+    }
+
+    /// Atomically replace text from several already bounded same-slide
+    /// batches in one scene read, rewrite, and read-back.
+    ///
+    /// Every inner slice retains the ordinary 256-selector and aggregate text
+    /// limits of [`Self::set_shape_texts`]. The chunks must identify a
+    /// globally disjoint set of shapes; the native codec validates that
+    /// contract before publishing the single candidate payload. The number of
+    /// chunks and the aggregate selection count are bounded by the native
+    /// scene shape limit.
+    /// Aggregate replacement text is bounded by the slide output-byte limit.
+    pub fn set_shape_text_chunks(
+        &mut self,
+        chunks: &[&[crate::opened::ShapeTextReplacement<'_>]],
+    ) -> Result<usize> {
+        self.check_execution()?;
+        if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
+            return Err(Error::Limit {
+                resource: "source-backed shape text chunks",
+                limit: crate::shape::Limits::DEFAULT.shapes(),
+            });
+        }
+        if chunks.iter().all(|chunk| chunk.is_empty()) {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "set_shape_text_chunks",
+                reason: "source-backed slide edits support one atomic shape text operation",
+            });
+        }
+        let admission = crate::opened::admit_shape_text_chunks(
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+        )?;
+        debug_assert!(admission.selections() != 0);
+        let reservation = reserve_source_shape_text_chunks(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            admission,
+            self.source.max_output_bytes,
+        )?;
+        let (xml, changed) = crate::opened::stage_shape_text_chunks_admitted(
+            self.working.as_bytes(),
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+            admission,
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            let bytes = Arc::new(xml);
+            self.working = match reservation {
+                Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+                None => SourcePayload::Edited(bytes),
+            };
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Atomically update text and bounds on selected shapes of this slide.
+    ///
+    /// Only existing direct DrawingML transforms are edited. The operation
+    /// retains opaque XML and applies all requested properties together.
+    /// An empty batch does not consume this focused edit's operation allowance.
+    pub fn set_shape_properties(
+        &mut self,
+        replacements: &[crate::opened::ShapePropertiesReplacement<'_>],
+    ) -> Result<usize> {
+        self.check_execution()?;
+        if replacements.is_empty() {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "set_shape_properties",
+                reason: "source-backed slide edits support one atomic semantic operation",
+            });
+        }
+        let reservation = reserve_source_shape_properties(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            replacements,
+            self.source.max_output_bytes,
+        )?;
+        let (xml, changed) = crate::opened::stage_shape_properties(
+            self.working.as_bytes(),
+            replacements,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            let bytes = Arc::new(xml);
+            self.working = match reservation {
+                Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+                None => SourcePayload::Edited(bytes),
+            };
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Atomically replace text and/or bounds from several already bounded
+    /// same-slide property batches in one scene read, rewrite, and read-back.
+    /// Every inner slice retains the ordinary per-call property limits.
+    /// Aggregate replacement text is bounded by the slide output-byte limit.
+    pub fn set_shape_property_chunks(
+        &mut self,
+        chunks: &[&[crate::opened::ShapePropertiesReplacement<'_>]],
+    ) -> Result<usize> {
+        self.check_execution()?;
+        if chunks.len() > crate::shape::Limits::DEFAULT.shapes() {
+            return Err(Error::Limit {
+                resource: "source-backed shape property chunks",
+                limit: crate::shape::Limits::DEFAULT.shapes(),
+            });
+        }
+        if chunks.iter().all(|chunk| chunk.is_empty()) {
+            return Ok(0);
+        }
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "set_shape_property_chunks",
+                reason: "source-backed slide edits support one atomic semantic operation",
+            });
+        }
+        let admission = crate::opened::admit_shape_property_chunks(
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+        )?;
+        debug_assert!(admission.selections() != 0);
+        let reservation = reserve_source_shape_property_chunks(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            admission,
+            self.source.max_output_bytes,
+        )?;
+        let (xml, changed) = crate::opened::stage_shape_property_chunks_admitted(
+            self.working.as_bytes(),
+            chunks,
+            crate::opened::Limits::default().max_text_bytes(),
+            self.source.max_output_bytes,
+            admission,
+        )?;
+        self.check_execution()?;
+        if let Some(xml) = xml {
+            let bytes = Arc::new(xml);
+            self.working = match reservation {
+                Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+                None => SourcePayload::Edited(bytes),
+            };
+        }
+        self.operation_used = true;
+        Ok(changed)
+    }
+
+    /// Add one plain DrawingML text box to this exact source slide.
+    ///
+    /// The operation is staged against the retained slide bytes and then
+    /// semantically read back before the edit is published. It does not build
+    /// an eager package or rewrite any related Part, so the surrounding source
+    /// XML remains eligible for the source-backed durable proof path.
+    pub fn add_text_box(
+        &mut self,
+        text: impl AsRef<str>,
+        bounds: (i64, i64, i64, i64),
+    ) -> Result<u32> {
+        self.check_execution()?;
+        if self.operation_used {
+            return Err(Error::UnsafeEdit {
+                operation: "add_text_box",
+                reason: "source-backed slide edits support one atomic semantic operation",
+            });
+        }
+        let text = text.as_ref();
+        crate::opened::validate_text_box_input(text, bounds)?;
+        let reservation = reserve_source_text_box(
+            self.context.as_ref(),
+            self.working.as_bytes().len(),
+            text.len(),
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        let (xml, shape_id) = crate::opened::stage_text_box(
+            self.working.as_bytes(),
+            text,
+            bounds,
+            self.source.max_output_bytes,
+        )?;
+        self.check_execution()?;
+        let bytes = Arc::new(xml);
+        self.working = match reservation {
+            Some(reservation) => SourcePayload::ReservedEdit { bytes, reservation },
+            None => SourcePayload::Edited(bytes),
+        };
+        self.operation_used = true;
+        Ok(shape_id)
     }
 
     fn check_execution(&self) -> Result<()> {
@@ -3411,6 +3865,21 @@ impl SourceSlide {
         self.owner.package.check_execution()?;
         let part = self.part()?;
         let name = SlidePart::from_part(&part)?.name()?;
+        self.owner.package.check_execution()?;
+        self.owner.package.source_version()?;
+        Ok(name)
+    }
+
+    /// Return the authored `p:cSld@name`, without the physical slide-part
+    /// URI fallback returned by [`Self::name`].
+    ///
+    /// Only this selected slide's XML is loaded. Source-version and caller
+    /// execution checks surround the read, including when the payload is
+    /// already resident in the bounded source cache.
+    pub fn authored_name(&self) -> Result<Option<String>> {
+        self.owner.package.check_execution()?;
+        let part = self.part()?;
+        let name = SlidePart::from_part(&part)?.authored_name()?;
         self.owner.package.check_execution()?;
         self.owner.package.source_version()?;
         Ok(name)
@@ -5200,6 +5669,8 @@ fn clone_relationship_text(value: &str, resource: &'static str) -> Result<String
 
 #[cfg(test)]
 mod tests {
+    mod primary;
+    mod scenes;
     #[cfg(any(unix, windows))]
     use std::fs;
     use std::io;

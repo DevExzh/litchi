@@ -2,8 +2,8 @@
 
 use super::model::{Conformance, Slide};
 use super::{
-    MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NODES, MAX_NOTES_XML, allocation, invalid,
-    limit, resolved, xml_error,
+    MAX_ATTRIBUTE_BYTES, MAX_ATTRIBUTES, MAX_DEPTH, MAX_NODES, MAX_NOTES_XML, MAX_SLIDE_ROOT_NODES,
+    allocation, invalid, limit, resolved, xml_error,
 };
 use crate::{Error, Result};
 use litchi_ooxml_common::mce::process_ooxml;
@@ -313,27 +313,48 @@ pub(crate) fn validate_resource_xml(
 
 pub(crate) fn root_conformance(xml: &[u8], max: usize, root: &str) -> Result<Conformance> {
     for conformance in [Conformance::Transitional, Conformance::Strict] {
-        if scan_xml(xml, max, conformance, root).is_ok() {
-            return Ok(conformance);
+        match scan_xml(xml, max, conformance, root) {
+            Ok(_) => return Ok(conformance),
+            Err(error) if is_typed_resource_error(&error) => return Err(error),
+            Err(_) => {},
         }
     }
     Err(invalid(format!("invalid {root} root or namespace")))
 }
 
 /// Classify one already-MCE-processed PresentationML root with the same
-/// Transitional-then-Strict retry and generic-error masking as
-/// [`root_conformance`].  `raw_len` is checked separately because the raw
-/// notes limit is part of `scan_xml`'s contract even when the processed bytes
-/// are borrowed from a capture-local reader.
+/// Transitional-then-Strict retry as [`root_conformance`]. Malformed roots
+/// return `Ok(None)`, while typed resource failures remain errors so callers
+/// cannot turn a bounded refusal into a cacheable negative proof. `raw_len` is
+/// checked separately because the raw notes limit is part of `scan_xml`'s
+/// contract even when the processed bytes are borrowed from a capture-local
+/// reader.
 pub(crate) fn root_conformance_from_processed(
     processed: &[u8],
     raw_len: usize,
     max: usize,
     root: &str,
-) -> Option<Conformance> {
-    [Conformance::Transitional, Conformance::Strict]
-        .into_iter()
-        .find(|&conformance| scan_processed_xml(processed, raw_len, max, conformance, root).is_ok())
+) -> Result<Option<Conformance>> {
+    for conformance in [Conformance::Transitional, Conformance::Strict] {
+        match scan_processed_xml(processed, raw_len, max, conformance, root) {
+            Ok(_) => return Ok(Some(conformance)),
+            Err(error) if is_typed_resource_error(&error) => return Err(error),
+            Err(_) => {},
+        }
+    }
+    Ok(None)
+}
+
+fn is_typed_resource_error(error: &Error) -> bool {
+    matches!(error, Error::Limit { .. } | Error::Allocation { .. })
+}
+
+fn node_policy(expected_root: &str) -> (&'static str, usize) {
+    if expected_root == "sld" {
+        ("slide XML nodes", MAX_SLIDE_ROOT_NODES)
+    } else {
+        ("notes XML nodes", MAX_NODES)
+    }
 }
 
 pub(crate) fn scan_xml(
@@ -381,6 +402,7 @@ fn scan_processed_xml(
     let mut attribute_bytes = 0usize;
     let mut root_seen = false;
     let mut scan = XmlScan::default();
+    let (node_resource, node_limit) = node_policy(expected_root);
     loop {
         if pending_pop {
             resolver.pop();
@@ -397,8 +419,8 @@ fn scan_processed_xml(
                 if depth > MAX_DEPTH {
                     return Err(limit("notes XML depth", MAX_DEPTH));
                 }
-                if nodes > MAX_NODES {
-                    return Err(limit("notes XML nodes", MAX_NODES));
+                if nodes > node_limit {
+                    return Err(limit(node_resource, node_limit));
                 }
                 inspect_element(
                     &resolver,
@@ -419,8 +441,8 @@ fn scan_processed_xml(
                     .map_err(xml_error)?;
                 pending_pop = true;
                 nodes += 1;
-                if nodes > MAX_NODES {
-                    return Err(limit("notes XML nodes", MAX_NODES));
+                if nodes > node_limit {
+                    return Err(limit(node_resource, node_limit));
                 }
                 if depth >= MAX_DEPTH {
                     return Err(limit("notes XML depth", MAX_DEPTH));
@@ -556,14 +578,15 @@ mod tests {
                     raw.len(),
                     crate::notes::MAX_SLIDE_XML,
                     "sld",
-                ),
+                )
+                .expect("processed root must classify without a resource failure"),
                 Some(expected)
             );
         }
     }
 
     #[test]
-    fn processed_root_classification_keeps_generic_failure_masking_and_limits() {
+    fn processed_root_classification_keeps_malformed_proofs_and_typed_limits() {
         let processed = process_ooxml(INVALID_ROOT).expect("test root must process");
         let raw_error = root_conformance(INVALID_ROOT, crate::notes::MAX_SLIDE_XML, "sld")
             .expect_err("invalid root must be refused");
@@ -577,22 +600,34 @@ mod tests {
                 INVALID_ROOT.len(),
                 crate::notes::MAX_SLIDE_XML,
                 "sld",
-            ),
+            )
+            .expect("malformed root should be a negative proof"),
             None
         );
 
         let raw_limited = root_conformance(INVALID_ROOT, INVALID_ROOT.len() - 1, "sld")
-            .expect_err("raw notes limit must be masked by root classification");
-        assert_eq!(raw_limited.to_string(), raw_error.to_string());
-        assert_eq!(
-            root_conformance_from_processed(
-                processed.as_ref(),
-                INVALID_ROOT.len(),
-                INVALID_ROOT.len() - 1,
-                "sld",
-            ),
-            None
-        );
+            .expect_err("raw resource limits must survive root classification");
+        assert!(matches!(
+            raw_limited,
+            Error::Limit {
+                resource: "notes XML bytes",
+                limit
+            } if limit == INVALID_ROOT.len() - 1
+        ));
+        let processed_limited = root_conformance_from_processed(
+            processed.as_ref(),
+            INVALID_ROOT.len(),
+            INVALID_ROOT.len() - 1,
+            "sld",
+        )
+        .expect_err("processed resource limits must survive root classification");
+        assert!(matches!(
+            processed_limited,
+            Error::Limit {
+                resource: "notes XML bytes",
+                limit
+            } if limit == INVALID_ROOT.len() - 1
+        ));
 
         let processed_limit =
             scan_processed_xml(processed.as_ref(), 0, 1, Conformance::Transitional, "sld")
@@ -817,26 +852,26 @@ mod tests {
     #[test]
     fn empty_attribute_tail_preserves_node_ceiling_for_start_and_empty_children() {
         for empty in [false, true] {
-            let mut xml = format!(r#"<p:sld xmlns:p="{P_NS}">"#).into_bytes();
+            let mut xml = format!(r#"<p:notes xmlns:p="{P_NS}">"#).into_bytes();
             let child: &[u8] = if empty { b"<p:x/>" } else { b"<p:x></p:x>" };
             for _ in 0..MAX_NODES {
                 xml.extend_from_slice(child);
             }
-            xml.extend_from_slice(b"</p:sld>");
+            xml.extend_from_slice(b"</p:notes>");
 
             let expected = outcome(buffered_scan_oracle(
                 &xml,
                 xml.len(),
                 crate::notes::MAX_SLIDE_XML,
                 Conformance::Transitional,
-                "sld",
+                "notes",
             ));
             let actual = outcome(scan_processed_xml(
                 &xml,
                 xml.len(),
                 crate::notes::MAX_SLIDE_XML,
                 Conformance::Transitional,
-                "sld",
+                "notes",
             ));
             assert_eq!(
                 actual,
@@ -849,6 +884,80 @@ mod tests {
                 Ok(_) => panic!("node ceiling must refuse 100001 nodes"),
             }
         }
+    }
+
+    #[test]
+    fn slide_and_notes_root_node_ceilings_are_independent() {
+        fn empty_root(root: &str, children: usize) -> Vec<u8> {
+            let mut xml = format!(r#"<p:{root} xmlns:p="{P_NS}">"#).into_bytes();
+            for _ in 0..children {
+                xml.extend_from_slice(b"<p:x/>");
+            }
+            xml.extend_from_slice(format!("</p:{root}>").as_bytes());
+            xml
+        }
+
+        let mut slide = empty_root("sld", MAX_SLIDE_ROOT_NODES - 1);
+        assert!(
+            scan_processed_xml(
+                &slide,
+                slide.len(),
+                crate::notes::MAX_SLIDE_XML,
+                Conformance::Transitional,
+                "sld",
+            )
+            .is_ok()
+        );
+        let slide_close = b"</p:sld>";
+        let slide_close_start = slide.len() - slide_close.len();
+        slide.splice(
+            slide_close_start..slide_close_start,
+            b"<p:x/>".iter().copied(),
+        );
+        assert!(matches!(
+            scan_processed_xml(
+                &slide,
+                slide.len(),
+                crate::notes::MAX_SLIDE_XML,
+                Conformance::Transitional,
+                "sld",
+            ),
+            Err(Error::Limit {
+                resource: "slide XML nodes",
+                limit: MAX_SLIDE_ROOT_NODES,
+            })
+        ));
+
+        let mut notes = empty_root("notes", MAX_NODES - 1);
+        assert!(
+            scan_processed_xml(
+                &notes,
+                notes.len(),
+                crate::notes::MAX_SLIDE_XML,
+                Conformance::Transitional,
+                "notes",
+            )
+            .is_ok()
+        );
+        let notes_close = b"</p:notes>";
+        let notes_close_start = notes.len() - notes_close.len();
+        notes.splice(
+            notes_close_start..notes_close_start,
+            b"<p:x/>".iter().copied(),
+        );
+        assert!(matches!(
+            scan_processed_xml(
+                &notes,
+                notes.len(),
+                crate::notes::MAX_SLIDE_XML,
+                Conformance::Transitional,
+                "notes",
+            ),
+            Err(Error::Limit {
+                resource: "notes XML nodes",
+                limit: MAX_NODES,
+            })
+        ));
     }
 
     #[test]
@@ -1001,6 +1110,7 @@ mod tests {
         let mut attribute_bytes = 0usize;
         let mut root_seen = false;
         let mut scan = XmlScan::default();
+        let (node_resource, node_limit) = node_policy(expected_root);
         loop {
             match reader.read_event_into(&mut buffer).map_err(xml_error)? {
                 Event::Start(element) => {
@@ -1009,8 +1119,8 @@ mod tests {
                     if depth > MAX_DEPTH {
                         return Err(limit("notes XML depth", MAX_DEPTH));
                     }
-                    if nodes > MAX_NODES {
-                        return Err(limit("notes XML nodes", MAX_NODES));
+                    if nodes > node_limit {
+                        return Err(limit(node_resource, node_limit));
                     }
                     inspect_element_oracle(
                         &reader,
@@ -1026,8 +1136,8 @@ mod tests {
                 },
                 Event::Empty(element) => {
                     nodes += 1;
-                    if nodes > MAX_NODES {
-                        return Err(limit("notes XML nodes", MAX_NODES));
+                    if nodes > node_limit {
+                        return Err(limit(node_resource, node_limit));
                     }
                     if depth >= MAX_DEPTH {
                         return Err(limit("notes XML depth", MAX_DEPTH));

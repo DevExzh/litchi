@@ -169,13 +169,17 @@ fn package_operations_are_selector_first_and_atomic() {
 
 #[test]
 fn public_package_and_slide_facades_use_the_same_shape_selector() {
-    let mut authored = crate::package::Package::new().expect("package");
+    let mut builder = crate::builder::Builder::new().expect("builder");
     {
-        let presentation = authored.presentation_mut().expect("mutable presentation");
+        let presentation = builder.presentation().expect("mutable presentation");
         let slide = presentation.add_slide().expect("slide");
         slide.add_text_box("Designer", 914_400, 914_400, 2_743_200, 914_400);
     }
-    let bytes = authored.to_bytes().expect("serialize");
+    let bytes = builder
+        .build()
+        .expect("build")
+        .to_bytes()
+        .expect("serialize");
     let mut package = crate::package::Package::from_bytes(&bytes).expect("reopen");
 
     assert!(

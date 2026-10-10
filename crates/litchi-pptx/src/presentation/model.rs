@@ -7,7 +7,7 @@ use std::sync::OnceLock;
 
 use crate::Result;
 use crate::parts::{PresentationPart, SlideReference};
-use crate::slide::{Key, Slide, SlideLayout, SlideMaster};
+use crate::slide::{Selector, Slide, SlideLayout, SlideMaster};
 
 use super::embedded;
 use super::package;
@@ -213,7 +213,7 @@ impl<'a> Presentation<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn find_slide<'k>(&self, key: impl Into<Key<'k>>) -> Result<Option<Slide<'a>>> {
+    pub fn find_slide<'k>(&self, key: impl Into<Selector<'k>>) -> Result<Option<Slide<'a>>> {
         package::find_slide(self, key.into())
     }
 

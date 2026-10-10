@@ -81,10 +81,20 @@ impl List {
             return Err(invalid("presentation sections exceed 8 MiB"));
         }
         let processed = litchi_ooxml_common::mce::process_ooxml(xml)?;
-        if processed.len() > MAX_BYTES {
+        Self::from_processed(processed.as_ref())
+    }
+
+    /// Parse XML that has already crossed the caller's MCE/resource boundary.
+    ///
+    /// Source-backed owners use this entry point after applying their
+    /// effective physical and semantic limits. It deliberately performs no
+    /// second MCE pass, while retaining the section codec's own bounded DOM
+    /// and structural validation.
+    pub(crate) fn from_processed(xml: &[u8]) -> Result<Self> {
+        if xml.len() > MAX_BYTES {
             return Err(invalid("processed presentation sections exceed 8 MiB"));
         }
-        parse_sections(&parse_dom(processed.as_ref())?)
+        parse_sections(&parse_dom(xml)?)
     }
 
     /// Serialize the complete `p:extLst` fragment containing `p14:sectionLst`.
@@ -291,8 +301,15 @@ fn parse_sections(root: &Node) -> Result<List> {
     expect(root, &[P, PS], "presentation")?;
     let mut presentation_ext = None;
     for child in children(root)? {
-        if is(child, &[P, PS], "extLst") && presentation_ext.replace(child).is_some() {
-            return Err(invalid("duplicate presentation extLst"));
+        if is(child, &[P, PS], "extLst") {
+            if child.namespace != root.namespace {
+                return Err(invalid(
+                    "presentation section extension has mixed conformance",
+                ));
+            }
+            if presentation_ext.replace(child).is_some() {
+                return Err(invalid("duplicate presentation extLst"));
+            }
         }
     }
     let Some(extension_list) = presentation_ext else {
@@ -300,7 +317,7 @@ fn parse_sections(root: &Node) -> Result<List> {
     };
     let mut section_list = None;
     for extension in children(extension_list)? {
-        expect(extension, &[P, PS], "ext")?;
+        expect(extension, &[root.namespace.as_str()], "ext")?;
         let uri = required_attr(extension, "uri")?;
         if uri == SECTION_URI {
             if section_list.is_some() {
@@ -690,6 +707,29 @@ mod tests {
         );
         let xml = list.to_xml().unwrap();
         assert_eq!(List::from_xml(wrap(&xml).as_bytes()).unwrap(), list);
+    }
+
+    #[test]
+    fn section_container_core_namespaces_match_the_presentation() {
+        for (owner, other) in [(P, PS), (PS, P)] {
+            let valid = format!(
+                r#"<p:presentation xmlns:p="{owner}"><p:extLst><p:ext uri="urn:unrelated"/></p:extLst></p:presentation>"#
+            );
+            assert!(
+                List::from_xml(valid.as_bytes())
+                    .unwrap()
+                    .sections()
+                    .is_empty()
+            );
+            let mixed_list = format!(
+                r#"<p:presentation xmlns:p="{owner}" xmlns:q="{other}"><q:extLst/></p:presentation>"#
+            );
+            assert!(List::from_xml(mixed_list.as_bytes()).is_err());
+            let mixed_entry = format!(
+                r#"<p:presentation xmlns:p="{owner}" xmlns:q="{other}"><p:extLst><q:ext uri="urn:unrelated"/></p:extLst></p:presentation>"#
+            );
+            assert!(List::from_xml(mixed_entry.as_bytes()).is_err());
+        }
     }
 
     #[test]

@@ -17,7 +17,7 @@ impl Package {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn set_font_embedding(
+    pub(crate) fn set_font_embedding(
         &mut self,
         embedding: litchi_fonts::embedding::Mode,
     ) -> Result<&mut Self> {
@@ -33,16 +33,6 @@ impl Package {
             litchi_fonts::embedding::Mode::Subset => litchi_opc::FontEmbedding::Subset,
         });
         self.font_embedding_dirty = true;
-        Ok(self)
-    }
-
-    /// Select automatic system-font publication and return this package by value.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the operation fails.
-    pub fn with_font_embedding(mut self, embedding: litchi_fonts::embedding::Mode) -> Result<Self> {
-        self.set_font_embedding(embedding)?;
         Ok(self)
     }
 

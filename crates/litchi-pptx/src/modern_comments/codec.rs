@@ -33,13 +33,25 @@ mod authors {
 
     fn parse_author_list(xml: &[u8]) -> Result<Authors> {
         if xml.len() > MAX_BYTES {
-            return Err(limit("modern Comment Author part bytes"));
+            return Err(limit("modern Comment Author part bytes", MAX_BYTES));
         }
         let selected = process_ooxml(xml)?;
         if selected.len() > MAX_BYTES {
-            return Err(limit("MCE-processed modern Comment Author bytes"));
+            return Err(limit(
+                "MCE-processed modern Comment Author bytes",
+                MAX_BYTES,
+            ));
         }
-        let bytes = selected.as_ref();
+        parse_processed_author_list(selected.as_ref())
+    }
+
+    fn parse_processed_author_list(bytes: &[u8]) -> Result<Authors> {
+        if bytes.len() > MAX_BYTES {
+            return Err(limit(
+                "MCE-processed modern Comment Author bytes",
+                MAX_BYTES,
+            ));
+        }
         let mut reader = NsReader::from_reader(bytes);
         let origin = ReaderOrigin::of(bytes);
         reader.config_mut().trim_text(false);
@@ -66,12 +78,12 @@ mod authors {
                 Event::Start(element) | Event::Empty(element) => {
                     nodes = nodes
                         .checked_add(1)
-                        .ok_or_else(|| limit("modern Comment Author nodes"))?;
+                        .ok_or_else(|| limit("modern Comment Author nodes", MAX_NODES))?;
                     if nodes > MAX_NODES {
-                        return Err(limit("modern Comment Author nodes"));
+                        return Err(limit("modern Comment Author nodes", MAX_NODES));
                     }
                     if stack.len() + 1 > MAX_DEPTH {
-                        return Err(limit("modern Comment Author XML depth"));
+                        return Err(limit("modern Comment Author XML depth", MAX_DEPTH));
                     }
                     let local = decode_name(element.local_name().as_ref())?;
                     let kind = if stack.is_empty() {
@@ -160,10 +172,17 @@ mod authors {
                         ));
                     }
                 },
-                Event::DocType(_) | Event::PI(_) | Event::GeneralRef(_) => {
-                    return Err(invalid(
-                        "DTD, processing instructions, and general references are rejected",
-                    ));
+                Event::GeneralRef(reference) => {
+                    let value = litchi_ooxml_common::xml::decode_xml_reference(&reference)
+                        .map_err(xml_error)?;
+                    if !inside_extension(&stack) && !value.trim().is_empty() {
+                        return Err(invalid(
+                            "unexpected character reference in modern Comment Author metadata",
+                        ));
+                    }
+                },
+                Event::DocType(_) | Event::PI(_) => {
+                    return Err(invalid("DTD and processing instructions are rejected"));
                 },
                 Event::Decl(_) | Event::Comment(_) => {},
                 Event::Eof => break,
@@ -197,7 +216,7 @@ mod authors {
                     return Err(invalid("authorLst permits only p188:author children"));
                 }
                 if authors.len() >= MAX_AUTHORS {
-                    return Err(limit("modern Comment Authors"));
+                    return Err(limit("modern Comment Authors", MAX_AUTHORS));
                 }
                 let declarations = namespace_declarations_from(element, decoder, None)?;
                 let attributes = known_attributes(
@@ -277,7 +296,7 @@ mod authors {
         validate_prefix(&value.root_prefix)?;
         validate_namespaces(&value.namespace_declarations, Some(&value.root_prefix))?;
         if value.authors.len() > MAX_AUTHORS {
-            return Err(limit("modern Comment Authors"));
+            return Err(limit("modern Comment Authors", MAX_AUTHORS));
         }
         let mut ids = HashSet::new();
         for author in &value.authors {
@@ -297,7 +316,7 @@ mod authors {
                 .as_ref()
                 .is_some_and(|xml| xml.len() > MAX_BYTES)
             {
-                return Err(limit("modern Comment Author extension bytes"));
+                return Err(limit("modern Comment Author extension bytes", MAX_BYTES));
             }
         }
         Ok(())
@@ -462,7 +481,10 @@ mod authors {
         if value.len() <= MAX_STRING_BYTES {
             Ok(())
         } else {
-            Err(limit("modern Comment Author string bytes"))
+            Err(limit(
+                "modern Comment Author string bytes",
+                MAX_STRING_BYTES,
+            ))
         }
     }
 
@@ -564,11 +586,19 @@ mod authors {
         Error::Invalid(message.into())
     }
 
-    fn limit(label: &str) -> Error {
-        invalid(format!("{label} exceeds implementation limit"))
+    fn limit(label: &'static str, limit: usize) -> Error {
+        Error::Limit {
+            resource: label,
+            limit,
+        }
     }
 
     impl Authors {
+        /// Decode XML already admitted by the source physical/MCE boundary.
+        pub(crate) fn from_processed(xml: &[u8]) -> Result<Self> {
+            parse_processed_author_list(xml)
+        }
+
         /// # Errors
         ///
         /// Returns an error if the input cannot be read or is malformed.
@@ -595,7 +625,7 @@ mod authors {
                 close_tag(&mut out, &self.root_prefix, "authorLst");
             }
             if out.len() > MAX_BYTES {
-                return Err(limit("serialized modern Comment Author bytes"));
+                return Err(limit("serialized modern Comment Author bytes", MAX_BYTES));
             }
             parse_author_list(&out)?;
             Ok(out)

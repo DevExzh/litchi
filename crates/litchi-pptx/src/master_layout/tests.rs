@@ -1295,12 +1295,10 @@ fn p232_legacy_facade_preflights_validation_and_preserves_noop_blob_sharing() {
 }
 
 #[test]
-fn p232_legacy_facade_flushes_new_slides_before_preflight_and_retires_writer() {
-    let mut package = Package::new().unwrap();
-    {
-        let presentation = package.presentation_mut().unwrap();
-        presentation.add_slide().unwrap();
-    }
+fn p232_built_package_composes_with_placeholder_preflight() {
+    let mut builder = crate::builder::Builder::new().unwrap();
+    builder.presentation().unwrap().add_slide().unwrap();
+    let mut package = builder.build().unwrap();
     let slide_uri = uri("/ppt/slides/slide1.xml");
     package
         .store_placeholder_shape(
@@ -1310,10 +1308,6 @@ fn p232_legacy_facade_flushes_new_slides_before_preflight_and_retires_writer() {
                 .with_type_extension(PlaceholderTypeExtension::Cameo),
         )
         .unwrap();
-    assert!(
-        package.presentation_mut().is_err(),
-        "raw placeholder mutation must retire the stale mutable writer"
-    );
 
     let bytes = package.to_bytes().unwrap();
     let reopened = Package::from_bytes(&bytes).unwrap();

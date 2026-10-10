@@ -8,8 +8,9 @@ mod codec;
 mod model;
 mod order;
 mod package;
-mod source;
+pub(crate) mod source;
 mod source_cross_copy;
+mod source_removal;
 mod transition;
 
 #[cfg(test)]
@@ -35,3 +36,16 @@ pub use source::{
     SourceSvgDescriptor, SourceSvgImage, SourceSvgReplacement,
 };
 pub use source_cross_copy::{SourceBackedCrossSlideCopyPlan, SourceBackedCrossSlideCopySnapshot};
+pub use source_removal::SourceBackedSlideRemovalPlan;
+
+/// Source-backed per-slide modern-comment snapshots.
+pub use source::modern_comments;
+/// Source-backed slide related-part snapshots.
+pub use source::related;
+/// Source-backed scene retention diagnostics.
+pub use source::scenes as scene;
+
+/// Explicit access to the retained presentation root.
+pub use source::raw;
+/// Detached presentation section membership.
+pub use source::sections;

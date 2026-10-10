@@ -1231,28 +1231,13 @@ fn prepare(
         )?);
         slide_relationship_order.push(PreparedSlideRelationship::Image(relationship_index));
     }
-    let source_layouts = registered_layouts(
+    validate_registered_source_layout(
         &source.inner.package,
         &source_presentation_view,
         source_presentation_data.as_bytes(),
-        source_dialect,
-        "source",
+        &source_layout_uri,
         execution_context,
     )?;
-    let mut source_layout_registered = false;
-    for uri in &source_layouts {
-        check_execution(execution_context)?;
-        if uri.is_equivalent_to(&source_layout_uri) {
-            source_layout_registered = true;
-            break;
-        }
-    }
-    if !source_layout_registered {
-        return refusal(
-            SlideCopyRefusal::AmbiguousTopology,
-            "source slide layout is not registered by a slide master",
-        );
-    }
     let destination_layouts = registered_layouts(
         &editor.package,
         &destination_presentation_view,
@@ -3650,6 +3635,7 @@ fn registered_layouts(
             });
         }
         let master_data = master.data()?;
+        crate::source_limits::validate_xml_limits(master_data.as_bytes(), package.read_limits())?;
         if validate_xml(
             master_data.as_bytes(),
             b"sldMaster",
@@ -3731,6 +3717,11 @@ fn registered_layouts(
                     format!("{context} repeats a slide layout"),
                 );
             }
+            let layout_data = layout.data()?;
+            crate::source_limits::validate_xml_limits(
+                layout_data.as_bytes(),
+                package.read_limits(),
+            )?;
             result.push(layout_uri);
         }
         let mut theme = None;
@@ -3752,8 +3743,114 @@ fn registered_layouts(
                 format!("{context} theme is not a leaf part"),
             );
         }
+        let theme_data = theme_part.data()?;
+        crate::source_limits::validate_xml_limits(theme_data.as_bytes(), package.read_limits())?;
     }
     Ok(result)
+}
+
+/// Select one registered source layout by its exact producer-visible name.
+///
+/// This is intentionally a metadata-only companion to [`registered_layouts`].
+/// It validates the same physical master/layout/theme graph and reads only the
+/// selected layout XML needed for its `p:cSld@name`; it does not acquire the
+/// detached shape scenes used by the public source layout snapshots.
+pub(super) fn registered_source_layout_by_name(
+    package: &SourceBackedPackage,
+    presentation: &PartView<'_>,
+    xml: &[u8],
+    layout_name: &str,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<PackURI> {
+    const CONTEXT: &str = "source";
+
+    check_execution(execution_context)?;
+    crate::source_limits::validate_xml_limits(xml, package.read_limits())?;
+    let dialect = validate_xml(
+        xml,
+        b"presentation",
+        RootNamespace::PresentationMl,
+        true,
+        true,
+        true,
+        true,
+        false,
+        CONTEXT,
+        execution_context,
+    )?;
+    let registered = registered_layouts(
+        package,
+        presentation,
+        xml,
+        dialect,
+        CONTEXT,
+        execution_context,
+    )?;
+    let mut selected = None;
+    let mut matches = 0usize;
+    for layout_uri in registered {
+        check_execution(execution_context)?;
+        let layout = package.part(&layout_uri)?;
+        let data = layout.data()?;
+        let name = crate::namespace::presentation_name(data.as_bytes())?
+            .unwrap_or_else(|| layout_uri.to_string());
+        if name == layout_name {
+            matches = matches
+                .checked_add(1)
+                .ok_or_else(|| invalid("source layout match count overflow"))?;
+            selected = Some(layout_uri);
+        }
+    }
+    if matches > 1 {
+        return Err(Error::AmbiguousSlideLayoutName {
+            name: layout_name.to_owned(),
+            matches,
+        });
+    }
+    selected.ok_or_else(|| Error::SlideLayoutNameNotFound(layout_name.to_owned()))
+}
+
+pub(super) fn validate_registered_source_layout(
+    package: &SourceBackedPackage,
+    presentation: &PartView<'_>,
+    xml: &[u8],
+    selected: &PackURI,
+    execution_context: Option<&ExecutionContext>,
+) -> Result<()> {
+    const CONTEXT: &str = "source";
+
+    check_execution(execution_context)?;
+    crate::source_limits::validate_xml_limits(xml, package.read_limits())?;
+    let dialect = validate_xml(
+        xml,
+        b"presentation",
+        RootNamespace::PresentationMl,
+        true,
+        true,
+        true,
+        true,
+        false,
+        CONTEXT,
+        execution_context,
+    )?;
+    let registered = registered_layouts(
+        package,
+        presentation,
+        xml,
+        dialect,
+        CONTEXT,
+        execution_context,
+    )?;
+    if registered
+        .iter()
+        .any(|layout| layout.is_equivalent_to(selected))
+    {
+        return Ok(());
+    }
+    refusal(
+        SlideCopyRefusal::AmbiguousTopology,
+        "source slide layout is not registered by a slide master",
+    )
 }
 
 fn prove_graphs(
@@ -6387,3 +6484,7 @@ mod tests {
 #[cfg(test)]
 #[path = "source_cross_copy/payload_guard_tests.rs"]
 mod payload_guard_tests;
+
+#[cfg(test)]
+#[path = "source_cross_copy/registered_layout_limits.rs"]
+mod registered_layout_limits;
