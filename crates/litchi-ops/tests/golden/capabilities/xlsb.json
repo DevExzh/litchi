@@ -492,6 +492,18 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -525,7 +537,20 @@
           "pathSegment": "<A1>"
         }
       ],
-      "properties": {}
+      "properties": {
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        }
+      }
     },
     {
       "format": "xlsb",

@@ -880,7 +880,7 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
 
 #[cfg(feature = "xlsb")]
 #[test]
-fn xlsb_reports_keep_selection_semantic_and_limit_writes_to_sheet_names() {
+fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
     let caps = Capabilities::of(FileFormat::Xlsb);
     assert!(caps.verb(Verb::Get).is_supported());
     assert!(caps.verb(Verb::Set).is_supported());
@@ -926,10 +926,12 @@ fn xlsb_reports_keep_selection_semantic_and_limit_writes_to_sheet_names() {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
         for property in element.properties() {
-            assert!(property.get(), "{}", property.name());
+            let payload = matches!(element.name(), "cell" | "range")
+                && matches!(property.name(), "value" | "clear");
+            assert_eq!(property.get(), !payload, "{}", property.name());
             assert_eq!(
                 property.set(),
-                element.name() == "sheet" && property.name() == "name",
+                (element.name() == "sheet" && property.name() == "name") || payload,
                 "{}.{}",
                 element.name(),
                 property.name()

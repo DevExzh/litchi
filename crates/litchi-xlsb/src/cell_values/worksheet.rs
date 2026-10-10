@@ -5,6 +5,7 @@
 
 //! Source-bound worksheet-cell snapshots and structural edits.
 
+use crate::formula::Range;
 use crate::leniency::{
     CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport, ValueEncodingDefect,
 };
@@ -18,7 +19,7 @@ use std::sync::Arc;
 const MAX_ROW: u32 = 1_048_575;
 const MAX_COLUMN: u32 = 16_383;
 const MAX_STYLE_INDEX: u32 = 0x00ff_ffff;
-const MAX_CELL_STRING_UNITS: usize = 32_767;
+pub(crate) const MAX_CELL_STRING_UNITS: usize = 32_767;
 const MAX_FORMULA_BYTES: usize = crate::formula::MAX_CELL_FORMULA_BYTES;
 const PATCH_MAGIC: &[u8; 8] = b"LCXBCLP1";
 
@@ -675,11 +676,20 @@ impl Snapshot {
     /// Start a detached edit against this exact source stream.
     #[must_use]
     pub fn edit(&self) -> Edit {
+        let mut index = BTreeMap::new();
+        for (entry_index, entry) in self.entries.iter().enumerate() {
+            index
+                .entry(entry.cell.reference)
+                .and_modify(|state| *state = CellIndex::Duplicate)
+                .or_insert(CellIndex::Unique(entry_index));
+        }
         Edit {
             source: Arc::clone(&self.source),
             entries: self.entries.clone(),
+            metadata: None,
             inserted: BTreeMap::new(),
             removed: BTreeSet::new(),
+            index,
             limits: self.limits,
             leniency: self.leniency,
         }
@@ -744,18 +754,158 @@ impl Iterator for Numbers<'_> {
 
 impl ExactSizeIterator for Numbers<'_> {}
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FormulaGroupKind {
+    Array,
+    Shared,
+    Table,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+struct FormulaGroupRange {
+    kind: FormulaGroupKind,
+    range: Range,
+}
+
+impl FormulaGroupRange {
+    fn contains(self, reference: Reference) -> bool {
+        self.range.contains(reference.row(), reference.column())
+    }
+}
+
+#[derive(Debug, Clone)]
+struct SourceMetadata {
+    source_cells: BTreeSet<Reference>,
+    formula_groups: Vec<FormulaGroupRange>,
+    formula_group_metadata_invalid: bool,
+}
+
 /// Detached structural edits of worksheet cell records.
 #[derive(Debug, Clone)]
 pub struct Edit {
     source: Arc<[u8]>,
     entries: Vec<Entry>,
+    metadata: Option<SourceMetadata>,
     inserted: BTreeMap<Reference, StoredCell>,
     removed: BTreeSet<Reference>,
+    index: BTreeMap<Reference, CellIndex>,
     limits: Limits,
     leniency: Leniency,
 }
 
 impl Edit {
+    /// Resource policy retained by this detached edit.
+    pub(crate) const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Return the current supported cell at `reference`, including staged
+    /// insertions and replacements.
+    pub(crate) fn current_cell(&self, reference: Reference) -> Result<Option<&StoredCell>> {
+        if let Some(cell) = self.inserted.get(&reference) {
+            return Ok(Some(cell));
+        }
+        if self.removed.contains(&reference) {
+            return Ok(None);
+        }
+        Ok(self
+            .indexed_index(reference)?
+            .map(|index| &self.entries[index].cell))
+    }
+
+    /// Whether a source cell has been staged for removal by this edit.
+    pub(crate) fn is_removed(&self, reference: Reference) -> bool {
+        self.removed.contains(&reference)
+    }
+
+    /// Whether the source contains any cell record at `reference`, including
+    /// a record family outside this owner's supported inventory.
+    pub(crate) fn source_has_cell(&mut self, reference: Reference) -> Result<bool> {
+        Ok(self.source_metadata()?.source_cells.contains(&reference))
+    }
+
+    /// Refuse a semantic scalar assignment that would split a formula group.
+    ///
+    /// Formula-group definitions are retained as opaque worksheet records by
+    /// the cell-value owner.  Their ranges are captured once, lazily when the
+    /// edit first needs structural admission, so a target can be rejected even
+    /// when its member cell record is absent or uses a value family this owner
+    /// does not decode.
+    pub(crate) fn scalar_assignment_guard(&mut self, reference: Reference) -> Result<()> {
+        let metadata = self.source_metadata()?;
+        if metadata.formula_group_metadata_invalid {
+            return Err(Error::UnsupportedFeature(
+                "scalar edits cannot target a worksheet with malformed formula-group metadata"
+                    .to_string(),
+            ));
+        }
+        if let Some(group) = metadata
+            .formula_groups
+            .iter()
+            .find(|group| group.contains(reference))
+        {
+            let kind = match group.kind {
+                FormulaGroupKind::Array => "array",
+                FormulaGroupKind::Shared => "shared",
+                FormulaGroupKind::Table => "data-table",
+            };
+            return Err(Error::UnsupportedFeature(format!(
+                "scalar edits cannot target a cell in a {kind} formula group"
+            )));
+        }
+        Ok(())
+    }
+
+    fn source_metadata(&mut self) -> Result<&SourceMetadata> {
+        if self.metadata.is_none() {
+            self.metadata = Some(scan_source_metadata(&self.source, self.limits)?);
+        }
+        self.metadata.as_ref().ok_or_else(|| {
+            Error::InvalidFormat("worksheet source metadata was not initialized".to_string())
+        })
+    }
+
+    /// Replace a direct scalar value while retaining the cell header and
+    /// allowing a deliberate BIFF12 storage-family change.
+    pub(crate) fn replace_scalar_value(
+        &mut self,
+        reference: Reference,
+        value: Value,
+    ) -> Result<()> {
+        validate_value_with_limits(&value, self.limits)?;
+        if let Value::RkNumber(number) = &value {
+            let _ = encode_rk(*number)?;
+        }
+        if let Some(cell) = self.inserted.get_mut(&reference) {
+            cell.value = value;
+            cell.formula = None;
+            return Ok(());
+        }
+        self.removed.remove(&reference);
+        let index = self.indexed_index(reference)?.ok_or_else(|| {
+            Error::UnsupportedFeature(format!(
+                "cell ({}, {}) is absent or uses an unsupported cell-record family",
+                reference.row(),
+                reference.column()
+            ))
+        })?;
+        self.entries[index].cell.value = value;
+        self.entries[index].cell.formula = None;
+        Ok(())
+    }
+
+    fn indexed_index(&self, reference: Reference) -> Result<Option<usize>> {
+        match self.index.get(&reference) {
+            None => Ok(None),
+            Some(CellIndex::Unique(index)) => Ok(Some(*index)),
+            Some(CellIndex::Duplicate) => Err(Error::UnsupportedFeature(format!(
+                "cell ({}, {}) has duplicate stored cell records",
+                reference.row(),
+                reference.column()
+            ))),
+        }
+    }
+
     /// Replace a value while retaining its existing BIFF12 storage family.
     ///
     /// Strings may change UTF-16 length. RK replacements must be exactly
@@ -1036,7 +1186,7 @@ impl Edit {
                 reference.column()
             )));
         }
-        if let Some(index) = unique_index(&self.entries, reference)? {
+        if let Some(index) = self.indexed_index(reference)? {
             if !self.removed.remove(&reference) {
                 return Err(Error::UnsupportedFeature(format!(
                     "cell ({}, {}) already exists",
@@ -1053,7 +1203,7 @@ impl Edit {
             };
             return Ok(());
         }
-        if any_cell_at(&self.source, self.limits, reference)? {
+        if self.source_has_cell(reference)? {
             return Err(Error::UnsupportedFeature(format!(
                 "cell ({}, {}) already exists in an unsupported record family",
                 reference.row(),
@@ -1599,6 +1749,12 @@ struct Entry {
     record_offset: usize,
 }
 
+#[derive(Debug, Clone, Copy)]
+enum CellIndex {
+    Unique(usize),
+    Duplicate,
+}
+
 impl Entry {
     fn changed(&self) -> bool {
         self.original != self.cell
@@ -1727,6 +1883,122 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
         limits,
         tolerance,
         leniency,
+    })
+}
+
+fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata> {
+    let mut source_cells = BTreeSet::new();
+    let mut formula_groups = Vec::new();
+    let mut formula_group_metadata_invalid = false;
+    let mut in_sheet_data = false;
+    let mut current_row = None;
+    let mut frt_depth = 0usize;
+
+    for item in Records::with_limits(source, limits.raw) {
+        let record = item?;
+        match record.kind() {
+            kind::BEGIN_SHEET_DATA => {
+                in_sheet_data = true;
+                current_row = None;
+                frt_depth = 0;
+            },
+            kind::END_SHEET_DATA => {
+                in_sheet_data = false;
+                frt_depth = 0;
+            },
+            kind::FRT_BEGIN if in_sheet_data => {
+                frt_depth = frt_depth.checked_add(1).ok_or(Error::CapacityOverflow {
+                    resource: "worksheet FRT nesting depth",
+                })?;
+            },
+            kind::FRT_END if in_sheet_data => {
+                frt_depth = frt_depth.saturating_sub(1);
+            },
+            kind::ROW_HDR if in_sheet_data && frt_depth == 0 => {
+                let row = binary::read_u32_le_at(record.payload(), 0)?;
+                if row > MAX_ROW {
+                    return Err(Error::InvalidCellReference(format!(
+                        "BrtRowHdr row {row} is outside the XLSB worksheet grid"
+                    )));
+                }
+                current_row = Some(row);
+            },
+            cell_kind if in_sheet_data && frt_depth == 0 && is_any_cell(cell_kind) => {
+                let row = current_row.ok_or_else(|| {
+                    Error::InvalidFormat(format!(
+                        "{} appears before a BrtRowHdr",
+                        cell_kind_name(cell_kind)
+                    ))
+                })?;
+                let reference = Reference::new(row, binary::read_u32_le_at(record.payload(), 0)?)?;
+                if source_cells.insert(reference) && source_cells.len() > limits.cells {
+                    return Err(Error::InvalidLength {
+                        expected: limits.cells,
+                        found: source_cells.len(),
+                    });
+                }
+            },
+            group_kind @ (kind::ARR_FMLA | kind::SHR_FMLA | kind::TABLE)
+                if in_sheet_data && frt_depth == 0 =>
+            {
+                let (kind, minimum_payload) = match group_kind {
+                    kind::ARR_FMLA => (FormulaGroupKind::Array, 17),
+                    kind::SHR_FMLA => (FormulaGroupKind::Shared, 16),
+                    kind::TABLE => (FormulaGroupKind::Table, 33),
+                    _ => unreachable!("formula-group match is exhaustive"),
+                };
+                let range = record
+                    .payload()
+                    .get(..16)
+                    .and_then(|payload| Range::parse_binary(payload).ok());
+                if record.payload().len() < minimum_payload {
+                    formula_group_metadata_invalid = true;
+                }
+                match range {
+                    Some(range) if record.payload().len() >= minimum_payload => {
+                        if kind != FormulaGroupKind::Table {
+                            let parsed = match kind {
+                                FormulaGroupKind::Array => {
+                                    crate::formula::Group::parse_array(record.payload())
+                                },
+                                FormulaGroupKind::Shared => {
+                                    crate::formula::Group::parse_shared(record.payload())
+                                },
+                                FormulaGroupKind::Table => unreachable!(),
+                            };
+                            if parsed.is_err() {
+                                formula_group_metadata_invalid = true;
+                            }
+                        }
+                        if formula_groups.len() >= limits.cells {
+                            return Err(Error::InvalidLength {
+                                expected: limits.cells,
+                                found: formula_groups.len().saturating_add(1),
+                            });
+                        }
+                        formula_groups.try_reserve(1).map_err(|allocation_error| {
+                            Error::Allocation {
+                                resource: "formula-group range index",
+                                source: allocation_error,
+                            }
+                        })?;
+                        formula_groups.push(FormulaGroupRange { kind, range });
+                    },
+                    _ => formula_group_metadata_invalid = true,
+                }
+            },
+            _ => {},
+        }
+    }
+    if in_sheet_data {
+        return Err(Error::InvalidFormat(
+            "worksheet stream ended before BrtEndSheetData".to_string(),
+        ));
+    }
+    Ok(SourceMetadata {
+        source_cells,
+        formula_groups,
+        formula_group_metadata_invalid,
     })
 }
 
@@ -2664,39 +2936,6 @@ fn is_any_cell(kind_value: crate::raw::Kind) -> bool {
     is_supported_cell(kind_value)
 }
 
-fn any_cell_at(source: &[u8], limits: Limits, reference: Reference) -> Result<bool> {
-    let mut row = None;
-    let mut in_sheet_data = false;
-    let mut frt_depth = 0usize;
-    for item in Records::with_limits(source, limits.raw) {
-        let record = item?;
-        match record.kind() {
-            kind::BEGIN_SHEET_DATA => in_sheet_data = true,
-            kind::END_SHEET_DATA => in_sheet_data = false,
-            kind::FRT_BEGIN if in_sheet_data => {
-                frt_depth = frt_depth.checked_add(1).ok_or(Error::CapacityOverflow {
-                    resource: "worksheet FRT nesting depth",
-                })?;
-            },
-            kind::FRT_END if in_sheet_data => frt_depth = frt_depth.saturating_sub(1),
-            kind::ROW_HDR if in_sheet_data && frt_depth == 0 => {
-                row = Some(binary::read_u32_le_at(record.payload(), 0)?);
-            },
-            cell_kind
-                if in_sheet_data
-                    && frt_depth == 0
-                    && is_any_cell(cell_kind)
-                    && row == Some(reference.row())
-                    && binary::read_u32_le_at(record.payload(), 0)? == reference.column() =>
-            {
-                return Ok(true);
-            },
-            _ => {},
-        }
-    }
-    Ok(false)
-}
-
 fn semantic_changes(
     entries: &[Entry],
     _inserted: &BTreeMap<Reference, StoredCell>,
@@ -2896,7 +3135,7 @@ fn put_stored_cell(edit: &mut Edit, cell: StoredCell) -> Result<()> {
         edit.removed.remove(&cell.reference);
         edit.entries[index].cell = cell;
     } else {
-        if any_cell_at(&edit.source, edit.limits, cell.reference)? {
+        if edit.source_has_cell(cell.reference)? {
             return Err(Error::UnsupportedFeature(format!(
                 "merged cell ({}, {}) collides with an unsupported record family",
                 cell.reference.row(),

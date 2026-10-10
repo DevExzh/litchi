@@ -51,6 +51,7 @@ const XLSB_CHARTSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.chartsheet"
 const XLSB_DIALOGSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.dialogsheet";
 const XLSB_MACROSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.macrosheet";
 const XLSB_INTL_MACROSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.intlmacrosheet";
+const XLSB_SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
 
 fn is_worksheet_relationship(reltype: &str) -> bool {
     matches!(
@@ -1623,22 +1624,45 @@ impl Workbook {
         Ok(())
     }
 
-    /// Load shared strings from xl/sharedStrings.bin
+    /// Load shared strings through the workbook's optional relationship.
     fn load_shared_strings(&mut self) -> Result<()> {
-        let shared_strings_uri = litchi_opc::PackURI::new("/xl/sharedStrings.bin")?;
-        match self.package.get_part(&shared_strings_uri) {
-            Ok(shared_strings_part) => {
-                let blob = shared_strings_part.blob();
-                let mut iter = Records::new(blob);
-                Self::read_shared_strings(
-                    &mut iter,
-                    &mut self.shared_strings,
-                    &mut self.tolerance,
-                )?;
-            },
-            Err(OpcError::PartNotFound(_)) => {},
-            Err(error) => return Err(error.into()),
+        let shared_strings_uri = {
+            let workbook_part = self.package.main_document_part()?;
+            let mut found = None;
+            for relationship in workbook_part.rels().iter() {
+                if !matches!(
+                    relationship.reltype(),
+                    relationship_type::SHARED_STRINGS | relationship_type::STRICT_SHARED_STRINGS
+                ) {
+                    continue;
+                }
+                if found.is_some() {
+                    return Err(crate::package::error::Error::InvalidRelationship(
+                        "XLSB workbook has multiple shared-string relationships".to_string(),
+                    ));
+                }
+                if relationship.is_external() {
+                    return Err(crate::package::error::Error::InvalidRelationship(
+                        "XLSB workbook shared-string relationship is external".to_string(),
+                    ));
+                }
+                found = Some(relationship.target_partname()?);
+            }
+            found
+        };
+        let Some(shared_strings_uri) = shared_strings_uri else {
+            return Ok(());
+        };
+        let shared_strings_part = self.package.get_part(&shared_strings_uri)?;
+        if shared_strings_part.content_type() != XLSB_SHARED_STRINGS_CONTENT_TYPE {
+            return Err(crate::package::error::Error::InvalidContentType {
+                expected: XLSB_SHARED_STRINGS_CONTENT_TYPE.to_string(),
+                got: shared_strings_part.content_type().to_string(),
+            });
         }
+        let blob = shared_strings_part.blob();
+        let mut iter = Records::new(blob);
+        Self::read_shared_strings(&mut iter, &mut self.shared_strings, &mut self.tolerance)?;
 
         Ok(())
     }

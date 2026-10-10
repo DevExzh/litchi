@@ -106,7 +106,7 @@ struct Step {
 }
 enum Leaf {
     #[cfg(feature = "xlsb")]
-    Xlsb(Box<litchi_xlsb::cell_values::structure::Patch>),
+    Xlsb(Box<crate::format::xlsb::write::Patch>),
     #[cfg(feature = "pptx")]
     Pptx {
         source: crate::format::pptx::Editable,
@@ -210,6 +210,8 @@ pub struct Edit {
     formatting: Option<crate::format::docx::write::coalesce::Run>,
     #[cfg(feature = "xlsx")]
     cells: Option<crate::format::xlsx::write::coalesce::Run>,
+    #[cfg(feature = "xlsb")]
+    xlsb_cells: Option<crate::format::xlsb::write::coalesce::Run>,
     #[cfg(feature = "pptx")]
     shapes: Option<crate::format::pptx::write::coalesce::Run>,
 }
@@ -280,6 +282,8 @@ impl File {
                 formatting: None,
                 #[cfg(feature = "xlsx")]
                 cells: None,
+                #[cfg(feature = "xlsb")]
+                xlsb_cells: None,
                 #[cfg(feature = "pptx")]
                 shapes: None,
             };
@@ -350,6 +354,7 @@ impl Edit {
     /// Set properties atomically within this transaction.
     /// Consecutive direct paragraph/run formatting sets share a native edit.
     /// Distinct direct XLSX cell payload assignments also share a native edit.
+    /// Distinct direct XLSB cell scalar assignments also share a native edit.
     /// Distinct direct PPTX shape text/geometry sets also share a native edit.
     /// Repeated PPTX shapes close their run before resolving partial properties.
     /// Reads and selectors close pending runs; repeated XLSX cells and font
@@ -674,6 +679,56 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "xlsb")]
+        if let File::Xlsb(handle) = &self.current {
+            let planned = match &self.xlsb_cells {
+                Some(run) => run.cell_plan(_target, _props, &self.limits),
+                None => handle.cell_plan(_target, _props, &self.limits),
+            };
+            if planned.is_err() {
+                // An earlier deferred native failure takes precedence over
+                // admission failure in the following command.
+                self.flush_pending()?;
+            }
+            let Some(plan) = planned? else {
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .xlsb_cells
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
+            {
+                self.flush_pending()?;
+            }
+            if self.xlsb_cells.is_none() {
+                let File::Xlsb(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.xlsb_cells = Some(crate::format::xlsb::write::coalesce::Run::new(
+                    handle,
+                    plan.target.sheet,
+                    &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
+                )?);
+            }
+            let run = self
+                .xlsb_cells
+                .as_mut()
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "XLSB cell run missing"))?;
+            let changed = run.stage(plan, _index)?;
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
         #[cfg(feature = "xlsx")]
         if let File::Xlsx(handle) = &self.current {
             let planned = match &self.cells {
@@ -803,6 +858,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "xlsb")]
+        if let Some(run) = self.xlsb_cells.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_xlsb(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "xlsx")]
         if let Some(run) = self.cells.take() {
             let index = run.first_index();
@@ -887,6 +967,10 @@ impl Edit {
                 #[cfg(feature = "xlsx")]
                 {
                     self.cells = None;
+                }
+                #[cfg(feature = "xlsb")]
+                {
+                    self.xlsb_cells = None;
                 }
                 #[cfg(feature = "pptx")]
                 {
@@ -984,13 +1068,10 @@ fn wrap_xlsb<T>(
 ) -> Result<(Step, T)> {
     let (after, patch) = commit.into_parts();
     let leaf_operations = patch.operation_count();
-    // This adapter only stages sheet names (at most 31 UTF-16 units).
-    // Charge their owned text conservatively in addition to both images.
-    let snapshot_bytes = patch
-        .before()
-        .len()
-        .saturating_add(patch.after().len())
-        .saturating_add(leaf_operations.saturating_mul(124));
+    // Structural and cell-value patches both retain exact package images.
+    // Cell selectors spanning worksheets retain every per-worksheet image;
+    // charge those images plus a conservative semantic operation allowance.
+    let snapshot_bytes = patch.retained_bytes();
     Ok((
         Step {
             before: File::Xlsb(before.clone()),

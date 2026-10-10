@@ -33,12 +33,13 @@ mod drawing_transfer;
 mod formula_transfer;
 mod package;
 mod resources;
+mod scalar_sst;
 pub mod structure;
 pub mod workbook;
 pub mod worksheet;
 
 pub use drawing_transfer::DrawingTransferRefusal;
-pub use package::{Commit, Diagnostics, Edit, Patch};
+pub use package::{Commit, Diagnostics, Edit, Patch, Scalar};
 pub use worksheet::{
     CellError, CellFormula, Change, Limits, Number, Reference, Snapshot, StoredCell, StyleIndex,
     TransferLimits, Value,

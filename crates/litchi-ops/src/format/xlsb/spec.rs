@@ -39,6 +39,72 @@ pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 1, 0> = Table::new(
 /// Read-schema projection of the XLSB sheet write registry.
 pub(crate) const SHEET_WRITE_PROPS: &[PropSpec] = &SHEET_WRITE_TABLE.readable();
 
+/// XLSB's cell payload setter vocabulary.
+///
+/// The binary cell owner accepts the common scalar union and an explicit
+/// `clear: true`.  A null `value` is admitted through the registry's clear
+/// path and has the same blank-cell meaning.  Formula authoring remains
+/// deliberately absent from this table: `formula` is readable in the
+/// capability schema, but its setter is still a format-local gap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CellSetter {
+    Value,
+    Clear,
+}
+
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 2, 0> = Table::new(
+    [
+        Entry {
+            spec: write_only("value", ValueType::Scalar),
+            access: Access::Set(CellSetter::Value),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: write_only("clear", ValueType::Bool),
+            access: Access::Set(CellSetter::Clear),
+            constraint: Constraint::None,
+            clear: false,
+        },
+    ],
+    [],
+);
+
+const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    spec
+}
+
+pub(crate) const CELL_WRITE_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
+
+/// Capability projection for cell writes.  The read projection remains the
+/// local `CELL_PROPS` slice; the two write-only payload entries are appended
+/// so the capability report exposes their registry types and set flags.
+const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
+    let mut props = [PropSpec::new("", ValueType::Text); CELL_PROPS.len() + 2];
+    let mut index = 0;
+    while index < CELL_PROPS.len() {
+        let mut prop = CELL_PROPS[index];
+        let mut write_index = 0;
+        while write_index < CELL_WRITE_PROPS.len() {
+            let write = CELL_WRITE_PROPS[write_index];
+            if same_name(prop.name, write.name) {
+                prop.access.set = write.access.set;
+                prop.access.add = write.access.add;
+            }
+            write_index += 1;
+        }
+        props[index] = prop;
+        index += 1;
+    }
+    props[CELL_PROPS.len()] = CELL_WRITE_PROPS[0];
+    props[CELL_PROPS.len() + 1] = CELL_WRITE_PROPS[1];
+    props
+}
+
+pub(crate) static CELL_CAPABILITY_PROPS: &[PropSpec] = &cell_capability_array();
+
 const fn same_name(left: &str, right: &str) -> bool {
     let left = left.as_bytes();
     let right = right.as_bytes();
@@ -320,8 +386,8 @@ const fn with_gap(
 static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_gap(&workbook::SPEC.elements[0], None),
     with_props(&workbook::SPEC.elements[1], SHEET_PROPS, None),
-    with_props(&workbook::SPEC.elements[2], CELL_PROPS, None),
-    with_gap(&workbook::SPEC.elements[3], None),
+    with_props(&workbook::SPEC.elements[2], CELL_CAPABILITY_PROPS, None),
+    with_props(&workbook::SPEC.elements[3], CELL_WRITE_PROPS, None),
     with_gap(&workbook::SPEC.elements[4], None),
     with_gap(&workbook::SPEC.elements[5], None),
     with_gap(&workbook::SPEC.elements[6], None),

@@ -338,7 +338,18 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
         .expect("edit")
         .expect("worksheet");
     assert!(matches!(edit.commit(), Err(Error::LimitExceeded { .. })));
-    let image_bytes = original.len() * 2;
+    let image_bytes = source
+        .edit_cell_values(0)
+        .expect("edit")
+        .expect("worksheet")
+        .commit()
+        .expect("baseline patch")
+        .patch()
+        .retained_bytes();
+    assert!(
+        image_bytes > original.len() * 2,
+        "quota includes worksheet proof and metadata"
+    );
     let edit = source
         .edit_cell_values_with_limits(0, Limits::DEFAULT, quota(image_bytes - 1, 1))
         .expect("edit")
@@ -348,7 +359,12 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
         .edit_cell_values_with_limits(0, Limits::DEFAULT, quota(image_bytes, 1))
         .expect("edit")
         .expect("worksheet");
-    assert!(edit.commit().expect("exact image quota").patch().is_noop());
+    assert!(
+        edit.commit()
+            .expect("exact retained quota")
+            .patch()
+            .is_noop()
+    );
     let mut edit = source
         .edit_cell_values_with_limits(0, Limits::DEFAULT, quota(image_bytes * 2, 1))
         .expect("edit")

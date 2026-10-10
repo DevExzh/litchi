@@ -210,22 +210,22 @@ impl Xlsb {
         self.0.owner.ensure_current()
     }
 
-    /// Admit the native structural editor without publishing a candidate.
+    /// Admit an edit without materializing a second native workbook before
+    /// the selected transaction owner does so.
     pub(crate) fn admit_edit(&self) -> Result<()> {
         self.check_source()?;
-        let editor = self.editor()?;
-        let package = match editor {
-            XlsbEditor::Eager(workbook) => workbook.to_package(),
-            XlsbEditor::Materialized(workbook) => workbook.into_package(),
-        };
-        package
-            .edit()
-            .map(|_| ())
-            .map_err(|error| Error::from(error).with_format(FileFormat::Xlsb))?;
-        self.check_source()
+        if !self.0.retain_source {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "the workbook was opened without retaining its source for editing",
+            )
+            .with_format(FileFormat::Xlsb)
+            .with_suggestion("reopen with `OpenOptions::retain_source(true)` to edit"));
+        }
+        Ok(())
     }
 
-    /// The one-shot unified worksheet-property setter.
+    /// The one-shot unified worksheet and cell-property setter.
     pub(crate) fn set<'p, 'v>(
         &self,
         target: crate::target::TargetArg<'p>,

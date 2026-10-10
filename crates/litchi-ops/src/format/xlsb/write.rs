@@ -1,22 +1,27 @@
 //! Immutable XLSB worksheet-property writes and publication.
 //!
-//! The first XLSB unified write is deliberately narrow: only the canonical
-//! `sheet.name` property is admitted. Target resolution and property
-//! coercion happen before the native workbook editor is materialized. The
-//! native `Package` transaction remains responsible for exact package
-//! replay, binary validation, signature policy, and the durable patch.
+//! The XLSB unified writes admit worksheet names and direct cell scalar
+//! payloads (`value`, `clear: true`, and null clears). Target resolution and
+//! property coercion happen before the native workbook editor is materialized.
+//! The native `Package` transaction remains responsible for exact package
+//! replay, binary validation, signature policy, and retained patch proofs.
 
-use std::collections::HashSet;
+use std::collections::{BTreeMap, HashSet};
 use std::io::{self, Write};
 use std::path::Path;
 
 use caseless::Caseless as _;
 use litchi_core::FileFormat;
-use litchi_xlsb::cell_values::{TransferLimits, structure::Patch};
+use litchi_core::selector::CellRange;
+use litchi_xlsb::cell_values::{
+    Edit as NativeCellEdit, Patch as NativeCellPatch, Reference, Scalar as NativeScalar,
+    TransferLimits, structure::Patch as NativeStructurePatch,
+};
+use litchi_xlsb::sheet::{Rect, Selector as NativeSelector};
 use unicode_normalization::UnicodeNormalization;
 
-use super::node::Node;
-use super::spec::{Kind, SHEET_WRITE_TABLE, SheetSetter};
+use super::node::{Item, Node};
+use super::spec::{CELL_WRITE_TABLE, CellSetter, Kind, SHEET_WRITE_TABLE, SheetSetter};
 use super::{Nav, Xlsb, XlsbEditor, XlsbOwner};
 use crate::error::{Code, Error, Result};
 use crate::props::{IntoProps, Props};
@@ -25,6 +30,72 @@ use crate::save::{Overwrite, SaveOptions};
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::Scalar;
+
+/// The native proof retained by one immutable XLSB write.
+///
+/// Structural sheet edits and cell-value edits have different native patch
+/// owners. Keeping the distinction here lets the transaction coordinator
+/// retain exact before/after package images without treating a cell patch as
+/// a structural worksheet patch.
+#[derive(Debug, Clone)]
+pub(crate) enum Patch {
+    Structure(NativeStructurePatch),
+    Cells(Vec<NativeCellPatch>),
+}
+
+impl Patch {
+    pub(crate) fn before(&self) -> &[u8] {
+        match self {
+            Self::Structure(patch) => patch.before(),
+            Self::Cells(patches) => patches
+                .first()
+                .expect("cell patch invariant: at least one worksheet")
+                .before(),
+        }
+    }
+
+    pub(crate) fn after(&self) -> &[u8] {
+        match self {
+            Self::Structure(patch) => patch.after(),
+            Self::Cells(patches) => patches
+                .last()
+                .expect("cell patch invariant: at least one worksheet")
+                .after(),
+        }
+    }
+
+    /// Charge every retained native image and semantic cell delta. A selector
+    /// spanning worksheets keeps one exact package patch per worksheet, so
+    /// endpoint images alone would undercharge transaction history.
+    pub(crate) fn snapshot_bytes(&self) -> usize {
+        match self {
+            Self::Structure(patch) => patch.before().len().saturating_add(patch.after().len()),
+            Self::Cells(patches) => patches
+                .iter()
+                .fold(size_of::<Vec<NativeCellPatch>>(), |bytes, patch| {
+                    bytes.saturating_add(patch.retained_bytes())
+                }),
+        }
+    }
+
+    pub(crate) fn retained_bytes(&self) -> usize {
+        self.snapshot_bytes()
+            .saturating_add(self.operation_count().saturating_mul(124))
+    }
+
+    pub(crate) fn is_noop(&self) -> bool {
+        self.before() == self.after()
+    }
+
+    pub(crate) fn operation_count(&self) -> usize {
+        match self {
+            Self::Structure(patch) => patch.operation_count(),
+            Self::Cells(patches) => patches.iter().fold(0usize, |count, patch| {
+                count.saturating_add(patch.changes().len())
+            }),
+        }
+    }
+}
 
 /// A committed immutable XLSB write.
 pub(crate) struct Commit {
@@ -59,6 +130,51 @@ impl Commit {
             } else {
                 base.adopt_package(package)?
             };
+            Ok(Self {
+                after,
+                patch: Patch::Structure(patch),
+            })
+        })();
+        base.check_source()?;
+        result
+    }
+
+    fn from_cell_native(base: &Xlsb, native: litchi_xlsb::cell_values::Commit) -> Result<Self> {
+        base.check_source()?;
+        let result = (|| {
+            let (package, patch) = native.into_parts();
+            let patch = Patch::Cells(vec![patch]);
+            let after = if patch.is_noop() {
+                base.clone()
+            } else {
+                base.adopt_package(package)?
+            };
+            Ok(Self { after, patch })
+        })();
+        base.check_source()?;
+        result
+    }
+
+    fn from_cell_parts(
+        base: &Xlsb,
+        package: litchi_xlsb::Package,
+        patches: Vec<NativeCellPatch>,
+    ) -> Result<Self> {
+        if patches.is_empty() {
+            return Err(Error::new(
+                Code::InternalError,
+                "an XLSB cell commit must retain at least one worksheet patch",
+            )
+            .with_format(FileFormat::Xlsb));
+        }
+        base.check_source()?;
+        let result = (|| {
+            let patch = Patch::Cells(patches);
+            let after = if patch.is_noop() {
+                base.clone()
+            } else {
+                base.adopt_package(package)?
+            };
             Ok(Self { after, patch })
         })();
         base.check_source()?;
@@ -80,9 +196,22 @@ pub(crate) fn set_with_limits<'p, 'v>(
     props: impl IntoProps<'v>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
+    file.admit_edit()?;
     let props = Props::from_props(props)?;
+    if let Some(commit) = set_cells_with_limits(file, &target, &props, limits)? {
+        return Ok(commit);
+    }
+    set_sheet_with_limits(file, target, &props, limits)
+}
+
+fn set_sheet_with_limits(
+    file: &Xlsb,
+    target: TargetArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
     let positions = resolve_sheet_targets(file, &target, limits)?;
-    let assignments = admit_sheet_properties(&props, limits)?;
+    let assignments = admit_sheet_properties(props, limits)?;
     check_limits(positions.len(), &assignments, limits)?;
 
     if assignments.name.is_some() && positions.len() > 1 {
@@ -124,11 +253,487 @@ pub(crate) fn set_with_limits<'p, 'v>(
     Ok(commit)
 }
 
+#[derive(Debug, Clone)]
+struct CellAssignments {
+    value: Option<NativeScalar>,
+    staged_bytes: usize,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct CellTarget {
+    pub(crate) sheet: usize,
+    pub(crate) reference: Reference,
+}
+
+fn set_cells_with_limits(
+    file: &Xlsb,
+    target: &TargetArg<'_>,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<Commit>> {
+    let admitted = target
+        .path()
+        .and_then(|path| path.path().steps().last())
+        .and_then(|step| step.cell_range())
+        .map(|_| admit_cell_properties(props, limits))
+        .transpose()?;
+    if let Some(assignments) = admitted.as_ref() {
+        let cells = target
+            .path()
+            .and_then(|path| path.path().steps().last())
+            .and_then(|step| step.cell_range())
+            .map(range_area)
+            .unwrap_or(0);
+        let staged = cells
+            .checked_mul(assignments.staged_bytes)
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+        if staged > limits.max_staged_bytes() {
+            return Err(staged_limit(staged, limits.max_staged_bytes()));
+        }
+    }
+    let Some(targets) = resolve_cell_targets(file, target, limits)? else {
+        return Ok(None);
+    };
+    let assignments = match admitted {
+        Some(assignments) => assignments,
+        None => admit_cell_properties(props, limits)?,
+    };
+    check_cell_limits(targets.len(), &assignments, limits)?;
+
+    // Complete target grouping is still admission work: it must finish before
+    // the native package owner is materialized. Every target in one worksheet
+    // is staged in one native cell-values edit; a selector spanning worksheets
+    // publishes the edits in workbook order through one exact package chain.
+    let mut grouped = BTreeMap::<usize, Vec<CellTarget>>::new();
+    for target in targets {
+        grouped
+            .entry(target.sheet)
+            .or_default()
+            .try_reserve(1)
+            .map_err(|_| allocation("XLSB cell write worksheet targets"))?;
+        grouped
+            .get_mut(&target.sheet)
+            .expect("entry was just inserted")
+            .push(target);
+    }
+    let editor = file.editor()?;
+    let mut package = package_from_editor(editor);
+    let mut patches = Vec::new();
+    patches
+        .try_reserve(grouped.len())
+        .map_err(|_| allocation("XLSB cell write patches"))?;
+    let mut remaining_snapshot = limits.max_snapshot_bytes();
+    for (sheet, targets) in grouped {
+        let semantic_charge = cell_semantic_charge(targets.len(), limits)?;
+        let image_budget = remaining_snapshot
+            .checked_sub(semantic_charge)
+            .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
+        if image_budget == 0 {
+            return Err(snapshot_limit(
+                limits.max_snapshot_bytes().saturating_add(1),
+                limits.max_snapshot_bytes(),
+            ));
+        }
+        let native_limits =
+            TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+        let mut edit = package
+            .edit_cell_values_with_limits(
+                NativeSelector::from(sheet),
+                Default::default(),
+                native_limits,
+            )
+            .map_err(native_error)?
+            .ok_or_else(|| {
+                Error::new(
+                    Code::OutOfRange,
+                    "the XLSB worksheet position is out of range",
+                )
+                .with_format(FileFormat::Xlsb)
+            })?;
+        for target in targets {
+            if let Some(value) = assignments.value.as_ref() {
+                edit.set_scalar(target.reference, value.clone())
+                    .map_err(native_error)?;
+            }
+        }
+        let native = edit.commit().map_err(native_error)?;
+        let (next, patch) = native.into_parts();
+        let patch_bytes = patch.retained_bytes();
+        let retained = patch_bytes
+            .checked_add(semantic_charge)
+            .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
+        if retained > remaining_snapshot {
+            let consumed = limits
+                .max_snapshot_bytes()
+                .saturating_sub(remaining_snapshot);
+            return Err(snapshot_limit(
+                consumed.saturating_add(retained),
+                limits.max_snapshot_bytes(),
+            ));
+        }
+        remaining_snapshot -= retained;
+        package = next;
+        patches.push(patch);
+    }
+    let commit = Commit::from_cell_parts(file, package, patches)?;
+    check_snapshot_limits(&commit.patch, limits)?;
+    Ok(Some(commit))
+}
+
+fn admit_cell_properties(props: &Props<'_>, limits: &SemanticLimits) -> Result<CellAssignments> {
+    let mut assignments = CellAssignments {
+        value: None,
+        staged_bytes: WRITE_ENTRY_OVERHEAD,
+    };
+    for (key, value) in props.iter() {
+        let (_, entry) = CELL_WRITE_TABLE
+            .resolve(key.as_str())
+            .map_err(|error| error.with_property(key.as_str().to_owned()))?;
+        let entry = *entry;
+        entry
+            .prepare(Operation::Set, value, |setter, value| match setter {
+                CellSetter::Value => {
+                    if assignments.value.is_some() {
+                        return Err(duplicate_cell_property("value"));
+                    }
+                    let scalar = match value {
+                        Some(value) => native_scalar(value)?,
+                        None => NativeScalar::Blank,
+                    };
+                    let bytes = native_scalar_bytes(&scalar);
+                    assignments.staged_bytes = assignments
+                        .staged_bytes
+                        .checked_add(bytes)
+                        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                    assignments.value = Some(scalar);
+                    Ok(())
+                },
+                CellSetter::Clear => {
+                    if assignments.value.is_some() {
+                        return Err(Error::new(
+                            Code::InvalidArgument,
+                            "cell properties value and clear cannot be supplied together",
+                        )
+                        .with_format(FileFormat::Xlsb)
+                        .with_property("clear"));
+                    }
+                    let Some(Scalar::Bool(true)) = value else {
+                        return Err(Error::new(Code::InvalidValue, "clear must be true")
+                            .with_format(FileFormat::Xlsb)
+                            .with_property("clear"));
+                    };
+                    assignments.staged_bytes = assignments
+                        .staged_bytes
+                        .checked_add(1)
+                        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                    assignments.value = Some(NativeScalar::Blank);
+                    Ok(())
+                },
+            })
+            .map_err(|error| error.with_format(FileFormat::Xlsb))?;
+    }
+    if assignments.value.is_none() && !props.is_empty() {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "an XLSB cell write requires value or clear",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    Ok(assignments)
+}
+
+fn native_scalar(value: Scalar<'_>) -> Result<NativeScalar> {
+    match value {
+        Scalar::Bool(value) => Ok(NativeScalar::Boolean(value)),
+        Scalar::Text(value) => {
+            validate_cell_text(value)?;
+            Ok(NativeScalar::Text(value.to_owned()))
+        },
+        Scalar::Int(value) => {
+            let number = value as f64;
+            if !number.is_finite() || number as i128 != i128::from(value) {
+                return Err(Error::new(
+                    Code::InvalidValue,
+                    "integer cell values must be exactly representable as XLSB numbers",
+                )
+                .with_format(FileFormat::Xlsb)
+                .with_property("value"));
+            }
+            Ok(NativeScalar::Number(number))
+        },
+        Scalar::Number(value) if value.is_normal() || value.to_bits() == 0 => {
+            Ok(NativeScalar::Number(value))
+        },
+        Scalar::Number(_) => Err(Error::new(
+            Code::InvalidValue,
+            "cell numbers must be finite normalized values or positive zero",
+        )
+        .with_format(FileFormat::Xlsb)
+        .with_property("value")),
+        _ => Err(Error::new(
+            Code::InvalidValue,
+            "XLSB cell values support only text, bool, integer and finite number scalars",
+        )
+        .with_format(FileFormat::Xlsb)
+        .with_property("value")),
+    }
+}
+
+fn validate_cell_text(value: &str) -> Result<()> {
+    if value.encode_utf16().count() > 32_767
+        || value
+            .chars()
+            .any(|character| !is_xml_10_character(character))
+    {
+        return Err(Error::new(
+            Code::InvalidValue,
+            "cell text is outside the XLSB string domain",
+        )
+        .with_format(FileFormat::Xlsb)
+        .with_property("value"));
+    }
+    Ok(())
+}
+
+fn native_scalar_bytes(value: &NativeScalar) -> usize {
+    match value {
+        NativeScalar::Text(value) => value.len(),
+        _ => 8,
+    }
+}
+
+fn check_cell_limits(
+    targets: usize,
+    assignments: &CellAssignments,
+    limits: &SemanticLimits,
+) -> Result<()> {
+    if limits.max_operations() < 1 {
+        return Err(operation_limit(1, limits.max_operations()));
+    }
+    if targets > limits.max_expanded_targets() {
+        return Err(expanded_limit(targets, limits.max_expanded_targets()));
+    }
+    let staged = targets
+        .checked_mul(assignments.staged_bytes)
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    if staged > limits.max_staged_bytes() {
+        return Err(staged_limit(staged, limits.max_staged_bytes()));
+    }
+    Ok(())
+}
+
+fn cell_semantic_charge(targets: usize, limits: &SemanticLimits) -> Result<usize> {
+    let operations = targets
+        .checked_mul(124)
+        .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
+    Ok(operations)
+}
+
+fn duplicate_cell_property(property: &'static str) -> Error {
+    Error::new(
+        Code::InvalidArgument,
+        "the same XLSB cell property was supplied more than once",
+    )
+    .with_format(FileFormat::Xlsb)
+    .with_property(property)
+}
+
 fn package_from_editor(editor: XlsbEditor<'_>) -> litchi_xlsb::Package {
     match editor {
         XlsbEditor::Eager(workbook) => workbook.to_package(),
         XlsbEditor::Materialized(workbook) => workbook.into_package(),
     }
+}
+
+/// Resolve cells and ranges while retaining the complete XLSB tab position.
+/// `None` means that the target selected only sheet-level nodes, so the sheet
+/// setter may handle it. A target that mixes cell and non-cell nodes is
+/// refused rather than partially applying a payload.
+fn resolve_cell_targets(
+    file: &Xlsb,
+    target: &TargetArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<Vec<CellTarget>>> {
+    preflight_direct_cell_range(target, limits)?;
+    let mut targets = Vec::new();
+    let mut seen = HashSet::new();
+    let mut matched = false;
+    let mut non_cell = false;
+    if let Some(path) = target.path() {
+        let node = crate::path::resolve::get(&Nav::new(file), path)?;
+        matched = true;
+        append_cell_node(&mut targets, &mut seen, &mut non_cell, node, limits)?;
+    } else if let Some(query) = target.query() {
+        let walk = crate::query::run(Nav::new(file), query.clone())?;
+        if !walk.plan().diagnostics().is_empty() {
+            return Err(Error::new(
+                Code::InvalidSelector,
+                "the mutation selector contains an unsupported predicate",
+            )
+            .with_format(FileFormat::Xlsb));
+        }
+        for node in walk {
+            matched = true;
+            append_cell_node(&mut targets, &mut seen, &mut non_cell, node?, limits)?;
+        }
+    } else {
+        return Err(
+            Error::new(Code::InvalidArgument, "the mutation target is empty")
+                .with_format(FileFormat::Xlsb),
+        );
+    }
+    file.check_source()?;
+    if !matched {
+        return Err(Error::new(
+            Code::ZeroMatches,
+            "the mutation selector matched no element",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    if non_cell && !targets.is_empty() {
+        return Err(Error::new(
+            Code::UnsupportedElement,
+            "an XLSB cell write selector cannot mix cells with sheet nodes",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    if targets.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(targets))
+    }
+}
+
+fn preflight_direct_cell_range(target: &TargetArg<'_>, limits: &SemanticLimits) -> Result<()> {
+    let Some(path) = target.path() else {
+        return Ok(());
+    };
+    let Some(step) = path.path().steps().last() else {
+        return Ok(());
+    };
+    let Some(range) = step.cell_range() else {
+        return Ok(());
+    };
+    let cells = range_area(range);
+    if cells > limits.max_expanded_targets() {
+        return Err(expanded_limit(cells, limits.max_expanded_targets()));
+    }
+    Ok(())
+}
+
+fn append_cell_node(
+    targets: &mut Vec<CellTarget>,
+    seen: &mut HashSet<CellTarget>,
+    non_cell: &mut bool,
+    node: Node<'_>,
+    limits: &SemanticLimits,
+) -> Result<()> {
+    if node.element() == Kind::Cell {
+        let Some(cell) = node.cell_ref() else {
+            return Err(
+                Error::new(Code::InvalidPath, "the XLSB cell reference is invalid")
+                    .with_format(FileFormat::Xlsb),
+            );
+        };
+        let reference = Reference::new(cell.row(), cell.column()).map_err(native_error)?;
+        append_cell_target(
+            targets,
+            seen,
+            CellTarget {
+                sheet: node.sheet_position(),
+                reference,
+            },
+            limits,
+        )?;
+        return Ok(());
+    }
+    if node.element() == Kind::Range {
+        let Item::Range(range) = node.item() else {
+            return Err(
+                Error::new(Code::InvalidPath, "the XLSB range reference is invalid")
+                    .with_format(FileFormat::Xlsb),
+            );
+        };
+        append_range_targets(targets, seen, node.sheet_position(), range.rect, limits)?;
+        return Ok(());
+    }
+    *non_cell = true;
+    Ok(())
+}
+
+fn append_cell_target(
+    targets: &mut Vec<CellTarget>,
+    seen: &mut HashSet<CellTarget>,
+    target: CellTarget,
+    limits: &SemanticLimits,
+) -> Result<()> {
+    if !seen.insert(target) {
+        return Ok(());
+    }
+    let total = targets
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| expanded_limit(usize::MAX, limits.max_expanded_targets()))?;
+    if total > limits.max_expanded_targets() {
+        return Err(expanded_limit(total, limits.max_expanded_targets()));
+    }
+    targets
+        .try_reserve(1)
+        .map_err(|_| allocation("XLSB cell write targets"))?;
+    targets.push(target);
+    Ok(())
+}
+
+fn append_range_targets(
+    targets: &mut Vec<CellTarget>,
+    seen: &mut HashSet<CellTarget>,
+    sheet: usize,
+    range: Rect,
+    limits: &SemanticLimits,
+) -> Result<()> {
+    let start = range.start();
+    let (end_row, end_column) = range.end();
+    let first_row = start.row().get();
+    let last_row = end_row.saturating_sub(1);
+    let first_column = start.column().get();
+    let last_column = end_column.saturating_sub(1);
+    let rows = usize::try_from(last_row - first_row + 1).unwrap_or(usize::MAX);
+    let columns = usize::try_from(last_column - first_column + 1).unwrap_or(usize::MAX);
+    let cells = rows
+        .checked_mul(columns)
+        .ok_or_else(|| expanded_limit(usize::MAX, limits.max_expanded_targets()))?;
+    if cells > limits.max_expanded_targets()
+        || targets.len().saturating_add(cells) > limits.max_expanded_targets()
+    {
+        let observed = targets.len().saturating_add(cells);
+        return Err(expanded_limit(observed, limits.max_expanded_targets()));
+    }
+    targets
+        .try_reserve(cells)
+        .map_err(|_| allocation("XLSB cell write range targets"))?;
+    seen.try_reserve(cells)
+        .map_err(|_| allocation("XLSB cell write range identities"))?;
+    for row in first_row..=last_row {
+        for column in first_column..=last_column {
+            let reference = Reference::new(row, column).map_err(native_error)?;
+            append_cell_target(targets, seen, CellTarget { sheet, reference }, limits)?;
+        }
+    }
+    Ok(())
+}
+
+fn range_area(range: CellRange) -> usize {
+    let start = range.start();
+    let end = range.end();
+    let rows = usize::try_from(end.row().abs_diff(start.row()))
+        .ok()
+        .and_then(|value| value.checked_add(1))
+        .unwrap_or(usize::MAX);
+    let columns = usize::try_from(end.column().abs_diff(start.column()))
+        .ok()
+        .and_then(|value| value.checked_add(1))
+        .unwrap_or(usize::MAX);
+    rows.saturating_mul(columns)
 }
 
 /// Resolve only workbook sheet nodes. A cell, range, table, or any other
@@ -316,11 +921,7 @@ fn check_limits(
 }
 
 fn check_snapshot_limits(patch: &Patch, limits: &SemanticLimits) -> Result<()> {
-    let observed = patch
-        .before()
-        .len()
-        .checked_add(patch.after().len())
-        .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
+    let observed = patch.snapshot_bytes();
     if observed > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(observed, limits.max_snapshot_bytes()));
     }
@@ -456,6 +1057,305 @@ pub(crate) fn save_to(file: &Xlsb, path: &Path, options: &SaveOptions) -> Result
         )?,
     }
     Ok(bytes)
+}
+
+/// The narrow direct-cell payload run used by explicit transactions.
+///
+/// A run fixes one worksheet and admits only distinct direct cell paths. A
+/// range, query, repeated cell, sheet property, read, or staged-byte boundary
+/// is a barrier owned by the transaction coordinator. This preserves the
+/// original mutation index for deferred native failures while letting a
+/// sequence of ordinary scalar writes share one package-owned edit.
+pub(crate) mod coalesce {
+    use super::{
+        CellTarget, Commit, FileFormat, NativeCellEdit, NativeScalar, NativeSelector, Result,
+        SemanticLimits, TargetArg, Xlsb, admit_cell_properties, check_cell_limits, native_error,
+        package_from_editor, resolve_cell_targets,
+    };
+    use crate::error::{Code, Error};
+    use crate::props::Props;
+    use crate::transaction::Error as TransactionError;
+    use litchi_xlsb::cell_values::{Limits, TransferLimits};
+    use std::collections::HashSet;
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct Plan {
+        pub(crate) target: CellTarget,
+        pub(crate) value: NativeScalar,
+        staged_bytes: usize,
+    }
+
+    impl Plan {
+        fn key(&self) -> CellTarget {
+            self.target
+        }
+
+        fn charge(&self) -> usize {
+            self.staged_bytes
+        }
+    }
+
+    struct Item {
+        plan: Plan,
+        index: usize,
+    }
+
+    pub(crate) struct Run {
+        base: Xlsb,
+        source: litchi_xlsb::Package,
+        edit: NativeCellEdit,
+        sheet: usize,
+        items: Vec<Item>,
+        seen: HashSet<CellTarget>,
+        staged_bytes: usize,
+        native_limits: TransferLimits,
+        max_staged_bytes: usize,
+    }
+
+    impl Xlsb {
+        pub(crate) fn cell_plan(
+            &self,
+            target: &TargetArg<'_>,
+            props: &Props<'_>,
+            limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.check_source()?;
+            let result = (|| {
+                let Some(path) = target.path() else {
+                    return Ok(None);
+                };
+                let Some(step) = path.path().steps().last() else {
+                    return Ok(None);
+                };
+                if step.cell_ref().is_none() {
+                    return Ok(None);
+                }
+                let assignments = match admit_cell_properties(props, limits) {
+                    Ok(assignments) => assignments,
+                    Err(error) if error.code() == Code::UnsupportedProperty => {
+                        return Err(error);
+                    },
+                    Err(error) => return Err(error),
+                };
+                let Some(value) = assignments.value.as_ref().cloned() else {
+                    // Empty property sets retain XLSX's admitted no-op
+                    // behavior, but do not enter a payload run.
+                    return Ok(None);
+                };
+                check_cell_limits(1, &assignments, limits)?;
+                let Some(targets) = resolve_cell_targets(self, target, limits)? else {
+                    return Ok(None);
+                };
+                if targets.len() != 1 {
+                    return Ok(None);
+                }
+                let target = targets[0];
+                Ok(Some(Plan {
+                    target,
+                    value,
+                    staged_bytes: assignments.staged_bytes,
+                }))
+            })();
+            self.check_source().and(result)
+        }
+    }
+
+    impl Run {
+        pub(crate) fn new(
+            base: &Xlsb,
+            sheet: usize,
+            limits: &SemanticLimits,
+            remaining_snapshot: usize,
+        ) -> Result<Self> {
+            if remaining_snapshot == 0 {
+                return Err(super::snapshot_limit(
+                    limits.max_snapshot_bytes().saturating_add(1),
+                    limits.max_snapshot_bytes(),
+                ));
+            }
+            base.check_source()?;
+            let source = package_from_editor(base.editor()?);
+            let native_limits = TransferLimits::new(
+                remaining_snapshot,
+                limits.max_expanded_targets(),
+                1,
+                remaining_snapshot,
+            );
+            let edit = source
+                .edit_cell_values_with_limits(
+                    NativeSelector::from(sheet),
+                    Limits::DEFAULT,
+                    native_limits,
+                )
+                .map_err(native_error)?
+                .ok_or_else(|| {
+                    Error::new(
+                        Code::OutOfRange,
+                        "the XLSB worksheet position is out of range",
+                    )
+                    .with_format(FileFormat::Xlsb)
+                })?;
+            base.check_source()?;
+            Ok(Self {
+                base: base.clone(),
+                source,
+                edit,
+                sheet,
+                items: Vec::new(),
+                seen: HashSet::new(),
+                staged_bytes: 0,
+                native_limits,
+                max_staged_bytes: limits.max_staged_bytes(),
+            })
+        }
+
+        pub(crate) fn cell_plan(
+            &self,
+            target: &TargetArg<'_>,
+            props: &Props<'_>,
+            limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.base.cell_plan(target, props, limits)
+        }
+
+        pub(crate) fn first_index(&self) -> Option<usize> {
+            self.items.first().map(|item| item.index)
+        }
+
+        pub(crate) fn requires_barrier(&self, plan: &Plan, limits: &SemanticLimits) -> bool {
+            plan.target.sheet != self.sheet
+                || self.seen.contains(&plan.key())
+                || self
+                    .staged_bytes
+                    .checked_add(plan.charge())
+                    .is_none_or(|bytes| bytes > limits.max_staged_bytes())
+        }
+
+        pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
+            if plan.target.sheet != self.sheet
+                || self.seen.contains(&plan.key())
+                || self
+                    .staged_bytes
+                    .checked_add(plan.charge())
+                    .is_none_or(|bytes| bytes > self.max_staged_bytes)
+            {
+                return Err(Error::new(
+                    Code::InternalError,
+                    "XLSB cell coalescing barrier was not flushed",
+                )
+                .with_format(FileFormat::Xlsb));
+            }
+            self.base.check_source()?;
+            self.items
+                .try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            self.seen
+                .try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            let changed = self
+                .edit
+                .set_scalar(plan.target.reference, plan.value.clone())
+                .map_err(native_error)?;
+            self.seen.insert(plan.key());
+            self.staged_bytes = self.staged_bytes.saturating_add(plan.charge());
+            self.items.push(Item { plan, index });
+            self.base.check_source()?;
+            Ok(changed)
+        }
+
+        pub(crate) fn commit(self) -> Result<(Xlsb, Commit)> {
+            let Self {
+                base,
+                source,
+                edit,
+                items,
+                native_limits,
+                ..
+            } = self;
+            base.check_source()?;
+            let result = edit
+                .commit()
+                .map_err(native_error)
+                .and_then(|native| Commit::from_cell_native(&base, native));
+            let freshness = base.check_source();
+            match freshness.and(result) {
+                Ok(commit) => Ok((base, commit)),
+                Err(error) => Err(locate_failure(
+                    &base,
+                    &source,
+                    items.as_slice(),
+                    native_limits,
+                    error,
+                )),
+            }
+        }
+    }
+
+    fn replay(
+        base: &Xlsb,
+        source: &litchi_xlsb::Package,
+        items: &[Item],
+        limits: TransferLimits,
+    ) -> Result<litchi_xlsb::Package> {
+        base.check_source()?;
+        let Some(first) = items.first() else {
+            return Ok(source.clone());
+        };
+        let mut edit = source
+            .edit_cell_values_with_limits(
+                NativeSelector::from(first.plan.target.sheet),
+                Limits::DEFAULT,
+                limits,
+            )
+            .map_err(native_error)?
+            .ok_or_else(|| {
+                Error::new(
+                    Code::OutOfRange,
+                    "the XLSB worksheet position is out of range",
+                )
+                .with_format(FileFormat::Xlsb)
+            })?;
+        for item in items {
+            edit.set_scalar(item.plan.target.reference, item.plan.value.clone())
+                .map_err(|error| native_error(error).with_item(item.index))?;
+        }
+        let package = edit.commit().map_err(native_error)?.into_package();
+        base.check_source()?;
+        Ok(package)
+    }
+
+    fn locate_failure(
+        base: &Xlsb,
+        source: &litchi_xlsb::Package,
+        items: &[Item],
+        limits: TransferLimits,
+        error: Error,
+    ) -> Error {
+        let Some(first) = items.first() else {
+            return error;
+        };
+        if items.len() == 1
+            || matches!(
+                error.code(),
+                Code::IoError
+                    | Code::Cancelled
+                    | Code::LimitExceeded
+                    | Code::InternalError
+                    | Code::DocumentProtected
+            )
+        {
+            return error.with_item(first.index);
+        }
+        let middle = items.len() / 2;
+        let prefix = match replay(base, source, &items[..middle], limits) {
+            Ok(package) => package,
+            Err(error) => return locate_failure(base, source, &items[..middle], limits, error),
+        };
+        match replay(base, &prefix, &items[middle..], limits) {
+            Err(error) => locate_failure(base, &prefix, &items[middle..], limits, error),
+            Ok(_) => error.with_item(first.index),
+        }
+    }
 }
 
 struct Counted<W> {

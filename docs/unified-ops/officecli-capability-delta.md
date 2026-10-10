@@ -21,7 +21,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `2346df7c5afcf5597a4a3caf4cf1ca5467f80d948e93e7f87b8fdf13461921e2` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `37ec4c18a475f501e9378faaa939b0d4ef3c41e5f95e2b9f5bea31a80c7523b0` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `30c7ea8d6733ff0cb8973e92505f33e7462bdb0ffd49f362949a098406471a8b` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -58,7 +58,7 @@ Properties:
 |---|---|---|---|---|---|---|---|---|
 | docx | 164 | 4 | 428 | 0 | 68 | 2 | 295 | 27 |
 | xlsx | 89 | 16 | 489 | 0 | 18 | 1 | 78 | 62 |
-| xlsb | 55 | 45 | 489 | 0 | 23 | 1 | 78 | 0 |
+| xlsb | 56 | 45 | 489 | 0 | 22 | 1 | 78 | 2 |
 | pptx | 153 | 31 | 113 | 0 | 110 | 0 | 280 | 156 |
 
 ## docx
@@ -2051,7 +2051,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | aboveaverage | `dxfId` | number | --g | element gap | M1-extended (R4x) |
 | autofilter | `range` | string | asg | element gap | M1-extended (R4x) |
 | autofilter | `criteria0` | string | a-- | element gap | M1-extended (R4x) |
-| cell | `value` | string | asg | supported | the node's text |
+| cell | `value` | string | asg | supported |  |
 | cell | `formula` | string | asg | supported |  |
 | cell | `numberformat` | string | asg | gap | M1-extended (R4d) |
 | cell | `font.bold` | bool | asg | gap | M1-extended (R4d) |
@@ -2081,7 +2081,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `display` | string | asg | gap | M1-extended (R4x) |
 | cell | `type` | enum | asg | supported |  |
 | cell | `runs` | string | a-- | write-only | M2 |
-| cell | `clear` | bool | as- | write-only | M2 |
+| cell | `clear` | bool | as- | supported |  |
 | cell | `shift` | string | a-- | write-only | M2 |
 | cell | `arrayformula` | string | as- | supported |  |
 | cell | `cachedValue` | string | --g | supported |  |
@@ -2507,6 +2507,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | range | `fill` | color | -s- | write-only | M2 |
 | range | `numberformat` | string | -s- | write-only | M2 |
 | range | `alignment.horizontal` | enum | -s- | write-only | M2 |
+| range | `value` | scalar |  | litchi-only |  |
+| range | `clear` | bool |  | litchi-only |  |
 | row | `matchedTable` | string | --g | missing |  |
 | row | `tableSource` | string | --g | missing |  |
 | row | `cols` | int | a-- | write-only | M2 |
