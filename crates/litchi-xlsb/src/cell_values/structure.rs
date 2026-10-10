@@ -11,7 +11,7 @@
 //! use litchi_xlsb::cell_values::TransferLimits;
 //! use litchi_xlsb::cell_values::structure::Patch;
 //!
-//! let source = Package::create()?;
+//! let source = Package::new()?;
 //! let mut edit = source.edit()?;
 //! edit.rename_sheet(0, "Renamed".to_owned())?;
 //! let commit = edit.commit()?;

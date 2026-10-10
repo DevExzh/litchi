@@ -272,7 +272,7 @@ fn workbook_trait_surface_matches_across_owner_states() {
 
 fn mixed_chart_tabs() -> Vec<u8> {
     use xlsb::chart::{Anchor, Chart};
-    use xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+    use xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -287,14 +287,18 @@ fn mixed_chart_tabs() -> Vec<u8> {
     data.set_cell(0, 0, "DATA");
     let mut tail = MutableWorksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(data);
     writer
         .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
         .unwrap();
     writer.add_worksheet(tail);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer
+        .build()
+        .expect("build XLSB fixture")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 

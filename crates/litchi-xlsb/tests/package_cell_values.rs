@@ -15,7 +15,7 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::cell_values::{Reference, StyleIndex, TransferLimits, Value};
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::raw::{Records, Writer, kind};
-use litchi_xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 use litchi_xlsb::{Package, SourceLimits};
 
 fn a1() -> Reference {
@@ -60,23 +60,31 @@ fn chart_sheet_package() -> Package {
         Anchor::new(0, 0, 10, 20),
     )
     .expect("chart fixture");
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer
         .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
         .expect("chart sheet");
     writer.add_worksheet(MutableWorksheet::new("Data"));
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("write chart fixture");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("write chart fixture");
     Package::from_bytes(output.into_inner()).expect("read chart package")
 }
 
 #[test]
 fn package_cell_name_selection_rejects_ambiguous_names() {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("DATA"));
     writer.add_worksheet(MutableWorksheet::new("Else"));
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("valid distinct names");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("valid distinct names");
     let mut opc = OpcPackage::from_bytes(&output.into_inner()).expect("OPC");
     let uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
     let original = opc.get_part(&uri).expect("workbook part").blob().to_vec();
@@ -110,7 +118,7 @@ fn package_cell_name_selection_rejects_ambiguous_names() {
 
 #[test]
 fn package_cell_commit_is_immutable_and_exposes_the_commit_triad() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let source_bytes = source.to_bytes().expect("source bytes");
     let commit = changed_commit(&source);
     let candidate_bytes = commit.package().to_bytes().expect("candidate bytes");
@@ -135,7 +143,7 @@ fn package_cell_commit_is_immutable_and_exposes_the_commit_triad() {
 
 #[test]
 fn package_cell_patch_inverse_replays_to_the_original_image() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let original = source.to_bytes().expect("original bytes");
     let commit = changed_commit(&source);
     let changed = source
@@ -150,7 +158,7 @@ fn package_cell_patch_inverse_replays_to_the_original_image() {
 
 #[test]
 fn package_cell_patch_rejects_stale_sources_including_noop_patches() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let changed = changed_commit(&source);
     let changed_package = source
         .apply_cell_values(changed.patch())
@@ -177,7 +185,7 @@ fn package_cell_patch_rejects_stale_sources_including_noop_patches() {
 
 #[test]
 fn package_cell_noop_preserves_exact_bytes() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let original = source.to_bytes().expect("original bytes");
     let noop = source
         .edit_cell_values("Sheet1")
@@ -198,7 +206,7 @@ fn package_cell_noop_preserves_exact_bytes() {
 
 #[test]
 fn package_cell_commit_rejects_invalid_style_in_context() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let original = source.to_bytes().expect("original bytes");
     let mut edit = source
         .edit_cell_values(0)
@@ -223,7 +231,7 @@ fn package_cell_commit_rejects_invalid_style_in_context() {
 
 #[test]
 fn package_cell_commit_and_replay_honor_finite_retained_input_limits() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let original = source.to_bytes().expect("original bytes");
 
     let mut edit = source
@@ -301,7 +309,7 @@ fn package_cell_selector_uses_the_complete_catalog() {
 
 #[test]
 fn raw_worksheet_transaction_stays_under_an_explicit_namespace() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let workbook = source.workbook().expect("workbook projection");
     let snapshot = workbook.cell_values(0).expect("worksheet snapshot");
     let mut edit: litchi_xlsb::cell_values::worksheet::Edit = snapshot.edit();
@@ -315,7 +323,7 @@ fn raw_worksheet_transaction_stays_under_an_explicit_namespace() {
 
 #[test]
 fn package_cell_edit_accepts_explicit_worksheet_and_transfer_limits() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let edit = source
         .edit_cell_values_with_limits(
             0_usize,
@@ -330,7 +338,7 @@ fn package_cell_edit_accepts_explicit_worksheet_and_transfer_limits() {
 #[test]
 fn package_cell_transfer_quotas_cover_images_and_changes() {
     use litchi_xlsb::cell_values::{Error, Limits};
-    let source = Package::create().expect("source");
+    let source = Package::new().expect("source");
     let original = source.to_bytes().expect("bytes");
     let quota = |bytes, changes| TransferLimits::new(bytes, changes, 1, bytes);
     let edit = source

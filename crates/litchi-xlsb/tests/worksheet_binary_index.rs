@@ -29,7 +29,7 @@ use litchi_xlsb::binary_index::Limits as BinaryIndexLimits;
 use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Header, Kind, Limits as RawLimits, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Package, SourceBackedWorkbook, SourceLimits, Workbook};
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
@@ -62,7 +62,10 @@ fn package_part(package_bytes: &[u8], path: &str) -> Vec<u8> {
 
 fn save_workbook(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save workbook");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save workbook");
     output.into_inner()
 }
 
@@ -575,10 +578,14 @@ fn writer_emits_lookupable_offsets_for_sparse_cells() {
     sheet.set_cell(0, 1_024, 2.5_f64);
     sheet.set_cell(33, 2, 3.75_f64);
     sheet.set_cell(MAX_ROW, MAX_COLUMN, 4.0_f64);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("writer save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("writer save");
     let package_bytes = bytes.into_inner();
 
     let index = package_part(&package_bytes, INDEX1);
@@ -627,10 +634,14 @@ fn writer_emits_lookupable_offsets_for_sparse_cells() {
 
 #[test]
 fn writer_emits_an_empty_index_block_for_an_empty_sheet() {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Empty"));
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("writer save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("writer save");
     let package_bytes = bytes.into_inner();
     let index = package_part(&package_bytes, INDEX1);
     let index_records = records(&index);
@@ -687,10 +698,14 @@ fn index_accepts_optional_empty_blocks_and_two_end_markers() {
 
 #[test]
 fn index_accepts_an_empty_block_before_a_later_empty_block() {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Empty"));
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("writer save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("writer save");
     let source = rewrite_index(&bytes.into_inner(), two_empty_index_blocks);
     let workbook = SourceBackedWorkbook::from_reader(Cursor::new(source)).expect("catalog");
     let indexed = workbook

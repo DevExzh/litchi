@@ -149,6 +149,9 @@ pub mod xml_maps;
 pub use litchi_opc::{SourceCacheDiagnostics, SourceCacheLimits, SourceLimitKind, SourceLimits};
 pub mod writer;
 
+/// Canonical builder for authoring a new XLSB package.
+pub use writer::Builder;
+
 pub use raw::Error;
 
 pub use leniency::{

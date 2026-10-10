@@ -18,7 +18,7 @@ use litchi_xlsb::package::connections::{
 };
 use litchi_xlsb::package::table::{Column, Range as TableRange, Table, Type as TableType};
 use litchi_xlsb::raw::{Kind, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{
     Defect, LayoutDefect, Package, ReservedFieldDefect, SourceBackedWorkbook, ToleranceReport,
     Workbook,
@@ -36,7 +36,7 @@ fn test_data(name: &str) -> Vec<u8> {
 
 fn save(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.to_package().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -126,10 +126,14 @@ fn table_workbook() -> Vec<u8> {
         ..Table::default()
     })
     .unwrap();
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(data);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 
@@ -137,10 +141,14 @@ fn table_workbook() -> Vec<u8> {
 fn connections_workbook() -> Vec<u8> {
     let mut sheet = MutableWorksheet::new("Sheet1");
     sheet.set_cell(0, 0, "value");
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     let mut workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
     workbook
         .set_connections(Connections {

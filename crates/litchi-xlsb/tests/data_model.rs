@@ -7,7 +7,7 @@ use litchi_xlsb::data_model::{
     TimeGrouping, TimeGroupingColumn,
 };
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 const EMPTY_RELATIONSHIPS: &[u8] =
     br#"<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"></Relationships>"#;
@@ -51,23 +51,31 @@ fn connections() -> Connections {
 }
 
 fn package() -> Package {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
         .set_data_model(Model::from_bytes(definition(), vec![1, 2, 3, 4]).expect("model"))
         .expect("set model");
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
     Package::from_bytes(output.into_inner()).expect("package")
 }
 
 fn empty_package() -> Package {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
     Package::from_bytes(output.into_inner()).expect("package")
 }
 
@@ -314,13 +322,12 @@ fn writer_emits_relationship_free_model_part_and_typed_workbook_records() {
 
 #[test]
 fn writer_requires_a_connection_for_each_model_table() {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer
         .set_data_model(Model::from_bytes(definition(), vec![1, 2, 3]).expect("model"))
         .expect("set model before its owner");
-    let mut output = Cursor::new(Vec::new());
-    let error = writer.save(&mut output).expect_err("missing owner");
+    let error = writer.build().expect_err("missing owner");
     assert!(error.to_string().contains("External Data Connections part"));
 }
 
@@ -328,14 +335,18 @@ fn writer_requires_a_connection_for_each_model_table() {
 fn table_connection_binding_is_case_insensitive() {
     let mut value = definition();
     value.tables[0].connection = "connection".to_string();
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
         .set_data_model(Model::from_bytes(value.clone(), vec![1, 2, 3]).expect("model"))
         .expect("case-insensitive binding");
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
     let reopened = Package::from_bytes(output.into_inner()).expect("package");
     assert_eq!(
         reopened
@@ -434,7 +445,10 @@ fn connection_source_change_is_stale_even_when_model_and_workbook_bytes_are_unch
     changed.connections[0].description = Some("changed source metadata".to_string());
     workbook.set_connections(changed).expect("change source");
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save changed source");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save changed source");
     let changed_package = Package::from_bytes(output.into_inner()).expect("reopen");
 
     assert_eq!(
@@ -766,7 +780,10 @@ fn signed_noop_preserves_and_signed_change_requires_explicit_disposition() {
     let mut workbook = signed.workbook().expect("signed workbook facade");
     let workbook_before = {
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).expect("signed workbook bytes");
+        workbook
+            .to_package()
+            .write_to(&mut output)
+            .expect("signed workbook bytes");
         output.into_inner()
     };
     let workbook_noop = workbook
@@ -781,7 +798,10 @@ fn signed_noop_preserves_and_signed_change_requires_explicit_disposition() {
     assert!(workbook.opc_package().is_signed());
     let workbook_after = {
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).expect("signed workbook bytes");
+        workbook
+            .to_package()
+            .write_to(&mut output)
+            .expect("signed workbook bytes");
         output.into_inner()
     };
     assert_eq!(workbook_after, workbook_before);
@@ -822,7 +842,7 @@ fn time_grouping_edit_requires_inner_xldm_identity_proof_before_draft_change() {
 
 #[test]
 fn writer_rejects_time_grouping_before_retaining_unproven_opaque_payload() {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     let mut definition = definition();

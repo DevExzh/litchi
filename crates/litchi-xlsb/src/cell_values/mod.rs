@@ -19,7 +19,7 @@
 //! # fn main() -> litchi_xlsb::package::PackageResult<()> {
 //! use litchi_xlsb::Package;
 //!
-//! let source = Package::create()?;
+//! let source = Package::new()?;
 //! let edit = source.edit_cell_values(0usize)?.expect("worksheet");
 //! let commit = edit.commit()?;
 //! assert_eq!(commit.package().to_bytes()?, commit.patch().after());

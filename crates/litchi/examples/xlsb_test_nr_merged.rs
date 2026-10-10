@@ -5,11 +5,11 @@
 use litchi::sheet::CellValue;
 use litchi::xlsb::merged_cells::MergedCell;
 use litchi::xlsb::named_ranges::{Definition, area3d_formula};
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Data");
 
     // Title row (merged)
@@ -32,7 +32,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_named_range(sales_range);
 
     let file = File::create("xlsb_test_nr_merged.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created xlsb_test_nr_merged.xlsb");
     println!("  - Named ranges + Merged cells (NO hyperlinks)");

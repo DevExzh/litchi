@@ -58,7 +58,7 @@ fn changed_dependencies() -> Dependencies {
 }
 
 fn package_with_dependencies(dependencies: Dependencies) -> Package {
-    let package = Package::create().expect("create workbook");
+    let package = Package::new().expect("create workbook");
     let mut transaction = package
         .edit_volatile_dependencies()
         .expect("start volatile dependency transaction");
@@ -256,7 +256,7 @@ fn changed_commit(package: &Package) -> Commit {
 
 #[test]
 fn public_create_change_remove_save_reopen_and_exact_inverse() {
-    let empty = Package::create().expect("create empty workbook");
+    let empty = Package::new().expect("create empty workbook");
     assert!(
         !empty
             .volatile_dependencies()

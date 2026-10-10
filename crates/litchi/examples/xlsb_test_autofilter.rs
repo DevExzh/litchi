@@ -10,13 +10,13 @@
 //! ```
 
 use litchi::sheet::CellValue;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating XLSB with a basic AutoFilter range...");
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("AutoFilter");
 
     // Header row (row 0)
@@ -46,7 +46,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_autofilter.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("\n[32m✓ Created xlsb_test_autofilter.xlsb[0m");
     Ok(())

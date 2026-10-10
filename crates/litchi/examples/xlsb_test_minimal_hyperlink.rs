@@ -4,13 +4,13 @@
 
 use litchi::sheet::CellValue;
 use litchi::xlsb::hyperlinks::Hyperlink;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test: Minimal hyperlink...");
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Test");
 
     // Simple data with one hyperlink
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_minimal_hyperlink.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created xlsb_test_minimal_hyperlink.xlsb");
     Ok(())

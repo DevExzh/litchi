@@ -15,7 +15,7 @@ use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Records, Writer, kind};
 use litchi_xlsb::sheet::{Kind, State};
-use litchi_xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 const DIALOG_SHEET: (&str, &str) = (
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
@@ -40,7 +40,7 @@ fn every_kind_workbook() -> Vec<u8> {
         Anchor::new(0, 0, 10, 20),
     )
     .unwrap();
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Data"));
     writer
         .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
@@ -50,7 +50,11 @@ fn every_kind_workbook() -> Vec<u8> {
     }
     writer.add_worksheet(MutableWorksheet::new("Tail"));
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     let mut bytes = output.into_inner();
     for (name, (relationship_type, content_type)) in [
         ("Dialog", DIALOG_SHEET),

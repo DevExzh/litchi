@@ -49,6 +49,7 @@ use crate::error::{Code, Error, Result};
 use crate::options::{OpenOptions, SourceMode};
 
 mod children;
+pub(crate) mod create;
 mod header;
 mod nav;
 mod node;
@@ -299,6 +300,28 @@ impl Xlsb {
                 .map(Metadata::from)
                 .unwrap_or_default();
         let workbook = xlsb::Package::from_opc(package)?.into_workbook()?;
+        Ok(Self::with_owner(
+            XlsbOwner::Eager(Box::new(workbook)),
+            metadata,
+            metadata_repairs,
+            options,
+        ))
+    }
+
+    /// Adopt a newly created native package without serializing and reopening
+    /// its binary workbook. The native creator has already validated the
+    /// package; `into_workbook` acquires its eager semantic projection at the
+    /// unified boundary.
+    pub(crate) fn from_package(package: xlsb::Package, options: &OpenOptions) -> Result<Self> {
+        let mut metadata_repairs = MetadataRepairs::default();
+        let metadata = litchi_ooxml_common::properties::read_with_report(
+            package.opc_package(),
+            &mut metadata_repairs,
+        )
+        .map_err(metadata_error)?
+        .map(Metadata::from)
+        .unwrap_or_default();
+        let workbook = package.into_workbook()?;
         Ok(Self::with_owner(
             XlsbOwner::Eager(Box::new(workbook)),
             metadata,

@@ -293,7 +293,7 @@ fn validate_column_dependencies(
 mod tests {
     use super::*;
     use crate::package::table::{Column, Range, Table, Type};
-    use crate::writer::WorkbookWriter;
+    use crate::writer::Builder;
     use litchi_opc::constants::relationship_type as rel;
     use litchi_opc::{OpcPackage, PackURI};
     use std::io::Cursor;
@@ -368,11 +368,11 @@ mod tests {
         sheet.set_mapped_table(mapped_table.clone()).unwrap();
         sheet.set_single_cell_mapping(single.clone()).unwrap();
 
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(catalog()).unwrap();
         workbook.add_worksheet(sheet);
         let mut bytes = Cursor::new(Vec::new());
-        workbook.save(&mut bytes).unwrap();
+        workbook.build().unwrap().write_to(&mut bytes).unwrap();
 
         let package = OpcPackage::from_bytes(&bytes.into_inner()).unwrap();
         let workbook_part = package
@@ -497,21 +497,16 @@ mod tests {
         .unwrap()
     }
 
-    fn authored(sheet: MutableWorksheet) -> WorkbookWriter {
-        let mut workbook = WorkbookWriter::new();
+    fn authored(sheet: MutableWorksheet) -> Builder {
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(catalog()).unwrap();
         workbook.add_worksheet(sheet);
         workbook
     }
 
-    fn assert_save_failure_is_atomic(
-        mut workbook: WorkbookWriter,
-        expected: &[(usize, usize, usize)],
-    ) {
+    fn assert_build_failure_is_atomic(mut workbook: Builder, expected: &[(usize, usize, usize)]) {
         let before_catalog = workbook.xml_maps().cloned();
-        let mut output = Cursor::new(Vec::new());
-        assert!(workbook.save(&mut output).is_err());
-        assert!(output.get_ref().is_empty());
+        assert!(workbook.build().is_err());
         assert_eq!(workbook.xml_maps(), before_catalog.as_ref());
         assert_eq!(workbook.worksheet_count(), expected.len());
         for (index, &(tables, mapped, single)) in expected.iter().enumerate() {
@@ -561,7 +556,7 @@ mod tests {
             .unwrap();
         cases.push(("missing column", authored(missing_column), vec![(1, 1, 0)]));
 
-        let mut duplicate = WorkbookWriter::new();
+        let mut duplicate = Builder::new();
         duplicate.set_xml_maps(catalog()).unwrap();
         for name in ["Duplicate One", "Duplicate Two"] {
             let mut sheet = MutableWorksheet::new(name);
@@ -699,7 +694,7 @@ mod tests {
             load_mode: 0,
             payload_xml: None,
         });
-        let mut missing_connection = WorkbookWriter::new();
+        let mut missing_connection = Builder::new();
         missing_connection
             .set_xml_maps(missing_connection_catalog)
             .unwrap();
@@ -711,7 +706,7 @@ mod tests {
         ));
 
         for (name, workbook, expected) in cases {
-            assert_save_failure_is_atomic(workbook, &expected);
+            assert_build_failure_is_atomic(workbook, &expected);
             assert!(!name.is_empty());
         }
     }
@@ -721,7 +716,7 @@ mod tests {
         let mut oversized = catalog();
         oversized.selection_namespaces =
             "x".repeat(litchi_ooxml_common::spreadsheet_xml_maps::MAX_STRING_BYTES + 1);
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         assert!(workbook.set_xml_maps(oversized).is_err());
         assert!(workbook.xml_maps().is_none());
     }
@@ -737,7 +732,7 @@ mod tests {
             load_mode: 0,
             payload_xml: None,
         });
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(value).unwrap();
         workbook
             .set_connections(crate::package::connections::Connections {
@@ -750,13 +745,13 @@ mod tests {
             .unwrap();
         workbook.add_worksheet(MutableWorksheet::new("Mapped"));
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).unwrap();
+        workbook.build().unwrap().write_to(&mut output).unwrap();
         assert!(!output.get_ref().is_empty());
     }
 
     #[test]
     fn table_connection_rules_accept_xml_id_and_non_xml_zero() {
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(catalog()).unwrap();
         workbook
             .set_connections(crate::package::connections::Connections {
@@ -796,7 +791,7 @@ mod tests {
         sheet.add_table(range).unwrap();
         workbook.add_worksheet(sheet);
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).unwrap();
+        workbook.build().unwrap().write_to(&mut output).unwrap();
         assert!(!output.get_ref().is_empty());
     }
 
@@ -808,7 +803,7 @@ mod tests {
             first_column: 0,
             last_column: 0,
         };
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         workbook.set_xml_maps(catalog()).unwrap();
         for (ordinal, name) in ["First", "Second"].into_iter().enumerate() {
             let table_id = 2 + ordinal as u32 * 2;
@@ -825,7 +820,7 @@ mod tests {
             workbook.add_worksheet(sheet);
         }
         let mut output = Cursor::new(Vec::new());
-        workbook.save(&mut output).unwrap();
+        workbook.build().unwrap().write_to(&mut output).unwrap();
         let package = OpcPackage::from_bytes(&output.into_inner()).unwrap();
         let mut targets = HashSet::new();
         for sheet_index in 1..=2 {

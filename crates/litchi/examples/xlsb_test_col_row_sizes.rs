@@ -10,13 +10,13 @@
 //! ```
 
 use litchi::sheet::CellValue;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating XLSB with custom column widths and row heights...");
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Sizes");
 
     // Header row
@@ -44,7 +44,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_col_row_sizes.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("\n[32m✓ Created xlsb_test_col_row_sizes.xlsb[0m");
     Ok(())

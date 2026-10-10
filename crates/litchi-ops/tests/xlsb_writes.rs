@@ -14,9 +14,9 @@ const FIRST: &str = "/sheet[1]";
 const SECOND: &str = "/sheet[2]";
 
 fn fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+    use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     let mut data = MutableWorksheet::new("Data");
     data.set_cell(0, 0, "source");
     writer.add_worksheet(data);
@@ -25,7 +25,11 @@ fn fixture() -> Vec<u8> {
     writer.add_worksheet(archive);
 
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("serialize XLSB fixture");
+    writer
+        .build()
+        .expect("build XLSB fixture")
+        .write_to(&mut output)
+        .expect("serialize XLSB fixture");
     output.into_inner()
 }
 
@@ -626,7 +630,7 @@ fn unsupported_reencryption_does_not_publish_plaintext() {
 #[test]
 fn worksheet_names_cannot_collide_with_chart_tabs() {
     use litchi_xlsb::chart::{Anchor as ChartAnchor, Chart};
-    use litchi_xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+    use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
     let chart = Chart::bar_chart_with_cache(
         "Sales",
         "Data!$A$1:$A$2",
@@ -636,13 +640,13 @@ fn worksheet_names_cannot_collide_with_chart_tabs() {
         ChartAnchor::new(0, 0, 10, 20),
     )
     .unwrap();
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Data"));
     writer
         .add_chart_sheet(MutableChartSheet::new("Café", chart))
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     for eager in [false, true] {
         let file = open_owner(&bytes, eager);

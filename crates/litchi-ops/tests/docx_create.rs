@@ -97,12 +97,19 @@ fn create_reports_a_disabled_leaf_as_an_unsupported_format() {
 
 #[cfg(feature = "xlsb")]
 #[test]
-fn create_reports_an_enabled_but_unintegrated_leaf_as_a_capability_gap() {
+fn create_reports_an_integrated_xlsb_leaf_as_supported() {
+    let file = create(FileFormat::Xlsb).expect("XLSB creator is integrated");
+    assert_eq!(file.format(), Some(FileFormat::Xlsb));
+}
+
+#[cfg(not(feature = "xlsb"))]
+#[test]
+fn create_reports_a_disabled_xlsb_leaf_as_an_unsupported_format() {
     assert_eq!(
         create(FileFormat::Xlsb)
-            .expect_err("XLSB creator has not landed")
+            .expect_err("XLSB creator is disabled in this build")
             .code(),
-        Code::UnsupportedCapability
+        Code::UnsupportedFormat
     );
 }
 

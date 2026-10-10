@@ -6,7 +6,7 @@
 
 //! OPC package assembly for XLSB workbooks.
 
-use super::model::{SheetSlot, WorkbookWriter};
+use super::model::{Builder, SheetSlot};
 use crate::package::error::{Error, Result};
 use crate::package::formula::{
     CompilationContext, Context, DefinedName, ExternalSheet, SupportingLink,
@@ -16,7 +16,6 @@ use litchi_core::xml::escape_xml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
-use std::io::{Seek, Write};
 use std::sync::Arc;
 
 pub(super) fn checked_capacity(resource: &'static str, terms: &[usize]) -> Result<usize> {
@@ -35,13 +34,26 @@ fn reserved_vec<T>(capacity: usize, resource: &'static str) -> Result<Vec<T>> {
     Ok(values)
 }
 
-impl WorkbookWriter {
-    /// Save the workbook to a writer
-    ///
-    /// # Arguments
-    ///
-    /// * `writer` - A writer that implements `Write` and `Seek`
-    pub fn save<W: Write + Seek>(&mut self, writer: W) -> Result<()> {
+impl Builder {
+    /// Build a validated XLSB package from the authored workbook.
+    pub fn build(&mut self) -> Result<crate::Package> {
+        // String indices and occurrence counts describe this build's cells,
+        // not prior successful builds. Keep the previous scratch state only
+        // so a failed attempt leaves the builder available for correction.
+        let previous_strings = std::mem::take(&mut self.shared_strings);
+        let result = self.build_package();
+        if result.is_err() {
+            self.shared_strings = previous_strings;
+        }
+        result
+    }
+
+    fn build_package(&mut self) -> Result<crate::Package> {
+        if self.sheet_order.is_empty() {
+            return Err(Error::InvalidFormat(
+                "an XLSB workbook must contain at least one worksheet or chart sheet".to_string(),
+            ));
+        }
         if let Some(model) = self.data_model.as_ref() {
             crate::data_model::validate_model_for_write(model, self.connections.as_ref())?;
         }
@@ -145,10 +157,11 @@ impl WorkbookWriter {
             )));
         }
 
-        // Save package to output
-        package.to_stream(writer)?;
-
-        Ok(())
+        // Validate the complete authored OPC graph before returning it.  The
+        // caller owns publication through `Package::write_to`/`save`.
+        let workbook = crate::Workbook::from_opc_package(package)?;
+        crate::cell_values::structure::validate_all_worksheets(&workbook)?;
+        Ok(crate::Package::from_validated_workbook(workbook))
     }
 
     fn authored_pivot_tables(&self) -> Vec<(String, String)> {

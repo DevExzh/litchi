@@ -58,7 +58,8 @@ fn attach_connections(package: Package) -> Package {
         .expect("attach synthetic connections");
     let mut output = Cursor::new(Vec::new());
     workbook
-        .save(&mut output)
+        .to_package()
+        .write_to(&mut output)
         .expect("save synthetic connections");
     Package::from_bytes(output.into_inner()).expect("reopen synthetic connections")
 }

@@ -51,10 +51,7 @@
       "supported": true
     },
     "create": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "W4",
-      "reason": "creation is not integrated for this format in the current wave"
+      "supported": true
     }
   },
   "views": {
@@ -1872,6 +1869,33 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4x)",
       "reason": "XLSB ranges do not report whether they are merged yet"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document; M2 XLSB template creation",
+      "reason": "the XLSB creator currently authors ordinary workbooks and refuses template requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "the XLSB creator emits Transitional packages and refuses Strict requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB metadata creation",
+      "reason": "the XLSB creator refuses initial metadata until typed metadata authoring is integrated"
     },
     {
       "subject": "view",

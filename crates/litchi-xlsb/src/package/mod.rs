@@ -17,7 +17,7 @@ use crate::external_link::ExternalLinkLimits;
 use crate::leniency::{Leniency, ToleranceReport};
 use crate::package::error::Result;
 use crate::workbook::DrawingLoadPolicy;
-use crate::writer::{MutableWorksheet, WorkbookWriter};
+use crate::writer::{Builder, MutableWorksheet};
 
 #[path = "../host/cell.rs"]
 pub(crate) mod cell;
@@ -150,12 +150,10 @@ impl Package {
     }
 
     /// Create a deterministic workbook containing one visible worksheet.
-    pub fn create() -> Result<Self> {
-        let mut writer = WorkbookWriter::new();
-        writer.add_worksheet(MutableWorksheet::new("Sheet1"));
-        let mut bytes = std::io::Cursor::new(Vec::new());
-        writer.save(&mut bytes)?;
-        Self::from_bytes(bytes.into_inner())
+    pub fn new() -> Result<Self> {
+        let mut builder = Builder::new();
+        builder.add_worksheet(MutableWorksheet::new("Sheet1"));
+        builder.build()
     }
 
     /// Read workbook slicer caches as an immutable, source-bound snapshot.
@@ -744,10 +742,7 @@ mod tests {
 
     #[test]
     fn workbook_adoption_retains_physical_and_external_link_limits() {
-        let bytes = Package::create()
-            .expect("create")
-            .to_bytes()
-            .expect("bytes");
+        let bytes = Package::new().expect("create").to_bytes().expect("bytes");
         let source_limits = SourceLimits::builder()
             .max_input_bytes(u64::try_from(bytes.len()).expect("length"))
             .expect("input limit")
@@ -779,10 +774,7 @@ mod tests {
 
     #[test]
     fn workbook_adoption_retains_leniency_without_changing_default_ingress() {
-        let bytes = Package::create()
-            .expect("create")
-            .to_bytes()
-            .expect("bytes");
+        let bytes = Package::new().expect("create").to_bytes().expect("bytes");
         let workbook = Workbook::new_with_leniency(
             Cursor::new(bytes.clone()),
             Leniency::TolerateCachedNumbers,
@@ -811,7 +803,7 @@ mod tests {
 
     #[test]
     fn ingress_honors_exact_read_limits() {
-        let bytes = Package::create()
+        let bytes = Package::new()
             .expect("create package")
             .to_bytes()
             .expect("serialize package");

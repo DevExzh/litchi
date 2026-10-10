@@ -28,7 +28,7 @@ fn dependencies(value: &'static str) -> Dependencies {
 }
 
 fn package_with_owner() -> Package {
-    let package = Package::create().expect("workbook");
+    let package = Package::new().expect("workbook");
     let mut edit = package
         .edit_volatile_dependencies()
         .expect("volatile snapshot");

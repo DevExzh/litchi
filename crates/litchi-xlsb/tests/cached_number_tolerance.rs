@@ -15,7 +15,7 @@ use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::cell_values::{CellError, Reference, Value};
 use litchi_xlsb::raw::{Kind, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{
     CachedNumberDefect, Defect, Leniency, SourceBackedWorkbook, ToleranceReport, Workbook,
 };
@@ -27,10 +27,14 @@ fn numbers_workbook() -> Vec<u8> {
     let mut sheet = MutableWorksheet::new("Numbers");
     sheet.set_cell(0, 0, 1.5);
     sheet.set_cell(0, 1, 2.5);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 

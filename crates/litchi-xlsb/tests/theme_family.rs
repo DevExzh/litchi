@@ -801,6 +801,9 @@ fn source_backed_family_projection_does_not_materialize_theme_media() {
 
 fn saved_bytes(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save workbook");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save workbook");
     output.into_inner()
 }

@@ -414,7 +414,7 @@ fn discover_signature(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::package::{MutableWorksheet, Workbook, WorkbookWriter};
+    use crate::package::{Builder, MutableWorksheet, Workbook};
     use litchi_opc::part::BlobPart;
     use litchi_vba::{Limits, Payload, build};
     use std::io::Cursor;
@@ -509,10 +509,10 @@ mod tests {
 
     #[test]
     fn parsed_xlsb_workbook_exposes_inert_project_metadata() {
-        let mut writer = WorkbookWriter::new();
+        let mut writer = Builder::new();
         writer.add_worksheet(MutableWorksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
-        writer.save(&mut bytes).unwrap();
+        writer.build().unwrap().write_to(&mut bytes).unwrap();
 
         let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
         let workbook_name = workbook
@@ -551,10 +551,10 @@ mod tests {
     }
 
     fn generated_workbook() -> Workbook {
-        let mut writer = WorkbookWriter::new();
+        let mut writer = Builder::new();
         writer.add_worksheet(MutableWorksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
-        writer.save(&mut bytes).unwrap();
+        writer.build().unwrap().write_to(&mut bytes).unwrap();
         Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
     }
 
@@ -583,15 +583,15 @@ mod tests {
 
     #[test]
     fn workbook_writer_attaches_validated_project() {
-        let mut writer = WorkbookWriter::new();
+        let mut writer = Builder::new();
         writer.add_worksheet(MutableWorksheet::new("Sheet1"));
         let limits = Limits::default();
         writer.put_vba(authored_project().finish(&limits).unwrap());
 
         let mut first = Cursor::new(Vec::new());
-        writer.save(&mut first).unwrap();
+        writer.build().unwrap().write_to(&mut first).unwrap();
         let mut second = Cursor::new(Vec::new());
-        writer.save(&mut second).unwrap();
+        writer.build().unwrap().write_to(&mut second).unwrap();
 
         for bytes in [first.into_inner(), second.into_inner()] {
             let workbook = Workbook::new(Cursor::new(bytes)).unwrap();

@@ -15,7 +15,7 @@ impl crate::Package {
     /// ```
     /// # use litchi_xlsb::Package;
     /// # fn main() -> litchi_xlsb::package::PackageResult<()> {
-    /// let package = Package::create()?;
+    /// let package = Package::new()?;
     /// let snapshot = package.volatile_dependencies()?;
     /// assert!(!snapshot.is_present());
     /// # Ok(())

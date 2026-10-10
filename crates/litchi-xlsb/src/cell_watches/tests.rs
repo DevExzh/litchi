@@ -174,7 +174,7 @@ fn rejects_invalid_coordinates_domains_and_duplicate_watches() {
 
 #[test]
 fn workbook_facade_publishes_only_a_valid_commit() {
-    let package = crate::Package::create().unwrap();
+    let package = crate::Package::new().unwrap();
     let mut workbook = package.into_workbook().unwrap();
     let mut edit = workbook.edit_cell_watches(0).unwrap();
     edit.add(Watch::new(3, 5).unwrap()).unwrap();

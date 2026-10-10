@@ -11,7 +11,7 @@ use litchi::sheet::CellValue;
 use litchi::xlsb::comments::Record;
 use litchi::xlsb::hyperlinks::Hyperlink;
 use litchi::xlsb::merged_cells::MergedCell;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() {
@@ -36,7 +36,7 @@ fn main() {
 }
 
 fn create_workbook(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.set_date_system(false); // 1900 date system
 
     println!("Creating worksheets...\n");
@@ -53,12 +53,12 @@ fn create_workbook(filename: &str) -> Result<(), Box<dyn std::error::Error>> {
     // Save
     println!("Writing workbook to file...");
     let file = File::create(filename)?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     Ok(())
 }
 
-fn create_basic_sheet(workbook: &mut WorkbookWriter) -> Result<(), Box<dyn std::error::Error>> {
+fn create_basic_sheet(workbook: &mut Builder) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Sheet 1: Basic Data Types...");
 
     let mut sheet = MutableWorksheet::new("BasicData");
@@ -89,7 +89,7 @@ fn create_basic_sheet(workbook: &mut WorkbookWriter) -> Result<(), Box<dyn std::
     Ok(())
 }
 
-fn create_formula_sheet(workbook: &mut WorkbookWriter) -> Result<(), Box<dyn std::error::Error>> {
+fn create_formula_sheet(workbook: &mut Builder) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Sheet 2: Formulas...");
 
     let mut sheet = MutableWorksheet::new("Formulas");
@@ -127,7 +127,7 @@ fn create_formula_sheet(workbook: &mut WorkbookWriter) -> Result<(), Box<dyn std
     Ok(())
 }
 
-fn create_advanced_sheet(workbook: &mut WorkbookWriter) -> Result<(), Box<dyn std::error::Error>> {
+fn create_advanced_sheet(workbook: &mut Builder) -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating Sheet 3: Advanced Features...");
 
     let mut sheet = MutableWorksheet::new("Advanced");

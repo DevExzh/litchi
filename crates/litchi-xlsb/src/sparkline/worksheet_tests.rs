@@ -339,7 +339,7 @@ fn strict_scan_rejects_family_members_outside_duplicate_unclosed_and_mismatch() 
 
 #[test]
 fn workbook_api_applies_atomically_and_refuses_stale_commits() {
-    let package = crate::Package::create().unwrap();
+    let package = crate::Package::new().unwrap();
     let mut workbook = package.into_workbook().unwrap();
     let workbook_part = litchi_opc::PackURI::new("/xl/workbook.bin").unwrap();
     let workbook_before = workbook
@@ -377,7 +377,7 @@ fn workbook_api_applies_atomically_and_refuses_stale_commits() {
 
 #[test]
 fn workbook_api_refuses_structural_formula_without_provable_context() {
-    let package = crate::Package::create().unwrap();
+    let package = crate::Package::new().unwrap();
     let mut workbook = package.into_workbook().unwrap();
     let colors = Colors::uniform(Color::rgb(20, 40, 60, 255, 0));
     let unbound = Groups::new(vec![
@@ -406,7 +406,7 @@ fn workbook_api_refuses_a_change_to_a_signed_workbook() {
     use litchi_opc::constants::{content_type, relationship_type};
     use litchi_opc::{BlobPart, PackURI};
 
-    let mut workbook = crate::Package::create().unwrap().into_workbook().unwrap();
+    let mut workbook = crate::Package::new().unwrap().into_workbook().unwrap();
     let package = workbook.opc_package_mut();
     package
         .try_add_part(Box::new(BlobPart::new(

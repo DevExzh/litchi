@@ -28,10 +28,10 @@ const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
 /// # Example
 ///
 /// ```rust,no_run
-/// use litchi_xlsb::writer::{WorkbookWriter, MutableWorksheet};
+/// use litchi_xlsb::writer::{Builder, MutableWorksheet};
 /// use std::fs::File;
 ///
-/// let mut workbook = WorkbookWriter::new();
+/// let mut workbook = Builder::new();
 ///
 /// let mut sheet = MutableWorksheet::new("Sheet1");
 /// sheet.set_cell(0, 0, "Hello");
@@ -39,11 +39,12 @@ const MAX_AUTHORED_EXTERNAL_LINKS: usize = 4_096;
 ///
 /// workbook.add_worksheet(sheet);
 ///
+/// let package = workbook.build()?;
 /// let file = File::create("output.xlsb")?;
-/// workbook.save(file)?;
+/// package.write_to(file)?;
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct WorkbookWriter {
+pub struct Builder {
     pub(super) worksheets: Vec<MutableWorksheet>,
     pub(super) chart_sheets: Vec<MutableChartSheet>,
     pub(super) sheet_order: Vec<SheetSlot>,
@@ -78,10 +79,10 @@ pub(super) struct AuthoredPivotCache {
     pub(super) bytes: Vec<u8>,
 }
 
-impl WorkbookWriter {
+impl Builder {
     /// Create a new XLSB workbook writer
     pub fn new() -> Self {
-        WorkbookWriter {
+        Builder {
             worksheets: Vec::new(),
             chart_sheets: Vec::new(),
             sheet_order: Vec::new(),
@@ -178,9 +179,9 @@ impl WorkbookWriter {
     /// # Example
     ///
     /// ```rust
-    /// use litchi_xlsb::writer::{WorkbookWriter, MutableWorksheet};
+    /// use litchi_xlsb::writer::{Builder, MutableWorksheet};
     ///
-    /// let mut workbook = WorkbookWriter::new();
+    /// let mut workbook = Builder::new();
     /// let sheet = MutableWorksheet::new("Sheet1");
     /// workbook.add_worksheet(sheet);
     /// ```
@@ -193,7 +194,7 @@ impl WorkbookWriter {
     /// Add a chart sheet in the current workbook sheet order.
     ///
     /// The chart is stored inertly in standard DrawingML parts. Package
-    /// relationships are allocated at save time and never followed or fetched.
+    /// relationships are allocated at build time and never followed or fetched.
     pub fn add_chart_sheet(
         &mut self,
         chart_sheet: MutableChartSheet,
@@ -339,7 +340,7 @@ impl WorkbookWriter {
     ///
     /// The definition is serialized immediately, so model content the
     /// serializer cannot represent losslessly is rejected here rather than
-    /// at save time. Returns the allocated workbook PivotCache identifier
+    /// at build time. Returns the allocated workbook PivotCache identifier
     /// (`idSx`), unique per writer. Cache contents are stored verbatim and
     /// are never refreshed, contacted, or evaluated.
     pub fn add_pivot_cache(
@@ -397,7 +398,7 @@ impl WorkbookWriter {
     }
 }
 
-impl WorkbookWriter {
+impl Builder {
     pub(super) fn validate_formula_metadata(&self) -> Result<()> {
         if self.sheet_order.len() > usize::from(u16::MAX) - 2 {
             return Err(Error::InvalidFormula(format!(
@@ -468,7 +469,7 @@ impl WorkbookWriter {
     }
 }
 
-impl Default for WorkbookWriter {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

@@ -153,14 +153,14 @@ fn every_format_has_one_answer_for_its_reads() {
             );
         }
 
-        // DOCX, XLSX and PPTX have creators and publishers; XLSB has a publisher.
+        // DOCX, XLSX, XLSB and PPTX have creators and publishers.
         // A format without a read adapter
         // keeps its whole-format refusal as the authoritative answer.
         for verb in [Verb::Save, Verb::Create] {
             let integrated = (format == FileFormat::Docx && cfg!(feature = "docx"))
                 || (format == FileFormat::Xlsx && cfg!(feature = "xlsx"))
                 || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
-                || (format == FileFormat::Xlsb && cfg!(feature = "xlsb") && verb == Verb::Save);
+                || (format == FileFormat::Xlsb && cfg!(feature = "xlsb"));
             let expected = if integrated {
                 Support::Supported
             } else if get.is_supported() {

@@ -21,7 +21,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `2346df7c5afcf5597a4a3caf4cf1ca5467f80d948e93e7f87b8fdf13461921e2` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `30c7ea8d6733ff0cb8973e92505f33e7462bdb0ffd49f362949a098406471a8b` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `6621b7c2cd729580e434e3116927a4fdcb060346a6de3a1e9f0faebd79fc4e4e` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -2739,7 +2739,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | Verb | Element | Context | Reason | Follow-up |
 |---|---|---|---|---|
-| — | — | — | no contextual operation gaps registered | — |
+| `create` | `workbook` | `template` | the XLSB creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLSB template creation |
+| `create` | `workbook` | `strict-conformance` | the XLSB creator emits Transitional packages and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
+| `create` | `workbook` | `initial-metadata` | the XLSB creator refuses initial metadata until typed metadata authoring is integrated | M2 XLSB metadata creation |
 
 ## pptx
 

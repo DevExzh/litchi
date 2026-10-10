@@ -149,7 +149,7 @@ impl Workbook {
     ///
     /// ```
     /// # fn main() -> litchi_xlsb::package::PackageResult<()> {
-    /// let workbook = litchi_xlsb::Package::create()?.into_workbook()?;
+    /// let workbook = litchi_xlsb::Package::new()?.into_workbook()?;
     /// let package = workbook.into_package();
     /// assert_eq!(package.leniency(), litchi_xlsb::Leniency::Strict);
     /// assert!(package.drawings_parsed());

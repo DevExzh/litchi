@@ -423,14 +423,14 @@ mod tests {
     use crate::package::connections::{
         CommandType, Connection, CredentialMethod, DbProperties, Properties, SourceType,
     };
-    use crate::writer::{MutableWorksheet, WorkbookWriter};
+    use crate::writer::{Builder, MutableWorksheet};
     use std::io::Cursor;
 
     fn generated_workbook() -> Workbook {
-        let mut writer = WorkbookWriter::new();
+        let mut writer = Builder::new();
         writer.add_worksheet(MutableWorksheet::new("Sheet1"));
         let mut bytes = Cursor::new(Vec::new());
-        writer.save(&mut bytes).unwrap();
+        writer.build().unwrap().write_to(&mut bytes).unwrap();
         Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
     }
 

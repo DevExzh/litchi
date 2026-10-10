@@ -23,9 +23,7 @@ fn sample_dependencies() -> Dependencies {
 }
 
 fn package_with_payload(payload: Vec<u8>) -> crate::Package {
-    let mut package = crate::Package::create()
-        .expect("generated package")
-        .into_opc();
+    let mut package = crate::Package::new().expect("generated package").into_opc();
     let workbook = package
         .main_document_part()
         .expect("workbook")
@@ -96,7 +94,7 @@ fn sheet_ordinals_bind_to_workbook_bundle_sheet_count() {
 
 #[test]
 fn absent_owner_can_be_created_and_removed_reversibly() {
-    let package = crate::Package::create().expect("package");
+    let package = crate::Package::new().expect("package");
     let before_bytes = package.to_bytes().expect("before bytes");
     assert!(!package.volatile_dependencies().expect("read").is_present());
 
@@ -133,7 +131,7 @@ fn absent_owner_can_be_created_and_removed_reversibly() {
 
 #[test]
 fn foreign_feature_relationship_is_not_treated_as_absence() {
-    let mut opc = crate::Package::create().expect("package").into_opc();
+    let mut opc = crate::Package::new().expect("package").into_opc();
     opc.rels_mut()
         .get_or_add(RELATIONSHIP_TYPE, "/xl/foreign-volatile.bin");
     let package = crate::Package::from_opc(opc).expect("generic package validation");

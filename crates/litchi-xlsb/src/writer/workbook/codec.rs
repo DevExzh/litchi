@@ -7,7 +7,7 @@
 
 //! XLSB workbook stream and record encoding.
 
-use super::model::{SheetSlot, WorkbookWriter};
+use super::model::{Builder, SheetSlot};
 use crate::calc;
 use crate::named_ranges::validate_name;
 use crate::package::error::{Error, Result};
@@ -15,7 +15,7 @@ use crate::package::formula::ParsedFormula;
 use crate::raw::{Writer, kind};
 use std::io::Write;
 
-impl WorkbookWriter {
+impl Builder {
     /// Write workbook-level defined names (BrtName records).
     fn write_named_ranges<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
         for named_range in &self.named_ranges {

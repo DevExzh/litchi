@@ -152,19 +152,15 @@ impl Edit {
     /// # Examples
     ///
     /// ```
-    /// use std::io::Cursor;
-    ///
     /// use litchi_xlsb::Package;
     /// use litchi_xlsb::cell_values::{Reference, Scalar};
-    /// use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+    /// use litchi_xlsb::writer::{MutableWorksheet, Builder};
     ///
     /// let mut sheet = MutableWorksheet::new("Sheet1");
     /// sheet.set_cell(0, 0, 1.0_f64);
-    /// let mut writer = WorkbookWriter::new();
+    /// let mut writer = Builder::new();
     /// writer.add_worksheet(sheet);
-    /// let mut bytes = Cursor::new(Vec::new());
-    /// writer.save(&mut bytes)?;
-    /// let package = Package::from_bytes(bytes.into_inner())?;
+    /// let package = writer.build()?;
     /// let mut edit = package.edit_cell_values(0)?.expect("worksheet");
     /// edit.set_scalar(Reference::new(0, 0)?, Scalar::Number(2.0))?;
     /// let _commit = edit.commit()?;

@@ -73,10 +73,10 @@ fn empty_workbook() -> Workbook {
 }
 
 fn generated_workbook() -> Workbook {
-    let mut writer = crate::writer::WorkbookWriter::new();
+    let mut writer = crate::writer::Builder::new();
     writer.add_worksheet(crate::writer::MutableWorksheet::new("Sheet1"));
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
 }
 
@@ -114,10 +114,14 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
 
 #[test]
 fn workbook_ingress_honors_exact_read_limits() {
-    let mut writer = crate::writer::WorkbookWriter::new();
+    let mut writer = crate::writer::Builder::new();
     writer.add_worksheet(crate::writer::MutableWorksheet::new("Sheet1"));
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("serialize workbook");
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut output)
+        .expect("serialize workbook");
     let bytes = output.into_inner();
     let input_bytes = u64::try_from(bytes.len()).expect("input length fits u64");
     let exact = crate::SourceLimits::builder()

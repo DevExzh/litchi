@@ -22430,10 +22430,10 @@ fn verify_xlsb_corpus(corpus: &Corpus, shape: XlsbShape) -> Result<(), Box<dyn E
 }
 
 fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
-    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+    use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
     let expected = xlsb_expected_cells(shape)?;
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     for sheet in 0..shape.sheet_count() {
         let mut worksheet = MutableWorksheet::new(format!("Sheet{sheet:02}"));
         for row in 0..shape.row_count() {
@@ -22450,7 +22450,7 @@ fn build_xlsb_corpus(shape: XlsbShape) -> Result<Corpus, Box<dyn Error>> {
         writer.add_worksheet(worksheet);
     }
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output)?;
+    writer.build()?.write_to(&mut output)?;
     let archive = output.into_inner();
     let target_payload = xlsb_cell_value(shape, 0, 0, 0)?
         .to_bits()

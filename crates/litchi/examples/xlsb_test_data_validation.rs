@@ -10,13 +10,13 @@
 
 use litchi::sheet::CellValue;
 use litchi::xlsb::data_validation::Validation;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test DV: Creating XLSB with data validation...");
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Validation");
 
     // Create headers
@@ -94,7 +94,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_data_validation.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created xlsb_test_data_validation.xlsb");
     println!("  - Open in Excel and try entering data in rows 2-100");

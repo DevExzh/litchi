@@ -67,7 +67,7 @@ mod publication_tests {
 
     #[test]
     fn failed_candidate_postcondition_leaves_the_workbook_unchanged() {
-        let mut workbook = crate::Package::create()
+        let mut workbook = crate::Package::new()
             .expect("empty package")
             .into_workbook()
             .expect("workbook");

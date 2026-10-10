@@ -10,11 +10,11 @@ use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::Workbook;
 use litchi_xlsb::merged_cells::MergedCell;
 use litchi_xlsb::raw::{Kind, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
 
 fn workbook_bytes(sheets: &[(&str, &[MergedCell])]) -> Vec<u8> {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     for (name, ranges) in sheets {
         let mut sheet = MutableWorksheet::new(*name);
         sheet.set_cell(0, 0, format!("{name} preserved"));
@@ -24,13 +24,17 @@ fn workbook_bytes(sheets: &[(&str, &[MergedCell])]) -> Vec<u8> {
         workbook.add_worksheet(sheet);
     }
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 
 fn save(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.to_package().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

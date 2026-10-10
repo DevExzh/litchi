@@ -120,7 +120,7 @@ fn signed_workbook() -> (Vec<u8>, Workbook) {
 
 fn save(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.to_package().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

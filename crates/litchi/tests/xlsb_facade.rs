@@ -53,7 +53,7 @@ fn mixed_chart_tabs_with_sparkline_bytes() -> Vec<u8> {
 fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
     use xlsb::chart::{Anchor, Chart};
     use xlsb::sparkline::{Color as SparkColor, Colors, Group, Groups, Location, Sparkline};
-    use xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+    use xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -81,7 +81,7 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
         tail.set_sparkline_groups(groups).unwrap();
     }
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(data);
     writer
         .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
@@ -89,30 +89,30 @@ fn mixed_chart_tabs_bytes_with_sparkline(with_sparkline: bool) -> Vec<u8> {
     writer.add_worksheet(tail);
 
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn all_worksheet_bytes() -> Vec<u8> {
-    use xlsb::writer::{MutableWorksheet, WorkbookWriter};
+    use xlsb::writer::{Builder, MutableWorksheet};
 
     let mut first = MutableWorksheet::new("First");
     first.set_cell(0, 0, "FIRST");
     let mut tail = MutableWorksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(first);
     writer.add_worksheet(tail);
 
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn chart_first_tabs_bytes() -> Vec<u8> {
     use xlsb::chart::{Anchor, Chart};
-    use xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+    use xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -126,14 +126,14 @@ fn chart_first_tabs_bytes() -> Vec<u8> {
     let mut data = MutableWorksheet::new("Data");
     data.set_cell(0, 0, "DATA");
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer
         .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
         .unwrap();
     writer.add_worksheet(data);
 
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

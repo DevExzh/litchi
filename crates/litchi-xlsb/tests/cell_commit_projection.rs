@@ -17,7 +17,7 @@ use litchi_core::sheet::WorkbookTrait as _;
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use litchi_xlsb::cell_values::{CellError, Reference, StyleIndex, Value};
 use litchi_xlsb::raw::{Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Leniency, Package, Workbook};
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
@@ -38,10 +38,14 @@ fn numbers_workbook() -> Vec<u8> {
     let mut sheet = MutableWorksheet::new("Numbers");
     sheet.set_cell(0, 0, 1.5);
     sheet.set_cell(0, 1, 2.5);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("write numbers fixture");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("write numbers fixture");
     output.into_inner()
 }
 
@@ -102,7 +106,7 @@ fn cell_value(workbook: &Workbook, reference: Reference) -> Value {
 
 #[test]
 fn changed_cell_commit_projects_to_the_exact_patch_image() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let commit = changed_commit(&source);
     let expected = commit.patch().after().to_vec();
 
@@ -123,7 +127,7 @@ fn changed_cell_commit_projects_to_the_exact_patch_image() {
 
 #[test]
 fn cloned_commit_and_follow_up_edit_do_not_use_a_stale_projection() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let commit = changed_commit(&source);
     let cloned_commit = commit.clone();
     let expected = commit.patch().after().to_vec();
@@ -178,7 +182,7 @@ fn cloned_commit_and_follow_up_edit_do_not_use_a_stale_projection() {
 
 #[test]
 fn no_op_cell_commit_projection_preserves_the_exact_source() {
-    let source = Package::create().expect("source package");
+    let source = Package::new().expect("source package");
     let original = source.to_bytes().expect("source bytes");
     let commit = source
         .edit_cell_values("Sheet1")

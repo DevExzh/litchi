@@ -25,7 +25,7 @@ use litchi_xlsb::shapes::{
     Preset,
 };
 use litchi_xlsb::styles::{Alignment, Fill, Font, HorizontalAlignment, VerticalAlignment};
-use litchi_xlsb::writer::{ChartAnchor, Image, ImageFormat, MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, ChartAnchor, Image, ImageFormat, MutableWorksheet};
 use litchi_xlsb::writer::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ShapeSpec};
 use litchi_xlsb::{Package, Workbook};
 use litchi_xlsb::{Parser, TableColumns, TableDataType, TableReference, TableRowType, Token};
@@ -44,10 +44,14 @@ fn producer_workbook(name: &str, initial_value: Option<&str>) -> Workbook {
     if let Some(value) = initial_value {
         sheet.set_cell(0, 0, value);
     }
-    let mut producer = WorkbookWriter::new();
+    let mut producer = Builder::new();
     producer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
-    producer.save(&mut bytes).expect("producer save");
+    producer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("producer save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("producer reopen")
 }
 
@@ -239,10 +243,14 @@ fn shape_graph_workbook(name: &str) -> Workbook {
         .expect("standalone shape");
     sheet.add_group(group).expect("shape group");
     sheet.add_connection(connection).expect("shape connection");
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("shape graph save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("shape graph save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("shape graph reopen")
 }
 
@@ -280,7 +288,10 @@ fn collect_object_names(object: &ShapeObject, output: &mut Vec<String>) {
 
 fn standard_drawing_xml(workbook: &Workbook) -> Vec<u8> {
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).expect("workbook package save");
+    workbook
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("workbook package save");
     let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
     package
         .opc_package()
@@ -297,7 +308,10 @@ fn standard_drawing_xml(workbook: &Workbook) -> Vec<u8> {
 
 fn standard_drawing_external_hyperlinks(workbook: &Workbook) -> Vec<(String, String)> {
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).expect("workbook package save");
+    workbook
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("workbook package save");
     let package = Package::from_slice(bytes.get_ref()).expect("package reopen");
     let drawing = package
         .opc_package()
@@ -367,7 +381,7 @@ fn formula_dependency_workbook(source_order: bool) -> Workbook {
             array_range: None,
         },
     );
-    let mut producer = WorkbookWriter::new();
+    let mut producer = Builder::new();
     if source_order {
         producer.add_worksheet(data);
         producer.add_worksheet(summary);
@@ -388,7 +402,11 @@ fn formula_dependency_workbook(source_order: bool) -> Workbook {
         );
     }
     let mut bytes = Cursor::new(Vec::new());
-    producer.save(&mut bytes).expect("dependency producer save");
+    producer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("dependency producer save");
     Workbook::new(Cursor::new(bytes.into_inner())).expect("dependency producer reopen")
 }
 
@@ -433,7 +451,10 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
     );
 
     let mut bytes = Cursor::new(Vec::new());
-    target.save(&mut bytes).expect("save transferred workbook");
+    target
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("save transferred workbook");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("consumer reopen");
     assert_eq!(reopened.worksheet_names(), &["Imported".to_string()]);
     assert!(
@@ -570,7 +591,10 @@ fn ordinary_root_authors_sst_rich_style_and_formula_resources() {
     assert_eq!(drawing.images.len(), 1);
     assert_eq!(drawing.images[0].data.as_ref(), GIF_1X1);
     let mut reopened_bytes = Cursor::new(Vec::new());
-    workbook.save(&mut reopened_bytes).expect("save authored");
+    workbook
+        .to_package()
+        .write_to(&mut reopened_bytes)
+        .expect("save authored");
     let reopened =
         Workbook::new(Cursor::new(reopened_bytes.into_inner())).expect("reopen authored");
     assert_eq!(
@@ -759,10 +783,14 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
     );
     let mut source_sheet = MutableWorksheet::new("Source");
     source_sheet.add_chart(chart).expect("source chart");
-    let mut source_writer = WorkbookWriter::new();
+    let mut source_writer = Builder::new();
     source_writer.add_worksheet(source_sheet);
     let mut source_bytes = Cursor::new(Vec::new());
-    source_writer.save(&mut source_bytes).expect("source save");
+    source_writer
+        .build()
+        .expect("build package")
+        .write_to(&mut source_bytes)
+        .expect("source save");
     let source = Workbook::new(Cursor::new(source_bytes.into_inner())).expect("source reopen");
 
     let mut target_sheet = MutableWorksheet::new("Target");
@@ -778,10 +806,14 @@ fn ordinary_chart_graph_transfer_retains_existing_drawing_and_resource_payloads(
             .expect("target description"),
         )
         .expect("add target image");
-    let mut target_writer = WorkbookWriter::new();
+    let mut target_writer = Builder::new();
     target_writer.add_worksheet(target_sheet);
     let mut target_bytes = Cursor::new(Vec::new());
-    target_writer.save(&mut target_bytes).expect("target save");
+    target_writer
+        .build()
+        .expect("build package")
+        .write_to(&mut target_bytes)
+        .expect("target save");
     let mut target = Workbook::new(Cursor::new(target_bytes.into_inner())).expect("target reopen");
     let existing_drawing_xml = standard_drawing_xml(&target);
 
@@ -891,7 +923,8 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
 
     let mut reopened_bytes = Cursor::new(Vec::new());
     target
-        .save(&mut reopened_bytes)
+        .to_package()
+        .write_to(&mut reopened_bytes)
         .expect("save transferred hyperlink workbook");
     let reopened = Workbook::new(Cursor::new(reopened_bytes.into_inner()))
         .expect("full reopen transferred hyperlink workbook");
@@ -995,7 +1028,10 @@ fn checked_in_unique_standard_drawing_corpus_transfers_every_anchor() {
                 let commit = edit.commit().expect("corpus commit");
                 publish_structure_patch(&mut target, commit.patch());
                 let mut bytes = Cursor::new(Vec::new());
-                target.save(&mut bytes).expect("save corpus transfer");
+                target
+                    .to_package()
+                    .write_to(&mut bytes)
+                    .expect("save corpus transfer");
                 let reopened = Workbook::new(Cursor::new(bytes.into_inner()))
                     .expect("full reopen corpus transfer");
                 let reopened_drawing = reopened
@@ -1164,7 +1200,10 @@ fn durable_transfer_remaps_name_sheet_and_table_formula_dependencies() {
         Value::RichString(_)
     ));
     let mut bytes = Cursor::new(Vec::new());
-    target.save(&mut bytes).expect("save dependency target");
+    target
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("save dependency target");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen dependencies");
     assert_eq!(
         reopened
@@ -1220,7 +1259,10 @@ fn third_party_fixture_cell_transfers_with_its_style_dependency_closure() {
             .is_some()
     );
     let mut bytes = Cursor::new(Vec::new());
-    target.save(&mut bytes).expect("save transferred fixture");
+    target
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("save transferred fixture");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen transfer");
     assert!(
         reopened

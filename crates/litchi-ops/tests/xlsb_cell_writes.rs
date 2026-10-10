@@ -24,9 +24,9 @@ const B2: &str = "/sheet[1]/B2";
 const SECOND_A1: &str = "/sheet[2]/A1";
 
 fn fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+    use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     let mut data = MutableWorksheet::new("Data");
     data.set_cell(0, 0, "seed");
     data.set_cell(0, 1, 2.5_f64);
@@ -41,14 +41,18 @@ fn fixture() -> Vec<u8> {
     writer.add_worksheet(archive);
 
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("serialize XLSB fixture");
+    writer
+        .build()
+        .expect("build XLSB fixture")
+        .write_to(&mut output)
+        .expect("serialize XLSB fixture");
     output.into_inner()
 }
 
 fn named_fixture() -> Vec<u8> {
-    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+    use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     let mut data = MutableWorksheet::new("My Data");
     data.set_cell(0, 0, "seed");
     data.set_cell(0, 1, "second");
@@ -57,14 +61,16 @@ fn named_fixture() -> Vec<u8> {
 
     let mut output = Cursor::new(Vec::new());
     writer
-        .save(&mut output)
+        .build()
+        .expect("build named XLSB fixture")
+        .write_to(&mut output)
         .expect("serialize named XLSB fixture");
     output.into_inner()
 }
 
 fn chart_first_fixture() -> Vec<u8> {
     use litchi_xlsb::chart::{Anchor, Chart};
-    use litchi_xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+    use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
     let chart = Chart::bar_chart_with_cache(
         "Sales",
@@ -75,7 +81,7 @@ fn chart_first_fixture() -> Vec<u8> {
         Anchor::new(0, 0, 10, 20),
     )
     .expect("chart fixture");
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer
         .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
         .expect("chart sheet");
@@ -85,7 +91,9 @@ fn chart_first_fixture() -> Vec<u8> {
 
     let mut output = Cursor::new(Vec::new());
     writer
-        .save(&mut output)
+        .build()
+        .expect("build chart-first XLSB fixture")
+        .write_to(&mut output)
         .expect("serialize chart-first XLSB fixture");
     output.into_inner()
 }

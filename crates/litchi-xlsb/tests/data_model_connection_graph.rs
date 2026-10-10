@@ -8,7 +8,7 @@ use std::io::Cursor;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_xlsb::data_model::{Definition, Model, Table};
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Package, Workbook};
 
 const WORKBOOK_PART_NAME: &str = "/xl/workbook.bin";
@@ -45,7 +45,7 @@ fn package_with_connections(names: &[&str]) -> Package {
 
 fn package_with_model_connection(names: &[&str], model_connection: &str) -> Package {
     assert!(!names.is_empty());
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer
         .set_connections(Connections {
@@ -63,7 +63,11 @@ fn package_with_model_connection(names: &[&str], model_connection: &str) -> Pack
         .expect("data model");
 
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
     Package::from_bytes(output.into_inner()).expect("package")
 }
 
@@ -185,7 +189,10 @@ fn add_connections_outbound_relationship(package: &mut OpcPackage) {
 
 fn saved_workbook(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("workbook bytes");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("workbook bytes");
     output.into_inner()
 }
 
@@ -235,7 +242,7 @@ fn model_connection_binding_is_case_insensitive() {
 
 #[test]
 fn case_variant_connection_names_are_rejected_as_ambiguous_owners() {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer
         .set_data_model(Model::from_bytes(definition("alpha"), vec![1, 2, 3, 4]).expect("model"))

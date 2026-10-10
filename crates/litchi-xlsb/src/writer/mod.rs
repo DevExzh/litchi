@@ -15,11 +15,11 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_xlsb::writer::{WorkbookWriter, MutableWorksheet};
+//! use litchi_xlsb::writer::{Builder, MutableWorksheet};
 //! use std::fs::File;
 //!
 //! // Create a new workbook
-//! let mut workbook = WorkbookWriter::new();
+//! let mut workbook = Builder::new();
 //!
 //! // Create a worksheet
 //! let mut sheet = MutableWorksheet::new("Sheet1");
@@ -30,9 +30,10 @@
 //! // Add worksheet to workbook
 //! workbook.add_worksheet(sheet);
 //!
-//! // Save to file
+//! // Build a validated package, then write it to a file.
+//! let package = workbook.build()?;
 //! let file = File::create("output.xlsb")?;
-//! workbook.save(file)?;
+//! package.write_to(file)?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
@@ -88,5 +89,5 @@ pub use chartsheet::MutableChartSheet;
 pub use shape::{ConnectionEndSpec, ConnectionShapeSpec, GroupSpec, ObjectSpec, ShapeSpec};
 pub use shared_strings::MutableSharedStringsWriter;
 pub use styles::{DxfStyle, StylesWriter};
-pub use workbook::WorkbookWriter;
+pub use workbook::Builder;
 pub use worksheet::{CellData, MutableWorksheet, SheetProtection};

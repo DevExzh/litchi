@@ -22,7 +22,7 @@ use litchi_sheet::view::{
 use litchi_sheet::{Cell, Rect};
 use litchi_xlsb::Workbook;
 use litchi_xlsb::raw::{Kind, Records, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -35,13 +35,17 @@ fn fixture(relative: &str) -> PathBuf {
 }
 
 fn workbook_bytes(configure: impl FnOnce(&mut MutableWorksheet)) -> Vec<u8> {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Sheet1");
     sheet.set_cell(0, 0, "views");
     configure(&mut sheet);
     workbook.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .unwrap();
     output.into_inner()
 }
 
@@ -376,7 +380,7 @@ fn untouched_worksheet_stream_round_trips_byte_identical() {
         assert_eq!(worksheet.views().len(), 1);
     }
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.to_package().write_to(&mut output).unwrap();
     let saved = output.into_inner();
 
     for name in [

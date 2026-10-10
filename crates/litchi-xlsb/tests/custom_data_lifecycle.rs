@@ -27,7 +27,7 @@ use litchi_xlsb::custom_data::{
 };
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Kind, Writer, kind as rt};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 const X14: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
 const WORKBOOK_URI: &str = "/xl/workbook.bin";
@@ -188,10 +188,14 @@ fn synthetic_fixture(
     let connections = connections_stream(references, opaque_frt);
     let opaque = b"opaque member source bytes".to_vec();
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("base XLSB package writes");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("base XLSB package writes");
     let base = Package::from_bytes(output.into_inner()).expect("base XLSB package reopens");
     let mut package = base.into_opc();
 

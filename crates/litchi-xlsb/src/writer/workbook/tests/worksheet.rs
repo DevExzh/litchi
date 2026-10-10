@@ -7,7 +7,7 @@
 
 //! Workbook-writer serialization and round-trip tests.
 
-use super::super::WorkbookWriter;
+use super::super::Builder;
 use crate::conditional_formatting::{
     Bar, Bar14, Color, Formatting, IconSet, RecordKind as ConditionalRecordKind, Rule,
     RuleMetadata, RuleType, Scale, Value,
@@ -23,7 +23,7 @@ use std::io::Cursor;
 
 #[test]
 fn row_and_column_formatting_survive_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Layout");
     sheet.set_cell(3, 2, "value");
     sheet.set_column_width(2, 18.25);
@@ -34,7 +34,7 @@ fn row_and_column_formatting_survive_package_roundtrip() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet(0).unwrap();
 
@@ -100,7 +100,7 @@ fn authored_sparkline_groups_reach_the_public_worksheet_model() {
     ])
     .unwrap();
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_named_range(
         Definition::new("SparkData".to_string(), None)
             .with_formula(area3d_formula(0, 0, 2, 0, 0).unwrap()),
@@ -113,7 +113,7 @@ fn authored_sparkline_groups_reach_the_public_worksheet_model() {
     workbook.add_worksheet(MutableWorksheet::new("Plain"));
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(
         reader.worksheet(0).unwrap().sparkline_groups(),
@@ -144,21 +144,19 @@ fn authored_sparkline_external_name_is_explicitly_unsupported_and_atomic() {
         .unwrap(),
     ])
     .unwrap();
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Sheet1");
     sheet.set_sparkline_groups(groups.clone()).unwrap();
     workbook.add_worksheet(sheet);
     let before = format!("{:?}", workbook.worksheets[0]);
     let shared_strings_before = workbook.shared_strings.len();
 
-    let mut output = Cursor::new(Vec::new());
-    let error = workbook.save(&mut output).unwrap_err();
+    let error = workbook.build().unwrap_err();
     assert!(matches!(
         error,
         crate::package::error::Error::UnsupportedFeature(message)
             if message.contains("sparkline PtgNameX")
     ));
-    assert!(output.get_ref().is_empty());
     assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
     assert_eq!(workbook.shared_strings.len(), shared_strings_before);
     assert_eq!(workbook.worksheets[0].sparkline_groups(), Some(&groups));
@@ -176,9 +174,9 @@ fn authored_sparkline_external_name_is_explicitly_unsupported_and_atomic() {
         .set_sparkline_groups(corrected)
         .unwrap();
     let mut first = Cursor::new(Vec::new());
-    workbook.save(&mut first).unwrap();
+    workbook.build().unwrap().write_to(&mut first).unwrap();
     let mut second = Cursor::new(Vec::new());
-    workbook.save(&mut second).unwrap();
+    workbook.build().unwrap().write_to(&mut second).unwrap();
     assert_eq!(first.into_inner(), second.into_inner());
 }
 
@@ -203,22 +201,20 @@ fn sparkline_encoding_limit_failure_is_atomic_and_recoverable() {
     sheet
         .set_sparkline_groups_with_limits(groups.clone(), encode_failure_limits)
         .unwrap();
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(sheet);
     let before = format!("{:?}", workbook.worksheets[0]);
     let shared_strings_before = workbook.shared_strings.len();
 
-    let mut failed = Cursor::new(Vec::new());
-    assert!(workbook.save(&mut failed).is_err());
-    assert!(failed.get_ref().is_empty());
+    assert!(workbook.build().is_err());
     assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
     assert_eq!(workbook.shared_strings.len(), shared_strings_before);
 
     workbook.worksheets[0].set_sparkline_groups(groups).unwrap();
     let mut first = Cursor::new(Vec::new());
-    workbook.save(&mut first).unwrap();
+    workbook.build().unwrap().write_to(&mut first).unwrap();
     let mut second = Cursor::new(Vec::new());
-    workbook.save(&mut second).unwrap();
+    workbook.build().unwrap().write_to(&mut second).unwrap();
     assert_eq!(first.into_inner(), second.into_inner());
 }
 
@@ -237,14 +233,14 @@ fn sparkline_preflight_capacity_overflow_is_typed() {
 
 #[test]
 fn auto_filter_range_survives_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Filtered");
     sheet.set_cell(0, 0, "Header");
     sheet.set_auto_filter(0, 20, 0, 4);
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let auto_filter = reader.worksheet(0).unwrap().auto_filter().unwrap();
     assert_eq!(
@@ -260,7 +256,7 @@ fn auto_filter_range_survives_package_roundtrip() {
 
 #[test]
 fn classic_and_extension_validations_survive_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Validated");
     sheet.set_cell(0, 0, 5);
 
@@ -294,7 +290,7 @@ fn classic_and_extension_validations_survive_package_roundtrip() {
     workbook.add_worksheet(source);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet(0).unwrap();
     assert_eq!(worksheet.data_validations().len(), 2);
@@ -340,7 +336,7 @@ fn classic_and_extension_validations_survive_package_roundtrip() {
 
 #[test]
 fn classic_conditional_formatting_survives_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Formatted");
     sheet.set_cell(0, 0, 5);
     let mut formatting = Formatting::new(vec!["A1:A10 C1:C10".to_string()]);
@@ -386,7 +382,7 @@ fn classic_conditional_formatting_survives_package_roundtrip() {
     workbook.add_worksheet(source);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet(0).unwrap();
     let formatting = &worksheet.conditional_formattings()[0];
@@ -407,7 +403,7 @@ fn classic_conditional_formatting_survives_package_roundtrip() {
 
 #[test]
 fn extension_conditional_formatting_survives_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Formatted");
     sheet.set_cell(0, 0, 5);
     let mut formatting = Formatting::new(vec!["A1:A10".to_string()]);
@@ -437,7 +433,7 @@ fn extension_conditional_formatting_survives_package_roundtrip() {
     workbook.add_worksheet(source);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet(0).unwrap();
     let formatting = &worksheet.conditional_formattings()[0];
@@ -456,7 +452,7 @@ fn extension_conditional_formatting_survives_package_roundtrip() {
 #[test]
 fn extended_data_bar_resolves_its_classic_rule_guid() {
     let guid = [0x7b; 16];
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Formatted");
     sheet.set_cell(0, 0, -5);
 
@@ -498,7 +494,7 @@ fn extended_data_bar_resolves_its_classic_rule_guid() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet(0).unwrap();
     assert_eq!(worksheet.conditional_formattings().len(), 2);
@@ -525,7 +521,7 @@ fn extended_data_bar_resolves_its_classic_rule_guid() {
 
 #[test]
 fn sheet_protection_survives_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Protected");
     sheet.set_cell(0, 0, "locked");
     sheet.set_sheet_protection(Some(SheetProtection {
@@ -538,7 +534,7 @@ fn sheet_protection_survives_package_roundtrip() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let protection = reader.worksheet(0).unwrap().sheet_protection().unwrap();
     assert_eq!(protection.password_hash, Some(0x5A3C));
@@ -553,7 +549,7 @@ fn sheet_protection_survives_package_roundtrip() {
 
 #[test]
 fn sheet_range_formula_survives_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Data Sheet"));
     workbook.add_worksheet(MutableWorksheet::new("Middle"));
     let mut summary = MutableWorksheet::new("Summary");
@@ -572,7 +568,7 @@ fn sheet_range_formula_survives_package_roundtrip() {
     workbook.add_worksheet(summary);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let summary = reader.worksheet_by_index(2).unwrap();
     for col in 0..2 {
@@ -586,7 +582,7 @@ fn sheet_range_formula_survives_package_roundtrip() {
 
 #[test]
 fn contextual_grouped_formulas_survive_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Data"));
     workbook.add_worksheet(MutableWorksheet::new("Middle"));
     workbook.add_named_range(
@@ -613,7 +609,7 @@ fn contextual_grouped_formulas_survive_package_roundtrip() {
     workbook.add_worksheet(summary);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let summary = reader.worksheet_by_index(2).unwrap();
     for col in 0..=1 {
@@ -650,7 +646,7 @@ fn contextual_grouped_formulas_survive_package_roundtrip() {
     }
 
     workbook.get_worksheet_mut(0).unwrap().set_name("Renamed");
-    assert!(workbook.save(Cursor::new(Vec::new())).is_err());
+    assert!(workbook.build().is_err());
 
     let mut invalid = MutableWorksheet::new("Invalid");
     assert!(
@@ -667,7 +663,7 @@ fn contextual_group_setters_defer_until_workbook_context_and_roundtrip() {
     summary.set_shared_formula(1, 0, 1, 0, "Rate").unwrap();
     assert_eq!(summary.formula_groups.len(), 2);
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Data"));
     workbook.add_named_range(
         Definition::new("Rate".to_string(), None)
@@ -676,7 +672,7 @@ fn contextual_group_setters_defer_until_workbook_context_and_roundtrip() {
     workbook.add_worksheet(summary);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet_by_index(1).unwrap();
     for col in 0..=1 {
@@ -702,7 +698,7 @@ fn contextual_group_setters_defer_until_workbook_context_and_roundtrip() {
 
 #[test]
 fn contextual_formula_missing_dependency_is_typed_and_transactional() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Data"));
     let mut summary = MutableWorksheet::new("Summary");
     summary.set_array_formula(0, 0, 0, 0, "Data!A1").unwrap();
@@ -712,13 +708,11 @@ fn contextual_formula_missing_dependency_is_typed_and_transactional() {
     workbook.add_worksheet(summary);
 
     let before = format!("{:?}", workbook.worksheets[1]);
-    let mut output = Cursor::new(Vec::new());
-    let error = workbook.save(&mut output).unwrap_err();
+    let error = workbook.build().unwrap_err();
     assert!(matches!(
         error,
         crate::package::error::Error::UnresolvedDependency(_)
     ));
-    assert!(output.get_ref().is_empty());
     assert_eq!(format!("{:?}", workbook.worksheets[1]), before);
 }
 
@@ -768,7 +762,7 @@ fn formula_group_setters_reject_malformed_and_unsupported_inputs_without_install
 #[test]
 fn malformed_array_formula_ranges_fail_contextual_compilation() {
     for array_range in [None, Some("not-a-range".to_string())] {
-        let mut workbook = WorkbookWriter::new();
+        let mut workbook = Builder::new();
         let mut sheet = MutableWorksheet::new("Sheet1");
         sheet.set_cell(
             0,
@@ -783,21 +777,19 @@ fn malformed_array_formula_ranges_fail_contextual_compilation() {
         workbook.add_worksheet(sheet);
 
         let before = format!("{:?}", workbook.worksheets[0]);
-        let mut output = Cursor::new(Vec::new());
-        let error = workbook.save(&mut output).unwrap_err();
+        let error = workbook.build().unwrap_err();
         assert!(matches!(
             error,
             crate::package::error::Error::InvalidFormula(_)
                 | crate::package::error::Error::InvalidCellReference(_)
         ));
-        assert!(output.get_ref().is_empty());
         assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
     }
 }
 
 #[test]
-fn contextual_formula_dependency_can_be_added_after_failed_save() {
-    let mut workbook = WorkbookWriter::new();
+fn contextual_formula_dependency_can_be_added_after_failed_build() {
+    let mut workbook = Builder::new();
     let mut summary = MutableWorksheet::new("Summary");
     summary
         .set_array_formula(0, 0, 0, 0, "Missing!A1+1")
@@ -808,18 +800,16 @@ fn contextual_formula_dependency_can_be_added_after_failed_save() {
     workbook.add_worksheet(summary);
 
     let before = format!("{:?}", workbook.worksheets[0]);
-    let mut failed = Cursor::new(Vec::new());
-    let error = workbook.save(&mut failed).unwrap_err();
+    let error = workbook.build().unwrap_err();
     assert!(matches!(
         error,
         crate::package::error::Error::UnresolvedDependency(_)
     ));
-    assert!(failed.get_ref().is_empty());
     assert_eq!(format!("{:?}", workbook.worksheets[0]), before);
 
     workbook.add_worksheet(MutableWorksheet::new("Missing"));
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet_by_index(0).unwrap();
     let array = worksheet.cell_value(0, 0).unwrap();
@@ -849,16 +839,16 @@ fn contextual_formula_dependency_can_be_added_after_failed_save() {
 
 #[test]
 fn rejects_ambiguous_formula_metadata_before_writing() {
-    let mut duplicate_sheets = WorkbookWriter::new();
+    let mut duplicate_sheets = Builder::new();
     duplicate_sheets.add_worksheet(MutableWorksheet::new("Data"));
     duplicate_sheets.add_worksheet(MutableWorksheet::new("data"));
-    assert!(duplicate_sheets.save(Cursor::new(Vec::new())).is_err());
+    assert!(duplicate_sheets.build().is_err());
 
-    let mut invalid_sheet = WorkbookWriter::new();
+    let mut invalid_sheet = Builder::new();
     invalid_sheet.add_worksheet(MutableWorksheet::new("Data/2026"));
-    assert!(invalid_sheet.save(Cursor::new(Vec::new())).is_err());
+    assert!(invalid_sheet.build().is_err());
 
-    let mut duplicate_names = WorkbookWriter::new();
+    let mut duplicate_names = Builder::new();
     duplicate_names.add_worksheet(MutableWorksheet::new("Data"));
     duplicate_names.add_named_range(
         Definition::new("Rate".to_string(), None)
@@ -868,12 +858,12 @@ fn rejects_ambiguous_formula_metadata_before_writing() {
         Definition::new("rate".to_string(), None)
             .with_formula(area3d_formula(0, 1, 1, 0, 0).unwrap()),
     );
-    assert!(duplicate_names.save(Cursor::new(Vec::new())).is_err());
+    assert!(duplicate_names.build().is_err());
 }
 
 #[test]
 fn contextual_formula_tokens_are_not_cached_across_saves() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Data"));
     let mut summary = MutableWorksheet::new("Summary");
     summary.set_cell(
@@ -887,15 +877,19 @@ fn contextual_formula_tokens_are_not_cached_across_saves() {
         },
     );
     workbook.add_worksheet(summary);
-    workbook.save(Cursor::new(Vec::new())).unwrap();
+    workbook
+        .build()
+        .unwrap()
+        .write_to(Cursor::new(Vec::new()))
+        .unwrap();
 
     workbook.get_worksheet_mut(0).unwrap().set_name("Renamed");
-    assert!(workbook.save(Cursor::new(Vec::new())).is_err());
+    assert!(workbook.build().is_err());
 }
 
 #[test]
 fn formula_survives_workbook_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Calculations");
     sheet.set_cell(0, 0, 2.0);
     sheet.set_cell(0, 1, 3.0);
@@ -962,7 +956,7 @@ fn formula_survives_workbook_package_roundtrip() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet_by_index(0).unwrap();
     let value = worksheet.cell_value(0, 2).unwrap();
@@ -1017,7 +1011,7 @@ fn formula_survives_workbook_package_roundtrip() {
 
 #[test]
 fn array_and_shared_formulas_survive_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Grouped formulas");
     sheet.set_cell(2, 2, 10.0);
     sheet.set_cell(3, 2, 20.0);
@@ -1038,7 +1032,7 @@ fn array_and_shared_formulas_survive_package_roundtrip() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet_by_index(0).unwrap();
 
@@ -1088,7 +1082,7 @@ fn array_and_shared_formulas_survive_package_roundtrip() {
 
 #[test]
 fn array_constant_survives_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Array constant");
     sheet.set_cell(
         0,
@@ -1103,7 +1097,7 @@ fn array_constant_survives_package_roundtrip() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet_by_index(0).unwrap();
     assert!(matches!(
@@ -1157,11 +1151,11 @@ fn worksheet_charts_round_trip_through_binary_drawing_graphs() {
     let mut summary = MutableWorksheet::new("Summary");
     summary.add_chart(pie).unwrap();
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(sheet);
     workbook.add_worksheet(summary);
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
 
     let drawing = reader.sheet_drawing(0).expect("sheet drawing missing");
@@ -1300,7 +1294,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         Some(true),
     );
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut data = MutableWorksheet::new("Data");
     data.add_chart(worksheet_chart).unwrap();
     workbook.add_worksheet(data);
@@ -1309,7 +1303,7 @@ fn chart_resource_graphs_round_trip_for_worksheets_and_chart_sheets() {
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
 
     let worksheet_chart = &reader.sheet_drawing(0).unwrap().charts[0];
@@ -1476,11 +1470,11 @@ fn worksheet_images_round_trip_with_charts_in_one_drawing_graph() {
     image_only
         .add_image(Image::new(GIF_1X1.to_vec(), ImageFormat::Gif, Anchor::new(0, 0, 2, 3)).unwrap())
         .unwrap();
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(sheet);
     workbook.add_worksheet(image_only);
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
 
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let drawing = reader.sheet_drawing(0).expect("sheet drawing missing");
@@ -1696,10 +1690,10 @@ fn worksheet_shapes_groups_and_connectors_round_trip() {
     sheet.add_shape(standalone).unwrap();
     sheet.add_group(group).unwrap();
     sheet.add_connection(connection).unwrap();
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
 
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let drawing = reader.sheet_drawing(0).expect("shape drawing missing");
@@ -1806,9 +1800,9 @@ fn worksheet_shape_crud_and_save_validation_are_lossless_or_refuse() {
         ))
         .unwrap();
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(sheet);
-    assert!(workbook.save(&mut Cursor::new(Vec::new())).is_err());
+    assert!(workbook.build().is_err());
     let sheet = workbook.get_worksheet_mut(0).unwrap();
     assert_eq!(sheet.shapes().len(), 1);
     assert_eq!(sheet.groups().len(), 1);
@@ -1817,7 +1811,7 @@ fn worksheet_shape_crud_and_save_validation_are_lossless_or_refuse() {
     assert!(sheet.remove_group(4).is_err());
     assert!(sheet.remove_connection(4).is_err());
     sheet.remove_connection(0).unwrap();
-    assert!(workbook.save(&mut Cursor::new(Vec::new())).is_ok());
+    assert!(workbook.build().is_ok());
     let sheet = workbook.get_worksheet_mut(0).unwrap();
     sheet.clear_drawing_shapes();
     assert!(sheet.shapes().is_empty());

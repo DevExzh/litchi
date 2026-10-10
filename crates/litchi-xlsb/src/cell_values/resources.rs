@@ -893,7 +893,7 @@ mod tests {
 
     #[test]
     fn existing_styles_part_without_relationship_is_relinked() {
-        let mut package = crate::Package::create().unwrap().into_opc();
+        let mut package = crate::Package::new().unwrap().into_opc();
         let relationship_type = litchi_opc::constants::relationship_type::STYLES;
         package_without_resource_relationship(&mut package, relationship_type, "styles.bin");
 
@@ -911,7 +911,7 @@ mod tests {
 
     #[test]
     fn existing_shared_strings_part_without_relationship_is_relinked() {
-        let mut package = crate::Package::create().unwrap().into_opc();
+        let mut package = crate::Package::new().unwrap().into_opc();
         let value = SharedString {
             text: "existing".to_string(),
             runs: Vec::new(),

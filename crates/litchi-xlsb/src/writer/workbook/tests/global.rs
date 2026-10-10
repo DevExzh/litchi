@@ -5,7 +5,7 @@
 
 //! Workbook-writer serialization and round-trip tests.
 
-use super::super::WorkbookWriter;
+use super::super::Builder;
 use crate::calc::{Delta, Mode, Opts, Threads};
 use crate::comments::{Record, Run};
 use crate::raw::kind;
@@ -22,7 +22,7 @@ fn external_links_round_trip_with_inert_package_topology() {
         NameFormula, NameFormulaKind, OleItem, SheetRange, ValueMatrix,
     };
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Host"));
     let external_formula = NameFormula::cell_reference(CellReference::new(
         SheetRange::sheets(0, 0).unwrap(),
@@ -92,7 +92,7 @@ fn external_links_round_trip_with_inert_package_topology() {
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     let package = OpcPackage::from_bytes(&bytes).unwrap();
     let workbook_part = package
@@ -327,7 +327,7 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
         )
         .unwrap();
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut data = MutableWorksheet::new("Data");
     data.set_cell(0, 0, 42.0);
     workbook.add_worksheet(data);
@@ -348,7 +348,7 @@ fn chart_sheet_metadata_chart_and_printer_settings_round_trip_in_sheet_order() {
     assert_eq!(workbook.chart_sheet_count(), 1);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     let package = OpcPackage::from_bytes(&bytes).unwrap();
     let reader = crate::Workbook::new(Cursor::new(bytes)).unwrap();
@@ -456,7 +456,7 @@ fn chart_sheet_validation_is_lossless_or_refuse() {
         Anchor::new(0, 0, 5, 5),
     )
     .unwrap();
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Data"));
     workbook
         .add_chart_sheet(MutableChartSheet::new("Chart", chart.clone()))
@@ -484,14 +484,14 @@ fn chart_sheet_validation_is_lossless_or_refuse() {
 
 #[test]
 fn test_set_date_system() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.set_date_system(true);
     assert!(workbook.is_1904);
 }
 
 #[test]
 fn calc_survives_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let properties = workbook.calc_mut();
     properties
         .set_mode(Mode::Manual)
@@ -508,7 +508,7 @@ fn calc_survives_package_roundtrip() {
 
     let expected = workbook.calc().clone();
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(reader.calc(), &expected);
 }
@@ -549,7 +549,7 @@ fn connections_round_trip_through_save_and_read() {
         ],
     };
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
     workbook.set_connections(connections.clone()).unwrap();
     // Validation: zero id, duplicate id, duplicate name (case-insensitive).
@@ -602,7 +602,7 @@ fn connections_round_trip_through_save_and_read() {
     );
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let parsed = reader.connections().expect("connections part missing");
     assert_eq!(parsed, &connections);
@@ -656,7 +656,7 @@ fn structured_tables_round_trip_through_save_and_read() {
         ..Table::default()
     };
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Sheet1");
     sheet.set_cell(0, 0, "Region");
     sheet.set_cell(0, 1, "Amount");
@@ -706,7 +706,7 @@ fn structured_tables_round_trip_through_save_and_read() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let tables = reader.structured_tables();
     assert_eq!(tables.len(), 1);
@@ -718,7 +718,7 @@ fn structured_tables_round_trip_through_save_and_read() {
 
 #[test]
 fn comments_survive_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Notes");
     let mut first = Record::new(2, 3, "Author".to_string(), "formatted note".to_string());
     first.runs = vec![Run {
@@ -736,7 +736,7 @@ fn comments_survive_package_roundtrip() {
     workbook.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = reader.worksheet(0).unwrap();
     assert_eq!(worksheet.comments().len(), 2);

@@ -12,7 +12,7 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
 use litchi_xlsb::data_model::{Definition, Model, ReadLimits, Relationship, Table};
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 const XLDM_PAGE_SIZE: usize = 4096;
 const CRC_SIZE: usize = 4;
@@ -79,14 +79,18 @@ fn connections() -> Connections {
 }
 
 fn package_with_model(definition: Definition, payload: Vec<u8>) -> Package {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer.set_connections(connections()).expect("connections");
     writer
         .set_data_model(Model::from_bytes(definition, payload).expect("model"))
         .expect("set Data Model");
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save");
     Package::from_bytes(output.into_inner()).expect("package")
 }
 

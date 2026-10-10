@@ -1,7 +1,7 @@
 use super::*;
 use crate::package::table::{Column, Range, Table};
 use crate::raw::{Records, Writer, kind};
-use crate::writer::{MutableWorksheet, WorkbookWriter};
+use crate::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
 
 fn binding(column_id: u32) -> ColumnBinding {
@@ -341,10 +341,10 @@ fn ordinary_unmapped_table_does_not_require_map_info() {
             ..Table::default()
         })
         .unwrap();
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(worksheet);
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
     let workbook = crate::Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
     let snapshot = workbook.xml_maps().unwrap();

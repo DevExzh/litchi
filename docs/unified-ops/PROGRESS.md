@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0175 | [XLSB creation and canonical builder](0175-xlsb-creation.md) | Native `Builder::build` / `Package::new` and unified creation; repeated-build SST fix; 1,138 native / 1,197 combined tests/doctests, lint/docs/glossary and consumer checks pass; explicit creation-option gaps; full goal remains open |
 | 0174 | [XLSB publication projection reuse](0174-xlsb-publication-projection.md) | Package-owned cached projection preserves exact admitted output and policies; 1,133 native / 1,194 combined tests/doctests, lint/docs/glossary pass; two after matrices meet measured one-cell 10% threshold, 1k/10k below 2x; full goal remains open |
 | 0173 | [XLSB direct cell resolution](0173-xlsb-direct-cell-resolution.md) | Shared path resolution defers redundant read grids for direct writes; 1,194 combined tests/doctests, lint/docs/minimal/boundaries pass; 12 paired cases exact, large-batch ratios improve, eager small-edit 10% requirement remains open (1.109 set / 1.118 edit); full goal remains open |
 | 0172 | [XLSB scalar cell writes](0172-xlsb-scalar-writes.md) | Native scalar assignment and shared-string closure; unified cells/ranges/queries, coalesced batches, exact no-ops/replay and retained quotas; 1,128 native / 521 XLSB facade tests, 1,190 combined before final guards; paired 1k/10k within 2x, eager one-shot 1.186 remains a performance follow-up; full goal remains open |

@@ -8,7 +8,7 @@
 //! Public-reader regression fixtures for the MS-XLSB sparkline wire format.
 //!
 //! The BIFF12 bytes below are assembled directly from the record layouts and
-//! identifiers in MS-XLSB. They deliberately do not use `WorkbookWriter`, the
+//! identifiers in MS-XLSB. They deliberately do not use `Builder`, the
 //! private sparkline encoder, or the crate's generic BIFF12 writer.
 
 use litchi_opc::constants::relationship_type;

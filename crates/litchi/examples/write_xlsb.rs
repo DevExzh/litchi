@@ -1,8 +1,8 @@
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut wb = WorkbookWriter::new();
+    let mut wb = Builder::new();
 
     // Sheet1: per spec example
     let mut sheet1 = MutableWorksheet::new("Sheet1");
@@ -21,7 +21,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     wb.add_worksheet(MutableWorksheet::new("Sheet3"));
 
     let file = File::create("target/example.xlsb")?;
-    wb.save(file)?;
+    wb.build()?.write_to(file)?;
     println!("Wrote target/example.xlsb");
     Ok(())
 }

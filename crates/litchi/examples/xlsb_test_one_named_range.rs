@@ -4,13 +4,13 @@
 
 use litchi::sheet::CellValue;
 use litchi::xlsb::named_ranges::Definition;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test: ONE named range...");
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Data");
 
     // Simple data
@@ -25,7 +25,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_named_range(test_range);
 
     let file = File::create("xlsb_test_one_named_range.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created xlsb_test_one_named_range.xlsb");
     Ok(())

@@ -41,7 +41,10 @@ fn skipped(bytes: &[u8]) -> Workbook {
 
 fn saved(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("workbook save");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("workbook save");
     output.into_inner()
 }
 

@@ -128,7 +128,7 @@ fn real_fixture_cell_value_commit_is_source_checked_and_length_stable() {
         replacement.to_bits()
     );
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).expect("save");
+    workbook.to_package().write_to(&mut bytes).expect("save");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen");
     assert_eq!(
         reopened
@@ -201,7 +201,7 @@ fn real_fixture_non_real_scalar_or_formula_cache_round_trips() {
     );
 
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).expect("save");
+    workbook.to_package().write_to(&mut bytes).expect("save");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen");
     assert_eq!(
         reopened
@@ -271,7 +271,7 @@ fn real_fixture_style_index_edit_is_contextually_validated() {
     );
 
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).expect("save");
+    workbook.to_package().write_to(&mut bytes).expect("save");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen");
     assert_eq!(
         reopened
@@ -338,7 +338,10 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
     workbook = publish(changed);
 
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).expect("save changed workbook");
+    workbook
+        .to_package()
+        .write_to(&mut bytes)
+        .expect("save changed workbook");
     let mut reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen changed");
     let snapshot = reopened.cell_values(sheet).expect("changed snapshot");
     assert_eq!(
@@ -365,7 +368,8 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
     reopened = publish(removed);
     let mut removed_bytes = Cursor::new(Vec::new());
     reopened
-        .save(&mut removed_bytes)
+        .to_package()
+        .write_to(&mut removed_bytes)
         .expect("save removed workbook");
     let final_workbook =
         Workbook::new(Cursor::new(removed_bytes.into_inner())).expect("final reopen");
@@ -461,7 +465,10 @@ fn real_fixture_exact_noop_publication_saves_byte_identical_output() {
     let sheet = 0;
 
     let mut before = Cursor::new(Vec::new());
-    workbook.save(&mut before).expect("save before");
+    workbook
+        .to_package()
+        .write_to(&mut before)
+        .expect("save before");
     let before = before.into_inner();
     let before_cells: Vec<_> = workbook
         .cell_values(sheet)
@@ -476,7 +483,10 @@ fn real_fixture_exact_noop_publication_saves_byte_identical_output() {
     workbook = publish(commit);
 
     let mut after = Cursor::new(Vec::new());
-    workbook.save(&mut after).expect("save after");
+    workbook
+        .to_package()
+        .write_to(&mut after)
+        .expect("save after");
     assert_eq!(
         after.into_inner(),
         before,
@@ -499,7 +509,10 @@ fn real_fixture_refused_publication_saves_byte_identical_output() {
     let sheet = 0;
 
     let mut before = Cursor::new(Vec::new());
-    workbook.save(&mut before).expect("save before");
+    workbook
+        .to_package()
+        .write_to(&mut before)
+        .expect("save before");
     let before = before.into_inner();
 
     let (_, mut edit) = package_edit(&workbook, sheet);
@@ -512,7 +525,10 @@ fn real_fixture_refused_publication_saves_byte_identical_output() {
     assert!(edit.commit().is_err());
 
     let mut after = Cursor::new(Vec::new());
-    workbook.save(&mut after).expect("save after");
+    workbook
+        .to_package()
+        .write_to(&mut after)
+        .expect("save after");
     assert_eq!(
         after.into_inner(),
         before,

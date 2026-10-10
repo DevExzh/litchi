@@ -4,7 +4,7 @@ use super::semantic::write_pivot_cache_definition;
 use crate::package::error::Error;
 use crate::package::pivot::model::*;
 use crate::package::pivot::parse_pivot_cache_definition;
-use crate::writer::{MutableWorksheet, WorkbookWriter};
+use crate::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
 
 fn field(name: &str) -> PivotCacheField {
@@ -641,7 +641,7 @@ fn written_caches_round_trip_through_the_package() {
         ..PivotCacheDefinition::default()
     };
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
     let first_id = workbook.add_pivot_cache(&first).unwrap();
     let second_id = workbook.add_pivot_cache(&second).unwrap();
@@ -649,7 +649,7 @@ fn written_caches_round_trip_through_the_package() {
     assert_eq!(second_id, 2);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::package::Workbook::new(Cursor::new(output.into_inner())).unwrap();
 
     let definitions = reader.pivot_cache_definitions();
@@ -675,7 +675,7 @@ fn add_pivot_cache_surfaces_serializer_refusals() {
     };
     broken.fields = vec![broken_field];
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
     assert!(matches!(
         workbook.add_pivot_cache(&broken),

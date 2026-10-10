@@ -138,7 +138,7 @@ impl CreateOptions {
 
 /// Create a new package with the default options.
 ///
-/// DOCX, XLSX and PPTX have native-backed unified creators. Other
+/// DOCX, XLSX, XLSB and PPTX have native-backed unified creators. Other
 /// formats return a typed capability or format refusal according to the
 /// features and creators present in this build.
 ///
@@ -155,8 +155,9 @@ pub fn create(format: FileFormat) -> Result<File> {
 ///
 /// The selected creator validates every option before publication.  DOCX
 /// supports ordinary documents, templates, Transitional conformance, and the
-/// core metadata fields its leaf stores.  Strict conformance and metadata
-/// fields outside that core are refused explicitly.
+/// core metadata fields its leaf stores.  XLSX, XLSB and PPTX support ordinary
+/// Transitional documents; template, Strict and initial metadata requests are
+/// refused explicitly by those creators.
 ///
 /// # Errors
 ///
@@ -175,6 +176,11 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
     #[cfg(feature = "pptx")]
     if format == FileFormat::Pptx {
         return crate::format::pptx::create::create(options).map(File::Pptx);
+    }
+
+    #[cfg(feature = "xlsb")]
+    if format == FileFormat::Xlsb {
+        return crate::format::xlsb::create::create(options).map(File::Xlsb);
     }
 
     let _ = options;

@@ -122,7 +122,7 @@ pub struct MutableWorksheet {
     /// Relationship ID allocated for the sheet's Drawings part.
     pub(crate) drawing_rel_id: Option<String>,
     /// Relationship IDs allocated for `tables` by the workbook writer, in
-    /// table order. Populated during `WorkbookWriter::save`.
+    /// table order. Populated during `Builder::build`.
     pub(crate) table_rel_ids: Vec<String>,
 }
 

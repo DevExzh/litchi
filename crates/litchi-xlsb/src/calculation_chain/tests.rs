@@ -30,7 +30,7 @@ fn package_with_chain(bytes: Vec<u8>) -> Package {
 }
 
 fn package_with_chain_at(bytes: Vec<u8>, physical_name: &str, target_ref: &str) -> Package {
-    let mut package = Package::create().expect("base package").into_opc();
+    let mut package = Package::new().expect("base package").into_opc();
     let workbook_name = package
         .main_document_part()
         .expect("workbook")
@@ -662,7 +662,7 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
 
 #[test]
 fn orphan_and_foreign_owner_edges_are_rejected_when_requested() {
-    let mut orphan = Package::create().expect("base package").into_opc();
+    let mut orphan = Package::new().expect("base package").into_opc();
     orphan.add_part(Box::new(BlobPart::new(
         PackURI::new("/xl/orphanCalcChain.bin").expect("URI"),
         CONTENT_TYPE.to_string(),
@@ -671,7 +671,7 @@ fn orphan_and_foreign_owner_edges_are_rejected_when_requested() {
     let orphan = Package::from_opc(orphan).expect("package");
     assert!(orphan.calculation_chain().is_err());
 
-    let mut foreign = Package::create().expect("base package").into_opc();
+    let mut foreign = Package::new().expect("base package").into_opc();
     let workbook_name = foreign
         .main_document_part()
         .expect("workbook")

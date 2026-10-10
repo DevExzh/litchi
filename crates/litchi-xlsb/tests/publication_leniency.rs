@@ -20,7 +20,7 @@ use litchi_xlsb::cell_values::{CellError, Reference, StyleIndex, Value};
 use litchi_xlsb::cell_watches::Watch;
 use litchi_xlsb::raw::{Records, Writer, kind};
 use litchi_xlsb::sparkline::{Color, Colors, Group, Groups, Location, Sparkline, SparklineType};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Leniency, Package, Workbook};
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
@@ -42,10 +42,14 @@ fn numbers_workbook() -> Vec<u8> {
     let mut sheet = MutableWorksheet::new("Numbers");
     sheet.set_cell(0, 0, 1.5);
     sheet.set_cell(0, 1, 2.5);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("write numbers fixture");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("write numbers fixture");
     output.into_inner()
 }
 
@@ -91,7 +95,10 @@ fn tolerant_workbook() -> Workbook {
 
 fn save(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save workbook");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save workbook");
     output.into_inner()
 }
 
@@ -469,7 +476,7 @@ fn failed_tolerant_cell_publication_leaves_source_and_nan_record_untouched() {
 
 #[test]
 fn mutable_structural_application_retains_destination_input_budget() {
-    let source = Package::create().expect("minimal workbook");
+    let source = Package::new().expect("minimal workbook");
     let bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("unbounded-by-input edit");
     edit.rename_sheet(0, "A significantly longer name".to_owned())

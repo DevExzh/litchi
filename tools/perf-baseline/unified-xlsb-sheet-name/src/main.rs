@@ -63,9 +63,9 @@ struct Config {
 }
 
 fn corpus(cell_count: usize) -> Result<Vec<u8>> {
-    use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+    use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     let mut sheet = MutableWorksheet::new(ORIGINAL_NAME);
     for index in 0..cell_count {
         let row = u32::try_from(index / 32)?;
@@ -75,7 +75,7 @@ fn corpus(cell_count: usize) -> Result<Vec<u8>> {
     }
     writer.add_worksheet(sheet);
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output)?;
+    writer.build()?.write_to(&mut output)?;
     Ok(output.into_inner())
 }
 
@@ -507,7 +507,7 @@ fn main() -> Result<()> {
         };
         let corpus_sha256 = sha256(&archive);
         let artifact = json!({
-            "generator": "litchi_xlsb::writer::{WorkbookWriter, MutableWorksheet}; one worksheet; row-major numeric cells",
+            "generator": "litchi_xlsb::writer::{Builder, MutableWorksheet}; one worksheet; row-major numeric cells",
             "cell_count": cell_count,
             "bytes": archive.len(),
             "sha256": corpus_sha256.clone(),

@@ -18,7 +18,7 @@ use litchi_core::{
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{OpcPackage, PackURI, SourceBackedPackage, SourceLimits};
 use litchi_xlsb::chart::{Anchor, Chart};
-use litchi_xlsb::writer::{MutableChartSheet, MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
 use crate::File;
 use crate::error::{Code, Result};
@@ -81,9 +81,13 @@ fn node_json(node: &Node<'_>, options: ViewOptions) -> String {
     String::from_utf8(bytes).expect("node view is UTF-8")
 }
 
-fn save(mut writer: WorkbookWriter) -> Vec<u8> {
+fn save(mut writer: Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("write XLSB fixture");
+    writer
+        .build()
+        .expect("build XLSB fixture")
+        .write_to(&mut output)
+        .expect("write XLSB fixture");
     output.into_inner()
 }
 
@@ -96,7 +100,7 @@ fn sparse_workbook() -> Vec<u8> {
     let mut tail = MutableWorksheet::new("Tail");
     tail.set_cell(0, 0, "tail");
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     writer.add_worksheet(tail);
     save(writer)
@@ -108,7 +112,7 @@ fn unicode_workbook() -> Vec<u8> {
     let mut other = MutableWorksheet::new("Other");
     other.set_cell(0, 0, "other");
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(decomposed);
     writer.add_worksheet(other);
     save(writer)
@@ -122,7 +126,7 @@ fn unicode_ambiguous_workbook() -> Vec<u8> {
     let mut ascii = MutableWorksheet::new("STRASSE");
     ascii.set_cell(0, 0, "ascii");
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sharp_s);
     writer.add_worksheet(ascii);
     save(writer)
@@ -144,7 +148,7 @@ fn chart_workbook() -> Vec<u8> {
     let mut tail = MutableWorksheet::new("Tail");
     tail.set_cell(0, 0, "TAIL");
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(data);
     writer
         .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))

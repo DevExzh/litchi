@@ -10,7 +10,7 @@ use super::model::*;
 use super::parse::parse_connections_part;
 use crate::package::Workbook;
 use crate::raw::{Kind, Writer, kind as rt};
-use crate::writer::{MutableWorksheet, WorkbookWriter};
+use crate::writer::{Builder, MutableWorksheet};
 use litchi_opc::PackURI;
 use std::io::Cursor;
 
@@ -375,10 +375,10 @@ fn rejects_malformed_parts() {
 }
 
 fn generated_workbook() -> Workbook {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     Workbook::new(Cursor::new(bytes.into_inner())).unwrap()
 }
 

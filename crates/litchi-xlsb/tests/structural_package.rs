@@ -10,7 +10,7 @@ use litchi_xlsb::cell_values::structure::Patch;
 
 #[test]
 fn package_edit_commit_apply_and_inverse_are_immutable() {
-    let source = Package::create().expect("source");
+    let source = Package::new().expect("source");
     let original = source.to_bytes().expect("original bytes");
     let mut edit = source.edit().expect("edit");
     edit.rename_sheet(0, "Renamed".to_owned()).expect("rename");
@@ -44,7 +44,7 @@ fn package_edit_commit_apply_and_inverse_are_immutable() {
 
 #[test]
 fn noop_and_failed_edits_keep_the_package_source() {
-    let source = Package::create().expect("source");
+    let source = Package::new().expect("source");
     let original = source.to_bytes().expect("original bytes");
     let noop = source.edit().expect("edit").commit().expect("commit");
     assert!(!noop.diagnostics().changed());
@@ -70,10 +70,7 @@ fn noop_and_failed_edits_keep_the_package_source() {
 
 #[test]
 fn retained_input_budget_is_checked_before_commit_and_allows_bounded_chaining() {
-    let bytes = Package::create()
-        .expect("source")
-        .to_bytes()
-        .expect("bytes");
+    let bytes = Package::new().expect("source").to_bytes().expect("bytes");
     let size = u64::try_from(bytes.len()).expect("size");
     let exact = litchi_opc::SourceLimits::builder()
         .max_input_bytes(size)

@@ -10,13 +10,13 @@
 
 use litchi::sheet::CellValue;
 use litchi::xlsb::conditional_formatting::{Formatting, Rule, RuleType};
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Test CF: Creating XLSB with conditional formatting...");
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let mut sheet = MutableWorksheet::new("Formatting");
 
     // Create headers
@@ -70,7 +70,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(sheet);
 
     let file = File::create("xlsb_test_conditional_formatting.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("✓ Created xlsb_test_conditional_formatting.xlsb");
     println!("  - Open in Excel to verify conditional formatting:");

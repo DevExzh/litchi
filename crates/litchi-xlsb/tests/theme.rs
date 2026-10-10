@@ -19,7 +19,7 @@ use litchi_xlsb::Workbook;
 use litchi_xlsb::theme::{
     Commit as ThemeCommit, Limits as ThemeLimits, Snapshot as ThemeSnapshot, Theme,
 };
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -171,7 +171,10 @@ fn replace_theme_blob(workbook: &mut Workbook, replacement: Vec<u8>) {
 
 fn saved_bytes(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save workbook");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save workbook");
     output.into_inner()
 }
 
@@ -652,14 +655,16 @@ fn theme_image_relationship_is_owned_and_preserved_by_typed_edit() {
 #[test]
 fn writer_custom_theme_is_created_and_round_trips_as_typed_metadata() {
     let custom = custom_theme();
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(MutableWorksheet::new("Sheet1"));
     writer
         .set_theme(custom.clone())
         .expect("validate custom writer theme");
     let mut bytes = Cursor::new(Vec::new());
     writer
-        .save(&mut bytes)
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
         .expect("write custom themed workbook");
 
     let workbook = Workbook::new(Cursor::new(bytes.into_inner())).expect("open custom workbook");

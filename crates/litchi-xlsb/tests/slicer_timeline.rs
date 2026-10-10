@@ -55,7 +55,7 @@ fn package_snapshot(package: &litchi_opc::OpcPackage) -> Package {
 }
 
 fn authored_package() -> litchi_opc::OpcPackage {
-    let source = Package::create().unwrap().into_opc();
+    let source = Package::new().unwrap().into_opc();
     let mut package = litchi_opc::OpcPackage::new();
     for part in source.try_iter_parts() {
         package.add_part(part.unwrap().clone_part());
@@ -193,7 +193,7 @@ fn relocate_workbook(package: &mut litchi_opc::OpcPackage, destination: &PackURI
 
 #[test]
 fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
-    let mut missing = Package::create().unwrap().into_opc();
+    let mut missing = Package::new().unwrap().into_opc();
     let root_id = missing
         .rels()
         .iter()
@@ -208,7 +208,7 @@ fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
     assert!(missing.slicer_caches().is_err());
     assert!(missing.timeline_caches().is_err());
 
-    let mut ambiguous = Package::create().unwrap().into_opc();
+    let mut ambiguous = Package::new().unwrap().into_opc();
     ambiguous
         .rels_mut()
         .try_add_relationship(
@@ -222,7 +222,7 @@ fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
     assert!(ambiguous.slicer_caches().is_err());
     assert!(ambiguous.timeline_caches().is_err());
 
-    let mut alternate = Package::create().unwrap().into_opc();
+    let mut alternate = Package::new().unwrap().into_opc();
     let workbook = PackURI::new("/xl/workbook.bin").unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     litchi_xlsb::slicer::package::store_caches(&mut alternate, &workbook, &[slicer_cache()])
@@ -269,7 +269,7 @@ fn semantic_facades_resolve_one_actual_root_workbook_relationship() {
 
 #[test]
 fn workbook_facade_round_trips_and_removes_both_inert_owners() {
-    let mut workbook = Package::create().unwrap().into_workbook().unwrap();
+    let mut workbook = Package::new().unwrap().into_workbook().unwrap();
     let cache = slicer_cache();
     workbook.set_slicer_caches(vec![cache.clone()]).unwrap();
 
@@ -307,7 +307,7 @@ fn workbook_facade_round_trips_and_removes_both_inert_owners() {
     assert!(workbook.timelines(0).unwrap().is_some());
 
     let mut bytes = Cursor::new(Vec::new());
-    workbook.save(&mut bytes).unwrap();
+    workbook.to_package().write_to(&mut bytes).unwrap();
     let reopened = Package::from_bytes(bytes.into_inner())
         .unwrap()
         .into_workbook()
@@ -329,7 +329,7 @@ fn workbook_facade_round_trips_and_removes_both_inert_owners() {
 
 #[test]
 fn slicer_patch_is_source_checked_reversible_and_dependency_safe() {
-    let mut package = Package::create().unwrap().into_opc();
+    let mut package = Package::new().unwrap().into_opc();
     let snapshot = package_snapshot(&package).slicer_caches().unwrap();
     let mut edit = snapshot.edit().unwrap();
     edit.replace_caches(vec![slicer_cache()]).unwrap();
@@ -376,7 +376,7 @@ fn slicer_patch_is_source_checked_reversible_and_dependency_safe() {
 
 #[test]
 fn timeline_patch_preserves_noop_and_emits_compact_xml() {
-    let mut package = Package::create().unwrap().into_opc();
+    let mut package = Package::new().unwrap().into_opc();
     let before = Package::from_opc(package.clone())
         .unwrap()
         .to_bytes()
@@ -457,7 +457,7 @@ fn timeline_patch_preserves_noop_and_emits_compact_xml() {
 
 #[test]
 fn shared_slicer_targets_are_refused_before_package_mutation() {
-    let mut package = Package::create().unwrap().into_opc();
+    let mut package = Package::new().unwrap().into_opc();
     let workbook = PackURI::new("/xl/workbook.bin").unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     litchi_xlsb::slicer::package::store_caches(&mut package, &workbook, &[slicer_cache()]).unwrap();
@@ -519,7 +519,7 @@ fn shared_slicer_targets_are_refused_before_package_mutation() {
 
 #[test]
 fn shared_timeline_targets_are_refused_before_package_mutation() {
-    let mut package = Package::create().unwrap().into_opc();
+    let mut package = Package::new().unwrap().into_opc();
     let workbook = PackURI::new("/xl/workbook.bin").unwrap();
     let worksheet = PackURI::new("/xl/worksheets/sheet1.bin").unwrap();
     litchi_xlsb::timeline::package::store_caches(&mut package, &workbook, &[timeline_cache()])

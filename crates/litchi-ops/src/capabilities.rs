@@ -735,7 +735,7 @@ impl Capabilities {
     fn creation_support(&self) -> Support {
         if matches!(
             self.format,
-            Some(FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx)
+            Some(FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx | FileFormat::Xlsb)
         ) && self.adapter().is_some()
         {
             Support::Supported
@@ -1067,6 +1067,26 @@ static XLSX_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ),
 ];
 
+/// XLSB creation options not represented by its native minimal creator.
+#[cfg(feature = "xlsb")]
+static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
+    xlsb_creation_gap(
+        "template",
+        "use Flavor::Document; M2 XLSB template creation",
+        "the XLSB creator currently authors ordinary workbooks and refuses template requests",
+    ),
+    xlsb_creation_gap(
+        "strict-conformance",
+        "CreateOptions::conformance(Conformance::Transitional)",
+        "the XLSB creator emits Transitional packages and refuses Strict requests",
+    ),
+    xlsb_creation_gap(
+        "initial-metadata",
+        "M2 XLSB metadata creation",
+        "the XLSB creator refuses initial metadata until typed metadata authoring is integrated",
+    ),
+];
+
 #[cfg(feature = "xlsx")]
 static XLSX_MANAGED_PUBLICATION_GAP: GapSpec = GapSpec {
     subject: Subject::Operation {
@@ -1112,6 +1132,24 @@ const fn encrypted_xlsx_edit_gap(verb: &'static str) -> GapSpec {
 
 #[cfg(feature = "xlsx")]
 const fn xlsx_creation_gap(
+    context: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "workbook",
+            context,
+        },
+        code: Code::UnsupportedCapability,
+        follow_up,
+        reason,
+    }
+}
+
+#[cfg(feature = "xlsb")]
+const fn xlsb_creation_gap(
     context: &'static str,
     follow_up: &'static str,
     reason: &'static str,
@@ -2166,6 +2204,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
         return XLSX_SECURITY_OPTION_GAPS
             .get(index - XLSX_WRITE_GAPS.len())
             .map(Some);
+    }
+    #[cfg(feature = "xlsb")]
+    if adapter == Adapter::Xlsb {
+        return XLSB_CREATION_OPTION_GAPS.get(index).map(Some);
     }
     let _ = (adapter, index);
     None

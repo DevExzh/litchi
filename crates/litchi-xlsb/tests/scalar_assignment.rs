@@ -15,7 +15,7 @@ use litchi_xlsb::Package;
 use litchi_xlsb::cell_values::{Limits, Reference, Scalar, StyleIndex, TransferLimits, Value};
 use litchi_xlsb::formula::ParsedFormula;
 use litchi_xlsb::raw::{Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 fn a1() -> Reference {
     Reference::new(0, 0).expect("A1")
@@ -47,10 +47,14 @@ fn package_with_scalars() -> Package {
     sheet.set_cell(0, 1, true);
     sheet.set_cell(0, 2, "same");
     sheet.set_cell(0, 3, CellValue::Empty);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("write fixture");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("write fixture");
     Package::from_bytes(bytes.into_inner()).expect("read fixture")
 }
 
@@ -59,10 +63,14 @@ fn package_with_grouped_formula() -> Package {
     sheet
         .set_shared_formula(0, 0, 0, 1, "1")
         .expect("formula fixture");
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
-    writer.save(&mut bytes).expect("write formula fixture");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
+        .expect("write formula fixture");
     Package::from_bytes(bytes.into_inner()).expect("read formula fixture")
 }
 
@@ -113,11 +121,13 @@ fn package_with_ordinary_formula() -> Package {
         rgcb: Vec::new(),
     };
     sheet.set_cell_formula_binary(0, 0, CellValue::Float(2.0), formula, false, 0);
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
     writer
-        .save(&mut bytes)
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
         .expect("write ordinary formula fixture");
     Package::from_bytes(bytes.into_inner()).expect("read ordinary formula fixture")
 }
@@ -138,11 +148,13 @@ fn package_with_typed_formula_caches() -> Package {
         false,
         0,
     );
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(sheet);
     let mut bytes = Cursor::new(Vec::new());
     writer
-        .save(&mut bytes)
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
         .expect("write typed formula fixture");
     Package::from_bytes(bytes.into_inner()).expect("read typed formula fixture")
 }

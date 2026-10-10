@@ -11,13 +11,13 @@
 
 use litchi::sheet::CellValue;
 use litchi::xlsb::hyperlinks::Hyperlink;
-use litchi::xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi::xlsb::writer::{Builder, MutableWorksheet};
 use std::fs::File;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating XLSB with an internal hyperlink (Source!A1 -> Target!B2)...");
 
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
 
     // Source sheet with a clickable cell.
     let mut source = MutableWorksheet::new("Source");
@@ -37,7 +37,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     workbook.add_worksheet(target);
 
     let file = File::create("xlsb_test_internal_hyperlinks.xlsb")?;
-    workbook.save(file)?;
+    workbook.build()?.write_to(file)?;
 
     println!("\n[32m✓ Created xlsb_test_internal_hyperlinks.xlsb[0m");
     Ok(())

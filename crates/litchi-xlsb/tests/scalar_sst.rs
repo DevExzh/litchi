@@ -12,7 +12,7 @@ use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_xlsb::Package;
 use litchi_xlsb::cell_values::{Reference, Scalar, Value};
 use litchi_xlsb::raw::{Kind, Records, Writer, kind};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 const SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
 
@@ -33,12 +33,14 @@ fn generated_package() -> Package {
     second.set_cell(0, 0, "keep");
     second.set_cell(0, 1, "later");
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(first);
     writer.add_worksheet(second);
     let mut bytes = Cursor::new(Vec::new());
     writer
-        .save(&mut bytes)
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
         .expect("write shared-string fixture");
     Package::from_bytes(bytes.into_inner()).expect("read shared-string fixture")
 }
@@ -51,12 +53,14 @@ fn generated_unique_package() -> Package {
     let mut second = MutableWorksheet::new("Second");
     second.set_cell(0, 0, "later");
 
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.add_worksheet(first);
     writer.add_worksheet(second);
     let mut bytes = Cursor::new(Vec::new());
     writer
-        .save(&mut bytes)
+        .build()
+        .expect("build package")
+        .write_to(&mut bytes)
         .expect("write unique-string fixture");
     Package::from_bytes(bytes.into_inner()).expect("read unique-string fixture")
 }

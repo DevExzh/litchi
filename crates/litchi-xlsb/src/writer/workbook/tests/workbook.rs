@@ -5,7 +5,7 @@
 
 //! Workbook-writer serialization and round-trip tests.
 
-use super::super::WorkbookWriter;
+use super::super::Builder;
 use crate::named_ranges::{Definition, area3d_formula};
 use crate::writer::MutableWorksheet;
 use litchi_core::sheet::{CellValue, WorkbookTrait};
@@ -13,14 +13,14 @@ use std::io::Cursor;
 
 #[test]
 fn test_create_empty_workbook() {
-    let workbook = WorkbookWriter::new();
+    let workbook = Builder::new();
     assert_eq!(workbook.worksheet_count(), 0);
     assert!(!workbook.is_1904);
 }
 
 #[test]
 fn test_add_worksheet() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let sheet = MutableWorksheet::new("Sheet1");
     workbook.add_worksheet(sheet);
     assert_eq!(workbook.worksheet_count(), 1);
@@ -28,14 +28,14 @@ fn test_add_worksheet() {
 
 #[test]
 fn test_workbook_writer_default() {
-    let workbook: WorkbookWriter = Default::default();
+    let workbook: Builder = Default::default();
     assert_eq!(workbook.worksheet_count(), 0);
     assert!(!workbook.is_1904);
 }
 
 #[test]
 fn test_get_worksheet_mut() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let sheet = MutableWorksheet::new("Sheet1");
     workbook.add_worksheet(sheet);
 
@@ -48,7 +48,7 @@ fn test_get_worksheet_mut() {
 
 #[test]
 fn test_styles_accessor() {
-    let workbook = WorkbookWriter::new();
+    let workbook = Builder::new();
     let styles = workbook.styles();
     // Just verify it returns a reference
     let _ = styles;
@@ -56,7 +56,7 @@ fn test_styles_accessor() {
 
 #[test]
 fn test_styles_mut_accessor() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let styles = workbook.styles_mut();
     // Just verify it returns a mutable reference
     let _ = styles;
@@ -64,7 +64,7 @@ fn test_styles_mut_accessor() {
 
 #[test]
 fn test_add_multiple_worksheets() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
     workbook.add_worksheet(MutableWorksheet::new("Sheet2"));
     workbook.add_worksheet(MutableWorksheet::new("Sheet3"));
@@ -74,7 +74,7 @@ fn test_add_multiple_worksheets() {
 
 #[test]
 fn test_create_app_xml() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Sheet1"));
     workbook.add_worksheet(MutableWorksheet::new("Sheet2"));
 
@@ -86,7 +86,7 @@ fn test_create_app_xml() {
 
 #[test]
 fn test_create_core_xml_is_repeatable_and_does_not_unwind() {
-    let workbook = WorkbookWriter::new();
+    let workbook = Builder::new();
     let first = std::panic::catch_unwind(|| workbook.create_core_xml())
         .expect("deterministic core-property creation must not unwind");
     let second = std::panic::catch_unwind(|| workbook.create_core_xml())
@@ -103,7 +103,7 @@ fn test_create_core_xml_is_repeatable_and_does_not_unwind() {
 
 #[test]
 fn test_create_minimal_theme() {
-    let workbook = WorkbookWriter::new();
+    let workbook = Builder::new();
     let theme = workbook.create_minimal_theme();
 
     assert!(theme.contains("<a:theme"));
@@ -112,7 +112,7 @@ fn test_create_minimal_theme() {
 
 #[test]
 fn test_add_named_range() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     let named_range = Definition::new("TestRange".to_string(), None).with_formula(vec![
         crate::package::formula::ptg_types::PTG_INT,
         1,
@@ -125,7 +125,7 @@ fn test_add_named_range() {
 
 #[test]
 fn defined_name_survives_package_roundtrip() {
-    let mut workbook = WorkbookWriter::new();
+    let mut workbook = Builder::new();
     workbook.add_worksheet(MutableWorksheet::new("Data Sheet"));
     workbook.add_named_range(
         Definition::new("SalesData".to_string(), None)
@@ -155,7 +155,7 @@ fn defined_name_survives_package_roundtrip() {
     workbook.add_worksheet(summary);
 
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).unwrap();
+    workbook.build().unwrap().write_to(&mut output).unwrap();
     let reader = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(reader.defined_names(), &["SalesData"]);
     let summary = reader.worksheet_by_index(1).unwrap();

@@ -19,7 +19,7 @@ use litchi_ooxml_common::spreadsheet_xml_maps::{
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use litchi_xlsb::Workbook;
 use litchi_xlsb::package::table::{Column, Range, Table, Type};
-use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
+use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::xml_maps::{
     CellReference, ColumnBinding, MappedTable, ReadLimits, SingleCellBinding, XPath, XmlDataType,
 };
@@ -799,7 +799,7 @@ fn a_real_change_needs_an_explicit_unsign_and_preserves_untouched_binary_parts()
 
 #[test]
 fn public_writer_authors_both_families_and_reopens_through_the_reader() {
-    let mut writer = WorkbookWriter::new();
+    let mut writer = Builder::new();
     writer.set_xml_maps(semantic_map_info()).unwrap();
 
     let mut sheet = MutableWorksheet::new("Sheet1");
@@ -857,7 +857,11 @@ fn public_writer_authors_both_families_and_reopens_through_the_reader() {
     writer.add_worksheet(sheet);
 
     let mut output = Cursor::new(Vec::new());
-    writer.save(&mut output).expect("save authored XLSB");
+    writer
+        .build()
+        .expect("build package")
+        .write_to(&mut output)
+        .expect("save authored XLSB");
     let reopened = Workbook::new(Cursor::new(output.into_inner())).expect("reopen authored XLSB");
     let snapshot = reopened.xml_maps().expect("read authored XML Maps");
 

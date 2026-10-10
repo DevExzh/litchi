@@ -1700,6 +1700,35 @@
           "name": "is_empty",
           "scope": "litchi_xlsb::cell_values::worksheet::Patch",
           "replacement": "use Patch::is_noop() for exact worksheet-image equality"
+        },
+        {
+          "name": "WorkbookWriter",
+          "scope": "litchi_xlsb",
+          "replacement": "use Builder; build returns Package"
+        },
+        {
+          "name": "create",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use Package::new",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_xlsb::writer::Builder",
+          "replacement": "use Builder::build then Package publication",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_xlsb::writer::Builder",
+          "replacement": "use Builder::build then Package publication",
+          "recursive": false
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_xlsb::writer::Builder",
+          "replacement": "use Builder::build then Package publication",
+          "recursive": false
         }
       ],
       "families": []
@@ -1846,6 +1875,35 @@
           "name": "is_empty",
           "scope": "litchi_xlsb::cell_values::worksheet::Patch",
           "replacement": "use Patch::is_noop() for exact worksheet-image equality"
+        },
+        {
+          "name": "WorkbookWriter",
+          "scope": "litchi_xlsb",
+          "replacement": "use Builder; build returns Package"
+        },
+        {
+          "name": "create",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use Package::new",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_xlsb::writer::Builder",
+          "replacement": "use Builder::build then Package publication",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_xlsb::writer::Builder",
+          "replacement": "use Builder::build then Package publication",
+          "recursive": false
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_xlsb::writer::Builder",
+          "replacement": "use Builder::build then Package publication",
+          "recursive": false
         }
       ],
       "families": []

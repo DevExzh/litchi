@@ -45,7 +45,10 @@ fn theme_bytes(workbook: &Workbook) -> Vec<u8> {
 
 fn saved_bytes(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    workbook.save(&mut output).expect("save XLSB workbook");
+    workbook
+        .to_package()
+        .write_to(&mut output)
+        .expect("save XLSB workbook");
     output.into_inner()
 }
 
