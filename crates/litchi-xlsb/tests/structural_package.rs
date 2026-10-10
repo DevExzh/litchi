@@ -13,7 +13,9 @@ fn package_edit_commit_apply_and_inverse_are_immutable() {
     let source = Package::new().expect("source");
     let original = source.to_bytes().expect("original bytes");
     let mut edit = source.edit().expect("edit");
-    edit.rename_sheet(0, "Renamed".to_owned()).expect("rename");
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let commit = edit.commit().expect("commit");
     assert!(commit.diagnostics().changed());
     assert_eq!(source.to_bytes().expect("unchanged source"), original);
@@ -54,7 +56,7 @@ fn noop_and_failed_edits_keep_the_package_source() {
         original
     );
     let mut edit = source.edit().expect("edit");
-    assert!(edit.rename_sheet(0, "invalid/name".to_owned()).is_err());
+    assert!(edit.set_sheet_name(0, "invalid/name".to_owned()).is_err());
     let commit = edit.commit().expect("failed staging leaves edit unchanged");
     assert!(commit.patch().is_noop());
     assert_eq!(
@@ -80,8 +82,9 @@ fn retained_input_budget_is_checked_before_commit_and_allows_bounded_chaining() 
     let source = Package::from_bytes_with_limits(bytes.clone(), exact).expect("bounded source");
     let original = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
-    edit.rename_sheet(0, "A significantly longer name".to_owned())
-        .expect("stage rename");
+    edit.set_sheet_name(0, "A significantly longer name".to_owned())
+        .expect("stage rename")
+        .expect("resolved worksheet selector");
     assert!(
         edit.commit().is_err(),
         "growth beyond retained input budget must fail before publication"
@@ -105,7 +108,9 @@ fn retained_input_budget_is_checked_before_commit_and_allows_bounded_chaining() 
     let mut package = Package::from_bytes_with_limits(bytes, roomy).expect("bounded source");
     for name in ["A significantly longer name", "Second edit"] {
         let mut edit = package.edit().expect("edit");
-        edit.rename_sheet(0, name.to_owned()).expect("stage rename");
+        edit.set_sheet_name(0, name.to_owned())
+            .expect("stage rename")
+            .expect("resolved worksheet selector");
         let commit = edit.commit().expect("bounded commit");
         let applied = package.apply(commit.patch()).expect("same-policy apply");
         assert_eq!(

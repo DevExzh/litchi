@@ -59,8 +59,9 @@ fn two_operation_patch() -> Patch {
     let source = producer_workbook("Source", Some("transferred value"));
     let target = producer_workbook("Target", None);
     let mut edit = target.to_package().edit().expect("two-operation edit");
-    edit.rename_sheet(0, "Renamed".to_owned())
-        .expect("rename operation");
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("rename operation")
+        .expect("resolved worksheet selector");
     edit.transfer_cell(
         &source,
         0,
@@ -417,8 +418,9 @@ fn producer_reopen_transfers_sst_and_renames_on_a_durable_root() {
     let destination = Reference::new(4, 3).expect("destination");
 
     let mut edit = target.to_package().edit().expect("detached workbook edit");
-    edit.rename_sheet(0, "Imported".to_string())
-        .expect("rename");
+    edit.set_sheet_name(0, "Imported".to_string())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     edit.transfer_cell(
         &source,
         0,
@@ -702,8 +704,9 @@ fn durable_drawing_transfer_closes_connector_graph_and_remaps_collisions() {
 
     let mut rename_edit = target.to_package().edit().expect("rename edit");
     rename_edit
-        .rename_sheet(0, "Transferred graphs".to_string())
-        .expect("rename");
+        .set_sheet_name(0, "Transferred graphs".to_string())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let rename_commit = rename_edit.commit().expect("rename commit");
     let merged = drawing_patch
         .merge_three_way(rename_commit.patch())
@@ -901,8 +904,9 @@ fn genuine_shape_hyperlink_transfer_is_durable_mergeable_and_reversible() {
 
     let mut rename_edit = target.to_package().edit().expect("rename edit");
     rename_edit
-        .rename_sheet(0, "Hyperlinked shape".to_string())
-        .expect("rename");
+        .set_sheet_name(0, "Hyperlinked shape".to_string())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let rename_commit = rename_edit.commit().expect("rename commit");
     let merged = drawing_patch
         .merge_three_way(rename_commit.patch())
@@ -1282,8 +1286,9 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
 
     let mut left_edit = target.to_package().edit().expect("left plan");
     left_edit
-        .rename_sheet(0, "Merged".to_string())
-        .expect("rename");
+        .set_sheet_name(0, "Merged".to_string())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let left_commit = left_edit.commit().expect("left commit");
 
     let mut right_edit = target.to_package().edit().expect("right plan");
@@ -1349,8 +1354,9 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
     assert!(empty.patch().inverse().is_noop());
 
     let mut edit = workbook.to_package().edit().expect("edit");
-    edit.rename_sheet(0, "Original".to_owned())
-        .expect("same name");
+    edit.set_sheet_name(0, "Original".to_owned())
+        .expect("same name")
+        .expect("resolved worksheet selector");
     let same = edit.commit().expect("same-name commit");
     assert_eq!(same.patch().operation_count(), 1);
     assert!(!same.diagnostics().changed());
@@ -1365,7 +1371,9 @@ fn structural_diagnostics_distinguish_images_from_operation_counts() {
     assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
 
     let mut edit = workbook.to_package().edit().expect("edit");
-    edit.rename_sheet(0, "Changed".to_owned()).expect("rename");
+    edit.set_sheet_name(0, "Changed".to_owned())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let changed = edit.commit().expect("changed commit");
     assert!(changed.diagnostics().changed());
     assert!(!changed.patch().is_noop());
@@ -1393,8 +1401,9 @@ fn rename_preserves_tolerated_bundle_sheet_suffix() {
 
     let workbook = workbook_with_bundle_suffix(&producer_workbook("Original", None), SUFFIX);
     let mut edit = workbook.to_package().edit().expect("suffix edit");
-    edit.rename_sheet(0, "Renamed".to_owned())
-        .expect("rename with suffix");
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("rename with suffix")
+        .expect("resolved worksheet selector");
     let commit = edit.commit().expect("rename commit");
     let wire = commit
         .patch()
@@ -1443,8 +1452,9 @@ fn same_tolerated_unpaired_name_is_an_exact_durable_noop() {
     let source_bytes = workbook.to_package().to_bytes().expect("source bytes");
 
     let mut edit = workbook.to_package().edit().expect("no-op edit");
-    edit.rename_sheet(0, "\u{fffd}".to_owned())
-        .expect("same tolerated name");
+    edit.set_sheet_name(0, "\u{fffd}".to_owned())
+        .expect("same tolerated name")
+        .expect("resolved worksheet selector");
     let commit = edit.commit().expect("no-op commit");
     assert!(!commit.diagnostics().changed());
     assert!(commit.patch().is_noop());
@@ -1477,8 +1487,9 @@ fn structural_quotas_return_typed_limit_errors() {
         .to_package()
         .edit_with_limits(limits)
         .expect("limited edit");
-    edit.rename_sheet(0, "Renamed".to_owned())
-        .expect("first operation");
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .expect("first operation")
+        .expect("resolved worksheet selector");
     let error = edit
         .transfer_cell(
             &source,

@@ -32,6 +32,25 @@ fn worksheets(names: &[&str]) -> Package {
     builder.build().expect("worksheet fixture")
 }
 
+fn chart_first_package() -> Package {
+    let chart = Chart::bar_chart_with_cache(
+        "Sales",
+        "Data!$A$1:$A$2",
+        &["North", "South"],
+        "Data!$B$1:$B$2",
+        &[42.0, 55.0],
+        Anchor::new(0, 0, 10, 20),
+    )
+    .expect("chart fixture");
+    let mut builder = Builder::new();
+    builder
+        .add_chart_sheet(MutableChartSheet::new("Chart", chart))
+        .expect("chart sheet fixture");
+    builder.add_worksheet(MutableWorksheet::new("Data"));
+    builder.add_worksheet(MutableWorksheet::new("Tail"));
+    builder.build().expect("chart-first fixture")
+}
+
 fn catalog_states(package: &Package) -> Vec<State> {
     package
         .workbook()
@@ -207,16 +226,25 @@ fn durable_state_wire_round_trips_and_rejects_unknown_tags_and_states() {
 
 #[test]
 fn old_rename_wire_tag_and_worksheet_ordinal_remain_compatible() {
-    let package = worksheets(&["Data", "Tail"]);
+    // The new operation addresses the complete catalog, so the first
+    // worksheet is catalog position 1 after the chart tab. Rewriting only the
+    // tag and payload below exercises the legacy decoder's
+    // worksheet-ordinal path while keeping the payload's checked integer
+    // encoding unchanged.
+    let package = chart_first_package();
     let mut edit = package.edit().expect("edit");
-    edit.rename_sheet(0, "Renamed".to_owned()).expect("rename");
+    edit.set_sheet_name(1, "Renamed".to_owned())
+        .expect("rename")
+        .expect("resolved worksheet selector");
     let commit = edit.commit().expect("rename commit");
-    let wire = commit
+    let mut wire = commit
         .patch()
         .to_bytes(TransferLimits::DEFAULT)
         .expect("durable rename patch");
     let offset = operation_offset(&wire);
-    assert_eq!(wire[offset], 1, "legacy rename tag is retained");
+    assert_eq!(wire[offset], 6, "catalog-position rename tag is emitted");
+    wire[offset] = 1;
+    wire[offset + 1..offset + 9].copy_from_slice(&0_u64.to_le_bytes());
     assert_eq!(
         u64::from_le_bytes(wire[offset + 1..offset + 9].try_into().unwrap()),
         0,
@@ -395,11 +423,17 @@ fn multi_sheet_visibility_preserves_opaque_records_and_exact_inverse() {
 fn grouped_rename_metadata_rejects_duplicate_final_names() {
     let package = worksheets(&["Data", "Tail"]);
     let mut edit = package.edit().expect("edit");
-    edit.rename_sheet(0, "Collision".to_owned())
-        .expect("first rename");
-    edit.rename_sheet(1, "Collision".to_owned())
-        .expect("second staged rename");
-    assert!(edit.commit().is_err());
+    edit.set_sheet_name(0, "Collision".to_owned())
+        .expect("first rename")
+        .expect("resolved worksheet selector");
+    assert!(edit.set_sheet_name(1, "Collision".to_owned()).is_err());
+    let committed = edit
+        .commit()
+        .expect("failed setter leaves prior edit intact");
+    assert_eq!(
+        committed.package().workbook().unwrap().worksheet_names(),
+        &["Collision", "Tail"]
+    );
 }
 
 #[test]
@@ -920,4 +954,92 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
     let mut output = Vec::new();
     package.to_stream(&mut output).expect("serialize OPC");
     output
+}
+
+#[test]
+fn canonical_name_selectors_track_staged_names_and_exact_cancellation() {
+    let package = chart_first_package();
+    let before = package.to_bytes().unwrap();
+    let mut edit = package.edit().unwrap();
+    assert_eq!(
+        edit.set_sheet_name("absent", "Bad/Name".into()).unwrap(),
+        None
+    );
+    assert_eq!(
+        edit.set_sheet_name("chart", "Chart".into()).unwrap(),
+        Some(false)
+    );
+    assert_eq!(
+        edit.set_sheet_name("Chart", "Dashboard".into()).unwrap(),
+        Some(true)
+    );
+    assert_eq!(
+        edit.set_sheet_name("Dashboard", "Other".into()).unwrap(),
+        None
+    );
+    assert_eq!(
+        edit.set_sheet_name(0, "Dashboard".into()).unwrap(),
+        Some(false)
+    );
+    assert!(edit.set_sheet_name(1, "dashboard".into()).is_err());
+    assert_eq!(
+        edit.set_sheet_name("Chart", "Chart".into()).unwrap(),
+        Some(true)
+    );
+    let commit = edit.commit().unwrap();
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().to_bytes().unwrap(), before);
+}
+
+#[test]
+fn every_catalog_kind_supports_name_patch_replay_and_inverse() {
+    let package =
+        Package::from_bytes(with_null_relationship(&every_kind_workbook(), 3, 2)).unwrap();
+    let before = package.to_bytes().unwrap();
+    for position in 0..6 {
+        let mut edit = package.edit().unwrap();
+        assert_eq!(
+            edit.set_sheet_name(position, "Renamed".into()).unwrap(),
+            Some(true)
+        );
+        let commit = edit.commit().unwrap();
+        let wire = commit.patch().to_bytes(TransferLimits::DEFAULT).unwrap();
+        let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+        let replay = package.apply(&patch).unwrap();
+        assert_eq!(
+            replay
+                .workbook()
+                .unwrap()
+                .sheets()
+                .nth(position)
+                .unwrap()
+                .name(),
+            "Renamed"
+        );
+        assert_eq!(
+            replay.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+            before
+        );
+    }
+}
+
+#[test]
+fn legacy_and_canonical_name_patches_share_merge_identity() {
+    let package = chart_first_package();
+    let mut left = package.edit().unwrap();
+    left.set_sheet_name(1, "Left".into()).unwrap();
+    let left = left.commit().unwrap();
+    let mut wire = left.patch().to_bytes(TransferLimits::DEFAULT).unwrap();
+    let offset = operation_offset(&wire);
+    wire[offset] = 1;
+    wire[offset + 1..offset + 9].copy_from_slice(&0_u64.to_le_bytes());
+    let legacy = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+    let canonical = legacy.to_bytes(TransferLimits::DEFAULT).unwrap();
+    assert_eq!(canonical[operation_offset(&canonical)], 6);
+    let mut right = package.edit().unwrap();
+    right.set_sheet_name(1, "Right".into()).unwrap();
+    let right = right.commit().unwrap();
+    let merge = legacy.merge_three_way(right.patch()).unwrap();
+    assert_eq!(merge.conflicts().len(), 1);
+    assert_eq!(merge.conflicts()[0].sheet_index(), 1);
 }

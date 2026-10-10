@@ -215,7 +215,9 @@ fn workbook_structure_changes_are_refused_and_noops_kept() {
 
     let (bytes, mut workbook) = signed_workbook();
     let mut edit = workbook.to_package().edit().unwrap();
-    edit.rename_sheet(0, "Renamed".to_owned()).unwrap();
+    edit.set_sheet_name(0, "Renamed".to_owned())
+        .unwrap()
+        .expect("resolved worksheet selector");
     let error = edit.commit().unwrap_err();
     assert!(matches!(error, PackageError::Signed), "{error:?}");
 
@@ -232,7 +234,10 @@ fn workbook_structure_changes_are_refused_and_noops_kept() {
 
     let name = workbook.worksheet_names()[0].clone();
     let mut same_name = workbook.to_package().edit().unwrap();
-    same_name.rename_sheet(0, name).unwrap();
+    same_name
+        .set_sheet_name(0, name)
+        .unwrap()
+        .expect("resolved worksheet selector");
     let same_name_commit = same_name.commit().unwrap();
     assert!(!same_name_commit.diagnostics().changed());
     assert!(same_name_commit.patch().is_noop());

@@ -9,7 +9,7 @@ and native source owners, and nine ABBA rounds. Three rounds are the minimum.
 The native eager leg edits a prepared `litchi_xlsb::Package`. The native source
 leg starts from a prepared `SourceBackedWorkbook` and includes
 `to_workbook().into_package()` inside every timed edit before calling
-`Package::edit`, `rename_sheet`, and `Commit::into_package`. Each unified leg
+`Package::edit`, `set_sheet_name`, and `Commit::into_package`. Each unified leg
 uses the matching prepared `File`: `SourceMode::Eager` for eager and
 `SourceMode::Auto` for source, then times one `File::set("/sheet[1]", props)`
 call. Opening, corpus generation, target/property preparation, warm-up,
@@ -46,3 +46,6 @@ and the report names each missing or differing member with its byte length and
 SHA-256; a mismatch exits nonzero. The result is scoped measurement evidence,
 not a claim about the complete unified-operations goal. Never commit the
 compiled binary or raw measurement output.
+
+The native call uses the canonical complete-catalog selector API as of record
+0183. Historical route names and JSON rename-call labels remain stable.

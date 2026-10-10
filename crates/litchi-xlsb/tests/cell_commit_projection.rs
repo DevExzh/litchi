@@ -159,8 +159,9 @@ fn cloned_commit_and_follow_up_edit_do_not_use_a_stale_projection() {
     // Sheet1 projection.
     let mut follow_up = cached.edit().expect("follow-up structural edit");
     follow_up
-        .rename_sheet(0, "Renamed".to_owned())
-        .expect("follow-up rename");
+        .set_sheet_name(0, "Renamed".to_owned())
+        .expect("follow-up rename")
+        .expect("resolved worksheet selector");
     let follow_up = follow_up.commit().expect("follow-up commit");
     let follow_up_expected = follow_up.patch().after().to_vec();
     let follow_up_workbook = follow_up

@@ -1091,7 +1091,7 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// a selector accepted by the cell handler, while workbook, sheet, row,
 /// column and other nodes are not removable structural elements.
 #[cfg(feature = "xlsb")]
-static XLSB_WRITE_GAPS: [GapSpec; 7] = [
+static XLSB_WRITE_GAPS: [GapSpec; 6] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "remove",
@@ -1131,16 +1131,6 @@ static XLSB_WRITE_GAPS: [GapSpec; 7] = [
         code: Code::UnsupportedCapability,
         follow_up: "M2 XLSB additional native cell-record families",
         reason: "semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "sheet",
-            context: "non-worksheet-name",
-        },
-        code: Code::UnsupportedType,
-        follow_up: "M2 XLSB complete-tab rename dependency support",
-        reason: "name writes require a worksheet tab; visibility writes address the complete tab catalog",
     },
     GapSpec {
         subject: Subject::Operation {

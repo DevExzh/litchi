@@ -1118,8 +1118,12 @@ It accepts `sheet::Selector` (semantic name or checked `Position`) over the
 complete tab catalog and returns `Result<Option<bool>>`: missing is `None`,
 while `Some` reports the staged state change. The existing `sheet::State`
 vocabulary supplies Visible/Hidden/VeryHidden. No mutable writer escape or
-parallel transaction family is added. Worksheet-only legacy rename selection
-remains a separate pending positional migration.
+parallel transaction family is added. Record 0183 completes name selection with `set_sheet_name(selector, String)`,
+using the same complete catalog and `Result<Option<bool>>` contract. The old
+`rename_sheet` method is removed. Selectors resolve against the immutable source
+catalog; repeated assignments report the staged value, and missing selectors
+stage nothing. Durable tag 1 retains worksheet-ordinal decoding and normalizes
+to catalog-based tag 6 before replay or merge.
 
 ## OPC batch payload replacement (0181)
 

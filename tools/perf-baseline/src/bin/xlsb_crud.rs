@@ -2120,8 +2120,9 @@ mod tests {
         let mut structure_edit = structure.to_package().edit().expect("structure edit");
         let new_name = format!("{}_v3", corpus.worksheet_names[0]);
         structure_edit
-            .rename_sheet(0, new_name)
-            .expect("structure rename");
+            .set_sheet_name(0, new_name)
+            .expect("structure rename")
+            .expect("resolved worksheet selector");
         let structure_commit = structure_edit.commit().expect("structure commit");
         structure = structure
             .to_package()

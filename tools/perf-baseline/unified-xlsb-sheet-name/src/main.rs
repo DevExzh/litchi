@@ -103,7 +103,8 @@ fn native_once(owner: &NativeOwner) -> Result<(litchi_xlsb::Package, NativeStats
     match owner {
         NativeOwner::Eager(base) => {
             let mut edit = base.edit()?;
-            edit.rename_sheet(0, RENAMED_NAME.to_owned())?;
+            edit.set_sheet_name(0, RENAMED_NAME.to_owned())?
+                .ok_or("native sheet selector unexpectedly missing")?;
             let commit = edit.commit()?;
             let changed = commit.diagnostics().changed();
             let package = commit.into_package();
@@ -119,7 +120,8 @@ fn native_once(owner: &NativeOwner) -> Result<(litchi_xlsb::Package, NativeStats
         NativeOwner::Source(base) => {
             let package = base.to_workbook()?.into_package();
             let mut edit = package.edit()?;
-            edit.rename_sheet(0, RENAMED_NAME.to_owned())?;
+            edit.set_sheet_name(0, RENAMED_NAME.to_owned())?
+                .ok_or("native sheet selector unexpectedly missing")?;
             let commit = edit.commit()?;
             let changed = commit.diagnostics().changed();
             let package = commit.into_package();

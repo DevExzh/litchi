@@ -30959,7 +30959,8 @@ fn run_xlsb_workbook_structure_edit_save(
 
         let started = Instant::now();
         let mut edit = package.edit()?;
-        edit.rename_sheet(0, "Renamed".to_owned())?;
+        edit.set_sheet_name(0, "Renamed".to_owned())?
+            .ok_or("native sheet selector unexpectedly missing")?;
         let commit = edit.commit()?;
         let planning_ns = elapsed_ns(started.elapsed())?;
 

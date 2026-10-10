@@ -479,8 +479,9 @@ fn mutable_structural_application_retains_destination_input_budget() {
     let source = Package::new().expect("minimal workbook");
     let bytes = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("unbounded-by-input edit");
-    edit.rename_sheet(0, "A significantly longer name".to_owned())
-        .unwrap();
+    edit.set_sheet_name(0, "A significantly longer name".to_owned())
+        .unwrap()
+        .expect("resolved worksheet selector");
     let commit = edit.commit().expect("default-budget commit");
     assert!(commit.patch().after().len() > bytes.len());
     let limits = litchi_opc::SourceLimits::builder()

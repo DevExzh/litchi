@@ -13,7 +13,7 @@
 //!
 //! let source = Package::new()?;
 //! let mut edit = source.edit()?;
-//! edit.rename_sheet(0, "Renamed".to_owned())?;
+//! edit.set_sheet_name(0, "Renamed".to_owned())?;
 //! let commit = edit.commit()?;
 //! assert!(commit.diagnostics().changed());
 //! assert!(!commit.patch().is_noop());
@@ -90,8 +90,18 @@ impl Default for AuthoredStyle {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum Operation {
+    /// Legacy durable operation: `sheet` is a worksheet-only ordinal.
+    ///
+    /// Tag 1 is retained so patches written before the complete tab catalog
+    /// was exposed remain decodable.  Newly staged edits use
+    /// [`Self::SetSheetName`], which identifies the complete catalog position.
     RenameSheet {
         sheet: usize,
+        name: String,
+    },
+    /// Canonical complete-catalog sheet-name operation.
+    SetSheetName {
+        catalog_position: usize,
         name: String,
     },
     SetSheetState {
@@ -137,7 +147,6 @@ struct SheetTarget {
     name: String,
     kind: Kind,
     state: State,
-    worksheet_position: Option<usize>,
 }
 
 impl ImagePlan {
@@ -180,6 +189,7 @@ impl ImagePlan {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Selection {
     SheetRename(usize),
+    LegacyWorksheetRename(usize),
     SheetState(usize),
     Cell(usize, Reference),
     Drawing(usize),
@@ -188,7 +198,10 @@ enum Selection {
 impl Operation {
     const fn selection(&self) -> Selection {
         match self {
-            Self::RenameSheet { sheet, .. } => Selection::SheetRename(*sheet),
+            Self::RenameSheet { sheet, .. } => Selection::LegacyWorksheetRename(*sheet),
+            Self::SetSheetName {
+                catalog_position, ..
+            } => Selection::SheetRename(*catalog_position),
             Self::SetSheetState {
                 catalog_position, ..
             } => Selection::SheetState(*catalog_position),
@@ -206,6 +219,8 @@ impl Operation {
         match (self, other) {
             (Self::RenameSheet { .. }, Self::SetSheetState { .. })
             | (Self::SetSheetState { .. }, Self::RenameSheet { .. }) => false,
+            (Self::SetSheetName { .. }, Self::SetSheetState { .. })
+            | (Self::SetSheetState { .. }, Self::SetSheetName { .. }) => false,
             _ => self.selection() == other.selection(),
         }
     }
@@ -234,7 +249,6 @@ impl Edit {
                 name: tab.name().to_owned(),
                 kind: tab.kind(),
                 state: tab.state(),
-                worksheet_position: tab.worksheet_position().map(|position| position.get()),
             })
             .collect::<Vec<_>>();
         Ok(Self {
@@ -249,15 +263,78 @@ impl Edit {
         })
     }
 
-    /// Plan a sheet rename without mutating the source workbook.
+    /// Plan a workbook-tab name change without mutating the source workbook.
+    ///
+    /// The selector resolves against this edit's immutable complete tab
+    /// catalog.  A tab renamed earlier in the same edit is therefore still
+    /// selected by its source name (or its source catalog position), and its
+    /// new name is not itself a selector.  Chart, dialog, macro, and unbound
+    /// tabs are addressable because their names are owned by `BrtBundleSh` in
+    /// the workbook part just like worksheet names.
+    ///
+    /// The return value reports whether the selected tab's current staged name
+    /// differs from `name`.  A resolved no-op is retained as one operation so
+    /// it has the same exact-image and durable-patch behavior as the other
+    /// metadata operations.  A missing selector returns `Ok(None)` without
+    /// staging.  The final staged names are checked as one workbook-wide
+    /// namespace using Excel's Unicode-caseless identity rule.
     ///
     /// # Errors
     ///
-    /// Returns an error for an invalid selector, invalid/duplicate name, or a
-    /// transaction that exceeds its finite change policy.
-    pub fn rename_sheet(&mut self, sheet: usize, name: String) -> Result<()> {
-        validate_sheet_name_in_catalog(&self.sheet_catalog, sheet, &name)?;
-        self.stage(Operation::RenameSheet { sheet, name })
+    /// Returns an error for an ambiguous selector, an invalid or duplicate
+    /// name, or a transaction that exceeds its finite change policy.
+    pub fn set_sheet_name<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        name: String,
+    ) -> Result<Option<bool>> {
+        let selector = selector.into();
+        let Some(catalog_position) = resolve_catalog_position(&self.sheet_catalog, &selector)?
+        else {
+            return Ok(None);
+        };
+        let name_index = self
+            .operation_indexes
+            .get(&Selection::SheetRename(catalog_position))
+            .and_then(|indexes| {
+                indexes.iter().copied().find(|index| {
+                    matches!(&self.operations[*index], Operation::SetSheetName { .. })
+                })
+            });
+        let current = name_index.map_or_else(
+            || self.sheet_catalog[catalog_position].name.as_str(),
+            |index| match &self.operations[index] {
+                Operation::SetSheetName { name, .. } => name.as_str(),
+                Operation::RenameSheet { .. }
+                | Operation::SetSheetState { .. }
+                | Operation::TransferCell { .. }
+                | Operation::AddImage { .. }
+                | Operation::TransferDrawing { .. } => {
+                    self.sheet_catalog[catalog_position].name.as_str()
+                },
+            },
+        );
+        let changed = current != name;
+        if changed {
+            validate_sheet_name_value(&name)?;
+            validate_staged_sheet_name(
+                &self.sheet_catalog,
+                &self.operations,
+                &self.operation_indexes,
+                catalog_position,
+                &name,
+            )?;
+        }
+        let operation = Operation::SetSheetName {
+            catalog_position,
+            name,
+        };
+        if let Some(index) = name_index {
+            self.operations[index] = operation;
+        } else {
+            self.stage(operation)?;
+        }
+        Ok(Some(changed))
     }
 
     /// Plan a workbook-tab visibility change using the complete sheet
@@ -317,6 +394,7 @@ impl Edit {
         let current = state_index.map_or(tab.state, |index| match &self.operations[index] {
             Operation::SetSheetState { state, .. } => *state,
             Operation::RenameSheet { .. }
+            | Operation::SetSheetName { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
             | Operation::TransferDrawing { .. } => tab.state,
@@ -1019,11 +1097,18 @@ impl Patch {
         }
         let before = copy_arc(&data[32..before_end], "workbook patch before image")?;
         let after = copy_arc(&data[before_end..after_end], "workbook patch after image")?;
-        let _validated_before = validated_workbook_with_external_link_limits_and_drawing_policy(
+        let validated_before = validated_workbook_with_external_link_limits_and_drawing_policy(
             &before,
             external_link_limits,
             drawing_load_policy,
         )?;
+        // Tag 1 predates the complete tab catalog and stores a worksheet-only
+        // ordinal.  Resolve it against the immutable before image before any
+        // replay or merge identity is computed.  This keeps an old patch's
+        // physical target stable when chart/dialog/macro tabs precede it and
+        // makes old and new encodings select the same merge key.  Re-encoding
+        // the decoded patch uses the canonical tag 6 form.
+        operations = canonicalize_legacy_operations(&validated_before, operations)?;
         let _validated_after = validated_workbook_with_external_link_limits_and_drawing_policy(
             &after,
             external_link_limits,
@@ -1062,7 +1147,9 @@ impl Patch {
                 })?;
         for operation in &self.operations {
             let operation_bytes = match operation {
-                Operation::RenameSheet { name, .. } => 17usize.checked_add(name.len()),
+                Operation::RenameSheet { name, .. } | Operation::SetSheetName { name, .. } => {
+                    17usize.checked_add(name.len())
+                },
                 Operation::SetSheetState { .. } => Some(17),
                 Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
                 Operation::AddImage { image, .. } => {
@@ -1097,6 +1184,7 @@ impl MergeConflict {
     pub const fn sheet_index(&self) -> usize {
         match self.selection {
             Selection::SheetRename(sheet)
+            | Selection::LegacyWorksheetRename(sheet)
             | Selection::SheetState(sheet)
             | Selection::Cell(sheet, _)
             | Selection::Drawing(sheet) => sheet,
@@ -1107,7 +1195,10 @@ impl MergeConflict {
     #[must_use]
     pub const fn cell_reference(&self) -> Option<Reference> {
         match self.selection {
-            Selection::SheetRename(_) | Selection::SheetState(_) | Selection::Drawing(_) => None,
+            Selection::SheetRename(_)
+            | Selection::LegacyWorksheetRename(_)
+            | Selection::SheetState(_)
+            | Selection::Drawing(_) => None,
             Selection::Cell(_, reference) => Some(reference),
         }
     }
@@ -1276,6 +1367,37 @@ fn replay_package(
     Ok((bytes, package))
 }
 
+fn canonicalize_legacy_operations(
+    workbook: &Workbook,
+    operations: Vec<Operation>,
+) -> Result<Vec<Operation>> {
+    let mut canonical = Vec::new();
+    canonical
+        .try_reserve_exact(operations.len())
+        .map_err(|source| Error::Allocation {
+            resource: "canonical workbook patch operations",
+            source,
+        })?;
+    for operation in operations {
+        let operation = match operation {
+            Operation::RenameSheet { sheet, name } => {
+                let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
+                Operation::SetSheetName {
+                    catalog_position,
+                    name,
+                }
+            },
+            operation @ (Operation::SetSheetName { .. }
+            | Operation::SetSheetState { .. }
+            | Operation::TransferCell { .. }
+            | Operation::AddImage { .. }
+            | Operation::TransferDrawing { .. }) => operation,
+        };
+        canonical.push(operation);
+    }
+    Ok(canonical)
+}
+
 fn replay_workbook(
     mut workbook: Workbook,
     before: &[u8],
@@ -1290,14 +1412,18 @@ fn replay_workbook(
     while index < operations.len() {
         if matches!(
             &operations[index],
-            Operation::RenameSheet { .. } | Operation::SetSheetState { .. }
+            Operation::RenameSheet { .. }
+                | Operation::SetSheetName { .. }
+                | Operation::SetSheetState { .. }
         ) {
             let start = index;
             index += 1;
             while index < operations.len()
                 && matches!(
                     &operations[index],
-                    Operation::RenameSheet { .. } | Operation::SetSheetState { .. }
+                    Operation::RenameSheet { .. }
+                        | Operation::SetSheetName { .. }
+                        | Operation::SetSheetState { .. }
                 )
             {
                 index += 1;
@@ -1345,7 +1471,9 @@ fn replay_workbook(
                 )?;
                 changed = true;
             },
-            Operation::RenameSheet { .. } | Operation::SetSheetState { .. } => {
+            Operation::RenameSheet { .. }
+            | Operation::SetSheetName { .. }
+            | Operation::SetSheetState { .. } => {
                 return Err(Error::InvalidFormat(
                     "workbook metadata operation grouping is internally inconsistent".to_string(),
                 ));
@@ -1802,14 +1930,28 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                             .is_some_and(|position| position.get() == *sheet)
                     })
                     .ok_or_else(|| Error::WorksheetNotFound(format!("sheet index {sheet}")))?;
-                validate_sheet_name(workbook, *sheet, name)?;
                 if tab.name() != name {
-                    if names.values().any(|previous| excel_name_eq(previous, name)) {
-                        return Err(Error::InvalidFormat(
-                            "duplicate sheet name in staged metadata changes".to_string(),
-                        ));
-                    }
+                    validate_sheet_name_value(name)?;
+                }
+                if tab.name() != name {
                     names.insert(catalog_position, name.as_str());
+                    changed = true;
+                }
+            },
+            Operation::SetSheetName {
+                catalog_position,
+                name,
+            } => {
+                let tab = tabs.get(*catalog_position).ok_or_else(|| {
+                    Error::WorksheetNotFound(format!("sheet index {catalog_position}"))
+                })?;
+                // A no-op must remain an exact source no-op even when a
+                // leniently opened package retained a malformed authored
+                // name.  Changed names are validated below before any
+                // package payload is touched.
+                if tab.name() != name {
+                    validate_sheet_name_value(name)?;
+                    names.insert(*catalog_position, name.as_str());
                     changed = true;
                 }
             },
@@ -1840,6 +1982,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             },
         }
     }
+    validate_final_sheet_name_changes(&tabs, &names)?;
     if !changed {
         return Ok((false, false));
     }
@@ -2340,10 +2483,7 @@ fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
     Ok(payload)
 }
 
-fn validate_sheet_name(workbook: &Workbook, sheet: usize, name: &str) -> Result<()> {
-    if sheet >= workbook.worksheet_count() {
-        return Err(Error::WorksheetNotFound(format!("sheet index {sheet}")));
-    }
+fn validate_sheet_name_value(name: &str) -> Result<()> {
     let units = name.encode_utf16().count();
     if units == 0
         || units > 31
@@ -2352,43 +2492,78 @@ fn validate_sheet_name(workbook: &Workbook, sheet: usize, name: &str) -> Result<
         || name.ends_with('\'')
     {
         return Err(Error::InvalidFormat(format!("invalid sheet name {name:?}")));
-    }
-    if workbook
-        .worksheet_names()
-        .iter()
-        .enumerate()
-        .any(|(index, existing)| index != sheet && existing.eq_ignore_ascii_case(name))
-    {
-        return Err(Error::InvalidFormat(format!(
-            "duplicate sheet name {name:?}"
-        )));
     }
     Ok(())
 }
 
-fn validate_sheet_name_in_catalog(catalog: &[SheetTarget], sheet: usize, name: &str) -> Result<()> {
-    if !catalog
-        .iter()
-        .any(|tab| tab.worksheet_position == Some(sheet))
-    {
-        return Err(Error::WorksheetNotFound(format!("sheet index {sheet}")));
-    }
-    let units = name.encode_utf16().count();
-    if units == 0
-        || units > 31
-        || name.contains(['\0', '\u{0003}', ':', '\\', '*', '?', '/', '[', ']'])
-        || name.starts_with('\'')
-        || name.ends_with('\'')
-    {
-        return Err(Error::InvalidFormat(format!("invalid sheet name {name:?}")));
-    }
-    if catalog
-        .iter()
-        .any(|tab| tab.worksheet_position != Some(sheet) && excel_name_eq(&tab.name, name))
-    {
-        return Err(Error::InvalidFormat(format!(
-            "duplicate sheet name {name:?}"
+fn validate_staged_sheet_name(
+    catalog: &[SheetTarget],
+    operations: &[Operation],
+    operation_indexes: &BTreeMap<Selection, Vec<usize>>,
+    catalog_position: usize,
+    name: &str,
+) -> Result<()> {
+    if catalog_position >= catalog.len() {
+        return Err(Error::WorksheetNotFound(format!(
+            "sheet index {catalog_position}"
         )));
+    }
+    // Every earlier staged name has already passed this check.  Resolve only
+    // the effective names of the other catalog entries for the new request;
+    // this keeps repeated staging linear in the catalog size instead of
+    // rescanning every earlier operation for every earlier operation.
+    for (right_position, right_tab) in catalog.iter().enumerate() {
+        if right_position == catalog_position {
+            continue;
+        }
+        let right_name = operation_indexes
+            .get(&Selection::SheetRename(right_position))
+            .and_then(|indexes| {
+                indexes
+                    .iter()
+                    .rev()
+                    .find_map(|index| match operations.get(*index) {
+                        Some(Operation::SetSheetName { name, .. }) => Some(name.as_str()),
+                        _ => None,
+                    })
+            })
+            .unwrap_or(right_tab.name.as_str());
+        if excel_name_eq(name, right_name) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate sheet name {name:?}"
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn validate_final_sheet_name_changes(
+    tabs: &[crate::sheet::Tab<'_>],
+    changes: &BTreeMap<usize, &str>,
+) -> Result<()> {
+    for (&left_position, left_name) in changes {
+        if left_position >= tabs.len() {
+            return Err(Error::WorksheetNotFound(format!(
+                "sheet index {left_position}"
+            )));
+        }
+        for (right_position, right_tab) in tabs.iter().enumerate() {
+            if right_position != left_position
+                && !changes.contains_key(&right_position)
+                && excel_name_eq(left_name, right_tab.name())
+            {
+                return Err(Error::InvalidFormat(format!(
+                    "duplicate sheet name {left_name:?}"
+                )));
+            }
+        }
+        if changes.iter().any(|(&right_position, right_name)| {
+            right_position != left_position && excel_name_eq(left_name, right_name)
+        }) {
+            return Err(Error::InvalidFormat(format!(
+                "duplicate sheet name {left_name:?}"
+            )));
+        }
     }
     Ok(())
 }
@@ -2406,8 +2581,7 @@ fn resolve_catalog_position(
             let first = matches.next().map(|(position, _)| position);
             if matches.next().is_some() {
                 return Err(Error::InvalidFormat(
-                    "sheet-state selector name is ambiguous in the complete tab catalog"
-                        .to_string(),
+                    "sheet selector name is ambiguous in the complete tab catalog".to_string(),
                 ));
             }
             Ok(first)
@@ -2480,8 +2654,21 @@ fn copy_arc(bytes: &[u8], resource: &'static str) -> Result<Arc<[u8]>> {
 fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
     match operation {
         Operation::RenameSheet { sheet, name } => {
+            // Tag 1 is retained for wire compatibility with patches
+            // written before complete-catalog selectors.  Current edits do
+            // not construct this variant; decoded instances are canonicalized
+            // to tag 6 before they can be replayed or re-encoded.
             output.push(1);
             push_usize(output, *sheet)?;
+            push_usize(output, name.len())?;
+            output.extend_from_slice(name.as_bytes());
+        },
+        Operation::SetSheetName {
+            catalog_position,
+            name,
+        } => {
+            output.push(6);
+            push_usize(output, *catalog_position)?;
             push_usize(output, name.len())?;
             output.extend_from_slice(name.as_bytes());
         },
@@ -2559,6 +2746,17 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                 .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
                 .to_string();
             Ok(Operation::RenameSheet { sheet, name })
+        },
+        6 => {
+            let catalog_position = read_next_usize(data, offset)?;
+            let length = read_next_usize(data, offset)?;
+            let name = std::str::from_utf8(read_slice(data, offset, length)?)
+                .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
+                .to_string();
+            Ok(Operation::SetSheetName {
+                catalog_position,
+                name,
+            })
         },
         5 => {
             let catalog_position = read_next_usize(data, offset)?;

@@ -1,6 +1,6 @@
-//! Immutable XLSB worksheet-property writes and publication.
+//! Immutable XLSB sheet-property writes and publication.
 //!
-//! The XLSB unified writes admit worksheet names, tab visibility and direct cell scalar
+//! The XLSB unified writes admit sheet names, tab visibility and direct cell scalar
 //! payloads (`value`, `clear: true`, and null clears). Target resolution and
 //! property coercion happen before the native workbook editor is materialized.
 //! The native `Package` transaction remains responsible for exact package
@@ -219,7 +219,6 @@ pub(crate) fn sheet_state_shape(target: &TargetArg<'_>, props: &Props<'_>) -> bo
 #[derive(Clone, Copy)]
 struct SheetTarget {
     tab: usize,
-    worksheet: Option<usize>,
 }
 
 const WRITE_ENTRY_OVERHEAD: usize = 64;
@@ -366,15 +365,7 @@ fn set_sheet_with_limits(
     }
 
     if let Some(name) = assignments.name.as_deref() {
-        let worksheet = positions[0].worksheet.ok_or_else(|| {
-            Error::new(
-                Code::UnsupportedType,
-                "renaming a non-worksheet XLSB tab is unsupported",
-            )
-            .with_format(FileFormat::Xlsb)
-            .with_property("name")
-        })?;
-        validate_sheet_name(file, &[worksheet], name)?;
+        validate_sheet_name(file, &[positions[0].tab], name)?;
     }
 
     if let Some(state) = assignments.state {
@@ -398,11 +389,13 @@ fn set_sheet_with_limits(
     if let Some(name) = assignments.name {
         // A name assignment is restricted to one target above, so cloning the
         // owned value does not multiply authored payload retention.
-        edit.rename_sheet(
-            positions[0].worksheet.expect("worksheet rename admitted"),
-            name,
-        )
-        .map_err(rename_error)?;
+        edit.set_sheet_name(positions[0].tab, name)
+            .map_err(rename_error)?
+            .ok_or_else(|| {
+                Error::new(Code::PathNotFound, "the selected XLSB tab is absent")
+                    .with_format(FileFormat::Xlsb)
+                    .with_property("name")
+            })?;
     }
     if let Some(state) = assignments.state {
         for target in &positions {
@@ -1012,10 +1005,7 @@ fn append_sheet(
     positions
         .try_reserve(1)
         .map_err(|_| allocation("XLSB sheet write targets"))?;
-    positions.push(SheetTarget {
-        tab: position,
-        worksheet: node.worksheet_position(),
-    });
+    positions.push(SheetTarget { tab: position });
     Ok(())
 }
 
@@ -1134,9 +1124,7 @@ fn validate_sheet_name(file: &Xlsb, targets: &[usize], name: &str) -> Result<()>
     if (0..catalog.len())
         .filter_map(|index| catalog.get(index))
         .any(|tab| {
-            let selected = tab
-                .worksheet_position()
-                .is_some_and(|position| targets.contains(&position.get()));
+            let selected = targets.contains(&tab.position().get());
             !selected && caseless_key(tab.name()) == key
         })
     {

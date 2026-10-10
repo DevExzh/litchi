@@ -1934,15 +1934,6 @@
       "subject": "operation",
       "verb": "set",
       "element": "sheet",
-      "context": "non-worksheet-name",
-      "code": "unsupported_type",
-      "followUp": "M2 XLSB complete-tab rename dependency support",
-      "reason": "name writes require a worksheet tab; visibility writes address the complete tab catalog"
-    },
-    {
-      "subject": "operation",
-      "verb": "set",
-      "element": "sheet",
       "context": "unbound-tab-visibility",
       "code": "unsupported_capability",
       "followUp": "bind a physical sheet before revealing an unbound tab",

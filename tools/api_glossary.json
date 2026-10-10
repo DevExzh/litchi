@@ -1729,6 +1729,12 @@
           "scope": "litchi_xlsb::writer::Builder",
           "replacement": "use Builder::build then Package publication",
           "recursive": false
+        },
+        {
+          "name": "rename_sheet",
+          "scope": "litchi_xlsb::cell_values::structure::Edit",
+          "replacement": "use set_sheet_name with a complete-catalog Selector",
+          "recursive": false
         }
       ],
       "families": []
@@ -1903,6 +1909,12 @@
           "name": "write_to",
           "scope": "litchi_xlsb::writer::Builder",
           "replacement": "use Builder::build then Package publication",
+          "recursive": false
+        },
+        {
+          "name": "rename_sheet",
+          "scope": "litchi_xlsb::cell_values::structure::Edit",
+          "replacement": "use set_sheet_name with a complete-catalog Selector",
           "recursive": false
         }
       ],

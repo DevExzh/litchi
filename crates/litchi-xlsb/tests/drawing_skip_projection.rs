@@ -300,8 +300,9 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
     let drawing_before = part_bytes(&source, &drawing_uri);
     let old_name = source.worksheet_names()[0].clone();
     let mut edit = source.to_package().edit().expect("structure edit");
-    edit.rename_sheet(0, format!("{old_name}_patched"))
-        .expect("sheet rename");
+    edit.set_sheet_name(0, format!("{old_name}_patched"))
+        .expect("sheet rename")
+        .expect("resolved worksheet selector");
     let commit = edit.commit().expect("structure commit");
     let durable = commit
         .patch()
@@ -324,8 +325,9 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
         .edit()
         .expect("malformed structure edit");
     malformed_edit
-        .rename_sheet(0, format!("{malformed_name}_patched"))
-        .expect("malformed sheet rename");
+        .set_sheet_name(0, format!("{malformed_name}_patched"))
+        .expect("malformed sheet rename")
+        .expect("resolved worksheet selector");
     let malformed_commit = malformed_edit.commit().expect("malformed structure commit");
     let malformed_durable = malformed_commit
         .patch()
