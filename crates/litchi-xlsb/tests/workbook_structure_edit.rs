@@ -1176,3 +1176,54 @@ fn three_way_history_and_adversarial_envelope_remain_atomic() {
     history.redo(&mut target).expect("redo");
     assert_eq!(target.worksheet_names(), &["Merged".to_string()]);
 }
+
+#[test]
+fn structural_diagnostics_distinguish_images_from_operation_counts() {
+    let mut workbook = producer_workbook("Original", None);
+    let empty = workbook
+        .edit_workbook_structure()
+        .expect("edit")
+        .commit()
+        .expect("commit");
+    assert!(!empty.diagnostics().changed());
+    assert!(empty.patch().is_noop());
+    assert!(empty.patch().inverse().is_noop());
+
+    let mut edit = workbook.edit_workbook_structure().expect("edit");
+    edit.rename_sheet(0, "Original".to_owned())
+        .expect("same name");
+    let same = edit.commit().expect("same-name commit");
+    assert_eq!(same.patch().operation_count(), 1);
+    assert!(!same.diagnostics().changed());
+    assert!(same.patch().is_noop());
+    let wire = same
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("wire");
+    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode");
+    assert!(decoded.is_noop());
+    decoded.apply(&mut workbook).expect("no-op apply");
+    assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
+
+    let mut edit = workbook.edit_workbook_structure().expect("edit");
+    edit.rename_sheet(0, "Changed".to_owned()).expect("rename");
+    let changed = edit.commit().expect("changed commit");
+    assert!(changed.diagnostics().changed());
+    assert!(!changed.patch().is_noop());
+    changed.patch().apply(&mut workbook).expect("apply");
+    assert!(empty.patch().apply(&mut workbook).is_err());
+    assert!(same.patch().apply(&mut workbook).is_err());
+    assert_eq!(workbook.worksheet_names(), &["Changed".to_owned()]);
+    let inverse = changed.patch().inverse();
+    assert_eq!(inverse.operation_count(), 0);
+    assert!(!inverse.is_noop());
+    let wire = inverse
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("inverse wire");
+    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("inverse decode");
+    assert!(!decoded.is_noop());
+    decoded.apply(&mut workbook).expect("inverse apply");
+    assert_eq!(workbook.worksheet_names(), &["Original".to_owned()]);
+    assert_eq!(changed.patch().before(), empty.patch().before());
+    assert_eq!(changed.clone().diagnostics(), changed.diagnostics());
+}

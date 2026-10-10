@@ -21,6 +21,8 @@
 //! let mut edit: Edit = workbook.edit_workbook_structure()?;
 //! edit.rename_sheet(0, "Renamed".to_owned())?;
 //! let commit: Commit = edit.commit()?;
+//! assert!(commit.diagnostics().changed());
+//! assert!(!commit.patch().is_noop());
 //! let wire = commit.patch().to_bytes(TransferLimits::DEFAULT)?;
 //! let patch = Patch::from_bytes(&wire, TransferLimits::DEFAULT)?;
 //! patch.apply(&mut workbook)?;
@@ -505,7 +507,10 @@ impl Edit {
             drawing_load_policy: self.drawing_load_policy,
         };
         let _bounded_encoding = patch.to_bytes(self.limits)?;
-        Ok(Commit { patch })
+        let diagnostics = Diagnostics {
+            changed: !patch.is_noop(),
+        };
+        Ok(Commit { patch, diagnostics })
     }
 
     fn stage(&mut self, operation: Operation) -> Result<()> {
@@ -534,9 +539,33 @@ impl Edit {
 #[derive(Debug, Clone)]
 pub struct Commit {
     patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+/// Content-free summary of a committed structural transaction.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+}
+
+impl Diagnostics {
+    /// Whether the exact canonical package image changed.
+    ///
+    /// A staged operation can leave the image unchanged; an inverse patch can
+    /// change it without retaining forward operations.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
 }
 
 impl Commit {
+    /// Summary computed from the validated package images at commit time.
+    #[must_use]
+    pub const fn diagnostics(&self) -> Diagnostics {
+        self.diagnostics
+    }
+
     /// Exact-source durable patch carried by this commit.
     #[must_use]
     pub const fn patch(&self) -> &Patch {
@@ -555,6 +584,15 @@ pub struct Patch {
 }
 
 impl Patch {
+    /// Whether the canonical before and after package images are identical.
+    ///
+    /// This compares images, not the number of retained forward operations.
+    /// It may inspect all image bytes and does not serialize or reparse them.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
+    }
+
     /// Canonical exact package image required before application.
     #[must_use]
     pub fn before(&self) -> &[u8] {
@@ -584,12 +622,10 @@ impl Patch {
                 "workbook patch source is stale".to_string(),
             ));
         }
-        if self.operations.is_empty() && self.before == self.after {
+        if self.is_noop() {
             return Ok(());
         }
-        if self.before != self.after {
-            crate::signature_policy::ensure_unsigned(&workbook.package)?;
-        }
+        crate::signature_policy::ensure_unsigned(&workbook.package)?;
         let candidate = validated_workbook_with_external_link_limits_and_drawing_policy(
             &self.after,
             workbook.external_link_limits(),
@@ -1078,40 +1114,56 @@ fn replay(
     if operations.is_empty() {
         return Ok(before.to_vec());
     }
+    let mut changed = false;
     for operation in operations {
         match operation {
-            Operation::RenameSheet { sheet, name } => rename_sheet(&mut workbook, *sheet, name)?,
+            Operation::RenameSheet { sheet, name } => {
+                changed |= rename_sheet(&mut workbook, *sheet, name)?;
+            },
             Operation::TransferCell {
                 source,
                 source_sheet,
                 source_reference,
                 target_sheet,
                 target_reference,
-            } => transfer_cell(
-                &mut workbook,
-                source,
-                *source_sheet,
-                *source_reference,
-                *target_sheet,
-                *target_reference,
-            )?,
-            Operation::AddImage { sheet, image } => add_image(&mut workbook, *sheet, image)?,
+            } => {
+                transfer_cell(
+                    &mut workbook,
+                    source,
+                    *source_sheet,
+                    *source_reference,
+                    *target_sheet,
+                    *target_reference,
+                )?;
+                changed = true;
+            },
+            Operation::AddImage { sheet, image } => {
+                add_image(&mut workbook, *sheet, image)?;
+                changed = true;
+            },
             Operation::TransferDrawing {
                 source,
                 source_sheet,
                 source_anchor,
                 target_sheet,
-            } => super::drawing_transfer::transfer(
-                &mut workbook,
-                source,
-                *source_sheet,
-                *source_anchor,
-                *target_sheet,
-            )?,
+            } => {
+                super::drawing_transfer::transfer(
+                    &mut workbook,
+                    source,
+                    *source_sheet,
+                    *source_anchor,
+                    *target_sheet,
+                )?;
+                changed = true;
+            },
         }
     }
     validate_all_worksheets(&workbook)?;
-    workbook_bytes(&workbook)
+    if changed {
+        workbook_bytes(&workbook)
+    } else {
+        Ok(before.to_vec())
+    }
 }
 
 fn author_style(workbook: &mut Workbook, style: &AuthoredStyle) -> Result<super::StyleIndex> {
@@ -1518,7 +1570,7 @@ fn transfer_cell(
     Ok(())
 }
 
-fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<()> {
+fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<bool> {
     validate_sheet_name(workbook, sheet, name)?;
     let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
     let uri = workbook.package.main_document_part()?.partname().clone();
@@ -1543,14 +1595,14 @@ fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<()>
         return Err(Error::WorksheetNotFound(format!("sheet index {sheet}")));
     }
     if output == source {
-        return Ok(());
+        return Ok(false);
     }
     crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let mut package = workbook.package.clone();
     package.get_part_mut(&uri)?.set_blob(output);
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
-    Ok(())
+    Ok(true)
 }
 
 fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {

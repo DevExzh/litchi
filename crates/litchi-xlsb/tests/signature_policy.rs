@@ -194,6 +194,8 @@ fn explicit_unsign_authorizes_a_changed_edit() {
 
 #[test]
 fn workbook_structure_changes_are_refused_and_noops_kept() {
+    use litchi_core::sheet::traits::WorkbookTrait as _;
+
     let (bytes, mut workbook) = signed_workbook();
     let mut edit = workbook.edit_workbook_structure().unwrap();
     edit.rename_sheet(0, "Renamed".to_owned()).unwrap();
@@ -205,7 +207,22 @@ fn workbook_structure_changes_are_refused_and_noops_kept() {
         .unwrap()
         .commit()
         .unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     workbook.apply_workbook_structure(&commit).unwrap();
+    assert_eq!(save(&workbook), bytes);
+
+    let name = workbook.worksheet_names()[0].clone();
+    let mut same_name = workbook.edit_workbook_structure().unwrap();
+    same_name.rename_sheet(0, name).unwrap();
+    let same_name_commit = same_name.commit().unwrap();
+    assert!(!same_name_commit.diagnostics().changed());
+    assert!(same_name_commit.patch().is_noop());
+    assert_eq!(same_name_commit.patch().operation_count(), 1);
+    workbook
+        .apply_workbook_structure(&same_name_commit)
+        .unwrap();
+    assert!(workbook.is_signed());
     assert_eq!(save(&workbook), bytes);
 }
 
