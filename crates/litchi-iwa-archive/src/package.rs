@@ -1586,15 +1586,21 @@ impl CatalogStorageRequirements {
             retained_bytes: self
                 .retained_bytes
                 .checked_add(other.retained_bytes)
-                .ok_or_else(|| Error::InvalidBundle("catalog retained bytes overflow".to_owned()))?,
+                .ok_or_else(|| {
+                    Error::InvalidBundle("catalog retained bytes overflow".to_owned())
+                })?,
             traversal_bytes: self
                 .traversal_bytes
                 .checked_add(other.traversal_bytes)
-                .ok_or_else(|| Error::InvalidBundle("catalog traversal bytes overflow".to_owned()))?,
+                .ok_or_else(|| {
+                    Error::InvalidBundle("catalog traversal bytes overflow".to_owned())
+                })?,
             allocations: self
                 .allocations
                 .checked_add(other.allocations)
-                .ok_or_else(|| Error::InvalidBundle("catalog allocation count overflow".to_owned()))?,
+                .ok_or_else(|| {
+                    Error::InvalidBundle("catalog allocation count overflow".to_owned())
+                })?,
         })
     }
 
@@ -1992,8 +1998,8 @@ impl Catalog {
             (entries, semantic_profile.is_none(), None)
         } else if let Some(index_name) = nested_name {
             let prefix: Box<[u8]> = legacy_raw_outer_prefix(&archive, &index_name)?.into();
-            physical_storage = physical_storage
-                .add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
+            physical_storage =
+                physical_storage.add_owned(prefix.len(), usize::from(!prefix.is_empty()))?;
             let (entries, nested_storage) = if semantic_profile.is_some() {
                 collect_semantic_legacy(
                     &archive,
@@ -5195,16 +5201,14 @@ fn collect_legacy(
             Error::InvalidBundle(format!("legacy package index: {error}"))
         }
     })?;
-    let storage = index
-        .storage_requirements()?
-        .add_owned(
-            index_source
-                .as_ref()
-                .len()
-                .checked_add(usize::from(index_is_deflated))
-                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
-            2,
-        )?;
+    let storage = index.storage_requirements()?.add_owned(
+        index_source
+            .as_ref()
+            .len()
+            .checked_add(usize::from(index_is_deflated))
+            .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+        2,
+    )?;
 
     let mut entries = Vec::new();
     let mut seen = HashSet::new();
@@ -5289,16 +5293,14 @@ fn collect_semantic_legacy(
             Error::InvalidBundle(format!("legacy package index: {error}"))
         }
     })?;
-    let storage = index
-        .storage_requirements()?
-        .add_owned(
-            index_source
-                .as_ref()
-                .len()
-                .checked_add(usize::from(index_is_deflated))
-                .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
-            2,
-        )?;
+    let storage = index.storage_requirements()?.add_owned(
+        index_source
+            .as_ref()
+            .len()
+            .checked_add(usize::from(index_is_deflated))
+            .ok_or_else(|| Error::InvalidBundle("legacy index storage overflow".to_owned()))?,
+        2,
+    )?;
 
     preflight_semantic_iwa_entries(&index, true)?;
 
@@ -5374,9 +5376,8 @@ fn entry_collection_storage(
         )
         .and_then(|bytes| bytes.checked_mul(2))
         .and_then(|bytes| {
-            seen.iter().try_fold(bytes, |total, name| {
-                total.checked_add(name.capacity())
-            })
+            seen.iter()
+                .try_fold(bytes, |total, name| total.checked_add(name.capacity()))
         })
         .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
     let entry_slack = entries_capacity
@@ -5384,11 +5385,7 @@ fn entry_collection_storage(
         .and_then(|bytes| bytes.checked_mul(size_of::<Entry>()))
         .ok_or_else(|| Error::InvalidBundle("entry census overflow".to_owned()))?;
     let allocations = usize::from(seen.capacity() != 0)
-        .checked_add(
-            seen.iter()
-                .filter(|name| name.capacity() != 0)
-                .count(),
-        )
+        .checked_add(seen.iter().filter(|name| name.capacity() != 0).count())
         .and_then(|value| value.checked_add(usize::from(entry_slack != 0)))
         .ok_or_else(|| Error::InvalidBundle("entry allocation census overflow".to_owned()))?;
     let retained = seen_bytes

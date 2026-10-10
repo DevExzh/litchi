@@ -204,6 +204,21 @@ impl BindingTracker {
         }
     }
 
+    /// Create a resolver seeded with already bounded inherited declarations.
+    /// Local scopes may shadow these bindings; popping them restores this base.
+    ///
+    /// # Errors
+    /// Rejects invalid reserved namespace bindings, as `push` does.
+    pub fn with_bindings<'a>(
+        bindings: impl IntoIterator<Item = (PrefixDeclaration<'a>, &'a [u8])>,
+    ) -> Result<Self, BindingTrackerError> {
+        let mut tracker = Self::new();
+        for (prefix, uri) in bindings {
+            tracker.add(prefix, uri)?;
+        }
+        Ok(tracker)
+    }
+
     /// Count work for the tests' operation bounds; nothing outside tests.
     #[inline]
     #[cfg_attr(not(test), expect(clippy::unused_self, reason = "test-only counter"))]
@@ -736,6 +751,38 @@ mod tests {
     use super::*;
     use quick_xml::events::Event;
     use quick_xml::reader::Reader;
+
+    #[test]
+    fn inherited_bindings_survive_local_scope_pop() {
+        let mut tracker = BindingTracker::with_bindings([
+            (PrefixDeclaration::Default, b"urn:default".as_slice()),
+            (PrefixDeclaration::Named(b"w"), b"urn:word".as_slice()),
+        ])
+        .unwrap();
+        let element = BytesStart::from_content("r xmlns='' xmlns:w='urn:other'", 1);
+        tracker.push(&element).unwrap();
+        assert_eq!(tracker.resolve_prefix_bytes(None), ResolveResult::Unbound);
+        assert_eq!(
+            tracker.resolve_prefix_bytes(Some(b"w")),
+            ResolveResult::Bound(Namespace(b"urn:other"))
+        );
+        tracker.pop();
+        assert_eq!(
+            tracker.resolve_prefix_bytes(None),
+            ResolveResult::Bound(Namespace(b"urn:default"))
+        );
+        assert_eq!(
+            tracker.resolve_prefix_bytes(Some(b"w")),
+            ResolveResult::Bound(Namespace(b"urn:word"))
+        );
+        assert!(
+            BindingTracker::with_bindings([(
+                PrefixDeclaration::Named(b"xml"),
+                b"urn:bad".as_slice()
+            )])
+            .is_err()
+        );
+    }
 
     fn push_root(xml: &str) -> Result<(), BindingTrackerError> {
         let mut reader = Reader::from_str(xml);

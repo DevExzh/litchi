@@ -181,9 +181,7 @@ impl Column {
         let bytes = reference.as_bytes();
         let start = usize::from(bytes.first() == Some(&b'$'));
         if start == bytes.len() || !bytes[start..].iter().all(u8::is_ascii_alphabetic) {
-            return Err(CoordinateError::ColumnA1 {
-                reference: reference.into(),
-            });
+            return Err(CoordinateError::ColumnA1);
         }
         let mut column = 0u32;
         for byte in &bytes[start..] {
@@ -192,21 +190,13 @@ impl Column {
                 .and_then(|value| {
                     value.checked_add(u32::from(byte.to_ascii_uppercase() - b'A' + 1))
                 })
-                .ok_or_else(|| CoordinateError::ColumnA1 {
-                    reference: reference.into(),
-                })?;
+                .ok_or(CoordinateError::ColumnA1)?;
         }
-        let zero_based = column
-            .checked_sub(1)
-            .ok_or_else(|| CoordinateError::ColumnA1 {
-                reference: reference.into(),
-            })?;
+        let zero_based = column.checked_sub(1).ok_or(CoordinateError::ColumnA1)?;
         if zero_based < COLUMNS {
             Ok(Self(zero_based))
         } else {
-            Err(CoordinateError::ColumnA1 {
-                reference: reference.into(),
-            })
+            Err(CoordinateError::ColumnA1)
         }
     }
 
@@ -371,9 +361,7 @@ impl Cell {
             index += 1;
         }
         if index == column_start {
-            return Err(CoordinateError::A1 {
-                reference: reference.into(),
-            });
+            return Err(CoordinateError::A1);
         }
         let mut column = 0u32;
         for byte in &bytes[column_start..index] {
@@ -382,9 +370,7 @@ impl Cell {
                 .and_then(|value| {
                     value.checked_add(u32::from(byte.to_ascii_uppercase() - b'A' + 1))
                 })
-                .ok_or_else(|| CoordinateError::A1 {
-                    reference: reference.into(),
-                })?;
+                .ok_or(CoordinateError::A1)?;
         }
         if bytes.get(index) == Some(&b'$') {
             index += 1;
@@ -394,21 +380,15 @@ impl Cell {
             index += 1;
         }
         if index == row_start || index != bytes.len() {
-            return Err(CoordinateError::A1 {
-                reference: reference.into(),
-            });
+            return Err(CoordinateError::A1);
         }
         let row = reference[row_start..]
             .parse::<u32>()
             .ok()
             .filter(|row| (1..=ROWS).contains(row))
-            .ok_or_else(|| CoordinateError::A1 {
-                reference: reference.into(),
-            })?;
+            .ok_or(CoordinateError::A1)?;
         if !(1..=COLUMNS).contains(&column) {
-            return Err(CoordinateError::A1 {
-                reference: reference.into(),
-            });
+            return Err(CoordinateError::A1);
         }
         Self::at(row - 1, column - 1)
     }
@@ -619,20 +599,11 @@ impl Rect {
         let (first, last) = reference.split_once(':').unwrap_or((reference, reference));
         if last.contains(':') {
             return Err(RangeError::A1 {
-                reference: reference.into(),
-                source: CoordinateError::A1 {
-                    reference: reference.into(),
-                },
+                source: CoordinateError::A1,
             });
         }
-        let first_cell = Cell::from_a1(first).map_err(|source| RangeError::A1 {
-            reference: reference.into(),
-            source,
-        })?;
-        let last_cell = Cell::from_a1(last).map_err(|source| RangeError::A1 {
-            reference: reference.into(),
-            source,
-        })?;
+        let first_cell = Cell::from_a1(first).map_err(|source| RangeError::A1 { source })?;
+        let last_cell = Cell::from_a1(last).map_err(|source| RangeError::A1 { source })?;
         Self::new(
             first_cell,
             last_cell.row.get() + 1,
@@ -822,11 +793,11 @@ pub enum CoordinateError {
     #[error("column {value} is outside the zero-based spreadsheet grid 0..{COLUMNS}")]
     Column { value: u32 },
     /// The string is not one bounded A1 column label.
-    #[error("invalid or out-of-grid A1 column label '{reference}'")]
-    ColumnA1 { reference: String },
+    #[error("invalid or out-of-grid A1 column label")]
+    ColumnA1,
     /// The string is not one bounded A1 cell reference.
-    #[error("invalid or out-of-grid A1 cell reference '{reference}'")]
-    A1 { reference: String },
+    #[error("invalid or out-of-grid A1 cell reference")]
+    A1,
 }
 
 /// Invalid half-open rectangle.
@@ -837,9 +808,8 @@ pub enum RangeError {
     #[error("invalid range start: {0}")]
     Start(CoordinateError),
     /// The string is not one bounded A1 cell or rectangular range.
-    #[error("invalid A1 range '{reference}': {source}")]
+    #[error("invalid A1 range: {source}")]
     A1 {
-        reference: String,
         #[source]
         source: CoordinateError,
     },
@@ -868,6 +838,31 @@ mod tests {
     )]
 
     use super::*;
+
+    #[test]
+    fn invalid_reference_errors_retain_no_authored_input() {
+        let secret = "private-sheet-content!A1";
+        let column = Column::from_a1(secret).unwrap_err();
+        let cell = Cell::from_a1(secret).unwrap_err();
+        let range = Rect::from_a1(secret).unwrap_err();
+        let errors: [&dyn std::error::Error; 3] = [&column, &cell, &range];
+        for error in errors {
+            assert!(!error.to_string().contains(secret));
+            assert!(!format!("{error:?}").contains(secret));
+            if let Some(source) = error.source() {
+                assert!(!source.to_string().contains(secret));
+                assert!(!format!("{source:?}").contains(secret));
+            }
+        }
+        assert_eq!(column, CoordinateError::ColumnA1);
+        assert_eq!(cell, CoordinateError::A1);
+        assert_eq!(
+            range,
+            RangeError::A1 {
+                source: CoordinateError::A1
+            }
+        );
+    }
 
     #[test]
     fn coordinates_make_out_of_grid_cells_unrepresentable() {

@@ -161,6 +161,16 @@ impl OwnedSource {
     pub fn as_slice(&self) -> &[u8] {
         self.bytes.as_slice()
     }
+
+    /// Return another owner of the immutable source allocation.
+    ///
+    /// This is used by adapters that move an already indexed owned source
+    /// into a second package representation.  Cloning the handle does not
+    /// copy the source bytes or reopen the archive.
+    #[must_use]
+    pub fn shared_bytes(&self) -> Arc<Vec<u8>> {
+        Arc::clone(&self.bytes)
+    }
 }
 
 impl From<Vec<u8>> for OwnedSource {

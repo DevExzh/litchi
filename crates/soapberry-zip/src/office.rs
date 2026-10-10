@@ -785,15 +785,11 @@ fn archive_reader_storage_requirements(
     };
     let mut add_map = |capacity: usize, entry_bytes: usize| -> Result<(), Error> {
         let bytes = capacity
-            .checked_mul(
-                entry_bytes
-                    .checked_add(map_slot_overhead)
-                    .ok_or_else(|| {
-                        Error::from(ErrorKind::InvalidInput {
-                            msg: "archive reader map census overflows usize".to_string(),
-                        })
-                    })?,
-            )
+            .checked_mul(entry_bytes.checked_add(map_slot_overhead).ok_or_else(|| {
+                Error::from(ErrorKind::InvalidInput {
+                    msg: "archive reader map census overflows usize".to_string(),
+                })
+            })?)
             .and_then(|bytes| bytes.checked_mul(2))
             .ok_or_else(|| {
                 Error::from(ErrorKind::InvalidInput {

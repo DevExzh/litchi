@@ -5,8 +5,8 @@ use soapberry_zip::{ZipArchive as RawZipArchive, ZipFileHeaderRecord};
 
 use crate::catalog::DirectoryIndexReport;
 use crate::catalog::{Component, parse_component};
-use crate::{Error, Limits, Result};
 use crate::package::CatalogStorageRequirements;
+use crate::{Error, Limits, Result};
 
 pub(crate) const ZIP_CENTRAL_FIXED_METADATA_BYTES: u64 = 46;
 
@@ -274,7 +274,9 @@ impl<'data> ZipArchive<'data> {
                         .count(),
                     )
                 })
-                .ok_or_else(|| Error::InvalidBundle("physical ZIP allocation overflow".to_owned()))?;
+                .ok_or_else(|| {
+                    Error::InvalidBundle("physical ZIP allocation overflow".to_owned())
+                })?;
         }
 
         Ok(CatalogStorageRequirements::from_parts(
