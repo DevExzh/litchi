@@ -137,8 +137,12 @@ fn animations_xml(effects: &[(u32, Effect)]) -> Result<String, Box<dyn StdError>
 
 fn sections_xml() -> Result<String, Box<dyn StdError>> {
     let mut sections = SectionList::new();
-    sections.add_section(Section::new("Section 1", "section-1").with_slides([256]));
-    sections.add_section(Section::new("Section 2", "section-2").with_slides([257]));
+    sections.add_section(
+        Section::new("Section 1", "{00000000-0000-4000-8000-000000000001}").with_slides([256]),
+    );
+    sections.add_section(
+        Section::new("Section 2", "{00000000-0000-4000-8000-000000000002}").with_slides([257]),
+    );
     Ok(sections.to_xml()?)
 }
 
@@ -168,9 +172,9 @@ fn write_case(
     body: &str,
     slide_count: usize,
 ) -> Result<(), Box<dyn StdError>> {
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation: &mut MutablePresentation = package.presentation_mut()?;
+        let presentation: &mut MutablePresentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         for index in 1..=slide_count {
             let slide = presentation.add_slide()?;
@@ -183,6 +187,7 @@ fn write_case(
             slide.add_text_box(body, X, Y, WIDTH, HEIGHT);
         }
     }
+    let mut package = builder.build()?;
     package.save(path)?;
     let reopened = Package::open(path)?;
     assert_eq!(reopened.presentation()?.slide_count()?, slide_count);

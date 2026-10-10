@@ -26,15 +26,14 @@ const TITLES: [&str; 15] = [
 fn main() -> Result<(), Box<dyn StdError>> {
     println!("=== Custom Slide Shows Example ===\n");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     for title in TITLES {
-        package.presentation_mut()?.add_slide()?.set_title(title);
+        builder.presentation()?.add_slide()?.set_title(title);
     }
 
     // Publish authored slides before the package-aware structure owner reads
     // their stable PresentationML IDs.
-    let bytes = package.to_bytes()?;
-    let mut package = Package::from_bytes(&bytes)?;
+    let mut package = builder.build()?;
     let slide_ids = package
         .with_opc(structure::load)?
         .slides

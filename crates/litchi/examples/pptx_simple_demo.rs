@@ -2,7 +2,7 @@
 //!
 //! Run with: cargo run --example pptx_simple_demo --features ooxml
 
-use litchi_pptx::{MutablePresentation, Package};
+use litchi_pptx::MutablePresentation;
 
 const EMU_PER_INCH: i64 = 914_400;
 const TEXT_WIDTH: i64 = 7_315_200;
@@ -10,9 +10,9 @@ const TEXT_WIDTH: i64 = 7_315_200;
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating typed PPTX demonstration...\n");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         add_title_slide(presentation)?;
         add_shapes_slide(presentation)?;
@@ -20,6 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     let output_path = "pptx_simple_demo.pptx";
     println!("\nSaving to {}...", output_path);
+    let mut package = builder.build()?;
     package.save(output_path)?;
     println!("✓ Done!");
 

@@ -139,9 +139,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== PPTX Charts Demo ===\n");
     println!("Building typed chart models and a summary presentation...\n");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
 
         let title = presentation.add_slide()?;
         title.set_title("Chart Types Demo");
@@ -199,8 +199,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Publish the authored slides first, then add chart parts through the
     // transactional OPC facade. Chart-frame mutation is not part of the
     // current writer, so the package graph remains the source of truth.
-    let authored = package.to_bytes()?;
-    let mut package = Package::from_bytes(&authored)?;
+    let mut package = builder.build()?;
     let relationship_ids = package.edit_opc(|opc| {
         let mut ids = Vec::with_capacity(charts.len());
         for (index, value) in charts.iter().enumerate() {

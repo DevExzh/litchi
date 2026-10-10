@@ -6,16 +6,15 @@
 //! cargo run --example pptx_minimal_test
 //! ```
 
-use litchi::pptx::*;
 use std::error::Error;
 
 fn main() -> std::result::Result<(), Box<dyn Error>> {
     println!("Creating minimal PPTX...");
 
-    let mut pkg = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
 
     {
-        let pres = pkg.presentation_mut()?;
+        let pres = builder.presentation()?;
         pres.set_widescreen_slide_size();
 
         // Create just 2 simple slides
@@ -31,6 +30,7 @@ fn main() -> std::result::Result<(), Box<dyn Error>> {
     }
 
     let output = "pptx_minimal_test.pptx";
+    let mut pkg = builder.build()?;
     pkg.save(output)?;
     println!("Saved to: {}", output);
 

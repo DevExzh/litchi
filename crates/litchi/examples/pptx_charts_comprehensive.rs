@@ -128,9 +128,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Comprehensive PPTX Charts ===");
     println!("Building typed chart models and a summary presentation...");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         let title = presentation.add_slide()?;
         title.set_title("Comprehensive Chart Demonstration");
         title.add_text_box(
@@ -167,9 +167,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     }
 
-    // Publish the managed slide model, then edit the canonical OPC graph.
-    let authored = package.to_bytes()?;
-    let mut package = Package::from_bytes(&authored)?;
+    // Finalize authoring, then edit the canonical OPC graph.
+    let mut package = builder.build()?;
     let relationship_ids = package.edit_opc(|opc| {
         let mut ids = Vec::with_capacity(charts.len());
         for (index, value) in charts.iter().enumerate() {

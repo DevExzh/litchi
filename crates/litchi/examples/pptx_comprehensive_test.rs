@@ -95,9 +95,9 @@ fn test_typed_models() -> Result<(), Box<dyn StdError>> {
 }
 
 fn test_package_round_trip(path: &str) -> Result<(), Box<dyn StdError>> {
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         add_feature_slides(presentation)?;
 
@@ -108,6 +108,7 @@ fn test_package_round_trip(path: &str) -> Result<(), Box<dyn StdError>> {
         assert_eq!(presentation.slide_height(), 5_143_500);
         assert!(presentation.is_modified());
     }
+    let mut package = builder.build()?;
     package.save(path)?;
 
     let reopened = Package::open(path)?;

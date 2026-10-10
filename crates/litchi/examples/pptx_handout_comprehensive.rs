@@ -204,11 +204,22 @@ fn animations_xml() -> Result<String, Box<dyn StdError>> {
 
 fn sections_xml() -> Result<String, Box<dyn StdError>> {
     let mut sections = SectionList::new();
-    sections
-        .add_section(Section::new("Introduction", "section-introduction").with_slides([256, 257]));
-    sections.add_section(Section::new("Main Content", "section-content").with_slides([258, 259]));
-    sections.add_section(Section::new("Demonstrations", "section-demos").with_slides([260, 261]));
-    sections.add_section(Section::new("Conclusion", "section-conclusion").with_slides([262, 263]));
+    sections.add_section(
+        Section::new("Introduction", "{00000000-0000-4000-8000-000000000001}")
+            .with_slides([256, 257]),
+    );
+    sections.add_section(
+        Section::new("Main Content", "{00000000-0000-4000-8000-000000000002}")
+            .with_slides([258, 259]),
+    );
+    sections.add_section(
+        Section::new("Demonstrations", "{00000000-0000-4000-8000-000000000003}")
+            .with_slides([260, 261]),
+    );
+    sections.add_section(
+        Section::new("Conclusion", "{00000000-0000-4000-8000-000000000004}")
+            .with_slides([262, 263]),
+    );
     let xml = sections.to_xml()?;
     assert_eq!(sections.sections().len(), 4);
     Ok(xml)
@@ -277,9 +288,9 @@ fn write_summary_package(
     body: &str,
     slide_count: usize,
 ) -> Result<(), Box<dyn StdError>> {
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         for index in 1..=slide_count {
             let slide = presentation.add_slide()?;
@@ -292,6 +303,7 @@ fn write_summary_package(
             slide.add_text_box(body, X, Y, WIDTH, HEIGHT);
         }
     }
+    let mut package = builder.build()?;
     package.save(path)?;
     let reopened = Package::open(path)?;
     assert_eq!(reopened.presentation()?.slide_count()?, slide_count);

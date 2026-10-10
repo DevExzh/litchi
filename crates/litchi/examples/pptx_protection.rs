@@ -144,9 +144,9 @@ fn main() {
 }
 
 fn generate_protection_pptx(password: &str) -> Result<(), Box<dyn std::error::Error>> {
-    let mut pkg = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let pres = pkg.presentation_mut()?;
+        let pres = builder.presentation()?;
         let slide = pres.add_slide()?;
         slide.set_title("Protection and Encryption Demo");
         slide.add_text_box(
@@ -161,6 +161,7 @@ fn generate_protection_pptx(password: &str) -> Result<(), Box<dyn std::error::Er
             914400,
         );
     }
+    let mut pkg = builder.build()?;
     pkg.save_plain("pptx_protection_clear.pptx")?;
     pkg.save_encrypted("pptx_protection_open_password.pptx", password, Mode::Agile)?;
 

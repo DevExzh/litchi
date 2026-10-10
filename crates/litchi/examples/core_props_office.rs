@@ -45,8 +45,8 @@ fn create_docx(directory: &Path) -> Result<()> {
 fn create_pptx(directory: &Path) -> Result<()> {
     let authored = directory.join("core-props.pptx");
     let cleared = directory.join("core-props-cleared.pptx");
-    let mut package = pptx::Package::new()?;
-    let slide = package.presentation_mut()?.add_slide()?;
+    let mut builder = pptx::builder::Builder::new()?;
+    let slide = builder.presentation()?.add_slide()?;
     slide.set_title("Litchi core-properties verification");
     slide.add_text_box(
         "PowerPoint opened a move-authored metadata package.",
@@ -55,9 +55,7 @@ fn create_pptx(directory: &Path) -> Result<()> {
         7_315_200,
         914_400,
     );
-    package.save(&authored)?;
-
-    let package = pptx::Package::open(&authored)?;
+    let package = builder.build()?;
     let mut graph = package.opc()?.clone();
     let _ = properties::write(&mut graph, smoke_props("PPTX"))?;
     let mut package = pptx::Package::from_opc_package(graph)?;

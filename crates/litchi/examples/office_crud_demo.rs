@@ -222,8 +222,8 @@ fn demo_pptx_operations() -> ExampleResult<()> {
 
     // CREATE: Create a new presentation
     println!("Creating new PowerPoint presentation...");
-    let mut pkg = PptxPackage::new()?;
-    let pres = pkg.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let pres = builder.presentation()?;
 
     // Add title slide
     let slide1 = pres.add_slide()?;
@@ -266,6 +266,7 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     );
 
     // Save
+    let mut pkg = builder.build()?;
     pkg.save("demo_presentation.pptx")?;
     println!("✓ Created: demo_presentation.pptx");
 
@@ -286,15 +287,13 @@ fn demo_pptx_operations() -> ExampleResult<()> {
 
     // UPDATE: Modify existing presentation
     //
-    // `presentation_mut` is the authoring writer and belongs to a package this
-    // process created with `Package::new`. An opened deck is never hydrated
-    // into it, so that call would refuse here with `UnsafeEdit`. Opened decks
+    // Builder authoring finishes before publication. Opened decks
     // are edited through one detached, failure-atomic transaction whose commit
     // the package publishes as a single patch; every part the transaction does
     // not name keeps its exact source bytes.
     println!("Updating PowerPoint presentation...");
     let mut pkg = PptxPackage::open("demo_presentation.pptx")?;
-    let mut edit = pkg.opened_presentation_transaction()?;
+    let mut edit = pkg.edit()?;
 
     // Retitle the closing slide and append a closing note to it.
     let closing = edit.slides().len() - 1;
@@ -306,10 +305,10 @@ fn demo_pptx_operations() -> ExampleResult<()> {
     )?;
 
     let commit = edit.commit()?;
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("the opened-presentation transaction changed nothing".into());
     }
-    pkg.apply_opened_presentation_commit(commit)?;
+    pkg = commit.into_package();
 
     pkg.save("demo_presentation_updated.pptx")?;
     println!("✓ Updated: demo_presentation_updated.pptx");

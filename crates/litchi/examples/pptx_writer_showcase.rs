@@ -25,7 +25,7 @@
 use litchi_pptx::transition::{
     Axis, InOut, Kind, Ms, Shape as TransitionShape, Side, Speed, Spokes, Transition,
 };
-use litchi_pptx::{GradientStop, MutablePresentation, Package, PatternType, SlideBackground};
+use litchi_pptx::{GradientStop, MutablePresentation, PatternType, SlideBackground};
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
@@ -34,10 +34,10 @@ fn main() -> Result<(), Box<dyn Error>> {
     println!("======================================================\n");
 
     // Create a new presentation package
-    let mut pkg = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
 
     let slide_count = {
-        let pres = pkg.presentation_mut()?;
+        let pres = builder.presentation()?;
 
         // Set widescreen dimensions (16:9)
         println!("✓ Setting widescreen slide size (16:9)");
@@ -70,6 +70,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     // Save the presentation
     let output_path = "pptx_writer_showcase.pptx";
     println!("\n✓ Saving presentation to: {}", output_path);
+    let mut pkg = builder.build()?;
     pkg.save(output_path)?;
 
     println!("\n======================================================");

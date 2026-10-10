@@ -42,9 +42,9 @@ fn main() -> Result<(), Box<dyn StdError>> {
     println!("  handout: {} XML bytes", handout_xml.len());
     println!("  protection: {} XML bytes", protection_xml.len());
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
         add_summary_slide(
             presentation,
@@ -87,6 +87,7 @@ fn main() -> Result<(), Box<dyn StdError>> {
     }
 
     let output_path = "pptx_advanced_features.pptx";
+    let mut package = builder.build()?;
     package.save(output_path)?;
     let reopened = Package::open(output_path)?;
     println!("\n✓ Wrote and reopened {output_path}");
@@ -187,8 +188,12 @@ fn diagram_demo() -> Vec<(&'static str, Graphic)> {
 
 fn section_demo() -> Result<String, Box<dyn StdError>> {
     let mut sections = SectionList::new();
-    sections.add_section(Section::new("Overview", "section-overview").with_slides([256, 257]));
-    sections.add_section(Section::new("Metadata", "section-metadata").with_slides([258]));
+    sections.add_section(
+        Section::new("Overview", "{00000000-0000-4000-8000-000000000001}").with_slides([256, 257]),
+    );
+    sections.add_section(
+        Section::new("Metadata", "{00000000-0000-4000-8000-000000000002}").with_slides([258]),
+    );
     Ok(sections.to_xml()?)
 }
 

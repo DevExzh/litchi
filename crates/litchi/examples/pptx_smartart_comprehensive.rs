@@ -28,9 +28,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     test_complex_hierarchies()?;
 
     let mut pkg = Package::new()?;
-    let bytes = pkg.to_bytes()?;
-    std::fs::write("smartart_comprehensive.pptx", &bytes)?;
-    let reopened = Package::from_bytes(&bytes)?;
+    pkg.save("smartart_comprehensive.pptx")?;
+    let reopened = Package::open("smartart_comprehensive.pptx")?;
     let slide_count = reopened.presentation()?.slide_count()?;
     let part_count = reopened.with_opc(|opc| Ok(opc.iter_parts().count()))?;
     assert_eq!(slide_count, 0);

@@ -75,16 +75,15 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 fn publish_and_reopen(xml: &str, expected: &Master) -> Result<(), Box<dyn std::error::Error>> {
-    let mut package = Package::new()?;
-    package
-        .presentation_mut()?
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    builder
+        .presentation()?
         .add_slide()?
         .set_title("Handout Demo");
 
-    // Flush the typed slide writer, then make one atomic OPC edit for the
+    // Build the canonical package, then make one atomic OPC edit for the
     // handout part, relationship, and presentation-level handout ID list.
-    let bytes = package.to_bytes()?;
-    let mut package = Package::from_bytes(&bytes)?;
+    let mut package = builder.build()?;
     package.edit_opc(|opc| store_handout(opc, xml))?;
 
     let bytes = package.to_bytes()?;

@@ -30,25 +30,25 @@ fn main() -> Result<(), Box<dyn StdError>> {
 
 fn test_basic() -> Result<(), Box<dyn StdError>> {
     println!("Test 1: Basic slides...");
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         add_summary_slide(
             presentation,
             "Basic Test",
             "Basic slide and text-box package authoring.",
         )?;
     }
-    save_and_reopen(package, "test_1_basic.pptx")?;
+    save_and_reopen(builder.build()?, "test_1_basic.pptx")?;
     Ok(())
 }
 
 fn test_animations() -> Result<(), Box<dyn StdError>> {
     println!("Test 2: With animations...");
     let animation_xml = animation_demo()?;
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         add_summary_slide(
             presentation,
             "Animation Test",
@@ -58,16 +58,16 @@ fn test_animations() -> Result<(), Box<dyn StdError>> {
             ),
         )?;
     }
-    save_and_reopen(package, "test_2_animations.pptx")?;
+    save_and_reopen(builder.build()?, "test_2_animations.pptx")?;
     Ok(())
 }
 
 fn test_sections() -> Result<(), Box<dyn StdError>> {
     println!("Test 3: With sections...");
     let sections_xml = sections_demo()?;
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         add_summary_slide(
             presentation,
             "Sections Test",
@@ -77,16 +77,16 @@ fn test_sections() -> Result<(), Box<dyn StdError>> {
             ),
         )?;
     }
-    save_and_reopen(package, "test_3_sections.pptx")?;
+    save_and_reopen(builder.build()?, "test_3_sections.pptx")?;
     Ok(())
 }
 
 fn test_custom_shows() -> Result<(), Box<dyn StdError>> {
     println!("Test 4: With custom shows...");
     let shows_xml = custom_shows_demo();
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         add_summary_slide(
             presentation,
             "Custom Shows Test",
@@ -96,16 +96,16 @@ fn test_custom_shows() -> Result<(), Box<dyn StdError>> {
             ),
         )?;
     }
-    save_and_reopen(package, "test_4_custom_shows.pptx")?;
+    save_and_reopen(builder.build()?, "test_4_custom_shows.pptx")?;
     Ok(())
 }
 
 fn test_handout() -> Result<(), Box<dyn StdError>> {
     println!("Test 5: With handout master...");
     let handout_xml = handout_demo();
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         add_summary_slide(
             presentation,
             "Handout Test",
@@ -115,7 +115,7 @@ fn test_handout() -> Result<(), Box<dyn StdError>> {
             ),
         )?;
     }
-    save_and_reopen(package, "test_5_handout.pptx")?;
+    save_and_reopen(builder.build()?, "test_5_handout.pptx")?;
     Ok(())
 }
 
@@ -126,9 +126,9 @@ fn test_all_features() -> Result<(), Box<dyn StdError>> {
     let shows_xml = custom_shows_demo();
     let handout_xml = handout_demo();
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         add_summary_slide(
             presentation,
             "All Features",
@@ -141,7 +141,7 @@ fn test_all_features() -> Result<(), Box<dyn StdError>> {
             ),
         )?;
     }
-    save_and_reopen(package, "test_6_all_features.pptx")?;
+    save_and_reopen(builder.build()?, "test_6_all_features.pptx")?;
     Ok(())
 }
 
@@ -184,8 +184,12 @@ fn animation_demo() -> Result<String, Box<dyn StdError>> {
 
 fn sections_demo() -> Result<String, Box<dyn StdError>> {
     let mut sections = SectionList::new();
-    sections.add_section(Section::new("Section 1", "section-1").with_slides([256]));
-    sections.add_section(Section::new("Section 2", "section-2").with_slides([257]));
+    sections.add_section(
+        Section::new("Section 1", "{00000000-0000-4000-8000-000000000001}").with_slides([256]),
+    );
+    sections.add_section(
+        Section::new("Section 2", "{00000000-0000-4000-8000-000000000002}").with_slides([257]),
+    );
     Ok(sections.to_xml()?)
 }
 

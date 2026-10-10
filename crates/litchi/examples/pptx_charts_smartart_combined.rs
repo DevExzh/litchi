@@ -249,9 +249,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_widescreen_slide_size();
 
         let title = presentation.add_slide()?;
@@ -316,11 +316,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         );
     }
 
-    let bytes = package.to_bytes()?;
+    let mut package = builder.build()?;
     let output_path = "charts_smartart_combined.pptx";
-    std::fs::write(output_path, &bytes)?;
+    package.save(output_path)?;
 
-    let reopened = Package::from_bytes(&bytes)?;
+    let reopened = Package::open(output_path)?;
     let presentation = reopened.presentation()?;
     println!("\nRead-back slide count: {}", presentation.slide_count()?);
     println!("Read-back text bytes: {}", presentation.text()?.len());

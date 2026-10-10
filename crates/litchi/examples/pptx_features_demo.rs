@@ -17,7 +17,7 @@ use litchi_pptx::media_parts::{
 };
 use litchi_pptx::presentation::media::{Format as MediaFormat, Kind as AuthoringMediaKind};
 use litchi_pptx::presentation_properties::metadata::sections::{List as SectionList, Section};
-use litchi_pptx::{Error, MutablePresentation, MutableSlide, Package, Result};
+use litchi_pptx::{Error, MutablePresentation, MutableSlide, Result};
 use std::collections::BTreeMap;
 use std::error::Error as StdError;
 use std::fs;
@@ -41,9 +41,9 @@ struct MediaAttachment {
 fn main() -> std::result::Result<(), Box<dyn StdError>> {
     println!("Creating PPTX features demonstration...\n");
 
-    let mut package = Package::new()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
     let media = {
-        let presentation = package.presentation_mut()?;
+        let presentation = builder.presentation()?;
         presentation.set_slide_size(SLIDE_WIDTH, SLIDE_HEIGHT);
         build_slides(presentation)?
     };
@@ -55,6 +55,7 @@ fn main() -> std::result::Result<(), Box<dyn StdError>> {
         sections.to_xml()?.len()
     );
 
+    let mut package = builder.build()?;
     package.edit_opc(move |opc| {
         store_comments(opc)?;
         store_sections(opc, &sections.to_xml()?)?;
@@ -332,11 +333,19 @@ fn read_media(
 
 fn build_sections() -> SectionList {
     let mut sections = SectionList::new();
-    sections.add_section(Section::new("Introduction", "section-1").with_slides([256]));
     sections.add_section(
-        Section::new("Feature Demonstrations", "section-2").with_slides([257, 258, 259, 260, 261]),
+        Section::new("Introduction", "{00000000-0000-4000-8000-000000000001}").with_slides([256]),
     );
-    sections.add_section(Section::new("Summary", "section-3").with_slides([262]));
+    sections.add_section(
+        Section::new(
+            "Feature Demonstrations",
+            "{00000000-0000-4000-8000-000000000002}",
+        )
+        .with_slides([257, 258, 259, 260, 261]),
+    );
+    sections.add_section(
+        Section::new("Summary", "{00000000-0000-4000-8000-000000000003}").with_slides([262]),
+    );
     sections
 }
 

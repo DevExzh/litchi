@@ -175,11 +175,13 @@
 //! [`Code::UnsupportedFormat`] and a suggestion to use
 //! `litchi::iwork::Document::open`.
 //!
-//! # Not here yet
+//! # Unified operations
 //!
-//! The unified API reads. Its edit verbs (`set`, `add`, `remove`, batches,
-//! `save` and `create`) and path queries arrive in later releases; until
-//! then, the format modules below write documents.
+//! [`File`] provides typed reads, paths, queries and views. DOCX also supports
+//! immutable paragraph/run edits, creation, stream publication and atomic path
+//! saving. [`File::capabilities`] lists the supported verbs and contextual
+//! gaps for the current handle. Batches and the other formats' unified write
+//! handlers are still in progress; the format modules expose their leaf APIs.
 //!
 //! # Low-level modules
 //!
@@ -777,8 +779,12 @@ pub use litchi_ops::WorkbookView;
     feature = "numbers"
 ))]
 pub use litchi_ops::{
-    Code, EncryptionKind, Error, Family, File, Locked, OpenOptions, Result, SignatureOrigin,
-    Signed, SourceMode, compat, error, format,
+    Added, Applied, BatchCommit, BatchItem, BatchMode, Code, Conformance, CreateOptions,
+    EncryptionKind, Error, Family, File, Flavor, IntoNode, IntoPlacement, IntoProps, IntoTarget,
+    ItemResult, Key, Locked, NewNode, OpenOptions, Overwrite, Placement, PropValue, Props, Result,
+    SaveOptions, SaveTo, Saved, SignatureOrigin, Signed, SourceMode, TargetArg, batch,
+    capabilities, compat, create, create_with, error, format, new_node, node, path, placement,
+    props, query, target, transaction, view,
 };
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),
