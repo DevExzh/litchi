@@ -87,7 +87,7 @@ pub(super) fn parse_positive_angle(value: &str) -> Result<u32> {
 /// The standard stores values as thousandths of a percent. Office also reads
 /// a human-readable percent sign form; accepting both keeps the shared owner
 /// useful for real-world files while always writing the canonical integer form.
-fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
+pub(crate) fn parse_scaled(value: &str, kind: &'static str) -> Result<i32> {
     let value = value.trim();
     if let Some(value) = value.strip_suffix('%') {
         let value = value.trim();

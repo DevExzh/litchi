@@ -3,7 +3,10 @@
 use std::fmt;
 use std::str::FromStr;
 
-use super::model::{Anchor, Direction, Underline, Wrap};
+use super::model::{
+    Alignment, Anchor, AutoNumber, Caps, Direction, FontAlignment, Strike, TabAlignment, Underline,
+    Wrap,
+};
 
 /// Failure to parse or construct a `DrawingML` text primitive.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -297,3 +300,121 @@ pub fn parse_on_off(value: &str) -> Result<bool, ParseError> {
 pub(super) const fn xsd_whitespace(character: char) -> bool {
     matches!(character, ' ' | '\t' | '\n' | '\r')
 }
+
+/// Implement `ALL`, `token`, `FromStr` and `Display` for a closed `DrawingML`
+/// token domain. Parsing is exact: callers apply the XML Schema `token`
+/// whitespace facet first when the attribute's type requires it.
+macro_rules! closed_tokens {
+    ($name:ident, $domain:literal, { $($variant:ident => $token:literal),+ $(,)? }) => {
+        impl $name {
+            /// Every value, in schema order.
+            pub const ALL: &'static [Self] = &[$(Self::$variant),+];
+
+            /// Return the exact `DrawingML` token.
+            #[must_use]
+            pub const fn token(self) -> &'static str {
+                match self {
+                    $(Self::$variant => $token),+
+                }
+            }
+        }
+
+        impl FromStr for $name {
+            type Err = ParseError;
+
+            fn from_str(value: &str) -> Result<Self, Self::Err> {
+                match value {
+                    $($token => Ok(Self::$variant),)+
+                    _ => Err(ParseError::InvalidToken($domain)),
+                }
+            }
+        }
+
+        impl fmt::Display for $name {
+            fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+                formatter.write_str(self.token())
+            }
+        }
+    };
+}
+
+closed_tokens!(Strike, "text strike", {
+    None => "noStrike",
+    Single => "sngStrike",
+    Double => "dblStrike",
+});
+
+closed_tokens!(Caps, "text caps", {
+    None => "none",
+    Small => "small",
+    All => "all",
+});
+
+closed_tokens!(Alignment, "paragraph alignment", {
+    Left => "l",
+    Center => "ctr",
+    Right => "r",
+    Justified => "just",
+    JustifiedLow => "justLow",
+    Distributed => "dist",
+    ThaiDistributed => "thaiDist",
+});
+
+closed_tokens!(FontAlignment, "font alignment", {
+    Auto => "auto",
+    Top => "t",
+    Center => "ctr",
+    Baseline => "base",
+    Bottom => "b",
+});
+
+closed_tokens!(TabAlignment, "tab alignment", {
+    Left => "l",
+    Center => "ctr",
+    Right => "r",
+    Decimal => "dec",
+});
+
+closed_tokens!(AutoNumber, "auto-number scheme", {
+    AlphaLowerParenBoth => "alphaLcParenBoth",
+    AlphaUpperParenBoth => "alphaUcParenBoth",
+    AlphaLowerParenRight => "alphaLcParenR",
+    AlphaUpperParenRight => "alphaUcParenR",
+    AlphaLowerPeriod => "alphaLcPeriod",
+    AlphaUpperPeriod => "alphaUcPeriod",
+    ArabicParenBoth => "arabicParenBoth",
+    ArabicParenRight => "arabicParenR",
+    ArabicPeriod => "arabicPeriod",
+    ArabicPlain => "arabicPlain",
+    RomanLowerParenBoth => "romanLcParenBoth",
+    RomanUpperParenBoth => "romanUcParenBoth",
+    RomanLowerParenRight => "romanLcParenR",
+    RomanUpperParenRight => "romanUcParenR",
+    RomanLowerPeriod => "romanLcPeriod",
+    RomanUpperPeriod => "romanUcPeriod",
+    CircleNumberDoubleBytePlain => "circleNumDbPlain",
+    CircleNumberWingdingsBlackPlain => "circleNumWdBlackPlain",
+    CircleNumberWingdingsWhitePlain => "circleNumWdWhitePlain",
+    ArabicDoubleBytePeriod => "arabicDbPeriod",
+    ArabicDoubleBytePlain => "arabicDbPlain",
+    EastAsianSimplifiedChinesePeriod => "ea1ChsPeriod",
+    EastAsianSimplifiedChinesePlain => "ea1ChsPlain",
+    EastAsianTraditionalChinesePeriod => "ea1ChtPeriod",
+    EastAsianTraditionalChinesePlain => "ea1ChtPlain",
+    EastAsianJapaneseChineseDoubleBytePeriod => "ea1JpnChsDbPeriod",
+    EastAsianJapaneseKoreanPlain => "ea1JpnKorPlain",
+    EastAsianJapaneseKoreanPeriod => "ea1JpnKorPeriod",
+    Arabic1Minus => "arabic1Minus",
+    Arabic2Minus => "arabic2Minus",
+    Hebrew2Minus => "hebrew2Minus",
+    ThaiAlphaPeriod => "thaiAlphaPeriod",
+    ThaiAlphaParenRight => "thaiAlphaParenR",
+    ThaiAlphaParenBoth => "thaiAlphaParenBoth",
+    ThaiNumberPeriod => "thaiNumPeriod",
+    ThaiNumberParenRight => "thaiNumParenR",
+    ThaiNumberParenBoth => "thaiNumParenBoth",
+    HindiAlphaPeriod => "hindiAlphaPeriod",
+    HindiNumberPeriod => "hindiNumPeriod",
+    HindiNumberParenRight => "hindiNumParenR",
+    HindiAlpha1Period => "hindiAlpha1Period",
+});

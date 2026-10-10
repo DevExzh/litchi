@@ -265,3 +265,60 @@ impl TryFrom<u32> for TextSize {
         Self::new(value)
     }
 }
+
+/// A length in hundredths of a point (`ST_TextPoint`, -400000..=400000).
+///
+/// Character spacing (`spc`) is signed; the kerning threshold (`kern`) uses
+/// the non-negative half of the same domain.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[repr(transparent)]
+#[must_use]
+pub struct TextPoint(i32);
+
+impl TextPoint {
+    pub const MIN: i32 = -400_000;
+    pub const MAX: i32 = 400_000;
+    /// Zero hundredths of a point.
+    pub const ZERO: Self = Self(0);
+
+    /// Construct a checked length in hundredths of a point.
+    /// # Errors
+    ///
+    /// Returns an error when the value is outside `-400000..=400000`.
+    pub const fn new(value: i32) -> Result<Self, ParseError> {
+        if value < Self::MIN || value > Self::MAX {
+            Err(ParseError::OutOfRange {
+                domain: "DrawingML text point",
+                value: value as i64,
+                min: Self::MIN as i64,
+                max: Self::MAX as i64,
+            })
+        } else {
+            Ok(Self(value))
+        }
+    }
+
+    /// Return the length in hundredths of a point.
+    #[must_use]
+    pub const fn get(self) -> i32 {
+        self.0
+    }
+}
+
+impl fmt::Display for TextPoint {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(formatter)
+    }
+}
+
+impl FromStr for TextPoint {
+    type Err = ParseError;
+
+    fn from_str(value: &str) -> Result<Self, Self::Err> {
+        let parsed = value
+            .trim_matches(super::codec::xsd_whitespace)
+            .parse::<i32>()
+            .map_err(|_error| ParseError::InvalidNumber("DrawingML text point"))?;
+        Self::new(parsed)
+    }
+}

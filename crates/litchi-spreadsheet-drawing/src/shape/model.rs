@@ -52,7 +52,7 @@ impl FromStr for Aspect {
         match value {
             "DVASPECT_CONTENT" => Ok(Self::Content),
             "DVASPECT_ICON" => Ok(Self::Icon),
-            _ => Err(invalid(format!("invalid OLE data/view aspect '{value}'"))),
+            _ => Err(invalid("invalid OLE data/view aspect")),
         }
     }
 }
@@ -81,6 +81,7 @@ pub(crate) const MAX_OBJECTS_PER_DRAWING: usize = 100_000;
 pub(crate) const MAX_GROUP_DEPTH: usize = 32;
 pub(crate) const MAX_XML_DEPTH: usize = 256;
 pub(crate) const MAX_TEXT_BYTES: usize = 1024 * 1024;
+pub(crate) const MAX_TEXT_ELEMENTS: usize = 100_000;
 
 /// An offset or extent in English Metric Units (EMU), the `DrawingML` length unit.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -215,7 +216,7 @@ pub enum Anchor {
 }
 
 /// Mutually exclusive `DrawingML` geometry of a worksheet shape.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub enum Geometry {
     /// A schema-defined preset (`a:prstGeom`).
     Preset(Preset),
@@ -258,6 +259,15 @@ impl From<Preset> for Geometry {
     }
 }
 
+impl fmt::Debug for Geometry {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Preset(preset) => formatter.debug_tuple("Preset").field(preset).finish(),
+            Self::Custom(_) => formatter.write_str("CustomGeometry(..)"),
+        }
+    }
+}
+
 impl From<CustomGeometry> for Geometry {
     fn from(geometry: CustomGeometry) -> Self {
         Self::Custom(Box::new(geometry))
@@ -265,7 +275,7 @@ impl From<CustomGeometry> for Geometry {
 }
 
 /// Non-visual identity shared by all drawing objects (`xdr:cNvPr` and lock flags).
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct NonVisual {
     /// Unknown attributes and child elements retained from the source object.
     pub opaque: Opaque,
@@ -371,7 +381,7 @@ pub struct Group {
 ///
 /// The referenced payload and link targets are recorded as relationship IDs
 /// only; they are never resolved, fetched, or activated.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct OleObject {
     /// Non-visual identity of the hosting graphic frame.
     pub non_visual: NonVisual,
@@ -390,7 +400,7 @@ pub struct OleObject {
 }
 
 /// One XML attribute retained because the shape owner does not interpret it.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct UnknownAttribute {
     name: Box<str>,
     value: Box<str>,
@@ -422,7 +432,7 @@ impl UnknownAttribute {
 }
 
 /// A bounded XML element retained without interpreting its semantics.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct UnknownElement {
     xml: Box<[u8]>,
 }
@@ -453,7 +463,7 @@ impl UnknownElement {
 }
 
 /// Unknown shape-owned markup retained as inert, bounded data.
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Clone, Default, PartialEq, Eq)]
 pub struct Opaque {
     attributes: Vec<UnknownAttribute>,
     elements: Vec<UnknownElement>,
@@ -490,7 +500,7 @@ impl Opaque {
 }
 
 /// An unknown drawing object preserved as its bounded XML fragment.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Unknown {
     element: UnknownElement,
 }
@@ -550,7 +560,7 @@ pub struct AnchoredObject {
 }
 
 /// Shape inventory of one worksheet drawing part.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Shapes {
     /// Worksheet name from the workbook.
     pub worksheet_name: String,
@@ -558,4 +568,85 @@ pub struct Shapes {
     pub worksheet_part_name: String,
     /// Anchored objects in drawing order.
     pub objects: Vec<AnchoredObject>,
+}
+
+impl fmt::Debug for NonVisual {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("NonVisual")
+            .field("id", &self.id)
+            .field("name_present", &self.name.is_some())
+            .field("description_present", &self.description.is_some())
+            .field("hidden", &self.hidden)
+            .field("locked", &self.locked)
+            .field("opaque", &self.opaque)
+            .finish()
+    }
+}
+
+impl fmt::Debug for OleObject {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("OleObject")
+            .field("non_visual", &self.non_visual)
+            .field("program_id_present", &self.program_id.is_some())
+            .field("shape_id", &self.shape_id)
+            .field("data_or_view_aspect", &self.data_or_view_aspect)
+            .field("auto_load", &self.auto_load)
+            .field("relationship_id_present", &self.relationship_id.is_some())
+            .field(
+                "link_relationship_id_present",
+                &self.link_relationship_id.is_some(),
+            )
+            .finish()
+    }
+}
+
+impl fmt::Debug for UnknownAttribute {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("UnknownAttribute")
+            .field("name_bytes", &self.name.len())
+            .field("value_bytes", &self.value.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for UnknownElement {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("UnknownElement")
+            .field("bytes", &self.xml.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for Opaque {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Opaque")
+            .field("attribute_count", &self.attributes.len())
+            .field("element_count", &self.elements.len())
+            .finish()
+    }
+}
+
+impl fmt::Debug for Unknown {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Unknown")
+            .field("element", &self.element)
+            .finish()
+    }
+}
+
+impl fmt::Debug for Shapes {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Shapes")
+            .field("worksheet_name_bytes", &self.worksheet_name.len())
+            .field("worksheet_part_name_bytes", &self.worksheet_part_name.len())
+            .field("objects", &self.objects)
+            .finish()
+    }
 }

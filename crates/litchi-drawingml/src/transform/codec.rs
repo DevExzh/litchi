@@ -7,8 +7,6 @@ use quick_xml::{
     reader::Reader,
 };
 
-use litchi_ooxml_common::xml::unqualified_attribute_value;
-
 use crate::{
     Error, Result,
     coordinate::{Coordinate, Extent},
@@ -363,10 +361,7 @@ fn validate_attributes(
             continue;
         }
         if !allowed.contains(&raw) {
-            return Err(invalid(format!(
-                "unsupported {description} attribute '{}'",
-                String::from_utf8_lossy(raw)
-            )));
+            return Err(invalid(format!("unsupported {description} attribute")));
         }
     }
     Ok(())
@@ -380,8 +375,7 @@ fn required_coordinate(
 ) -> Result<Coordinate> {
     let value = unqualified_attribute_value(element, name, decoder)?
         .ok_or_else(|| invalid(format!("DrawingML transform {description} is missing")))?;
-    Coordinate::parse(&value)
-        .map_err(|error| invalid(format!("invalid transform {description}: {error}")))
+    Coordinate::parse(&value).map_err(|_error| invalid(format!("invalid transform {description}")))
 }
 
 fn required_extent(
@@ -392,8 +386,7 @@ fn required_extent(
 ) -> Result<Extent> {
     let value = unqualified_attribute_value(element, name, decoder)?
         .ok_or_else(|| invalid(format!("DrawingML transform {description} is missing")))?;
-    Extent::parse(&value)
-        .map_err(|error| invalid(format!("invalid transform {description}: {error}")))
+    Extent::parse(&value).map_err(|_error| invalid(format!("invalid transform {description}")))
 }
 
 fn child_order(local: &[u8]) -> Option<u8> {
@@ -411,7 +404,7 @@ fn parse_bool(value: &str, name: &str) -> Result<bool> {
         "1" | "true" => Ok(true),
         "0" | "false" => Ok(false),
         _ => Err(invalid(format!(
-            "invalid DrawingML transform {name} boolean '{value}'"
+            "invalid DrawingML transform {name} boolean"
         ))),
     }
 }
@@ -444,19 +437,24 @@ fn format_error(error: std::fmt::Error) -> Error {
     Error::Xml(error.to_string())
 }
 
-fn xml_error(error: impl std::fmt::Display) -> Error {
-    Error::Xml(error.to_string())
+fn xml_error(_error: impl std::fmt::Display) -> Error {
+    Error::Xml("malformed DrawingML transform XML".into())
 }
 
 fn invalid(message: impl Into<String>) -> Error {
     Error::Invalid(message.into())
 }
 
-fn unsupported_child(local: &[u8]) -> Error {
-    invalid(format!(
-        "unsupported DrawingML transform child '{}'",
-        String::from_utf8_lossy(local)
-    ))
+fn unsupported_child(_local: &[u8]) -> Error {
+    invalid("unsupported DrawingML transform child")
+}
+
+fn unqualified_attribute_value(
+    element: &BytesStart<'_>,
+    name: &[u8],
+    decoder: quick_xml::encoding::Decoder,
+) -> Result<Option<String>> {
+    litchi_ooxml_common::xml::unqualified_attribute_value(element, name, decoder).map_err(xml_error)
 }
 
 fn limit(resource: &'static str, limit: usize) -> Error {

@@ -14,5 +14,8 @@ pub mod body;
 mod tests;
 
 pub use codec::{ParseError, parse_bool, parse_on_off};
-pub use model::{Anchor, Autofit, Direction, Underline, Wrap};
-pub use scalars::{Columns, Coordinate32, TextSize};
+pub use model::{
+    Alignment, Anchor, AutoNumber, Autofit, Caps, Direction, FontAlignment, Strike, TabAlignment,
+    Underline, Wrap,
+};
+pub use scalars::{Columns, Coordinate32, TextPoint, TextSize};

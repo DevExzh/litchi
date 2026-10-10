@@ -15,6 +15,8 @@ mod codec;
 mod model;
 mod validation;
 
+pub(crate) use validation::parse_scaled;
+
 #[cfg(test)]
 mod tests;
 

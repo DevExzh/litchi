@@ -98,12 +98,12 @@ fn parses_two_cell_text_box() {
     assert_eq!(body.paragraphs.len(), 2);
     let bold = &body.paragraphs[0].runs[0];
     assert_eq!(bold.text, "Bold");
-    assert_eq!(bold.bold, Some(true));
-    assert_eq!(bold.italic, Some(true));
-    assert_eq!(bold.underline, Some(Underline::Single));
-    assert_eq!(bold.font_size.map(TextSize::get), Some(1200));
+    assert_eq!(bold.properties.bold, Some(true));
+    assert_eq!(bold.properties.italic, Some(true));
+    assert_eq!(bold.properties.underline, Some(Underline::Single));
+    assert_eq!(bold.properties.size.map(TextSize::get), Some(1200));
     assert_eq!(body.paragraphs[0].runs[1].text, " plain");
-    assert_eq!(body.paragraphs[0].runs[1].bold, None);
+    assert_eq!(body.paragraphs[0].runs[1].properties.bold, None);
     // The break contributes a newline run.
     assert_eq!(body.paragraphs[0].runs[2].text, "\n");
     assert_eq!(body.text(), "Bold plain\n\nSecond");
@@ -195,7 +195,9 @@ fn rejects_unknown_preset() {
              <xdr:ext cx=\"789\" cy=\"101\"/>{object}<xdr:clientData/></xdr:absoluteAnchor>"
     );
     let error = read(&drawing(&anchor)).unwrap_err();
-    assert!(error.to_string().contains("vendorWeird"));
+    let message = error.to_string();
+    assert!(message.contains("invalid DrawingML shape preset"));
+    assert!(!message.contains("vendorWeird"));
 }
 
 #[test]
@@ -229,7 +231,7 @@ fn rejects_missing_presets_and_invalid_text_domains() {
         );
     }
 
-    for run_properties in ["u=\"vendor\"", "sz=\"99\"", "b=\"on\""] {
+    for run_properties in ["u=\"vendor\"", "sz=\"99\"", "b=\"on\"", "strike=\"bogus\""] {
         let object = format!(
             "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"3\" name=\"Text\"/><xdr:cNvSpPr/>\
                  </xdr:nvSpPr><xdr:txBody><a:bodyPr/><a:p><a:r><a:rPr {run_properties}/>\
@@ -379,7 +381,9 @@ fn rejects_unknown_ole_object_aspect() {
 
     let error = read(&xml).unwrap_err();
 
-    assert!(error.to_string().contains("DVASPECT_THUMBNAIL"));
+    let message = error.to_string();
+    assert!(message.contains("invalid OLE data/view aspect"));
+    assert!(!message.contains("DVASPECT_THUMBNAIL"));
 }
 
 #[test]
@@ -477,4 +481,105 @@ fn rejects_malformed_drawings() {
     for xml in cases {
         assert!(read(&xml).is_err(), "accepted {xml}");
     }
+}
+
+#[test]
+fn text_bodies_come_from_the_shared_reader_under_the_strict_contract() {
+    use litchi_drawingml::color::{Rgb, Value};
+    use litchi_drawingml::text::Alignment;
+    use litchi_drawingml::text::body::{RunKind, raw};
+
+    let object = "<xdr:sp><xdr:nvSpPr><xdr:cNvPr id=\"3\" name=\"Linked\"/><xdr:cNvSpPr txBox=\"1\"/>\
+         </xdr:nvSpPr><xdr:spPr/><xdr:txBody><a:bodyPr/><a:lstStyle/>\
+         <a:p><a:pPr algn=\"ctr\" lvl=\"1\"><a:buNone/></a:pPr>\
+         <a:r><a:rPr sz=\"1100\" strike=\"sngStrike\"><a:solidFill><a:srgbClr val=\"FF0000\"/></a:solidFill>\
+         <a:latin typeface=\"Calibri\"/></a:rPr><a:t>A</a:t></a:r>\
+         <a:br><a:rPr sz=\"1100\"/></a:br>\
+         <a:fld id=\"{4E5A4B57-27D5-4D0E-8F5C-4A5B5B1E5F01}\" type=\"TxLink\"><a:t>linked</a:t></a:fld>\
+         <a:endParaRPr sz=\"900\"/></a:p></xdr:txBody></xdr:sp>";
+    let objects = read(&drawing(&two_cell_anchor(object))).unwrap().unwrap();
+    let Object::Shape(shape) = &objects[0].object else {
+        panic!("expected a shape");
+    };
+    let body = shape.text_body.as_ref().unwrap();
+    // Paragraph and character properties are typed by the shared reader.
+    let paragraph = &body.paragraphs[0];
+    assert_eq!(paragraph.properties.alignment, Some(Alignment::Center));
+    assert_eq!(paragraph.properties.level, Some(1));
+    let run = &paragraph.runs[0];
+    assert_eq!(run.properties.size.map(TextSize::get), Some(1100));
+    assert_eq!(
+        run.properties.strike,
+        Some(litchi_drawingml::text::Strike::Single)
+    );
+    assert_eq!(
+        run.properties.color().and_then(Value::as_rgb),
+        Some(Rgb::new(0xFF, 0, 0))
+    );
+    assert_eq!(
+        run.properties
+            .latin
+            .as_ref()
+            .map(|font| font.typeface.as_str()),
+        Some("Calibri")
+    );
+    // A break is a newline run with its own properties; fields are semantic
+    // runs while their authored markup remains opaque below the shape.
+    assert_eq!(paragraph.runs.len(), 3);
+    assert_eq!(paragraph.runs[1].kind, RunKind::Break);
+    assert_eq!(
+        paragraph.runs[1].properties.size.map(TextSize::get),
+        Some(1100)
+    );
+    let RunKind::Field(field) = &paragraph.runs[2].kind else {
+        panic!("expected a semantic text field");
+    };
+    assert_eq!(
+        raw::field_id(field),
+        "{4E5A4B57-27D5-4D0E-8F5C-4A5B5B1E5F01}"
+    );
+    assert_eq!(paragraph.runs[2].text, "linked");
+    assert_eq!(body.text(), "A\nlinked");
+    assert_eq!(
+        paragraph
+            .end_properties
+            .as_deref()
+            .and_then(|properties| properties.size)
+            .map(TextSize::get),
+        Some(900)
+    );
+    // The markup this parser has always retained stays retained.
+    let opaque: Vec<_> = shape
+        .non_visual
+        .opaque
+        .elements()
+        .iter()
+        .map(|element| String::from_utf8_lossy(element.as_xml()).into_owned())
+        .collect();
+    for prefix in ["<a:lstStyle", "<a:pPr", "<a:br", "<a:fld", "<a:endParaRPr"] {
+        assert!(
+            opaque.iter().any(|xml| xml.starts_with(prefix)),
+            "{prefix} not retained: {opaque:?}"
+        );
+    }
+}
+
+#[test]
+fn debug_redacts_authored_shape_values() {
+    let objects = read(&drawing(&two_cell_anchor(text_box_shape())))
+        .unwrap()
+        .unwrap();
+    let shape_debug = format!("{:?}", &objects[0].object);
+    assert!(!shape_debug.contains("Text Box 7"));
+    assert!(!shape_debug.contains("alt"));
+    assert!(!shape_debug.contains("Bold"));
+
+    let shapes = Shapes {
+        worksheet_name: "Secret worksheet".to_owned(),
+        worksheet_part_name: "/xl/worksheets/secret.xml".to_owned(),
+        objects,
+    };
+    let inventory_debug = format!("{shapes:?}");
+    assert!(!inventory_debug.contains("Secret worksheet"));
+    assert!(!inventory_debug.contains("secret.xml"));
 }

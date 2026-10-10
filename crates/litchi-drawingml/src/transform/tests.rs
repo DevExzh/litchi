@@ -105,3 +105,22 @@ fn resource_limits_and_fragment_shape_are_checked() {
     assert!(codec::read(br#"<a:xfrm"#).is_err());
     assert!(codec::read(br#""#).is_err());
 }
+
+#[test]
+fn transform_errors_do_not_echo_authored_xml() {
+    for xml in [
+        r#"<a:xfrm rot="private-value"/>"#,
+        r#"<a:xfrm flipV="private-value"/>"#,
+        r#"<a:xfrm private-value="1"/>"#,
+        r#"<a:xfrm><a:private-value/></a:xfrm>"#,
+        r#"<a:xfrm rot="&private-value;"/>"#,
+        r#"<a:xfrm><a:off x="private-value" y="0"/></a:xfrm>"#,
+        r#"<a:xfrm><a:ext cx="private-value" cy="0"/></a:xfrm>"#,
+        r#"<a:xfrm></private-value>"#,
+    ] {
+        let error = codec::read(xml.as_bytes()).expect_err("invalid transform");
+        assert!(!format!("{error:?} {error}").contains("private-value"));
+    }
+    let error = Angle::parse("private-value").unwrap_err();
+    assert!(!format!("{error:?} {error}").contains("private-value"));
+}
