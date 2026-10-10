@@ -330,12 +330,12 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         return Err("owning PPTX ingress did not retain exact source authorization".into());
     }
     let mut no_op_package = litchi_pptx::Package::from_vec(source.clone())?;
-    let no_op_edit = no_op_package.opened_presentation_transaction()?;
+    let no_op_edit = no_op_package.edit()?;
     let no_op_commit = no_op_edit.commit()?;
-    if no_op_commit.is_changed() {
+    if no_op_commit.diagnostics().changed() {
         return Err("owning PPTX empty transaction unexpectedly changed the package".into());
     }
-    no_op_package.apply_opened_presentation_commit(no_op_commit)?;
+    no_op_package = no_op_commit.into_package();
     let no_op_ownership = ownership_capability(no_op_package.opc()?);
     let no_op = no_op_package.to_bytes()?;
     write_new_bytes(&directory.join(NOOP_FILE), &no_op)?;
@@ -349,7 +349,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     }
 
     let mut package = litchi_pptx::Package::from_vec(source.clone())?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut edit = package.edit()?;
     for slide_position in selected_positions.iter().copied() {
         let texts = replacement_texts(slide_position);
         let replacements = super::pptx_batch_replacements(&texts);
@@ -359,7 +359,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         }
     }
     let commit = edit.commit()?;
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("owning PPTX control produced an unchanged commit".into());
     }
     if commit.patch().resource_count() == 0 {
@@ -367,7 +367,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     }
     let forward = commit.patch().clone();
     let inverse = forward.inverse();
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     let mut ownership = ingress_ownership;
     let after_edit = ownership_capability(package.opc()?);
     ownership.after_edit_unmodified_owned_source = after_edit.ingress_unmodified_owned_source;
@@ -453,13 +453,13 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     };
 
     let mut inverse_package = package;
-    inverse_package.apply_opened_presentation_patch(&inverse)?;
+    inverse_package = inverse_package.apply(&inverse)?;
     let inverse_output = inverse_package.to_bytes()?;
     write_new_bytes(&directory.join(INVERSE_FILE), &inverse_output)?;
     if inverse_output != source {
         return Err("owning PPTX inverse did not restore exact source bytes".into());
     }
-    inverse_package.apply_opened_presentation_patch(&forward)?;
+    inverse_package = inverse_package.apply(&forward)?;
     let forward_replay = inverse_package.to_bytes()?;
     write_new_bytes(&directory.join(FORWARD_REPLAY_FILE), &forward_replay)?;
     if forward_replay != output {
@@ -477,13 +477,13 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
         return Err("owning PPTX durable inverse patch changed during round-trip".into());
     }
     let mut durable_forward_package = litchi_pptx::Package::from_vec(source.clone())?;
-    durable_forward_package.apply_opened_presentation_patch(&decoded_forward)?;
+    durable_forward_package = durable_forward_package.apply(&decoded_forward)?;
     let durable_forward_output = durable_forward_package.to_bytes()?;
     if durable_forward_output != output {
         return Err("owning PPTX durable forward patch failed on a reopened source".into());
     }
     let mut durable_inverse_package = litchi_pptx::Package::from_vec(output.clone())?;
-    durable_inverse_package.apply_opened_presentation_patch(&decoded_inverse)?;
+    durable_inverse_package = durable_inverse_package.apply(&decoded_inverse)?;
     let durable_inverse_output = durable_inverse_package.to_bytes()?;
     if durable_inverse_output != source {
         return Err("owning PPTX durable inverse patch failed on a reopened candidate".into());
@@ -513,16 +513,16 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     }
 
     let mut stale = litchi_pptx::Package::from_vec(source.clone())?;
-    let mut stale_edit = stale.opened_presentation_transaction()?;
+    let mut stale_edit = stale.edit()?;
     let stale_texts = replacement_texts(0);
     let stale_replacements = super::pptx_batch_replacements(&stale_texts);
     if stale_edit.set_shape_texts(0, &stale_replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
         return Err("owning PPTX stale fixture changed an unexpected shape count".into());
     }
-    stale.apply_opened_presentation_commit(stale_edit.commit()?)?;
+    stale = stale_edit.commit()?.into_package();
     let stale_before = stale.to_bytes()?;
     let stale_error = stale
-        .apply_opened_presentation_patch(&forward)
+        .apply(&forward)
         .err()
         .ok_or("owning PPTX control accepted a stale source patch")?;
     let stale_after = stale.to_bytes()?;
@@ -541,7 +541,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     let mut foreign = litchi_pptx::Package::from_vec(foreign_bytes)?;
     let foreign_before = foreign.to_bytes()?;
     let foreign_error = foreign
-        .apply_opened_presentation_patch(&forward)
+        .apply(&forward)
         .err()
         .ok_or("owning PPTX control accepted a foreign source patch")?;
     let foreign_after = foreign.to_bytes()?;
@@ -599,7 +599,7 @@ fn run_control(corpus: Corpus, directory: &Path) -> Result<RunOutput, Box<dyn Er
     let report = ControlReport {
         schema: SCHEMA,
         status: "probe_passed_pending_independent_raw_census",
-        implementation: "litchi_pptx::Package::from_vec -> opened_presentation_transaction -> PackageWriter::write_to_stream",
+        implementation: "litchi_pptx::Package::from_vec -> edit -> PackageWriter::write_to_stream",
         timing_scope: "untimed qualification; no elapsed-time, allocation, instruction, compression, or speedup measurement",
         performance_claim: "none; this owning control only establishes preservation and refusal gates",
         corpus: corpus.manifest,

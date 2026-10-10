@@ -1217,11 +1217,13 @@ dependencies = [
 name = "litchi-ops"
 version = "0.0.1"
 dependencies = [
+ "caseless",
  "chrono",
  "litchi-cfb",
  "litchi-core",
  "litchi-doc",
  "litchi-docx",
+ "litchi-drawingml",
  "litchi-odf-common",
  "litchi-odp",
  "litchi-ods",
@@ -1236,6 +1238,9 @@ dependencies = [
  "litchi-xls",
  "litchi-xlsb",
  "litchi-xlsx",
+ "serde",
+ "serde_json",
+ "unicode-normalization",
 ]
 
 [[package]]

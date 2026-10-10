@@ -17128,8 +17128,8 @@ fn pptx_cross_copy_bytes(
     media_slide: Option<usize>,
     title_prefix: &str,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut authored = litchi_pptx::Package::new()?;
-    let presentation = authored.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..slide_count {
         let slide = presentation.add_slide()?;
         slide.set_title(&format!(
@@ -17144,12 +17144,12 @@ fn pptx_cross_copy_bytes(
         );
     }
 
-    let mut package = litchi_pptx::Package::from_bytes(&authored.to_bytes()?)?;
+    let mut package = builder.build()?;
     if let Some(media_slide) = media_slide {
         if media_slide >= slide_count {
             return Err("PPTX cross-copy media owner is outside the slide corpus".into());
         }
-        let mut edit = package.opened_presentation_transaction()?;
+        let mut edit = package.edit()?;
         for index in 0..PPTX_CROSS_COPY_MEDIA_ENTRY_COUNT {
             let resource = litchi_pptx::media_parts::Resource::new(
                 format!("/ppt/media/litchi-perf-cross-copy-media-{index:02}.png"),
@@ -17164,19 +17164,19 @@ fn pptx_cross_copy_bytes(
             )?;
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err(
                 "PPTX cross-copy media corpus transaction did not change the package".into(),
             );
         }
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
     }
     Ok(package.to_bytes()?)
 }
 
 fn pptx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut authored = litchi_pptx::Package::new()?;
-    let presentation = authored.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..PPTX_SOURCE_SLIDE_COUNT {
         let slide = presentation.add_slide()?;
         for shape_index in 0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
@@ -17189,8 +17189,8 @@ fn pptx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
             );
         }
     }
-    let mut package = litchi_pptx::Package::from_bytes(&authored.to_bytes()?)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut package = builder.build()?;
+    let mut edit = package.edit()?;
     for index in 0..PPTX_SOURCE_MEDIA_ENTRY_COUNT {
         let resource = litchi_pptx::media_parts::Resource::new(
             format!("/ppt/media/litchi-perf-source-media-{index:02}.png"),
@@ -17205,10 +17205,10 @@ fn pptx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
         )?;
     }
     let commit = edit.commit()?;
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("PPTX source-edit corpus media transaction did not change the package".into());
     }
-    package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
     Ok(package.to_bytes()?)
 }
 
@@ -19895,7 +19895,7 @@ fn verify_pptx_cross_copy_refusal_gates(
         0_usize,
         "stale destination mutation",
     )?;
-    stale_destination.apply_opened_presentation_commit(stale_destination_edit.commit()?)?;
+    stale_destination = stale_destination_edit.commit()?.into_package();
     let stale_destination_before = stale_destination.to_bytes()?;
     let stale_destination_result =
         stale_destination.apply_cross_slide_copy_plan(&stale_source, &stale_plan);
@@ -19919,7 +19919,7 @@ fn verify_pptx_cross_copy_refusal_gates(
         0_usize,
         "stale source mutation",
     )?;
-    stale_source.apply_opened_presentation_commit(stale_source_edit.commit()?)?;
+    stale_source = stale_source_edit.commit()?.into_package();
     let stale_source_before = stale_source.to_bytes()?;
     let mut stale_source_destination =
         litchi_pptx::Package::from_vec(destination_archive.to_vec())?;
@@ -20478,8 +20478,8 @@ fn rewrite_pptx_slide_names(
 }
 
 fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_pptx::Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..shape.pptx_slides() {
         let slide = presentation.add_slide()?;
         for shape_index in 0..shape.pptx_text_boxes_per_slide() {
@@ -20492,7 +20492,7 @@ fn semantic_pptx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> 
             );
         }
     }
-    Ok(package.to_bytes()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn semantic_odt_text(index: usize, updated: bool) -> String {
@@ -34590,7 +34590,7 @@ fn run_semantic_pptx(
             | Case::PptxSemanticOnePercentEditSave => {
                 let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
                 let started = Instant::now();
-                let mut edit = package.opened_presentation_transaction()?;
+                let mut edit = package.edit()?;
                 for linear in &selected {
                     let slide = *linear / shape.pptx_text_boxes_per_slide();
                     let object = *linear % shape.pptx_text_boxes_per_slide();
@@ -34603,10 +34603,10 @@ fn run_semantic_pptx(
                     }
                 }
                 let commit = edit.commit()?;
-                if commit.is_changed() == selected.is_empty() {
+                if commit.diagnostics().changed() == selected.is_empty() {
                     return Err("semantic PPTX commit has unexpected changed state".into());
                 }
-                package.apply_opened_presentation_commit(commit)?;
+                package = commit.into_package();
                 let bytes = package.to_bytes()?;
                 let duration = started.elapsed();
                 let reopened = litchi_pptx::Package::from_bytes(&bytes)?;
@@ -34640,7 +34640,7 @@ fn run_pptx_opened_transaction_phases(
     let mut elapsed = Vec::with_capacity(samples);
     let mut summary = PptxOpenedTransactionPhaseSummary {
         implementation: "litchi-pptx::Package opened presentation transaction",
-        timing_scope: "total_ns encloses opened_presentation, Snapshot::edit, set_shape_text, Transaction::commit, apply_opened_presentation_commit, and Package::to_bytes; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
+        timing_scope: "total_ns encloses opened_presentation, Snapshot::edit, set_shape_text, Edit::commit, Commit::into_package, and Package::to_bytes; package construction, semantic reopening, digesting, and all correctness checks are outside the clocks",
         performance_claim: "attribution-only phase evidence; no speedup, allocation, RSS, physical-I/O, cold-cache, or producer claim",
         source_archive_sha256: corpus.manifest.archive_sha256.clone(),
         selected_edit_count: selected.len(),
@@ -34680,12 +34680,12 @@ fn run_pptx_opened_transaction_phases(
         let started = Instant::now();
         let commit = edit.commit()?;
         let transaction_commit_ns = elapsed_ns(started.elapsed())?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX phase edit did not produce a changed commit".into());
         }
 
         let started = Instant::now();
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
         let apply_commit_ns = elapsed_ns(started.elapsed())?;
 
         let started = Instant::now();
@@ -34800,7 +34800,7 @@ fn run_pptx_slide_name_index(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let mut package = litchi_pptx::Package::from_vec(corpus.archive.clone())?;
         let started = Instant::now();
-        let mut edit = package.opened_presentation_transaction()?;
+        let mut edit = package.edit()?;
         for operation in &edits {
             let changed = if named {
                 edit.set_shape_text(
@@ -34820,10 +34820,10 @@ fn run_pptx_slide_name_index(
             }
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX selector edit did not produce a changed commit".into());
         }
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
         let output = package.to_bytes()?;
         let duration = started.elapsed();
         if output != expected_output {
@@ -50769,19 +50769,20 @@ fn publish_pptx_batch_edit<W: Write>(
         let opc = package.into_opc_package()?;
         let materializations = opc.part_count();
         let mut package = litchi_pptx::Package::from_opc_package(opc)?;
-        let mut edit = package.opened_presentation_transaction()?;
+        let mut edit = package.edit()?;
         if edit.set_shape_texts(target_slide, &replacements)? != PPTX_SOURCE_TEXT_BOXES_PER_SLIDE {
             return Err("PPTX eager batch changed an unexpected shape count".into());
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX eager batch produced an unchanged commit".into());
         }
         let inverse = commit.patch().inverse();
-        let published = package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
+        let published = package.opened_presentation()?;
         if package
-            .apply_opened_presentation_patch(&inverse)
-            .and_then(|_| package.apply_opened_presentation_patch(&inverse.inverse()))
+            .apply(&inverse)
+            .and_then(|restored| restored.apply(&inverse.inverse()))
             .is_err()
         {
             return Err("PPTX eager batch inverse/forward replay failed".into());
@@ -50938,7 +50939,7 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
     let opc = package.into_opc_package()?;
     let materializations = opc.part_count();
     let mut package = litchi_pptx::Package::from_opc_package(opc)?;
-    let mut edit = package.opened_presentation_transaction()?;
+    let mut edit = package.edit()?;
     for slide_position in pptx_multi_slide_positions() {
         let texts = (0..PPTX_SOURCE_TEXT_BOXES_PER_SLIDE)
             .map(|shape| semantic_pptx_text(slide_position, shape, true))
@@ -50950,14 +50951,15 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
         }
     }
     let commit = edit.commit()?;
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("PPTX eager multi-slide batch produced an unchanged commit".into());
     }
     let inverse = commit.patch().inverse();
-    let published = package.apply_opened_presentation_commit(commit)?;
+    package = commit.into_package();
+    let published = package.opened_presentation()?;
     if package
-        .apply_opened_presentation_patch(&inverse)
-        .and_then(|_| package.apply_opened_presentation_patch(&inverse.inverse()))
+        .apply(&inverse)
+        .and_then(|restored| restored.apply(&inverse.inverse()))
         .is_err()
     {
         return Err("PPTX eager multi-slide batch inverse/forward replay failed".into());

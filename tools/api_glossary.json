@@ -703,6 +703,391 @@
           "name": "ReadResource",
           "scope": "litchi_pptx",
           "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_pptx::shape::owned::Selector",
+          "replacement": "use Position(Position)"
+        },
+        {
+          "name": "Id",
+          "scope": "litchi_pptx::shape::owned::Selector",
+          "replacement": "ordinary selection uses Name or Position"
+        },
+        {
+          "name": "index",
+          "scope": "litchi_pptx::shape::owned::Handle",
+          "replacement": "use position() -> Position"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_pptx::shape::owned::Handle",
+          "replacement": "native IDs require an explicit raw escape"
+        },
+        {
+          "name": "xml",
+          "scope": "litchi_pptx::shape::owned::Handle",
+          "replacement": "physical markup is not an ordinary handle property"
+        },
+        {
+          "name": "xml",
+          "scope": "litchi_pptx::shape::owned::Scene",
+          "replacement": "use owned::raw::xml"
+        },
+        {
+          "name": "LookupError",
+          "scope": "litchi_pptx::shape::owned",
+          "replacement": "use focused Error"
+        },
+        {
+          "name": "SceneCacheDiagnostics",
+          "scope": "litchi_pptx::presentation::scene",
+          "replacement": "use focused CacheDiagnostics"
+        },
+        {
+          "name": "Payload",
+          "scope": "litchi_pptx::shape",
+          "replacement": "use shape::raw for native payload metadata",
+          "recursive": false
+        },
+        {
+          "name": "PayloadAttribute",
+          "scope": "litchi_pptx::shape",
+          "replacement": "use shape::raw for native payload metadata",
+          "recursive": false
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_pptx::shape::Common",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "non_visual_span",
+          "scope": "litchi_pptx::shape::Common",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "transform_span",
+          "scope": "litchi_pptx::shape::Common",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_pptx::shape::Shape",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "non_visual_span",
+          "scope": "litchi_pptx::shape::Shape",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "transform_span",
+          "scope": "litchi_pptx::shape::Shape",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "text_body_span",
+          "scope": "litchi_pptx::shape::Common",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "text_body_span",
+          "scope": "litchi_pptx::shape::Shape",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Layout",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Layout",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Layout",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Notes",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Notes",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Notes",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Comments",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Comments",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Comments",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "author_id",
+          "scope": "litchi_pptx::presentation::related::Comment",
+          "replacement": "use presentation::related::raw::author_id"
+        },
+        {
+          "name": "index",
+          "scope": "litchi_pptx::presentation::related::Comment",
+          "replacement": "use presentation::related::raw::index"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Chart",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Chart",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Chart",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Master",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Master",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Master",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "native_id",
+          "scope": "litchi_pptx::presentation::related::Master",
+          "replacement": "use presentation::related::raw::native_id"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_pptx::presentation::sections::Section",
+          "replacement": "use presentation::sections::raw::id"
+        },
+        {
+          "name": "native_slide_ids",
+          "scope": "litchi_pptx::presentation::sections::Section",
+          "replacement": "use presentation::sections::raw::native_slide_ids"
+        },
+        {
+          "name": "extension_xml",
+          "scope": "litchi_pptx::presentation::sections::Section",
+          "replacement": "use presentation::sections::raw::extension_xml"
+        },
+        {
+          "name": "SourceMaster",
+          "scope": "litchi_pptx",
+          "replacement": "use presentation::related::Master"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw for part identity"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw for relationship identity"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw for original bytes"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "author_id",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "assigned_to",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "text_body_xml",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for original markup"
+        },
+        {
+          "name": "extension_xml",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for original markup"
+        },
+        {
+          "name": "namespace_declarations",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for XML metadata"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "author_id",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "text_body_xml",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for original markup"
+        },
+        {
+          "name": "extension_xml",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for original markup"
+        },
+        {
+          "name": "namespace_declarations",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for XML metadata"
+        },
+        {
+          "name": "root_prefix",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw"
+        },
+        {
+          "name": "namespace_declarations",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pptx::opened",
+          "replacement": "use opened::Edit"
+        },
+        {
+          "name": "opened_presentation_transaction",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use Package::edit()"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_pptx::opened::Edit",
+          "replacement": "drop the detached Edit to discard staged changes"
+        },
+        {
+          "name": "apply_opened_presentation_commit",
+          "scope": "litchi_pptx::Package",
+          "replacement": "consume Commit::into_package()"
+        },
+        {
+          "name": "apply_opened_presentation_patch",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use immutable Package::apply(&patch)"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_pptx::opened::Commit",
+          "replacement": "use Commit::package()"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pptx::opened::Commit",
+          "replacement": "use Commit::diagnostics().changed()"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pptx::opened::Edit",
+          "replacement": "commit and inspect diagnostics().changed()"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_pptx::opened::Patch",
+          "replacement": "use Patch::is_noop()"
+        },
+        {
+          "name": "create",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use Package::new() or builder::Builder"
+        },
+        {
+          "name": "save",
+          "scope": "litchi_pptx::builder::Builder",
+          "replacement": "call build() and publish the returned Package"
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_pptx::builder::Builder",
+          "replacement": "call build() and publish the returned Package"
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_pptx::builder::Builder",
+          "replacement": "call build() and publish the returned Package"
+        },
+        {
+          "name": "presentation_mut",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use builder::Builder::presentation for authoring; Package::edit for changes"
+        },
+        {
+          "name": "set_font_embedding",
+          "scope": "litchi_pptx::Package",
+          "replacement": "configure builder::Builder::font_embedding before build"
+        },
+        {
+          "name": "with_font_embedding",
+          "scope": "litchi_pptx::Package",
+          "replacement": "configure builder::Builder::font_embedding before build"
+        },
+        {
+          "name": "Key",
+          "scope": "litchi_pptx",
+          "replacement": "use slide::Selector with semantic names or Position",
+          "recursive": false
+        },
+        {
+          "name": "Key",
+          "scope": "litchi_pptx::slide",
+          "replacement": "use Selector with semantic names or Position",
+          "recursive": false
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_pptx::slide::Selector",
+          "replacement": "use Position(Position)"
+        },
+        {
+          "name": "Key",
+          "scope": "litchi_pptx::slide::model",
+          "replacement": "use slide::Selector with semantic names or Position",
+          "recursive": false
         }
       ],
       "families": []
@@ -731,6 +1116,346 @@
           "name": "ReadResource",
           "scope": "litchi_pptx",
           "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_pptx::shape::owned::Selector",
+          "replacement": "use Position(Position)"
+        },
+        {
+          "name": "Id",
+          "scope": "litchi_pptx::shape::owned::Selector",
+          "replacement": "ordinary selection uses Name or Position"
+        },
+        {
+          "name": "index",
+          "scope": "litchi_pptx::shape::owned::Handle",
+          "replacement": "use position() -> Position"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_pptx::shape::owned::Handle",
+          "replacement": "native IDs require an explicit raw escape"
+        },
+        {
+          "name": "xml",
+          "scope": "litchi_pptx::shape::owned::Handle",
+          "replacement": "physical markup is not an ordinary handle property"
+        },
+        {
+          "name": "xml",
+          "scope": "litchi_pptx::shape::owned::Scene",
+          "replacement": "use owned::raw::xml"
+        },
+        {
+          "name": "LookupError",
+          "scope": "litchi_pptx::shape::owned",
+          "replacement": "use focused Error"
+        },
+        {
+          "name": "SceneCacheDiagnostics",
+          "scope": "litchi_pptx::presentation::scene",
+          "replacement": "use focused CacheDiagnostics"
+        },
+        {
+          "name": "Payload",
+          "scope": "litchi_pptx::shape",
+          "replacement": "use shape::raw for native payload metadata",
+          "recursive": false
+        },
+        {
+          "name": "PayloadAttribute",
+          "scope": "litchi_pptx::shape",
+          "replacement": "use shape::raw for native payload metadata",
+          "recursive": false
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_pptx::shape::Common",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "non_visual_span",
+          "scope": "litchi_pptx::shape::Common",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "transform_span",
+          "scope": "litchi_pptx::shape::Common",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "payload",
+          "scope": "litchi_pptx::shape::Shape",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "non_visual_span",
+          "scope": "litchi_pptx::shape::Shape",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "transform_span",
+          "scope": "litchi_pptx::shape::Shape",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "text_body_span",
+          "scope": "litchi_pptx::shape::Common",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "text_body_span",
+          "scope": "litchi_pptx::shape::Shape",
+          "replacement": "use explicit shape::raw access"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Layout",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Layout",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Layout",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Notes",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Notes",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Notes",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Comments",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Comments",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Comments",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "author_id",
+          "scope": "litchi_pptx::presentation::related::Comment",
+          "replacement": "use presentation::related::raw::author_id"
+        },
+        {
+          "name": "index",
+          "scope": "litchi_pptx::presentation::related::Comment",
+          "replacement": "use presentation::related::raw::index"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Chart",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Chart",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Chart",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::related::Master",
+          "replacement": "use presentation::related::raw::part_uri"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::related::Master",
+          "replacement": "use presentation::related::raw::relationship_id"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::related::Master",
+          "replacement": "use presentation::related::raw::data"
+        },
+        {
+          "name": "native_id",
+          "scope": "litchi_pptx::presentation::related::Master",
+          "replacement": "use presentation::related::raw::native_id"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_pptx::presentation::sections::Section",
+          "replacement": "use presentation::sections::raw::id"
+        },
+        {
+          "name": "native_slide_ids",
+          "scope": "litchi_pptx::presentation::sections::Section",
+          "replacement": "use presentation::sections::raw::native_slide_ids"
+        },
+        {
+          "name": "extension_xml",
+          "scope": "litchi_pptx::presentation::sections::Section",
+          "replacement": "use presentation::sections::raw::extension_xml"
+        },
+        {
+          "name": "SourceMaster",
+          "scope": "litchi_pptx",
+          "replacement": "use presentation::related::Master"
+        },
+        {
+          "name": "part_uri",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw for part identity"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw for relationship identity"
+        },
+        {
+          "name": "data",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw for original bytes"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "author_id",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "assigned_to",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "text_body_xml",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for original markup"
+        },
+        {
+          "name": "extension_xml",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for original markup"
+        },
+        {
+          "name": "namespace_declarations",
+          "scope": "litchi_pptx::presentation::modern_comments::Comment",
+          "replacement": "use presentation::modern_comments::raw for XML metadata"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "author_id",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for native identity"
+        },
+        {
+          "name": "text_body_xml",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for original markup"
+        },
+        {
+          "name": "extension_xml",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for original markup"
+        },
+        {
+          "name": "namespace_declarations",
+          "scope": "litchi_pptx::presentation::modern_comments::Reply",
+          "replacement": "use presentation::modern_comments::raw for XML metadata"
+        },
+        {
+          "name": "root_prefix",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw"
+        },
+        {
+          "name": "namespace_declarations",
+          "scope": "litchi_pptx::presentation::modern_comments::List",
+          "replacement": "use presentation::modern_comments::raw"
+        },
+        {
+          "name": "create",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use Package::new() or builder::Builder"
+        },
+        {
+          "name": "save",
+          "scope": "litchi_pptx::builder::Builder",
+          "replacement": "call build() and publish the returned Package"
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_pptx::builder::Builder",
+          "replacement": "call build() and publish the returned Package"
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_pptx::builder::Builder",
+          "replacement": "call build() and publish the returned Package"
+        },
+        {
+          "name": "presentation_mut",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use builder::Builder::presentation for authoring; Package::edit for changes"
+        },
+        {
+          "name": "set_font_embedding",
+          "scope": "litchi_pptx::Package",
+          "replacement": "configure builder::Builder::font_embedding before build"
+        },
+        {
+          "name": "with_font_embedding",
+          "scope": "litchi_pptx::Package",
+          "replacement": "configure builder::Builder::font_embedding before build"
+        },
+        {
+          "name": "Key",
+          "scope": "litchi_pptx",
+          "replacement": "use slide::Selector with semantic names or Position",
+          "recursive": false
+        },
+        {
+          "name": "Key",
+          "scope": "litchi_pptx::slide",
+          "replacement": "use Selector with semantic names or Position",
+          "recursive": false
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_pptx::slide::Selector",
+          "replacement": "use Position(Position)"
+        },
+        {
+          "name": "Key",
+          "scope": "litchi_pptx::slide::model",
+          "replacement": "use slide::Selector with semantic names or Position",
+          "recursive": false
         }
       ],
       "families": []
@@ -755,6 +1480,31 @@
           "name": "ReadResource",
           "scope": "litchi_xlsx",
           "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "SourceGrid",
+          "scope": "litchi_xlsx",
+          "replacement": "use workbook::source::Grid"
+        },
+        {
+          "name": "SemanticCacheDiagnostics",
+          "scope": "litchi_xlsx",
+          "replacement": "use workbook::source::CacheDiagnostics"
+        },
+        {
+          "name": "SourceCellRecord",
+          "scope": "litchi_xlsx",
+          "replacement": "use workbook::source::Record"
+        },
+        {
+          "name": "SourceStyleKey",
+          "scope": "litchi_xlsx",
+          "replacement": "use style::StyleKey"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_xlsx::style::cell_format::NumberFormat",
+          "replacement": "use cell_format::raw::number_format_id for explicit native metadata"
         }
       ],
       "families": []
@@ -782,6 +1532,31 @@
           "name": "ReadResource",
           "scope": "litchi_xlsx",
           "replacement": "use SourceLimitKind"
+        },
+        {
+          "name": "SourceGrid",
+          "scope": "litchi_xlsx",
+          "replacement": "use workbook::source::Grid"
+        },
+        {
+          "name": "SemanticCacheDiagnostics",
+          "scope": "litchi_xlsx",
+          "replacement": "use workbook::source::CacheDiagnostics"
+        },
+        {
+          "name": "SourceCellRecord",
+          "scope": "litchi_xlsx",
+          "replacement": "use workbook::source::Record"
+        },
+        {
+          "name": "SourceStyleKey",
+          "scope": "litchi_xlsx",
+          "replacement": "use style::StyleKey"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_xlsx::style::cell_format::NumberFormat",
+          "replacement": "use cell_format::raw::number_format_id for explicit native metadata"
         }
       ],
       "families": []
@@ -809,6 +1584,41 @@
           "scope": "litchi_xlsb",
           "replacement": "use SourceLimitKind",
           "recursive": false
+        },
+        {
+          "name": "SheetKind",
+          "scope": "litchi_xlsb",
+          "replacement": "use the canonical sheet::{Kind, State, Tab} vocabulary"
+        },
+        {
+          "name": "SheetState",
+          "scope": "litchi_xlsb",
+          "replacement": "use the canonical sheet::{Kind, State, Tab} vocabulary"
+        },
+        {
+          "name": "SheetTab",
+          "scope": "litchi_xlsb",
+          "replacement": "use the canonical sheet::{Kind, State, Tab} vocabulary"
+        },
+        {
+          "name": "Id",
+          "scope": "litchi_xlsb::sheet::Selector",
+          "replacement": "select by semantic name or checked Position; native identities require raw access"
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_xlsb::sheet::Selector",
+          "replacement": "select by semantic name or checked Position; native identities require raw access"
+        },
+        {
+          "name": "sheet_tab",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use sheet(selector) and sheets()"
+        },
+        {
+          "name": "sheet_tabs",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use sheet(selector) and sheets()"
         }
       ],
       "families": []
@@ -839,6 +1649,75 @@
           "scope": "litchi_xlsb",
           "replacement": "use SourceLimitKind",
           "recursive": false
+        },
+        {
+          "name": "SheetKind",
+          "scope": "litchi_xlsb",
+          "replacement": "use the canonical sheet::{Kind, State, Tab} vocabulary"
+        },
+        {
+          "name": "SheetState",
+          "scope": "litchi_xlsb",
+          "replacement": "use the canonical sheet::{Kind, State, Tab} vocabulary"
+        },
+        {
+          "name": "SheetTab",
+          "scope": "litchi_xlsb",
+          "replacement": "use the canonical sheet::{Kind, State, Tab} vocabulary"
+        },
+        {
+          "name": "Id",
+          "scope": "litchi_xlsb::sheet::Selector",
+          "replacement": "select by semantic name or checked Position; native identities require raw access"
+        },
+        {
+          "name": "Index",
+          "scope": "litchi_xlsb::sheet::Selector",
+          "replacement": "select by semantic name or checked Position; native identities require raw access"
+        },
+        {
+          "name": "sheet_tab",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use sheet(selector) and sheets()"
+        },
+        {
+          "name": "sheet_tabs",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use sheet(selector) and sheets()"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "drawingml",
+      "package": "litchi-drawingml",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "Profile",
+          "scope": "litchi_drawingml::text::body::reader",
+          "replacement": "the shared reader is strict by default"
+        },
+        {
+          "name": "read_with",
+          "scope": "litchi_drawingml::text::body::reader",
+          "replacement": "use read_with_options"
+        },
+        {
+          "name": "id",
+          "scope": "litchi_drawingml::text::body::Field",
+          "replacement": "use explicit body::raw::field_id"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_drawingml::text::body::Hyperlink",
+          "replacement": "use explicit body::raw access"
+        },
+        {
+          "name": "relationship_id",
+          "scope": "litchi_drawingml::text::body::Picture",
+          "replacement": "use explicit body::raw access"
         }
       ],
       "families": []

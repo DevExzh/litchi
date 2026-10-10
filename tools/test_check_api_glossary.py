@@ -113,7 +113,7 @@ class RustdocTests(unittest.TestCase):
 
     @classmethod
     def setUpClass(cls):
-        cls.scratch = tempfile.TemporaryDirectory(prefix="litchi-glossary-test-", dir=gate.ROOT.parent)
+        cls.scratch = tempfile.TemporaryDirectory(prefix="litchi-glossary-test-", dir=gate.ROOT)
         cls.addClassCleanup(cls.scratch.cleanup)
         cls.directory = Path(cls.scratch.name)
         source = cls.directory / "lib.rs"

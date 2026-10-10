@@ -722,8 +722,8 @@ fn archive_census(archive: &[u8]) -> Result<Vec<MemberCensus>, Box<dyn Error>> {
 /// Returns the writer's own package and the marked one, so a corpus can state
 /// what the production writer already emits.
 fn pptx_marker_archive() -> Result<(Vec<u8>, Vec<u8>), Box<dyn Error>> {
-    let mut package = litchi_pptx::Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for slide_index in 0..PPTX_MARKER_SLIDES {
         let slide = presentation.add_slide()?;
         for shape_index in 0..PPTX_MARKER_TEXT_BOXES {
@@ -736,7 +736,7 @@ fn pptx_marker_archive() -> Result<(Vec<u8>, Vec<u8>), Box<dyn Error>> {
             );
         }
     }
-    let skeleton = package.to_bytes()?;
+    let skeleton = builder.build()?.to_bytes()?;
 
     let reader = ArchiveReader::new(&skeleton)?;
     let names = reader.file_names().map(str::to_owned).collect::<Vec<_>>();

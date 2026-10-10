@@ -108,14 +108,14 @@ fn reserve_exact<T>(
 }
 
 fn build_plain_archive(slide_count: usize, prefix: &str) -> Result<Vec<u8>, Box<dyn StdError>> {
-    let mut package = Package::new()?;
-    let presentation = package.presentation_mut()?;
+    let mut builder = litchi_pptx::builder::Builder::new()?;
+    let presentation = builder.presentation()?;
     for index in 0..slide_count {
         let slide = presentation.add_slide()?;
         slide.set_title(&format!("{prefix}-title-{index}"));
         slide.add_text_box(&format!("{prefix}-body-{index}"), 36, 36, 540, 72);
     }
-    Ok(package.to_bytes()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn package_slide_names(bytes: &[u8]) -> Result<Vec<String>, Box<dyn StdError>> {
@@ -148,10 +148,10 @@ fn move_bytes(bytes: &[u8], from: usize, to: usize) -> Result<Vec<u8>, Box<dyn S
     let mut package = Package::from_vec(bytes.to_vec())?;
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
-    let changed = transaction.move_slide(from, to)?;
+    let changed = transaction.move_slide(from, litchi_core::Position::new(to))?;
     let commit = transaction.commit()?;
     if changed {
-        package.apply_opened_presentation_commit(commit)?;
+        package = commit.into_package();
     }
     Ok(package.to_bytes()?)
 }
@@ -423,8 +423,8 @@ fn apply_boundary_to_package(
                 .ok_or("PPTX boundary move operation index is outside the fixed pair set")?;
             let snapshot = package.opened_presentation()?;
             let mut transaction = snapshot.edit();
-            transaction.move_slide(from, to)?;
-            package.apply_opened_presentation_commit(transaction.commit()?)?;
+            transaction.move_slide(from, litchi_core::Position::new(to))?;
+            *package = transaction.commit()?.into_package();
         },
     }
     Ok(())
@@ -461,8 +461,8 @@ fn verify_partial_zero_sinks(
 fn mutate_order(package: &mut Package) -> Result<(), Box<dyn StdError>> {
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
-    transaction.move_slide(0, 1)?;
-    package.apply_opened_presentation_commit(transaction.commit()?)?;
+    transaction.move_slide(0, litchi_core::Position::new(1))?;
+    *package = transaction.commit()?.into_package();
     Ok(())
 }
 
@@ -500,25 +500,28 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
     let package = Package::from_vec(corpus.archive.clone())?;
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
-    transaction.move_slide(REPRESENTATIVE_MOVE.0, REPRESENTATIVE_MOVE.1)?;
+    transaction.move_slide(
+        REPRESENTATIVE_MOVE.0,
+        litchi_core::Position::new(REPRESENTATIVE_MOVE.1),
+    )?;
     let commit = transaction.commit()?;
     let forward = Patch::from_bytes(&commit.patch().to_bytes()?)?;
     let inverse = Patch::from_bytes(&forward.inverse().to_bytes()?)?;
     let mut applied = Package::from_vec(corpus.archive.clone())?;
-    applied.apply_opened_presentation_patch(&forward)?;
+    applied = applied.apply(&forward)?;
     let applied_bytes = applied.to_bytes()?;
     let forward_verified = verify_semantic_output(&applied_bytes, Operation::Move, 0, corpus)?
         && verify_untouched_raw_members(&corpus.archive, &applied_bytes, Operation::Move, None)?;
     let mut restored = Package::from_vec(applied_bytes)?;
-    restored.apply_opened_presentation_patch(&inverse)?;
+    restored = restored.apply(&inverse)?;
     let restored_bytes = restored.to_bytes()?;
     let inverse_verified = restored_bytes == corpus.archive;
 
     let mut stale = Package::from_vec(corpus.archive.clone())?;
     mutate_order(&mut stale)?;
-    let stale_verified = stale.apply_opened_presentation_patch(&forward).is_err();
-    let mut foreign = Package::from_vec(corpus.foreign_archive.clone())?;
-    let foreign_verified = foreign.apply_opened_presentation_patch(&forward).is_err();
+    let stale_verified = stale.apply(&forward).is_err();
+    let foreign = Package::from_vec(corpus.foreign_archive.clone())?;
+    let foreign_verified = foreign.apply(&forward).is_err();
     Ok((
         forward_verified,
         inverse_verified,
@@ -552,9 +555,10 @@ fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>>
         .iter()
         .map(|slide| slide.name().to_owned())
         .collect::<Vec<_>>();
-    let staging_unchanged =
-        !transaction.is_changed() && transaction.source().revision() == source_revision;
-    let rolled_back = transaction.rollback();
+    let staging_unchanged = !transaction.clone().commit()?.diagnostics().changed()
+        && transaction.source().revision() == source_revision;
+    let rolled_back = transaction.source().clone();
+    drop(transaction);
     let rollback_names = rolled_back
         .slides()
         .iter()
@@ -620,7 +624,10 @@ fn verify_refusal_gates(
         let package = Package::from_vec(corpus.archive.clone())?;
         let snapshot = package.opened_presentation_with_limits(limits)?;
         let mut transaction = snapshot.edit();
-        transaction.move_slide(REPRESENTATIVE_MOVE.0, REPRESENTATIVE_MOVE.1)?;
+        transaction.move_slide(
+            REPRESENTATIVE_MOVE.0,
+            litchi_core::Position::new(REPRESENTATIVE_MOVE.1),
+        )?;
         transaction.commit().is_err()
     };
     Ok((
@@ -823,7 +830,10 @@ pub(super) fn run(
             transaction
                 .as_mut()
                 .ok_or("PPTX move transaction disappeared before planning")?
-                .move_slide(REPRESENTATIVE_MOVE.0, REPRESENTATIVE_MOVE.1)?;
+                .move_slide(
+                    REPRESENTATIVE_MOVE.0,
+                    litchi_core::Position::new(REPRESENTATIVE_MOVE.1),
+                )?;
             None
         };
         let plan_duration = started.elapsed();
@@ -842,7 +852,7 @@ pub(super) fn run(
                     .take()
                     .ok_or("PPTX move transaction disappeared before commit")?
                     .commit()?;
-                package.apply_opened_presentation_commit(commit)?;
+                package = commit.into_package();
             },
         }
         let commit_duration = started.elapsed();

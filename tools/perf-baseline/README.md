@@ -3247,8 +3247,8 @@ The route is the documented one: `Package::open(path)` →
 `document_mut().add_paragraph_with_text(..)` → `Package::save(path)` for DOCX,
 `Workbook::open(path)` → `edit().sheet(..).set(..)` → `commit()` →
 `Workbook::save(path)` for XLSX, and `Package::open(path)` →
-`opened_presentation_transaction().set_shape_text(..)` →
-`apply_opened_presentation_commit(..)` → `Package::save(path)` for PPTX.
+`edit().set_shape_text(..)` →
+`Commit::into_package()` → `Package::save(path)` for PPTX.
 
 * `lifecycle` times open, edit and save together.
 * `edit` times the semantic edit alone; the open is outside the clock.
@@ -3598,8 +3598,8 @@ docx_marker_ordinary_save_counting_publish   docx_marker_control_ordinary_save_c
 ```
 
 and the same eight names with `pptx_`. `pptx_marker_ordinary_save_edit` is
-0649's phase: `opened_presentation_transaction().set_shape_text(..)` plus
-`apply_opened_presentation_commit(..)`. The marker origins cover DOCX and PPTX
+0649's phase: `edit().set_shape_text(..)` plus
+`Commit::into_package()`. The marker origins cover DOCX and PPTX
 only; an XLSX marker origin is refused with a typed error, because change 0601's
 XLSX producer family already exists.
 
@@ -3959,7 +3959,7 @@ extending the claim to the other PPTX save paths.
 `pptx_semantic_opened_transaction_phases` is the phase decomposition of the
 one-edit control on the same semantic corpus. It records separate clocks for
 `opened_presentation`, `Snapshot::edit`, `set_shape_text`,
-`Transaction::commit`, `apply_opened_presentation_commit`, and `to_bytes`, plus
+`Edit::commit`, `Commit::into_package`, and `to_bytes`, plus
 the enclosing total. Package construction, reopen/oracle checks, and output
 digests stay outside the clocks. Every phase vector is aligned to the sorted
 total samples and every retained output must reproduce the same semantic
@@ -5735,3 +5735,12 @@ preparation and validation. Operation incremental heap is the region high-water
 live bytes minus live bytes at region entry, not cumulative requested bytes or
 RSS. See `docs/performance/results/change-0477` for the frozen isolated process
 matrix, commands, source custody, and limitations.
+
+### Unified DOCX formatting batch pairs
+
+The isolated [unified DOCX batch runner](unified-docx-batch/README.md) measures
+prepared eager and source-backed owners at 1–10,000 operations, with frozen
+corpus identity, leaf/unified byte and operation-count checks, and repeated
+ABBA samples. Its separate manifest limits compilation to the DOCX dependency
+closure. Record 0078 includes an uncached-target control and scoped timing
+evidence; it does not establish full unified-API performance acceptance.

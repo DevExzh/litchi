@@ -280,6 +280,8 @@ jobs:
 
       - name: Test API glossary gate against real rustdoc graphs
         run: python3 -m unittest tools.test_check_api_glossary
+      - name: Check capability delta inputs and generator
+        run: python3 -m unittest tools.test_officecli_capability_delta
 
       - name: Check registered API glossary waves
         run: python3 tools/check_api_glossary.py --target-dir target/api-glossary

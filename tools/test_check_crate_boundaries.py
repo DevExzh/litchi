@@ -8593,7 +8593,7 @@ class BoundaryPolicyTests(unittest.TestCase):
         all_policy_edges = self.policy.canonical_edges | self.policy.migration_edges
 
         self.assertEqual(len(self.policy.packages), 66)
-        self.assertEqual(len(all_policy_edges), 266)
+        self.assertEqual(len(all_policy_edges), 267)
         self.assertEqual(len(self.policy.migration_debt), 11)
         self.assertEqual(
             [item.order for item in self.policy.migration_debt],

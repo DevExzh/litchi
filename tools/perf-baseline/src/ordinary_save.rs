@@ -756,9 +756,7 @@ impl Owner {
                     return Ok(EditOutcome::Refused(corpus.evidence.edit_outcome.clone()));
                 };
                 let outcome = (|| -> Result<litchi_pptx::opened::Commit, String> {
-                    let mut edit = package
-                        .opened_presentation_transaction()
-                        .map_err(|error| error.to_string())?;
+                    let mut edit = package.edit().map_err(|error| error.to_string())?;
                     if !edit
                         .set_shape_text(slide, shape, EDIT_MARKER)
                         .map_err(|error| error.to_string())?
@@ -766,14 +764,14 @@ impl Owner {
                         return Err("the derived shape position reported no change".to_owned());
                     }
                     let commit = edit.commit().map_err(|error| error.to_string())?;
-                    if !commit.is_changed() {
+                    if !commit.diagnostics().changed() {
                         return Err("the commit reports no change".to_owned());
                     }
                     Ok(commit)
                 })();
                 match outcome {
                     Ok(commit) => {
-                        package.apply_opened_presentation_commit(commit)?;
+                        **package = commit.into_package();
                         Ok(EditOutcome::Admitted)
                     },
                     Err(error) => Ok(EditOutcome::Refused(format!("refused:{error}"))),
@@ -1078,7 +1076,7 @@ fn pptx_edit_target(
         for shape in 0..MAX_SHAPES {
             // Each transaction is detached from the package, so one open is
             // enough to probe every position.
-            let Ok(mut edit) = package.opened_presentation_transaction() else {
+            let Ok(mut edit) = package.edit() else {
                 continue;
             };
             match edit.set_shape_text(slide, shape, EDIT_MARKER) {
@@ -1187,10 +1185,10 @@ pub(crate) fn build_corpus(
         ),
         Format::Pptx => match pptx_target {
             Some((slide, shape)) => format!(
-                "Package::opened_presentation_transaction().set_shape_text({slide}, {shape}, \
+                "Package::edit().set_shape_text({slide}, {shape}, \
                  {EDIT_MARKER:?}) and apply"
             ),
-            None => "Package::opened_presentation_transaction() admits no shape position on this \
+            None => "Package::edit() admits no shape position on this \
                      deck; the save phases publish the unedited opened package"
                 .to_owned(),
         },

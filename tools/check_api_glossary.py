@@ -13,6 +13,7 @@ not transaction semantics (which remain Rust/CRUD test obligations).
 from __future__ import annotations
 
 import argparse
+from contextlib import nullcontext
 import json
 import os
 import re
@@ -334,7 +335,11 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError(f"unknown profile {args.profile}")
         if args.json and (not args.profile or len(profiles) != 1):
             raise ValueError("--json requires --profile")
-        with tempfile.TemporaryDirectory(prefix="litchi-api-glossary-", dir=ROOT.parent) as scratch:
+        scratch_context = (
+            nullcontext(args.target_dir or ROOT) if args.target_dir or args.json else
+            tempfile.TemporaryDirectory(prefix="litchi-api-glossary-", dir=ROOT.parent)
+        )
+        with scratch_context as scratch:
             target = (args.target_dir or Path(scratch)).resolve()
             failures = []
             for profile in profiles:
