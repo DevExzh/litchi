@@ -1110,3 +1110,13 @@ package escape or parallel transaction type is introduced. The unified facade
 routes top-level shape targets through those edits. Source removal preserves
 unused relationship resources for exact replay, while shared native admission
 refuses retained connector/animation references to removed shape identities.
+
+## XLSB tab state selection (0177)
+
+The primary `Package::edit()` family gains `set_sheet_state(selector, State)`.
+It accepts `sheet::Selector` (semantic name or checked `Position`) over the
+complete tab catalog and returns `Result<Option<bool>>`: missing is `None`,
+while `Some` reports the staged state change. The existing `sheet::State`
+vocabulary supplies Visible/Hidden/VeryHidden. No mutable writer escape or
+parallel transaction family is added. Worksheet-only legacy rename selection
+remains a separate pending positional migration.

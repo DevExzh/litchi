@@ -1,0 +1,761 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "these integration fixtures deliberately fail at the assertion site"
+)]
+
+//! Native workbook-tab visibility transactions.
+//!
+//! The fixtures in this file exercise the complete tab catalog, including
+//! chart and unbound tabs.  The low-level rewrites are intentionally small:
+//! they create the kinds of source images that Excel can produce while
+//! leaving all unrelated BIFF12 records opaque to the transaction.
+
+use std::io::Cursor;
+
+use litchi_core::sheet::WorkbookTrait as _;
+use litchi_opc::{BlobPart, OpcPackage, PackURI, Part as _, TargetMode};
+use litchi_xlsb::Package;
+use litchi_xlsb::cell_values::TransferLimits;
+use litchi_xlsb::cell_values::structure::Patch;
+use litchi_xlsb::chart::{Anchor, Chart};
+use litchi_xlsb::package::PackageError;
+use litchi_xlsb::raw::{Kind as RawKind, Records, Writer, kind};
+use litchi_xlsb::sheet::State;
+use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
+
+fn worksheets(names: &[&str]) -> Package {
+    let mut builder = Builder::new();
+    for name in names {
+        builder.add_worksheet(MutableWorksheet::new(*name));
+    }
+    builder.build().expect("worksheet fixture")
+}
+
+fn catalog_states(package: &Package) -> Vec<State> {
+    package
+        .workbook()
+        .expect("workbook projection")
+        .sheets()
+        .map(|tab| tab.state())
+        .collect()
+}
+
+fn operation_offset(wire: &[u8]) -> usize {
+    let before = usize::try_from(u64::from_le_bytes(
+        wire[8..16].try_into().expect("before length"),
+    ))
+    .expect("before length fits usize");
+    let after = usize::try_from(u64::from_le_bytes(
+        wire[16..24].try_into().expect("after length"),
+    ))
+    .expect("after length fits usize");
+    32 + before + after
+}
+
+#[test]
+fn selector_missing_is_distinct_from_a_resolved_noop() {
+    let package = worksheets(&["Data", "Tail"]);
+    let mut edit = package.edit().expect("edit");
+    assert_eq!(
+        edit.set_sheet_state("does-not-exist", State::Hidden)
+            .expect("missing selector"),
+        None
+    );
+    assert_eq!(
+        edit.set_sheet_state(0usize, State::Visible)
+            .expect("resolved no-op"),
+        Some(false)
+    );
+}
+
+#[test]
+fn ambiguous_catalog_names_are_rejected_before_state_selection() {
+    let mut builder = Builder::new();
+    builder.add_worksheet(MutableWorksheet::new("DATA"));
+    builder.add_worksheet(MutableWorksheet::new("Else"));
+    let mut bytes = Cursor::new(Vec::new());
+    builder
+        .build()
+        .expect("distinct source")
+        .write_to(&mut bytes)
+        .expect("write source");
+
+    let mut opc = OpcPackage::from_bytes(&bytes.into_inner()).expect("OPC source");
+    let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let original = opc
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .blob()
+        .to_vec();
+    let old: Vec<_> = "Else".encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let replacement: Vec<_> = "data".encode_utf16().flat_map(u16::to_le_bytes).collect();
+    let mut rewritten = Vec::new();
+    let mut writer = Writer::new(&mut rewritten);
+    let mut replaced = false;
+    for item in Records::new(&original) {
+        let record = item.expect("workbook record");
+        let mut payload = record.payload().to_vec();
+        if record.kind() == kind::BUNDLE_SH && payload.ends_with(&old) {
+            let start = payload.len() - old.len();
+            payload[start..].copy_from_slice(&replacement);
+            replaced = true;
+        }
+        writer
+            .write_record(record.kind(), &payload)
+            .expect("rewritten record");
+    }
+    assert!(replaced);
+    opc.get_part_mut(&workbook_uri)
+        .expect("workbook part")
+        .set_blob(rewritten);
+
+    // Catalog construction is eager.  A malformed duplicate must fail the
+    // package boundary instead of allowing a name selector to pick a tab.
+    assert!(Package::from_opc(opc).is_err());
+}
+
+#[test]
+fn repeated_state_setters_last_wins_and_cancel_to_an_exact_source() {
+    let package = worksheets(&["Data", "Tail"]);
+    let source = package.to_bytes().expect("source bytes");
+    let mut edit = package.edit().expect("edit");
+    assert_eq!(
+        edit.set_sheet_state(0usize, State::Hidden).expect("hide"),
+        Some(true)
+    );
+    assert_eq!(
+        edit.set_sheet_state(0usize, State::VeryHidden)
+            .expect("very hide"),
+        Some(true)
+    );
+    assert_eq!(
+        edit.set_sheet_state(0usize, State::Visible)
+            .expect("reveal"),
+        Some(true)
+    );
+
+    let commit = edit.commit().expect("cancelled state commit");
+    assert_eq!(commit.patch().operation_count(), 1);
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.package().to_bytes().expect("candidate bytes"),
+        source
+    );
+}
+
+#[test]
+fn one_edit_can_hide_the_active_tab_and_reveal_the_next_visible_tab() {
+    let package = worksheets(&["Data", "Tail"]);
+    let mut edit = package.edit().expect("edit");
+    assert_eq!(
+        edit.set_sheet_state(0usize, State::Hidden)
+            .expect("hide active"),
+        Some(true)
+    );
+    assert_eq!(
+        edit.set_sheet_state(1usize, State::Visible)
+            .expect("reveal replacement"),
+        Some(false)
+    );
+    let commit = edit.commit().expect("state commit");
+    assert_eq!(
+        catalog_states(commit.package()),
+        vec![State::Hidden, State::Visible]
+    );
+}
+
+#[test]
+fn durable_state_wire_round_trips_and_rejects_unknown_tags_and_states() {
+    let package = worksheets(&["Data", "Tail"]);
+    let mut edit = package.edit().expect("edit");
+    edit.set_sheet_state(0usize, State::Hidden)
+        .expect("hide active");
+    let commit = edit.commit().expect("state commit");
+    let wire = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable state patch");
+    let offset = operation_offset(&wire);
+    assert_eq!(wire[offset], 5, "visibility operation has its own wire tag");
+    assert_eq!(
+        Package::from_bytes(
+            package
+                .apply(&Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode"))
+                .expect("replay")
+                .to_bytes()
+                .expect("replayed bytes"),
+        )
+        .expect("reopen replayed package")
+        .workbook()
+        .expect("replayed workbook")
+        .sheets()
+        .next()
+        .expect("first tab")
+        .state(),
+        State::Hidden
+    );
+
+    let mut invalid_tag = wire.clone();
+    invalid_tag[offset] = 0xff;
+    assert!(Patch::from_bytes(&invalid_tag, TransferLimits::DEFAULT).is_err());
+
+    let mut invalid_state = wire;
+    invalid_state[offset + 1 + 8] = 3;
+    assert!(Patch::from_bytes(&invalid_state, TransferLimits::DEFAULT).is_err());
+}
+
+#[test]
+fn old_rename_wire_tag_and_worksheet_ordinal_remain_compatible() {
+    let package = worksheets(&["Data", "Tail"]);
+    let mut edit = package.edit().expect("edit");
+    edit.rename_sheet(0, "Renamed".to_owned()).expect("rename");
+    let commit = edit.commit().expect("rename commit");
+    let wire = commit
+        .patch()
+        .to_bytes(TransferLimits::DEFAULT)
+        .expect("durable rename patch");
+    let offset = operation_offset(&wire);
+    assert_eq!(wire[offset], 1, "legacy rename tag is retained");
+    assert_eq!(
+        u64::from_le_bytes(wire[offset + 1..offset + 9].try_into().unwrap()),
+        0,
+        "legacy rename payload addresses a worksheet ordinal"
+    );
+
+    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode rename");
+    let replayed = package.apply(&decoded).expect("replay rename");
+    assert_eq!(
+        replayed
+            .workbook()
+            .expect("renamed workbook")
+            .worksheet_names(),
+        &["Renamed".to_owned(), "Tail".to_owned()]
+    );
+}
+
+#[test]
+fn signed_exact_noop_is_preserved_but_visibility_change_is_refused() {
+    let package = signed_package();
+    let source = package.to_bytes().expect("signed source bytes");
+
+    let mut noop = package.edit().expect("signed no-op edit");
+    noop.set_sheet_state(0usize, State::Visible)
+        .expect("same state");
+    let commit = noop.commit().expect("signed no-op commit");
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.package().to_bytes().expect("signed no-op bytes"),
+        source
+    );
+
+    let mut changed = package.edit().expect("signed changed edit");
+    changed
+        .set_sheet_state(1usize, State::Hidden)
+        .expect("hide second tab");
+    assert!(matches!(changed.commit(), Err(PackageError::Signed)));
+    assert_eq!(package.to_bytes().expect("source remains signed"), source);
+}
+
+#[test]
+fn all_hidden_source_accepts_an_equal_state_exact_noop() {
+    let visible = worksheets(&["Data", "Tail"]);
+    let bytes = with_states(
+        &visible.to_bytes().expect("source bytes"),
+        &[(0, 1), (1, 1)],
+    );
+    let package = Package::from_bytes(bytes).expect("all-hidden source");
+    let source = package.to_bytes().expect("all-hidden source bytes");
+    let mut edit = package.edit().expect("all-hidden edit");
+    assert_eq!(
+        edit.set_sheet_state(0usize, State::Hidden)
+            .expect("equal hidden state"),
+        Some(false)
+    );
+    let commit = edit.commit().expect("all-hidden exact no-op");
+    assert!(commit.patch().is_noop());
+    assert_eq!(
+        commit.package().to_bytes().expect("all-hidden bytes"),
+        source
+    );
+}
+
+#[test]
+fn unknown_workbook_records_survive_a_native_state_patch() {
+    let source = with_unknown_workbook_record(
+        &worksheets(&["Data", "Tail"])
+            .to_bytes()
+            .expect("source bytes"),
+    );
+    let package = Package::from_bytes(source).expect("unknown-record source");
+    let mut edit = package.edit().expect("edit");
+    edit.set_sheet_state(0usize, State::Hidden)
+        .expect("hide active");
+    let commit = edit.commit().expect("state commit");
+    let uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let workbook = commit
+        .package()
+        .opc_package()
+        .get_part(&uri)
+        .expect("workbook part");
+    let unknown = Records::new(workbook.blob())
+        .map(|record| record.expect("record"))
+        .find(|record| record.kind() == RawKind::new(0x3ffe).unwrap())
+        .expect("unknown record");
+    assert_eq!(unknown.payload(), &[0xde, 0xad, 0xbe, 0xef]);
+}
+
+#[test]
+fn grouped_rename_metadata_rejects_duplicate_final_names() {
+    let package = worksheets(&["Data", "Tail"]);
+    let mut edit = package.edit().expect("edit");
+    edit.rename_sheet(0, "Collision".to_owned())
+        .expect("first rename");
+    edit.rename_sheet(1, "Collision".to_owned())
+        .expect("second staged rename");
+    assert!(edit.commit().is_err());
+}
+
+#[test]
+fn chart_visibility_is_native_and_unmodeled_selected_kinds_fail_closed() {
+    let bytes = every_kind_workbook();
+    let package = Package::from_bytes(bytes).expect("complete-kind source");
+
+    // Dialog, macro, and international macro tabs have no selected-view
+    // codec.  Hiding one must refuse before leaving a selected tab behind.
+    for position in [2usize, 3usize, 4usize] {
+        let mut edit = package.edit().expect("edit");
+        let result = edit.set_sheet_state(position, State::VeryHidden);
+        if result
+            .expect("catalog selector")
+            .is_some_and(|changed| changed)
+        {
+            assert!(edit.commit().is_err(), "unmodeled kind {position}");
+        }
+    }
+
+    // The chart sheet is part of the complete catalog and can be selected by
+    // a state transition when the active worksheet is hidden in the same edit.
+    let mut edit = package.edit().expect("chart edit");
+    edit.set_sheet_state(0usize, State::Hidden)
+        .expect("hide worksheet");
+    edit.set_sheet_state(1usize, State::Visible)
+        .expect("reveal chart");
+    let commit = edit.commit().expect("chart transition");
+    assert_eq!(catalog_states(commit.package())[1], State::Visible);
+}
+
+#[test]
+fn unbound_tabs_accept_only_very_hidden_state() {
+    let bytes = with_null_relationship(&every_kind_workbook(), 3, 2);
+    let package = Package::from_bytes(bytes).expect("unbound source");
+    let mut edit = package.edit().expect("edit");
+    assert!(edit.set_sheet_state(3usize, State::Hidden).is_err());
+    assert_eq!(
+        edit.set_sheet_state(3usize, State::VeryHidden)
+            .expect("equal very-hidden state"),
+        Some(false)
+    );
+}
+
+#[test]
+fn active_relocation_refuses_multiple_chart_views() {
+    let bytes = with_duplicate_chart_view(&with_states(&every_kind_workbook(), &[(1, 2)]));
+    let package = Package::from_bytes(bytes).expect("multiple-view source");
+    let mut edit = package.edit().expect("edit");
+    edit.set_sheet_state(0usize, State::Hidden)
+        .expect("hide active worksheet");
+    edit.set_sheet_state(1usize, State::Visible)
+        .expect("reveal chart");
+    assert!(edit.commit().is_err());
+}
+
+#[test]
+fn active_relocation_refuses_a_missing_chart_view() {
+    let bytes = without_chart_views(&with_states(&every_kind_workbook(), &[(1, 2)]));
+    let package = Package::from_bytes(bytes).expect("missing-view source");
+    let mut edit = package.edit().expect("edit");
+    edit.set_sheet_state(0usize, State::Hidden)
+        .expect("hide active worksheet");
+    edit.set_sheet_state(1usize, State::Visible)
+        .expect("reveal chart");
+    assert!(edit.commit().is_err());
+}
+
+fn signed_package() -> Package {
+    let mut package = worksheets(&["Data", "Tail"]).into_opc();
+    let origin = PackURI::new("/_xmlsignatures/origin.sigs").expect("signature origin URI");
+    let signature = PackURI::new("/_xmlsignatures/sig1.xml").expect("signature URI");
+    let mut origin_part = BlobPart::new(
+        origin.clone(),
+        litchi_opc::constants::content_type::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+        Vec::new(),
+    );
+    origin_part
+        .rels_mut()
+        .try_add_relationship(
+            "http://schemas.openxmlformats.org/package/2006/relationships/digital-signature/signature"
+                .to_owned(),
+            signature.relative_ref(origin.base_uri()),
+            "rIdSignature".to_owned(),
+            TargetMode::Internal,
+        )
+        .expect("signature relationship");
+    package
+        .try_add_part(Box::new(origin_part))
+        .expect("signature origin");
+    package
+        .try_add_part(Box::new(BlobPart::new(
+            signature,
+            litchi_opc::constants::content_type::OPC_DIGITAL_SIGNATURE_XMLSIGNATURE.to_owned(),
+            b"<Signature xmlns=\"http://www.w3.org/2000/09/xmldsig#\"/>".to_vec(),
+        )))
+        .expect("signature part");
+    package.relate_to(
+        "_xmlsignatures/origin.sigs",
+        litchi_opc::constants::relationship_type::DIGITAL_SIGNATURE_ORIGIN,
+    );
+    let package = Package::from_opc(package).expect("signed package");
+    assert!(package.opc_package().is_signed());
+    package
+}
+
+fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let original = package
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .blob()
+        .to_vec();
+    let mut rewritten = Vec::new();
+    let mut position = 0usize;
+    let mut writer = Writer::new(&mut rewritten);
+    for item in Records::new(&original) {
+        let record = item.expect("workbook record");
+        let mut payload = record.payload().to_vec();
+        if record.kind() == kind::BUNDLE_SH {
+            if let Some((_, state)) = states.iter().find(|(at, _)| *at == position) {
+                payload[..4].copy_from_slice(&state.to_le_bytes());
+            }
+            position += 1;
+        }
+        writer
+            .write_record(record.kind(), &payload)
+            .expect("rewritten record");
+    }
+    package
+        .get_part_mut(&workbook_uri)
+        .expect("workbook part")
+        .set_blob(rewritten);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).expect("serialize OPC");
+    output
+}
+
+fn with_unknown_workbook_record(bytes: &[u8]) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let original = package
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .blob()
+        .to_vec();
+    let unknown = RawKind::new(0x3ffe).expect("unknown record kind");
+    let mut rewritten = Vec::new();
+    let mut inserted = false;
+    let mut writer = Writer::new(&mut rewritten);
+    for item in Records::new(&original) {
+        let record = item.expect("workbook record");
+        if !inserted && record.kind() == kind::END_BOOK {
+            writer
+                .write_record(unknown, &[0xde, 0xad, 0xbe, 0xef])
+                .expect("unknown record");
+            inserted = true;
+        }
+        writer
+            .write_record(record.kind(), record.payload())
+            .expect("rewritten record");
+    }
+    assert!(inserted);
+    package
+        .get_part_mut(&workbook_uri)
+        .expect("workbook part")
+        .set_blob(rewritten);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).expect("serialize OPC");
+    output
+}
+
+fn bundle_entries(package: &OpcPackage) -> Vec<(String, String)> {
+    let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    Records::new(
+        package
+            .get_part(&workbook_uri)
+            .expect("workbook part")
+            .blob(),
+    )
+    .map(|record| record.expect("workbook record"))
+    .filter(|record| record.kind() == kind::BUNDLE_SH)
+    .map(|record| {
+        let payload = record.payload();
+        let current_id = u32::from_le_bytes(payload[4..8].try_into().unwrap());
+        let strings_offset = if (1..=0xffff).contains(&current_id) {
+            8
+        } else {
+            12
+        };
+        let rel_units = u32::from_le_bytes(
+            payload[strings_offset..strings_offset + 4]
+                .try_into()
+                .unwrap(),
+        ) as usize;
+        let rel_start = strings_offset + 4;
+        let rel_end = rel_start + rel_units * 2;
+        let rel_id = String::from_utf16(
+            &payload[rel_start..rel_end]
+                .chunks_exact(2)
+                .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        let name_units =
+            u32::from_le_bytes(payload[rel_end..rel_end + 4].try_into().unwrap()) as usize;
+        let name_start = rel_end + 4;
+        let name_end = name_start + name_units * 2;
+        let name = String::from_utf16(
+            &payload[name_start..name_end]
+                .chunks_exact(2)
+                .map(|unit| u16::from_le_bytes([unit[0], unit[1]]))
+                .collect::<Vec<_>>(),
+        )
+        .unwrap();
+        (name, rel_id)
+    })
+    .collect()
+}
+
+fn sheet_partname(package: &OpcPackage, position: usize) -> PackURI {
+    let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let workbook_part = package.get_part(&workbook_uri).expect("workbook part");
+    let entries = bundle_entries(package);
+    workbook_part
+        .rels()
+        .get(&entries[position].1)
+        .expect("sheet relationship")
+        .target_partname()
+        .expect("sheet part")
+}
+
+fn every_kind_workbook() -> Vec<u8> {
+    let chart = Chart::bar_chart_with_cache(
+        "Sales",
+        "Data!$A$1:$A$2",
+        &["North", "South"],
+        "Data!$B$1:$B$2",
+        &[42.0, 55.0],
+        Anchor::new(0, 0, 10, 20),
+    )
+    .expect("chart fixture");
+    let mut builder = Builder::new();
+    builder.add_worksheet(MutableWorksheet::new("Data"));
+    builder
+        .add_chart_sheet(MutableChartSheet::new("Sales Chart", chart))
+        .expect("chart sheet");
+    for name in ["Dialog", "Macro", "Intl"] {
+        builder.add_worksheet(MutableWorksheet::new(name));
+    }
+    builder.add_worksheet(MutableWorksheet::new("Tail"));
+    let mut bytes = Cursor::new(Vec::new());
+    builder
+        .build()
+        .expect("all-kind package")
+        .write_to(&mut bytes)
+        .expect("all-kind bytes");
+    let mut bytes = bytes.into_inner();
+    for (name, relationship_type, content_type) in [
+        (
+            "Dialog",
+            "http://schemas.openxmlformats.org/officeDocument/2006/relationships/dialogsheet",
+            "application/vnd.ms-excel.dialogsheet",
+        ),
+        (
+            "Macro",
+            "http://schemas.microsoft.com/office/2006/relationships/xlMacrosheet",
+            "application/vnd.ms-excel.macrosheet",
+        ),
+        (
+            "Intl",
+            "http://schemas.microsoft.com/office/2006/relationships/xlIntlMacrosheet",
+            "application/vnd.ms-excel.intlmacrosheet",
+        ),
+    ] {
+        bytes = retype_sheet(&bytes, name, relationship_type, content_type);
+    }
+    with_states(&bytes, &[(1, 2), (3, 1), (5, 1)])
+}
+
+fn retype_sheet(bytes: &[u8], name: &str, relationship_type: &str, content_type: &str) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let entries = bundle_entries(&package);
+    let position = entries
+        .iter()
+        .position(|(sheet_name, _)| sheet_name == name)
+        .expect("sheet name");
+    let sheet_uri = sheet_partname(&package, position);
+    let (relationship_id, target_ref) = package
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .rels()
+        .iter()
+        .find_map(|relationship| {
+            (relationship.target_partname().ok()? == sheet_uri).then(|| {
+                (
+                    relationship.r_id().to_owned(),
+                    relationship.target_ref().to_owned(),
+                )
+            })
+        })
+        .expect("sheet relationship");
+    let workbook = package.get_part_mut(&workbook_uri).expect("workbook part");
+    workbook
+        .rels_mut()
+        .remove(&relationship_id)
+        .expect("remove sheet relationship");
+    workbook.rels_mut().add_relationship(
+        relationship_type.to_owned(),
+        target_ref,
+        relationship_id,
+        false,
+    );
+    package
+        .get_part_mut(&sheet_uri)
+        .expect("sheet part")
+        .set_content_type(content_type.to_owned())
+        .expect("content type");
+    let mut output = Vec::new();
+    package.to_stream(&mut output).expect("serialize OPC");
+    output
+}
+
+fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let workbook_uri = PackURI::new("/xl/workbook.bin").expect("workbook URI");
+    let original = package
+        .get_part(&workbook_uri)
+        .expect("workbook part")
+        .blob()
+        .to_vec();
+    let mut rewritten = Vec::new();
+    let mut current_position = 0usize;
+    let mut writer = Writer::new(&mut rewritten);
+    for item in Records::new(&original) {
+        let record = item.expect("workbook record");
+        let mut payload = record.payload().to_vec();
+        if record.kind() == kind::BUNDLE_SH {
+            if current_position == position {
+                payload[..4].copy_from_slice(&state.to_le_bytes());
+                let current_id = u32::from_le_bytes(payload[4..8].try_into().unwrap());
+                let strings_offset = if (1..=0xffff).contains(&current_id) {
+                    8
+                } else {
+                    12
+                };
+                let rel_units = u32::from_le_bytes(
+                    payload[strings_offset..strings_offset + 4]
+                        .try_into()
+                        .unwrap(),
+                ) as usize;
+                let rel_end = strings_offset + 4 + rel_units * 2;
+                let mut null_payload = Vec::with_capacity(payload.len() - rel_units * 2);
+                null_payload.extend_from_slice(&payload[..strings_offset]);
+                null_payload.extend_from_slice(&u32::MAX.to_le_bytes());
+                null_payload.extend_from_slice(&payload[rel_end..]);
+                payload = null_payload;
+            }
+            current_position += 1;
+        }
+        writer
+            .write_record(record.kind(), &payload)
+            .expect("rewritten record");
+    }
+    package
+        .get_part_mut(&workbook_uri)
+        .expect("workbook part")
+        .set_blob(rewritten);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).expect("serialize OPC");
+    output
+}
+
+fn with_duplicate_chart_view(bytes: &[u8]) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let uri = sheet_partname(&package, 1);
+    let original = package.get_part(&uri).expect("chart part").blob().to_vec();
+    let mut rewritten = Vec::new();
+    let mut view_payload = None;
+    let mut inserted = false;
+    let mut writer = Writer::new(&mut rewritten);
+    for item in Records::new(&original) {
+        let record = item.expect("chart record");
+        if record.kind() == kind::BEGIN_CS_VIEW {
+            view_payload = Some(record.payload().to_vec());
+        }
+        writer
+            .write_record(record.kind(), record.payload())
+            .expect("chart record");
+        if record.kind() == kind::END_CS_VIEW && !inserted {
+            writer
+                .write_record(kind::BEGIN_CS_VIEW, view_payload.as_deref().unwrap())
+                .expect("duplicate chart view");
+            writer
+                .write_record(kind::END_CS_VIEW, &[])
+                .expect("duplicate chart view end");
+            inserted = true;
+        }
+    }
+    assert!(inserted);
+    package
+        .get_part_mut(&uri)
+        .expect("chart part")
+        .set_blob(rewritten);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).expect("serialize OPC");
+    output
+}
+
+fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
+    let mut package = OpcPackage::from_bytes(bytes).expect("OPC source");
+    let uri = sheet_partname(&package, 1);
+    let original = package.get_part(&uri).expect("chart part").blob().to_vec();
+    let mut rewritten = Vec::new();
+    let mut in_views = false;
+    let mut removed = false;
+    let mut writer = Writer::new(&mut rewritten);
+    for item in Records::new(&original) {
+        let record = item.expect("chart record");
+        if record.kind() == kind::BEGIN_CS_VIEWS {
+            in_views = true;
+            removed = true;
+            continue;
+        }
+        if in_views {
+            if record.kind() == kind::END_CS_VIEWS {
+                in_views = false;
+            }
+            continue;
+        }
+        writer
+            .write_record(record.kind(), record.payload())
+            .expect("chart record");
+    }
+    assert!(removed && !in_views);
+    package
+        .get_part_mut(&uri)
+        .expect("chart part")
+        .set_blob(rewritten);
+    let mut output = Vec::new();
+    package.to_stream(&mut output).expect("serialize OPC");
+    output
+}

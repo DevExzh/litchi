@@ -1,6 +1,6 @@
 //! Immutable XLSB worksheet-property writes and publication.
 //!
-//! The XLSB unified writes admit worksheet names and direct cell scalar
+//! The XLSB unified writes admit worksheet names, tab visibility and direct cell scalar
 //! payloads (`value`, `clear: true`, and null clears). Target resolution and
 //! property coercion happen before the native workbook editor is materialized.
 //! The native `Package` transaction remains responsible for exact package
@@ -17,7 +17,7 @@ use litchi_xlsb::cell_values::{
     Edit as NativeCellEdit, Patch as NativeCellPatch, Reference, Scalar as NativeScalar,
     TransferLimits, structure::Patch as NativeStructurePatch,
 };
-use litchi_xlsb::sheet::{Rect, Selector as NativeSelector};
+use litchi_xlsb::sheet::{Rect, Selector as NativeSelector, State as SheetState};
 use unicode_normalization::UnicodeNormalization;
 
 use super::node::{Item, Node};
@@ -185,6 +185,13 @@ impl Commit {
 #[derive(Debug, Default)]
 struct SheetAssignments {
     name: Option<String>,
+    state: Option<SheetState>,
+}
+
+#[derive(Clone, Copy)]
+struct SheetTarget {
+    tab: usize,
+    worksheet: Option<usize>,
 }
 
 const WRITE_ENTRY_OVERHEAD: usize = 64;
@@ -331,7 +338,19 @@ fn set_sheet_with_limits(
     }
 
     if let Some(name) = assignments.name.as_deref() {
-        validate_sheet_name(file, &positions, name)?;
+        let worksheet = positions[0].worksheet.ok_or_else(|| {
+            Error::new(
+                Code::UnsupportedType,
+                "renaming a non-worksheet XLSB tab is unsupported",
+            )
+            .with_format(FileFormat::Xlsb)
+            .with_property("name")
+        })?;
+        validate_sheet_name(file, &[worksheet], name)?;
+    }
+
+    if let Some(state) = assignments.state {
+        validate_sheet_state(file, &positions, state)?;
     }
 
     // All target and property admission above is intentionally before this
@@ -341,7 +360,7 @@ fn set_sheet_with_limits(
     let package = package_from_editor(editor);
     let native_limits = TransferLimits::new(
         limits.max_snapshot_bytes(),
-        limits.max_operations(),
+        limits.max_expanded_targets().saturating_mul(2),
         1,
         limits.max_snapshot_bytes(),
     );
@@ -351,8 +370,21 @@ fn set_sheet_with_limits(
     if let Some(name) = assignments.name {
         // A name assignment is restricted to one target above, so cloning the
         // owned value does not multiply authored payload retention.
-        edit.rename_sheet(positions[0], name)
-            .map_err(rename_error)?;
+        edit.rename_sheet(
+            positions[0].worksheet.expect("worksheet rename admitted"),
+            name,
+        )
+        .map_err(rename_error)?;
+    }
+    if let Some(state) = assignments.state {
+        for target in &positions {
+            edit.set_sheet_state(target.tab, state)
+                .map_err(native_error)?
+                .ok_or_else(|| {
+                    Error::new(Code::PathNotFound, "the selected XLSB tab is absent")
+                        .with_format(FileFormat::Xlsb)
+                })?;
+        }
     }
     let native = edit.commit().map_err(native_error)?;
     let commit = Commit::from_native(file, native)?;
@@ -884,7 +916,7 @@ fn resolve_sheet_targets(
     file: &Xlsb,
     target: &TargetArg<'_>,
     limits: &SemanticLimits,
-) -> Result<Vec<usize>> {
+) -> Result<Vec<SheetTarget>> {
     let mut positions = Vec::new();
     let mut seen = HashSet::new();
 
@@ -925,7 +957,7 @@ fn resolve_sheet_targets(
 }
 
 fn append_sheet(
-    positions: &mut Vec<usize>,
+    positions: &mut Vec<SheetTarget>,
     seen: &mut HashSet<usize>,
     node: Node<'_>,
     limits: &SemanticLimits,
@@ -938,13 +970,7 @@ fn append_sheet(
         .with_format(FileFormat::Xlsb)
         .with_suggestion(format!("resolved target kind: {}", node.kind())));
     }
-    let Some(position) = node.worksheet_position() else {
-        return Err(Error::new(
-            Code::UnsupportedType,
-            "the selected XLSB tab is not a worksheet",
-        )
-        .with_format(FileFormat::Xlsb));
-    };
+    let position = node.sheet_position();
     if !seen.insert(position) {
         return Ok(());
     }
@@ -958,7 +984,10 @@ fn append_sheet(
     positions
         .try_reserve(1)
         .map_err(|_| allocation("XLSB sheet write targets"))?;
-    positions.push(position);
+    positions.push(SheetTarget {
+        tab: position,
+        worksheet: node.worksheet_position(),
+    });
     Ok(())
 }
 
@@ -987,10 +1016,74 @@ fn admit_sheet_properties(props: &Props<'_>, limits: &SemanticLimits) -> Result<
                     assignments.name = Some(value.to_owned());
                     Ok(())
                 },
+                SheetSetter::Hidden | SheetSetter::Visibility => {
+                    if assignments.state.is_some() {
+                        return Err(Error::new(
+                            Code::InvalidArgument,
+                            "hidden and visibility assign the same sheet state",
+                        ));
+                    }
+                    assignments.state = Some(match (setter, value) {
+                        (SheetSetter::Hidden, Some(Scalar::Bool(true))) => SheetState::Hidden,
+                        (SheetSetter::Hidden, Some(Scalar::Bool(false))) => SheetState::Visible,
+                        (SheetSetter::Visibility, Some(Scalar::Token("visible"))) => {
+                            SheetState::Visible
+                        },
+                        (SheetSetter::Visibility, Some(Scalar::Token("hidden"))) => {
+                            SheetState::Hidden
+                        },
+                        (SheetSetter::Visibility, Some(Scalar::Token("veryHidden"))) => {
+                            SheetState::VeryHidden
+                        },
+                        _ => return Err(Error::new(Code::InvalidValue, "invalid sheet state")),
+                    });
+                    Ok(())
+                },
             })
             .map_err(|error| error.with_format(FileFormat::Xlsb))?;
     }
     Ok(assignments)
+}
+
+fn validate_sheet_state(file: &Xlsb, targets: &[SheetTarget], state: SheetState) -> Result<()> {
+    let catalog = file.catalog()?;
+    let mut selected = HashSet::new();
+    selected
+        .try_reserve(targets.len())
+        .map_err(|_| allocation("XLSB tab state targets"))?;
+    selected.extend(targets.iter().map(|target| target.tab));
+    let mut visible = false;
+    let mut changed = false;
+    for position in 0..catalog.len() {
+        let Some(tab) = catalog.get(position) else {
+            continue;
+        };
+        let next = if selected.contains(&position) {
+            state
+        } else {
+            tab.state()
+        };
+        if selected.contains(&position)
+            && tab.kind() == litchi_xlsb::sheet::Kind::Unbound
+            && next != SheetState::VeryHidden
+        {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "unbound XLSB tabs must remain very hidden",
+            )
+            .with_format(FileFormat::Xlsb));
+        }
+        changed |= next != tab.state();
+        visible |= next.is_visible();
+    }
+    if changed && !visible {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "a workbook must retain a visible sheet",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    Ok(())
 }
 
 fn validate_sheet_name(file: &Xlsb, targets: &[usize], name: &str) -> Result<()> {
@@ -1054,7 +1147,8 @@ fn check_limits(
         .name
         .as_ref()
         .map_or(0, String::len)
-        .saturating_add(WRITE_ENTRY_OVERHEAD);
+        .saturating_add(WRITE_ENTRY_OVERHEAD)
+        .saturating_add(usize::from(assignments.state.is_some()) * WRITE_ENTRY_OVERHEAD);
     let staged = targets.saturating_mul(per_target);
     if staged > limits.max_staged_bytes() {
         return Err(staged_limit(staged, limits.max_staged_bytes()));

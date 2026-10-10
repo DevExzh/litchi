@@ -18,22 +18,35 @@ pub(crate) use workbook::{
     WORKBOOK_PROPS, WorkbookKey,
 };
 
-/// The XLSB sheet setter vocabulary. The first unified XLSB write exposes
-/// only a worksheet name; hidden/visibility and every other sheet property
-/// remain read-only or capability gaps. Cell removal is an operation on the
-/// cell element and therefore has no additional sheet property entry here.
+/// The XLSB sheet setter vocabulary, shared by coercion and capabilities.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SheetSetter {
     Name,
+    Hidden,
+    Visibility,
 }
 
-pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 1, 0> = Table::new(
-    [Entry {
-        spec: PropSpec::new("name", ValueType::Text),
-        access: Access::Set(SheetSetter::Name),
-        constraint: Constraint::None,
-        clear: false,
-    }],
+pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 3, 0> = Table::new(
+    [
+        Entry {
+            spec: PropSpec::new("name", ValueType::Text),
+            access: Access::Set(SheetSetter::Name),
+            constraint: Constraint::None,
+            clear: false,
+        },
+        Entry {
+            spec: PropSpec::new("hidden", ValueType::Bool),
+            access: Access::Set(SheetSetter::Hidden),
+            constraint: Constraint::None,
+            clear: false,
+        },
+        Entry {
+            spec: PropSpec::new("visibility", ValueType::Token(&workbook::VISIBILITY)),
+            access: Access::Set(SheetSetter::Visibility),
+            constraint: Constraint::None,
+            clear: false,
+        },
+    ],
     [],
 );
 
@@ -150,7 +163,7 @@ const fn sheet_props_with_writes() -> [PropSpec; workbook::SHEET_PROPS.len()] {
     props
 }
 
-/// XLSB's local sheet table, with only `name` marked settable.
+/// XLSB's local sheet table with registry-derived setter access.
 pub(crate) static SHEET_PROPS: &[PropSpec] = &sheet_props_with_writes();
 
 /// XLSB's node exposes only this subset of the shared workbook cell

@@ -505,10 +505,10 @@ fn unsupported_sheet_properties_are_rejected_before_editor_admission() {
         let original = open_owner(&bytes, eager);
         let before = original.to_bytes().expect("publish original XLSB");
         let error = original
-            .set(FIRST, props! { "hidden" => true })
+            .set(FIRST, props! { "zoom" => 125 })
             .expect_err("unsupported XLSB sheet property");
         assert_eq!(error.code(), Code::UnsupportedProperty);
-        assert_eq!(error.property(), Some("hidden"));
+        assert_eq!(error.property(), Some("zoom"));
         assert_eq!(original.to_bytes().unwrap(), before);
     }
 }

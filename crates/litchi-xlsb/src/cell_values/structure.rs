@@ -49,7 +49,9 @@ use super::{CellFormula, Reference, TransferLimits, Value};
 use crate::Workbook;
 use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
+use crate::package::formula::excel_name_eq;
 use crate::raw::{Header, Limits as RawLimits, Records, Writer, kind};
+use crate::sheet::{Kind, Selector, State};
 use crate::workbook::DrawingLoadPolicy;
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{BlobPart, PackURI, Part};
@@ -92,6 +94,10 @@ enum Operation {
         sheet: usize,
         name: String,
     },
+    SetSheetState {
+        catalog_position: usize,
+        state: State,
+    },
     TransferCell {
         source: Arc<[u8]>,
         source_sheet: usize,
@@ -124,6 +130,14 @@ struct ImagePlan {
     to_row: u32,
     to_row_offset: i64,
     description: Option<String>,
+}
+
+#[derive(Debug, Clone)]
+struct SheetTarget {
+    name: String,
+    kind: Kind,
+    state: State,
+    worksheet_position: Option<usize>,
 }
 
 impl ImagePlan {
@@ -165,7 +179,8 @@ impl ImagePlan {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
 enum Selection {
-    Sheet(usize),
+    SheetRename(usize),
+    SheetState(usize),
     Cell(usize, Reference),
     Drawing(usize),
 }
@@ -173,7 +188,10 @@ enum Selection {
 impl Operation {
     const fn selection(&self) -> Selection {
         match self {
-            Self::RenameSheet { sheet, .. } => Selection::Sheet(*sheet),
+            Self::RenameSheet { sheet, .. } => Selection::SheetRename(*sheet),
+            Self::SetSheetState {
+                catalog_position, ..
+            } => Selection::SheetState(*catalog_position),
             Self::TransferCell {
                 target_sheet,
                 target_reference,
@@ -183,6 +201,14 @@ impl Operation {
             Self::TransferDrawing { target_sheet, .. } => Selection::Drawing(*target_sheet),
         }
     }
+
+    fn conflicts_with(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::RenameSheet { .. }, Self::SetSheetState { .. })
+            | (Self::SetSheetState { .. }, Self::RenameSheet { .. }) => false,
+            _ => self.selection() == other.selection(),
+        }
+    }
 }
 
 /// A detached workbook transaction planned against one exact package image.
@@ -190,7 +216,9 @@ impl Operation {
 pub struct Edit {
     base: crate::Package,
     before: Arc<[u8]>,
+    sheet_catalog: Arc<[SheetTarget]>,
     operations: Vec<Operation>,
+    operation_indexes: BTreeMap<Selection, Vec<usize>>,
     limits: TransferLimits,
     external_link_limits: ExternalLinkLimits,
     drawing_load_policy: DrawingLoadPolicy,
@@ -199,10 +227,22 @@ pub struct Edit {
 impl Edit {
     pub(crate) fn new(package: &crate::Package, limits: TransferLimits) -> Result<Self> {
         validate_limits(limits)?;
+        let workbook = package.workbook()?;
+        let sheet_catalog = workbook
+            .sheets()
+            .map(|tab| SheetTarget {
+                name: tab.name().to_owned(),
+                kind: tab.kind(),
+                state: tab.state(),
+                worksheet_position: tab.worksheet_position().map(|position| position.get()),
+            })
+            .collect::<Vec<_>>();
         Ok(Self {
             base: package.clone(),
             before: Arc::from(package.to_bytes()?),
+            sheet_catalog: sheet_catalog.into(),
             operations: Vec::new(),
+            operation_indexes: BTreeMap::new(),
             limits,
             external_link_limits: package.external_link_limits(),
             drawing_load_policy: package.drawing_load_policy(),
@@ -216,9 +256,84 @@ impl Edit {
     /// Returns an error for an invalid selector, invalid/duplicate name, or a
     /// transaction that exceeds its finite change policy.
     pub fn rename_sheet(&mut self, sheet: usize, name: String) -> Result<()> {
-        let workbook = self.base.workbook()?;
-        validate_sheet_name(&workbook, sheet, &name)?;
+        validate_sheet_name_in_catalog(&self.sheet_catalog, sheet, &name)?;
         self.stage(Operation::RenameSheet { sheet, name })
+    }
+
+    /// Plan a workbook-tab visibility change using the complete sheet
+    /// catalog.  Positions are zero-based [`litchi_core::Position`] values
+    /// wrapped by [`Selector`], so chart, dialog, macro, and unbound tabs are
+    /// addressable alongside worksheets.
+    ///
+    /// The return value reports whether the selected tab's current staged
+    /// state differs from `state`.  A resolved no-op is still retained as one
+    /// operation so its commit has the usual exact-image and durable-patch
+    /// behavior.  A missing selector returns `Ok(None)` without staging;
+    /// `Ok(Some(false))` is a resolved no-op.
+    ///
+    /// The final candidate must retain at least one visible tab.  This check
+    /// is performed at commit time, allowing a transaction to hide one tab
+    /// and reveal another before publication.  An unbound tab can only be
+    /// very hidden because it has no physical sheet part.
+    ///
+    /// ```
+    /// use litchi_xlsb::{Builder, sheet::State, writer::MutableWorksheet};
+    /// let mut builder = Builder::new();
+    /// builder.add_worksheet(MutableWorksheet::new("Visible"));
+    /// builder.add_worksheet(MutableWorksheet::new("Archive"));
+    /// let source = builder.build()?;
+    /// let mut edit = source.edit()?;
+    /// assert_eq!(edit.set_sheet_state("Archive", State::Hidden)?, Some(true));
+    /// assert_eq!(edit.set_sheet_state("Missing", State::Hidden)?, None);
+    /// let commit = edit.commit()?;
+    /// assert!(commit.diagnostics().changed());
+    /// assert_eq!(commit.package().apply(&commit.patch().inverse())?.to_bytes()?, source.to_bytes()?);
+    /// # Ok::<(), litchi_xlsb::package::PackageError>(())
+    /// ```
+    pub fn set_sheet_state<'a>(
+        &mut self,
+        selector: impl Into<Selector<'a>>,
+        state: State,
+    ) -> Result<Option<bool>> {
+        let selector = selector.into();
+        let Some(catalog_position) = resolve_catalog_position(&self.sheet_catalog, &selector)?
+        else {
+            return Ok(None);
+        };
+        let tab = &self.sheet_catalog[catalog_position];
+        if tab.kind == Kind::Unbound && state != State::VeryHidden {
+            return Err(Error::InvalidRelationship(
+                "unbound XLSB sheet tabs must be very hidden".to_string(),
+            ));
+        }
+        let state_index = self
+            .operation_indexes
+            .get(&Selection::SheetState(catalog_position))
+            .and_then(|indexes| {
+                indexes.iter().copied().find(|index| {
+                    matches!(&self.operations[*index], Operation::SetSheetState { .. })
+                })
+            });
+        let current = state_index.map_or(tab.state, |index| match &self.operations[index] {
+            Operation::SetSheetState { state, .. } => *state,
+            Operation::RenameSheet { .. }
+            | Operation::TransferCell { .. }
+            | Operation::AddImage { .. }
+            | Operation::TransferDrawing { .. } => tab.state,
+        });
+        let changed = current != state;
+        if let Some(index) = state_index {
+            self.operations[index] = Operation::SetSheetState {
+                catalog_position,
+                state,
+            };
+        } else {
+            self.stage(Operation::SetSheetState {
+                catalog_position,
+                state,
+            })?;
+        }
+        Ok(Some(changed))
     }
 
     /// Plan dependency-complete transfer of one stored cell from another XLSB.
@@ -492,16 +607,25 @@ impl Edit {
             });
         }
         let selection = operation.selection();
-        if self
-            .operations
-            .iter()
-            .any(|existing| existing.selection() == selection)
-        {
+        let conflicts = self
+            .operation_indexes
+            .get(&selection)
+            .is_some_and(|indexes| {
+                indexes
+                    .iter()
+                    .any(|index| self.operations[*index].conflicts_with(&operation))
+            });
+        if conflicts {
             return Err(Error::UnsupportedFeature(format!(
                 "workbook transaction selects {selection:?} more than once"
             )));
         }
+        let index = self.operations.len();
         self.operations.push(operation);
+        self.operation_indexes
+            .entry(selection)
+            .or_default()
+            .push(index);
         Ok(())
     }
 }
@@ -678,21 +802,19 @@ impl Patch {
             ));
         }
         let mut merged = self.operations.clone();
-        let mut positions = merged
-            .iter()
-            .enumerate()
-            .map(|(index, operation)| (operation.selection(), index))
-            .collect::<BTreeMap<_, _>>();
         let mut conflicts = Vec::new();
         for right in &other.operations {
-            if let Some(index) = positions.get(&right.selection()).copied() {
-                if merged[index] != *right {
-                    conflicts.push(MergeConflict {
-                        selection: right.selection(),
-                    });
-                }
+            if merged.iter().any(|operation| operation == right) {
+                continue;
+            }
+            if merged
+                .iter()
+                .any(|operation| operation.conflicts_with(right))
+            {
+                conflicts.push(MergeConflict {
+                    selection: right.selection(),
+                });
             } else {
-                positions.insert(right.selection(), merged.len());
                 merged.push(right.clone());
             }
         }
@@ -941,6 +1063,7 @@ impl Patch {
         for operation in &self.operations {
             let operation_bytes = match operation {
                 Operation::RenameSheet { name, .. } => 17usize.checked_add(name.len()),
+                Operation::SetSheetState { .. } => Some(17),
                 Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
                 Operation::AddImage { image, .. } => {
                     74usize.checked_add(image.data.len()).and_then(|size| {
@@ -973,9 +1096,10 @@ impl MergeConflict {
     #[must_use]
     pub const fn sheet_index(&self) -> usize {
         match self.selection {
-            Selection::Sheet(sheet) | Selection::Cell(sheet, _) | Selection::Drawing(sheet) => {
-                sheet
-            },
+            Selection::SheetRename(sheet)
+            | Selection::SheetState(sheet)
+            | Selection::Cell(sheet, _)
+            | Selection::Drawing(sheet) => sheet,
         }
     }
 
@@ -983,7 +1107,7 @@ impl MergeConflict {
     #[must_use]
     pub const fn cell_reference(&self) -> Option<Reference> {
         match self.selection {
-            Selection::Sheet(_) | Selection::Drawing(_) => None,
+            Selection::SheetRename(_) | Selection::SheetState(_) | Selection::Drawing(_) => None,
             Selection::Cell(_, reference) => Some(reference),
         }
     }
@@ -1161,11 +1285,30 @@ fn replay_workbook(
         return Ok((before.to_vec(), workbook));
     }
     let mut changed = false;
-    for operation in operations {
-        match operation {
-            Operation::RenameSheet { sheet, name } => {
-                changed |= rename_sheet(&mut workbook, *sheet, name)?;
-            },
+    let mut state_changed = false;
+    let mut index = 0usize;
+    while index < operations.len() {
+        if matches!(
+            &operations[index],
+            Operation::RenameSheet { .. } | Operation::SetSheetState { .. }
+        ) {
+            let start = index;
+            index += 1;
+            while index < operations.len()
+                && matches!(
+                    &operations[index],
+                    Operation::RenameSheet { .. } | Operation::SetSheetState { .. }
+                )
+            {
+                index += 1;
+            }
+            let (metadata_changed, metadata_state_changed) =
+                apply_sheet_metadata(&mut workbook, &operations[start..index])?;
+            changed |= metadata_changed;
+            state_changed |= metadata_state_changed;
+            continue;
+        }
+        match &operations[index] {
             Operation::TransferCell {
                 source,
                 source_sheet,
@@ -1202,7 +1345,16 @@ fn replay_workbook(
                 )?;
                 changed = true;
             },
+            Operation::RenameSheet { .. } | Operation::SetSheetState { .. } => {
+                return Err(Error::InvalidFormat(
+                    "workbook metadata operation grouping is internally inconsistent".to_string(),
+                ));
+            },
         }
+        index += 1;
+    }
+    if state_changed {
+        validate_sheet_state_invariants(&workbook)?;
     }
     validate_all_worksheets(&workbook)?;
     let bytes = if changed {
@@ -1633,46 +1785,481 @@ fn transfer_cell(
     Ok(())
 }
 
-fn rename_sheet(workbook: &mut Workbook, sheet: usize, name: &str) -> Result<bool> {
-    validate_sheet_name(workbook, sheet, name)?;
-    if workbook
-        .worksheet_names()
-        .get(sheet)
-        .is_some_and(|current| current == name)
-    {
-        return Ok(false);
+fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Result<(bool, bool)> {
+    let mut names = BTreeMap::<usize, &str>::new();
+    let mut states = BTreeMap::<usize, State>::new();
+    let mut changed = false;
+    let mut state_changed = false;
+    let tabs = workbook.sheets().collect::<Vec<_>>();
+    for operation in operations {
+        match operation {
+            Operation::RenameSheet { sheet, name } => {
+                let (catalog_position, tab) = tabs
+                    .iter()
+                    .enumerate()
+                    .find(|(_, tab)| {
+                        tab.worksheet_position()
+                            .is_some_and(|position| position.get() == *sheet)
+                    })
+                    .ok_or_else(|| Error::WorksheetNotFound(format!("sheet index {sheet}")))?;
+                validate_sheet_name(workbook, *sheet, name)?;
+                if tab.name() != name {
+                    if names.values().any(|previous| excel_name_eq(previous, name)) {
+                        return Err(Error::InvalidFormat(
+                            "duplicate sheet name in staged metadata changes".to_string(),
+                        ));
+                    }
+                    names.insert(catalog_position, name.as_str());
+                    changed = true;
+                }
+            },
+            Operation::SetSheetState {
+                catalog_position,
+                state,
+            } => {
+                let tab = tabs.get(*catalog_position).ok_or_else(|| {
+                    Error::WorksheetNotFound(format!("sheet index {catalog_position}"))
+                })?;
+                if tab.kind() == Kind::Unbound && *state != State::VeryHidden {
+                    return Err(Error::InvalidRelationship(
+                        "unbound XLSB sheet tabs must be very hidden".to_string(),
+                    ));
+                }
+                if tab.state() != *state {
+                    states.insert(*catalog_position, *state);
+                    changed = true;
+                    state_changed = true;
+                }
+            },
+            Operation::TransferCell { .. }
+            | Operation::AddImage { .. }
+            | Operation::TransferDrawing { .. } => {
+                return Err(Error::InvalidFormat(
+                    "workbook metadata operation grouping is internally inconsistent".to_string(),
+                ));
+            },
+        }
     }
-    let catalog_position = workbook.catalog_position_for_worksheet(sheet)?;
+    if !changed {
+        return Ok((false, false));
+    }
+    let kinds = tabs.iter().map(|tab| tab.kind()).collect::<Vec<_>>();
+    let mut final_states = tabs.iter().map(|tab| tab.state()).collect::<Vec<_>>();
+    for (catalog_position, state) in &states {
+        let final_state = final_states
+            .get_mut(*catalog_position)
+            .ok_or_else(|| Error::WorksheetNotFound(format!("sheet index {catalog_position}")))?;
+        *final_state = *state;
+    }
+    drop(tabs);
+    crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let uri = workbook.package.main_document_part()?.partname().clone();
     let source = workbook.package.get_part(&uri)?.blob().to_vec();
-    let mut output = Vec::new();
+    if names.is_empty() {
+        let mut output = source.clone();
+        let mut index = 0usize;
+        let mut replaced = false;
+        for item in Records::new(&source) {
+            let record = item?;
+            if record.kind() == kind::BUNDLE_SH {
+                if let Some(state) = states.get(&index).copied() {
+                    let header_source = source.get(record.offset()..).ok_or_else(|| {
+                        Error::InvalidFormat("record offset is outside workbook.bin".to_string())
+                    })?;
+                    let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
+                    let payload_start =
+                        record
+                            .offset()
+                            .checked_add(header_len)
+                            .ok_or(Error::CapacityOverflow {
+                                resource: "bundle-sheet state offset",
+                            })?;
+                    let payload_end = payload_start.saturating_add(4);
+                    let output_len = output.len();
+                    let state_bytes =
+                        output
+                            .get_mut(payload_start..payload_end)
+                            .ok_or(Error::InvalidLength {
+                                expected: payload_end,
+                                found: output_len,
+                            })?;
+                    state_bytes.copy_from_slice(&u32::from(state_to_wire(state)).to_le_bytes());
+                    replaced = true;
+                }
+                index = index.saturating_add(1);
+            }
+        }
+        if !replaced {
+            return Err(Error::WorksheetNotFound(
+                "sheet state record was not found".to_string(),
+            ));
+        }
+        let mut package = workbook.package.clone();
+        package.get_part_mut(&uri)?.set_blob(output);
+        apply_sheet_view_dependencies(workbook, &mut package, &kinds, &final_states, &states)?;
+        let validated = workbook.reparse_candidate(package)?;
+        *workbook = validated;
+        return Ok((true, state_changed));
+    }
+    let mut output = Vec::with_capacity(source.len());
     let mut index = 0usize;
     let mut replaced = false;
     for item in Records::new(&source) {
         let record = item?;
-        if record.kind() == kind::BUNDLE_SH && index == catalog_position {
-            let payload = renamed_bundle_payload(record.payload(), name)?;
-            Writer::new(&mut output).write_record(kind::BUNDLE_SH, &payload)?;
-            replaced = true;
+        if record.kind() == kind::BUNDLE_SH {
+            let name = names.get(&index).copied();
+            let state = states.get(&index).copied();
+            if name.is_some() || state.is_some() {
+                let mut payload = record.payload().to_vec();
+                if let Some(name) = name {
+                    payload = renamed_bundle_payload(&payload, name)?;
+                }
+                if let Some(state) = state {
+                    let payload_len = payload.len();
+                    let state_bytes = payload.get_mut(..4).ok_or(Error::InvalidLength {
+                        expected: 4,
+                        found: payload_len,
+                    })?;
+                    state_bytes.copy_from_slice(&u32::from(state_to_wire(state)).to_le_bytes());
+                }
+                Writer::new(&mut output).write_record(kind::BUNDLE_SH, &payload)?;
+                replaced = true;
+            } else {
+                copy_record(&source, &record, &mut output)?;
+            }
+            index = index.saturating_add(1);
         } else {
             copy_record(&source, &record, &mut output)?;
         }
-        if record.kind() == kind::BUNDLE_SH {
-            index = index.saturating_add(1);
-        }
     }
     if !replaced {
-        return Err(Error::WorksheetNotFound(format!("sheet index {sheet}")));
+        return Err(Error::WorksheetNotFound(
+            "sheet metadata record was not found".to_string(),
+        ));
     }
-    if output == source {
-        return Ok(false);
-    }
-    crate::signature_policy::ensure_unsigned(&workbook.package)?;
     let mut package = workbook.package.clone();
     package.get_part_mut(&uri)?.set_blob(output);
+    apply_sheet_view_dependencies(workbook, &mut package, &kinds, &final_states, &states)?;
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
-    Ok(true)
+    Ok((true, state_changed))
+}
+
+fn apply_sheet_view_dependencies(
+    workbook: &Workbook,
+    package: &mut litchi_opc::OpcPackage,
+    kinds: &[Kind],
+    final_states: &[State],
+    changed_states: &BTreeMap<usize, State>,
+) -> Result<()> {
+    if changed_states.is_empty() {
+        return Ok(());
+    }
+    if kinds.len() != final_states.len() {
+        return Err(Error::InvalidFormat(
+            "sheet catalog and visibility state counts differ".to_string(),
+        ));
+    }
+    let workbook_uri = workbook.package.main_document_part()?.partname().clone();
+    let workbook_source = package.get_part(&workbook_uri)?.blob().to_vec();
+    let workbook_part = workbook.package.get_part(&workbook_uri)?;
+    let mut workbook_output = workbook_source.clone();
+    let transitions = rewrite_book_views(&mut workbook_output, final_states)?;
+    let mut relocated_target = None;
+    for (_, new_active) in &transitions {
+        if let Some(previous) = relocated_target
+            && previous != *new_active
+        {
+            return Err(Error::UnsupportedFeature(
+                "multiple BrtBookView active tabs cannot be mapped to one selected view"
+                    .to_string(),
+            ));
+        }
+        relocated_target = Some(*new_active);
+    }
+    let old_active = workbook.active_catalog_position().unwrap_or(0);
+    if old_active >= final_states.len() {
+        return Err(Error::InvalidFormat(
+            "active workbook view points outside the sheet catalog".to_string(),
+        ));
+    }
+    if transitions.is_empty() && final_states[old_active].is_hidden() {
+        return Err(Error::InvalidFormat(
+            "active workbook view has no relocatable BrtBookView".to_string(),
+        ));
+    }
+
+    let mut actions = BTreeMap::<usize, bool>::new();
+    for catalog_position in changed_states.keys().copied() {
+        if final_states[catalog_position] != State::Visible {
+            actions.insert(catalog_position, false);
+        }
+    }
+    for (old_active, new_active) in &transitions {
+        if old_active != new_active {
+            actions.insert(*old_active, false);
+            actions.insert(*new_active, true);
+        }
+    }
+
+    for catalog_position in actions.keys() {
+        match kinds[*catalog_position] {
+            Kind::Worksheet | Kind::Chart => {},
+            Kind::Dialog | Kind::Macro | Kind::IntlMacro | Kind::Unbound => {
+                return Err(Error::UnsupportedFeature(format!(
+                    "cannot update the selected view for {:?} sheet tab",
+                    kinds[*catalog_position]
+                )));
+            },
+        }
+    }
+
+    let mut sheet_parts = vec![None; kinds.len()];
+    let mut catalog_position = 0usize;
+    for item in Records::new(&workbook_source) {
+        let record = item?;
+        if record.kind() != kind::BUNDLE_SH {
+            continue;
+        }
+        let bundle = crate::package::records::BundleSheetRecord::parse(record.payload())?;
+        if let Some(rel_id) = bundle.rel_id.as_deref() {
+            let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+                Error::InvalidRelationship(format!("sheet relationship {rel_id:?} is missing"))
+            })?;
+            if relationship.is_external() {
+                return Err(Error::InvalidRelationship(format!(
+                    "sheet relationship {rel_id:?} is external"
+                )));
+            }
+            sheet_parts[catalog_position] = Some(relationship.target_partname()?);
+        }
+        catalog_position = catalog_position.saturating_add(1);
+    }
+    if catalog_position != kinds.len() {
+        return Err(Error::InvalidFormat(
+            "workbook sheet records do not match the sheet catalog".to_string(),
+        ));
+    }
+
+    if workbook_output != workbook_source {
+        package
+            .get_part_mut(&workbook_uri)?
+            .set_blob(workbook_output);
+    }
+
+    for (catalog_position, selected) in actions {
+        let Some(partname) = sheet_parts[catalog_position].as_ref() else {
+            continue;
+        };
+        let part_kind = kinds[catalog_position];
+        if !matches!(part_kind, Kind::Worksheet | Kind::Chart) {
+            continue;
+        }
+        let source = package.get_part(partname)?.blob().to_vec();
+        let Some(output) = rewrite_sheet_view_flags(&source, part_kind, selected)? else {
+            continue;
+        };
+        package.get_part_mut(partname)?.set_blob(output);
+    }
+    Ok(())
+}
+
+fn rewrite_book_views(output: &mut [u8], final_states: &[State]) -> Result<Vec<(usize, usize)>> {
+    if final_states.is_empty() {
+        return Err(Error::UnsupportedFeature(
+            "workbook must retain at least one visible sheet tab".to_string(),
+        ));
+    }
+    let source = output.to_vec();
+    let mut transitions = Vec::new();
+    let mut saw_book_view = false;
+    for item in Records::new(&source) {
+        let record = item?;
+        if record.kind() != kind::BOOK_VIEW {
+            continue;
+        }
+        saw_book_view = true;
+        let payload = record.payload();
+        let current_bytes = payload.get(24..28).ok_or(Error::InvalidLength {
+            expected: 29,
+            found: payload.len(),
+        })?;
+        let current = usize::try_from(u32::from_le_bytes([
+            current_bytes[0],
+            current_bytes[1],
+            current_bytes[2],
+            current_bytes[3],
+        ]))
+        .map_err(|_error| {
+            Error::InvalidFormula("BrtBookView itabCur does not fit usize".to_string())
+        })?;
+        if current >= final_states.len() {
+            return Err(Error::InvalidFormat(
+                "BrtBookView itabCur points outside the sheet catalog".to_string(),
+            ));
+        }
+        let next = if final_states[current] == State::Visible {
+            current
+        } else {
+            next_visible_sheet(current, final_states).ok_or_else(|| {
+                Error::UnsupportedFeature(
+                    "workbook must retain at least one visible sheet tab".to_string(),
+                )
+            })?
+        };
+        if current == next {
+            continue;
+        }
+        let header_source = source.get(record.offset()..).ok_or_else(|| {
+            Error::InvalidFormat("book-view record offset is outside workbook.bin".to_string())
+        })?;
+        let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
+        let payload_start = record
+            .offset()
+            .checked_add(header_len)
+            .and_then(|offset| offset.checked_add(24))
+            .ok_or(Error::CapacityOverflow {
+                resource: "BrtBookView itabCur offset",
+            })?;
+        let payload_end = payload_start
+            .checked_add(4)
+            .ok_or(Error::CapacityOverflow {
+                resource: "BrtBookView itabCur length",
+            })?;
+        let output_len = output.len();
+        let bytes = output
+            .get_mut(payload_start..payload_end)
+            .ok_or(Error::InvalidLength {
+                expected: payload_end,
+                found: output_len,
+            })?;
+        bytes.copy_from_slice(
+            &u32::try_from(next)
+                .map_err(|_error| Error::CapacityOverflow {
+                    resource: "active workbook sheet index",
+                })?
+                .to_le_bytes(),
+        );
+        transitions.push((current, next));
+    }
+    if !saw_book_view {
+        return Ok(Vec::new());
+    }
+    if !transitions.is_empty() {
+        let book_view_count = Records::new(&source).try_fold(0usize, |count, item| {
+            let record = item?;
+            Ok::<_, Error>(count.saturating_add(if record.kind() == kind::BOOK_VIEW {
+                1
+            } else {
+                0
+            }))
+        })?;
+        if book_view_count > 1 {
+            return Err(Error::UnsupportedFeature(
+                "active-tab relocation across multiple BrtBookView records is unsupported"
+                    .to_string(),
+            ));
+        }
+    }
+    Ok(transitions)
+}
+
+fn next_visible_sheet(current: usize, states: &[State]) -> Option<usize> {
+    (1..=states.len())
+        .map(|distance| current.saturating_add(distance) % states.len())
+        .find(|position| states[*position] == State::Visible)
+}
+
+fn rewrite_sheet_view_flags(source: &[u8], kind: Kind, selected: bool) -> Result<Option<Vec<u8>>> {
+    let (record_kind, flag) = match kind {
+        Kind::Worksheet => (kind::BEGIN_WS_VIEW, 0x0040u16),
+        Kind::Chart => (kind::BEGIN_CS_VIEW, 0x0001u16),
+        Kind::Dialog | Kind::Macro | Kind::IntlMacro | Kind::Unbound => return Ok(None),
+    };
+    if selected {
+        let mut view_count = 0usize;
+        for item in Records::new(source) {
+            if item?.kind() == record_kind {
+                view_count = view_count.saturating_add(1);
+                if view_count > 1 {
+                    return Err(Error::UnsupportedFeature(format!(
+                        "cannot map multiple {:?} view records to one active workbook view",
+                        kind
+                    )));
+                }
+            }
+        }
+        if view_count == 0 {
+            return Err(Error::UnsupportedFeature(format!(
+                "cannot select active {:?} sheet without a view record",
+                kind
+            )));
+        }
+    }
+    let mut output = source.to_vec();
+    let mut changed = false;
+    for item in Records::new(source) {
+        let record = item?;
+        if record.kind() != record_kind {
+            continue;
+        }
+        let payload = record.payload();
+        let flags = payload.get(..2).ok_or(Error::InvalidLength {
+            expected: 2,
+            found: payload.len(),
+        })?;
+        let old = u16::from_le_bytes([flags[0], flags[1]]);
+        let updated = if selected { old | flag } else { old & !flag };
+        if old == updated {
+            continue;
+        }
+        let header_source = source.get(record.offset()..).ok_or_else(|| {
+            Error::InvalidFormat("sheet-view record offset is outside its part".to_string())
+        })?;
+        let (_, header_len) = Header::parse(header_source, RawLimits::DEFAULT)?;
+        let payload_start =
+            record
+                .offset()
+                .checked_add(header_len)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "sheet-view flags offset",
+                })?;
+        let payload_end = payload_start
+            .checked_add(2)
+            .ok_or(Error::CapacityOverflow {
+                resource: "sheet-view flags length",
+            })?;
+        let output_len = output.len();
+        let bytes = output
+            .get_mut(payload_start..payload_end)
+            .ok_or(Error::InvalidLength {
+                expected: payload_end,
+                found: output_len,
+            })?;
+        bytes.copy_from_slice(&updated.to_le_bytes());
+        changed = true;
+    }
+    Ok(changed.then_some(output))
+}
+
+fn validate_sheet_state_invariants(workbook: &Workbook) -> Result<()> {
+    let visible = workbook
+        .sheets()
+        .filter(|tab| tab.state() == State::Visible)
+        .count();
+    if visible == 0 {
+        return Err(Error::UnsupportedFeature(
+            "workbook must retain at least one visible sheet tab".to_string(),
+        ));
+    }
+    for tab in workbook.sheets() {
+        if tab.kind() == Kind::Unbound && tab.state() != State::VeryHidden {
+            return Err(Error::InvalidRelationship(
+                "unbound XLSB sheet tabs must be very hidden".to_string(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
@@ -1764,6 +2351,58 @@ fn validate_sheet_name(workbook: &Workbook, sheet: usize, name: &str) -> Result<
     Ok(())
 }
 
+fn validate_sheet_name_in_catalog(catalog: &[SheetTarget], sheet: usize, name: &str) -> Result<()> {
+    if !catalog
+        .iter()
+        .any(|tab| tab.worksheet_position == Some(sheet))
+    {
+        return Err(Error::WorksheetNotFound(format!("sheet index {sheet}")));
+    }
+    let units = name.encode_utf16().count();
+    if units == 0
+        || units > 31
+        || name.contains(['\0', '\u{0003}', ':', '\\', '*', '?', '/', '[', ']'])
+        || name.starts_with('\'')
+        || name.ends_with('\'')
+    {
+        return Err(Error::InvalidFormat(format!("invalid sheet name {name:?}")));
+    }
+    if catalog
+        .iter()
+        .any(|tab| tab.worksheet_position != Some(sheet) && excel_name_eq(&tab.name, name))
+    {
+        return Err(Error::InvalidFormat(format!(
+            "duplicate sheet name {name:?}"
+        )));
+    }
+    Ok(())
+}
+
+fn resolve_catalog_position(
+    catalog: &[SheetTarget],
+    selector: &Selector<'_>,
+) -> Result<Option<usize>> {
+    match selector {
+        Selector::Name(name) => {
+            let mut matches = catalog
+                .iter()
+                .enumerate()
+                .filter(|(_, tab)| excel_name_eq(&tab.name, name.as_ref()));
+            let first = matches.next().map(|(position, _)| position);
+            if matches.next().is_some() {
+                return Err(Error::InvalidFormat(
+                    "sheet-state selector name is ambiguous in the complete tab catalog"
+                        .to_string(),
+                ));
+            }
+            Ok(first)
+        },
+        Selector::Position(position) => {
+            Ok((position.get() < catalog.len()).then_some(position.get()))
+        },
+    }
+}
+
 pub(crate) fn validate_all_worksheets(workbook: &Workbook) -> Result<()> {
     for index in 0..workbook.worksheet_count() {
         let uri = workbook.worksheet_uri(index)?;
@@ -1831,6 +2470,14 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             push_usize(output, name.len())?;
             output.extend_from_slice(name.as_bytes());
         },
+        Operation::SetSheetState {
+            catalog_position,
+            state,
+        } => {
+            output.push(5);
+            push_usize(output, *catalog_position)?;
+            output.push(state_to_wire(*state));
+        },
         Operation::TransferCell {
             source,
             source_sheet,
@@ -1897,6 +2544,14 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                 .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
                 .to_string();
             Ok(Operation::RenameSheet { sheet, name })
+        },
+        5 => {
+            let catalog_position = read_next_usize(data, offset)?;
+            let state = state_from_wire(read_slice(data, offset, 1)?[0])?;
+            Ok(Operation::SetSheetState {
+                catalog_position,
+                state,
+            })
         },
         2 => {
             let source_len = read_next_usize(data, offset)?;
@@ -2011,6 +2666,25 @@ fn image_format_from_bits(value: u8) -> Result<crate::package::drawing_image::Im
         8 => Ok(crate::package::drawing_image::ImageFormat::Wdp),
         _ => Err(Error::InvalidFormat(format!(
             "unknown durable image format {value}"
+        ))),
+    }
+}
+
+const fn state_to_wire(state: State) -> u8 {
+    match state {
+        State::Visible => 0,
+        State::Hidden => 1,
+        State::VeryHidden => 2,
+    }
+}
+
+fn state_from_wire(value: u8) -> Result<State> {
+    match value {
+        0 => Ok(State::Visible),
+        1 => Ok(State::Hidden),
+        2 => Ok(State::VeryHidden),
+        _ => Err(Error::InvalidFormat(format!(
+            "unknown durable sheet state {value}"
         ))),
     }
 }

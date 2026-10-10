@@ -931,7 +931,9 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
             assert_eq!(property.get(), !payload, "{}", property.name());
             assert_eq!(
                 property.set(),
-                (element.name() == "sheet" && property.name() == "name") || payload,
+                (element.name() == "sheet"
+                    && matches!(property.name(), "name" | "hidden" | "visibility"))
+                    || payload,
                 "{}.{}",
                 element.name(),
                 property.name()

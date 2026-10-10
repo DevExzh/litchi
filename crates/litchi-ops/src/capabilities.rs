@@ -1091,7 +1091,7 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// a selector accepted by the cell handler, while workbook, sheet, row,
 /// column and other nodes are not removable structural elements.
 #[cfg(feature = "xlsb")]
-static XLSB_WRITE_GAPS: [GapSpec; 4] = [
+static XLSB_WRITE_GAPS: [GapSpec; 7] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "remove",
@@ -1131,6 +1131,36 @@ static XLSB_WRITE_GAPS: [GapSpec; 4] = [
         code: Code::UnsupportedCapability,
         follow_up: "M2 XLSB additional native cell-record families",
         reason: "semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "sheet",
+            context: "non-worksheet-name",
+        },
+        code: Code::UnsupportedType,
+        follow_up: "M2 XLSB complete-tab rename dependency support",
+        reason: "name writes require a worksheet tab; visibility writes address the complete tab catalog",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "sheet",
+            context: "unbound-tab-visibility",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "bind a physical sheet before revealing an unbound tab",
+        reason: "an unbound XLSB tab has no sheet payload and must remain veryHidden",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "sheet",
+            context: "unmodeled-tab-views",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB multi-window and additional tab-kind view mutation",
+        reason: "visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs",
     },
 ];
 

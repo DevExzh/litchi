@@ -310,7 +310,7 @@
         "hidden": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "visibility": {
@@ -321,7 +321,7 @@
             "veryHidden"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         }
       },
@@ -1929,6 +1929,33 @@
       "code": "unsupported_capability",
       "followUp": "M2 XLSB additional native cell-record families",
       "reason": "semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "non-worksheet-name",
+      "code": "unsupported_type",
+      "followUp": "M2 XLSB complete-tab rename dependency support",
+      "reason": "name writes require a worksheet tab; visibility writes address the complete tab catalog"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "unbound-tab-visibility",
+      "code": "unsupported_capability",
+      "followUp": "bind a physical sheet before revealing an unbound tab",
+      "reason": "an unbound XLSB tab has no sheet payload and must remain veryHidden"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "unmodeled-tab-views",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB multi-window and additional tab-kind view mutation",
+      "reason": "visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs"
     },
     {
       "subject": "view",

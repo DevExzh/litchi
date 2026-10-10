@@ -298,7 +298,8 @@ pub(crate) static READING_ORDER: Tokens = Tokens::new(
         ("righttoleft", 2),
     ],
 );
-static VISIBILITY: Tokens = Tokens::new("visibility", &["visible", "hidden", "veryHidden"], &[]);
+pub(crate) static VISIBILITY: Tokens =
+    Tokens::new("visibility", &["visible", "hidden", "veryHidden"], &[]);
 
 /// Spreadsheet colours: ARGB or a theme slot with its tint.
 const COLOR: ValueType = ValueType::Color(ColorContext::Spreadsheet);

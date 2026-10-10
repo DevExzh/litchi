@@ -21,7 +21,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `2346df7c5afcf5597a4a3caf4cf1ca5467f80d948e93e7f87b8fdf13461921e2` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `93f3748feb71e0561b4e1e4564f4e39c6822e582cdc5463891c50ac136144335` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `fdb8d11111be086a46e6d5e4ef95cf8157feea264ea6d7cc336d71ae1dea9c2f` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -2746,6 +2746,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `remove` | `cell` | `formula-groups` | array, shared and data-table formula-group members require native group lifecycle support before removal | M2 XLSB dependency-aware formula-group removal |
 | `remove` | `cell` | `calculation-chain` | stored formulas cannot be removed while an opaque calculation chain is present | M2 XLSB calculation-chain-aware formula removal |
 | `remove` | `cell` | `unmodeled-cell-records` | semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled | M2 XLSB additional native cell-record families |
+| `set` | `sheet` | `non-worksheet-name` | name writes require a worksheet tab; visibility writes address the complete tab catalog | M2 XLSB complete-tab rename dependency support |
+| `set` | `sheet` | `unbound-tab-visibility` | an unbound XLSB tab has no sheet payload and must remain veryHidden | bind a physical sheet before revealing an unbound tab |
+| `set` | `sheet` | `unmodeled-tab-views` | visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs | M2 XLSB multi-window and additional tab-kind view mutation |
 
 ## pptx
 
