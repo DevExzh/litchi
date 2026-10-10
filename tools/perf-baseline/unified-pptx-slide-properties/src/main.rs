@@ -3,7 +3,7 @@
 //!
 //! Corpus generation, opening, target and property preparation, warm-up,
 //! output serialization and equivalence checks are outside the timed interval.
-//! Each timed native sample performs the two requested setters in one Edit and
+//! Each timed native sample performs one combined property setter in one Edit and
 //! commits once; each unified sample performs one prepared File::set call.
 
 use litchi_core::{OwnedSource, Position};
@@ -43,8 +43,7 @@ enum NativeOwner {
 
 #[derive(Clone, Copy)]
 struct NativeStats {
-    name_changed: bool,
-    hidden_changed: bool,
+    changed: bool,
     setter_calls: usize,
     commits: usize,
 }
@@ -90,30 +89,26 @@ fn native_once(owner: &NativeOwner) -> Result<(NativeOwner, NativeStats)> {
     match owner {
         NativeOwner::Eager(base) => {
             let mut edit = base.edit()?;
-            let name_changed = edit.set_slide_name(slide, SLIDE_NAME)?;
-            let hidden_changed = edit.set_slide_hidden(slide, true)?;
+            let changed = edit.set_slide_properties(slide, Some(SLIDE_NAME), Some(true))?;
             let package = edit.commit()?.into_package();
             Ok((
                 NativeOwner::Eager(package),
                 NativeStats {
-                    name_changed,
-                    hidden_changed,
-                    setter_calls: 2,
+                    changed,
+                    setter_calls: 1,
                     commits: 1,
                 },
             ))
         },
         NativeOwner::Source(base) => {
             let mut edit = base.edit()?;
-            let name_changed = edit.set_slide_name(slide, SLIDE_NAME)?;
-            let hidden_changed = edit.set_slide_hidden(slide, true)?;
+            let changed = edit.set_slide_properties(slide, Some(SLIDE_NAME), Some(true))?;
             let package = edit.commit()?.into_package();
             Ok((
                 NativeOwner::Source(package),
                 NativeStats {
-                    name_changed,
-                    hidden_changed,
-                    setter_calls: 2,
+                    changed,
+                    setter_calls: 1,
                     commits: 1,
                 },
             ))
@@ -165,16 +160,16 @@ fn median(values: &[u128]) -> u128 {
 }
 
 fn route_name(mode: OwnerMode, leg: &str) -> String {
-    format!("pptx_{}_{}_slide_properties_v1", mode.name(), leg)
+    format!("pptx_{}_{}_slide_properties_v2", mode.name(), leg)
 }
 
 fn expected_native_stats(stats: NativeStats) -> Result<()> {
-    if stats.name_changed && stats.hidden_changed && stats.setter_calls == 2 && stats.commits == 1 {
+    if stats.changed && stats.setter_calls == 1 && stats.commits == 1 {
         return Ok(());
     }
     Err(format!(
-        "native accounting mismatch: name_changed={}, hidden_changed={}, setter_calls={}, commits={}, expected true, true, 2, 1",
-        stats.name_changed, stats.hidden_changed, stats.setter_calls, stats.commits
+        "native accounting mismatch: changed={}, setter_calls={}, commits={}, expected true, 1, 1",
+        stats.changed, stats.setter_calls, stats.commits
     )
     .into())
 }
@@ -265,8 +260,7 @@ fn measure(corpus: &[u8], shape_count: usize, mode: OwnerMode, rounds: usize) ->
         "hidden": true,
         "native_route": route_name(mode, "native_primary"),
         "unified_route": route_name(mode, "unified_file_set"),
-        "native_name_changed": true,
-        "native_hidden_changed": true,
+        "native_changed": true,
         "native_setter_calls": native_setter_calls,
         "native_commits": native_commits,
         "unified_set_calls": 1,
@@ -436,7 +430,7 @@ fn main() -> Result<()> {
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({
-            "schema": 1,
+            "schema": 2,
             "format": "pptx",
             "workload": "one-slide-properties",
             "target": TARGET_PREFIX,
@@ -447,8 +441,8 @@ fn main() -> Result<()> {
             "order": "ABBA",
             "samples_per_leg": config.rounds * 2,
             "routes": routes,
-            "timing_scope": "one native Edit.set_slide_name plus Edit.set_slide_hidden sequence and one commit, or one prepared unified File::set('/slide[1]', props) call; excludes corpus generation, opening, target/property preparation, warm-up, output serialization/save, equivalence checks and drop",
-            "publication_contract": "native_setter_calls is two and native_commits is one per sample; unified_set_calls is one per sample",
+            "timing_scope": "one native Edit.set_slide_properties call and one commit, or one prepared unified File::set('/slide[1]', props) call; excludes corpus generation, opening, target/property preparation, warm-up, output serialization/save, equivalence checks and drop",
+            "publication_contract": "native_setter_calls is one and native_commits is one per sample; unified_set_calls is one per sample",
             "equivalence_scope": "warm-up outputs are compared by exact bytes, falling back to decoded ZIP members before timing",
             "build_provenance": build_provenance(),
             "results": results,

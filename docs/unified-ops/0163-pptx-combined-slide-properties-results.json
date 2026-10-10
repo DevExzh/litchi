@@ -1,0 +1,491 @@
+{
+  "build_provenance": {
+    "build_command": "CARGO_PROFILE_DEV_DEBUG=0 CARGO_PROFILE_TEST_DEBUG=0 CARGO_PROFILE_RELEASE_DEBUG=0 CARGO_INCREMENTAL=0 CARGO_TARGET_DIR=/tmp/litchi-unified-0163-target CARGO_NET_OFFLINE=true cargo build --release --manifest-path tools/perf-baseline/unified-pptx-slide-properties/Cargo.toml",
+    "crate": "unified-pptx-slide-properties-baseline",
+    "crate_version": "0.1.0",
+    "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+    "source_commit": "e6dd93cc63a8c11ed6c5948c80afec3d1d01e927",
+    "target": "x86_64-unknown-linux-gnu",
+    "source_manifest_files": 8238,
+    "source_manifest_sha256": "cf94957f52174bf8f2d34e516ab77b9b7c55e2bad09ccfc98ccf8198257c4768",
+    "source_manifest_algorithm": "Sort relative .rs, Cargo.toml and Cargo.lock paths under crates and tools/perf-baseline/unified-pptx-slide-properties; concatenate SHA-256(file), two spaces, path, LF; SHA-256 that UTF-8 manifest.",
+    "working_tree": "dirty: record 0163 changes",
+    "binary": {
+      "name": "unified-pptx-slide-properties-baseline",
+      "bytes": 9781392,
+      "sha256": "ce74d781f0432014e3c0e9dae3a9c7f4f8684b1734bbefbaf70c6a4ea8a52dc4"
+    }
+  },
+  "equivalence_scope": "warm-up outputs are compared by exact bytes, falling back to decoded ZIP members before timing",
+  "failure_matrix": [],
+  "format": "pptx",
+  "order": "ABBA",
+  "owners": [
+    "eager",
+    "source"
+  ],
+  "performance_claim": "scoped timing evidence only; full acceptance remains pending",
+  "properties": {
+    "hidden": true,
+    "name": "renamed"
+  },
+  "publication_contract": "native_setter_calls is one and native_commits is one per sample; unified_set_calls is one per sample",
+  "results": [
+    {
+      "artifact": {
+        "bytes": 29508,
+        "corpus_sha256": "f0af8347a0d6015f6484b8d45c8b83f0fb097b8868e43b41211928953f0fca75",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "f0af8347a0d6015f6484b8d45c8b83f0fb097b8868e43b41211928953f0fca75",
+        "shape_count": 1
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 301761,
+      "native_ns": [
+        356751,
+        309832,
+        295641,
+        301761,
+        286872,
+        289492
+      ],
+      "native_route": "pptx_eager_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "eager",
+      "shape_count": 1,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 302331,
+      "unified_ns": [
+        321372,
+        302331,
+        304231,
+        291731,
+        293501,
+        299081
+      ],
+      "unified_over_native": 1.0018889120860548,
+      "unified_route": "pptx_eager_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 29508,
+        "corpus_sha256": "f0af8347a0d6015f6484b8d45c8b83f0fb097b8868e43b41211928953f0fca75",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "f0af8347a0d6015f6484b8d45c8b83f0fb097b8868e43b41211928953f0fca75",
+        "shape_count": 1
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 46520,
+      "native_ns": [
+        50891,
+        46190,
+        46221,
+        46520,
+        45610,
+        46900
+      ],
+      "native_route": "pptx_source_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "source",
+      "shape_count": 1,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 47880,
+      "unified_ns": [
+        49460,
+        47190,
+        46880,
+        47880,
+        53891,
+        47220
+      ],
+      "unified_over_native": 1.0292347377472055,
+      "unified_route": "pptx_source_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 29601,
+        "corpus_sha256": "d120b1829027eeee761009578b6bdf740ab32adb1cb1f2c26e6c2f75eb35add8",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "d120b1829027eeee761009578b6bdf740ab32adb1cb1f2c26e6c2f75eb35add8",
+        "shape_count": 10
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 392422,
+      "native_ns": [
+        450422,
+        402722,
+        385262,
+        392422,
+        388922,
+        383372
+      ],
+      "native_route": "pptx_eager_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "eager",
+      "shape_count": 10,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 393822,
+      "unified_ns": [
+        415211,
+        395732,
+        393822,
+        382771,
+        383832,
+        389841
+      ],
+      "unified_over_native": 1.0035675879537844,
+      "unified_route": "pptx_eager_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 29601,
+        "corpus_sha256": "d120b1829027eeee761009578b6bdf740ab32adb1cb1f2c26e6c2f75eb35add8",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "d120b1829027eeee761009578b6bdf740ab32adb1cb1f2c26e6c2f75eb35add8",
+        "shape_count": 10
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 221531,
+      "native_ns": [
+        225551,
+        222171,
+        221531,
+        220991,
+        221151,
+        220001
+      ],
+      "native_route": "pptx_source_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "source",
+      "shape_count": 10,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 226391,
+      "unified_ns": [
+        232001,
+        220351,
+        225461,
+        226391,
+        219421,
+        227101
+      ],
+      "unified_over_native": 1.0219382388920737,
+      "unified_route": "pptx_source_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 30237,
+        "corpus_sha256": "1f880edf314165ac51773d298252116915feb4f8220981ce3109195544fb1bb9",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "1f880edf314165ac51773d298252116915feb4f8220981ce3109195544fb1bb9",
+        "shape_count": 100
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 1272266,
+      "native_ns": [
+        1325376,
+        1277766,
+        1268865,
+        1272266,
+        1268105,
+        1270075
+      ],
+      "native_route": "pptx_eager_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "eager",
+      "shape_count": 100,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 1287966,
+      "unified_ns": [
+        1298976,
+        1293736,
+        1287966,
+        1267346,
+        1273366,
+        1259846
+      ],
+      "unified_over_native": 1.012340186721959,
+      "unified_route": "pptx_eager_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 30237,
+        "corpus_sha256": "1f880edf314165ac51773d298252116915feb4f8220981ce3109195544fb1bb9",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "1f880edf314165ac51773d298252116915feb4f8220981ce3109195544fb1bb9",
+        "shape_count": 100
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 1956468,
+      "native_ns": [
+        1954769,
+        1952038,
+        1958339,
+        1956468,
+        1951689,
+        1957318
+      ],
+      "native_route": "pptx_source_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "source",
+      "shape_count": 100,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 1930239,
+      "unified_ns": [
+        1933649,
+        1926519,
+        1930239,
+        1922349,
+        1925419,
+        1934019
+      ],
+      "unified_over_native": 0.9865936984402505,
+      "unified_route": "pptx_source_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 36017,
+        "corpus_sha256": "8bd903e9c1ea822152bf209bcbf3169459506d31caf7c9d06c3ffb3ecbca4771",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "8bd903e9c1ea822152bf209bcbf3169459506d31caf7c9d06c3ffb3ecbca4771",
+        "shape_count": 1000
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 9950195,
+      "native_ns": [
+        10112995,
+        9928394,
+        9950195,
+        9936584,
+        9950005,
+        9975034
+      ],
+      "native_route": "pptx_eager_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "eager",
+      "shape_count": 1000,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 9945575,
+      "unified_ns": [
+        9945575,
+        9952095,
+        9925175,
+        9932715,
+        9956305,
+        9924055
+      ],
+      "unified_over_native": 0.9995356874915516,
+      "unified_route": "pptx_eager_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 36017,
+        "corpus_sha256": "8bd903e9c1ea822152bf209bcbf3169459506d31caf7c9d06c3ffb3ecbca4771",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "8bd903e9c1ea822152bf209bcbf3169459506d31caf7c9d06c3ffb3ecbca4771",
+        "shape_count": 1000
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 19229456,
+      "native_ns": [
+        19213306,
+        19229456,
+        19170766,
+        19201077,
+        19232356,
+        19343957
+      ],
+      "native_route": "pptx_source_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "source",
+      "shape_count": 1000,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 18930756,
+      "unified_ns": [
+        18932975,
+        18935326,
+        18883115,
+        18894875,
+        18930756,
+        18891805
+      ],
+      "unified_over_native": 0.9844665392510323,
+      "unified_route": "pptx_source_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 91398,
+        "corpus_sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd",
+        "shape_count": 10000
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 96065552,
+      "native_ns": [
+        97181228,
+        95950122,
+        95827711,
+        96196203,
+        96065552,
+        95910702
+      ],
+      "native_route": "pptx_eager_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "eager",
+      "shape_count": 10000,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 96029672,
+      "unified_ns": [
+        95882211,
+        96029672,
+        96072543,
+        96343123,
+        95968572,
+        95960242
+      ],
+      "unified_over_native": 0.9996265050348121,
+      "unified_route": "pptx_eager_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    },
+    {
+      "artifact": {
+        "bytes": 91398,
+        "corpus_sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd",
+        "generator": "litchi_pptx::builder::Builder; one slide; direct text boxes",
+        "sha256": "3718c459492e44f5b68acc66b83a862e95b5998c172b8fd6350bc05535e1aacd",
+        "shape_count": 10000
+      },
+      "hidden": true,
+      "name": "renamed",
+      "native_changed": true,
+      "native_commits": 1,
+      "native_median_ns": 192462256,
+      "native_ns": [
+        192462256,
+        192959858,
+        193645691,
+        192306075,
+        192105904,
+        191870964
+      ],
+      "native_route": "pptx_source_native_primary_slide_properties_v2",
+      "native_setter_calls": 1,
+      "operation": "slide_properties",
+      "owner": "source",
+      "shape_count": 10000,
+      "target": "/slide[1]",
+      "unified_diagnostics": null,
+      "unified_median_ns": 189493183,
+      "unified_ns": [
+        189868505,
+        189143251,
+        189221982,
+        189493183,
+        189982955,
+        189348082
+      ],
+      "unified_over_native": 0.984573219384896,
+      "unified_route": "pptx_source_unified_file_set_slide_properties_v2",
+      "unified_set_calls": 1,
+      "warm_equivalence": "exact_bytes"
+    }
+  ],
+  "rounds": 3,
+  "routes": [
+    "pptx_eager_native_primary_slide_properties_v2",
+    "pptx_eager_unified_file_set_slide_properties_v2",
+    "pptx_source_native_primary_slide_properties_v2",
+    "pptx_source_unified_file_set_slide_properties_v2"
+  ],
+  "samples_per_leg": 6,
+  "schema": 2,
+  "shape_counts": [
+    1,
+    10,
+    100,
+    1000,
+    10000
+  ],
+  "target": "/slide[1]",
+  "timing_scope": "one native Edit.set_slide_properties call and one commit, or one prepared unified File::set('/slide[1]', props) call; excludes corpus generation, opening, target/property preparation, warm-up, output serialization/save, equivalence checks and drop",
+  "workload": "one-slide-properties",
+  "execution": {
+    "cpu_affinity": [
+      0
+    ],
+    "cpu_model": "AMD EPYC 9R45",
+    "command": "taskset -c 0 /tmp/litchi-unified-0163-target/release/unified-pptx-slide-properties-baseline --rounds 3",
+    "concurrent_cargo_jobs": false,
+    "exit_code": 0
+  },
+  "verification": {
+    "native_tests": 9,
+    "facade_tests": 5,
+    "doctests": 9,
+    "clippy": "native/facade libraries and affected integration tests; all harness targets; warnings denied",
+    "glossary_banned_names": 70,
+    "cleanup": "Removed build target, raw JSON and logs after retaining all samples and binary provenance."
+  }
+}

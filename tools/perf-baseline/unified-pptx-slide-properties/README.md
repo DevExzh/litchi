@@ -3,8 +3,8 @@
 This standalone harness compares one native primary slide-property edit with
 one unified `File::set` call on generated one-slide PPTX corpora. Each sample
 sets the authored slide name to `renamed` and visibility to hidden. The native
-leg calls `Edit::set_slide_name(Position::new(0), "renamed")`, then
-`Edit::set_slide_hidden(Position::new(0), true)`, and commits once. The unified
+leg calls `Edit::set_slide_properties(Position::new(0), Some("renamed"), Some(true))`
+and commits once. The unified
 leg calls `File::set("/slide[1]", props)` once with `name` and `hidden`.
 
 The default corpus sizes are `1,10,100,1000,10000` direct text-box shapes,
@@ -29,11 +29,11 @@ LITCHI_BUILD_COMMAND='CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=/tmp/litchi-unifie
 taskset -c 0 "$BIN" --rounds 9 > /tmp/unified-pptx-slide-properties.json
 ```
 
-The JSON schema is version `1`. Route names end in `slide_properties_v1` and
+The JSON schema is version `2`. Route names end in `slide_properties_v2` and
 cover eager/source × native primary/unified file set. Every result records the
 generated corpus byte count and SHA-256, the requested properties, exact or
 decoded-member warm-up equivalence, raw ABBA nanosecond samples, upper-middle
-medians, native two-setter/one-commit accounting and unified one-call
+medians, native combined-setter/one-commit accounting and unified one-call
 accounting. Build provenance records the crate version and optional source,
 compiler, target and build-command values. Failures are retained in a
 structured `failure_matrix`, and the process exits nonzero after printing JSON
@@ -41,6 +41,6 @@ if any matrix case fails.
 
 Corpus generation, opening, target parsing, property preparation, warm-up,
 output serialization, equivalence checks and teardown are outside the timer.
-This measures the requested native setter sequence and unified set call; it
+This measures the requested native combined setter and unified set call; it
 does not measure file-system save, allocation or RSS, real-world decks, or
 complete goal acceptance. Never commit the compiled binary.

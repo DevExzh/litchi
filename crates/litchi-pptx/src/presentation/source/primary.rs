@@ -1248,14 +1248,7 @@ impl Edit {
         slide: impl Into<Position>,
         name: impl AsRef<str>,
     ) -> Result<bool> {
-        let name = name.as_ref();
-        let changed = self.stage_slide_edit(
-            slide.into(),
-            |_package, _snapshot| Ok(None),
-            |edit| edit.set_slide_name(name).map(usize::from),
-        )? != 0;
-        self.shape_removals |= changed;
-        Ok(changed)
+        self.set_slide_properties(slide, Some(name.as_ref()), None)
     }
 
     /// Set whether one existing slide is hidden during presentation.
@@ -1279,10 +1272,42 @@ impl Edit {
     /// # }
     /// ```
     pub fn set_slide_hidden(&mut self, slide: impl Into<Position>, hidden: bool) -> Result<bool> {
+        self.set_slide_properties(slide, None, Some(hidden))
+    }
+
+    /// Atomically set a slide's authored name and presentation visibility.
+    ///
+    /// Each omitted property remains unchanged. Both values share one source
+    /// admission and lexical publication; failed staging retains earlier edits.
+    ///
+    /// ```
+    /// # fn main() -> litchi_pptx::Result<()> {
+    /// use std::sync::Arc;
+    /// use litchi_core::OwnedSource;
+    /// use litchi_pptx::{builder::Builder, source::Package};
+    /// let mut builder = Builder::new()?;
+    /// builder.presentation()?.add_slide()?;
+    /// let bytes = builder.build()?.to_bytes()?;
+    /// let source = Package::from_read_at(Arc::new(OwnedSource::new(bytes)))?;
+    /// let mut edit = source.edit()?;
+    /// edit.set_slide_properties(0, Some("Roadmap"), Some(true))?;
+    /// let _commit = edit.commit()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    pub fn set_slide_properties(
+        &mut self,
+        slide: impl Into<Position>,
+        name: Option<&str>,
+        hidden: Option<bool>,
+    ) -> Result<bool> {
+        if name.is_none() && hidden.is_none() {
+            return Ok(false);
+        }
         let changed = self.stage_slide_edit(
             slide.into(),
             |_package, _snapshot| Ok(None),
-            |edit| edit.set_slide_hidden(hidden).map(usize::from),
+            |edit| edit.set_slide_properties(name, hidden).map(usize::from),
         )? != 0;
         self.shape_removals |= changed;
         Ok(changed)

@@ -433,3 +433,56 @@ fn slide_properties_require_expanded_wire_and_reject_unmanaged_attribute_changes
     forged[offset + 6] = b'X';
     assert!(Patch::from_bytes(&forged).is_err());
 }
+
+#[test]
+fn combined_primary_properties_match_sequential_edits_and_preserve_prior_staging() {
+    let before = fixture(1, 2);
+    let source = open_source(&before);
+    let mut sequential = source.edit().unwrap();
+    sequential.set_slide_name(0, "Roadmap\tQ4").unwrap();
+    sequential.set_slide_hidden(0, true).unwrap();
+    let sequential = sequential.commit().unwrap().into_package();
+
+    let mut combined = source.edit().unwrap();
+    assert!(!combined.set_slide_properties(0, None, None).unwrap());
+    assert!(
+        combined
+            .set_slide_properties(0, Some("Roadmap\tQ4"), Some(true))
+            .unwrap()
+    );
+    assert!(
+        combined
+            .set_slide_properties(0, Some("bad\u{1}"), Some(false))
+            .is_err()
+    );
+    assert!(
+        !combined
+            .set_slide_properties(0, Some("Roadmap\tQ4"), Some(true))
+            .unwrap()
+    );
+    let (changed, patch) = combined.commit().unwrap().into_parts();
+    assert_eq!(changed.to_bytes().unwrap(), sequential.to_bytes().unwrap());
+    assert_eq!(
+        source
+            .apply(&transported(&patch))
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        changed.to_bytes().unwrap()
+    );
+    assert_eq!(
+        changed
+            .apply(&transported(&patch).inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
+
+    let eager = Package::from_vec(before).unwrap();
+    let mut edit = eager.edit().unwrap();
+    edit.set_slide_properties(0, Some("Roadmap\tQ4"), Some(true))
+        .unwrap();
+    let mut eager = edit.commit().unwrap().into_package();
+    assert_eq!(eager.to_bytes().unwrap(), changed.to_bytes().unwrap());
+}

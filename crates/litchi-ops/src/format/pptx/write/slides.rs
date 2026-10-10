@@ -137,12 +137,7 @@ impl Pptx {
             Editable::Source(package) => {
                 let mut edit = package.edit()?;
                 for position in &targets {
-                    if let Some(name) = &name {
-                        edit.set_slide_name(*position, name)?;
-                    }
-                    if let Some(hidden) = hidden {
-                        edit.set_slide_hidden(*position, hidden)?;
-                    }
+                    edit.set_slide_properties(*position, name.as_deref(), hidden)?;
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
@@ -151,12 +146,7 @@ impl Pptx {
             Editable::Eager(package) => {
                 let mut edit = package.edit()?;
                 for position in &targets {
-                    if let Some(name) = &name {
-                        edit.set_slide_name(*position, name)?;
-                    }
-                    if let Some(hidden) = hidden {
-                        edit.set_slide_hidden(*position, hidden)?;
-                    }
+                    edit.set_slide_properties(*position, name.as_deref(), hidden)?;
                 }
                 let (target, patch) = edit.commit()?.into_parts();
                 let changed = !patch.is_noop();
