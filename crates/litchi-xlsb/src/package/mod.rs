@@ -13,8 +13,9 @@ use litchi_opc::{OpcPackage, PackageWriter, SourceLimits};
 
 use crate::Workbook;
 use crate::external_link::ExternalLinkLimits;
-use crate::leniency::ToleranceReport;
+use crate::leniency::{Leniency, ToleranceReport};
 use crate::package::error::Result;
+use crate::workbook::DrawingLoadPolicy;
 use crate::writer::{MutableWorksheet, WorkbookWriter};
 
 #[path = "../host/cell.rs"]
@@ -107,7 +108,13 @@ pub use shared_strings::{
 /// only the XLSB package boundary and validates the workbook graph before a
 /// package is handed to callers.
 #[derive(Debug, Clone)]
-pub struct Package(OpcPackage, ExternalLinkLimits, ToleranceReport);
+pub struct Package(
+    OpcPackage,
+    ExternalLinkLimits,
+    ToleranceReport,
+    DrawingLoadPolicy,
+    Leniency,
+);
 
 impl Package {
     /// Create a deterministic workbook containing one visible worksheet.
@@ -166,7 +173,7 @@ impl Package {
     pub fn apply_slicer_patch(&self, patch: &crate::slicer::Patch) -> Result<Self> {
         let mut candidate = self.0.clone();
         crate::slicer::transaction::apply(&mut candidate, patch)?;
-        Self::from_opc_with_external_link_limits(candidate, self.1)
+        self.reparse_candidate(candidate)
     }
 
     /// Read workbook timeline caches as an immutable, source-bound snapshot.
@@ -219,7 +226,7 @@ impl Package {
     pub fn apply_timeline_patch(&self, patch: &crate::timeline::Patch) -> Result<Self> {
         let mut candidate = self.0.clone();
         crate::timeline::transaction::apply(&mut candidate, patch)?;
-        Self::from_opc_with_external_link_limits(candidate, self.1)
+        self.reparse_candidate(candidate)
     }
 
     /// Open and validate an XLSB package from a filesystem path.
@@ -455,7 +462,7 @@ impl Package {
     pub fn apply_custom_data_patch(&self, patch: &crate::custom_data::Patch) -> Result<Self> {
         let mut candidate = self.0.clone();
         patch.apply_to_opc(&mut candidate)?;
-        Self::from_opc_with_external_link_limits(candidate, self.1)
+        self.reparse_candidate(candidate)
     }
 
     /// Apply a source-checked Custom Data commit and return a new package.
@@ -474,7 +481,51 @@ impl Package {
             external_link_limits,
         )?;
         let tolerance = workbook.into_tolerance_report();
-        Ok(Self(package, external_link_limits, tolerance))
+        Ok(Self(
+            package,
+            external_link_limits,
+            tolerance,
+            DrawingLoadPolicy::Eager,
+            Leniency::Strict,
+        ))
+    }
+
+    /// Adopt a validated workbook without serializing or reparsing its graph.
+    pub(crate) fn from_validated_workbook(workbook: Workbook) -> Self {
+        let limits = workbook.external_link_limits();
+        let tolerance = workbook.tolerance_report().clone();
+        let drawing_policy = workbook.drawing_load_policy();
+        let leniency = workbook.leniency();
+        Self(
+            workbook.package,
+            limits,
+            tolerance,
+            drawing_policy,
+            leniency,
+        )
+    }
+
+    /// Revalidate a candidate under the owner's retained projection policies.
+    pub(crate) fn reparse_candidate(&self, candidate: OpcPackage) -> Result<Self> {
+        let workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
+            candidate.clone(),
+            self.1,
+            self.3,
+        )?;
+        let tolerance = workbook.into_tolerance_report();
+        Ok(Self(candidate, self.1, tolerance, self.3, self.4))
+    }
+
+    /// The worksheet repair policy retained by this package.
+    #[must_use]
+    pub const fn leniency(&self) -> Leniency {
+        self.4
+    }
+
+    /// Whether workbook views decode drawings rather than retaining them as opaque parts.
+    #[must_use]
+    pub fn drawings_parsed(&self) -> bool {
+        self.3 == DrawingLoadPolicy::Eager
     }
 
     /// Every repair the validating open applied while admitting this package.
@@ -502,12 +553,22 @@ impl Package {
 
     /// Materialize a workbook handle from this package.
     pub fn workbook(&self) -> Result<Workbook> {
-        Workbook::from_opc_package_with_external_link_limits(self.0.clone(), self.1)
+        let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
+            self.0.clone(),
+            self.1,
+            self.3,
+        )?;
+        workbook.set_projection_leniency(self.4);
+        Ok(workbook)
     }
 
     /// Consume this package and materialize its workbook handle.
     pub fn into_workbook(self) -> Result<Workbook> {
-        Workbook::from_opc_package_with_external_link_limits(self.0, self.1)
+        let mut workbook = Workbook::from_opc_package_with_external_link_limits_and_drawing_policy(
+            self.0, self.1, self.3,
+        )?;
+        workbook.set_projection_leniency(self.4);
+        Ok(workbook)
     }
 
     /// Consume this package and return its underlying OPC graph.
@@ -586,6 +647,8 @@ impl From<OpcPackage> for Package {
             package,
             ExternalLinkLimits::default(),
             ToleranceReport::default(),
+            DrawingLoadPolicy::Eager,
+            Leniency::Strict,
         )
     }
 }
@@ -599,6 +662,73 @@ mod tests {
     use std::io::Cursor;
 
     use super::*;
+
+    #[test]
+    fn workbook_adoption_retains_physical_and_external_link_limits() {
+        let bytes = Package::create()
+            .expect("create")
+            .to_bytes()
+            .expect("bytes");
+        let source_limits = SourceLimits::builder()
+            .max_input_bytes(u64::try_from(bytes.len()).expect("length"))
+            .expect("input limit")
+            .build()
+            .expect("source limits");
+        let external_limits = ExternalLinkLimits::builder()
+            .max_links(1)
+            .build()
+            .expect("external limits");
+        let workbook = Workbook::new_with_limits_and_external_link_limits(
+            Cursor::new(bytes),
+            source_limits,
+            external_limits,
+        )
+        .expect("bounded workbook");
+        let package = workbook.into_package();
+        assert_eq!(package.external_link_limits(), external_limits);
+        assert_eq!(
+            package.opc_package().source_read_limits(),
+            Some(source_limits)
+        );
+        let reconstructed = package.into_workbook().expect("projection");
+        assert_eq!(reconstructed.external_link_limits(), external_limits);
+        assert_eq!(
+            reconstructed.opc_package().source_read_limits(),
+            Some(source_limits)
+        );
+    }
+
+    #[test]
+    fn workbook_adoption_retains_leniency_without_changing_default_ingress() {
+        let bytes = Package::create()
+            .expect("create")
+            .to_bytes()
+            .expect("bytes");
+        let workbook = Workbook::new_with_leniency(
+            Cursor::new(bytes.clone()),
+            Leniency::TolerateCachedNumbers,
+        )
+        .expect("opt-in workbook");
+        let tolerance = workbook.tolerance_report().clone();
+        let package = workbook.into_package();
+        assert_eq!(package.leniency(), Leniency::TolerateCachedNumbers);
+        assert_eq!(package.tolerance_report(), &tolerance);
+        assert_eq!(
+            package.workbook().expect("projection").leniency(),
+            Leniency::TolerateCachedNumbers
+        );
+        let published = package.without_signatures().expect("publication");
+        assert_eq!(
+            published.into_workbook().expect("projection").leniency(),
+            Leniency::TolerateCachedNumbers
+        );
+        assert_eq!(
+            Package::from_bytes(bytes)
+                .expect("default ingress")
+                .leniency(),
+            Leniency::Strict
+        );
+    }
 
     #[test]
     fn ingress_honors_exact_read_limits() {

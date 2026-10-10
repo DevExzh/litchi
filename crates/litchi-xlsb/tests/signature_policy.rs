@@ -435,3 +435,12 @@ mod task_panes_and_ribbon {
         );
     }
 }
+
+#[test]
+fn consuming_workbook_into_package_preserves_signed_source() {
+    let (bytes, workbook) = signed_workbook();
+    let package = workbook.into_package();
+    assert!(package.opc_package().is_signed());
+    assert_eq!(package.to_bytes().unwrap(), bytes);
+    assert_eq!(save(&package.into_workbook().unwrap()), bytes);
+}

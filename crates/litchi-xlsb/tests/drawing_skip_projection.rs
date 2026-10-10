@@ -356,3 +356,29 @@ fn workbook_patch_respects_skipped_target_and_durable_decode_boundary() {
         b"<broken-drawing/>"
     );
 }
+
+#[test]
+fn package_conversion_and_publication_retain_skipped_drawings() {
+    let (workbook, referenced, unrelated) = malformed_skipped_fixture();
+    let original = package_blobs(&workbook);
+    let package = workbook.into_package();
+    assert!(!package.drawings_parsed());
+    let projected = package.workbook().expect("skipped package projection");
+    assert!(!projected.drawings_parsed());
+    assert_eq!(package_blobs(&projected), original);
+
+    // Even an unrelated package publication must not enter the drawing parser.
+    let published = package
+        .without_signatures()
+        .expect("policy-preserving publication");
+    assert!(!published.drawings_parsed());
+    let reopened = published.into_workbook().expect("consuming projection");
+    assert!(!reopened.drawings_parsed());
+    assert_eq!(package_blobs(&reopened), original);
+    assert_eq!(part_bytes(&reopened, &referenced), b"<broken-drawing/>");
+    assert_eq!(
+        part_bytes(&reopened, &unrelated),
+        b"<unrelated-broken-drawing/>"
+    );
+    assert!(Workbook::new(Cursor::new(saved(&reopened))).is_err());
+}

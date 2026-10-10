@@ -49,7 +49,7 @@ impl crate::Package {
     pub fn apply_volatile_dependencies_patch(&self, patch: &Patch) -> Result<Self> {
         let mut candidate = self.clone().into_opc();
         patch.apply(&mut candidate)?;
-        Self::from_opc_with_external_link_limits(candidate, self.external_link_limits())
+        self.reparse_candidate(candidate)
     }
 
     /// Explicitly remove package signatures before planning a changed
@@ -57,6 +57,6 @@ impl crate::Package {
     pub fn without_signatures(&self) -> Result<Self> {
         let mut candidate = self.clone().into_opc();
         candidate.unsign();
-        Self::from_opc_with_external_link_limits(candidate, self.external_link_limits())
+        self.reparse_candidate(candidate)
     }
 }

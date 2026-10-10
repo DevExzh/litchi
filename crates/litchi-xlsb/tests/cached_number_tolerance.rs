@@ -279,3 +279,36 @@ fn the_opt_in_changes_nothing_on_a_conformant_workbook() {
         CellValue::Float(1.5)
     );
 }
+
+#[test]
+fn package_adoption_and_publication_keep_opt_in_cached_number_reads() {
+    let bytes = with_cached_number(&numbers_workbook(), kind::CELL_REAL, f64::NAN);
+    let workbook =
+        Workbook::new_with_leniency(Cursor::new(bytes.clone()), Leniency::TolerateCachedNumbers)
+            .unwrap();
+    let package = workbook.into_package();
+    let projected = package.workbook().unwrap();
+    let published = package
+        .without_signatures()
+        .unwrap()
+        .into_workbook()
+        .unwrap();
+    for workbook in [projected, published] {
+        let snapshot = workbook.cell_values(0).unwrap();
+        assert_eq!(
+            snapshot.cell(a1()).unwrap().unwrap().value(),
+            &Value::Error(CellError::Number)
+        );
+        assert_single(
+            snapshot.tolerance_report(),
+            CachedNumberDefect::NonFinite,
+            kind::CELL_REAL,
+            f64::NAN,
+        );
+    }
+    let strict = litchi_xlsb::Package::from_bytes(bytes)
+        .unwrap()
+        .into_workbook()
+        .unwrap();
+    assert!(strict.cell_values(0).is_err());
+}

@@ -133,6 +133,29 @@ impl Workbook {
         self.leniency
     }
 
+    /// Consume this workbook into its physical package owner without reparsing.
+    ///
+    /// The OPC graph, external-link limits, drawing projection, worksheet
+    /// repair policy and open-time tolerance report are retained.
+    ///
+    /// ```
+    /// # fn main() -> litchi_xlsb::package::PackageResult<()> {
+    /// let workbook = litchi_xlsb::Package::create()?.into_workbook()?;
+    /// let package = workbook.into_package();
+    /// assert_eq!(package.leniency(), litchi_xlsb::Leniency::Strict);
+    /// assert!(package.drawings_parsed());
+    /// # Ok(())
+    /// # }
+    /// ```
+    #[must_use]
+    pub fn into_package(self) -> crate::Package {
+        crate::Package::from_validated_workbook(self)
+    }
+
+    pub(crate) fn set_projection_leniency(&mut self, leniency: crate::leniency::Leniency) {
+        self.leniency = leniency;
+    }
+
     /// Consume the workbook and keep only its open-time repair report.
     pub(crate) fn into_tolerance_report(self) -> crate::leniency::ToleranceReport {
         self.tolerance

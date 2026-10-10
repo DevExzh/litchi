@@ -78,7 +78,7 @@ impl crate::Package {
         }
         let mut candidate = self.clone().into_opc();
         patch.apply(&mut candidate)?;
-        Self::from_opc_with_external_link_limits(candidate, self.external_link_limits())
+        self.reparse_candidate(candidate)
     }
 
     /// Apply a detached Data Model commit to a cloned package.
