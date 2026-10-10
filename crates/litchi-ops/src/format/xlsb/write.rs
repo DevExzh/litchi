@@ -13,6 +13,7 @@ use std::path::Path;
 use caseless::Caseless as _;
 use litchi_core::FileFormat;
 use litchi_core::selector::CellRange;
+use litchi_xlsb::cell_values::structure::Edit as NativeStructureEdit;
 use litchi_xlsb::cell_values::{
     Edit as NativeCellEdit, Patch as NativeCellPatch, Reference, Scalar as NativeScalar,
     TransferLimits, structure::Patch as NativeStructurePatch,
@@ -186,6 +187,33 @@ impl Commit {
 struct SheetAssignments {
     name: Option<String>,
     state: Option<SheetState>,
+}
+
+/// Whether a setter is eligible for the narrow direct-path visibility run.
+/// Names, combined assignments, selectors, and empty property sets stay on
+/// the ordinary structural path so their existing resolution and policy
+/// ordering remains unchanged.
+pub(crate) fn sheet_state_shape(target: &TargetArg<'_>, props: &Props<'_>) -> bool {
+    let Some(path) = target.path() else {
+        return false;
+    };
+    if !path.path().is_absolute() || path.path().steps().len() != 1 || props.len() != 1 {
+        return false;
+    }
+    let step = &path.path().steps()[0];
+    if step.name() != "sheet" || step.predicates().len() != 1 || step.index().is_none() {
+        return false;
+    }
+    let Some((key, _)) = props.iter().next() else {
+        return false;
+    };
+    let Some((_, entry)) = SHEET_WRITE_TABLE.lookup(key.as_str()) else {
+        return false;
+    };
+    matches!(
+        entry.access,
+        crate::registry::Access::Set(SheetSetter::Hidden | SheetSetter::Visibility)
+    )
 }
 
 #[derive(Clone, Copy)]
@@ -1293,6 +1321,313 @@ pub(crate) fn save_to(file: &Xlsb, path: &Path, options: &SaveOptions) -> Result
         )?,
     }
     Ok(bytes)
+}
+
+/// The narrow direct-sheet visibility run used by explicit transactions.
+///
+/// A run fixes one exact `SheetState` and admits distinct direct sheet paths.
+/// Names, combined assignments, selectors, repeated targets, state changes,
+/// reads, and quota boundaries are barriers owned by the transaction
+/// coordinator. One native structural edit therefore preserves the order of
+/// active-tab relocation and can still replay a deferred native failure to
+/// its originating command index.
+pub(crate) mod sheet_coalesce {
+    use super::{
+        Commit, FileFormat, NativeStructureEdit, Result, SheetState, TargetArg,
+        WRITE_ENTRY_OVERHEAD, Xlsb, admit_sheet_properties, check_limits, native_error,
+        package_from_editor, resolve_sheet_targets, sheet_state_shape, validate_sheet_state,
+    };
+    use crate::error::{Code, Error};
+    use crate::props::Props;
+    use crate::transaction::Error as TransactionError;
+    use litchi_xlsb::cell_values::TransferLimits as NativeTransferLimits;
+    use std::collections::HashSet;
+
+    #[derive(Debug, Clone, Copy)]
+    pub(crate) struct Plan {
+        pub(crate) tab: usize,
+        pub(crate) state: SheetState,
+        staged_bytes: usize,
+    }
+
+    struct Item {
+        plan: Plan,
+        index: usize,
+    }
+
+    pub(crate) struct Run {
+        base: Xlsb,
+        source: litchi_xlsb::Package,
+        edit: NativeStructureEdit,
+        state: SheetState,
+        items: Vec<Item>,
+        seen: HashSet<usize>,
+        visible_count: usize,
+        active_catalog: Option<usize>,
+        active_hide: bool,
+        staged_bytes: usize,
+        native_limits: NativeTransferLimits,
+        max_staged_bytes: usize,
+    }
+
+    impl Xlsb {
+        /// Admit one direct sheet visibility assignment for the structural
+        /// run. All other property shapes return `None` so the ordinary
+        /// one-shot handler retains their existing semantics.
+        pub(crate) fn sheet_plan(
+            &self,
+            target: &TargetArg<'_>,
+            props: &Props<'_>,
+            limits: &crate::transaction::SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.check_source()?;
+            if !sheet_state_shape(target, props) {
+                return Ok(None);
+            }
+            let assignments = admit_sheet_properties(props, limits)?;
+            let Some(state) = assignments.state else {
+                return Ok(None);
+            };
+            let positions = resolve_sheet_targets(self, target, limits)?;
+            if positions.len() != 1 {
+                return Ok(None);
+            }
+            check_limits(positions.len(), &assignments, limits)?;
+            validate_sheet_state(self, &positions, state)?;
+            let result = Some(Plan {
+                tab: positions[0].tab,
+                state,
+                staged_bytes: WRITE_ENTRY_OVERHEAD.saturating_mul(2),
+            });
+            self.check_source().and(Ok(result))
+        }
+    }
+
+    impl Run {
+        pub(crate) fn new(
+            base: &Xlsb,
+            state: SheetState,
+            limits: &crate::transaction::SemanticLimits,
+            remaining_snapshot: usize,
+        ) -> Result<Self> {
+            if remaining_snapshot == 0 {
+                return Err(super::snapshot_limit(
+                    limits.max_snapshot_bytes().saturating_add(1),
+                    limits.max_snapshot_bytes(),
+                ));
+            }
+            base.check_source()?;
+            let source = package_from_editor(base.editor()?);
+            let native_limits = NativeTransferLimits::new(
+                remaining_snapshot,
+                limits.max_expanded_targets(),
+                1,
+                remaining_snapshot,
+            );
+            let edit = source
+                .edit_with_limits(native_limits)
+                .map_err(native_error)?;
+            let catalog = base.catalog()?;
+            let mut visible_count = 0usize;
+            for position in 0..catalog.len() {
+                if catalog
+                    .get(position)
+                    .is_some_and(|tab| tab.state().is_visible())
+                {
+                    visible_count = visible_count.saturating_add(1);
+                }
+            }
+            base.check_source()?;
+            Ok(Self {
+                base: base.clone(),
+                source,
+                edit,
+                state,
+                items: Vec::new(),
+                seen: HashSet::new(),
+                visible_count,
+                active_catalog: base
+                    .active_catalog_position()?
+                    .map(|position| position.get()),
+                active_hide: false,
+                staged_bytes: 0,
+                native_limits,
+                max_staged_bytes: limits.max_staged_bytes(),
+            })
+        }
+
+        pub(crate) fn first_index(&self) -> Option<usize> {
+            self.items.first().map(|item| item.index)
+        }
+
+        pub(crate) fn would_hide_last_visible(&self, plan: &Plan) -> Result<bool> {
+            if plan.state.is_visible() {
+                return Ok(false);
+            }
+            let catalog = self.base.catalog()?;
+            let Some(tab) = catalog.get(plan.tab) else {
+                return Err(
+                    Error::new(Code::PathNotFound, "the selected XLSB tab is absent")
+                        .with_format(FileFormat::Xlsb),
+                );
+            };
+            Ok(tab.state().is_visible() && self.visible_count <= 1)
+        }
+
+        pub(crate) fn requires_barrier(
+            &self,
+            plan: &Plan,
+            limits: &crate::transaction::SemanticLimits,
+        ) -> bool {
+            plan.state != self.state
+                || self.seen.contains(&plan.tab)
+                || self.active_hide
+                || self.items.len() >= limits.max_expanded_targets()
+                || self
+                    .staged_bytes
+                    .checked_add(plan.staged_bytes)
+                    .is_none_or(|bytes| bytes > self.max_staged_bytes)
+        }
+
+        pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
+            if plan.state != self.state
+                || self.seen.contains(&plan.tab)
+                || self.items.len() >= self.native_limits.changes()
+                || self
+                    .staged_bytes
+                    .checked_add(plan.staged_bytes)
+                    .is_none_or(|bytes| bytes > self.max_staged_bytes)
+            {
+                return Err(Error::new(
+                    Code::InternalError,
+                    "XLSB sheet coalescing barrier was not flushed",
+                )
+                .with_format(FileFormat::Xlsb));
+            }
+            if self.would_hide_last_visible(&plan)? {
+                return Err(last_visible_error());
+            }
+            self.seen
+                .try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            self.items
+                .try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            self.base.check_source()?;
+            let changed = self
+                .edit
+                .set_sheet_state(plan.tab, plan.state)
+                .map_err(native_error)?
+                .ok_or_else(|| {
+                    Error::new(Code::PathNotFound, "the selected XLSB tab is absent")
+                        .with_format(FileFormat::Xlsb)
+                })?;
+            let catalog = self.base.catalog()?;
+            if let Some(tab) = catalog.get(plan.tab) {
+                if tab.state().is_visible() && !plan.state.is_visible() {
+                    self.visible_count = self.visible_count.saturating_sub(1);
+                } else if !tab.state().is_visible() && plan.state.is_visible() {
+                    self.visible_count = self.visible_count.saturating_add(1);
+                }
+            }
+            if changed && self.active_catalog == Some(plan.tab) && !plan.state.is_visible() {
+                self.active_hide = true;
+            }
+            self.seen.insert(plan.tab);
+            self.staged_bytes = self.staged_bytes.saturating_add(plan.staged_bytes);
+            self.items.push(Item { plan, index });
+            self.base.check_source()?;
+            Ok(changed)
+        }
+
+        pub(crate) fn commit(self) -> Result<(Xlsb, Commit)> {
+            let Self {
+                base,
+                source,
+                edit,
+                items,
+                native_limits,
+                ..
+            } = self;
+            base.check_source()?;
+            let result = edit
+                .commit()
+                .map_err(native_error)
+                .and_then(|native| Commit::from_native(&base, native));
+            let freshness = base.check_source();
+            match freshness.and(result) {
+                Ok(commit) => Ok((base, commit)),
+                Err(error) => Err(locate_failure(
+                    &base,
+                    &source,
+                    items.as_slice(),
+                    native_limits,
+                    error,
+                )),
+            }
+        }
+    }
+
+    fn replay(
+        base: &Xlsb,
+        source: &litchi_xlsb::Package,
+        items: &[Item],
+        limits: NativeTransferLimits,
+    ) -> Result<litchi_xlsb::Package> {
+        base.check_source()?;
+        if items.is_empty() {
+            return Ok(source.clone());
+        }
+        let mut edit = source.edit_with_limits(limits).map_err(native_error)?;
+        for item in items {
+            edit.set_sheet_state(item.plan.tab, item.plan.state)
+                .map_err(|error| native_error(error).with_item(item.index))?;
+        }
+        let package = edit.commit().map_err(native_error)?.into_package();
+        base.check_source()?;
+        Ok(package)
+    }
+
+    fn locate_failure(
+        base: &Xlsb,
+        source: &litchi_xlsb::Package,
+        items: &[Item],
+        limits: NativeTransferLimits,
+        error: Error,
+    ) -> Error {
+        let Some(first) = items.first() else {
+            return error;
+        };
+        if items.len() == 1
+            || matches!(
+                error.code(),
+                Code::IoError
+                    | Code::Cancelled
+                    | Code::LimitExceeded
+                    | Code::InternalError
+                    | Code::DocumentProtected
+            )
+        {
+            return error.with_item(first.index);
+        }
+        let middle = items.len() / 2;
+        let prefix = match replay(base, source, &items[..middle], limits) {
+            Ok(package) => package,
+            Err(error) => return locate_failure(base, source, &items[..middle], limits, error),
+        };
+        match replay(base, &prefix, &items[middle..], limits) {
+            Err(error) => locate_failure(base, &prefix, &items[middle..], limits, error),
+            Ok(_) => error.with_item(first.index),
+        }
+    }
+
+    fn last_visible_error() -> Error {
+        Error::new(
+            Code::InvalidArgument,
+            "a workbook must retain a visible sheet",
+        )
+        .with_format(FileFormat::Xlsb)
+    }
 }
 
 /// The narrow direct-cell payload run used by explicit transactions.

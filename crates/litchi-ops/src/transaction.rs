@@ -212,6 +212,8 @@ pub struct Edit {
     cells: Option<crate::format::xlsx::write::coalesce::Run>,
     #[cfg(feature = "xlsb")]
     xlsb_cells: Option<crate::format::xlsb::write::coalesce::Run>,
+    #[cfg(feature = "xlsb")]
+    xlsb_sheets: Option<crate::format::xlsb::write::sheet_coalesce::Run>,
     #[cfg(feature = "pptx")]
     shapes: Option<crate::format::pptx::write::coalesce::Run>,
 }
@@ -284,6 +286,8 @@ impl File {
                 cells: None,
                 #[cfg(feature = "xlsb")]
                 xlsb_cells: None,
+                #[cfg(feature = "xlsb")]
+                xlsb_sheets: None,
                 #[cfg(feature = "pptx")]
                 shapes: None,
             };
@@ -355,6 +359,10 @@ impl Edit {
     /// Consecutive direct paragraph/run formatting sets share a native edit.
     /// Distinct direct XLSX cell payload assignments also share a native edit.
     /// Distinct direct XLSB cell scalar assignments also share a native edit.
+    /// Consecutive direct XLSB sheet visibility assignments to distinct tabs
+    /// with one exact state also share one native structural edit. Hiding the
+    /// active tab closes its run before the next command so intermediate view
+    /// validation retains sequential semantics.
     /// Distinct direct PPTX shape text/geometry sets also share a native edit.
     /// Repeated PPTX shapes close their run before resolving partial properties.
     /// Reads and selectors close pending runs; repeated XLSX cells and font
@@ -582,10 +590,18 @@ impl Edit {
         index: usize,
     ) -> Result<Option<bool>> {
         #[cfg(feature = "xlsb")]
-        if let File::Xlsb(handle) = &self.current {
+        if let File::Xlsb(_) = &self.current {
+            if self.xlsb_sheets.is_some() {
+                self.flush_pending()?;
+            }
             let planned = match &self.xlsb_cells {
                 Some(run) => run.remove_plan(target, &self.limits),
-                None => handle.remove_plan(target, &self.limits),
+                None => {
+                    let File::Xlsb(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    handle.remove_plan(target, &self.limits)
+                },
             };
             if planned.is_err() {
                 // An earlier deferred native failure takes precedence over
@@ -784,10 +800,128 @@ impl Edit {
             return Ok(Some(changed));
         }
         #[cfg(feature = "xlsb")]
-        if let File::Xlsb(handle) = &self.current {
+        if let File::Xlsb(_) = &self.current {
+            let sheet_shape = crate::format::xlsb::write::sheet_state_shape(_target, _props);
+            if sheet_shape && self.xlsb_cells.is_some() {
+                // Sheet resolution must see the candidate after a pending
+                // cell run; the two native owners cannot share a transaction.
+                self.flush_pending()?;
+            }
+            if sheet_shape {
+                let mut planned = {
+                    let File::Xlsb(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    handle.sheet_plan(_target, _props, &self.limits)
+                };
+                if planned.is_err() {
+                    // An earlier deferred native failure takes precedence over
+                    // this command's setter admission error.
+                    self.flush_pending()?;
+                    let File::Xlsb(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    planned = handle.sheet_plan(_target, _props, &self.limits);
+                }
+                let Some(mut plan) = planned? else {
+                    return Ok(None);
+                };
+                if self.operations >= self.limits.max_operations() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::Operations,
+                        observed: self.operations.saturating_add(1),
+                        maximum: self.limits.max_operations(),
+                    }
+                    .into());
+                }
+                let barrier = (|| -> Result<Option<(bool, bool)>> {
+                    let Some(run) = self.xlsb_sheets.as_ref() else {
+                        return Ok(None);
+                    };
+                    let requires_barrier = run.requires_barrier(&plan, &self.limits);
+                    let hides_last_visible = (!requires_barrier)
+                        .then(|| run.would_hide_last_visible(&plan))
+                        .transpose()?
+                        .unwrap_or(false);
+                    Ok(Some((requires_barrier, hides_last_visible)))
+                })();
+                if barrier.is_err() {
+                    self.flush_pending()?;
+                }
+                let barrier = barrier?;
+                if let Some((requires_barrier, hides_last_visible)) = barrier {
+                    if requires_barrier {
+                        self.flush_pending()?;
+                        let File::Xlsb(handle) = &self.current else {
+                            return Err(pending());
+                        };
+                        plan = handle
+                            .sheet_plan(_target, _props, &self.limits)?
+                            .ok_or_else(|| {
+                                crate::Error::new(
+                                    Code::InternalError,
+                                    "XLSB sheet visibility plan disappeared after flush",
+                                )
+                                .with_format(litchi_core::FileFormat::Xlsb)
+                            })?;
+                    } else if hides_last_visible {
+                        let error = crate::Error::new(
+                            Code::InvalidArgument,
+                            "a workbook must retain a visible sheet",
+                        )
+                        .with_format(litchi_core::FileFormat::Xlsb);
+                        // Flush first so a deferred native view/source failure
+                        // from an earlier item wins over this admission error.
+                        self.flush_pending()?;
+                        return Err(error);
+                    }
+                }
+                if self.xlsb_sheets.is_none() {
+                    let File::Xlsb(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    self.xlsb_sheets = Some(crate::format::xlsb::write::sheet_coalesce::Run::new(
+                        handle,
+                        plan.state,
+                        &self.limits,
+                        self.limits
+                            .max_snapshot_bytes()
+                            .saturating_sub(self.snapshot_bytes),
+                    )?);
+                }
+                let (had_prior, staged) = {
+                    let run = self.xlsb_sheets.as_mut().ok_or_else(|| {
+                        crate::Error::new(Code::InternalError, "XLSB sheet run missing")
+                    })?;
+                    let had_prior = run.first_index().is_some();
+                    (had_prior, run.stage(plan, _index))
+                };
+                let changed = match staged {
+                    Ok(changed) => changed,
+                    Err(error) => {
+                        if had_prior {
+                            self.flush_pending()?;
+                        }
+                        return Err(error);
+                    },
+                };
+                self.operations += 1;
+                return Ok(Some(changed));
+            }
+
+            if self.xlsb_sheets.is_some() {
+                // A cell plan must resolve against the package published by
+                // the sheet run, never against its stale pre-edit snapshot.
+                self.flush_pending()?;
+            }
             let planned = match &self.xlsb_cells {
                 Some(run) => run.cell_plan(_target, _props, &self.limits),
-                None => handle.cell_plan(_target, _props, &self.limits),
+                None => {
+                    let File::Xlsb(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    handle.cell_plan(_target, _props, &self.limits)
+                },
             };
             if planned.is_err() {
                 // An earlier deferred native failure takes precedence over
@@ -963,6 +1097,31 @@ impl Edit {
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
         #[cfg(feature = "xlsb")]
+        if let Some(run) = self.xlsb_sheets.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_xlsb(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
+        #[cfg(feature = "xlsb")]
         if let Some(run) = self.xlsb_cells.take() {
             let index = run.first_index();
             let result = (|| -> Result<()> {
@@ -1075,6 +1234,7 @@ impl Edit {
                 #[cfg(feature = "xlsb")]
                 {
                     self.xlsb_cells = None;
+                    self.xlsb_sheets = None;
                 }
                 #[cfg(feature = "pptx")]
                 {
