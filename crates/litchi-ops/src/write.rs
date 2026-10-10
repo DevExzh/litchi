@@ -118,6 +118,8 @@ impl File {
     /// checks refuse removals that the format cannot preserve safely.
     /// PPTX supports dependency-free slides in created or eagerly opened
     /// presentations and requires at least one slide to remain.
+    /// XLSB removes stored cell records from cells, ranges, and cell queries;
+    /// virtual cells are exact no-ops and neighboring cells never shift.
     ///
     /// # Errors
     /// Returns target, protection, source, dependency or capability errors.
@@ -140,6 +142,10 @@ impl File {
             Self::Xlsx(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Xlsx(commit.into_file())),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Xlsb(commit.into_file())),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .remove(_target.into_target()?)

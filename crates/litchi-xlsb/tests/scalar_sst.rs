@@ -326,14 +326,18 @@ fn unsupported_low_cell_family_is_refused_before_remapping() {
         .edit_cell_values(0)
         .expect("select worksheet")
         .expect("worksheet");
-    edit.set_scalar(a1(), Scalar::Number(4.0))
-        .expect("convert SST cell");
-    let error = edit.commit().expect_err("unsupported cell family refusal");
-    assert!(
-        error
-            .to_string()
-            .contains("unsupported worksheet cell family")
-    );
+    // Relationship iteration may select either worksheet. A reserved family
+    // in the edited sheet refuses at admission; one in another sheet refuses
+    // when SST reconciliation reaches the full dependency closure.
+    let before = source.to_bytes().expect("source bytes");
+    let result = edit
+        .set_scalar(a1(), Scalar::Number(4.0))
+        .and_then(|_| edit.commit());
+    assert!(matches!(
+        result,
+        Err(litchi_xlsb::package::PackageError::UnsupportedFeature(_))
+    ));
+    assert_eq!(source.to_bytes().expect("source remains"), before);
 }
 
 #[test]

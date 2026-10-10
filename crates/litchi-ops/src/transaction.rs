@@ -514,29 +514,117 @@ impl Edit {
 
     /// Remove selected elements from the current candidate.
     ///
+    /// Consecutive direct XLSB cell removals on one worksheet share one
+    /// native cell-values edit.  Ranges, queries, and non-cell targets use
+    /// the format handler after the pending direct-cell run is flushed.
+    ///
     /// # Errors
     /// As [`File::remove`], with the mutation's item index and transaction limits.
     pub fn remove<'p>(&mut self, _target: impl IntoTarget<'p>) -> Result<()> {
-        #[cfg(any(feature = "xlsx", feature = "pptx"))]
-        let limits = self.limits;
-        self.execute(|file| match file {
-            #[cfg(feature = "docx")]
-            File::Docx(handle) => wrap(handle, handle.remove(_target.into_target()?)?, ()),
-            #[cfg(feature = "xlsx")]
-            File::Xlsx(handle) => wrap_xlsx(
-                handle,
-                handle.remove_with_limits(_target.into_target()?, &limits)?,
-                (),
-            ),
-            #[cfg(feature = "pptx")]
-            File::Pptx(handle) => wrap_pptx(
-                handle,
-                handle.remove_with_limits(_target.into_target()?, &limits)?,
-                (),
-            ),
-            #[allow(unreachable_patterns)]
-            _ => Err(pending()),
-        })
+        self.check()?;
+        let index = self.operations;
+        let result = (|| {
+            if index >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: index.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            let target = match _target.into_target() {
+                Ok(target) => target,
+                Err(error) => {
+                    self.flush_pending()?;
+                    return Err(error);
+                },
+            };
+            if self.coalesce_remove_parsed(&target, index)?.is_some() {
+                return Ok(());
+            }
+            #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "pptx"))]
+            let limits = self.limits;
+            self.execute(|file| match file {
+                #[cfg(feature = "docx")]
+                File::Docx(handle) => wrap(handle, handle.remove(target.clone())?, ()),
+                #[cfg(feature = "xlsx")]
+                File::Xlsx(handle) => wrap_xlsx(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "xlsb")]
+                File::Xlsb(handle) => wrap_xlsb(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "pptx")]
+                File::Pptx(handle) => wrap_pptx(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[allow(unreachable_patterns)]
+                _ => Err(pending()),
+            })
+        })();
+        result.map_err(|error| self.poison(error, index))
+    }
+
+    /// Try to stage a direct XLSB cell removal in the pending native cell
+    /// edit.  Range and query removals close the run and use the full
+    /// worksheet-grouping path, while consecutive direct removals on one
+    /// worksheet share one native transaction.
+    fn coalesce_remove_parsed(
+        &mut self,
+        target: &crate::TargetArg<'_>,
+        index: usize,
+    ) -> Result<Option<bool>> {
+        #[cfg(feature = "xlsb")]
+        if let File::Xlsb(handle) = &self.current {
+            let planned = match &self.xlsb_cells {
+                Some(run) => run.remove_plan(target, &self.limits),
+                None => handle.remove_plan(target, &self.limits),
+            };
+            if planned.is_err() {
+                // An earlier deferred native failure takes precedence over
+                // admission failure in the following command.
+                self.flush_pending()?;
+            }
+            let Some(plan) = planned? else {
+                return Ok(None);
+            };
+            if self
+                .xlsb_cells
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
+            {
+                self.flush_pending()?;
+            }
+            if self.xlsb_cells.is_none() {
+                let File::Xlsb(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.xlsb_cells = Some(crate::format::xlsb::write::coalesce::Run::new(
+                    handle,
+                    plan.target.sheet,
+                    &self.limits,
+                    self.limits
+                        .max_snapshot_bytes()
+                        .saturating_sub(self.snapshot_bytes),
+                )?);
+            }
+            let run = self
+                .xlsb_cells
+                .as_mut()
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "XLSB cell run missing"))?;
+            let changed = run.stage(plan, index)?;
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
+        let _ = (target, index);
+        Ok(None)
     }
     /// Move an element, resolving its path against the current candidate.
     ///
@@ -613,6 +701,22 @@ impl Edit {
             },
         };
         self.coalesce_parsed(&target, _props, _index, Some(_target))
+    }
+
+    /// Command-channel entry to the shared XLSB cell-removal coordinator.
+    /// Only a direct cell path joins the pending native run; ranges, queries,
+    /// and other formats return `None` so the ordinary dispatcher can handle
+    /// them after closing the run.
+    pub(crate) fn coalesce_remove(&mut self, _target: &str, _index: usize) -> Result<Option<bool>> {
+        self.check()?;
+        let target = match _target.into_target() {
+            Ok(target) => target,
+            Err(error) => {
+                self.flush_pending()?;
+                return Err(error);
+            },
+        };
+        self.coalesce_remove_parsed(&target, _index)
     }
 
     fn coalesce_parsed(

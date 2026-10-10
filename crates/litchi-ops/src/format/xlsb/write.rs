@@ -204,6 +204,113 @@ pub(crate) fn set_with_limits<'p, 'v>(
     set_sheet_with_limits(file, target, &props, limits)
 }
 
+/// Remove stored cells selected by a direct cell path, range, or scoped
+/// query.  The target expansion and worksheet grouping are shared with cell
+/// setters, while the native cell-values owner supplies the deletion
+/// semantics: a virtual (unstored) cell is an exact no-op and no row or
+/// column shifting is attempted.
+pub(crate) fn remove_with_limits(
+    file: &Xlsb,
+    target: TargetArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    file.admit_edit()?;
+    if let Some(range) = target
+        .path()
+        .and_then(|path| path.path().steps().last())
+        .and_then(|step| step.cell_range())
+    {
+        check_remove_limits(range_area(range), limits)?;
+    }
+    let Some(targets) = resolve_cell_targets(file, &target, limits)? else {
+        return Err(Error::new(
+            Code::UnsupportedElement,
+            "an XLSB removal target must be a cell, range, or cell query",
+        )
+        .with_format(FileFormat::Xlsb));
+    };
+    check_remove_limits(targets.len(), limits)?;
+
+    // Complete target resolution and grouping happen before the native
+    // package owner is materialized.  One native edit covers each worksheet;
+    // a cross-worksheet selector publishes those edits in tab order through
+    // one immutable package chain.
+    let mut grouped = BTreeMap::<usize, Vec<CellTarget>>::new();
+    for target in targets {
+        grouped
+            .entry(target.sheet)
+            .or_default()
+            .try_reserve(1)
+            .map_err(|_| allocation("XLSB cell removal worksheet targets"))?;
+        grouped
+            .get_mut(&target.sheet)
+            .expect("entry was just inserted")
+            .push(target);
+    }
+    let editor = file.editor()?;
+    let mut package = package_from_editor(editor);
+    let mut patches = Vec::new();
+    patches
+        .try_reserve(grouped.len())
+        .map_err(|_| allocation("XLSB cell removal patches"))?;
+    let mut remaining_snapshot = limits.max_snapshot_bytes();
+    for (sheet, targets) in grouped {
+        let semantic_charge = cell_semantic_charge(targets.len(), limits)?;
+        let image_budget = remaining_snapshot
+            .checked_sub(semantic_charge)
+            .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
+        if image_budget == 0 {
+            return Err(snapshot_limit(
+                limits.max_snapshot_bytes().saturating_add(1),
+                limits.max_snapshot_bytes(),
+            ));
+        }
+        let native_limits =
+            TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
+        let mut edit = package
+            .edit_cell_values_with_limits(
+                NativeSelector::from(sheet),
+                Default::default(),
+                native_limits,
+            )
+            .map_err(native_error)?
+            .ok_or_else(|| {
+                Error::new(
+                    Code::OutOfRange,
+                    "the XLSB worksheet position is out of range",
+                )
+                .with_format(FileFormat::Xlsb)
+            })?;
+        for target in targets {
+            // The native owner treats an absent or virtual cell as an
+            // idempotent no-op.  This is deliberately a cell-value removal;
+            // it never shifts neighboring cells or edits row/column layout.
+            edit.remove(target.reference).map_err(native_error)?;
+        }
+        let native = edit.commit().map_err(native_error)?;
+        let (next, patch) = native.into_parts();
+        let patch_bytes = patch.retained_bytes();
+        let retained = patch_bytes
+            .checked_add(semantic_charge)
+            .ok_or_else(|| snapshot_limit(usize::MAX, limits.max_snapshot_bytes()))?;
+        if retained > remaining_snapshot {
+            let consumed = limits
+                .max_snapshot_bytes()
+                .saturating_sub(remaining_snapshot);
+            return Err(snapshot_limit(
+                consumed.saturating_add(retained),
+                limits.max_snapshot_bytes(),
+            ));
+        }
+        remaining_snapshot -= retained;
+        package = next;
+        patches.push(patch);
+    }
+    let commit = Commit::from_cell_parts(file, package, patches)?;
+    check_snapshot_limits(&commit.patch, limits)?;
+    Ok(commit)
+}
+
 fn set_sheet_with_limits(
     file: &Xlsb,
     target: TargetArg<'_>,
@@ -522,6 +629,22 @@ fn check_cell_limits(
     Ok(())
 }
 
+fn check_remove_limits(targets: usize, limits: &SemanticLimits) -> Result<()> {
+    if limits.max_operations() < 1 {
+        return Err(operation_limit(1, limits.max_operations()));
+    }
+    if targets > limits.max_expanded_targets() {
+        return Err(expanded_limit(targets, limits.max_expanded_targets()));
+    }
+    let staged = targets
+        .checked_mul(WRITE_ENTRY_OVERHEAD)
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    if staged > limits.max_staged_bytes() {
+        return Err(staged_limit(staged, limits.max_staged_bytes()));
+    }
+    Ok(())
+}
+
 fn cell_semantic_charge(targets: usize, limits: &SemanticLimits) -> Result<usize> {
     let operations = targets
         .checked_mul(124)
@@ -548,7 +671,7 @@ fn package_from_editor(editor: XlsbEditor<'_>) -> litchi_xlsb::Package {
 /// Resolve cells and ranges while retaining the complete XLSB tab position.
 /// `None` means that the target selected only sheet-level nodes, so the sheet
 /// setter may handle it. A target that mixes cell and non-cell nodes is
-/// refused rather than partially applying a payload.
+/// refused rather than partially applying a mutation.
 fn resolve_cell_targets(
     file: &Xlsb,
     target: &TargetArg<'_>,
@@ -598,7 +721,7 @@ fn resolve_cell_targets(
     if non_cell && !targets.is_empty() {
         return Err(Error::new(
             Code::UnsupportedElement,
-            "an XLSB cell write selector cannot mix cells with sheet nodes",
+            "an XLSB cell mutation selector cannot mix cells with sheet nodes",
         )
         .with_format(FileFormat::Xlsb));
     }
@@ -1084,12 +1207,14 @@ pub(crate) fn save_to(file: &Xlsb, path: &Path, options: &SaveOptions) -> Result
 /// range, query, repeated cell, sheet property, read, or staged-byte boundary
 /// is a barrier owned by the transaction coordinator. This preserves the
 /// original mutation index for deferred native failures while letting a
-/// sequence of ordinary scalar writes share one package-owned edit.
+/// sequence of ordinary scalar writes or removals share one package-owned
+/// edit.
 pub(crate) mod coalesce {
     use super::{
         CellTarget, Commit, FileFormat, NativeCellEdit, NativeScalar, NativeSelector, Result,
-        SemanticLimits, TargetArg, Xlsb, admit_cell_properties, check_cell_limits, native_error,
-        package_from_editor, resolve_cell_targets,
+        SemanticLimits, TargetArg, WRITE_ENTRY_OVERHEAD, Xlsb, admit_cell_properties,
+        check_cell_limits, check_remove_limits, native_error, package_from_editor,
+        resolve_cell_targets,
     };
     use crate::error::{Code, Error};
     use crate::props::Props;
@@ -1098,9 +1223,15 @@ pub(crate) mod coalesce {
     use std::collections::HashSet;
 
     #[derive(Debug, Clone)]
+    pub(crate) enum Action {
+        Set(NativeScalar),
+        Remove,
+    }
+
+    #[derive(Debug, Clone)]
     pub(crate) struct Plan {
         pub(crate) target: CellTarget,
-        pub(crate) value: NativeScalar,
+        action: Action,
         staged_bytes: usize,
     }
 
@@ -1171,8 +1302,40 @@ pub(crate) mod coalesce {
                 let target = targets[0];
                 Ok(Some(Plan {
                     target,
-                    value,
+                    action: Action::Set(value),
                     staged_bytes: assignments.staged_bytes,
+                }))
+            })();
+            self.check_source().and(result)
+        }
+
+        pub(crate) fn remove_plan(
+            &self,
+            target: &TargetArg<'_>,
+            limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.check_source()?;
+            let result = (|| {
+                let Some(path) = target.path() else {
+                    return Ok(None);
+                };
+                let Some(step) = path.path().steps().last() else {
+                    return Ok(None);
+                };
+                if step.cell_ref().is_none() {
+                    return Ok(None);
+                }
+                let Some(targets) = resolve_cell_targets(self, target, limits)? else {
+                    return Ok(None);
+                };
+                if targets.len() != 1 {
+                    return Ok(None);
+                }
+                check_remove_limits(1, limits)?;
+                Ok(Some(Plan {
+                    target: targets[0],
+                    action: Action::Remove,
+                    staged_bytes: WRITE_ENTRY_OVERHEAD,
                 }))
             })();
             self.check_source().and(result)
@@ -1237,6 +1400,14 @@ pub(crate) mod coalesce {
             self.base.cell_plan(target, props, limits)
         }
 
+        pub(crate) fn remove_plan(
+            &self,
+            target: &TargetArg<'_>,
+            limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.base.remove_plan(target, limits)
+        }
+
         pub(crate) fn first_index(&self) -> Option<usize> {
             self.items.first().map(|item| item.index)
         }
@@ -1271,10 +1442,16 @@ pub(crate) mod coalesce {
             self.seen
                 .try_reserve(1)
                 .map_err(|source| TransactionError::Allocation { source })?;
-            let changed = self
-                .edit
-                .set_scalar(plan.target.reference, plan.value.clone())
-                .map_err(native_error)?;
+            let changed = match &plan.action {
+                Action::Set(value) => self
+                    .edit
+                    .set_scalar(plan.target.reference, value.clone())
+                    .map_err(native_error)?,
+                Action::Remove => self
+                    .edit
+                    .remove(plan.target.reference)
+                    .map_err(native_error)?,
+            };
             self.seen.insert(plan.key());
             self.staged_bytes = self.staged_bytes.saturating_add(plan.charge());
             self.items.push(Item { plan, index });
@@ -1335,8 +1512,11 @@ pub(crate) mod coalesce {
                 .with_format(FileFormat::Xlsb)
             })?;
         for item in items {
-            edit.set_scalar(item.plan.target.reference, item.plan.value.clone())
-                .map_err(|error| native_error(error).with_item(item.index))?;
+            let result = match &item.plan.action {
+                Action::Set(value) => edit.set_scalar(item.plan.target.reference, value.clone()),
+                Action::Remove => edit.remove(item.plan.target.reference),
+            };
+            result.map_err(|error| native_error(error).with_item(item.index))?;
         }
         let package = edit.commit().map_err(native_error)?.into_package();
         base.check_source()?;

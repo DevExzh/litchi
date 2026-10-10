@@ -682,7 +682,7 @@ impl Capabilities {
                 return Support::Supported;
             }
             #[cfg(feature = "xlsb")]
-            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
+            if matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch)
                 && self.adapter() == Some(Adapter::Xlsb)
             {
                 if self.retains_source == Some(false) {
@@ -1085,6 +1085,53 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         "M2 XLSB metadata creation",
         "the XLSB creator refuses initial metadata until typed metadata authoring is integrated",
     ),
+];
+
+/// XLSB cell removal deliberately has a narrow element surface.  A range is
+/// a selector accepted by the cell handler, while workbook, sheet, row,
+/// column and other nodes are not removable structural elements.
+#[cfg(feature = "xlsb")]
+static XLSB_WRITE_GAPS: [GapSpec; 4] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "workbook",
+            context: "non-cell-elements",
+        },
+        code: Code::UnsupportedElement,
+        follow_up: "M2 XLSB non-cell removal handlers",
+        reason: "XLSB removal deletes stored cell records; ranges select cells, while sheet, row, column, table and other structural elements are refused",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "cell",
+            context: "formula-groups",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware formula-group removal",
+        reason: "array, shared and data-table formula-group members require native group lifecycle support before removal",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "cell",
+            context: "calculation-chain",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB calculation-chain-aware formula removal",
+        reason: "stored formulas cannot be removed while an opaque calculation chain is present",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "cell",
+            context: "unmodeled-cell-records",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB additional native cell-record families",
+        reason: "semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled",
+    },
 ];
 
 #[cfg(feature = "xlsx")]
@@ -1832,6 +1879,12 @@ impl Element {
                     "cell" | "range" | "sheet" | "row" | "col"
                 )
                 && readable);
+        #[cfg(feature = "xlsb")]
+        let settable = settable
+            || (self.adapter == Adapter::Xlsb
+                && self.retains_source != Some(false)
+                && matches!(self.data().canonical, "cell" | "range" | "sheet")
+                && readable);
         #[cfg(feature = "pptx")]
         let settable = settable
             || (self.adapter == Adapter::Pptx
@@ -1889,6 +1942,12 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let remove = structural;
+        #[cfg(feature = "xlsb")]
+        let remove = remove
+            || (self.adapter == Adapter::Xlsb
+                && self.retains_source != Some(false)
+                && self.data().canonical == "cell"
+                && readable);
         Operations {
             add,
             set: settable,
@@ -2207,7 +2266,12 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     }
     #[cfg(feature = "xlsb")]
     if adapter == Adapter::Xlsb {
-        return XLSB_CREATION_OPTION_GAPS.get(index).map(Some);
+        if let Some(gap) = XLSB_CREATION_OPTION_GAPS.get(index) {
+            return Some(Some(gap));
+        }
+        return XLSB_WRITE_GAPS
+            .get(index.saturating_sub(XLSB_CREATION_OPTION_GAPS.len()))
+            .map(Some);
     }
     let _ = (adapter, index);
     None

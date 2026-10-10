@@ -359,9 +359,42 @@ impl Edit {
         self.raw.insert_formula(reference, style, cache, formula)
     }
 
-    /// Remove one supported stored cell.
-    pub fn remove(&mut self, reference: Reference) -> Result<()> {
-        self.raw.remove(reference)
+    /// Remove one supported stored cell without shifting its neighbours.
+    ///
+    /// Returns `false` when the coordinate is already absent, including a
+    /// repeated removal in this edit. The cell header and formula payload are
+    /// removed together; shared-string occurrence counts are reconciled at
+    /// commit. Formula-group members and ordinary formulas with an opaque
+    /// calculation chain are refused before staging.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an ambiguous or unsupported stored record,
+    /// formula dependencies that cannot be preserved, or exceeded limits.
+    pub fn remove(&mut self, reference: Reference) -> Result<bool> {
+        self.raw.scalar_assignment_guard(reference)?;
+        if self.raw.is_removed(reference) {
+            return Ok(false);
+        }
+        let Some(current) = self.raw.current_cell(reference)? else {
+            if self.raw.source_has_cell(reference)? {
+                return Err(Error::UnsupportedFeature(
+                    "cell removal cannot target an unsupported cell-record family".to_string(),
+                ));
+            }
+            return Ok(false);
+        };
+        if (current.formula().is_some() || current.value().is_formula_cache())
+            && self.calculation_chain_present
+            && !self.raw.is_inserted(reference)
+        {
+            return Err(Error::UnsupportedFeature(
+                "cell removal cannot remove a formula while an opaque calculation chain is present"
+                    .to_string(),
+            ));
+        }
+        self.raw.remove(reference)?;
+        Ok(true)
     }
 
     /// Validate the edit and publish an immutable package commit.

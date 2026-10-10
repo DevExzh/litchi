@@ -252,6 +252,25 @@ impl Xlsb {
         result
     }
 
+    /// Remove stored cells under the unified cell, range, and query target
+    /// contract.  Missing coordinates are virtual cells and therefore exact
+    /// no-ops; the native owner never shifts neighboring cells.
+    pub(crate) fn remove(&self, target: crate::target::TargetArg<'_>) -> Result<write::Commit> {
+        self.remove_with_limits(target, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Remove cells under a caller-selected semantic budget.
+    pub(crate) fn remove_with_limits(
+        &self,
+        target: crate::target::TargetArg<'_>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        self.check_source()?;
+        let result = write::remove_with_limits(self, target, limits);
+        self.check_source()?;
+        result
+    }
+
     /// Stream this immutable snapshot to a sequential sink.
     pub(crate) fn write_to<W: std::io::Write>(&self, sink: W) -> Result<()> {
         write::write_to(self, sink)

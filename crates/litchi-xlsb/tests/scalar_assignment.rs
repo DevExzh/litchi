@@ -425,5 +425,137 @@ fn formula_assignment_refuses_transitional_and_strict_calculation_chains() {
             .set_scalar(a1(), Scalar::Number(2.0))
             .expect_err("chain guard");
         assert!(error.to_string().contains("calculation chain"));
+        let error = edit.remove(a1()).expect_err("removal chain guard");
+        assert!(error.to_string().contains("calculation chain"));
+        edit.insert_formula(
+            b1(),
+            style_zero(),
+            Value::FormulaNumberCache(1.0),
+            litchi_xlsb::cell_values::CellFormula::new(0, vec![0x1E, 1, 0], Vec::new())
+                .expect("formula"),
+        )
+        .expect("staged insertion");
+        assert!(edit.remove(b1()).expect("cancel insertion"));
+        assert!(edit.commit().expect("unchanged").patch().is_noop());
     }
+}
+
+#[test]
+fn removal_is_idempotent_and_inverse_restores_exact_package() {
+    let source = package_with_scalars();
+    let before = source.to_bytes().expect("source bytes");
+    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    assert!(!edit.remove(e1()).expect("absent coordinate"));
+    assert!(edit.remove(a1()).expect("number"));
+    assert!(!edit.remove(a1()).expect("repeated removal"));
+    assert!(edit.remove(c1()).expect("last shared string"));
+    let (after, patch) = edit.commit().expect("commit").into_parts();
+    let workbook = after.workbook().expect("workbook");
+    let cells = workbook.cell_values(0).expect("read");
+    assert!(cells.cell(a1()).expect("lookup").is_none());
+    assert!(cells.cell(c1()).expect("lookup").is_none());
+    assert!(cells.cell(b1()).expect("neighbour").is_some());
+    assert!(workbook.shared_strings().is_empty());
+    let sst = PackURI::new("/xl/sharedStrings.bin").expect("URI");
+    let part = after
+        .opc_package()
+        .get_part(&sst)
+        .expect("retained SST envelope");
+    let begin = Records::new(part.blob())
+        .next()
+        .expect("SST begin")
+        .expect("record");
+    assert_eq!(&begin.payload()[..8], &[0; 8]);
+    assert_eq!(source.to_bytes().expect("source remains"), before);
+    assert_eq!(
+        after
+            .apply_cell_values(&patch.inverse())
+            .expect("inverse")
+            .to_bytes()
+            .expect("restored"),
+        before
+    );
+}
+
+#[test]
+fn removal_of_missing_cells_and_cancelled_insertions_is_exact() {
+    let source = package_with_scalars();
+    let before = source.to_bytes().expect("bytes");
+    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    assert!(!edit.remove(e1()).expect("missing"));
+    edit.set_scalar(e1(), Scalar::Number(9.0)).expect("insert");
+    assert!(edit.remove(e1()).expect("remove insertion"));
+    assert!(!edit.remove(e1()).expect("missing again"));
+    let commit = edit.commit().expect("commit");
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().to_bytes().expect("bytes"), before);
+}
+
+#[test]
+fn removal_refuses_formula_group_members_including_absent_followers() {
+    for source in [
+        package_with_grouped_formula(),
+        package_with_missing_group_follower(),
+    ] {
+        let before = source.to_bytes().expect("bytes");
+        let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+        for reference in [a1(), b1()] {
+            assert!(edit.remove(reference).is_err());
+        }
+        assert!(edit.commit().expect("unchanged commit").patch().is_noop());
+        assert_eq!(source.to_bytes().expect("source"), before);
+    }
+}
+
+#[test]
+fn ordinary_formula_removal_drops_the_complete_record() {
+    let source = package_with_typed_formula_caches();
+    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    for reference in [a1(), b1(), c1()] {
+        assert!(edit.remove(reference).expect("formula removal"));
+    }
+    let after = edit.commit().expect("commit").into_package();
+    let workbook = after.workbook().expect("workbook");
+    let cells = workbook.cell_values(0).expect("read");
+    for reference in [a1(), b1(), c1()] {
+        assert!(cells.cell(reference).expect("lookup").is_none());
+    }
+}
+
+#[test]
+fn semantic_mutation_refuses_unmodeled_cell_families_without_guessing_coordinates() {
+    let source = package_with_scalars();
+    let mut opc = source.into_opc();
+    let uri = PackURI::new("/xl/worksheets/sheet1.bin").expect("URI");
+    let bytes = opc.get_part(&uri).expect("sheet").blob().to_vec();
+    let mut output = Vec::new();
+    let mut inserted = false;
+    for item in Records::new(&bytes) {
+        let record = item.expect("record");
+        Writer::new(&mut output)
+            .write_record(record.kind(), record.payload())
+            .expect("copy");
+        if !inserted && record.kind() == kind::ROW_HDR {
+            Writer::new(&mut output)
+                .write_record(
+                    litchi_xlsb::raw::Kind::new(0x000C).expect("reserved kind"),
+                    &[0; 12],
+                )
+                .expect("reserved record");
+            inserted = true;
+        }
+    }
+    opc.get_part_mut(&uri).expect("sheet").set_blob(output);
+    let source = Package::from_opc(opc).expect("opaque source");
+    let before = source.to_bytes().expect("bytes");
+    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    assert!(matches!(
+        edit.remove(e1()),
+        Err(litchi_xlsb::package::PackageError::UnsupportedFeature(_))
+    ));
+    assert!(matches!(
+        edit.set_scalar(e1(), Scalar::Blank),
+        Err(litchi_xlsb::package::PackageError::UnsupportedFeature(_))
+    ));
+    assert_eq!(source.to_bytes().expect("unchanged"), before);
 }

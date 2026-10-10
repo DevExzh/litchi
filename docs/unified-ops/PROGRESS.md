@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0176 | [XLSB cell removal](0176-xlsb-cell-removal.md) | Native idempotent removal and unified cells/ranges/queries with atomic command coalescing; indexed native lookup fixes quadratic scaling; 1,144 native / 1,207 combined tests plus 34 final focused checks, lint/docs/glossary/boundaries/parity pass; repeated paired matrices meet measured one-cell and batch budgets; full goal remains open |
 | 0175 | [XLSB creation and canonical builder](0175-xlsb-creation.md) | Native `Builder::build` / `Package::new` and unified creation; repeated-build SST fix; 1,138 native / 1,197 combined tests/doctests, lint/docs/glossary and consumer checks pass; explicit creation-option gaps; full goal remains open |
 | 0174 | [XLSB publication projection reuse](0174-xlsb-publication-projection.md) | Package-owned cached projection preserves exact admitted output and policies; 1,133 native / 1,194 combined tests/doctests, lint/docs/glossary pass; two after matrices meet measured one-cell 10% threshold, 1k/10k below 2x; full goal remains open |
 | 0173 | [XLSB direct cell resolution](0173-xlsb-direct-cell-resolution.md) | Shared path resolution defers redundant read grids for direct writes; 1,194 combined tests/doctests, lint/docs/minimal/boundaries pass; 12 paired cases exact, large-batch ratios improve, eager small-edit 10% requirement remains open (1.109 set / 1.118 edit); full goal remains open |

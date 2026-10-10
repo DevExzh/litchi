@@ -813,6 +813,11 @@ impl Edit {
             .map(|index| &self.entries[index].cell))
     }
 
+    /// Whether this coordinate is an insertion staged by this edit.
+    pub(crate) fn is_inserted(&self, reference: Reference) -> bool {
+        self.inserted.contains_key(&reference)
+    }
+
     /// Whether a source cell has been staged for removal by this edit.
     pub(crate) fn is_removed(&self, reference: Reference) -> bool {
         self.removed.contains(&reference)
@@ -1157,7 +1162,13 @@ impl Edit {
         if self.inserted.remove(&reference).is_some() {
             return Ok(());
         }
-        let _ = required_index(&self.entries, reference)?;
+        self.indexed_index(reference)?.ok_or_else(|| {
+            Error::UnsupportedFeature(format!(
+                "cell ({}, {}) is absent or uses an unsupported cell-record family",
+                reference.row(),
+                reference.column()
+            ))
+        })?;
         self.removed.insert(reference);
         Ok(())
     }
@@ -1922,6 +1933,19 @@ fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata>
                     )));
                 }
                 current_row = Some(row);
+            },
+            cell_kind
+                if in_sheet_data
+                    && frt_depth == 0
+                    && (0x000C..=0x0012).contains(&cell_kind.get()) =>
+            {
+                // These reserved cell families have no modeled coordinate
+                // layout. Refuse semantic mutation rather than interpreting
+                // their payload as an ordinary full cell header.
+                return Err(Error::UnsupportedFeature(
+                    "semantic cell edits require modeled worksheet cell-record families"
+                        .to_string(),
+                ));
             },
             cell_kind if in_sheet_data && frt_depth == 0 && is_any_cell(cell_kind) => {
                 let row = current_row.ok_or_else(|| {

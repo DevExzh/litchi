@@ -20,7 +20,8 @@ pub(crate) use workbook::{
 
 /// The XLSB sheet setter vocabulary. The first unified XLSB write exposes
 /// only a worksheet name; hidden/visibility and every other sheet property
-/// remain read-only or capability gaps.
+/// remain read-only or capability gaps. Cell removal is an operation on the
+/// cell element and therefore has no additional sheet property entry here.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum SheetSetter {
     Name,

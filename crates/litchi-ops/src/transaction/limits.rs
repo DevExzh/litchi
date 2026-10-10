@@ -11,9 +11,9 @@ pub enum LimitKind {
     Operations,
     /// Retained native snapshot and patch data.
     SnapshotBytes,
-    /// Distinct XLSX grid or PPTX shape targets expanded by one mutation.
+    /// Distinct XLSX/XLSB grid or PPTX shape targets expanded by one mutation.
     ExpandedTargets,
-    /// Authored XLSX/PPTX payload and action charge staged by one mutation.
+    /// Authored XLSX/XLSB/PPTX payload and action charge staged by one mutation.
     StagedBytes,
 }
 
@@ -84,9 +84,9 @@ impl std::error::Error for Error {
 }
 
 /// Bounds on an explicit transaction: 10,000 mutation calls and 256 MiB of
-/// retained native snapshots by default. XLSX and PPTX mutations additionally default
+/// retained native snapshots by default. XLSX, XLSB and PPTX mutations additionally default
 /// to 65,536 expanded targets and a 16 MiB staged payload/action charge.
-/// Coalesced XLSX cell and PPTX shape runs close before their summed charge
+/// Coalesced XLSX/XLSB cell and PPTX shape runs close before their summed charge
 /// exceeds the staged-byte bound; an individual oversized mutation is refused.
 ///
 /// Snapshot bytes are a conservative logical charge, counting shared data at
@@ -127,13 +127,13 @@ impl SemanticLimits {
     pub const fn max_operations(self) -> usize {
         self.operations
     }
-    /// Maximum distinct XLSX grid or PPTX shape targets expanded by one mutation.
+    /// Maximum distinct XLSX/XLSB grid or PPTX shape targets expanded by one mutation.
     /// This adapter admission bound is independent of native transfer limits.
     #[must_use]
     pub const fn max_expanded_targets(self) -> usize {
         self.expanded_targets
     }
-    /// Maximum authored payload/action charge staged by one XLSX or PPTX mutation.
+    /// Maximum authored payload/action charge staged by one XLSX/XLSB or PPTX mutation.
     /// Counts repeated scalar payloads before native staging. Coalesced cell
     /// runs also close at this bound. This is separate from retained snapshots
     /// and does not measure total allocator use.
@@ -145,6 +145,7 @@ impl SemanticLimits {
     ///
     /// DOCX charges before/after main-document XML lengths. XLSX charges
     /// retained package data and native patch buffers, including no-op steps.
+    /// XLSB charges package and worksheet patch images plus semantic cell deltas.
     /// PPTX charges the retained native patch wire size.
     /// Shared endpoints are charged repeatedly; this is a semantic retention
     /// budget, not a complete bound on allocator or derived-cache memory.
@@ -176,7 +177,7 @@ impl SemanticLimitsBuilder {
         self.0.snapshot_bytes = value;
         Ok(self)
     }
-    /// Set the expanded-target bound for each XLSX or PPTX mutation.
+    /// Set the expanded-target bound for each XLSX/XLSB or PPTX mutation.
     ///
     /// # Errors
     /// Refuses zero and values larger than `isize::MAX`.
@@ -185,7 +186,7 @@ impl SemanticLimitsBuilder {
         self.0.expanded_targets = value;
         Ok(self)
     }
-    /// Set the authored payload/action byte bound for each XLSX or PPTX mutation.
+    /// Set the authored payload/action byte bound for each XLSX/XLSB or PPTX mutation.
     ///
     /// # Errors
     /// Refuses zero and values larger than `isize::MAX`.

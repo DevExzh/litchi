@@ -24,10 +24,7 @@
       "reason": "edit verbs arrive with the write kernel in milestone M2"
     },
     "remove": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "move": {
       "supported": false,
@@ -211,7 +208,7 @@
       "parent": "workbook",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -345,10 +342,10 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -518,7 +515,7 @@
       "parent": "sheet",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": false,
         "remove": false
@@ -1896,6 +1893,42 @@
       "code": "unsupported_capability",
       "followUp": "M2 XLSB metadata creation",
       "reason": "the XLSB creator refuses initial metadata until typed metadata authoring is integrated"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "workbook",
+      "context": "non-cell-elements",
+      "code": "unsupported_element",
+      "followUp": "M2 XLSB non-cell removal handlers",
+      "reason": "XLSB removal deletes stored cell records; ranges select cells, while sheet, row, column, table and other structural elements are refused"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "formula-groups",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware formula-group removal",
+      "reason": "array, shared and data-table formula-group members require native group lifecycle support before removal"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "calculation-chain",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB calculation-chain-aware formula removal",
+      "reason": "stored formulas cannot be removed while an opaque calculation chain is present"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "unmodeled-cell-records",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB additional native cell-record families",
+      "reason": "semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled"
     },
     {
       "subject": "view",

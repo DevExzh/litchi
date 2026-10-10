@@ -79,9 +79,10 @@ impl File {
     /// formatting sets in one native commit. Text, selectors, metadata and
     /// structural commands close the group. XLSX batches group distinct direct
     /// cell payload assignments; repeated cells, fonts and selectors close the
-    /// group. PPTX batches group distinct direct shape text/geometry sets;
-    /// repeated shapes and selectors close the group. Best effort isolates
-    /// every item.
+    /// group. XLSB batches group distinct direct cell payload assignments and
+    /// removals; ranges, queries, and repeated cells close the group. PPTX
+    /// batches group distinct direct shape text/geometry sets; repeated shapes
+    /// and selectors close the group. Best effort isolates every item.
     ///
     /// DOCX command run text sets update the first direct text node literally,
     /// retaining later text and control elements. Cached-result edits mark
@@ -192,6 +193,33 @@ impl File {
                         continue;
                     }
                 }
+                if mode == BatchMode::Atomic && item.command.eq_ignore_ascii_case("remove") {
+                    let path = match remove_fields(&item) {
+                        Ok(path) => path,
+                        Err(error) => {
+                            // A previous deferred native failure precedes a
+                            // malformed following command in wire order.
+                            edit.flush_pending()?;
+                            return Err(error.with_item(index));
+                        },
+                    };
+                    if let Some(changed) = edit.coalesce_remove(path, index).map_err(|error| {
+                        // A closing prior run already carries its
+                        // originating wire index. Do not reattribute it
+                        // to the next item.
+                        if error.item().is_some() {
+                            error
+                        } else {
+                            error.with_item(index)
+                        }
+                    })? {
+                        results.push(ItemResult::Applied(Applied {
+                            path: None,
+                            changed,
+                        }));
+                        continue;
+                    }
+                }
                 edit.flush_pending()?;
                 // Metadata changes interpretation of the whole payload. It is
                 // never safe to skip a bad declaration and continue replay.
@@ -266,8 +294,7 @@ fn dispatch(edit: &mut Edit, item: &BatchItem<'_>) -> Result<Option<Path<'static
             .at(placement(item, false)?);
         return edit.add_command(parent, node).map(Some);
     } else if command.eq_ignore_ascii_case("remove") {
-        fields(item, &["path"])?;
-        edit.remove(required(item.path.as_deref(), "remove requires path")?)?;
+        edit.remove(remove_fields(item)?)?;
     } else if command.eq_ignore_ascii_case("move") {
         fields(item, &["path", "to", "index", "after", "before", "props"])?;
         if item.props.is_some() {
@@ -497,4 +524,9 @@ fn set_fields<'a>(item: &'a BatchItem<'_>) -> Result<(&'a str, &'a Props<'a>)> {
         return Err(invalid("set requires at least one property"));
     }
     Ok((path, props))
+}
+
+fn remove_fields<'a>(item: &'a BatchItem<'_>) -> Result<&'a str> {
+    fields(item, &["path"])?;
+    required(item.path.as_deref(), "remove requires path")
 }

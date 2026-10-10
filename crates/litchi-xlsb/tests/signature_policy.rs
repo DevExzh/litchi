@@ -465,3 +465,31 @@ fn consuming_workbook_into_package_preserves_signed_source() {
     assert_eq!(package.to_bytes().unwrap(), bytes);
     assert_eq!(save(&package.into_workbook().unwrap()), bytes);
 }
+
+#[test]
+fn package_cell_removal_preserves_signed_noops_and_refuses_changed_publication() {
+    let plain = Package::new().expect("new");
+    let a1 = Reference::new(0, 0).expect("A1");
+    let b1 = Reference::new(0, 1).expect("B1");
+    let mut edit = plain.edit_cell_values(0).expect("edit").expect("sheet");
+    edit.set_scalar(a1, litchi_xlsb::cell_values::Scalar::Number(1.0))
+        .expect("set");
+    let bytes = signed(
+        &edit
+            .commit()
+            .expect("commit")
+            .package()
+            .to_bytes()
+            .expect("bytes"),
+    );
+    let source = Package::from_bytes(bytes.clone()).expect("signed source");
+    let mut noop = source.edit_cell_values(0).expect("edit").expect("sheet");
+    assert!(!noop.remove(b1).expect("missing"));
+    let commit = noop.commit().expect("signed noop");
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.package().to_bytes().expect("bytes"), bytes);
+    let mut edit = source.edit_cell_values(0).expect("edit").expect("sheet");
+    assert!(edit.remove(a1).expect("stage removal"));
+    assert!(matches!(edit.commit(), Err(PackageError::Signed)));
+    assert_eq!(source.to_bytes().expect("source unchanged"), bytes);
+}
