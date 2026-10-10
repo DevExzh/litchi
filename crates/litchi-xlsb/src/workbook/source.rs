@@ -2716,8 +2716,10 @@ mod materialize_tests {
         }
         // The materialized owner is the eager edit entry.
         materialized
-            .edit_cell_values(0)
-            .expect("eager cell-value edit");
+            .to_package()
+            .edit_cell_values(materialized.worksheet_names()[0].as_str())
+            .expect("eager cell-value edit")
+            .expect("worksheet selector");
         // The lazy catalog stays readable after materialization.
         assert_eq!(source.worksheet_names().unwrap(), eager.worksheet_names());
     }

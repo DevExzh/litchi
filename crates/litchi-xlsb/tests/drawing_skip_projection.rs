@@ -157,14 +157,18 @@ fn skipped_projection_cell_noop_and_scalar_change_keep_malformed_drawings_opaque
     let (mut workbook, referenced_uri, unrelated_uri) = malformed_skipped_fixture();
     let before = package_blobs(&workbook);
 
-    let no_op = workbook
-        .edit_cell_values(0)
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[0].clone();
+    let no_op = package
+        .edit_cell_values(name)
+        .expect("cell no-op selector")
         .expect("cell no-op edit")
         .commit()
         .expect("cell no-op commit");
-    assert!(no_op.patch().is_empty());
-    workbook
-        .apply_cell_values(0, &no_op)
+    assert!(no_op.patch().is_noop());
+    workbook = no_op
+        .into_package()
+        .into_workbook()
         .expect("cell no-op publication");
     assert!(workbook.sheet_drawings().is_empty());
     assert_eq!(package_blobs(&workbook), before);
@@ -175,12 +179,18 @@ fn skipped_projection_cell_noop_and_scalar_change_keep_malformed_drawings_opaque
     } else {
         12_345.25
     };
-    let mut edit = workbook.edit_cell_values(sheet).expect("scalar edit");
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[sheet].clone();
+    let mut edit = package
+        .edit_cell_values(name)
+        .expect("scalar selector")
+        .expect("scalar edit");
     edit.set_number(reference, replacement)
         .expect("replace finite number");
     let commit = edit.commit().expect("scalar commit");
-    workbook
-        .apply_cell_values(sheet, &commit)
+    workbook = commit
+        .into_package()
+        .into_workbook()
         .expect("scalar publication");
 
     assert!(workbook.sheet_drawings().is_empty());

@@ -12,6 +12,7 @@
 //! publication may rebuild the archive, but it must not silently normalize an
 //! opaque cached number.
 
+use litchi_core::sheet::WorkbookTrait as _;
 use std::io::Cursor;
 
 use litchi_opc::{OpcPackage, PackURI};
@@ -104,6 +105,16 @@ fn worksheet_blob(workbook: &Workbook) -> Vec<u8> {
         .to_vec()
 }
 
+fn package_edit(workbook: &Workbook, sheet: usize) -> (Package, litchi_xlsb::cell_values::Edit) {
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[sheet].clone();
+    let edit = package
+        .edit_cell_values(name)
+        .expect("cell-value selector")
+        .expect("worksheet selector");
+    (package, edit)
+}
+
 /// Return the complete raw record containing the NaN cache, including its
 /// BIFF12 header.  Comparing this value catches an accidental normalization
 /// even when the high-level read still reports `#NUM!`.
@@ -186,17 +197,20 @@ fn sparkline_groups() -> Groups {
 fn changed_cell_values_keep_leniency_and_nan_record_bytes() {
     let mut workbook = tolerant_workbook();
     let original_record = nan_cell_record(&worksheet_blob(&workbook));
-    let mut edit = workbook.edit_cell_values(0).expect("cell edit");
-    edit.set_number(b1(), 3.5).expect("change B1");
-    let commit = edit.commit().expect("cell commit");
 
+    // Keep the raw OPC escape hatch explicit: this commit is owned by the
+    // worksheet codec, so it is applied through the raw helper and reopened
+    // under the strict workbook projection.
+    let mut raw_edit = workbook.cell_values(0).expect("raw cell snapshot").edit();
+    raw_edit.set_number(b1(), 3.5).expect("raw change B1");
+    let raw_commit = raw_edit.commit().expect("raw cell commit");
     let mut raw_package = workbook.opc_package().clone();
     litchi_xlsb::cell_values::workbook::apply(
         &mut raw_package,
         &PackURI::new(SHEET1).expect("worksheet URI"),
-        &commit,
+        &raw_commit,
     )
-    .expect("publish an explicitly tolerant, already-validated commit to raw OPC");
+    .expect("publish an explicitly raw commit to raw OPC");
     let raw_workbook = Workbook::from_opc_package(raw_package).expect("raw output workbook");
     assert_eq!(raw_workbook.leniency(), Leniency::Strict);
     assert!(
@@ -208,8 +222,12 @@ fn changed_cell_values_keep_leniency_and_nan_record_bytes() {
         original_record
     );
 
-    workbook
-        .apply_cell_values(0, &commit)
+    let (_, mut edit) = package_edit(&workbook, 0);
+    edit.set_number(b1(), 3.5).expect("change B1");
+    let commit = edit.commit().expect("cell commit");
+    workbook = commit
+        .into_package()
+        .into_workbook()
         .expect("tolerant cell publication");
     assert_tolerant_nan_with_b1(&workbook, 3.5);
     assert_eq!(
@@ -375,13 +393,12 @@ fn structural_transfer_into_tolerant_package_retains_nan_policy_and_bytes() {
 fn no_op_publications_keep_source_bytes_and_tolerant_policy() {
     let mut cells = tolerant_workbook();
     let cells_before = save(&cells);
-    let cell_commit = cells
-        .edit_cell_values(0)
-        .expect("cell edit")
-        .commit()
-        .expect("cell no-op commit");
-    cells
-        .apply_cell_values(0, &cell_commit)
+    let (_, edit) = package_edit(&cells, 0);
+    let cell_commit = edit.commit().expect("cell no-op commit");
+    assert!(cell_commit.patch().is_noop());
+    cells = cell_commit
+        .into_package()
+        .into_workbook()
         .expect("cell no-op publication");
     assert_eq!(save(&cells), cells_before);
     assert_tolerant_nan(&cells);
@@ -431,19 +448,18 @@ fn no_op_publications_keep_source_bytes_and_tolerant_policy() {
 
 #[test]
 fn failed_tolerant_cell_publication_leaves_source_and_nan_record_untouched() {
-    let mut workbook = tolerant_workbook();
+    let workbook = tolerant_workbook();
     let before = save(&workbook);
     let original_record = nan_cell_record(&worksheet_blob(&workbook));
-    let mut edit = workbook.edit_cell_values(0).expect("cell edit");
+    let (_, mut edit) = package_edit(&workbook, 0);
     edit.insert(
         Reference::new(10_000, 100).expect("new cell"),
         StyleIndex::new(0x00ff_ffff).expect("wire style"),
         Value::Number(9.0),
     )
     .expect("stage invalid dependency");
-    let commit = edit.commit().expect("invalid dependency commit");
     assert!(
-        workbook.apply_cell_values(0, &commit).is_err(),
+        edit.commit().is_err(),
         "missing style dependency must refuse before publication"
     );
     assert_eq!(save(&workbook), before);

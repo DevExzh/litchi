@@ -9,6 +9,7 @@
 //! `OpcPackage::unsign` inside `edit_opc`); an exact no-op keeps the source
 //! bytes, signature included.
 
+use litchi_core::sheet::WorkbookTrait as _;
 use std::io::Cursor;
 use std::path::PathBuf;
 
@@ -153,12 +154,16 @@ fn assert_signed_refusal(error: &PackageError) {
 
 #[test]
 fn changed_cell_values_on_a_signed_workbook_are_refused() {
-    let (bytes, mut workbook) = signed_workbook();
-    let mut edit = workbook.edit_cell_values(0).unwrap();
+    let (bytes, workbook) = signed_workbook();
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[0].clone();
+    let mut edit = package
+        .edit_cell_values(name)
+        .unwrap()
+        .expect("worksheet selector");
     let (reference, style, value) = new_cell();
     edit.insert(reference, style, value).unwrap();
-    let commit = edit.commit().unwrap();
-    let error = workbook.apply_cell_values(0, &commit).unwrap_err();
+    let error = edit.commit().unwrap_err();
     assert!(matches!(error, PackageError::Signed), "{error:?}");
     // Nothing was published: the workbook still saves its signed source.
     assert!(workbook.is_signed());
@@ -168,8 +173,15 @@ fn changed_cell_values_on_a_signed_workbook_are_refused() {
 #[test]
 fn exact_noop_cell_values_keep_the_signature_bytes() {
     let (bytes, mut workbook) = signed_workbook();
-    let commit = workbook.edit_cell_values(0).unwrap().commit().unwrap();
-    workbook.apply_cell_values(0, &commit).unwrap();
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[0].clone();
+    let edit = package
+        .edit_cell_values(name)
+        .unwrap()
+        .expect("worksheet selector");
+    let commit = edit.commit().unwrap();
+    assert!(commit.patch().is_noop());
+    workbook = commit.into_package().into_workbook().unwrap();
     assert_eq!(save(&workbook), bytes);
 }
 
@@ -177,11 +189,16 @@ fn exact_noop_cell_values_keep_the_signature_bytes() {
 fn explicit_unsign_authorizes_a_changed_edit() {
     let (_, mut workbook) = signed_workbook();
     workbook.unsign();
-    let mut edit = workbook.edit_cell_values(0).unwrap();
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[0].clone();
+    let mut edit = package
+        .edit_cell_values(name)
+        .unwrap()
+        .expect("worksheet selector");
     let (reference, style, value) = new_cell();
     edit.insert(reference, style, value).unwrap();
     let commit = edit.commit().unwrap();
-    workbook.apply_cell_values(0, &commit).unwrap();
+    workbook = commit.into_package().into_workbook().unwrap();
     let output = save(&workbook);
     assert!(!carries_signature(&output));
     let reopened = Package::from_bytes(output)

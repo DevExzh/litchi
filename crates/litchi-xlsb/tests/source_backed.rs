@@ -981,11 +981,15 @@ fn eager_grid_selectors_share_the_owner_cache_and_survive_republication() {
     assert!(workbook.grid("missing").unwrap().is_none());
 
     let inserted = Reference::new(10_001, 100).unwrap();
-    let mut edit = workbook.edit_cell_values(0).unwrap();
+    let package = workbook.to_package();
+    let mut edit = package
+        .edit_cell_values(name.as_str())
+        .unwrap()
+        .expect("worksheet selector");
     edit.insert(inserted, StyleIndex::new(0).unwrap(), Value::Number(1.0))
         .unwrap();
     let commit = edit.commit().unwrap();
-    workbook.apply_cell_values(0, &commit).unwrap();
+    workbook = commit.into_package().into_workbook().unwrap();
 
     assert!(
         old_grid

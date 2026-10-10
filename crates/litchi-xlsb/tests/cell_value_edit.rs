@@ -14,7 +14,7 @@
 
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_xlsb::{
-    Workbook,
+    Package, Workbook,
     cell_values::{CellError, CellFormula, Reference, StyleIndex, Value},
 };
 use std::fs::File;
@@ -25,6 +25,23 @@ fn fixture(relative: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../..")
         .join(relative)
+}
+
+fn package_edit(workbook: &Workbook, sheet: usize) -> (Package, litchi_xlsb::cell_values::Edit) {
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[sheet].clone();
+    let edit = package
+        .edit_cell_values(name)
+        .expect("cell-value selector")
+        .expect("worksheet selector");
+    (package, edit)
+}
+
+fn publish(commit: litchi_xlsb::cell_values::Commit) -> Workbook {
+    commit
+        .into_package()
+        .into_workbook()
+        .expect("published workbook")
 }
 
 #[test]
@@ -71,25 +88,36 @@ fn real_fixture_cell_value_commit_is_source_checked_and_length_stable() {
     } else {
         12_345.25
     };
-    let mut edit = before.edit();
-    edit.set_number(reference, replacement).expect("set number");
-    let commit = edit.commit().expect("commit");
-    let after = commit.patch().after();
-    assert_eq!(before.source_bytes().len(), after.len());
+
+    // The package patch owns the whole OPC graph.  Keep the worksheet codec
+    // assertions on its explicit raw transaction so this regression still
+    // proves the BrtCellReal replacement is length-stable and source-checked.
+    let mut raw_edit = before.edit();
+    raw_edit
+        .set_number(reference, replacement)
+        .expect("raw set number");
+    let raw_commit = raw_edit.commit().expect("raw commit");
+    let raw_after = raw_commit.patch().after();
+    assert_eq!(before.source_bytes().len(), raw_after.len());
     assert!(
         before
             .source_bytes()
             .iter()
-            .zip(after)
+            .zip(raw_after)
             .filter(|(left, right)| left != right)
             .count()
             <= 8,
         "only the selected f64 field may change"
     );
+    assert!(raw_commit.patch().apply(before.source_bytes()).is_ok());
+    assert!(raw_commit.patch().apply(raw_after).is_err());
 
-    let published = workbook
-        .apply_cell_values_by_name(&sheet_name, &commit)
-        .expect("publish");
+    let (_, mut edit) = package_edit(&workbook, sheet);
+    edit.set_number(reference, replacement).expect("set number");
+    let commit = edit.commit().expect("commit");
+    assert!(!commit.patch().is_noop());
+    workbook = publish(commit);
+    let published = workbook.cell_values(sheet).expect("published snapshot");
     assert_eq!(
         published
             .number(reference)
@@ -99,9 +127,6 @@ fn real_fixture_cell_value_commit_is_source_checked_and_length_stable() {
             .to_bits(),
         replacement.to_bits()
     );
-    assert!(commit.patch().apply(before.source_bytes()).is_ok());
-    assert!(commit.patch().apply(after).is_err());
-
     let mut bytes = Cursor::new(Vec::new());
     workbook.save(&mut bytes).expect("save");
     let reopened = Workbook::new(Cursor::new(bytes.into_inner())).expect("reopen");
@@ -148,12 +173,24 @@ fn real_fixture_non_real_scalar_or_formula_cache_round_trips() {
         })
         .expect("a real fixture contains an editable non-BrtCellReal value");
 
-    let mut edit = workbook.edit_cell_values(sheet).expect("edit");
+    let before = workbook.cell_values(sheet).expect("before snapshot");
+    let mut raw_edit = before.edit();
+    raw_edit
+        .set_value(reference, replacement.clone())
+        .expect("raw set typed value");
+    let raw_commit = raw_edit.commit().expect("raw commit");
+    assert_eq!(
+        raw_commit.patch().before().len(),
+        raw_commit.patch().after().len()
+    );
+
+    let (_, mut edit) = package_edit(&workbook, sheet);
     edit.set_value(reference, replacement.clone())
         .expect("set typed value");
     let commit = edit.commit().expect("commit");
-    assert_eq!(commit.patch().before().len(), commit.patch().after().len());
-    let published = workbook.apply_cell_values(sheet, &commit).expect("publish");
+    assert!(!commit.patch().is_noop());
+    workbook = publish(commit);
+    let published = workbook.cell_values(sheet).expect("published snapshot");
     assert_eq!(
         published
             .cell(reference)
@@ -209,11 +246,21 @@ fn real_fixture_style_index_edit_is_contextually_validated() {
     .expect("a real fixture contains at least two cell styles and one stored cell");
 
     let before = workbook.cell_values(sheet).expect("snapshot");
-    let mut edit = before.edit();
+    let mut raw_edit = before.edit();
+    raw_edit
+        .set_style(reference, replacement)
+        .expect("raw set style");
+    let raw_commit = raw_edit.commit().expect("raw style commit");
+    assert_eq!(
+        before.source_bytes().len(),
+        raw_commit.patch().after().len()
+    );
+    let (_, mut edit) = package_edit(&workbook, sheet);
     edit.set_style(reference, replacement).expect("set style");
     let commit = edit.commit().expect("commit");
-    assert_eq!(before.source_bytes().len(), commit.patch().after().len());
-    let published = workbook.apply_cell_values(sheet, &commit).expect("publish");
+    assert!(!commit.patch().is_noop());
+    workbook = publish(commit);
+    let published = workbook.cell_values(sheet).expect("published snapshot");
     assert_eq!(
         published
             .cell(reference)
@@ -250,7 +297,7 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
     assert!(before.cell(string_ref).expect("string lookup").is_none());
     assert!(before.cell(formula_ref).expect("formula lookup").is_none());
 
-    let mut create = before.edit();
+    let (_, mut create) = package_edit(&workbook, sheet);
     create
         .insert(
             string_ref,
@@ -267,13 +314,9 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
         )
         .expect("insert formula");
     let created = create.commit().expect("create commit");
-    workbook
-        .apply_cell_values(sheet, &created)
-        .expect("create publication");
+    workbook = publish(created);
 
-    let mut change = workbook
-        .edit_cell_values(sheet)
-        .expect("edit created cells");
+    let (_, mut change) = package_edit(&workbook, sheet);
     change
         .set_inline_string(
             string_ref,
@@ -292,9 +335,7 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
         .set_formula_number_cache(formula_ref, 3.5)
         .expect("formula cache");
     let changed = change.commit().expect("change commit");
-    workbook
-        .apply_cell_values(sheet, &changed)
-        .expect("change publication");
+    workbook = publish(changed);
 
     let mut bytes = Cursor::new(Vec::new());
     workbook.save(&mut bytes).expect("save changed workbook");
@@ -317,13 +358,11 @@ fn real_fixture_structural_crud_and_length_changing_formula_and_string_reopen() 
         &Value::FormulaNumberCache(3.5)
     );
 
-    let mut remove = snapshot.edit();
+    let (_, mut remove) = package_edit(&reopened, sheet);
     remove.remove(string_ref).expect("remove string");
     remove.remove(formula_ref).expect("remove formula");
     let removed = remove.commit().expect("remove commit");
-    reopened
-        .apply_cell_values(sheet, &removed)
-        .expect("remove publication");
+    reopened = publish(removed);
     let mut removed_bytes = Cursor::new(Vec::new());
     reopened
         .save(&mut removed_bytes)
@@ -343,10 +382,7 @@ fn real_fixture_publication_rejects_missing_style_and_shared_string_dependencies
     let sheet = 0;
     let reference = Reference::new(10_001, 100).expect("reference");
 
-    let mut invalid_style_workbook =
-        Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
-            .expect("workbook");
-    let mut invalid_style = workbook.edit_cell_values(sheet).expect("edit");
+    let (_, mut invalid_style) = package_edit(&workbook, sheet);
     invalid_style
         .insert(
             reference,
@@ -354,17 +390,9 @@ fn real_fixture_publication_rejects_missing_style_and_shared_string_dependencies
             Value::Number(1.0),
         )
         .expect("insert");
-    let invalid_style_commit = invalid_style.commit().expect("worksheet commit");
-    assert!(
-        invalid_style_workbook
-            .apply_cell_values(sheet, &invalid_style_commit)
-            .is_err()
-    );
+    assert!(invalid_style.commit().is_err());
 
-    let mut invalid_shared_workbook =
-        Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
-            .expect("workbook");
-    let mut invalid_shared = workbook.edit_cell_values(sheet).expect("edit");
+    let (_, mut invalid_shared) = package_edit(&workbook, sheet);
     invalid_shared
         .insert(
             reference,
@@ -372,12 +400,7 @@ fn real_fixture_publication_rejects_missing_style_and_shared_string_dependencies
             Value::SharedStringIndex(u32::MAX),
         )
         .expect("insert");
-    let invalid_shared_commit = invalid_shared.commit().expect("worksheet commit");
-    assert!(
-        invalid_shared_workbook
-            .apply_cell_values(sheet, &invalid_shared_commit)
-            .is_err()
-    );
+    assert!(invalid_shared.commit().is_err());
 }
 
 #[allow(
@@ -447,17 +470,10 @@ fn real_fixture_exact_noop_publication_saves_byte_identical_output() {
         .cloned()
         .collect();
 
-    let commit = workbook
-        .cell_values(sheet)
-        .expect("snapshot")
-        .edit()
-        .commit()
-        .expect("commit");
-    assert!(commit.patch().is_empty());
-    let published = workbook
-        .apply_cell_values(sheet, &commit)
-        .expect("publish no-op");
-    assert_eq!(published.source_bytes(), commit.snapshot().source_bytes());
+    let (_, edit) = package_edit(&workbook, sheet);
+    let commit = edit.commit().expect("commit");
+    assert!(commit.patch().is_noop());
+    workbook = publish(commit);
 
     let mut after = Cursor::new(Vec::new());
     workbook.save(&mut after).expect("save after");
@@ -477,7 +493,7 @@ fn real_fixture_exact_noop_publication_saves_byte_identical_output() {
 
 #[test]
 fn real_fixture_refused_publication_saves_byte_identical_output() {
-    let mut workbook =
+    let workbook =
         Workbook::new(File::open(fixture("test-data/ooxml/xlsb/Simple.xlsb")).expect("fixture"))
             .expect("workbook");
     let sheet = 0;
@@ -486,15 +502,14 @@ fn real_fixture_refused_publication_saves_byte_identical_output() {
     workbook.save(&mut before).expect("save before");
     let before = before.into_inner();
 
-    let mut edit = workbook.edit_cell_values(sheet).expect("edit");
+    let (_, mut edit) = package_edit(&workbook, sheet);
     edit.insert(
         Reference::new(10_001, 100).expect("reference"),
         StyleIndex::new(0x00FF_FFFF).expect("wire style"),
         Value::Number(1.0),
     )
     .expect("insert");
-    let commit = edit.commit().expect("commit");
-    assert!(workbook.apply_cell_values(sheet, &commit).is_err());
+    assert!(edit.commit().is_err());
 
     let mut after = Cursor::new(Vec::new());
     workbook.save(&mut after).expect("save after");

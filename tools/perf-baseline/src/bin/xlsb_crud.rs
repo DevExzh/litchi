@@ -973,37 +973,46 @@ fn run_case_with_opener(
             text: Some(facade_text(&corpus.bytes)?),
         }),
         Case::NoopTransactionCommitSave => {
-            let mut workbook = opener(&corpus.bytes)?;
-            let snapshot = workbook.cell_values(corpus.selected_sheet)?;
-            let commit = snapshot.edit().commit()?;
-            if !commit.patch().is_empty() {
+            let workbook = opener(&corpus.bytes)?;
+            let selector = worksheet_selector(&workbook, corpus.selected_sheet)?;
+            let edit = workbook
+                .into_package()
+                .edit_cell_values(selector)?
+                .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
+            let commit = edit.commit()?;
+            if commit.diagnostics().changed() || !commit.patch().is_noop() {
                 return Err("public exact no-op commit unexpectedly changed bytes".into());
             }
-            workbook.apply_cell_values(corpus.selected_sheet, &commit)?;
-            Ok(RunOutcome::Saved(save_workbook(&workbook)?))
+            Ok(RunOutcome::Saved(save_package(&commit.into_package())?))
         },
         Case::EditOneExistingScalarSave => {
-            let mut workbook = opener(&corpus.bytes)?;
+            let workbook = opener(&corpus.bytes)?;
             let target = corpus
                 .edits
                 .first()
                 .ok_or_else(|| "no editable scalar target".to_string())?;
-            let mut edit = workbook.edit_cell_values(corpus.selected_sheet)?;
+            let selector = worksheet_selector(&workbook, corpus.selected_sheet)?;
+            let mut edit = workbook
+                .into_package()
+                .edit_cell_values(selector)?
+                .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
             edit.set_value(target.reference, target.after.clone())?;
             let commit = edit.commit()?;
-            workbook.apply_cell_values(corpus.selected_sheet, &commit)?;
-            Ok(RunOutcome::Saved(save_workbook(&workbook)?))
+            Ok(RunOutcome::Saved(save_package(&commit.into_package())?))
         },
         Case::EditCeilOnePercentExistingCellsSave => {
-            let mut workbook = opener(&corpus.bytes)?;
+            let workbook = opener(&corpus.bytes)?;
             let count = corpus.stored_cell_count.div_ceil(100);
-            let mut edit = workbook.edit_cell_values(corpus.selected_sheet)?;
+            let selector = worksheet_selector(&workbook, corpus.selected_sheet)?;
+            let mut edit = workbook
+                .into_package()
+                .edit_cell_values(selector)?
+                .ok_or_else(|| "selected XLSB tab is not a worksheet".to_string())?;
             for target in corpus.edits.iter().take(count) {
                 edit.set_value(target.reference, target.after.clone())?;
             }
             let commit = edit.commit()?;
-            workbook.apply_cell_values(corpus.selected_sheet, &commit)?;
-            Ok(RunOutcome::Saved(save_workbook(&workbook)?))
+            Ok(RunOutcome::Saved(save_package(&commit.into_package())?))
         },
     }
 }
@@ -1393,6 +1402,27 @@ fn save_workbook(workbook: &litchi_xlsb::Workbook) -> Result<Vec<u8>> {
     let mut output = Cursor::new(Vec::new());
     workbook.save(&mut output)?;
     Ok(output.into_inner())
+}
+
+fn save_package(package: &litchi_xlsb::Package) -> Result<Vec<u8>> {
+    Ok(package.to_bytes()?)
+}
+
+fn worksheet_selector(
+    workbook: &litchi_xlsb::Workbook,
+    worksheet_position: usize,
+) -> Result<usize> {
+    workbook
+        .sheets()
+        .find(|tab| {
+            tab.worksheet_position()
+                .is_some_and(|position| position.get() == worksheet_position)
+        })
+        .map(|tab| tab.position().get())
+        .ok_or_else(|| {
+            format!("worksheet ordinal {worksheet_position} is missing from the XLSB tab catalog")
+                .into()
+        })
 }
 
 fn replacement_for(cell: &StoredCell, workbook: &litchi_xlsb::Workbook) -> Option<Value> {
@@ -1863,22 +1893,26 @@ mod tests {
             package_part_digests(raw_noop_package.opc_package())
         );
 
-        let mut changed = open_direct_without_drawings(&bytes).expect("changed projection");
+        let changed = open_direct_without_drawings(&bytes).expect("changed projection");
         let target = corpus.edits.first().expect("editable scalar");
+        let selector = worksheet_selector(&changed, corpus.selected_sheet).expect("sheet selector");
         let mut edit = changed
-            .edit_cell_values(corpus.selected_sheet)
-            .expect("projection edit");
+            .to_package()
+            .edit_cell_values(selector)
+            .expect("projection edit")
+            .expect("selected tab is a worksheet");
         edit.set_value(target.reference, target.after.clone())
             .expect("projection scalar edit");
         let commit = edit.commit().expect("projection commit");
-        changed
-            .apply_cell_values(corpus.selected_sheet, &commit)
+        let changed_package = commit.into_package();
+        let changed_output = changed_package.to_bytes().expect("projection package save");
+        let changed = changed_package
+            .into_workbook()
             .expect("projection publication");
         assert!(
             changed.sheet_drawings().is_empty(),
             "drawing-skipped projection must retain its explicit typed-inventory boundary after publication"
         );
-        let changed_output = save_workbook(&changed).expect("changed projection save");
         let changed_package =
             litchi_xlsb::Package::from_slice(&changed_output).expect("changed output package");
         let changed_parts = package_part_digests(changed_package.opc_package());
@@ -2125,20 +2159,27 @@ mod tests {
             calculation_before.get(calculation_drawing_uri.as_str())
         );
 
-        let (mut scalar, scalar_drawing_uri) = malformed(&bytes).expect("malformed scalar fixture");
+        let (scalar, scalar_drawing_uri) = malformed(&bytes).expect("malformed scalar fixture");
         let scalar_before = package_part_digests(scalar.opc_package());
         let target = corpus.edits.first().expect("editable scalar");
+        let selector = worksheet_selector(&scalar, corpus.selected_sheet).expect("sheet selector");
         let mut edit = scalar
-            .edit_cell_values(corpus.selected_sheet)
-            .expect("scalar edit");
+            .to_package()
+            .edit_cell_values(selector)
+            .expect("scalar edit")
+            .expect("selected tab is a worksheet");
         edit.set_value(target.reference, target.after.clone())
             .expect("scalar value");
         let commit = edit.commit().expect("scalar commit");
-        scalar
-            .apply_cell_values(corpus.selected_sheet, &commit)
+        let scalar_package = commit.into_package();
+        let scalar_output = scalar_package.to_bytes().expect("scalar package save");
+        let scalar = scalar_package
+            .into_workbook()
             .expect("scalar publication with opaque drawing");
         assert!(scalar.sheet_drawings().is_empty());
-        let scalar_after = package_part_digests(scalar.opc_package());
+        let scalar_after_package =
+            litchi_xlsb::Package::from_slice(&scalar_output).expect("scalar output package");
+        let scalar_after = package_part_digests(scalar_after_package.opc_package());
         assert_eq!(
             scalar_after.get(scalar_drawing_uri.as_str()),
             scalar_before.get(scalar_drawing_uri.as_str()),

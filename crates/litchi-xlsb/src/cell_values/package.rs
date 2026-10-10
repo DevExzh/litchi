@@ -1,0 +1,525 @@
+//! Package-owned transactions for worksheet cell values.
+//!
+//! [`crate::cell_values::worksheet`] is the bounded worksheet-stream codec.
+//! This module owns the package boundary around that codec: selectors resolve
+//! against the complete workbook tab catalog, commits validate the complete
+//! workbook, and patches carry exact whole-package images.
+//!
+//! A durable package-patch wire envelope is intentionally deferred; the
+//! worksheet-only `LCXBCLP1` envelope is never used to represent a package
+//! patch.
+
+use super::worksheet::{
+    CellError, CellFormula, Change, Limits, Patch as WorksheetPatch, Reference, Snapshot,
+    StyleIndex, TransferLimits, Value,
+};
+use crate::cell_values::workbook::{self, Applied};
+use crate::package::Package;
+use crate::package::error::{Error, Result};
+use crate::sheet::Selector;
+use litchi_opc::{OpcPackage, PackURI};
+use std::io::{self, Write};
+use std::sync::Arc;
+
+/// Publication diagnostics for a package-owned cell-values commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+}
+
+impl Diagnostics {
+    const fn new(changed: bool) -> Self {
+        Self { changed }
+    }
+
+    /// Whether the commit changes the package image.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+}
+
+/// A detached package-owned edit of one worksheet's cell values.
+#[derive(Debug, Clone)]
+pub struct Edit {
+    base: Package,
+    worksheet: PackURI,
+    raw: super::worksheet::Edit,
+    transfer_limits: TransferLimits,
+}
+
+impl Edit {
+    fn new(
+        base: Package,
+        worksheet: PackURI,
+        snapshot: Snapshot,
+        transfer_limits: TransferLimits,
+    ) -> Self {
+        Self {
+            base,
+            worksheet,
+            raw: snapshot.edit(),
+            transfer_limits,
+        }
+    }
+
+    /// Replace a value while retaining the existing BIFF12 storage family.
+    pub fn set_value(&mut self, reference: Reference, value: Value) -> Result<()> {
+        self.raw.set_value(reference, value)
+    }
+
+    /// Set an existing direct numeric value, retaining direct or RK storage.
+    pub fn set_number(&mut self, reference: Reference, value: f64) -> Result<()> {
+        self.raw.set_number(reference, value)
+    }
+
+    /// Set an existing Boolean cell.
+    pub fn set_boolean(&mut self, reference: Reference, value: bool) -> Result<()> {
+        self.raw.set_boolean(reference, value)
+    }
+
+    /// Set an existing cell error.
+    pub fn set_error(&mut self, reference: Reference, value: CellError) -> Result<()> {
+        self.raw.set_error(reference, value)
+    }
+
+    /// Set an existing inline string.
+    pub fn set_inline_string(&mut self, reference: Reference, value: String) -> Result<()> {
+        self.raw.set_inline_string(reference, value)
+    }
+
+    /// Set an existing shared-string index.
+    pub fn set_shared_string_index(&mut self, reference: Reference, index: u32) -> Result<()> {
+        self.raw.set_shared_string_index(reference, index)
+    }
+
+    /// Set an existing rich string.
+    pub fn set_rich_string(
+        &mut self,
+        reference: Reference,
+        value: crate::package::SharedString,
+    ) -> Result<()> {
+        self.raw.set_rich_string(reference, value)
+    }
+
+    /// Set the cached numeric result of an existing formula cell.
+    pub fn set_formula_number_cache(&mut self, reference: Reference, value: f64) -> Result<()> {
+        self.raw.set_formula_number_cache(reference, value)
+    }
+
+    /// Set the cached Boolean result of an existing formula cell.
+    pub fn set_formula_boolean_cache(&mut self, reference: Reference, value: bool) -> Result<()> {
+        self.raw.set_formula_boolean_cache(reference, value)
+    }
+
+    /// Set the cached error result of an existing formula cell.
+    pub fn set_formula_error_cache(
+        &mut self,
+        reference: Reference,
+        value: CellError,
+    ) -> Result<()> {
+        self.raw.set_formula_error_cache(reference, value)
+    }
+
+    /// Set the cached string result of an existing formula cell.
+    pub fn set_formula_string_cache(&mut self, reference: Reference, value: String) -> Result<()> {
+        self.raw.set_formula_string_cache(reference, value)
+    }
+
+    /// Change the cell-XF style index of an existing cell.
+    pub fn set_style(&mut self, reference: Reference, style: StyleIndex) -> Result<()> {
+        self.raw.set_style(reference, style)
+    }
+
+    /// Change the phonetic-display flag of an existing cell.
+    pub fn set_show_phonetic(&mut self, reference: Reference, show: bool) -> Result<()> {
+        self.raw.set_show_phonetic(reference, show)
+    }
+
+    /// Replace the inert formula payload of an existing formula cell.
+    pub fn set_formula(&mut self, reference: Reference, formula: CellFormula) -> Result<()> {
+        self.raw.set_formula(reference, formula)
+    }
+
+    /// Insert one direct scalar cell.
+    pub fn insert(&mut self, reference: Reference, style: StyleIndex, value: Value) -> Result<()> {
+        self.raw.insert(reference, style, value)
+    }
+
+    /// Insert one formula cell with a typed cached-result family.
+    pub fn insert_formula(
+        &mut self,
+        reference: Reference,
+        style: StyleIndex,
+        cache: Value,
+        formula: CellFormula,
+    ) -> Result<()> {
+        self.raw.insert_formula(reference, style, cache, formula)
+    }
+
+    /// Remove one supported stored cell.
+    pub fn remove(&mut self, reference: Reference) -> Result<()> {
+        self.raw.remove(reference)
+    }
+
+    /// Validate the edit and publish an immutable package commit.
+    pub fn commit(self) -> Result<Commit> {
+        validate_limits(self.transfer_limits)?;
+        let before: Arc<[u8]> =
+            Arc::from(serialize_package(&self.base, self.transfer_limits.bytes())?);
+        let raw_commit = self
+            .raw
+            .commit_with_change_limit(self.transfer_limits.changes())?;
+        validate_transfer_limits(raw_commit.patch(), self.transfer_limits)?;
+
+        let applied = workbook::apply_retaining_parse(
+            self.base.opc_package(),
+            &self.worksheet,
+            &raw_commit,
+            self.base.external_link_limits(),
+            self.base.drawing_load_policy(),
+            self.base.leniency(),
+        )?;
+
+        let (package, after) = match applied {
+            Applied::Unchanged(_) => (self.base.clone(), Arc::clone(&before)),
+            Applied::Published { workbook, .. } => {
+                let remaining = remaining_image_budget(before.len(), self.transfer_limits)?;
+                let (package, after) =
+                    publish_validated_workbook(&self.base, *workbook, remaining)?;
+                (package, Arc::from(after))
+            },
+        };
+        validate_package_images(&before, &after, self.transfer_limits)?;
+
+        let patch = Patch {
+            before,
+            after,
+            worksheet: self.worksheet,
+            worksheet_patch: raw_commit.patch().clone(),
+            transfer_limits: self.transfer_limits,
+        };
+        let diagnostics = Diagnostics::new(!patch.is_noop());
+        Ok(Commit {
+            package,
+            patch,
+            diagnostics,
+        })
+    }
+}
+
+/// The immutable package result, exact patch, and diagnostics of one edit.
+#[derive(Debug, Clone)]
+pub struct Commit {
+    package: Package,
+    patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+impl Commit {
+    /// Validated package that the commit would publish.
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.package
+    }
+
+    /// Exact whole-package patch produced by the commit.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Commit diagnostics.
+    #[must_use]
+    pub const fn diagnostics(&self) -> Diagnostics {
+        self.diagnostics
+    }
+
+    /// Consume the commit and return its validated package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.package
+    }
+
+    /// Consume the commit and return the package and exact patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+}
+
+/// An exact before/after package patch for one worksheet cell-values owner.
+#[derive(Debug, Clone)]
+pub struct Patch {
+    before: Arc<[u8]>,
+    after: Arc<[u8]>,
+    worksheet: PackURI,
+    worksheet_patch: WorksheetPatch,
+    transfer_limits: TransferLimits,
+}
+
+impl Patch {
+    /// Whether the exact package images are identical.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before == self.after
+    }
+
+    /// Exact whole-package image required before applying this patch.
+    #[must_use]
+    pub fn before(&self) -> &[u8] {
+        &self.before
+    }
+
+    /// Exact whole-package image produced by this patch.
+    #[must_use]
+    pub fn after(&self) -> &[u8] {
+        &self.after
+    }
+
+    /// Cell-level semantic changes retained by this package patch.
+    #[must_use]
+    pub fn changes(&self) -> &[Change] {
+        self.worksheet_patch.changes()
+    }
+
+    /// Apply this patch to an exact package source.
+    pub fn apply(&self, package: &Package) -> Result<Package> {
+        validate_limits(self.transfer_limits)?;
+        let source = serialize_package(package, self.transfer_limits.bytes())?;
+        if source.as_slice() != self.before.as_ref() {
+            return Err(Error::UnsupportedFeature(
+                "cell-values package patch source is stale".to_string(),
+            ));
+        }
+        if self.is_noop() {
+            return Ok(package.clone());
+        }
+        crate::signature_policy::ensure_unsigned(package.opc_package())?;
+        let candidate =
+            OpcPackage::from_bytes_with_limits(&self.after, package.opc_package().read_limits())?;
+        let workbook = package.project_candidate(candidate)?;
+        super::structure::validate_all_worksheets(&workbook)?;
+        Ok(Package::from_validated_workbook(workbook))
+    }
+
+    /// Return the exact inverse package patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self {
+            before: Arc::clone(&self.after),
+            after: Arc::clone(&self.before),
+            worksheet: self.worksheet.clone(),
+            worksheet_patch: self.worksheet_patch.inverse(),
+            transfer_limits: self.transfer_limits,
+        }
+    }
+}
+
+impl Package {
+    /// Start a detached cell-values edit selected from the complete tab
+    /// catalog using the default worksheet and transfer policies.
+    pub fn edit_cell_values<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Edit>> {
+        self.edit_cell_values_with_limits(selector, Limits::DEFAULT, TransferLimits::DEFAULT)
+    }
+
+    /// Start a detached cell-values edit with explicit finite policies.
+    pub fn edit_cell_values_with_limits<'a>(
+        &self,
+        selector: impl Into<Selector<'a>>,
+        worksheet_limits: Limits,
+        transfer_limits: TransferLimits,
+    ) -> Result<Option<Edit>> {
+        validate_limits(transfer_limits)?;
+        let Some(worksheet) = resolve_worksheet(self, selector)? else {
+            return Ok(None);
+        };
+        let snapshot = workbook::read_with_limits_and_leniency(
+            self.opc_package(),
+            &worksheet,
+            worksheet_limits,
+            self.leniency(),
+        )?;
+        Ok(Some(Edit::new(
+            self.clone(),
+            worksheet,
+            snapshot,
+            transfer_limits,
+        )))
+    }
+
+    /// Apply an exact-source cell-values patch and return the new package.
+    pub fn apply_cell_values(&self, patch: &Patch) -> Result<Self> {
+        patch.apply(self)
+    }
+}
+
+fn resolve_worksheet<'a>(
+    package: &Package,
+    selector: impl Into<Selector<'a>>,
+) -> Result<Option<PackURI>> {
+    let workbook = package.workbook()?;
+    let selector = selector.into();
+    if let Selector::Name(name) = &selector {
+        let matches = workbook
+            .sheets()
+            .filter(|tab| crate::package::formula::excel_name_eq(tab.name(), name.as_ref()))
+            .count();
+        if matches > 1 {
+            return Err(Error::InvalidFormat(
+                "cell-values selector name is ambiguous in the complete tab catalog".to_string(),
+            ));
+        }
+    }
+    let Some(tab) = workbook.sheet(selector)? else {
+        return Ok(None);
+    };
+    let Some(position) = tab.worksheet_position() else {
+        return Err(Error::UnsupportedFeature(
+            "cell-values editing requires a worksheet tab with a grid".to_string(),
+        ));
+    };
+    workbook.worksheet_uri(position.get()).map(Some)
+}
+
+fn publish_validated_workbook(
+    base: &Package,
+    workbook: crate::Workbook,
+    image_budget: usize,
+) -> Result<(Package, Vec<u8>)> {
+    super::structure::validate_all_worksheets(&workbook)?;
+    let tolerance = workbook.tolerance_report().clone();
+    let candidate = Package::from_validated_workbook(workbook);
+    let after = serialize_package(&candidate, image_budget)?;
+    let admitted = OpcPackage::from_bytes_with_limits(&after, base.opc_package().read_limits())?;
+    Ok((base.with_admitted_opc(admitted, tolerance), after))
+}
+
+fn remaining_image_budget(before_len: usize, limits: TransferLimits) -> Result<usize> {
+    limits
+        .bytes()
+        .checked_sub(before_len)
+        .ok_or(Error::LimitExceeded {
+            resource: "cell-values package patch images",
+            actual: before_len.saturating_add(1),
+            maximum: limits.bytes(),
+        })
+}
+
+fn serialize_package(package: &Package, maximum: usize) -> Result<Vec<u8>> {
+    let mut writer = BoundedWriter::new(maximum);
+    let result = package.write_to(&mut writer);
+    if writer.exceeded {
+        return Err(Error::LimitExceeded {
+            resource: "cell-values package image",
+            actual: writer.written.max(maximum.saturating_add(1)),
+            maximum,
+        });
+    }
+    result?;
+    Ok(writer.bytes)
+}
+
+struct BoundedWriter {
+    bytes: Vec<u8>,
+    maximum: usize,
+    written: usize,
+    exceeded: bool,
+}
+
+impl BoundedWriter {
+    fn new(maximum: usize) -> Self {
+        Self {
+            bytes: Vec::new(),
+            maximum,
+            written: 0,
+            exceeded: false,
+        }
+    }
+}
+
+impl Write for BoundedWriter {
+    fn write(&mut self, buffer: &[u8]) -> io::Result<usize> {
+        let Some(end) = self.written.checked_add(buffer.len()) else {
+            self.exceeded = true;
+            return Err(io::Error::other("bounded package image length overflow"));
+        };
+        if end > self.maximum {
+            self.exceeded = true;
+            self.written = end;
+            return Err(io::Error::other("bounded package image limit exceeded"));
+        }
+        if end > self.bytes.capacity() {
+            let capacity = end
+                .max(self.bytes.capacity().saturating_mul(2))
+                .min(self.maximum);
+            self.bytes
+                .try_reserve_exact(capacity - self.bytes.len())
+                .map_err(io::Error::other)?;
+        }
+        self.bytes.extend_from_slice(buffer);
+        self.written = end;
+        Ok(buffer.len())
+    }
+
+    fn flush(&mut self) -> io::Result<()> {
+        Ok(())
+    }
+}
+
+fn validate_transfer_limits(patch: &WorksheetPatch, limits: TransferLimits) -> Result<()> {
+    validate_limits(limits)?;
+    if patch.changes().len() > limits.changes() {
+        return Err(Error::LimitExceeded {
+            resource: "cell-values patch changes",
+            actual: patch.changes().len(),
+            maximum: limits.changes(),
+        });
+    }
+    let bytes = patch
+        .before()
+        .len()
+        .checked_add(patch.after().len())
+        .ok_or(Error::CapacityOverflow {
+            resource: "cell-values patch images",
+        })?;
+    if bytes > limits.bytes() {
+        return Err(Error::LimitExceeded {
+            resource: "cell-values patch images",
+            actual: bytes,
+            maximum: limits.bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_package_images(before: &[u8], after: &[u8], limits: TransferLimits) -> Result<()> {
+    validate_limits(limits)?;
+    let bytes = before
+        .len()
+        .checked_add(after.len())
+        .ok_or(Error::CapacityOverflow {
+            resource: "cell-values package patch images",
+        })?;
+    if bytes > limits.bytes() {
+        return Err(Error::LimitExceeded {
+            resource: "cell-values package patch images",
+            actual: bytes,
+            maximum: limits.bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn validate_limits(limits: TransferLimits) -> Result<()> {
+    if limits.bytes() == 0
+        || limits.changes() == 0
+        || limits.history_entries() == 0
+        || limits.history_bytes() == 0
+    {
+        return Err(Error::InvalidFormat(
+            "cell-values transfer/history limits must all be nonzero".to_string(),
+        ));
+    }
+    Ok(())
+}

@@ -13,6 +13,7 @@
 //! record inspection is limited to checking the offsets that the public API
 //! promises to validate and maintain.
 
+use litchi_core::sheet::WorkbookTrait as _;
 use std::io::{self, Cursor};
 use std::path::Path;
 use std::sync::Arc;
@@ -29,7 +30,7 @@ use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 use litchi_xlsb::package::PackageError;
 use litchi_xlsb::raw::{Header, Kind, Limits as RawLimits, Records, Writer, kind};
 use litchi_xlsb::writer::{MutableWorksheet, WorkbookWriter};
-use litchi_xlsb::{SourceBackedWorkbook, SourceLimits, Workbook};
+use litchi_xlsb::{Package, SourceBackedWorkbook, SourceLimits, Workbook};
 
 const SHEET1: &str = "/xl/worksheets/sheet1.bin";
 const INDEX1: &str = "/xl/worksheets/binaryIndex1.bin";
@@ -63,6 +64,23 @@ fn save_workbook(workbook: &Workbook) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
     workbook.save(&mut output).expect("save workbook");
     output.into_inner()
+}
+
+fn package_edit(workbook: &Workbook, sheet: usize) -> (Package, litchi_xlsb::cell_values::Edit) {
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[sheet].clone();
+    let edit = package
+        .edit_cell_values(name)
+        .expect("cell-value selector")
+        .expect("worksheet selector");
+    (package, edit)
+}
+
+fn publish(commit: litchi_xlsb::cell_values::Commit) -> Workbook {
+    commit
+        .into_package()
+        .into_workbook()
+        .expect("published workbook")
 }
 
 #[derive(Debug, Clone)]
@@ -488,7 +506,7 @@ fn topology_change_preserves_formatting_only_index_rows() {
     let reference = Reference::new(22, 0).expect("reference");
     let snapshot = workbook.cell_values(0).expect("cell snapshot");
     assert!(snapshot.cell(reference).expect("lookup").is_none());
-    let mut edit = snapshot.edit();
+    let (_, mut edit) = package_edit(&workbook, 0);
     edit.insert(
         reference,
         StyleIndex::new(0).expect("style"),
@@ -496,9 +514,8 @@ fn topology_change_preserves_formatting_only_index_rows() {
     )
     .expect("insert cell into formatting-only row");
     let commit = edit.commit().expect("commit");
-    let published = workbook
-        .apply_cell_values(0, &commit)
-        .expect("publish topology-changing edit");
+    workbook = publish(commit);
+    let published = workbook.cell_values(0).expect("published snapshot");
     assert_eq!(
         published
             .cell(reference)
@@ -691,14 +708,11 @@ fn removing_an_earlier_cell_updates_later_anchor_offsets() {
     let source = fixture("test-data/ooxml/xlsb/sample.xlsb");
     let before_index = package_part(&source, INDEX1);
     let mut workbook = Workbook::new(Cursor::new(source)).expect("workbook");
-    let snapshot = workbook.cell_values(0).expect("cell snapshot");
-    let mut edit = snapshot.edit();
+    let (_, mut edit) = package_edit(&workbook, 0);
     edit.remove(Reference::new(0, 1).expect("reference"))
         .expect("remove second cell");
     let commit = edit.commit().expect("commit");
-    workbook
-        .apply_cell_values(0, &commit)
-        .expect("publish edit");
+    workbook = publish(commit);
     let saved = save_workbook(&workbook);
     let after_index = package_part(&saved, INDEX1);
     let after_sheet = package_part(&saved, SHEET1);
@@ -730,11 +744,10 @@ fn no_op_save_keeps_the_source_index_byte_exact() {
     );
     let before_index = package_part(&source, INDEX1);
     let mut workbook = Workbook::new(Cursor::new(source)).expect("workbook");
-    let snapshot = workbook.cell_values(0).expect("snapshot");
-    let commit = snapshot.edit().commit().expect("empty commit");
-    workbook
-        .apply_cell_values(0, &commit)
-        .expect("publish no-op");
+    let (_, edit) = package_edit(&workbook, 0);
+    let commit = edit.commit().expect("empty commit");
+    assert!(commit.patch().is_noop());
+    workbook = publish(commit);
     let after_index = package_part(&save_workbook(&workbook), INDEX1);
     assert_eq!(before_index, after_index);
 }
@@ -748,13 +761,11 @@ fn opaque_index_record_refuses_offset_patch_atomically() {
     assert!(records(&before_index).iter().any(|record| {
         record.kind.get() == OPAQUE_KIND && record.payload == b"extension bytes"
     }));
-    let mut workbook = Workbook::new(Cursor::new(decorated)).expect("workbook");
-    let snapshot = workbook.cell_values(0).expect("snapshot");
-    let mut edit = snapshot.edit();
+    let workbook = Workbook::new(Cursor::new(decorated)).expect("workbook");
+    let (_, mut edit) = package_edit(&workbook, 0);
     edit.remove(Reference::new(0, 1).expect("reference"))
         .expect("remove second cell");
-    let commit = edit.commit().expect("commit");
-    assert!(workbook.apply_cell_values(0, &commit).is_err());
+    assert!(edit.commit().is_err());
     let after_package = save_workbook(&workbook);
     assert_eq!(before_index, package_part(&after_package, INDEX1));
     assert_eq!(before_sheet, package_part(&after_package, SHEET1));

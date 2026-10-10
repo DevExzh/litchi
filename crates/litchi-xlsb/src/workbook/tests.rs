@@ -1632,8 +1632,7 @@ fn workbook_projection(workbook: &Workbook) -> String {
     )
 }
 
-/// Parse the package a workbook currently publishes, exactly as the caller of
-/// `apply_cell_values` used to.
+/// Parse the package a workbook currently publishes.
 fn reparse_published_package(workbook: &Workbook) -> Workbook {
     Workbook::from_opc_package_with_external_link_limits(
         workbook.opc_package().clone(),
@@ -1650,15 +1649,21 @@ fn exact_noop_cell_value_commit_publishes_nothing() {
     );
     let mut workbook = Workbook::new(File::open(path).unwrap()).unwrap();
     let before = workbook_projection(&workbook);
-    let commit = workbook.cell_values(0).unwrap().edit().commit().unwrap();
+    let before_bytes = workbook.to_package().to_bytes().unwrap();
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[0].clone();
+    let edit = package
+        .edit_cell_values(name)
+        .unwrap()
+        .expect("worksheet selector");
+    let commit = edit.commit().unwrap();
     assert!(
-        commit.patch().is_empty(),
-        "the control commit must change no worksheet bytes"
+        commit.patch().is_noop(),
+        "the control commit must change no package bytes"
     );
-
-    let published = workbook.apply_cell_values(0, &commit).unwrap();
-
-    assert_eq!(published.source_bytes(), commit.snapshot().source_bytes());
+    let published = commit.into_package();
+    assert_eq!(published.to_bytes().unwrap(), before_bytes);
+    workbook = published.into_workbook().unwrap();
     assert_eq!(workbook_projection(&workbook), before);
     assert_eq!(
         workbook_projection(&workbook),
@@ -1676,7 +1681,12 @@ fn cell_value_publication_installs_the_parse_that_validated_it() {
     let mut workbook = Workbook::new(File::open(path).unwrap()).unwrap();
     let before = workbook_projection(&workbook);
 
-    let mut edit = workbook.edit_cell_values(0).unwrap();
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[0].clone();
+    let mut edit = package
+        .edit_cell_values(name)
+        .unwrap()
+        .expect("worksheet selector");
     edit.insert(
         crate::cell_values::Reference::new(10_001, 100).unwrap(),
         crate::cell_values::StyleIndex::new(0).unwrap(),
@@ -1684,9 +1694,9 @@ fn cell_value_publication_installs_the_parse_that_validated_it() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(!commit.patch().is_empty());
+    assert!(!commit.patch().is_noop());
 
-    workbook.apply_cell_values(0, &commit).unwrap();
+    workbook = commit.into_package().into_workbook().unwrap();
 
     assert_ne!(workbook_projection(&workbook), before);
     assert_eq!(
@@ -1702,19 +1712,22 @@ fn refused_cell_value_publication_leaves_the_workbook_unchanged() {
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/ooxml/xlsb/Simple.xlsb"
     );
-    let mut workbook = Workbook::new(File::open(path).unwrap()).unwrap();
+    let workbook = Workbook::new(File::open(path).unwrap()).unwrap();
     let before = workbook_projection(&workbook);
 
-    let mut edit = workbook.edit_cell_values(0).unwrap();
+    let package = workbook.to_package();
+    let name = workbook.worksheet_names()[0].clone();
+    let mut edit = package
+        .edit_cell_values(name)
+        .unwrap()
+        .expect("worksheet selector");
     edit.insert(
         crate::cell_values::Reference::new(10_001, 100).unwrap(),
         crate::cell_values::StyleIndex::new(0x00FF_FFFF).unwrap(),
         crate::cell_values::Value::Number(1.0),
     )
     .unwrap();
-    let commit = edit.commit().unwrap();
-
-    assert!(workbook.apply_cell_values(0, &commit).is_err());
+    assert!(edit.commit().is_err());
     assert_eq!(
         workbook_projection(&workbook),
         before,

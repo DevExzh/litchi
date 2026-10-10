@@ -1670,6 +1670,36 @@
           "name": "apply_workbook_structure",
           "scope": "litchi_xlsb::workbook::Workbook",
           "replacement": "use Package::apply"
+        },
+        {
+          "name": "edit_cell_values",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "edit_cell_values_with_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "edit_cell_values_by_name",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "apply_cell_values",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "apply_cell_values_by_name",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xlsb::cell_values::worksheet::Patch",
+          "replacement": "use Patch::is_noop() for exact worksheet-image equality"
         }
       ],
       "families": []
@@ -1786,6 +1816,36 @@
           "name": "apply_workbook_structure",
           "scope": "litchi_xlsb::workbook::Workbook",
           "replacement": "use Package::apply"
+        },
+        {
+          "name": "edit_cell_values",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "edit_cell_values_with_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "edit_cell_values_by_name",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "apply_cell_values",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "apply_cell_values_by_name",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use Package::edit_cell_values(selector) or immutable Package::apply_cell_values(&patch)"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xlsb::cell_values::worksheet::Patch",
+          "replacement": "use Patch::is_noop() for exact worksheet-image equality"
         }
       ],
       "families": []

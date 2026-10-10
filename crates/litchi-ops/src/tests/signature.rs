@@ -391,11 +391,15 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
         File::Xlsb(handle) => {
             use litchi_xlsb::cell_values::{Reference, StyleIndex, Value};
 
-            let Ok(crate::format::xlsb::XlsbEditor::Materialized(mut workbook)) = handle.editor()
+            let Ok(crate::format::xlsb::XlsbEditor::Materialized(workbook)) = handle.editor()
             else {
                 panic!("an unsigned XLSB builds an owning unsigned copy");
             };
-            let mut edit = workbook.edit_cell_values(0).unwrap();
+            let mut edit = (*workbook)
+                .into_package()
+                .edit_cell_values(0)
+                .unwrap()
+                .expect("worksheet selector resolves");
             edit.insert(
                 Reference::new(100, 0).unwrap(),
                 StyleIndex::new(0).unwrap(),
@@ -403,9 +407,9 @@ fn changed_commit(file: &File) -> (Vec<u8>, String) {
             )
             .unwrap();
             let commit = edit.commit().unwrap();
-            workbook.apply_cell_values(0, &commit).unwrap();
+            let package = commit.into_package();
             let mut output = Cursor::new(Vec::new());
-            workbook.save(&mut output).unwrap();
+            package.write_to(&mut output).unwrap();
             (output.into_inner(), MARKER.to_owned())
         },
         #[cfg(feature = "doc")]
@@ -599,14 +603,15 @@ fn assert_exact_noop(input: &Input) {
         },
         #[cfg(feature = "xlsb")]
         FileFormat::Xlsb => {
-            let mut workbook = litchi_xlsb::Package::from_bytes(bytes.clone())
+            let package = litchi_xlsb::Package::from_bytes(bytes.clone()).unwrap();
+            let commit = package
+                .edit_cell_values(0)
                 .unwrap()
-                .into_workbook()
+                .expect("worksheet selector resolves")
+                .commit()
                 .unwrap();
-            let commit = workbook.edit_cell_values(0).unwrap().commit().unwrap();
-            workbook.apply_cell_values(0, &commit).unwrap();
             let mut output = Cursor::new(Vec::new());
-            workbook.save(&mut output).unwrap();
+            commit.into_package().write_to(&mut output).unwrap();
             assert_eq!(&output.into_inner(), bytes, "{label}: eager no-op");
         },
         #[cfg(feature = "doc")]

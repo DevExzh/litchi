@@ -119,8 +119,8 @@ enum XlsbOwner {
     Eager(Box<xlsb::Workbook>),
 }
 
-/// The eager workbook the write kernel (M2) edits through
-/// [`xlsb::Workbook::edit_cell_values`] and the other eager edit entries.
+/// The eager workbook the write kernel (M2) materializes before handing the
+/// owning [`xlsb::Package`] to a cell-value transaction.
 pub(crate) enum XlsbEditor<'a> {
     /// The handle's own eager owner.
     Eager(&'a xlsb::Workbook),
@@ -456,7 +456,8 @@ impl Xlsb {
     }
 
     /// The eager workbook the write kernel (M2) edits, without detecting or
-    /// indexing the input again.
+    /// indexing the input again. Cell-value transactions start from its owning
+    /// [`xlsb::Package`] so the package boundary remains the publication owner.
     ///
     /// An eager handle lends its own workbook. A source-backed handle
     /// materializes one from the package indexed at open through the same

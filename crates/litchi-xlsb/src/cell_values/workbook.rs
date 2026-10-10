@@ -6,7 +6,7 @@
 
 //! Workbook-level publication for lossless cell-value edits.
 
-use super::{Commit, Limits, Snapshot, Value};
+use super::worksheet::{Commit, Limits, Snapshot, Value};
 use crate::external_link::ExternalLinkLimits;
 use crate::package::error::{Error, Result};
 use crate::workbook::DrawingLoadPolicy;

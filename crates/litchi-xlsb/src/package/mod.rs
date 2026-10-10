@@ -541,6 +541,20 @@ impl Package {
         )
     }
 
+    /// Adopt an OPC image that has already been semantically validated by a
+    /// workbook projection, while retaining this package's format policies.
+    ///
+    /// The physical image is admitted separately by callers before this seam
+    /// is used. Keeping the policy adoption here avoids reparsing the same
+    /// workbook projection solely to rebuild the package owner.
+    pub(crate) fn with_admitted_opc(
+        &self,
+        package: OpcPackage,
+        tolerance: ToleranceReport,
+    ) -> Self {
+        Self(package, self.1, tolerance, self.3, self.4)
+    }
+
     /// Revalidate a candidate under the owner's retained projection policies.
     pub(crate) fn reparse_candidate(&self, candidate: OpcPackage) -> Result<Self> {
         let workbook =

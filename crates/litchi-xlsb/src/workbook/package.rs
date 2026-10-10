@@ -396,72 +396,6 @@ impl Workbook {
         )
     }
 
-    /// Start a detached, source-checked structural cell edit.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet selector or malformed stream.
-    pub fn edit_cell_values(&self, worksheet_index: usize) -> Result<cell_values::Edit> {
-        Ok(self.cell_values(worksheet_index)?.edit())
-    }
-
-    /// Start a detached cell-value edit using an explicit finite policy.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet selector, malformed stream,
-    /// or exceeded cell-value resource limit.
-    pub fn edit_cell_values_with_limits(
-        &self,
-        worksheet_index: usize,
-        limits: cell_values::Limits,
-    ) -> Result<cell_values::Edit> {
-        Ok(self
-            .cell_values_with_limits(worksheet_index, limits)?
-            .edit())
-    }
-
-    /// Apply an exact-source cell-value commit and republish this workbook
-    /// from the candidate parse that whole-workbook readback validated.
-    ///
-    /// An exact no-op commit publishes nothing. Its patch reproduces the
-    /// stored worksheet bytes, so the candidate would be this workbook's own
-    /// package and the readback would re-derive the state this workbook
-    /// already holds; the commit's snapshot is returned unchanged instead.
-    /// Every other commit is parsed and validated as a complete candidate
-    /// workbook first, and only a candidate that passes every check replaces
-    /// this one, so a refusal leaves the published workbook untouched. The
-    /// candidate is parsed under this workbook's drawing policy, so a
-    /// drawing-skipped projection keeps that typed-inventory boundary after
-    /// publication.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet selector, stale commit,
-    /// invalid contextual index, or failed whole-workbook readback.
-    pub fn apply_cell_values(
-        &mut self,
-        worksheet_index: usize,
-        commit: &cell_values::Commit,
-    ) -> Result<cell_values::Snapshot> {
-        let uri = self.worksheet_uri(worksheet_index)?;
-        let applied = cell_values::workbook::apply_retaining_parse(
-            &self.package,
-            &uri,
-            commit,
-            self.external_link_limits,
-            self.drawing_load_policy,
-            self.leniency,
-        )?;
-        match applied {
-            cell_values::workbook::Applied::Unchanged(snapshot) => Ok(snapshot),
-            cell_values::workbook::Applied::Published { snapshot, workbook } => {
-                *self = *workbook;
-                Ok(snapshot)
-            },
-        }
-    }
-
     /// Read editable cell values from a worksheet selected by exact name.
     ///
     /// # Errors
@@ -483,29 +417,6 @@ impl Workbook {
         limits: cell_values::Limits,
     ) -> Result<cell_values::Snapshot> {
         self.cell_values_with_limits(self.worksheet_index(worksheet_name)?, limits)
-    }
-
-    /// Start a detached cell-value edit on a worksheet selected by exact name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet name or malformed stream.
-    pub fn edit_cell_values_by_name(&self, worksheet_name: &str) -> Result<cell_values::Edit> {
-        Ok(self.cell_values_by_name(worksheet_name)?.edit())
-    }
-
-    /// Apply an exact-source cell-value commit to a worksheet selected by name.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for an invalid worksheet name, stale commit, invalid
-    /// contextual style/shared-string index, or failed whole-workbook readback.
-    pub fn apply_cell_values_by_name(
-        &mut self,
-        worksheet_name: &str,
-        commit: &cell_values::Commit,
-    ) -> Result<cell_values::Snapshot> {
-        self.apply_cell_values(self.worksheet_index(worksheet_name)?, commit)
     }
 
     /// Read the optional sparkline groups selected by zero-based worksheet

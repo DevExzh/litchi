@@ -1086,6 +1086,11 @@ impl Edit {
     /// Returns an error if a replacement range cannot be represented or the
     /// generated source stream fails bounded structural readback.
     pub fn commit(self) -> Result<Commit> {
+        let maximum = self.limits.cells.saturating_mul(2);
+        self.commit_with_change_limit(maximum)
+    }
+
+    pub(crate) fn commit_with_change_limit(self, maximum: usize) -> Result<Commit> {
         let retained = self.entries.len().saturating_sub(self.removed.len());
         let final_cells =
             retained
@@ -1108,7 +1113,13 @@ impl Edit {
             Arc::clone(&self.source)
         };
         let snapshot = read_shared(Arc::clone(&after), self.limits, self.leniency)?;
-        let changes = semantic_changes(&self.entries, &self.inserted, &self.removed, &snapshot)?;
+        let changes = semantic_changes(
+            &self.entries,
+            &self.inserted,
+            &self.removed,
+            &snapshot,
+            maximum,
+        )?;
         Ok(Commit {
             snapshot,
             patch: Patch {
@@ -1160,7 +1171,7 @@ pub struct Patch {
 impl Patch {
     /// Whether this patch leaves the source stream untouched.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -2691,6 +2702,7 @@ fn semantic_changes(
     _inserted: &BTreeMap<Reference, StoredCell>,
     _removed: &BTreeSet<Reference>,
     after: &Snapshot,
+    maximum: usize,
 ) -> Result<Vec<Change>> {
     let mut before_by_reference = BTreeMap::<Reference, StoredCell>::new();
     for entry in entries {
@@ -2725,7 +2737,7 @@ fn semantic_changes(
         .collect::<BTreeSet<_>>();
     let mut changes = Vec::new();
     changes
-        .try_reserve(references.len())
+        .try_reserve_exact(references.len().min(maximum))
         .map_err(|source| Error::Allocation {
             resource: "semantic cell patch changes",
             source,
@@ -2734,6 +2746,13 @@ fn semantic_changes(
         let before = before_by_reference.get(&reference);
         let destination = after_by_reference.get(&reference);
         if before != destination {
+            if changes.len() == maximum {
+                return Err(Error::LimitExceeded {
+                    resource: "cell-values patch changes",
+                    actual: changes.len().saturating_add(1),
+                    maximum,
+                });
+            }
             changes.push(Change {
                 reference,
                 before: before.cloned(),

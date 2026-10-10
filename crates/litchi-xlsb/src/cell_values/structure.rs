@@ -1764,7 +1764,7 @@ fn validate_sheet_name(workbook: &Workbook, sheet: usize, name: &str) -> Result<
     Ok(())
 }
 
-fn validate_all_worksheets(workbook: &Workbook) -> Result<()> {
+pub(crate) fn validate_all_worksheets(workbook: &Workbook) -> Result<()> {
     for index in 0..workbook.worksheet_count() {
         let uri = workbook.worksheet_uri(index)?;
         if workbook.package.get_part(&uri)?.content_type() == WORKSHEET_CONTENT_TYPE {

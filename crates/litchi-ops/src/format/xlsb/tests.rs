@@ -609,14 +609,22 @@ fn source_handles_materialize_the_eager_editor_from_the_same_package() {
         WorkbookTrait::worksheet_names(&*editor),
         ["Sheet1", "Sheet2", "Sheet3"]
     );
-    editor.edit_cell_values(0).expect("eager cell-value edit");
+    editor
+        .to_package()
+        .edit_cell_values(0)
+        .expect("eager cell-value edit")
+        .expect("worksheet selector resolves");
     // The source-backed handle stays readable.
     assert_eq!(handle.text().unwrap().len(), 75);
 
     let eager = open_eager(bytes.clone(), &OpenOptions::new());
     let editor = eager.editor().unwrap();
     assert!(matches!(editor, XlsbEditor::Eager(_)));
-    editor.edit_cell_values(0).expect("eager cell-value edit");
+    editor
+        .to_package()
+        .edit_cell_values(0)
+        .expect("eager cell-value edit")
+        .expect("worksheet selector resolves");
 
     for handle in [
         open_bytes(bytes.clone(), &OpenOptions::new().retain_source(false)),
