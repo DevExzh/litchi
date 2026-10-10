@@ -1333,7 +1333,7 @@ pub(crate) fn save_to(file: &Xlsb, path: &Path, options: &SaveOptions) -> Result
 /// its originating command index.
 pub(crate) mod sheet_coalesce {
     use super::{
-        Commit, FileFormat, NativeStructureEdit, Result, SheetState, TargetArg,
+        Commit, FileFormat, NativeStructureEdit, Result, SheetState, SheetTarget, TargetArg,
         WRITE_ENTRY_OVERHEAD, Xlsb, admit_sheet_properties, check_limits, native_error,
         package_from_editor, resolve_sheet_targets, sheet_state_shape, validate_sheet_state,
     };
@@ -1357,6 +1357,7 @@ pub(crate) mod sheet_coalesce {
 
     pub(crate) struct Run {
         base: Xlsb,
+        catalog: std::sync::Arc<crate::format::xlsb::owner::Catalog>,
         source: litchi_xlsb::Package,
         edit: NativeStructureEdit,
         state: SheetState,
@@ -1381,26 +1382,47 @@ pub(crate) mod sheet_coalesce {
             limits: &crate::transaction::SemanticLimits,
         ) -> Result<Option<Plan>> {
             self.check_source()?;
-            if !sheet_state_shape(target, props) {
-                return Ok(None);
-            }
-            let assignments = admit_sheet_properties(props, limits)?;
-            let Some(state) = assignments.state else {
+            let Some((plan, target)) = admit_sheet_state_plan(self, target, props, limits)? else {
                 return Ok(None);
             };
-            let positions = resolve_sheet_targets(self, target, limits)?;
-            if positions.len() != 1 {
-                return Ok(None);
-            }
-            check_limits(positions.len(), &assignments, limits)?;
-            validate_sheet_state(self, &positions, state)?;
-            let result = Some(Plan {
-                tab: positions[0].tab,
+            validate_sheet_state(self, std::slice::from_ref(&target), plan.state)?;
+            self.check_source().and(Ok(Some(plan)))
+        }
+    }
+
+    /// Admit the direct positional visibility shape without deciding whether
+    /// the complete workbook would become invalid.  The latter check is
+    /// intentionally supplied by the caller: the first command and every
+    /// post-barrier replan use the ordinary full-catalog validator, while a
+    /// pending homogeneous run validates only its selected tab here and uses
+    /// its maintained visible count for the last-visible policy.
+    fn admit_sheet_state_plan(
+        file: &Xlsb,
+        target: &TargetArg<'_>,
+        props: &Props<'_>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<Option<(Plan, SheetTarget)>> {
+        if !sheet_state_shape(target, props) {
+            return Ok(None);
+        }
+        let assignments = admit_sheet_properties(props, limits)?;
+        let Some(state) = assignments.state else {
+            return Ok(None);
+        };
+        let positions = resolve_sheet_targets(file, target, limits)?;
+        if positions.len() != 1 {
+            return Ok(None);
+        }
+        check_limits(positions.len(), &assignments, limits)?;
+        let target = positions[0];
+        Ok(Some((
+            Plan {
+                tab: target.tab,
                 state,
                 staged_bytes: WRITE_ENTRY_OVERHEAD.saturating_mul(2),
-            });
-            self.check_source().and(Ok(result))
-        }
+            },
+            target,
+        )))
     }
 
     impl Run {
@@ -1440,6 +1462,7 @@ pub(crate) mod sheet_coalesce {
             base.check_source()?;
             Ok(Self {
                 base: base.clone(),
+                catalog,
                 source,
                 edit,
                 state,
@@ -1460,12 +1483,46 @@ pub(crate) mod sheet_coalesce {
             self.items.first().map(|item| item.index)
         }
 
+        /// Admit a direct visibility command against the still-pending run.
+        /// The target and property shape, quotas, and selected-tab kind retain
+        /// their ordinary admission rules, but the workbook-wide last-visible
+        /// scan is deferred to [`Self::would_hide_last_visible`], which uses
+        /// the run's maintained count.  A caller must flush and replan through
+        /// [`Xlsb::sheet_plan`] whenever [`Self::requires_barrier`] is true.
+        pub(crate) fn sheet_plan(
+            &self,
+            target: &TargetArg<'_>,
+            props: &Props<'_>,
+            limits: &crate::transaction::SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.base.check_source()?;
+            let Some((plan, target)) = admit_sheet_state_plan(&self.base, target, props, limits)?
+            else {
+                return Ok(None);
+            };
+            let Some(tab) = self.catalog.get(target.tab) else {
+                return Err(
+                    Error::new(Code::PathNotFound, "the selected XLSB tab is absent")
+                        .with_format(FileFormat::Xlsb),
+                );
+            };
+            if tab.kind() == litchi_xlsb::sheet::Kind::Unbound
+                && plan.state != SheetState::VeryHidden
+            {
+                return Err(Error::new(
+                    Code::UnsupportedCapability,
+                    "unbound XLSB tabs must remain very hidden",
+                )
+                .with_format(FileFormat::Xlsb));
+            }
+            self.base.check_source().and(Ok(Some(plan)))
+        }
+
         pub(crate) fn would_hide_last_visible(&self, plan: &Plan) -> Result<bool> {
             if plan.state.is_visible() {
                 return Ok(false);
             }
-            let catalog = self.base.catalog()?;
-            let Some(tab) = catalog.get(plan.tab) else {
+            let Some(tab) = self.catalog.get(plan.tab) else {
                 return Err(
                     Error::new(Code::PathNotFound, "the selected XLSB tab is absent")
                         .with_format(FileFormat::Xlsb),
@@ -1522,8 +1579,7 @@ pub(crate) mod sheet_coalesce {
                     Error::new(Code::PathNotFound, "the selected XLSB tab is absent")
                         .with_format(FileFormat::Xlsb)
                 })?;
-            let catalog = self.base.catalog()?;
-            if let Some(tab) = catalog.get(plan.tab) {
+            if let Some(tab) = self.catalog.get(plan.tab) {
                 if tab.state().is_visible() && !plan.state.is_visible() {
                     self.visible_count = self.visible_count.saturating_sub(1);
                 } else if !tab.state().is_visible() && plan.state.is_visible() {

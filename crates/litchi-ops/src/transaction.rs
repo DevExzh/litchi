@@ -812,7 +812,10 @@ impl Edit {
                     let File::Xlsb(handle) = &self.current else {
                         return Err(pending());
                     };
-                    handle.sheet_plan(_target, _props, &self.limits)
+                    match self.xlsb_sheets.as_ref() {
+                        Some(run) => run.sheet_plan(_target, _props, &self.limits),
+                        None => handle.sheet_plan(_target, _props, &self.limits),
+                    }
                 };
                 if planned.is_err() {
                     // An earlier deferred native failure takes precedence over
