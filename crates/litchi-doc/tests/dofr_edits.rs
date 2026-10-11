@@ -12,11 +12,12 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::Position;
 use litchi_doc::body_text::{Error, Refusal, Snapshot, TransactionLimits};
+use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::tracked_revision::{
     Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot as RevisionSnapshot,
 };
-use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, Writer};
+use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting};
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use litchi_ole_common::property_set::{
     CodePage, DOCUMENT_SUMMARY_INFORMATION_FMTID, Section, Stream, Value,
@@ -29,7 +30,7 @@ fn base_doc() -> Vec<u8> {
 }
 
 fn base_doc_with_text(text: &str) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph_runs(
             vec![(text.to_string(), CharacterFormatting::default())],
@@ -37,7 +38,11 @@ fn base_doc_with_text(text: &str) -> Vec<u8> {
         )
         .expect("fixture paragraph");
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("fixture DOC");
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut output)
+        .expect("fixture DOC");
     output.into_inner()
 }
 

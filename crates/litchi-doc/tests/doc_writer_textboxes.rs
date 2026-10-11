@@ -38,8 +38,9 @@
 //! boxes, then re-opens it with the crate's own reader: the textbox story
 //! (ccpTxbx + PlcftxbxTxt) and the OfficeArtClientTextbox links must resolve
 //! to the right shapes and text.
+use litchi_doc::builder::Builder;
 use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
-use litchi_doc::writer::{FloatingPosition, Picture, Writer};
+use litchi_doc::writer::{FloatingPosition, Picture};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use litchi_odraw::{Record, shape::Kind};
@@ -100,7 +101,7 @@ const FIRST_BOX_SPID: u32 = 1028;
 const SECOND_BOX_SPID: u32 = 1029;
 
 fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("before boxes").unwrap();
     writer
         .insert_picture(Picture::new(make_png(32, 16)).unwrap())
@@ -141,7 +142,7 @@ fn write_doc_with_text_boxes(jpeg_bytes: &[u8]) -> Vec<u8> {
     writer.add_paragraph("after boxes").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     cursor.into_inner()
 }
 
@@ -296,7 +297,7 @@ fn genuine_word_text_boxes_parse_via_crate_reader() {
 
 #[test]
 fn document_without_text_boxes_has_empty_story() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("no boxes").unwrap();
     writer
         .insert_floating_shape(
@@ -306,7 +307,7 @@ fn document_without_text_boxes_has_empty_story() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
     let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();

@@ -5,6 +5,7 @@
 //! annotations, layout, and binary-backed metadata.
 
 mod basics;
+mod body;
 mod content_support;
 mod field_support;
 mod fields;
@@ -15,3 +16,5 @@ mod metadata;
 mod numbering;
 mod prelude;
 mod subdocuments;
+
+pub use body::BodyParagraphs;

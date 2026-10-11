@@ -37,9 +37,9 @@
 use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
-    AuxiliaryTableDefect, BookmarkDefect, CommentDefect, Defect, Leniency, OpenOptions, Package,
-    PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
-    StylesheetDefect, TableDefinitionDefect, Writer,
+    AuxiliaryTableDefect, BookmarkDefect, Builder, CommentDefect, Defect, Leniency, OpenOptions,
+    Package, PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
+    StylesheetDefect, TableDefinitionDefect,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;
@@ -161,14 +161,18 @@ fn a_conforming_document_records_no_repairs() {
 // Optional auxiliary tables and Stshif reserved bytes (default repairs)
 // ──────────────────────────────────────────────────────────────────────────
 
-fn writer_document(build: impl FnOnce(&mut Writer)) -> Vec<u8> {
-    let mut writer = Writer::new();
+fn writer_document(build: impl FnOnce(&mut Builder)) -> Vec<u8> {
+    let mut writer = Builder::new();
     writer
         .add_paragraph("Body text for the leniency fixtures.")
         .expect("fixture paragraph");
     build(&mut writer);
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("fixture DOC");
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut output)
+        .expect("fixture DOC");
     output.into_inner()
 }
 
@@ -190,7 +194,7 @@ fn edit_word_stream(bytes: &[u8], edit: impl FnOnce(&mut Vec<u8>)) -> Vec<u8> {
 
 /// Point one FIB table entry at a one-byte range, which every auxiliary
 /// table parser rejects. The declared pointer count is raised when the index
-/// lies past the Writer's Word 2002 layout; the added entries land in the
+/// lies past the Builder's Word 2002 layout; the added entries land in the
 /// zeroed slack between the FIB and the text, never in document content.
 fn break_table_pointer(word: &mut [u8], index: usize) {
     let declared = usize::from(u16::from_le_bytes([word[152], word[153]]));
@@ -445,7 +449,7 @@ fn first_std_offset(table: &[u8], stsh_offset: usize) -> usize {
     assert_ne!(
         u16::from_le_bytes([table[lpstd], table[lpstd + 1]]),
         0,
-        "the Writer always emits the Normal style"
+        "the Builder always emits the Normal style"
     );
     lpstd + 2
 }
@@ -605,7 +609,7 @@ fn first_tc80_offset(word: &[u8]) -> usize {
     let sprm = word
         .windows(2)
         .position(|pair| pair == [0x08, 0xD6])
-        .expect("the Writer emits sprmTDefTable for a table row");
+        .expect("the Builder emits sprmTDefTable for a table row");
     let itc_mac = usize::from(word[sprm + 4]);
     sprm + 5 + (itc_mac + 1) * 2
 }
@@ -833,7 +837,7 @@ fn section_page_border_defects_are_repaired_and_recorded() {
         let sprm = word
             .windows(4)
             .position(|bytes| bytes == [0x2B, 0x70, 8, 0x01])
-            .expect("the Writer emits sprmSBrcTop80");
+            .expect("the Builder emits sprmSBrcTop80");
         word[sprm + 4] = 0x11; // ico 17
         word[sprm + 5] |= 0x80; // reserved effect bit
     });
@@ -873,7 +877,7 @@ fn an_unresolvable_piece_modifier_is_ignored_and_recorded() {
 
     let bytes = edit_table_stream(clean, |word, table| {
         let clx = table_pointer(word, 33);
-        assert_eq!(table[clx], 0x02, "the Writer emits no RgPrc");
+        assert_eq!(table[clx], 0x02, "the Builder emits no RgPrc");
         let lcb = usize::try_from(u32::from_le_bytes(
             table[clx + 1..clx + 5].try_into().unwrap(),
         ))

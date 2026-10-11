@@ -578,6 +578,9 @@ enum Inner<'n, 'f> {
     /// Boxed: the DOCX iterator carries its parent's address.
     #[cfg(feature = "docx")]
     Docx(Box<crate::format::docx::Children<'f>>),
+    /// The legacy DOC iterator carries the retained document handle.
+    #[cfg(feature = "doc")]
+    Doc(crate::format::doc::children::Children<'f>),
     /// The XLSX iterator carries the workbook handle through its nodes.
     #[cfg(feature = "xlsx")]
     Xlsx(crate::format::xlsx::Children<'f>),
@@ -622,6 +625,14 @@ impl<'n, 'f> Children<'n, 'f> {
         }
     }
 
+    /// A DOC node's children.
+    #[cfg(feature = "doc")]
+    pub(crate) fn doc(children: crate::format::doc::children::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Doc(children),
+        }
+    }
+
     /// An XLSX node's children.
     #[cfg(feature = "xlsx")]
     pub(crate) const fn xlsx(children: crate::format::xlsx::Children<'f>) -> Self {
@@ -654,6 +665,8 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Fake(children) => children.next(),
             #[cfg(feature = "docx")]
             Inner::Docx(children) => children.next().map(|child| child.map(Node::Docx)),
+            #[cfg(feature = "doc")]
+            Inner::Doc(children) => children.next().map(|child| child.map(Node::Doc)),
             #[cfg(feature = "xlsx")]
             Inner::Xlsx(children) => children.next().map(|child| child.map(Node::Xlsx)),
             #[cfg(feature = "pptx")]

@@ -32,7 +32,7 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
-use litchi_doc::writer::Writer;
+use litchi_doc::builder::Builder;
 use litchi_doc::{FieldStory, FieldType, IndexEntryOption, Package, TableOfAuthoritiesEntryOption};
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -157,7 +157,7 @@ fn poi_hyperlink_fixture_retains_inert_hyperlink_field() {
 
 #[test]
 fn generated_tc_document_discovers_table_of_contents_entries() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} TC \"Illustration 1\" \\f i \\l 4 ",
@@ -165,7 +165,7 @@ fn generated_tc_document_discovers_table_of_contents_entries() {
         ))
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
     let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
@@ -182,7 +182,7 @@ fn generated_tc_document_discovers_table_of_contents_entries() {
 
 #[test]
 fn generated_ta_document_discovers_table_of_authorities_entries() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} TA \\l \"Baldwin v. Alberti\" \\c 1 \\s Baldwin ",
@@ -190,7 +190,7 @@ fn generated_ta_document_discovers_table_of_authorities_entries() {
         ))
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
     let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
@@ -217,7 +217,7 @@ fn generated_ta_document_discovers_table_of_authorities_entries() {
 
 #[test]
 fn generated_xe_document_discovers_index_entries() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} XE \"Office Open XML:Syntax\" \\b \\f Intro \\i ",
@@ -225,7 +225,7 @@ fn generated_xe_document_discovers_index_entries() {
         ))
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
     let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
@@ -250,7 +250,7 @@ fn generated_xe_document_discovers_index_entries() {
 
 #[test]
 fn generated_rd_document_discovers_referenced_documents() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} RD \"chapters/Chapter 1.doc\" \\f \\* MERGEFORMAT ",
@@ -258,7 +258,7 @@ fn generated_rd_document_discovers_referenced_documents() {
         ))
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
     let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();
@@ -278,7 +278,7 @@ fn generated_rd_document_discovers_referenced_documents() {
 
 #[test]
 fn generated_private_document_discovers_private_fields() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph(concat!(
             "\u{0013} PRIVATE \"converter payload\" \\* MERGEFORMAT ",
@@ -286,7 +286,7 @@ fn generated_private_document_discovers_private_fields() {
         ))
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
     let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
     let document = package.document().unwrap();

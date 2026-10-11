@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn test_add_table_invalid_dimensions() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert!(writer.add_table(0, 3).is_err());
     assert!(writer.add_table(2, 0).is_err());
     assert!(writer.add_table(0, 0).is_err());
@@ -11,7 +11,7 @@ fn test_add_table_invalid_dimensions() {
 
 #[test]
 fn test_set_table_cell_invalid_indices() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let idx = writer.add_table(2, 2).unwrap();
     assert!(writer.set_table_cell_text(idx, 2, 0, "Invalid").is_err());
     assert!(writer.set_table_cell_text(idx, 0, 2, "Invalid").is_err());
@@ -20,7 +20,7 @@ fn test_set_table_cell_invalid_indices() {
 
 #[test]
 fn rejects_invalid_table_row_formatting() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let table = writer.add_table(2, 2).unwrap();
     let one_cell = crate::writer::TableRow {
         cells: vec![crate::writer::TableCell {
@@ -72,9 +72,9 @@ fn rejects_invalid_table_row_formatting() {
     writer
         .set_table_row_formatting(table, 1, late_header)
         .unwrap();
-    assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+    assert!(writer.build().is_err());
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let table = writer.add_table(1, 1).unwrap();
     writer
         .set_table_row_formatting(
@@ -90,5 +90,5 @@ fn rejects_invalid_table_row_formatting() {
             },
         )
         .unwrap();
-    assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_err());
+    assert!(writer.build().is_err());
 }

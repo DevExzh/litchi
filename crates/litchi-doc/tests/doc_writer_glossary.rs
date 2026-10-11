@@ -38,7 +38,7 @@ use litchi_doc::writer::{
     ParagraphFormatting, Picture, Shape as DrawingShape,
 };
 use litchi_doc::{
-    GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, OpenOptions, Package, Writer,
+    Builder, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, OpenOptions, Package,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -79,8 +79,8 @@ fn metadata() -> GlossaryMetadata {
     .unwrap()
 }
 
-fn writer() -> Writer {
-    let mut writer = Writer::new();
+fn writer() -> Builder {
+    let mut writer = Builder::new();
     writer.add_paragraph("Greeting").unwrap();
     writer.add_paragraph("World").unwrap();
     writer.add_paragraph("").unwrap();
@@ -98,8 +98,8 @@ fn image_fixture(relative: &str) -> Vec<u8> {
     .unwrap()
 }
 
-fn glossary_with_drawings() -> Writer {
-    let mut writer = Writer::new();
+fn glossary_with_drawings() -> Builder {
+    let mut writer = Builder::new();
     writer.add_paragraph("Greeting").unwrap();
     writer
         .insert_picture(Picture::new(image_fixture("png/lena.png")).unwrap())
@@ -135,11 +135,11 @@ fn glossary_with_drawings() -> Writer {
     writer
 }
 
-fn glossary_with_hyperlink() -> Writer {
+fn glossary_with_hyperlink() -> Builder {
     const DISPLAY_TEXT: &str = "OpenAI";
     const TARGET: &str = "https://example.com";
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_hyperlink(DISPLAY_TEXT, TARGET, ParagraphFormatting::default())
         .unwrap();
@@ -173,7 +173,7 @@ fn glossary_with_hyperlink() -> Writer {
     writer
 }
 
-fn glossary_with_non_plcf_fields() -> Writer {
+fn glossary_with_non_plcf_fields() -> Builder {
     const INSTRUCTIONS: [&str; 5] = [
         r#"TC "Illustration 1" \f i \l 4 \n"#,
         r#"TA \l "Baldwin v. Alberti" \c 1 \s Baldwin"#,
@@ -182,7 +182,7 @@ fn glossary_with_non_plcf_fields() -> Writer {
         r#"PRIVATE "converter payload""#,
     ];
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let marker_format = CharacterFormatting {
         special: Some(true),
         ..CharacterFormatting::default()
@@ -255,7 +255,11 @@ fn assert_glossary(package: &mut Package<Cursor<Vec<u8>>>) {
 fn attached_template_bytes(mutate: impl FnOnce(&mut [u8], usize)) -> Vec<u8> {
     let mut source_writer = writer();
     let mut source = Cursor::new(Vec::new());
-    source_writer.write_to(&mut source).unwrap();
+    source_writer
+        .build()
+        .unwrap()
+        .write_to(&mut source)
+        .unwrap();
 
     let mut source_ole = OleFile::open(Cursor::new(source.into_inner())).unwrap();
     let mut word_document = source_ole.open_stream(&["WordDocument"]).unwrap();
@@ -311,7 +315,7 @@ fn glossary_only_document_round_trips_through_write_to() {
     assert_eq!(writer.glossary_metadata(), Some(&metadata()));
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     assert_glossary(&mut package);
 }
@@ -325,7 +329,7 @@ fn glossary_only_document_round_trips_through_file_save_and_can_be_cleared() {
     writer.set_glossary_metadata(removed);
 
     let path = temporary_doc_path();
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     std::fs::remove_file(path).unwrap();
     let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
@@ -334,13 +338,13 @@ fn glossary_only_document_round_trips_through_file_save_and_can_be_cleared() {
 
 #[test]
 fn mismatched_main_story_length_is_rejected_before_output_changes() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("short").unwrap();
     writer.set_glossary_metadata(metadata());
 
     let original = vec![0xA5; 16];
-    let mut output = Cursor::new(original.clone());
-    let error = writer.write_to(&mut output).unwrap_err();
+    let output = Cursor::new(original.clone());
+    let error = writer.build().unwrap_err();
     assert!(error.to_string().contains("glossary ccpText"));
     assert_eq!(output.into_inner(), original);
 }
@@ -360,13 +364,13 @@ fn glossary_utf16_ranges_round_trip_non_bmp_text_and_reject_split_pairs() {
         )
         .unwrap()
     };
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("😀").unwrap();
     writer.add_paragraph("").unwrap();
     writer.add_paragraph("").unwrap();
     writer.set_glossary_metadata(metadata(3));
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(
         package.document().unwrap().glossary_item_text(0).unwrap(),
@@ -375,8 +379,8 @@ fn glossary_utf16_ranges_round_trip_non_bmp_text_and_reject_split_pairs() {
 
     writer.set_glossary_metadata(metadata(1));
     let original = vec![0x5A; 8];
-    let mut output = Cursor::new(original.clone());
-    let error = writer.write_to(&mut output).unwrap_err();
+    let output = Cursor::new(original.clone());
+    let error = writer.build().unwrap_err();
     assert!(error.to_string().contains("surrogate pair"));
     assert_eq!(output.into_inner(), original);
 }
@@ -400,13 +404,13 @@ fn template_secondary_fib_exposes_passive_attached_glossary() {
 
 #[test]
 fn distinct_attached_glossary_round_trips_through_public_writer() {
-    let mut template = Writer::new();
+    let mut template = Builder::new();
     template.add_paragraph("Template body only").unwrap();
     assert!(template.set_attached_glossary(writer()).unwrap().is_none());
     assert!(template.attached_glossary().is_some());
 
     let mut output = Cursor::new(Vec::new());
-    template.write_to(&mut output).unwrap();
+    template.build().unwrap().write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
 
@@ -426,11 +430,11 @@ fn distinct_attached_glossary_round_trips_through_public_writer() {
 
 #[test]
 fn invalid_attached_glossary_configuration_is_atomic() {
-    let mut template = Writer::new();
+    let mut template = Builder::new();
     template.add_paragraph("Template").unwrap();
-    let mut output = Cursor::new(vec![0xA5; 16]);
+    let output = Cursor::new(vec![0xA5; 16]);
 
-    let error = match template.set_attached_glossary(Writer::new()) {
+    let error = match template.set_attached_glossary(Builder::new()) {
         Ok(_) => panic!("glossary metadata must be required"),
         Err(error) => error,
     };
@@ -439,14 +443,14 @@ fn invalid_attached_glossary_configuration_is_atomic() {
 
     template.set_glossary_metadata(metadata());
     template.set_attached_glossary(writer()).unwrap();
-    let error = template.write_to(&mut output).unwrap_err();
+    let error = template.build().unwrap_err();
     assert!(error.to_string().contains("both glossary-only"));
     assert_eq!(output.into_inner(), vec![0xA5; 16]);
 }
 
 #[test]
 fn attached_glossary_round_trips_inside_encrypted_template() {
-    let mut template = Writer::new();
+    let mut template = Builder::new();
     template.add_paragraph("Protected template").unwrap();
     template.set_attached_glossary(writer()).unwrap();
     template
@@ -454,7 +458,7 @@ fn attached_glossary_round_trips_inside_encrypted_template() {
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    template.write_to(&mut output).unwrap();
+    template.build().unwrap().write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package
         .document_with_options(OpenOptions::default().with_password("secret".to_owned().into()))
@@ -474,7 +478,7 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
 
     let parent_image = image_fixture("jpg/abstract1.jpg");
     let child_image = image_fixture("png/lena.png");
-    let mut template = Writer::new();
+    let mut template = Builder::new();
     template.add_paragraph("Template").unwrap();
     template
         .insert_picture(Picture::new(parent_image.clone()).unwrap())
@@ -484,7 +488,7 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    template.write_to(&mut output).unwrap();
+    template.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     let mut ole = OleFile::open(Cursor::new(&bytes)).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();
@@ -560,14 +564,14 @@ fn attached_glossary_preserves_shared_data_and_drawing_graphs() {
 
 #[test]
 fn attached_glossary_exposes_typed_inert_fields() {
-    let mut template = Writer::new();
+    let mut template = Builder::new();
     template.add_paragraph("Template").unwrap();
     template
         .set_attached_glossary(glossary_with_hyperlink())
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    template.write_to(&mut output).unwrap();
+    template.build().unwrap().write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     let attached = document.attached_glossary().unwrap().unwrap();
@@ -587,14 +591,14 @@ fn attached_glossary_exposes_typed_inert_fields() {
 
 #[test]
 fn attached_glossary_reconstructs_all_fields_excluded_from_plcfld() {
-    let mut template = Writer::new();
+    let mut template = Builder::new();
     template.add_paragraph("Template").unwrap();
     template
         .set_attached_glossary(glossary_with_non_plcf_fields())
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    template.write_to(&mut output).unwrap();
+    template.build().unwrap().write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     let attached = document.attached_glossary().unwrap().unwrap();

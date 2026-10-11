@@ -180,7 +180,7 @@ pub enum Node<'f> {
     Xlsb(crate::format::xlsb::Node<'f>),
     /// A legacy Word node (DOC adapter, step R6a).
     #[cfg(feature = "doc")]
-    Doc(Pending<'f, crate::format::doc::Doc>),
+    Doc(crate::format::doc::Node<'f>),
     /// A legacy Excel node (XLS adapter, step R6b).
     #[cfg(feature = "xls")]
     Xls(Pending<'f, crate::format::xls::Xls>),
@@ -287,6 +287,20 @@ impl<'f> Node<'f> {
     pub fn as_docx(&self) -> Option<&crate::format::docx::Node<'f>> {
         match self {
             Self::Docx(node) => Some(node),
+            #[allow(
+                unreachable_patterns,
+                reason = "other formats' variants exist only with their features"
+            )]
+            _ => None,
+        }
+    }
+
+    /// The legacy Word node, when the node belongs to a DOC document.
+    #[cfg(feature = "doc")]
+    #[must_use]
+    pub fn as_doc(&self) -> Option<&crate::format::doc::Node<'f>> {
+        match self {
+            Self::Doc(node) => Some(node),
             #[allow(
                 unreachable_patterns,
                 reason = "other formats' variants exist only with their features"

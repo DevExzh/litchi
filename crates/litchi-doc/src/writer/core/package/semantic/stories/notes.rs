@@ -1,14 +1,14 @@
 use crate::writer::core::{
     codec,
     model::{
-        CharacterFormatting, NoteStoryData, ParagraphFormatting, TextStream, WriteError, Writer,
+        Builder, CharacterFormatting, NoteStoryData, ParagraphFormatting, TextStream, WriteError,
         utf16_code_unit_len,
     },
 };
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::footnotes::FootnoteEntry;
 use crate::writer::piece_table::Piece;
-impl Writer {
+impl Builder {
     /// Build footnote or endnote subdocument text and PLCFs.
     ///
     /// Per MS-DOC spec:

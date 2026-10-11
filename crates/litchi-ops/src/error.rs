@@ -338,6 +338,12 @@ pub enum Source {
     /// A legacy Word binary error.
     #[cfg(feature = "doc")]
     Doc(litchi_doc::Error),
+    /// A legacy Word main-story semantic edit error.
+    #[cfg(feature = "doc")]
+    DocEdit(litchi_doc::body_text::Error),
+    /// A legacy Word package creation/publication error.
+    #[cfg(feature = "doc")]
+    DocWrite(litchi_doc::writer::WriteError),
     /// A source-backed legacy Word main-story edit error.
     #[cfg(feature = "doc")]
     DocBodyText(litchi_doc::body_text::source::Error),
@@ -411,6 +417,10 @@ impl Source {
             Self::XlsbRaw(error) => Some(error),
             #[cfg(feature = "doc")]
             Self::Doc(error) => Some(error),
+            #[cfg(feature = "doc")]
+            Self::DocEdit(error) => Some(error),
+            #[cfg(feature = "doc")]
+            Self::DocWrite(error) => Some(error),
             #[cfg(feature = "doc")]
             Self::DocBodyText(error) => Some(error),
             #[cfg(feature = "xls")]
@@ -1214,6 +1224,95 @@ impl Classify for litchi_doc::Error {
     }
 }
 
+#[cfg(feature = "doc")]
+impl Classify for litchi_core::patch::PatchError {
+    fn classify(&self) -> Class {
+        use litchi_core::patch::PatchError;
+
+        match self {
+            PatchError::InvalidText { .. }
+            | PatchError::InvalidBlobId
+            | PatchError::UnsupportedVersion(_) => Class::of(Code::InvalidArgument),
+            PatchError::BlobLimit { .. }
+            | PatchError::HistoryWeight { .. }
+            | PatchError::JsonLimit { .. } => Class::of(Code::LimitExceeded),
+            PatchError::Allocation | PatchError::HistoryInvariant => Class::of(Code::InternalError),
+            PatchError::BlobBase64(_)
+            | PatchError::Json(_)
+            | PatchError::NonCanonicalJson
+            | PatchError::BlobDigestMismatch
+            | PatchError::IncompatibleBlobLimits { .. }
+            | PatchError::OperationPairing => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "doc")]
+impl Classify for litchi_core::patch::CompositionError {
+    fn classify(&self) -> Class {
+        use litchi_core::patch::CompositionError;
+
+        match self {
+            CompositionError::InvalidId | CompositionError::InvalidEffect => {
+                Class::of(Code::InvalidArgument)
+            },
+            CompositionError::Limit { .. } => Class::of(Code::LimitExceeded),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "doc")]
+impl Classify for litchi_doc::body_text::Error {
+    fn classify(&self) -> Class {
+        use litchi_doc::body_text::Refusal;
+
+        match self {
+            Self::Invalid(error) => error.classify(),
+            Self::Refused(Refusal::Protected | Refusal::UnknownProtection) => Class::suggest(
+                Code::DocumentProtected,
+                "authorize the protected edit explicitly",
+            ),
+            Self::Refused(Refusal::SignedSource) => {
+                Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
+            },
+            Self::Refused(Refusal::ParagraphNotFound | Refusal::TargetNotFound) => {
+                Class::of(Code::OutOfRange)
+            },
+            Self::Refused(Refusal::ResourceCollision { .. }) => Class::of(Code::DuplicateName),
+            Self::Refused(Refusal::ResourceNotFound { .. }) => Class::of(Code::NotFound),
+            Self::Refused(Refusal::OperationLimit { .. } | Refusal::ReplacementLimit { .. }) => {
+                Class::of(Code::LimitExceeded)
+            },
+            Self::Refused(_) => Class::of(Code::UnsupportedCapability),
+            Self::Conflict => Class::of(Code::InvalidInput),
+            Self::Composition(error) => error.classify(),
+            Self::Durable(error) => error.classify(),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "doc")]
+impl Classify for litchi_doc::writer::WriteError {
+    fn classify(&self) -> Class {
+        use litchi_doc::writer::WriteError;
+
+        match self {
+            WriteError::Io(error) => error.classify(),
+            WriteError::InvalidData(_) => Class::of(Code::CorruptFile),
+            WriteError::Ole(error) => error.classify(),
+            // The VBA leaf is intentionally retained as a typed cause. The
+            // facade cannot name its private crate dependency, so unsupported
+            // VBA details remain a conservative malformed-write category.
+            WriteError::Vba(_) => Class::of(Code::CorruptFile),
+            WriteError::Package(error) => error.classify(),
+            WriteError::UnsupportedProperty => Class::of(Code::UnsupportedCapability),
+        }
+    }
+}
+
 #[cfg(feature = "xls")]
 impl Classify for litchi_xls::Error {
     fn classify(&self) -> Class {
@@ -1497,6 +1596,32 @@ impl From<litchi_xlsb::Error> for Error {
     }
 }
 from_leaf!(#[cfg(feature = "doc")] litchi_doc::Error => Doc, Some(FileFormat::Doc));
+#[cfg(feature = "doc")]
+impl From<litchi_doc::body_text::Error> for Error {
+    fn from(error: litchi_doc::body_text::Error) -> Self {
+        let class = error.classify();
+        let message = class.code.summary();
+        Self::from_class(
+            class,
+            message,
+            Some(FileFormat::Doc),
+            Source::DocEdit(error),
+        )
+    }
+}
+#[cfg(feature = "doc")]
+impl From<litchi_doc::writer::WriteError> for Error {
+    fn from(error: litchi_doc::writer::WriteError) -> Self {
+        let class = error.classify();
+        let message = class.code.summary();
+        Self::from_class(
+            class,
+            message,
+            Some(FileFormat::Doc),
+            Source::DocWrite(error),
+        )
+    }
+}
 from_leaf!(
     #[cfg(feature = "doc")]
     litchi_doc::body_text::source::Error => DocBodyText, Some(FileFormat::Doc)

@@ -38,9 +38,10 @@
 //! floating text box, then re-opens it with the crate's own reader: header
 //! text, header text box text/shape metadata, and both drawing layers must
 //! resolve correctly without disturbing the main stories.
+use litchi_doc::builder::Builder;
 use litchi_doc::parts::headers::HeaderFooterType;
 use litchi_doc::shape::{extract_drawing_shapes, extract_shape_text};
-use litchi_doc::writer::{FloatingPosition, Writer};
+use litchi_doc::writer::FloatingPosition;
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
     HeaderFooterParagraph, HeaderKind, Package, ShapeHorizontalOrigin, ShapeTextWrap,
@@ -56,7 +57,7 @@ const HEADER_BOX_SPID: u32 = 2049;
 const MAIN_BOX_SPID: u32 = 1025;
 
 fn write_doc_with_header_text_box() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body text").unwrap();
     writer
         .set_odd_header_paragraphs(vec![HeaderFooterParagraph::plain("LETTERHEAD")])
@@ -87,7 +88,7 @@ fn write_doc_with_header_text_box() -> Vec<u8> {
     writer.add_paragraph("More body").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     cursor.into_inner()
 }
 
@@ -208,12 +209,12 @@ fn header_text_box_writes_two_drawing_layers() {
 
 #[test]
 fn document_with_header_but_no_boxes_has_empty_header_story_tables() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("plain").unwrap();
     writer.set_odd_header("just a header");
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
     let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();

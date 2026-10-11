@@ -34,12 +34,13 @@
 
 use litchi_cfb::OleFile;
 use litchi_doc::Package;
+use litchi_doc::builder::Builder;
 use litchi_doc::tracked_revision::{Limits, RevisionEditor, RevisionKind, RevisionMetadata};
-use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
+use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph_runs(
             vec![
@@ -59,7 +60,7 @@ fn base_doc() -> Vec<u8> {
         )
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

@@ -1,6 +1,12 @@
 //! Immutable operation and publication dispatch.
 
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xlsb"
+))]
 use std::io;
 use std::io::Write;
 
@@ -267,6 +273,10 @@ impl File {
             Self::Pptx(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Pptx(commit.into_file())),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Doc(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -295,7 +305,13 @@ impl File {
     /// Returns typed leaf, source, encryption-policy and I/O failures, or
     /// `unsupported_capability` for formats whose publisher is not integrated.
     #[cfg_attr(
-        not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb")),
+        not(any(
+            feature = "doc",
+            feature = "docx",
+            feature = "xlsx",
+            feature = "pptx",
+            feature = "xlsb"
+        )),
         allow(
             clippy::only_used_in_recursion,
             reason = "signed publication forwards the sink when no publisher feature is enabled"
@@ -323,6 +339,12 @@ impl File {
             },
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => {
                 let mut counted = Counted { sink, bytes: 0 };
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
@@ -357,13 +379,25 @@ fn pending(file: &File, operation: &str) -> Error {
     .with_suggestion("see the format capability report and M2 follow-up")
 }
 
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xlsb"
+))]
 struct Counted<W> {
     sink: W,
     bytes: u64,
 }
 
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xlsb"
+))]
 impl<W: Write> Write for Counted<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {
         let count = self.sink.write(bytes)?;

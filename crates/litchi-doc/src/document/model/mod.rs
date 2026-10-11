@@ -9,4 +9,5 @@ mod semantic;
 mod state;
 mod validation;
 
+pub use semantic::BodyParagraphs;
 pub use state::Document;

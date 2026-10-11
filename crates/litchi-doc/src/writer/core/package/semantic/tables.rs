@@ -1,13 +1,13 @@
 use crate::writer::core::{
     codec,
     model::{
-        RevisionWriterData, TextStream, WritableParagraph, WriteError, Writer,
+        Builder, RevisionWriterData, TextStream, WritableParagraph, WriteError,
         contains_field_character, utf16_code_unit_len,
     },
 };
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::Piece;
-impl Writer {
+impl Builder {
     pub(in crate::writer::core::package) fn append_tables_to_main_story(
         &self,
         text_fc_start: u32,

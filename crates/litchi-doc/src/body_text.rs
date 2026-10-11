@@ -47,6 +47,57 @@ use std::sync::{Arc, OnceLock};
 /// Bounded undo/redo history over immutable DOC snapshots.
 pub type History = litchi_core::patch::History<Snapshot>;
 
+/// Configuration for opening an owned body-text package.
+///
+/// The envelope keeps the package, strict revision-owner, transaction, and
+/// protected-publication policies together so every byte-ingress route can
+/// apply the same caller-selected limits.  The fields remain private so the
+/// set of format-specific knobs can grow without exposing an unstable struct
+/// layout.
+#[derive(Clone, Debug, Default, PartialEq, Eq)]
+pub struct OpenOptions {
+    package_limits: crate::package::Limits,
+    revision_limits: Limits,
+    transaction_limits: TransactionLimits,
+    protection_policy: ProtectionPolicy,
+}
+
+impl OpenOptions {
+    /// Creates the default body-text open configuration.
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Selects the outer-package and aggregate-stream admission limits.
+    #[must_use]
+    pub const fn with_package_limits(mut self, package_limits: crate::package::Limits) -> Self {
+        self.package_limits = package_limits;
+        self
+    }
+
+    /// Selects limits for strict tracked-revision ownership and parsing.
+    #[must_use]
+    pub const fn with_revision_limits(mut self, revision_limits: Limits) -> Self {
+        self.revision_limits = revision_limits;
+        self
+    }
+
+    /// Selects staged operation and replacement-payload limits.
+    #[must_use]
+    pub const fn with_transaction_limits(mut self, transaction_limits: TransactionLimits) -> Self {
+        self.transaction_limits = transaction_limits;
+        self
+    }
+
+    /// Selects the explicit policy for changed publication of protected DOCs.
+    #[must_use]
+    pub fn with_protection_policy(mut self, protection_policy: ProtectionPolicy) -> Self {
+        self.protection_policy = protection_policy;
+        self
+    }
+}
+
 /// Finite limits for one body transaction.
 ///
 /// The default policy retains at most 8 MiB of already-rendered output
@@ -610,6 +661,7 @@ pub struct Snapshot {
     source: Arc<[u8]>,
     fingerprint_cache: OnceLock<u64>,
     limits: Limits,
+    package_limits: crate::package::Limits,
     transaction_limits: TransactionLimits,
     protection_policy: ProtectionPolicy,
 }
@@ -626,6 +678,7 @@ impl Clone for Snapshot {
             source: Arc::clone(&self.source),
             fingerprint_cache,
             limits: self.limits,
+            package_limits: self.package_limits,
             transaction_limits: self.transaction_limits,
             protection_policy: self.protection_policy.clone(),
         }
@@ -674,26 +727,34 @@ impl Snapshot {
         transaction_limits: TransactionLimits,
         protection_policy: ProtectionPolicy,
     ) -> Result<Self> {
-        let bytes = input.into();
-        crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
-            bytes.len(),
-            crate::package::Limits::default(),
+        Self::from_bytes_with_options(
+            input,
+            OpenOptions::default()
+                .with_revision_limits(limits)
+                .with_transaction_limits(transaction_limits)
+                .with_protection_policy(protection_policy),
         )
-        .map_err(Error::Invalid)?;
+    }
+
+    fn open_with_options(input: impl Into<Vec<u8>>, options: OpenOptions) -> Result<Self> {
+        let bytes = input.into();
+        crate::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), options.package_limits)
+            .map_err(Error::Invalid)?;
         let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
             bytes.clone(),
-            limits,
-            protection_policy.clone(),
+            options.revision_limits,
+            options.protection_policy.clone(),
         )
         .map_err(Error::Invalid)?;
-        crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
+        crate::Package::validate_ole_file(&mut ole, options.package_limits)
             .map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
             fingerprint_cache: OnceLock::new(),
-            limits,
-            transaction_limits,
-            protection_policy,
+            limits: options.revision_limits,
+            package_limits: options.package_limits,
+            transaction_limits: options.transaction_limits,
+            protection_policy: options.protection_policy,
         })
     }
 
@@ -802,6 +863,7 @@ impl Snapshot {
             source,
             fingerprint_cache: OnceLock::new(),
             limits,
+            package_limits,
             transaction_limits,
             protection_policy: ProtectionPolicy::default(),
         })
@@ -813,7 +875,7 @@ impl Snapshot {
     ///
     /// Returns the same validation failure as [`Self::open`].
     pub fn parse(input: &[u8]) -> Result<Self> {
-        Self::open(input.to_vec(), Limits::default())
+        Self::from_bytes_with_options(input.to_vec(), OpenOptions::default())
     }
 
     /// Opens an owned DOC source with the default resource limits.
@@ -822,7 +884,19 @@ impl Snapshot {
     ///
     /// Returns the same validation failure as [`Self::open`].
     pub fn from_bytes(input: Vec<u8>) -> Result<Self> {
-        Self::open(input, Limits::default())
+        Self::from_bytes_with_options(input, OpenOptions::default())
+    }
+
+    /// Opens owned DOC bytes under one explicit configuration envelope.
+    ///
+    /// The selected package and strict-owner limits are retained by the
+    /// immutable snapshot and reused for every changed commit and inverse
+    /// patch application.
+    pub fn from_bytes_with_options(
+        input: impl Into<Vec<u8>>,
+        options: OpenOptions,
+    ) -> Result<Self> {
+        Self::open_with_options(input, options)
     }
 
     /// Exact CFB source bytes retained for source checks and byte-exact no-ops.
@@ -854,6 +928,13 @@ impl Snapshot {
     #[must_use]
     pub const fn transaction_limits(&self) -> TransactionLimits {
         self.transaction_limits
+    }
+
+    /// Configured outer-package and aggregate stream limits retained by this
+    /// immutable source owner.
+    #[must_use]
+    pub const fn package_limits(&self) -> crate::package::Limits {
+        self.package_limits
     }
 
     /// Lists ordinary source-body paragraphs under the requested review projection.
@@ -929,6 +1010,20 @@ impl Snapshot {
     /// Returns [`Error::Invalid`] if the retained source no longer validates.
     pub fn edit(&self) -> Result<Edit> {
         Edit::new(self.clone())
+    }
+
+    /// Starts a staged transaction under an additional caller-selected
+    /// transaction profile.  Every dimension is intersected with the source
+    /// snapshot's retained policy, so applying a looser profile can never
+    /// discard a stricter ingress or edit bound already attached to the
+    /// source.
+    pub fn edit_with_limits(&self, transaction_limits: TransactionLimits) -> Result<Edit> {
+        let mut edit = Edit::new(self.clone())?;
+        edit.source.transaction_limits =
+            edit.source.transaction_limits.intersect(transaction_limits);
+        edit.editor
+            .set_retained_render_limit(edit.source.transaction_limits.max_retained_render_bytes());
+        Ok(edit)
     }
 
     /// Alias for [`Self::edit`].
@@ -1340,6 +1435,21 @@ impl Snapshot {
         snapshot
     }
 
+    fn with_policies(
+        &self,
+        limits: Limits,
+        package_limits: crate::package::Limits,
+        transaction_limits: TransactionLimits,
+        protection_policy: ProtectionPolicy,
+    ) -> Self {
+        let mut snapshot = self.clone();
+        snapshot.limits = limits;
+        snapshot.package_limits = package_limits;
+        snapshot.transaction_limits = transaction_limits;
+        snapshot.protection_policy = protection_policy;
+        snapshot
+    }
+
     fn lineage(&self) -> Lineage {
         Lineage(Arc::clone(&self.source))
     }
@@ -1352,6 +1462,7 @@ impl std::fmt::Debug for Snapshot {
             .field("bytes", &self.source.len())
             .field("fingerprint", &self.fingerprint())
             .field("limits", &self.limits)
+            .field("package_limits", &self.package_limits)
             .field("transaction_limits", &self.transaction_limits)
             .finish()
     }
@@ -1679,16 +1790,33 @@ impl Edit {
                 Refusal::ReplacementContainsStructuralContent,
             ));
         }
-        let actual = replacement.encode_utf16().count();
-        self.ensure_replacement_capacity(actual)?;
-        if span.start_cp == span.end_cp {
-            return Err(Error::Refused(Refusal::EmptyParagraph));
-        }
-        if text_revision_intersects(&self.editor, span.start_cp, span.end_cp)? {
-            return Err(Error::Refused(Refusal::TrackedText));
-        }
+        // Compare before charging the replacement. An exact semantic no-op
+        // must remain admissible even when the caller's quota is tighter than
+        // the already-stored value (and an empty paragraph must be able to
+        // accept an empty no-op).
         if span.text == replacement {
             return Ok(());
+        }
+        let actual = replacement.encode_utf16().count();
+        self.ensure_replacement_capacity(actual)?;
+        if span.start_cp == span.end_cp
+            && !matches!(
+                target,
+                TextTarget::StoryParagraph {
+                    story: Story::Main,
+                    ..
+                }
+            )
+        {
+            return Err(Error::Refused(Refusal::EmptyParagraph));
+        }
+        let dependency_end = if span.start_cp == span.end_cp {
+            span.start_cp.checked_add(1).ok_or_else(cp_overflow)?
+        } else {
+            span.end_cp
+        };
+        if text_revision_intersects(&self.editor, span.start_cp, dependency_end)? {
+            return Err(Error::Refused(Refusal::TrackedText));
         }
         let expected = span.text.encode_utf16().count();
         let story = target_story(target);
@@ -1711,9 +1839,18 @@ impl Edit {
             return Err(Error::Refused(Refusal::PositionDependency { fib_index }));
         }
         self.ensure_operation_capacity()?;
+        // An empty ordinary paragraph has no text run, but its paragraph mark
+        // still carries the direct character formatting that must be copied to
+        // newly inserted text. Include that one mark in the formatting proof;
+        // the replacement itself remains inserted before the mark.
+        let formatting_end = if span.start_cp == span.end_cp {
+            span.start_cp.checked_add(1).ok_or_else(cp_overflow)?
+        } else {
+            span.end_cp
+        };
         if !self
             .editor
-            .has_uniform_character_format(span.start_cp, span.end_cp)
+            .has_uniform_character_format(span.start_cp, formatting_end)
             .map_err(Error::Invalid)?
         {
             return Err(Error::Refused(Refusal::FormattingDependency));
@@ -2091,11 +2228,13 @@ impl Edit {
             self.editor
                 .authorize_rendered(&bytes)
                 .map_err(map_protection_error)?;
-            Snapshot::open_bounded_with_policy(
+            Snapshot::open_with_options(
                 bytes,
-                self.source.limits,
-                self.source.transaction_limits,
-                self.source.protection_policy.clone(),
+                OpenOptions::default()
+                    .with_package_limits(self.source.package_limits)
+                    .with_revision_limits(self.source.limits)
+                    .with_transaction_limits(self.source.transaction_limits)
+                    .with_protection_policy(self.source.protection_policy.clone()),
             )?
         };
         let patch = Patch::new(
@@ -2191,10 +2330,11 @@ impl Edit {
                 Ok(self.source.clone())
             })?
         } else {
-            Snapshot::open_bounded_profiled_with_cfb_observer(
+            Snapshot::open_bounded_profiled_with_package_limits(
                 bytes,
                 self.source.limits,
                 self.source.transaction_limits,
+                self.source.package_limits,
                 &mut observer,
                 &mut cfb_observer,
             )
@@ -2292,10 +2432,20 @@ impl Edit {
 }
 
 /// Validated commit result for one body-text transaction.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Commit {
     snapshot: Snapshot,
     patch: Patch,
+}
+
+impl std::fmt::Debug for Commit {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Commit")
+            .field("snapshot", &self.snapshot)
+            .field("patch", &self.patch)
+            .finish()
+    }
 }
 
 impl Commit {
@@ -2325,12 +2475,24 @@ impl Commit {
 }
 
 /// In-memory reversible replacement guarded by exact source bytes.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, PartialEq, Eq)]
 pub struct Patch {
     before: Snapshot,
     after: Snapshot,
     changes: Vec<Change>,
     auxiliary_changed: bool,
+}
+
+impl std::fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("before", &self.before)
+            .field("after", &self.after)
+            .field("change_count", &self.changes.len())
+            .field("auxiliary_changed", &self.auxiliary_changed)
+            .finish()
+    }
 }
 
 impl Patch {
@@ -2414,6 +2576,10 @@ impl Patch {
             .transaction_limits
             .intersect(self.before.transaction_limits)
             .intersect(self.after.transaction_limits);
+        let package_limits = source
+            .package_limits
+            .constrained_by(self.before.package_limits)
+            .constrained_by(self.after.package_limits);
         // The same-allocation shortcut skips only the byte comparison; a
         // changed patch is still authorized under the source's protection
         // policy before its target is published.
@@ -2425,13 +2591,36 @@ impl Patch {
             return Err(Error::Conflict);
         }
         if self.is_noop() {
-            return Ok(source.with_transaction_limits(transaction_limits));
+            return Ok(source.with_policies(
+                source.limits,
+                package_limits,
+                transaction_limits,
+                source.protection_policy.clone(),
+            ));
         }
         source
             .editor()?
             .authorize_rendered(self.after.bytes())
             .map_err(map_protection_error)?;
-        Ok(self.after.with_transaction_limits(transaction_limits))
+        if self.after.package_limits == package_limits
+            && self.after.limits == source.limits
+            && self.after.protection_policy == source.protection_policy
+        {
+            return Ok(self.after.with_policies(
+                source.limits,
+                package_limits,
+                transaction_limits,
+                source.protection_policy.clone(),
+            ));
+        }
+        Snapshot::open_with_options(
+            self.after.bytes().to_vec(),
+            OpenOptions::default()
+                .with_package_limits(package_limits)
+                .with_revision_limits(source.limits)
+                .with_transaction_limits(transaction_limits)
+                .with_protection_policy(source.protection_policy.clone()),
+        )
     }
 
     /// Exact inverse patch.
@@ -2489,7 +2678,7 @@ impl Patch {
 }
 
 /// Borrowed semantic change carried by an in-memory patch.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub enum ChangeRef<'a> {
     /// One semantic text replacement.
@@ -2531,6 +2720,79 @@ pub enum ChangeRef<'a> {
         before_present: bool,
         after_present: bool,
     },
+}
+
+impl std::fmt::Debug for ChangeRef<'_> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Text {
+                target,
+                before,
+                after,
+            } => formatter
+                .debug_struct("Text")
+                .field("target", target)
+                .field("before_units", &before.encode_utf16().count())
+                .field("after_units", &after.encode_utf16().count())
+                .finish(),
+            Self::Format {
+                target,
+                property,
+                before,
+                after,
+            } => formatter
+                .debug_struct("Format")
+                .field("target", target)
+                .field("property", property)
+                .field("before", before)
+                .field("after", after)
+                .finish(),
+            Self::RevisionMark {
+                kind,
+                start_cp,
+                end_cp,
+                before_present,
+                after_present,
+            } => formatter
+                .debug_struct("RevisionMark")
+                .field("kind", kind)
+                .field("start_cp", start_cp)
+                .field("end_cp", end_cp)
+                .field("before_present", before_present)
+                .field("after_present", after_present)
+                .finish(),
+            Self::EmbeddedDisplay {
+                storage_id,
+                before,
+                after,
+            } => formatter
+                .debug_struct("EmbeddedDisplay")
+                .field("storage_id", storage_id)
+                .field("before", before)
+                .field("after", after)
+                .finish(),
+            Self::EmbeddedObject {
+                storage_id,
+                before_present,
+                after_present,
+            } => formatter
+                .debug_struct("EmbeddedObject")
+                .field("storage_id", storage_id)
+                .field("before_present", before_present)
+                .field("after_present", after_present)
+                .finish(),
+            Self::Picture {
+                target,
+                before_present,
+                after_present,
+            } => formatter
+                .debug_struct("Picture")
+                .field("target", target)
+                .field("before_present", before_present)
+                .field("after_present", after_present)
+                .finish(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -4448,14 +4710,15 @@ mod tests {
         observe_phase,
     };
     use super::{
-        CharacterProperty, DrawingDependency, Error, Projection, Refusal, RevisionDisposition,
-        Snapshot, Story, TextTarget, TransactionLimits, fingerprint,
+        CharacterProperty, DrawingDependency, Error, OpenOptions, Projection, Refusal,
+        RevisionDisposition, Snapshot, Story, TextTarget, TransactionLimits, fingerprint,
     };
     use crate::parts::dofr::{DofrFrameKind, DofrPayload};
     use crate::parts::fib::FileInformationBlock;
     use crate::tracked_revision::{Limits, RevisionEditor};
     use crate::writer::{
-        CharacterFormatting, FloatingPosition, ParagraphFormatting, Picture, TextRevision, Writer,
+        BookmarkEntry, Builder, CharacterFormatting, FloatingPosition, ParagraphFormatting,
+        Picture, TextRevision,
     };
     use litchi_cfb::{OleFile, OleWriter};
     use litchi_core::Position;
@@ -4468,7 +4731,7 @@ mod tests {
     use std::sync::{Arc, OnceLock};
 
     fn doc(paragraphs: &[&str]) -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         for paragraph in paragraphs {
             writer
                 .add_paragraph_runs(
@@ -4479,8 +4742,52 @@ mod tests {
         }
         let mut output = Cursor::new(Vec::new());
         writer
+            .build()
+            .unwrap()
             .write_to(&mut output)
             .expect("fixture DOC must serialize");
+        normalize_word2002_dop(output.into_inner())
+    }
+
+    fn formatted_empty_doc() -> Vec<u8> {
+        let mut writer = Builder::new();
+        writer
+            .add_paragraph_runs(
+                vec![(
+                    String::new(),
+                    CharacterFormatting {
+                        bold: Some(true),
+                        italic: Some(true),
+                        ..CharacterFormatting::default()
+                    },
+                )],
+                ParagraphFormatting::default(),
+            )
+            .expect("formatted empty paragraph must be accepted");
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .build()
+            .expect("DOC fixture builds")
+            .write_to(&mut output)
+            .expect("formatted empty DOC must serialize");
+        normalize_word2002_dop(output.into_inner())
+    }
+
+    fn empty_body_and_table_doc() -> Vec<u8> {
+        let mut writer = Builder::new();
+        writer
+            .add_paragraph("")
+            .expect("empty body paragraph must be accepted");
+        let table = writer.add_table(1, 1).expect("table");
+        writer
+            .set_table_cell_text(table, 0, 0, "")
+            .expect("empty table cell must be accepted");
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .build()
+            .expect("DOC fixture builds")
+            .write_to(&mut output)
+            .expect("empty body/table DOC must serialize");
         normalize_word2002_dop(output.into_inner())
     }
 
@@ -4633,7 +4940,7 @@ mod tests {
         )
         .expect("PNG fixture");
         let picture = Picture::new(bytes).expect("picture fixture");
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         if floating {
             writer
                 .insert_floating_picture(picture, FloatingPosition::new(1440, 720))
@@ -4642,12 +4949,16 @@ mod tests {
             writer.insert_picture(picture).expect("inline picture");
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("picture DOC");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("picture DOC");
         normalize_word2002_dop(output.into_inner())
     }
 
     fn formatted_picture_receiver_doc() -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_paragraph_runs(
                 vec![(
@@ -4663,13 +4974,15 @@ mod tests {
         writer.add_paragraph("other").expect("second paragraph");
         let mut output = Cursor::new(Vec::new());
         writer
+            .build()
+            .unwrap()
             .write_to(&mut output)
             .expect("formatted receiver DOC");
         normalize_word2002_dop(output.into_inner())
     }
 
     fn structured_doc() -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("Body").expect("body paragraph");
         let table = writer.add_table(1, 1).expect("table");
         writer
@@ -4684,7 +4997,11 @@ mod tests {
             .expect("hyperlink field");
         writer.set_odd_header("Header");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("structured DOC");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("structured DOC");
         normalize_word2002_dop(output.into_inner())
     }
 
@@ -5285,6 +5602,46 @@ mod tests {
     }
 
     #[test]
+    fn patch_apply_revalidates_and_retains_intersected_package_limits() {
+        let source_bytes = doc(&["alpha"]);
+        let source = Snapshot::from_bytes(source_bytes.clone()).expect("source");
+        let mut edit = source.edit().expect("edit");
+        let replacement = "expanded ".repeat(4_096);
+        edit.replace_paragraph(Position::new(0), &replacement)
+            .expect("large replacement");
+        let commit = edit.commit().expect("changed commit");
+        assert!(commit.snapshot().bytes().len() > source.bytes().len());
+
+        let source_limit = crate::package::Limits::default()
+            .with_max_package_bytes(source.bytes().len())
+            .expect("source limit");
+        let strict_source = Snapshot::from_bytes_with_options(
+            source_bytes.clone(),
+            OpenOptions::default().with_package_limits(source_limit),
+        )
+        .expect("source fits strict package limit");
+        assert!(matches!(
+            commit.patch().apply(&strict_source),
+            Err(Error::Invalid(crate::package::Error::ResourceLimit(_)))
+        ));
+
+        let target_limit = crate::package::Limits::default()
+            .with_max_package_bytes(commit.snapshot().bytes().len())
+            .expect("target limit");
+        let bounded_source = Snapshot::from_bytes_with_options(
+            source_bytes,
+            OpenOptions::default().with_package_limits(target_limit),
+        )
+        .expect("source fits target package limit");
+        let applied = commit
+            .patch()
+            .apply(&bounded_source)
+            .expect("target fits retained package limit");
+        assert_eq!(applied.package_limits(), target_limit);
+        assert_eq!(applied.bytes(), commit.snapshot().bytes());
+    }
+
+    #[test]
     fn auxiliary_tables_publish_through_body_commit_and_reopen() {
         let source =
             Snapshot::open(doc_with_auxiliary_tables(), Limits::default()).expect("auxiliary DOC");
@@ -5548,6 +5905,168 @@ mod tests {
     }
 
     #[test]
+    fn empty_body_paragraph_insertion_round_trips_and_inverts() {
+        let source = Snapshot::parse(&doc(&[""])).expect("empty paragraph source");
+        assert_eq!(
+            source
+                .paragraphs(Projection::All)
+                .expect("source paragraphs")[0]
+                .text(),
+            ""
+        );
+        let mut edit = source.edit().expect("empty paragraph edit");
+        edit.replace_paragraph(Position::new(0), "inserted")
+            .expect("empty paragraph accepts insertion");
+        let commit = edit.commit().expect("empty paragraph commit");
+        assert_eq!(
+            commit
+                .snapshot()
+                .paragraphs(Projection::All)
+                .expect("changed paragraphs")[0]
+                .text(),
+            "inserted"
+        );
+        assert_eq!(
+            commit
+                .patch()
+                .inverse()
+                .apply(commit.snapshot())
+                .expect("empty insertion inverse"),
+            source
+        );
+    }
+
+    #[test]
+    fn formatted_empty_body_paragraph_copies_paragraph_mark_character_format() {
+        let source = Snapshot::parse(&formatted_empty_doc()).expect("formatted empty source");
+        let mut edit = source.edit().expect("formatted empty edit");
+        edit.replace_paragraph(Position::new(0), "formatted")
+            .expect("formatted empty paragraph accepts insertion");
+        let commit = edit.commit().expect("formatted empty commit");
+        let mut package = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+            .expect("formatted candidate opens");
+        let document = package.document().expect("formatted candidate document");
+        let paragraph = document
+            .paragraphs()
+            .expect("formatted candidate paragraphs")
+            .into_iter()
+            .next()
+            .expect("formatted candidate paragraph");
+        let run = paragraph
+            .runs()
+            .expect("formatted candidate runs")
+            .into_iter()
+            .next()
+            .expect("formatted candidate run");
+        assert_eq!(run.bold(), Some(true));
+        assert_eq!(run.italic(), Some(true));
+    }
+
+    #[test]
+    fn empty_body_paragraph_does_not_address_a_table_cell() {
+        let source = Snapshot::parse(&empty_body_and_table_doc()).expect("body/table source");
+        assert_eq!(
+            source
+                .paragraphs(Projection::All)
+                .expect("ordinary paragraphs")
+                .len(),
+            2
+        );
+        assert_eq!(source.table_cells().expect("table cells")[0].text(), "");
+        let mut edit = source.edit().expect("body/table edit");
+        edit.replace_paragraph(Position::new(0), "body")
+            .expect("ordinary empty body paragraph accepts insertion");
+        assert!(matches!(
+            edit.replace_paragraph(Position::new(2), "table"),
+            Err(Error::Refused(Refusal::ParagraphNotFound))
+        ));
+        let commit = edit.commit().expect("body-only commit");
+        let paragraphs = commit
+            .snapshot()
+            .paragraphs(Projection::All)
+            .expect("changed ordinary paragraphs");
+        assert_eq!(
+            paragraphs
+                .iter()
+                .map(|paragraph| paragraph.text())
+                .collect::<Vec<_>>(),
+            ["body", ""]
+        );
+        assert_eq!(
+            commit
+                .snapshot()
+                .table_cells()
+                .expect("changed table cells")[0]
+                .text(),
+            ""
+        );
+    }
+
+    #[test]
+    fn empty_body_insertion_updates_bookmark_cp_tables() {
+        let mut writer = Builder::new();
+        writer.add_paragraph("").expect("empty paragraph");
+        writer.add_bookmark(BookmarkEntry::new("Empty", 0, 0));
+        let mut output = Cursor::new(Vec::new());
+        writer
+            .build()
+            .expect("DOC fixture builds")
+            .write_to(&mut output)
+            .expect("bookmark DOC");
+        let source =
+            Snapshot::parse(&normalize_word2002_dop(output.into_inner())).expect("bookmark source");
+        let mut edit = source.edit().expect("bookmark edit");
+        edit.replace_paragraph(Position::new(0), "inside")
+            .expect("bookmark-protected empty insertion");
+        let commit = edit.commit().expect("bookmark commit");
+        let mut package = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+            .expect("bookmark candidate opens");
+        let bookmark = package
+            .document()
+            .expect("bookmark candidate document")
+            .bookmarks()
+            .expect("bookmark candidate bookmarks")
+            .into_iter()
+            .next()
+            .expect("bookmark");
+        assert_eq!((bookmark.start, bookmark.end), (6, 6));
+    }
+
+    #[test]
+    fn exact_text_noop_bypasses_replacement_quota() {
+        let source = Snapshot::open_bounded(
+            doc(&["already stored"]),
+            Limits::default(),
+            TransactionLimits::new(1, 0, 0),
+        )
+        .expect("zero replacement quota source");
+        let mut edit = source.edit().expect("zero replacement quota edit");
+        edit.replace_paragraph(Position::new(0), "already stored")
+            .expect("exact text no-op bypasses quota");
+        let commit = edit.commit().expect("exact text no-op commit");
+        assert!(!commit.changed());
+        assert!(Arc::ptr_eq(
+            &source.bytes_shared(),
+            &commit.snapshot().bytes_shared()
+        ));
+    }
+
+    #[test]
+    fn patch_and_commit_debug_redact_authored_text() {
+        let source = Snapshot::parse(&doc(&["private-before"])).expect("debug source");
+        let mut edit = source.edit().expect("debug edit");
+        edit.replace_paragraph(Position::new(0), "private-after")
+            .expect("debug replacement");
+        let commit = edit.commit().expect("debug commit");
+        let debug = format!("{commit:?} {:?}", commit.patch());
+        assert!(!debug.contains("private-before"));
+        assert!(!debug.contains("private-after"));
+        let change = commit.patch().changes().next().expect("debug change");
+        assert!(!format!("{change:?}").contains("private-before"));
+        assert!(!format!("{change:?}").contains("private-after"));
+    }
+
+    #[test]
     fn paragraph_commit_preserves_every_unmodeled_stream_payload() {
         let source = Snapshot::from_bytes(doc_with_opaque_stream(&["alpha", "bravo"]))
             .expect("source with opaque stream should open");
@@ -5660,7 +6179,7 @@ mod tests {
 
     #[test]
     fn accepted_and_rejected_projections_hide_text_revisions() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_paragraph_runs(
                 vec![
@@ -5678,7 +6197,11 @@ mod tests {
             )
             .expect("fixture paragraph");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("fixture DOC");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("fixture DOC");
         let bytes = normalize_word2002_dop(output.into_inner());
         let snapshot = Snapshot::parse(&bytes).expect("snapshot");
         assert_eq!(
@@ -6151,7 +6674,7 @@ mod tests {
             }))
         ));
 
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("body").expect("body");
         writer
             .insert_floating_shape(
@@ -6160,7 +6683,11 @@ mod tests {
             )
             .expect("floating shape");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("drawing DOC");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("drawing DOC");
         let bytes = normalize_word2002_dop(output.into_inner());
         let drawing = Snapshot::parse(&bytes).expect("drawing snapshot");
         let anchor = drawing
@@ -6180,7 +6707,7 @@ mod tests {
 
     #[test]
     fn non_destructive_revision_disposition_is_durable_and_reversible() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_paragraph_runs(
                 vec![(
@@ -6194,7 +6721,11 @@ mod tests {
             )
             .expect("revision paragraph");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("revision DOC");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("revision DOC");
         let bytes = normalize_word2002_dop(output.into_inner());
         let source = Snapshot::parse(&bytes).expect("revision snapshot");
         let position = source
@@ -6458,7 +6989,7 @@ mod tests {
                 .join("../../test-data/images/png/lena.png"),
         )
         .expect("PNG fixture");
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .insert_floating_shape(
                 crate::writer::Shape::new(crate::writer::Kind::Rectangle, 640, 320)
@@ -6510,6 +7041,8 @@ mod tests {
             .expect("second floating picture run");
         let mut output = Cursor::new(Vec::new());
         writer
+            .build()
+            .unwrap()
             .write_to(&mut output)
             .expect("mixed drawing donor DOC");
         let bytes = normalize_word2002_dop(output.into_inner());

@@ -138,9 +138,11 @@ impl CreateOptions {
 
 /// Create a new package with the default options.
 ///
-/// DOCX, XLSX, XLSB and PPTX have native-backed unified creators. Other
-/// formats return a typed capability or format refusal according to the
-/// features and creators present in this build.
+/// DOC and DOCX, XLSX, XLSB and PPTX have native-backed unified creators.
+/// The DOC creator emits one ordinary blank document paragraph; template,
+/// Strict and initial metadata options are refused explicitly. Other formats
+/// return a typed capability or format refusal according to the features and
+/// creators present in this build.
 ///
 /// # Errors
 ///
@@ -153,16 +155,22 @@ pub fn create(format: FileFormat) -> Result<File> {
 
 /// Create a new package using `options`.
 ///
-/// The selected creator validates every option before publication.  DOCX
-/// supports ordinary documents, templates, Transitional conformance, and the
-/// core metadata fields its leaf stores.  XLSX, XLSB and PPTX support ordinary
-/// Transitional documents; template, Strict and initial metadata requests are
-/// refused explicitly by those creators.
+/// The selected creator validates every option before publication. DOC
+/// supports an ordinary Transitional document without initial metadata.
+/// DOCX supports ordinary documents, templates, Transitional conformance, and
+/// the core metadata fields its leaf stores. XLSX, XLSB and PPTX support
+/// ordinary Transitional documents; template, Strict and initial metadata
+/// requests are refused explicitly by those creators.
 ///
 /// # Errors
 ///
 /// See [`create`].
 pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> {
+    #[cfg(feature = "doc")]
+    if format == FileFormat::Doc {
+        return crate::format::doc::Doc::create(options).map(File::Doc);
+    }
+
     #[cfg(feature = "docx")]
     if format == FileFormat::Docx {
         return crate::format::docx::create::create(options).map(File::Docx);

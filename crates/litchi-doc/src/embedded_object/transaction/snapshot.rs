@@ -337,14 +337,14 @@ pub(super) fn fingerprint(bytes: &[u8]) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::{Limits, Snapshot, SourceOwner};
-    use crate::writer::Writer;
+    use crate::builder::Builder;
     use std::sync::Arc;
 
     fn base_doc() -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("source owner regression").unwrap();
         let mut output = std::io::Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         output.into_inner()
     }
 

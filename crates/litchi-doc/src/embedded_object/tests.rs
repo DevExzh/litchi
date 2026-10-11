@@ -5,7 +5,7 @@ use super::codec::{discover_targets, validate_existing_fields};
 use super::model::{FieldMarker, Info, Kind};
 use super::storage::{OBJECT_POOL, is_object_storage_name};
 use super::{Snapshot, TransactionError};
-use crate::writer::Writer;
+use crate::builder::Builder;
 use litchi_cfb::OleWriter;
 use litchi_ole_common::object::{Editor as ObjectEditor, Target, Targets};
 use litchi_ole_common::ole_streams::{
@@ -142,10 +142,10 @@ fn snapshot_clones_share_the_first_public_source_view_allocation() {
 }
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("embedded metadata").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     normalize_word2002_dop(output.into_inner())
 }
 

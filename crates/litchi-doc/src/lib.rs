@@ -84,7 +84,7 @@
 //! Compound-file and `OfficeArt` primitives live in `litchi-cfb`,
 //! `litchi-ole-common`, and `litchi-odraw`. The public API is re-exported at
 //! this crate's root so callers can use concise paths such as
-//! [`Package`] and [`writer::Writer`].
+//! [`Package`] and [`Builder`].
 //!
 //! A Word binary document is an OLE2 structured storage containing a
 //! `WordDocument` stream, a `0Table` or `1Table` stream, and optional data,
@@ -143,6 +143,7 @@ pub mod captions {
 pub mod comment;
 // The parsed document owner is intentionally private; `Document` is exposed
 // directly at the crate facade instead of behind an outer `document` module.
+pub mod builder;
 mod document;
 mod encryption;
 pub mod footnote;
@@ -187,8 +188,9 @@ pub use parts::annotation_bookmarks;
 pub mod writer;
 
 pub use bookmark::Bookmark;
+pub use builder::Builder;
 pub use comment::{Comment, DateTime, ExtendedMetadata};
-pub use document::Document;
+pub use document::{BodyParagraphs, Document};
 pub use embedded_object::{Editor, WriteOptions};
 pub use encryption::EncryptionProfile;
 pub use equation::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions};
@@ -416,7 +418,7 @@ pub use writer::{
     NumberingRevision, ParagraphBorder, ParagraphBorderStyle, ParagraphBorders,
     ParagraphFormatting, ParagraphShading, PhysicalJustification, Picture, Shape as DrawingShape,
     SmartTagEntry, StyleRevision, StyleWriteError, TabAlignment, TabLeader, TabStop,
-    TextBoxTightWrap, TextRevision, WriteError, Writer,
+    TextBoxTightWrap, TextRevision, WriteError,
 };
 
 /// Crate-native ordered document element returned by [`Document::elements`].

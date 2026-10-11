@@ -36,7 +36,7 @@ use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::parts::headers::HeaderFooterType;
 use litchi_doc::writer::FootnoteEntry;
 use litchi_doc::{
-    CharacterFormatting, HeaderFooterParagraph, Package, ParagraphFormatting, Writer,
+    Builder, CharacterFormatting, HeaderFooterParagraph, Package, ParagraphFormatting,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
@@ -53,7 +53,7 @@ fn temporary_doc_path() -> std::path::PathBuf {
 
 #[test]
 fn formatted_multi_paragraph_header_round_trips_through_plcfhdd() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
 
     let bold = CharacterFormatting {
@@ -75,7 +75,7 @@ fn formatted_multi_paragraph_header_round_trips_through_plcfhdd() {
         .unwrap();
 
     let path = temporary_doc_path();
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
     let mut package = Package::open(&path).unwrap();
     let document = package.document().unwrap();
     let headers = document.headers().unwrap();
@@ -90,7 +90,7 @@ fn formatted_multi_paragraph_header_round_trips_through_plcfhdd() {
 
 #[test]
 fn rich_header_api_rejects_ambiguous_or_unbounded_structure() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert!(writer.set_odd_header_paragraphs(Vec::new()).is_err());
     assert!(
         writer
@@ -132,13 +132,13 @@ fn rich_header_api_rejects_ambiguous_or_unbounded_structure() {
 
 #[test]
 fn inert_header_field_round_trips_with_structural_markers() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     let field = HeaderFooterParagraph::field("PAGE", "1", CharacterFormatting::default()).unwrap();
     writer.set_odd_footer_paragraphs(vec![field]).unwrap();
 
     let path = temporary_doc_path();
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
     let mut package = Package::open(&path).unwrap();
     let document = package.document().unwrap();
     let footer = document
@@ -174,7 +174,7 @@ fn writes_header_and_note_plcfs_through_fib_pointers() {
             .collect()
     }
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Main").unwrap();
     writer.add_paragraph("End").unwrap();
     writer.set_odd_header("Header");
@@ -185,7 +185,7 @@ fn writes_header_and_note_plcfs_through_fib_pointers() {
     writer.add_endnote(FootnoteEntry::new(9, "Edn", 3));
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let document_bytes = output.into_inner();
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(&document_bytes)).unwrap();
     let word_document = ole.open_stream(&["WordDocument"]).unwrap();

@@ -4,7 +4,13 @@
 // In a build without any adapter, `Json` is uninhabited; those lints are
 // allowed in such builds only. Each adapter adds its feature to this list.
 #![cfg_attr(
-    not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb")),
+    not(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "xlsb"
+    )),
     allow(
         dead_code,
         unreachable_code,
@@ -42,6 +48,8 @@ pub struct Json<'f> {
 
 /// One variant per format adapter (static dispatch, ADR 0004).
 enum Inner<'f> {
+    #[cfg(feature = "doc")]
+    Doc(crate::format::doc::views::Json),
     #[cfg(feature = "docx")]
     Docx(Box<crate::format::docx::views::Json>),
     #[cfg(feature = "xlsx")]
@@ -56,6 +64,14 @@ enum Inner<'f> {
 }
 
 impl Json<'_> {
+    /// A DOC view.
+    #[cfg(feature = "doc")]
+    pub(crate) fn doc(json: crate::format::doc::views::Json) -> Self {
+        Self {
+            inner: Inner::Doc(json),
+        }
+    }
+
     /// An DOCX view.
     #[cfg(feature = "docx")]
     pub(crate) fn docx(json: crate::format::docx::views::Json) -> Self {
@@ -88,6 +104,8 @@ impl Json<'_> {
 impl Serialize for Json<'_> {
     fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
         match &self.inner {
+            #[cfg(feature = "doc")]
+            Inner::Doc(json) => json.serialize(serializer),
             #[cfg(feature = "docx")]
             Inner::Docx(json) => json.serialize(serializer),
             #[cfg(feature = "xlsx")]

@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn standard_bookmarks_round_trip_through_both_output_paths() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Main text").unwrap();
     writer.add_bookmark(BookmarkEntry::new("Outer", 2, 5));
     writer.add_bookmark(
@@ -12,7 +12,7 @@ fn standard_bookmarks_round_trip_through_both_output_paths() {
     );
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let bookmarks = package.document().unwrap().bookmarks().unwrap();
     assert_eq!(bookmarks.len(), 2);
@@ -31,7 +31,7 @@ fn standard_bookmarks_round_trip_through_both_output_paths() {
             .unwrap()
             .as_nanos()
     ));
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
     let mut package = crate::Package::open(&path).unwrap();
     assert_eq!(package.document().unwrap().bookmarks().unwrap(), bookmarks);
     std::fs::remove_file(path).unwrap();
@@ -40,15 +40,12 @@ fn standard_bookmarks_round_trip_through_both_output_paths() {
 #[test]
 fn rejects_invalid_standard_bookmarks() {
     let write_error = |entries: Vec<BookmarkEntry>| {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("Main").unwrap();
         for entry in entries {
             writer.add_bookmark(entry);
         }
-        writer
-            .write_to(&mut Cursor::new(Vec::new()))
-            .unwrap_err()
-            .to_string()
+        writer.build().unwrap_err().to_string()
     };
     assert!(write_error(vec![BookmarkEntry::new("", 0, 1)]).contains("names"));
     assert!(

@@ -33,18 +33,19 @@
 )]
 
 use litchi_cfb::OleFile;
-use litchi_doc::writer::{EncryptionProfile, FootnoteEntry, Writer};
+use litchi_doc::builder::Builder;
+use litchi_doc::writer::{EncryptionProfile, FootnoteEntry};
 use litchi_doc::{Error, OpenOptions, Package};
 use std::io::Cursor;
 
 fn encrypted_document(profile: EncryptionProfile, password: &str) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Main 文本").unwrap();
     writer.set_odd_header("Header");
     writer.add_footnote(FootnoteEntry::new(2, "Footnote text", 1));
     writer.set_password(password, profile).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -124,7 +125,7 @@ fn salts_are_nondeterministic_and_setter_validation_is_atomic() {
     let (_, second_table, _) = streams(&second);
     assert_ne!(&first_table[4..20], &second_table[4..20]);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .set_password("kept", EncryptionProfile::OfficeBinaryRc4)
         .unwrap();

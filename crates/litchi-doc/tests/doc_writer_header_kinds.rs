@@ -37,8 +37,9 @@
 //! Covers the full header kind set (odd/even/first-page), the automatic
 //! section flags (DOP fFacingPages, SEP sprmSFTitlePage), and the header
 //! picture pipeline (PICF block + PlcfSpaHdr + header-drawing picture frame).
+use litchi_doc::builder::Builder;
 use litchi_doc::shape::extract_drawing_shapes;
-use litchi_doc::writer::{FloatingPosition, Picture, Writer};
+use litchi_doc::writer::{FloatingPosition, Picture};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
     HeaderFooterParagraph, HeaderFooterType, HeaderKind, Package, ShapeHorizontalOrigin,
@@ -96,7 +97,7 @@ fn jpeg_fixture() -> Vec<u8> {
 }
 
 fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body text").unwrap();
     writer
         .set_odd_header_paragraphs(vec![HeaderFooterParagraph::plain("OddH")])
@@ -121,7 +122,7 @@ fn write_doc_with_even_and_first_boxes() -> Vec<u8> {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     cursor.into_inner()
 }
 
@@ -226,7 +227,7 @@ fn even_and_first_headers_set_section_flags() {
 fn header_picture_round_trips_with_byte_identical_payload() {
     let png_bytes = make_png(32, 16);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     writer
         .insert_header_picture(
@@ -244,7 +245,7 @@ fn header_picture_round_trips_with_byte_identical_payload() {
         .unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let doc_bytes = cursor.into_inner();
 
     let mut package = Package::from_reader(Cursor::new(&doc_bytes)).unwrap();

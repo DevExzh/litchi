@@ -1463,28 +1463,61 @@ impl RevisionEditor {
         Ok(uniform)
     }
 
-    /// Replaces a non-empty main-story range by appending one Unicode piece,
-    /// shifting modeled CP tables, rebuilding CHPX FKPs, and publishing a new
-    /// CLX. Callers must first prove a uniform character-format closure.
+    /// Replaces a main-story range by appending one Unicode piece, shifting
+    /// modeled CP tables, rebuilding CHPX FKPs, and publishing a new CLX.
+    /// Callers must first prove a uniform character-format closure. A zero
+    /// width range is accepted only as an insertion immediately before a
+    /// character (the body facade uses this for an empty paragraph and copies
+    /// the paragraph mark's character formatting).
     pub(crate) fn replace_plain_text(
         &mut self,
         start: u32,
         end: u32,
         replacement: &str,
     ) -> Result<()> {
-        validate_range(start, end, self.main_ccp)?;
+        if start > end || end > self.main_ccp || (start == end && start >= self.main_ccp) {
+            return Err(corrupted(
+                "body replacement range is empty or exceeds the main story",
+            ));
+        }
+        if start == end {
+            let next = start
+                .checked_add(1)
+                .ok_or_else(|| corrupted("body insertion CP overflows"))?;
+            if read_units(&self.word, &self.pieces, start, next)?.as_slice() != [0x000D] {
+                return Err(corrupted(
+                    "zero-width body replacement is not before a paragraph mark",
+                ));
+            }
+            if !self.unmodeled_cp_tables.is_empty() {
+                return Err(corrupted(
+                    "zero-width body replacement has unmodeled CP-indexed dependencies",
+                ));
+            }
+        }
         self.reject_destructive_interactions(start, end)?;
-        if !self.has_uniform_character_format(start, end)? {
+        let formatting_end = if start == end {
+            start
+                .checked_add(1)
+                .filter(|value| *value <= self.main_ccp)
+                .ok_or_else(|| corrupted("body insertion has no following character"))?
+        } else {
+            end
+        };
+        if !self.has_uniform_character_format(start, formatting_end)? {
             return Err(corrupted(
                 "length-changing body replacement crosses character formatting runs",
             ));
         }
-        let groups = self.character_groups(start, end)?;
+        let groups = self.character_groups(start, formatting_end)?;
         let formatting = groups
             .first()
             .ok_or_else(|| corrupted("body replacement has no character formatting"))?
             .to_vec();
         let units = replacement.encode_utf16().collect::<Vec<_>>();
+        if start == end && units.is_empty() {
+            return Err(corrupted("body insertion text is empty"));
+        }
         if units.len() > MAX_TEXT_UNITS {
             return Err(corrupted("body replacement exceeds text resource limit"));
         }
@@ -3311,8 +3344,9 @@ mod containment_tests {
 #[cfg(test)]
 mod papx_cache_tests {
     use super::*;
+    use crate::builder::Builder;
     use crate::sprm_operations::SPRM_P_F_IN_TABLE;
-    use crate::writer::{CharacterFormatting, ParagraphFormatting, Writer};
+    use crate::writer::{CharacterFormatting, ParagraphFormatting};
     use std::io::Cursor;
 
     fn table_sprm(value: u8) -> [u8; 3] {
@@ -3321,7 +3355,7 @@ mod papx_cache_tests {
     }
 
     fn doc_with_table_state(in_table: bool) -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_paragraph_runs(
                 vec![("cell".to_owned(), CharacterFormatting::default())],
@@ -3333,13 +3367,15 @@ mod papx_cache_tests {
             .expect("table-state fixture paragraph should be valid");
         let mut output = Cursor::new(Vec::new());
         writer
+            .build()
+            .unwrap()
             .write_to(&mut output)
             .expect("table-state fixture should serialize");
         output.into_inner()
     }
 
     fn simple_table_doc() -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let table = writer
             .add_table(1, 1)
             .expect("table fixture should be accepted");
@@ -3348,6 +3384,8 @@ mod papx_cache_tests {
             .expect("table cell fixture should be accepted");
         let mut output = Cursor::new(Vec::new());
         writer
+            .build()
+            .unwrap()
             .write_to(&mut output)
             .expect("table fixture should serialize");
         output.into_inner()
@@ -3582,7 +3620,8 @@ mod picture_group_tests {
     #[test]
     fn nested_image_group_transfers_through_the_body_transaction() {
         use crate::body_text::{Projection, Snapshot as BodySnapshot, TextTarget};
-        use crate::writer::{CharacterFormatting, FloatingPosition, ParagraphFormatting, Writer};
+        use crate::builder::Builder;
+        use crate::writer::{CharacterFormatting, FloatingPosition, ParagraphFormatting};
         use litchi_core::Position;
         use std::io::Cursor;
 
@@ -3592,12 +3631,12 @@ mod picture_group_tests {
         )
         .unwrap();
         let picture = crate::writer::Picture::new(bytes).unwrap();
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .insert_floating_picture(picture, FloatingPosition::new(1440, 720))
             .unwrap();
         let mut donor_bytes = Cursor::new(Vec::new());
-        writer.write_to(&mut donor_bytes).unwrap();
+        writer.build().unwrap().write_to(&mut donor_bytes).unwrap();
 
         let donor_bytes = normalize_word2002_dop(donor_bytes.into_inner());
         let mut editor = RevisionEditor::open(donor_bytes, Limits::default()).unwrap();
@@ -3628,7 +3667,7 @@ mod picture_group_tests {
         editor.commit().unwrap();
         let donor = BodySnapshot::parse(&editor.finish().unwrap()).unwrap();
 
-        let mut receiver_writer = Writer::new();
+        let mut receiver_writer = Builder::new();
         receiver_writer
             .add_paragraph_runs(
                 vec![("placeholder".to_owned(), CharacterFormatting::default())],
@@ -3636,7 +3675,11 @@ mod picture_group_tests {
             )
             .unwrap();
         let mut receiver_bytes = Cursor::new(Vec::new());
-        receiver_writer.write_to(&mut receiver_bytes).unwrap();
+        receiver_writer
+            .build()
+            .unwrap()
+            .write_to(&mut receiver_bytes)
+            .unwrap();
         let receiver_bytes = normalize_word2002_dop(receiver_bytes.into_inner());
         let receiver = BodySnapshot::parse(&receiver_bytes).unwrap();
         let plan = receiver

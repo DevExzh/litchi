@@ -8,9 +8,9 @@
 
 use litchi_core::Position;
 use litchi_doc::body_text::{Error, Projection, Refusal, Snapshot};
+use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::tracked_revision::Limits;
-use litchi_doc::writer::Writer;
 use litchi_doc::{Package, SavedSelection, SelectionGeometry, SelectionStyle};
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use litchi_ole_common::property_set::{
@@ -86,10 +86,14 @@ fn document_with_selsf(source: &[u8], length: u32) -> Vec<u8> {
 }
 
 fn document_with_selsf_body(body: &str, source: &[u8], length: u32) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph(body).expect("fixture paragraph");
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("fixture DOC");
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut output)
+        .expect("fixture DOC");
     let mut package =
         PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
             .expect("package");

@@ -499,8 +499,7 @@ fn row_resource_limits_are_limit_exceeded() {
             .expect("a one-byte package limit is valid");
         let error =
             litchi_doc::Package::from_reader_with_limits(io::Cursor::new(vec![0_u8; 64]), limits)
-                .err()
-                .expect("a 64-byte package exceeds a one-byte limit");
+                .expect_err("a 64-byte package exceeds a one-byte limit");
         assert!(
             matches!(error, litchi_doc::Error::ResourceLimit(_)),
             "{error:?}"
@@ -987,6 +986,121 @@ fn doc_body_text_errors_are_classified() {
         BodyError::Overlay(OverlayError::SourceChanged { expected, observed }),
         Code::IoError,
     );
+}
+
+#[cfg(feature = "doc")]
+#[test]
+fn doc_edit_errors_keep_the_edit_type_and_map_native_categories() {
+    use litchi_doc::body_text::{Error as EditError, Refusal};
+    use litchi_doc::package::Error as PackageError;
+
+    let protected = assert_code(
+        EditError::Refused(Refusal::Protected),
+        Code::DocumentProtected,
+    );
+    assert!(matches!(protected.leaf(), Source::DocEdit(_)));
+    assert!(protected.suggestion().is_some());
+
+    assert_code(
+        EditError::Refused(Refusal::OperationLimit {
+            observed: 2,
+            limit: 1,
+        }),
+        Code::LimitExceeded,
+    );
+    assert_code(
+        EditError::Refused(Refusal::ResourceCollision { storage_id: 7 }),
+        Code::DuplicateName,
+    );
+    assert_code(
+        EditError::Refused(Refusal::ResourceNotFound { storage_id: 7 }),
+        Code::NotFound,
+    );
+    assert_code(EditError::Conflict, Code::InvalidInput);
+    assert_code(
+        EditError::Refused(Refusal::StructuralContent),
+        Code::UnsupportedCapability,
+    );
+
+    let invalid = assert_code(
+        EditError::Invalid(PackageError::Corrupted(
+            "authored body payload must remain private".into(),
+        )),
+        Code::CorruptFile,
+    );
+    assert!(matches!(invalid.leaf(), Source::DocEdit(_)));
+    assert!(std::error::Error::source(&invalid).is_some());
+}
+
+#[cfg(feature = "doc")]
+#[test]
+fn doc_edit_diagnostics_are_redacted_but_retain_the_typed_chain() {
+    use litchi_doc::body_text::{Error as EditError, Refusal};
+    use litchi_doc::package::Error as PackageError;
+
+    let secret = "private authored DOC text";
+    let error = Error::from(EditError::Invalid(PackageError::Corrupted(
+        secret.to_owned(),
+    )));
+    for diagnostic in [
+        error.message().to_owned(),
+        error.to_string(),
+        format!("{error:?}"),
+        format!("{:?}", error.leaf()),
+    ] {
+        assert!(!diagnostic.contains(secret), "diagnostic leaked {secret:?}");
+    }
+    assert!(matches!(error.leaf(), Source::DocEdit(_)));
+    assert!(std::error::Error::source(&error).is_some());
+
+    let protected = Error::from(EditError::Refused(Refusal::Protected));
+    assert!(matches!(protected.leaf(), Source::DocEdit(_)));
+}
+
+#[cfg(feature = "doc")]
+#[test]
+fn doc_write_errors_keep_the_write_type_and_map_native_categories() {
+    use litchi_doc::package::Error as PackageError;
+    use litchi_doc::writer::WriteError;
+
+    let unsupported = assert_code(WriteError::UnsupportedProperty, Code::UnsupportedCapability);
+    assert!(matches!(unsupported.leaf(), Source::DocWrite(_)));
+    assert!(std::error::Error::source(&unsupported).is_some());
+    assert_code(
+        WriteError::Io(io::Error::from(io::ErrorKind::NotFound)),
+        Code::FileNotFound,
+    );
+    assert_code(
+        WriteError::InvalidData("invalid authored text".into()),
+        Code::CorruptFile,
+    );
+    assert_code(
+        WriteError::Ole(litchi_cfb::OleError::InvalidFormat("bad OLE".into())),
+        Code::CorruptFile,
+    );
+    assert_code(
+        WriteError::Package(PackageError::Corrupted("bad package".into())),
+        Code::CorruptFile,
+    );
+}
+
+#[cfg(feature = "doc")]
+#[test]
+fn doc_write_diagnostics_are_redacted_but_retain_the_typed_chain() {
+    use litchi_doc::writer::WriteError;
+
+    let secret = "private authored DOC property";
+    let error = Error::from(WriteError::InvalidData(secret.to_owned()));
+    for diagnostic in [
+        error.message().to_owned(),
+        error.to_string(),
+        format!("{error:?}"),
+        format!("{:?}", error.leaf()),
+    ] {
+        assert!(!diagnostic.contains(secret), "diagnostic leaked {secret:?}");
+    }
+    assert!(matches!(error.leaf(), Source::DocWrite(_)));
+    assert!(std::error::Error::source(&error).is_some());
 }
 
 #[cfg(feature = "ppt")]

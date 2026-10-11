@@ -2,7 +2,7 @@ use super::super::support::*;
 
 #[test]
 fn tables_round_trip_through_both_output_paths() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Before table").unwrap();
     let table = writer.add_table(2, 2).unwrap();
     writer
@@ -266,7 +266,7 @@ fn tables_round_trip_through_both_output_paths() {
     };
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     assert_document(package.document().unwrap());
 
@@ -278,7 +278,7 @@ fn tables_round_trip_through_both_output_paths() {
             .unwrap()
             .as_nanos()
     ));
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
     let mut package = crate::Package::open(&path).unwrap();
     assert_document(package.document().unwrap());
     std::fs::remove_file(path).unwrap();

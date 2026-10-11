@@ -84,13 +84,25 @@ impl<S> Opened<S> {
     /// A handle over the same state with a stable path origin. The origin is
     /// deliberately absent from `Debug`; it is persistence metadata, not a
     /// document value.
-    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "xlsb"
+    ))]
     pub(crate) fn with_origin(&self, origin: Option<Arc<Path>>) -> Arc<Self> {
         Self::from_parts_with_origin(self.signature, Arc::clone(&self.state), origin)
     }
 
     /// The stable path origin retained by this open, if any.
-    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "xlsb"
+    ))]
     pub(crate) fn origin(&self) -> Option<Arc<Path>> {
         self.origin.clone()
     }

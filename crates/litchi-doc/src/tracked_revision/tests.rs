@@ -1,15 +1,16 @@
 //! Focused regression tests for the tracked-revision semantic layer.
 
 use super::{Error, Limits, RevisionEditor, RevisionKind, RevisionMetadata, Snapshot};
+use crate::builder::Builder;
 use crate::package::Error as PackageError;
 use crate::parts::fib::FileInformationBlock;
 use crate::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
-use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision, Writer};
+use crate::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
 use litchi_ole_common::object::{Editor as ObjectEditor, Targets};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph_runs(
             vec![
@@ -29,7 +30,7 @@ fn base_doc() -> Vec<u8> {
         )
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     normalize_word2002_dop(output.into_inner())
 }
 

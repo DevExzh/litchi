@@ -1,8 +1,8 @@
 use crate::writer::core::{
-    Writer,
+    Builder,
     model::{CharacterFormatting, ParagraphFormatting, WriteError},
 };
-impl Writer {
+impl Builder {
     pub(in crate::writer::core::package) fn validate_style_reference(
         &self,
         index: u16,

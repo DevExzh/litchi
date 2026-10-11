@@ -75,13 +75,13 @@ fn without_nested_fields(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::builder::Builder;
     use crate::package::Package;
-    use crate::writer::Writer;
     use std::io::Cursor;
 
     #[test]
     fn field_text_at_position_selects_the_innermost_nested_field() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .add_paragraph(concat!(
                 "\u{0013}IF 1 = ",
@@ -94,7 +94,7 @@ mod tests {
             .unwrap();
 
         let mut bytes = Cursor::new(Vec::new());
-        writer.write_to(&mut bytes).unwrap();
+        writer.build().unwrap().write_to(&mut bytes).unwrap();
         let mut package = Package::from_reader(Cursor::new(bytes.into_inner())).unwrap();
         let document = package.document().unwrap();
         let fields = document.fields().unwrap();

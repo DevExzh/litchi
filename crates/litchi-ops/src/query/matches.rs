@@ -5,7 +5,13 @@
 // are unreachable; those lints are allowed in such builds only. Each adapter
 // adds its feature to this list.
 #![cfg_attr(
-    not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb")),
+    not(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "xlsb"
+    )),
     allow(
         dead_code,
         unreachable_code,
@@ -22,7 +28,13 @@ use std::iter::FusedIterator;
 use std::marker::PhantomData;
 
 use super::plan::{Diagnostic, Plan};
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xlsb"
+))]
 use super::walk::Walk;
 use crate::Result;
 use crate::node::Node;
@@ -65,6 +77,8 @@ pub struct Matches<'f, 'q> {
 enum Inner<'f, 'q> {
     #[cfg(feature = "docx")]
     Docx(Walk<'q, 'f, crate::format::docx::Nav<'f>>),
+    #[cfg(feature = "doc")]
+    Doc(Walk<'q, 'f, crate::format::doc::Nav<'f>>),
     #[cfg(feature = "xlsx")]
     Xlsx(Walk<'q, 'f, crate::format::xlsx::Nav<'f>>),
     #[cfg(feature = "pptx")]
@@ -77,6 +91,14 @@ enum Inner<'f, 'q> {
 }
 
 impl<'f, 'q> Matches<'f, 'q> {
+    /// The matches of a DOC walk.
+    #[cfg(feature = "doc")]
+    pub(crate) fn doc(walk: Walk<'q, 'f, crate::format::doc::Nav<'f>>) -> Self {
+        Self {
+            inner: Inner::Doc(walk),
+        }
+    }
+
     /// The matches of an DOCX walk.
     #[cfg(feature = "docx")]
     pub(crate) fn docx(walk: Walk<'q, 'f, crate::format::docx::Nav<'f>>) -> Self {
@@ -111,6 +133,10 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[must_use]
     pub fn limit(self, n: usize) -> Self {
         match self.inner {
+            #[cfg(feature = "doc")]
+            Inner::Doc(walk) => Self {
+                inner: Inner::Doc(walk.limit(n)),
+            },
             #[cfg(feature = "docx")]
             Inner::Docx(walk) => Self {
                 inner: Inner::Docx(walk.limit(n)),
@@ -145,6 +171,8 @@ impl<'f, 'q> Matches<'f, 'q> {
     #[must_use]
     pub fn plan(&self) -> &Plan<'q> {
         match &self.inner {
+            #[cfg(feature = "doc")]
+            Inner::Doc(walk) => walk.plan(),
             #[cfg(feature = "docx")]
             Inner::Docx(walk) => walk.plan(),
             #[cfg(feature = "xlsx")]
@@ -170,6 +198,8 @@ impl<'f> Iterator for Matches<'f, '_> {
 
     fn next(&mut self) -> Option<Self::Item> {
         match &mut self.inner {
+            #[cfg(feature = "doc")]
+            Inner::Doc(walk) => walk.next().map(|node| node.map(Node::Doc)),
             #[cfg(feature = "docx")]
             Inner::Docx(walk) => walk.next().map(|node| node.map(Node::Docx)),
             #[cfg(feature = "xlsx")]

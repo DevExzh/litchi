@@ -15612,7 +15612,7 @@ fn build_writer_corpus(case: Case, shape: WriterShape) -> Result<Corpus, Box<dyn
 fn write_fresh_doc(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dyn Error>> {
     let paragraph_count = shape.doc_paragraph_count();
     let payload_bytes = (shape == WriterShape::PayloadHeavy).then_some(20_000);
-    let mut writer = litchi_doc::writer::Writer::new();
+    let mut writer = litchi_doc::builder::Builder::new();
     let mut content_bytes = 0;
     for paragraph in 0..paragraph_count {
         let text = payload_bytes.map_or_else(
@@ -15623,7 +15623,8 @@ fn write_fresh_doc(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
         writer.add_paragraph(&text)?;
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    let mut package = writer.build()?;
+    package.write_to(&mut output)?;
     Ok((output.into_inner(), paragraph_count, content_bytes))
 }
 

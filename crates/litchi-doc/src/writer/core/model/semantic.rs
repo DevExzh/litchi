@@ -1,11 +1,11 @@
 use super::{
-    AssociatedStringSlot, BookmarkEntry, CharacterFormatting, CommentEntry,
+    AssociatedStringSlot, BookmarkEntry, Builder, CharacterFormatting, CommentEntry,
     DocumentAssociatedStrings, EncryptionProfile, FloatingAnchorKind, FootnoteEntry,
-    FormattingRevision, GlossaryMetadata, HashMap, HeaderAnchor, HeaderFooterParagraph, HeaderKind,
+    FormattingRevision, GlossaryMetadata, HeaderAnchor, HeaderFooterParagraph, HeaderKind,
     ListFormatOverride, ListNamesTable, ListStructure, ListTemplateTable, NumberingWriter,
     ParagraphFormatting, ProofingFeature, ProofingStateTable, ProofingTables, SavedByTable,
     SmartTagEntry, SmartTagRecognizerRange, TableCell, TableRow, TextRun, WritableParagraph,
-    WritableTable, WriteError, Writer, WriterEncryption, WriterPicture, WriterShape, Zeroizing,
+    WritableTable, WriteError, WriterEncryption, WriterPicture, WriterShape, Zeroizing,
     validate_header_footer_paragraphs, validate_writer_password, writable_paragraph_from_runs,
 };
 
@@ -16,14 +16,13 @@ use super::{
 /// in the returned story character count. Returns the story-relative start
 /// CP of each text box and the total story length (a ccp value).
 
-impl Writer {
+impl Builder {
     /// Create a new DOC writer
     #[must_use]
     pub fn new() -> Self {
         Self {
             paragraphs: Vec::new(),
             tables: Vec::new(),
-            properties: HashMap::new(),
             header_even: None,
             header_odd: None,
             header_first: None,
@@ -215,7 +214,7 @@ impl Writer {
 
     /// Attach a distinct glossary-only document to this template.
     ///
-    /// The attached writer must have [`Writer::set_glossary_metadata`]
+    /// The attached writer must have [`Builder::set_glossary_metadata`]
     /// configured. Its main story becomes the template's `AutoText` story.
     ///
     /// # Errors
@@ -225,8 +224,8 @@ impl Writer {
     /// represented by the shared DOC stream topology.
     pub fn set_attached_glossary(
         &mut self,
-        glossary: Writer,
-    ) -> Result<Option<Writer>, WriteError> {
+        glossary: Builder,
+    ) -> Result<Option<Builder>, WriteError> {
         glossary.validate_as_attached_glossary()?;
         Ok(self
             .attached_glossary
@@ -236,22 +235,22 @@ impl Writer {
 
     /// Access the attached glossary writer.
     #[must_use]
-    pub fn attached_glossary(&self) -> Option<&Writer> {
+    pub fn attached_glossary(&self) -> Option<&Builder> {
         self.attached_glossary.as_deref()
     }
 
     /// Mutably access the attached glossary writer.
-    pub fn attached_glossary_mut(&mut self) -> Option<&mut Writer> {
+    pub fn attached_glossary_mut(&mut self) -> Option<&mut Builder> {
         self.attached_glossary.as_deref_mut()
     }
 
     /// Remove and return the attached glossary writer.
-    pub fn clear_attached_glossary(&mut self) -> Option<Writer> {
+    pub fn clear_attached_glossary(&mut self) -> Option<Builder> {
         self.attached_glossary.take().map(|glossary| *glossary)
     }
 }
 
-impl Writer {
+impl Builder {
     /// Add a custom paragraph, character, table, or numbering style.
     ///
     /// Custom styles occupy consecutive indices beginning at 15. The returned
@@ -804,7 +803,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     pub fn add_table(&mut self, rows: usize, cols: usize) -> Result<usize, WriteError> {
         if rows == 0 || cols == 0 {
             return Err(WriteError::InvalidData(
@@ -1037,18 +1036,17 @@ impl Writer {
         Ok(())
     }
 
-    /// Set a document property
+    /// Reject an unmodeled document property instead of silently dropping it.
     ///
-    /// # Arguments
-    ///
-    /// * `name` - Property name (e.g., "Title", "Author", "Subject")
-    /// * `value` - Property value
-    pub fn set_property(&mut self, name: &str, value: &str) {
-        self.properties.insert(name.to_string(), value.to_string());
+    /// Generic DOC property serialization is not implemented by this fresh
+    /// authoring model. Callers must use a focused typed property API once one
+    /// exists for the property family they need.
+    pub fn set_property(&mut self, _name: &str, _value: &str) -> Result<(), WriteError> {
+        Err(WriteError::UnsupportedProperty)
     }
 }
 
-impl Default for Writer {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

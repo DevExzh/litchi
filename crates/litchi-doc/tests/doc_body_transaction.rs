@@ -9,9 +9,10 @@ use litchi_doc::body_text::{
     CharacterProperty, DrawingDependency, Error, Projection, Refusal, Snapshot, Story, TextTarget,
     TransactionLimits,
 };
+use litchi_doc::builder::Builder;
 use litchi_doc::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
 use litchi_doc::tracked_revision::Limits;
-use litchi_doc::writer::{FloatingPosition, Kind, Picture, Shape, Writer};
+use litchi_doc::writer::{FloatingPosition, Kind, Picture, Shape};
 use litchi_doc::{HeaderKind, Package};
 use std::io::Cursor;
 use std::path::PathBuf;
@@ -286,7 +287,7 @@ fn genuine_embedded_object_transfer_closes_cfb_field_preview_and_storage() {
 fn genuine_receivers_accept_pictures_beside_main_and_header_drawings() {
     let image = std::fs::read(fixture("test-data/images/png/lena.png")).expect("PNG fixture");
     for floating in [false, true] {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer
             .insert_floating_shape(
                 Shape::new(Kind::Rectangle, 640, 320).expect("neighbor shape"),
@@ -327,6 +328,8 @@ fn genuine_receivers_accept_pictures_beside_main_and_header_drawings() {
         }
         let mut donor_bytes = Cursor::new(Vec::new());
         writer
+            .build()
+            .unwrap()
             .write_to(&mut donor_bytes)
             .expect("picture donor DOC");
         let donor = authorized_fixture(&donor_bytes.into_inner());

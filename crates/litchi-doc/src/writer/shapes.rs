@@ -72,7 +72,7 @@ impl Kind {
 ///
 /// The shape uses its preset geometry ([MS-ODRAW] MSOSPT); position and
 /// wrapping come from the `FloatingPosition` passed to
-/// [`super::core::Writer::insert_floating_shape`]. By default a shape is
+/// [`super::core::Builder::insert_floating_shape`]. By default a shape is
 /// drawn as an outline: no fill, black line.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Shape {

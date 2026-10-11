@@ -2,19 +2,23 @@
 
 #[cfg(test)]
 mod lazy_auxiliary_tests {
+    use crate::builder::Builder;
     use crate::package::Package;
     use crate::parts::fib::FileInformationBlock;
     use crate::tracked_revision::Limits;
-    use crate::writer::Writer;
     use litchi_ole_common::object::{Editor as PackageEditor, Targets};
     use std::io::Cursor;
 
     #[test]
     fn malformed_optional_auxiliary_tables_are_deferred_until_access() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("Body").expect("fixture paragraph");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("fixture DOC");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("fixture DOC");
         let mut package =
             PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
                 .expect("fixture package");
@@ -83,10 +87,14 @@ mod lazy_auxiliary_tests {
 
     #[test]
     fn deferred_auxiliary_sources_retain_only_selected_ranges() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_paragraph("Body").expect("fixture paragraph");
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("fixture DOC");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("fixture DOC");
         let mut package =
             PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
                 .expect("fixture package");
@@ -179,7 +187,7 @@ mod owned_mtef_tests {
 
 use crate::package::{Error as PackageError, Package};
 use crate::parts::fib::WORD_97_NFIB;
-use crate::{Image, ImageError, Writer};
+use crate::{Builder, Image, ImageError};
 use std::io::Cursor;
 use std::path::Path;
 
@@ -219,10 +227,10 @@ fn test_extract_png_image_from_doc() {
 
 #[test]
 fn opened_document_exposes_versioned_document_properties() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let mut package = Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().expect("load document");
     let properties = document

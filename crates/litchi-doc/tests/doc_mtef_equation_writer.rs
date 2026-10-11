@@ -33,8 +33,9 @@
 )]
 
 use litchi_cfb::OleFile;
+use litchi_doc::builder::Builder;
 use litchi_doc::embedded_object::{Info, Limits};
-use litchi_doc::writer::{Picture, Writer};
+use litchi_doc::writer::Picture;
 use litchi_doc::{EQUATION_3_CLSID, Editor, MtefEquation, MtefEquationWriteOptions, Package};
 use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Target, Targets};
 use std::io::Cursor;
@@ -66,10 +67,10 @@ fn preview_png() -> Vec<u8> {
 }
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("native equation follows").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

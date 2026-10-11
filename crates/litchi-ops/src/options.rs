@@ -285,6 +285,7 @@ impl Default for OpenOptions {
 #[non_exhaustive]
 pub struct DocOptions {
     pub(crate) leniency: litchi_doc::Leniency,
+    pub(crate) limits: Option<litchi_doc::package::Limits>,
 }
 
 #[cfg(feature = "doc")]
@@ -294,7 +295,21 @@ impl DocOptions {
     pub const fn new() -> Self {
         Self {
             leniency: litchi_doc::Leniency::Strict,
+            limits: None,
         }
+    }
+
+    /// Set finite DOC package and stream ingestion limits.
+    ///
+    /// ```
+    /// let limits = litchi_doc::package::Limits::try_new(1_000_000, 500_000, 800_000)?;
+    /// let options = litchi_ops::DocOptions::new().limits(limits);
+    /// # Ok::<(), litchi_doc::package::LimitsError>(())
+    /// ```
+    #[must_use]
+    pub const fn limits(mut self, limits: litchi_doc::package::Limits) -> Self {
+        self.limits = Some(limits);
+        self
     }
 
     /// Set the stylesheet-defect policy.

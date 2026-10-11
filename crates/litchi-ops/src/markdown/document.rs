@@ -180,7 +180,7 @@ fn validate_projection(view: &DocumentView<'_>) -> Result<()> {
     match view.inner() {
         #[cfg(feature = "doc")]
         Inner::Doc(doc) => {
-            let document = doc.reader();
+            let document = doc.reader()?;
             if !document.hyperlinks()?.is_empty() {
                 return Err(unsupported("DOC hyperlinks"));
             }
@@ -288,7 +288,7 @@ fn list_items(view: &DocumentView<'_>) -> Result<Vec<Option<ListItemInfo>>> {
     )]
     match view.inner() {
         #[cfg(feature = "doc")]
-        Inner::Doc(doc) => resolve_doc_lists(doc.reader()),
+        Inner::Doc(doc) => resolve_doc_lists(doc.reader()?),
         #[cfg(feature = "docx")]
         Inner::Docx(docx) => {
             let package = docx.markdown_package()?;

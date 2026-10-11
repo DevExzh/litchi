@@ -105,6 +105,8 @@ struct Step {
     snapshot_bytes: usize,
 }
 enum Leaf {
+    #[cfg(feature = "doc")]
+    Doc(Box<litchi_doc::body_text::Patch>),
     #[cfg(feature = "xlsb")]
     Xlsb(Box<crate::format::xlsb::write::Patch>),
     #[cfg(feature = "pptx")]
@@ -206,6 +208,8 @@ pub struct Edit {
     failure: Option<crate::Error>,
     snapshot_bytes: usize,
     operations: usize,
+    #[cfg(feature = "doc")]
+    doc: Option<crate::format::doc::write::Run>,
     #[cfg(feature = "docx")]
     formatting: Option<crate::format::docx::write::coalesce::Run>,
     #[cfg(feature = "xlsx")]
@@ -280,6 +284,8 @@ impl File {
                 failure: None,
                 snapshot_bytes: 0,
                 operations: 0,
+                #[cfg(feature = "doc")]
+                doc: None,
                 #[cfg(feature = "docx")]
                 formatting: None,
                 #[cfg(feature = "xlsx")]
@@ -426,9 +432,13 @@ impl Edit {
             {
                 return Ok(());
             }
-            #[cfg(any(feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+            #[cfg(any(feature = "doc", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
             let limits = self.limits;
             self.execute(|file| match file {
+                #[cfg(feature = "doc")]
+                File::Doc(handle) => {
+                    wrap_doc(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
                 #[cfg(feature = "docx")]
                 File::Docx(handle) => {
                     let commit = if _command_text {
@@ -768,6 +778,53 @@ impl Edit {
         _index: usize,
         _spelling: Option<&str>,
     ) -> Result<Option<bool>> {
+        #[cfg(feature = "doc")]
+        if let File::Doc(handle) = self.current.clone() {
+            // A body paragraph's ordinal is stable across text replacement,
+            // so direct `text` assignments can share one variable-width leaf
+            // edit. Queries and non-text properties close the run before the
+            // ordinary setter resolves them against the published candidate.
+            let planned = match self.doc.as_ref() {
+                Some(run) => run.plan(_spelling, _target, _props),
+                None => handle.paragraph_plan(_target, _props),
+            };
+            if planned.is_err() {
+                self.flush_pending()?;
+            }
+            let Some(plan) = planned? else {
+                if self.doc.is_some() {
+                    self.flush_pending()?;
+                }
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self.doc.is_none() {
+                self.doc = Some(crate::format::doc::write::Run::new(&handle, &self.limits)?);
+            }
+            let run = self
+                .doc
+                .as_mut()
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "DOC body run missing"))?;
+            let changed = run.stage(plan, _index, _spelling)?;
+            let bytes = self.snapshot_bytes.saturating_add(run.snapshot_bytes());
+            if bytes > self.limits.max_snapshot_bytes() {
+                return Err(Error::Limit {
+                    kind: LimitKind::SnapshotBytes,
+                    observed: bytes,
+                    maximum: self.limits.max_snapshot_bytes(),
+                }
+                .into());
+            }
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
         #[cfg(feature = "docx")]
         if let File::Docx(handle) = &self.current {
             // The shared paragraph/run `text` key always closes this family.
@@ -1100,6 +1157,31 @@ impl Edit {
     }
 
     pub(crate) fn flush_pending(&mut self) -> Result<()> {
+        #[cfg(feature = "doc")]
+        if let Some(run) = self.doc.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let commit = run.commit()?;
+                let (step, ()) = wrap_doc(&commit.before.clone(), commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "docx")]
         if let Some(run) = self.formatting.take() {
             let index = run.first_index();
@@ -1252,6 +1334,10 @@ impl Edit {
         match result {
             Ok(value) => Ok(value),
             Err(error) => {
+                #[cfg(feature = "doc")]
+                {
+                    self.doc = None;
+                }
                 #[cfg(feature = "docx")]
                 {
                     self.formatting = None;
@@ -1353,6 +1439,31 @@ fn wrap<T>(
     ))
 }
 
+#[cfg(feature = "doc")]
+fn wrap_doc<T>(
+    _before: &crate::format::doc::Doc,
+    commit: crate::format::doc::WriteCommit,
+    value: T,
+) -> Result<(Step, T)> {
+    let crate::format::doc::WriteCommit {
+        before: committed_before,
+        after,
+        patch,
+        operations,
+        snapshot_bytes,
+    } = commit;
+    Ok((
+        Step {
+            before: File::Doc(committed_before),
+            after: File::Doc(after),
+            leaf: Leaf::Doc(Box::new(patch)),
+            leaf_operations: operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
 #[cfg(feature = "xlsb")]
 fn wrap_xlsb<T>(
     before: &crate::format::xlsb::Xlsb,
@@ -1430,6 +1541,8 @@ fn changed(steps: &[Step]) -> Result<bool> {
         return Ok(false);
     };
     match (&first.leaf, &last.leaf) {
+        #[cfg(feature = "doc")]
+        (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "xlsb")]
         (Leaf::Xlsb(first), Leaf::Xlsb(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "pptx")]
@@ -1447,6 +1560,8 @@ fn changed(steps: &[Step]) -> Result<bool> {
 
 fn same_snapshot(left: &File, right: &File) -> bool {
     match (left, right) {
+        #[cfg(feature = "doc")]
+        (File::Doc(left), File::Doc(right)) => left.same_snapshot(right),
         #[cfg(feature = "xlsb")]
         (File::Xlsb(left), File::Xlsb(right)) => left.same_snapshot(right),
         #[cfg(feature = "pptx")]
@@ -1460,6 +1575,20 @@ fn same_snapshot(left: &File, right: &File) -> bool {
 }
 fn admit(file: &File) -> Result<()> {
     match file {
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => {
+            if handle.signature() == crate::format::signature::Signature::Signed {
+                return Err(crate::Error::signed(litchi_core::FileFormat::Doc));
+            }
+            match handle.body_text_snapshot()? {
+                Some(_) => Ok(()),
+                None => Err(crate::Error::new(
+                    Code::UnsupportedCapability,
+                    "explicit transactions for DOC require retained source bytes",
+                )
+                .with_format(litchi_core::FileFormat::Doc)),
+            }
+        },
         #[cfg(feature = "pptx")]
         File::Pptx(handle) => {
             drop(handle.editable()?);
@@ -1479,6 +1608,14 @@ fn admit(file: &File) -> Result<()> {
 }
 fn check_source(file: &File) -> Result<()> {
     match file {
+        #[cfg(feature = "doc")]
+        File::Doc(handle) => {
+            handle.check_source()?;
+            if handle.signature() == crate::format::signature::Signature::Signed {
+                return Err(crate::Error::signed(litchi_core::FileFormat::Doc));
+            }
+            Ok(())
+        },
         #[cfg(feature = "pptx")]
         File::Pptx(handle) => handle.check_source(),
         #[cfg(feature = "docx")]

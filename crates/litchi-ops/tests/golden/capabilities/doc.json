@@ -1,0 +1,314 @@
+{
+  "format": "doc",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": true
+    },
+    "find": {
+      "supported": true
+    },
+    "query": {
+      "supported": true
+    },
+    "view": {
+      "supported": true
+    },
+    "set": {
+      "supported": true
+    },
+    "add": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "remove": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "move": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "swap": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2",
+      "reason": "edit verbs arrive with the write kernel in milestone M2"
+    },
+    "edit": {
+      "supported": true
+    },
+    "batch": {
+      "supported": true
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    }
+  },
+  "views": {
+    "text": {
+      "supported": true
+    },
+    "annotated": {
+      "supported": true
+    },
+    "outline": {
+      "supported": true
+    },
+    "stats": {
+      "supported": true
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  },
+  "elements": [
+    {
+      "format": "doc",
+      "element": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": false,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/"
+        ]
+      },
+      "children": [
+        {
+          "element": "body",
+          "pathSegment": "body"
+        }
+      ],
+      "properties": {}
+    },
+    {
+      "format": "doc",
+      "element": "body",
+      "parent": "document",
+      "operations": {
+        "add": false,
+        "set": false,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "stable": [
+          "/body"
+        ]
+      },
+      "children": [
+        {
+          "element": "paragraph",
+          "pathSegment": "p"
+        }
+      ],
+      "properties": {},
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    },
+    {
+      "format": "doc",
+      "element": "paragraph",
+      "parent": "body",
+      "elementAliases": [
+        "p"
+      ],
+      "operations": {
+        "add": false,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": false
+      },
+      "paths": {
+        "positional": [
+          "/body/p[N]"
+        ]
+      },
+      "properties": {
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
+      }
+    }
+  ],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::flavor(Flavor::Document)",
+      "reason": "the DOC creator emits ordinary documents and refuses template flavor rather than silently changing the requested content type"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "legacy DOC has one canonical binary writer and does not accept an OOXML Strict conformance request"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "document",
+      "context": "initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "M2 DOC initial metadata authoring",
+      "reason": "the DOC creator currently emits a blank body only and refuses initial metadata rather than dropping it"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "body",
+      "context": "structural-edit",
+      "code": "unsupported_capability",
+      "followUp": "M2 DOC structural body editing",
+      "reason": "the DOC write adapter currently replaces existing ordinary paragraph text and does not add elements"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "body",
+      "context": "structural-edit",
+      "code": "unsupported_capability",
+      "followUp": "M2 DOC structural body editing",
+      "reason": "the DOC write adapter currently replaces existing ordinary paragraph text and does not remove elements"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "body",
+      "context": "structural-edit",
+      "code": "unsupported_capability",
+      "followUp": "M2 DOC structural body editing",
+      "reason": "the DOC write adapter currently replaces existing ordinary paragraph text and does not move elements"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "body",
+      "context": "structural-edit",
+      "code": "unsupported_capability",
+      "followUp": "M2 DOC structural body editing",
+      "reason": "the DOC write adapter currently replaces existing ordinary paragraph text and does not reorder elements"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "body",
+      "context": "non-text-command",
+      "code": "unsupported_capability",
+      "followUp": "M2 DOC structural batch commands",
+      "reason": "DOC atomic batches currently admit paragraph text sets only; structural and read commands remain refused"
+    },
+    {
+      "subject": "view",
+      "mode": "issues",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the issues view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "forms",
+      "code": "unsupported_capability",
+      "followUp": "M2 (validate)",
+      "reason": "the forms view needs the validators M2's `validate` adds (M1-Δ20)"
+    },
+    {
+      "subject": "view",
+      "mode": "html",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "svg",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "screenshot",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    },
+    {
+      "subject": "view",
+      "mode": "pdf",
+      "code": "unsupported_capability",
+      "followUp": "design §10 (rendering is out of scope)",
+      "reason": "visual rendering is outside the unified layer"
+    }
+  ]
+}

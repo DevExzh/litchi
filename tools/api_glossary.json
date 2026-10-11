@@ -1953,6 +1953,97 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "doc-minimal",
+      "package": "litchi-doc",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "Writer",
+          "scope": "litchi_doc",
+          "replacement": "use builder::Builder and build() -> Package"
+        },
+        {
+          "name": "save",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "doc-full",
+      "package": "litchi-doc",
+      "default_features": false,
+      "features": [
+        "formula",
+        "performance-diagnostics"
+      ],
+      "banned_names": [
+        {
+          "name": "Writer",
+          "scope": "litchi_doc",
+          "replacement": "use builder::Builder and build() -> Package"
+        },
+        {
+          "name": "save",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "to_stream",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "write_to_stream",
+          "scope": "litchi_doc::Builder",
+          "replacement": "publish the Package returned by build()"
+        }
+      ],
+      "families": []
     }
   ]
 }

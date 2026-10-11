@@ -1,4 +1,4 @@
-//! Writer-facing document state, input models, and authoring methods.
+//! Builder-facing document state, input models, and authoring methods.
 
 use crate::DateTime;
 use crate::encryption::{EncryptionProfile, validate_writer_password};
@@ -21,7 +21,6 @@ use crate::{
     AssociatedStringSlot, DocumentAssociatedStrings, GlossaryMetadata, ProofingFeature,
     ProofingStateTable, ProofingTables, SavedByTable, SmartTagRecognizerRange,
 };
-use std::collections::HashMap;
 use zeroize::Zeroizing;
 
 pub(super) const WORD_DOCUMENT_CLSID: [u8; 16] = [
@@ -39,7 +38,7 @@ mod validation;
 
 pub use error::WriteError;
 pub use formatting::{CharacterFormatting, LineSpacing, ParagraphFormatting};
-pub use state::Writer;
+pub use state::Builder;
 pub use story::{HeaderFooterParagraph, HeaderKind};
 
 pub(crate) use codec::pack_dttm;

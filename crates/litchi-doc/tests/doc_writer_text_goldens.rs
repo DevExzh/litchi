@@ -26,8 +26,8 @@ use litchi_doc::writer::{
     ParagraphFormatting, Shape as DrawingShape,
 };
 use litchi_doc::{
-    GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, HeaderFooterParagraph,
-    HeaderKind, Writer,
+    Builder, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle,
+    HeaderFooterParagraph, HeaderKind,
 };
 use std::io::Cursor;
 
@@ -57,14 +57,14 @@ fn special() -> CharacterFormatting {
     }
 }
 
-fn written(mut writer: Writer) -> Vec<u8> {
+fn written(mut writer: Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn ascii_paragraphs() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("").unwrap();
     writer.add_paragraph("a").unwrap();
     writer
@@ -83,7 +83,7 @@ fn ascii_paragraphs() -> Vec<u8> {
 }
 
 fn unicode_paragraphs() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph("Latin-1: àéîõüçñ ÀÉÎÕÜÇÑ ß ÿ")
         .unwrap();
@@ -116,7 +116,7 @@ fn unicode_paragraphs() -> Vec<u8> {
 }
 
 fn main_story_fields() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Before the fields").unwrap();
     writer
         .add_paragraph(&format!(
@@ -145,7 +145,7 @@ fn main_story_fields() -> Vec<u8> {
 }
 
 fn tables() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Table follows").unwrap();
     let table = writer.add_table(2, 3).unwrap();
     writer
@@ -176,7 +176,7 @@ fn tables() -> Vec<u8> {
 }
 
 fn headers_and_footers() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     writer
         .set_odd_header_paragraphs(vec![
@@ -210,7 +210,7 @@ fn headers_and_footers() -> Vec<u8> {
 }
 
 fn notes_and_comments() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph("Reference text for notes and comments")
         .unwrap();
@@ -229,7 +229,7 @@ fn notes_and_comments() -> Vec<u8> {
 }
 
 fn text_boxes() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body with text boxes").unwrap();
     writer
         .set_odd_header_paragraphs(vec![HeaderFooterParagraph::plain("Header")])
@@ -276,8 +276,8 @@ fn glossary_metadata() -> GlossaryMetadata {
     .unwrap()
 }
 
-fn glossary_writer() -> Writer {
-    let mut writer = Writer::new();
+fn glossary_writer() -> Builder {
+    let mut writer = Builder::new();
     writer.add_paragraph("Greeting").unwrap();
     writer.add_paragraph("World").unwrap();
     writer.add_paragraph("").unwrap();
@@ -291,7 +291,7 @@ fn glossary_document() -> Vec<u8> {
 }
 
 fn attached_glossary_template() -> Vec<u8> {
-    let mut template = Writer::new();
+    let mut template = Builder::new();
     template.add_paragraph("Template body 😀").unwrap();
     template.set_attached_glossary(glossary_writer()).unwrap();
     written(template)
@@ -366,14 +366,14 @@ fn fresh_doc_writer_text_paths_match_the_pre_0753_goldens() {
 /// built per write and nothing is left behind in the writer.
 #[test]
 fn a_writer_written_twice_writes_the_same_bytes() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("once 😀").unwrap();
     writer
         .add_paragraph(&repeat_to("twice payload ", 40_000))
         .unwrap();
     let mut first = Cursor::new(Vec::new());
-    writer.write_to(&mut first).unwrap();
+    writer.build().unwrap().write_to(&mut first).unwrap();
     let mut second = Cursor::new(Vec::new());
-    writer.write_to(&mut second).unwrap();
+    writer.build().unwrap().write_to(&mut second).unwrap();
     assert_eq!(first.into_inner(), second.into_inner());
 }

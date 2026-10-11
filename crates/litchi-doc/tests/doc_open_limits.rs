@@ -33,7 +33,8 @@
 )]
 
 use litchi_cfb::OleFile;
-use litchi_doc::writer::{Picture, Writer};
+use litchi_doc::builder::Builder;
+use litchi_doc::writer::Picture;
 use litchi_doc::{Error, Limits, OpenOptions, Package, PackageOpenOptions, Password, ResourceKind};
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::path::PathBuf;
@@ -89,13 +90,13 @@ impl Seek for GatedReader {
 fn document_bytes() -> Vec<u8> {
     let image =
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/images/jpg/abstract4.jpg");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("bounded DOC read").unwrap();
     writer
         .insert_picture(Picture::new(std::fs::read(image).unwrap()).unwrap())
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

@@ -40,14 +40,14 @@ use litchi_doc::route_slip::{
     DeliveryOption, EditKind, Editor, Metadata, NarrowString, Protection, Recipient,
     RecipientSelectionError, RecipientSelector, Snapshot, TransactionError, parse, to_bytes,
 };
-use litchi_doc::{Package, Writer};
+use litchi_doc::{Builder, Package};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("route-slip source").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

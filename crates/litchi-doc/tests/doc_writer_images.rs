@@ -34,11 +34,12 @@
 
 //! Round-trip tests for the DOC inline picture writer.
 //!
-//! Writes a new .doc with PNG and JPEG pictures via `Writer::insert_picture`
+//! Writes a new .doc with PNG and JPEG pictures via `Builder::insert_picture`
 //! and re-opens it with the crate's own DOC reader, asserting image count,
 //! format, dimensions, and byte-identity of the embedded payloads.
+use litchi_doc::builder::Builder;
 use litchi_doc::image::PictureFields;
-use litchi_doc::writer::{FloatingPosition, Picture, PictureKind, Writer};
+use litchi_doc::writer::{FloatingPosition, Picture, PictureKind};
 use litchi_doc::{Package, Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
 use litchi_odraw::image::Kind as BlipKind;
 use std::io::{Cursor, Write};
@@ -153,14 +154,14 @@ fn png_and_jpeg_pictures_round_trip_through_doc_reader() {
         (jpeg_picture.width_twips(), jpeg_picture.height_twips()),
     ];
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("before pictures").unwrap();
     writer.insert_picture(png_picture).unwrap();
     writer.insert_picture(jpeg_picture).unwrap();
     writer.add_paragraph("after pictures").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
 
     let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
@@ -221,7 +222,7 @@ fn native_officeart_picture_family_round_trips_without_reencoding() {
             (1440, 720),
         ),
     ];
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let mut expected = Vec::new();
     for (name, format, blip_type, dimensions) in fixtures {
         let bytes = hex_fixture(name);
@@ -234,7 +235,7 @@ fn native_officeart_picture_family_round_trips_without_reencoding() {
     }
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
     let runs = picture_runs(&document);
@@ -268,11 +269,11 @@ fn bmp_is_normalized_to_dib_and_explicit_formats_are_validated() {
 
 #[test]
 fn document_without_pictures_keeps_empty_data_stream() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("plain text").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
 
     let mut package = Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
@@ -290,7 +291,7 @@ fn write_doc_with_inline_and_floating(jpeg_bytes: &[u8]) -> (Vec<u8>, u32, u32) 
     let jpeg_picture = Picture::new(jpeg_bytes.to_vec()).unwrap();
     let floating_dims = (jpeg_picture.width_twips(), jpeg_picture.height_twips());
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("before pictures").unwrap();
     writer.insert_picture(png_picture).unwrap();
     writer
@@ -305,7 +306,7 @@ fn write_doc_with_inline_and_floating(jpeg_bytes: &[u8]) -> (Vec<u8>, u32, u32) 
     writer.add_paragraph("after pictures").unwrap();
 
     let mut cursor = Cursor::new(Vec::new());
-    writer.write_to(&mut cursor).unwrap();
+    writer.build().unwrap().write_to(&mut cursor).unwrap();
     (cursor.into_inner(), floating_dims.0, floating_dims.1)
 }
 

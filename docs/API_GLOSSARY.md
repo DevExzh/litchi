@@ -1183,3 +1183,14 @@ families remain structural barriers. The unified sheet-path and homogeneous
 sheet-query adapters delegate to one native edit and commit. Additional
 internal content dependencies require explicit disposition and currently
 receive typed refusal; removal does not implicitly run garbage collection.
+
+## DOC builder and publication entry (record 0188)
+
+Legacy DOC now exports `Builder::build() -> Package`; `Writer` and its direct
+output methods are removed. `Package` owns byte, sequential-stream and atomic
+path publication, and `from_bytes` borrows its input slice. The DOC minimal and
+full glossary profiles guard this completed naming slice. Native package
+transaction ownership, commit diagnostics, and the unified native ingress
+options envelope remain pending; separate body-text transaction types are not
+registered as a completed glossary family. See
+[0188](unified-ops/0188-doc-paragraph-loop.md).

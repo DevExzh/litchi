@@ -456,6 +456,13 @@ pub enum Error {
     StreamNotFound(String),
     /// Corrupted file
     Corrupted(String),
+    /// A bounded package output buffer could not be reserved.
+    Allocation {
+        /// Output resource whose allocation failed.
+        resource: &'static str,
+        /// Original allocator failure.
+        source: std::collections::TryReserveError,
+    },
     /// A changed DOC publication was blocked by its active protection state.
     ProtectionDenied(crate::parts::protection::EditProtection),
     /// A caller-selected finite parsing limit was exceeded.
@@ -507,6 +514,9 @@ impl std::fmt::Display for Error {
             Error::InvalidFormat(s) => write!(f, "Invalid format: {s}"),
             Error::StreamNotFound(s) => write!(f, "Stream not found: {s}"),
             Error::Corrupted(s) => write!(f, "Corrupted file: {s}"),
+            Error::Allocation { resource, source } => {
+                write!(f, "could not reserve {resource}: {source}")
+            },
             Error::ProtectionDenied(state) => {
                 write!(
                     f,
@@ -530,7 +540,25 @@ impl std::fmt::Display for Error {
     }
 }
 
-impl std::error::Error for Error {}
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Io(error) => Some(error),
+            Self::Ole(error) => Some(error),
+            Self::Allocation { source, .. } => Some(source),
+            Self::InvalidFormat(_)
+            | Self::StreamNotFound(_)
+            | Self::Corrupted(_)
+            | Self::ProtectionDenied(_)
+            | Self::ResourceLimit(_)
+            | Self::PasswordRequired
+            | Self::InvalidPassword
+            | Self::UnsupportedEncryption(_)
+            | Self::MalformedEncryptionHeader(_)
+            | Self::UnsupportedVersion { .. } => None,
+        }
+    }
+}
 
 /// Result type for DOC operations.
 pub type Result<T> = std::result::Result<T, Error>;
@@ -563,6 +591,15 @@ pub struct Package<R: Read + Seek = File> {
     pub(super) limits: Limits,
 }
 
+impl<R: Read + Seek> std::fmt::Debug for Package<R> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
+
 impl From<Error> for litchi_core::Error {
     fn from(err: Error) -> Self {
         match err {
@@ -571,6 +608,9 @@ impl From<Error> for litchi_core::Error {
             Error::InvalidFormat(s) => litchi_core::Error::InvalidFormat(s),
             Error::StreamNotFound(s) => litchi_core::Error::ComponentNotFound(s),
             Error::Corrupted(s) => litchi_core::Error::CorruptedFile(s),
+            Error::Allocation { resource, source } => {
+                litchi_core::Error::Allocation { resource, source }
+            },
             Error::ProtectionDenied(state) => litchi_core::Error::InvalidFormat(format!(
                 "protected DOC publication requires explicit authorization ({state:?})"
             )),

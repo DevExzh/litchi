@@ -7,6 +7,7 @@
 
 use std::path::Path;
 #[cfg(any(
+    feature = "doc",
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
@@ -32,6 +33,7 @@ use crate::{File, OpenOptions};
 /// filename or extension decision and does not canonicalize through the
 /// filesystem: a path's symlink spelling remains the path the caller opened.
 #[cfg(any(
+    feature = "doc",
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
@@ -108,11 +110,18 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             tail,
             super::ooxml_format_for_extension(path),
         )?;
-        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+        #[cfg(any(
+            feature = "doc",
+            feature = "docx",
+            feature = "xlsx",
+            feature = "pptx",
+            feature = "xlsb"
+        ))]
         let file = if matches!(
             file.format(),
             Some(
-                litchi_core::FileFormat::Docx
+                litchi_core::FileFormat::Doc
+                    | litchi_core::FileFormat::Docx
                     | litchi_core::FileFormat::Xlsx
                     | litchi_core::FileFormat::Pptx
                     | litchi_core::FileFormat::Xlsb
@@ -133,7 +142,16 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "xls",
             feature = "encryption"
         ))]
-        return super::cfb::open_path(path, source, version, options);
+        {
+            let file = super::cfb::open_path(path, source, version, options)?;
+            #[cfg(feature = "doc")]
+            let file = if file.format() == Some(litchi_core::FileFormat::Doc) {
+                super::attach_origin(file, stable_origin(path)?)
+            } else {
+                file
+            };
+            return Ok(file);
+        }
         #[cfg(not(any(
             feature = "doc",
             feature = "ppt",
@@ -182,11 +200,18 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         tail,
         super::ooxml_format_for_extension(path),
     )?;
-    #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+    #[cfg(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "xlsb"
+    ))]
     let opened = if matches!(
         opened.format(),
         Some(
-            litchi_core::FileFormat::Docx
+            litchi_core::FileFormat::Doc
+                | litchi_core::FileFormat::Docx
                 | litchi_core::FileFormat::Xlsx
                 | litchi_core::FileFormat::Pptx
                 | litchi_core::FileFormat::Xlsb

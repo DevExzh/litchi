@@ -6,12 +6,13 @@ use crate::writer::fib::FibBuilder;
 use crate::writer::font_table::FontTableBuilder;
 use crate::writer::piece_table::{Piece, PieceTableBuilder};
 use litchi_cfb::writer::OleWriter;
+use std::io::Cursor;
 
 use super::super::{
     codec,
     model::{
-        CharacterFormatting, FloatingAnchorKind, MainReferenceKind, ParagraphFormatting,
-        TextStream, VBA_PROJECT_STORAGE_NAME, WORD_DOCUMENT_CLSID, WriteError, Writer, WriterShape,
+        Builder, CharacterFormatting, FloatingAnchorKind, MainReferenceKind, ParagraphFormatting,
+        TextStream, VBA_PROJECT_STORAGE_NAME, WORD_DOCUMENT_CLSID, WriteError, WriterShape,
         contains_field_character, pack_dttm, utf16_code_unit_len, utf16_units,
     },
 };
@@ -23,7 +24,7 @@ pub(in crate::writer::core) struct DocOutputStreams {
     data: Vec<u8>,
 }
 
-impl Writer {
+impl Builder {
     pub(in crate::writer::core) fn validate_as_attached_glossary(&self) -> Result<(), WriteError> {
         if self.glossary_metadata.is_none() {
             return Err(WriteError::InvalidData(
@@ -108,35 +109,7 @@ impl Writer {
         Ok(())
     }
 }
-impl Writer {
-    pub fn save<P: AsRef<std::path::Path>>(&mut self, path: P) -> Result<(), WriteError> {
-        self.save_with_durability(path, litchi_core::Durability::Full)
-    }
-
-    /// Saves the document atomically at a caller-chosen
-    /// [`Durability`](litchi_core::Durability).
-    ///
-    /// [`Self::save`] is this method at `Durability::Full`. Every level
-    /// writes the same bytes through the same sibling temporary file and
-    /// atomic replacement; a weaker level only skips the parent-directory
-    /// sync (`FileOnly`) or both synchronizations (`NoSync`), with the crash
-    /// guarantees `Durability` states.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if serialization fails or the file cannot be written
-    /// or replaced. Only `Durability::Full` can report that the destination
-    /// was replaced but its directory could not be synchronized.
-    pub fn save_with_durability<P: AsRef<std::path::Path>>(
-        &mut self,
-        path: P,
-        durability: litchi_core::Durability,
-    ) -> Result<(), WriteError> {
-        self.build_ole_writer()?
-            .save_with_durability(path, durability)?;
-        Ok(())
-    }
-
+impl Builder {
     /// Capacity for the `WordDocument` stream, used only to allocate it once
     /// instead of growing it by doubling: the FIB placeholder of
     /// `text_start` bytes and an upper bound of the text, plus, when that text
@@ -1174,13 +1147,17 @@ impl Writer {
         Ok(ole_writer)
     }
 
-    /// Write the document to a seekable output.
-    pub fn write_to<W: std::io::Write + std::io::Seek>(
-        &mut self,
-        writer: &mut W,
-    ) -> Result<(), WriteError> {
-        self.build_ole_writer()?.write_to(writer)?;
-        Ok(())
+    /// Build and validate a fresh DOC package.
+    ///
+    /// The returned package owns a cursor-backed copy of the complete CFB
+    /// artifact.  Byte and filesystem publication are methods on that package
+    /// so every output path shares one validated owner boundary.
+    pub fn build(&mut self) -> Result<crate::Package<Cursor<Vec<u8>>>, WriteError> {
+        let mut output = Cursor::new(Vec::new());
+        self.build_ole_writer()
+            .and_then(|mut writer| writer.write_to(&mut output).map_err(WriteError::from))?;
+        crate::Package::from_owned_bytes(output.into_inner(), crate::package::Limits::default())
+            .map_err(WriteError::Package)
     }
 
     // Helper methods for DOC writer:

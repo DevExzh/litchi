@@ -119,6 +119,9 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
+            let doc_edit = format == FileFormat::Doc
+                && cfg!(feature = "doc")
+                && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
             let xlsx_edit = format == FileFormat::Xlsx
                 && cfg!(feature = "xlsx")
                 && matches!(
@@ -136,7 +139,8 @@ fn every_format_has_one_answer_for_its_reads() {
                 && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
             assert_eq!(
                 capabilities.verb(verb),
-                if docx_edit
+                if doc_edit
+                    || docx_edit
                     || xlsx_edit
                     || pptx_edit
                     || (format == FileFormat::Xlsb
@@ -162,11 +166,12 @@ fn every_format_has_one_answer_for_its_reads() {
             );
         }
 
-        // DOCX, XLSX, XLSB and PPTX have creators and publishers.
+        // DOC, DOCX, XLSX, XLSB and PPTX have creators and publishers.
         // A format without a read adapter
         // keeps its whole-format refusal as the authoritative answer.
         for verb in [Verb::Save, Verb::Create] {
-            let integrated = (format == FileFormat::Docx && cfg!(feature = "docx"))
+            let integrated = (format == FileFormat::Doc && cfg!(feature = "doc"))
+                || (format == FileFormat::Docx && cfg!(feature = "docx"))
                 || (format == FileFormat::Xlsx && cfg!(feature = "xlsx"))
                 || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
                 || (format == FileFormat::Xlsb && cfg!(feature = "xlsb"));
@@ -217,7 +222,7 @@ fn formats_without_a_variant_point_at_m6() {
 /// reads: each element's identity keys are the ones a path step may use,
 /// each alias normalizes to the element's kind, and the report's element
 /// lookup finds the element by every name.
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "xlsb"))]
+#[cfg(any(feature = "doc", feature = "docx", feature = "xlsx", feature = "xlsb"))]
 #[test]
 fn spec_tables_agree_with_their_vocabularies() {
     use crate::node::spec::FormatSpec;
@@ -261,6 +266,8 @@ fn spec_tables_agree_with_their_vocabularies() {
         assert_eq!(capabilities.elements().count(), spec.elements.len());
     }
 
+    #[cfg(feature = "doc")]
+    check(&crate::format::doc::SPEC, FileFormat::Doc);
     #[cfg(feature = "docx")]
     check(&crate::format::docx::SPEC, FileFormat::Docx);
     #[cfg(feature = "xlsx")]

@@ -3035,11 +3035,15 @@ mod tests {
 
     #[test]
     fn fib_fc_min_must_follow_the_complete_fib() {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::builder::Builder::new();
         let text = "x".repeat(SCAN_CHUNK_UNITS * 2);
         writer.add_paragraph(&text).expect("DOC fixture");
         let mut output = io::Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("DOC fixture");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("DOC fixture");
         let mut bytes = output.into_inner();
         let mut file =
             litchi_cfb::OleFile::open(io::Cursor::new(bytes.clone())).expect("CFB fixture");
@@ -3600,11 +3604,15 @@ mod tests {
     #[test]
     fn first_paragraph_scans_a_giant_piece_in_bounded_chunks() {
         let giant = "x".repeat(SCAN_CHUNK_UNITS * 8);
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::builder::Builder::new();
         let combined = format!("a\r{giant}");
         writer.add_paragraph(&combined).expect("giant paragraph");
         let mut output = io::Cursor::new(Vec::new());
-        writer.write_to(&mut output).expect("DOC fixture");
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut output)
+            .expect("DOC fixture");
         let counted = Arc::new(CountingSource::new(&output.into_inner()));
         let source: Arc<dyn ReadAt> = counted.clone();
         let snapshot = SourceSnapshot::open(source).expect("source-backed DOC fixture");

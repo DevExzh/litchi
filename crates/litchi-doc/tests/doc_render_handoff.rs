@@ -18,8 +18,8 @@ use litchi_doc::Package;
 use litchi_doc::body_text::{
     Edit, Error, Projection, Refusal, Snapshot, SubEditJoinFailure, TransactionLimits,
 };
+use litchi_doc::builder::Builder;
 use litchi_doc::tracked_revision::Limits;
-use litchi_doc::writer::Writer;
 use std::io::Cursor;
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -79,7 +79,7 @@ fn snapshot(bytes: &[u8], transaction_limits: TransactionLimits) -> Snapshot {
 }
 
 fn writer_document(paragraphs: &[&str]) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for paragraph in paragraphs {
         writer
             .add_paragraph(paragraph)
@@ -87,6 +87,8 @@ fn writer_document(paragraphs: &[&str]) -> Vec<u8> {
     }
     let mut output = Cursor::new(Vec::new());
     writer
+        .build()
+        .unwrap()
         .write_to(&mut output)
         .expect("synthetic DOC should serialize");
     output.into_inner()

@@ -109,6 +109,8 @@ impl<'q> Plan<'q> {
         // Each format adapter (M1 steps R4-R7) adds an arm compiling for its
         // `Inspect` implementation.
         match format {
+            #[cfg(feature = "doc")]
+            FileFormat::Doc => super::compile::compile::<crate::format::doc::Nav<'static>>(query),
             #[cfg(feature = "docx")]
             FileFormat::Docx => super::compile::compile::<crate::format::docx::Nav<'static>>(query),
             #[cfg(feature = "xlsx")]

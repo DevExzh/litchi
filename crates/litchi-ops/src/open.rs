@@ -368,9 +368,17 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
 /// route reaches the byte classifier before it knows the package's format;
 /// this helper applies metadata only after classification and preserves a
 /// signed wrapper by temporarily using its existing explicit disposition.
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xlsb"
+))]
 pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
     match file {
+        #[cfg(feature = "doc")]
+        File::Doc(doc) => File::Doc(doc.with_origin(Some(origin))),
         #[cfg(feature = "docx")]
         File::Docx(docx) => File::Docx(docx.with_origin(Some(origin))),
         #[cfg(feature = "xlsx")]

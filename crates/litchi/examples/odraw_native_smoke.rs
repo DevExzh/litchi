@@ -5,7 +5,8 @@
 
 use std::{error::Error, fs, path::PathBuf};
 
-use litchi_doc::writer::{FloatingPosition, Kind, Shape, Writer};
+use litchi_doc::builder::Builder;
+use litchi_doc::writer::{FloatingPosition, Kind, Shape};
 use litchi_ppt::writer::{
     FillStyle, LineStyleConfig, ShapeColor, ShapeStyle, ShapeType, Table, Writer as PptWriter,
 };
@@ -36,11 +37,11 @@ fn main() -> Result<(), Box<dyn Error>> {
 }
 
 fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
-    let mut doc = Writer::new();
+    let mut doc = Builder::new();
     doc.add_paragraph("Litchi OfficeArt native smoke test")?;
 
     if mode == "basic" {
-        doc.save(path)?;
+        doc.build()?.save(path)?;
         return Ok(());
     }
 
@@ -52,7 +53,7 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
     )?;
 
     if mode == "shape" {
-        doc.save(path)?;
+        doc.build()?.save(path)?;
         return Ok(());
     }
 
@@ -64,7 +65,7 @@ fn write_doc(path: &std::path::Path, mode: &str) -> Result<(), Box<dyn Error>> {
         "Typed DOC textbox",
     )?;
     doc.add_paragraph("The document remains editable in Microsoft Word.")?;
-    doc.save(path)?;
+    doc.build()?.save(path)?;
     Ok(())
 }
 

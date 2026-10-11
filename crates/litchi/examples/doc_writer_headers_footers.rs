@@ -7,14 +7,14 @@
 //!
 //! Run with: cargo run --example doc_writer_headers_footers
 
-use litchi_doc::writer::Writer;
+use litchi_doc::builder::Builder;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating DOC file with headers and footers...");
 
     // Create a new DOC writer
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     // Add some content to the document (need enough for multiple pages)
     writer.add_paragraph("Title Page")?;
@@ -66,7 +66,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the document
     let output_path = "output/doc_headers_footers.doc";
-    writer.save(output_path)?;
+    writer.build()?.save(output_path)?;
 
     println!("\n✅ Document saved to: {}", output_path);
     println!("\n📝 Open this file in Microsoft Word to verify:");

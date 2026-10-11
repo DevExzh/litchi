@@ -8,7 +8,13 @@ use crate::{Error, Family, File, Result};
 use litchi_core::FileFormat;
 
 #[cfg_attr(
-    not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb")),
+    not(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "xlsb"
+    )),
     allow(
         clippy::only_used_in_recursion,
         reason = "without a unified format adapter, arguments only pass through signed wrappers"
@@ -64,6 +70,12 @@ impl File {
                 crate::path::resolve::get(&crate::format::docx::Nav::new(handle), &path)
                     .map(Node::Docx)
             },
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::get(&crate::format::doc::Nav::new(handle), &path)
+                    .map(Node::Doc)
+            },
             #[cfg(feature = "xlsx")]
             Self::Xlsx(handle) => {
                 let path = path.into_path()?;
@@ -100,6 +112,12 @@ impl File {
                 let path = path.into_path()?;
                 crate::path::resolve::find(&crate::format::docx::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Docx))
+            },
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::find(&crate::format::doc::Nav::new(handle), &path)
+                    .map(|node| node.map(Node::Doc))
             },
             #[cfg(feature = "xlsx")]
             Self::Xlsx(handle) => {
@@ -149,6 +167,10 @@ impl File {
                 crate::query::run(crate::format::docx::Nav::new(handle), selector)
                     .map(Matches::docx)
             },
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => {
+                crate::query::run(crate::format::doc::Nav::new(handle), selector).map(Matches::doc)
+            },
             #[cfg(feature = "xlsx")]
             Self::Xlsx(handle) => {
                 crate::query::run(crate::format::xlsx::Nav::new(handle), selector)
@@ -188,6 +210,10 @@ impl File {
     /// As [`Self::view`]. Serialize the returned value with any serde serializer.
     pub fn view_json(&self, mode: Mode) -> Result<crate::view::Json<'_>> {
         match self {
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => {
+                crate::format::doc::views::view_json(handle, mode).map(crate::view::Json::doc)
+            },
             #[cfg(feature = "docx")]
             Self::Docx(handle) => crate::format::docx::views::view_json(
                 handle,
@@ -230,6 +256,8 @@ impl File {
                 &crate::view::mode::Options::default(),
                 output,
             ),
+            #[cfg(feature = "doc")]
+            Self::Doc(handle) => crate::format::doc::views::view_to(handle, mode, output),
             #[cfg(feature = "xlsx")]
             Self::Xlsx(handle) => crate::format::xlsx::view_to(
                 handle,
@@ -269,6 +297,9 @@ fn pending(file: &File) -> Error {
 /// does not compile.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub(crate) enum Adapter {
+    /// Legacy binary Word (`.doc`).
+    #[cfg(feature = "doc")]
+    Doc,
     /// WordprocessingML (record 0051).
     #[cfg(feature = "docx")]
     Docx,
@@ -286,6 +317,8 @@ impl Adapter {
     /// on.
     pub(crate) const fn of(format: FileFormat) -> Option<Self> {
         match format {
+            #[cfg(feature = "doc")]
+            FileFormat::Doc => Some(Self::Doc),
             #[cfg(feature = "docx")]
             FileFormat::Docx => Some(Self::Docx),
             #[cfg(feature = "xlsx")]
@@ -301,6 +334,8 @@ impl Adapter {
     /// The format the adapter reads.
     pub(crate) const fn format(self) -> FileFormat {
         match self {
+            #[cfg(feature = "doc")]
+            Self::Doc => FileFormat::Doc,
             #[cfg(feature = "docx")]
             Self::Docx => FileFormat::Docx,
             #[cfg(feature = "xlsx")]
@@ -325,6 +360,11 @@ impl Adapter {
 macro_rules! with_spec {
     ($adapter:expr, $spec:ident => $body:expr) => {
         match $adapter {
+            #[cfg(feature = "doc")]
+            $crate::read::Adapter::Doc => {
+                let $spec = &$crate::format::doc::SPEC;
+                $body
+            },
             #[cfg(feature = "docx")]
             $crate::read::Adapter::Docx => {
                 let $spec = &$crate::format::docx::SPEC;

@@ -15,6 +15,7 @@
     reason = "zerocopy's RawDirectoryEntry derive expansion emits internal identifiers outside this crate's source"
 )]
 
+pub mod atomic;
 pub mod consts;
 mod directory_name;
 mod file;

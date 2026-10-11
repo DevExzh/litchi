@@ -6,4 +6,4 @@ mod package;
 #[cfg(test)]
 mod tests;
 
-pub use model::Document;
+pub use model::{BodyParagraphs, Document};

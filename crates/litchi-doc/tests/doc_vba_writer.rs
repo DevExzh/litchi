@@ -32,22 +32,22 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
-use litchi_doc::{EncryptionProfile, OpenOptions, Package, Writer};
+use litchi_doc::{Builder, EncryptionProfile, OpenOptions, Package};
 use litchi_vba::{
     Limits,
     build::{Module, Project},
 };
 use std::io::Cursor;
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 #[test]
 fn complete_project_round_trips_from_the_macros_storage() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     let project = Project::new("DocumentTools")
         .module(Module::standard(
@@ -91,7 +91,7 @@ fn complete_project_round_trips_from_the_macros_storage() {
 
 #[test]
 fn project_storage_remains_clear_when_document_streams_are_encrypted() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Encrypted body").unwrap();
     let project = Project::new("EncryptedDocument").module(Module::standard(
         "Module1",
@@ -115,7 +115,7 @@ fn project_storage_remains_clear_when_document_streams_are_encrypted() {
 
 #[test]
 fn failed_build_is_atomic_and_project_can_be_cleared() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_paragraph("Body").unwrap();
     let existing = Project::new("ExistingProject")
         .finish(&Limits::default())

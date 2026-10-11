@@ -7,7 +7,7 @@ use litchi_ole_common::property_set::{
     PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::fs::File;
-use std::io::{Read, Seek, SeekFrom, Write};
+use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
 
 impl Package<File> {
@@ -35,8 +35,12 @@ impl Package<File> {
     /// the simple default API intact while making the selected limits visible
     /// at the call site.
     pub fn open_with<P: AsRef<Path>>(path: P, options: PackageOpenOptions) -> Result<Self> {
+        let path = path.as_ref();
+        let limits = options.limits();
         let file = File::open(path)?;
-        Package::from_reader_with_limits(file, options.limits())
+        let source_len = file.metadata()?.len();
+        validate_package_size(source_len, limits)?;
+        Package::from_reader_with_limits(file, limits)
     }
 
     /// Open a `.doc` package with explicit finite read limits.
@@ -185,6 +189,44 @@ impl<R: Read + Seek> Package<R> {
     /// Limits inherited by [`Self::document`].
     pub const fn limits(&self) -> Limits {
         self.limits
+    }
+
+    /// Return the complete package bytes exactly as received at ingress.
+    pub fn to_bytes(&mut self) -> Result<Vec<u8>> {
+        let size = usize::try_from(self.ole.file_size()).map_err(|_| {
+            Error::InvalidFormat("DOC package size does not fit in memory".to_string())
+        })?;
+        let mut output = Vec::new();
+        output
+            .try_reserve_exact(size)
+            .map_err(|source| Error::Allocation {
+                resource: "DOC package output",
+                source,
+            })?;
+        self.ole.copy_source_to(&mut output)?;
+        Ok(output)
+    }
+
+    /// Stream this package to a sequential sink.
+    pub fn write_to(&mut self, mut writer: impl Write) -> Result<()> {
+        self.ole.copy_source_to(&mut writer)?;
+        Ok(())
+    }
+
+    /// Atomically save this package through a sibling temporary file.
+    pub fn save(&mut self, path: impl AsRef<Path>) -> Result<()> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically save this package with an explicit durability level.
+    pub fn save_with_durability(
+        &mut self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
+        self.ole
+            .save_source_with_durability(path, durability)
+            .map_err(Error::from)
     }
 
     /// Inspect the package's typed MS-OFFCRYPTO `DataSpaces` graph.
@@ -396,6 +438,40 @@ impl<R: Read + Seek> Package<R> {
             document.fields_table(),
             limits,
         )
+    }
+}
+
+impl Package<Cursor<Vec<u8>>> {
+    /// Parse a complete in-memory DOC artifact for exact no-op publication.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Package<Cursor<Vec<u8>>>> {
+        let limits = Limits::default();
+        Self::validate_source_len(bytes.len(), limits)?;
+        Self::from_owned_bytes(bytes.to_vec(), limits)
+    }
+
+    /// Parse a complete in-memory DOC artifact with explicit finite limits.
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: PackageOpenOptions,
+    ) -> Result<Package<Cursor<Vec<u8>>>> {
+        let limits = options.limits();
+        Self::validate_source_len(bytes.len(), limits)?;
+        Self::from_owned_bytes(bytes.to_vec(), limits)
+    }
+
+    pub(crate) fn from_owned_bytes(
+        bytes: Vec<u8>,
+        limits: Limits,
+    ) -> Result<Package<Cursor<Vec<u8>>>> {
+        Self::validate_source_len(bytes.len(), limits)?;
+        let ole =
+            OleFile::open_with_limits(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
+        Package::from_ole_file_with_limits(ole, limits)
+    }
+
+    /// Create the minimal valid DOC package through the canonical builder.
+    pub fn new() -> std::result::Result<Self, crate::writer::WriteError> {
+        crate::builder::Builder::new().build()
     }
 }
 

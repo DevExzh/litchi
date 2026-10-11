@@ -6,13 +6,14 @@
 //!
 //! Run with: cargo run --example doc_writer_hyperlinks
 
-use litchi_doc::writer::{ParagraphFormatting, Writer};
+use litchi_doc::builder::Builder;
+use litchi_doc::writer::ParagraphFormatting;
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("Creating DOC file with hyperlinks...");
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     // Title
     writer.add_paragraph("Hyperlink Examples")?;
@@ -68,7 +69,7 @@ fn main() -> Result<(), Box<dyn Error>> {
 
     // Save the document
     let output_path = "output/doc_hyperlinks.doc";
-    writer.save(output_path)?;
+    writer.build()?.save(output_path)?;
 
     println!("\n Document saved to: {}", output_path);
     println!("\n Open this file in Microsoft Word to verify:");

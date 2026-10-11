@@ -104,8 +104,8 @@ pub use bookmarks::BookmarkEntry;
 pub use comments::CommentEntry;
 pub use core::HeaderKind;
 pub use core::{
-    CharacterFormatting, HeaderFooterParagraph, LineSpacing, ParagraphFormatting, WriteError,
-    Writer,
+    Builder, CharacterFormatting, HeaderFooterParagraph, LineSpacing, ParagraphFormatting,
+    WriteError,
 };
 pub use fib::FibBuilder;
 pub use fkp::{ChpxFkpBuilder, PapxFkpBuilder};

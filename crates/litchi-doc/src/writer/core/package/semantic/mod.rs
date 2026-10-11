@@ -1,6 +1,6 @@
 //! Semantic DOC story and table assembly facade.
 //!
-//! Each child owns one semantic concern while the inherent `Writer` methods
+//! Each child owns one semantic concern while the inherent `Builder` methods
 //! remain available through the same package-level API used by stream assembly.
 
 mod bookmarks;

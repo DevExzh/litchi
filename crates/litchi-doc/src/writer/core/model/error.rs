@@ -11,6 +11,10 @@ pub enum WriteError {
     Ole(OleError),
     /// MS-OVBA project authoring error
     Vba(litchi_vba::Error),
+    /// The staged document assembled, but its package could not be parsed.
+    Package(crate::package::Error),
+    /// A generic document property has no typed DOC serialization path.
+    UnsupportedProperty,
 }
 
 impl From<std::io::Error> for WriteError {
@@ -38,6 +42,10 @@ impl std::fmt::Display for WriteError {
             WriteError::InvalidData(s) => write!(f, "Invalid data: {s}"),
             WriteError::Ole(e) => write!(f, "OLE error: {e}"),
             WriteError::Vba(e) => write!(f, "VBA project error: {e}"),
+            WriteError::Package(e) => write!(f, "DOC package error: {e}"),
+            WriteError::UnsupportedProperty => {
+                f.write_str("the requested DOC property has no typed authoring path")
+            },
         }
     }
 }
@@ -47,7 +55,9 @@ impl std::error::Error for WriteError {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
             Self::Vba(error) => Some(error),
+            Self::Package(error) => Some(error),
             Self::InvalidData(_) => None,
+            Self::UnsupportedProperty => None,
         }
     }
 }

@@ -4619,9 +4619,9 @@ the existing phase counters and target hash. They are opt-in evidence only.
 Change 0144 accepts p50/p95 only for its clean, configured-simulator ABBA;
 no cold-I/O, physical-device, ambient-network, allocation, RSS, or semantic
 native-Office claim is made.
-- `doc_fresh_write_to`: construct a new `litchi_doc::writer::Writer`, add the
-  selected fixed paragraphs through its public API, and package it with public
-  `write_to`.
+- `doc_fresh_write_to`: construct a new `litchi_doc::builder::Builder`, add the
+  selected fixed paragraphs through its public API, build a `Package`, and
+  publish it with public `write_to`.
 - `xls_fresh_write_to`: construct a new `litchi_xls::writer::Writer`, add the
   selected sheets and cells through its public API, and package it with public
   `write_to`.

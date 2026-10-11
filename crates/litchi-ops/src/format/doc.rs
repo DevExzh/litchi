@@ -14,17 +14,37 @@
 //! parse. An editor is built from that source at the first edit, never at
 //! open.
 
-use std::io::Cursor;
-use std::sync::Arc;
+use std::io::{Cursor, Write};
+use std::sync::{Arc, OnceLock};
 
 use litchi_cfb::{OleFile, SharedOleFile, SharedOleFileLimits};
-use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt, SourceVersion};
+use litchi_core::{FileFormat, Metadata, OwnedSource, Position, ReadAt, SourceVersion};
 use litchi_doc::body_text::source::SourceSnapshot;
+use litchi_doc::body_text::{
+    OpenOptions as BodyOpenOptions, Snapshot, TransactionLimits as BodyTransactionLimits,
+};
 use litchi_ole_common::property_set::PropertySetReader;
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
-use crate::{OpenOptions, Result};
+use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
+use crate::{IntoProps, OpenOptions, Props, Result, TargetArg};
+
+// The DOC adapter deliberately starts with the smallest complete document
+// vocabulary: root, main body and ordinary main-story paragraphs.  Keeping
+// these nodes leaf-backed means the generic path/query/view surfaces never
+// manufacture a Pending value for an element that the binary reader already
+// knows how to answer.
+pub(crate) mod children;
+mod nav;
+mod node;
+mod spec;
+pub(crate) mod views;
+pub(crate) mod write;
+
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub(crate) use spec::SPEC;
 
 /// An opened legacy Word (`.doc`) document.
 ///
@@ -36,12 +56,17 @@ use crate::{OpenOptions, Result};
 pub struct Doc(Arc<Opened<DocState>>);
 
 struct DocState {
-    /// The reader every M0a read goes through, built at open exactly as the
-    /// facade builds it.
-    reader: litchi_doc::Document,
+    /// The reader every M0a read goes through.  The original open installs
+    /// the already-built reader; an edited body snapshot leaves this empty so
+    /// a generic DOC read pays for one reader build only when it is requested.
+    reader: OnceLock<Result<litchi_doc::Document>>,
     /// The OLE property-set projection, read at open as the facade reads it
     /// (record 0003 §1.6).
     metadata: Metadata,
+    /// Package and reader policy retained for a lazy reader built from an
+    /// edited body snapshot.
+    package_limits: litchi_doc::package::Limits,
+    doc_leniency: litchi_doc::Leniency,
     /// The source an editor is built from.
     source: DocSource,
 }
@@ -52,7 +77,15 @@ struct DocState {
 /// a positional source; a positional route would add a variant here.
 enum DocSource {
     /// The input bytes and the CFB index detection built, sealed together.
-    Retained(Arc<SharedOleFile>),
+    /// The body snapshot is initialized at the first edit and then reused by
+    /// subsequent direct sets and transaction runs.
+    Retained {
+        shared: Arc<SharedOleFile>,
+        snapshot: OnceLock<Result<Arc<Snapshot>>>,
+    },
+    /// A native variable-width body edit result.  Its bytes and policy stay
+    /// alive without reopening or copying the compound file at commit.
+    Edited(Arc<Snapshot>),
     /// The input was released after open (`retain_source(false)`).
     Released,
 }
@@ -64,9 +97,76 @@ const _: () = {
 };
 
 impl Doc {
+    /// Create a canonical blank DOC through the leaf writer.  The empty body
+    /// paragraph is structural document content, not a visible placeholder;
+    /// it gives the native paragraph editor a real formatting run to replace.
+    pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
+        if options.flavor != crate::Flavor::Document {
+            return Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "DOC creation does not support template flavor",
+            )
+            .with_format(FileFormat::Doc));
+        }
+        if options.conformance != crate::Conformance::Transitional {
+            return Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "DOC creation does not support Strict conformance",
+            )
+            .with_format(FileFormat::Doc));
+        }
+        if options.metadata.is_some() {
+            return Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "DOC creation does not yet author initial metadata",
+            )
+            .with_format(FileFormat::Doc));
+        }
+        let mut builder = litchi_doc::Builder::new();
+        builder.add_paragraph("")?;
+        let package = builder.build()?;
+        match Self::from_ole_file(package.into_ole_file(), &OpenOptions::default(), None)? {
+            LegacyOpen::Opened(doc) => Ok(doc),
+            LegacyOpen::PasswordRequired(_) => Err(litchi_doc::Error::PasswordRequired.into()),
+        }
+    }
+
+    pub(crate) fn with_origin(&self, origin: Option<Arc<std::path::Path>>) -> Self {
+        Self(self.0.with_origin(origin))
+    }
+
+    pub(crate) fn origin(&self) -> Option<Arc<std::path::Path>> {
+        self.0.origin()
+    }
+
     /// Whether this handle retains an edit source, without reading any payload.
     pub(crate) fn retains_source(&self) -> bool {
         !matches!(self.0.source, DocSource::Released)
+    }
+
+    /// Fence a source-backed read or edit against a change made after open.
+    /// Retained-source payload reads perform before/after version checks; an
+    /// already released source has no external revision to fence.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        if let DocSource::Retained { shared, .. } = &self.0.source {
+            check_shared_source(shared)?;
+        }
+        Ok(())
+    }
+
+    /// Whether two handles point at the same retained source snapshot.  Byte
+    /// equality is intentionally insufficient for transaction history: a
+    /// separately opened document with identical bytes is still foreign.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        match (&self.0.source, &other.0.source) {
+            (
+                DocSource::Retained { shared: left, .. },
+                DocSource::Retained { shared: right, .. },
+            ) => Arc::ptr_eq(left, right),
+            (DocSource::Edited(left), DocSource::Edited(right)) => Arc::ptr_eq(left, right),
+            (DocSource::Released, DocSource::Released) => Arc::ptr_eq(&self.0, &other.0),
+            _ => false,
+        }
     }
 
     /// Opens the document from the OLE file detection already parsed.
@@ -89,7 +189,10 @@ impl Doc {
         options: &OpenOptions,
         password: Option<&str>,
     ) -> Result<LegacyOpen<Self>> {
-        let mut package = litchi_doc::Package::from_ole_file(ole)?;
+        let mut package = litchi_doc::Package::from_ole_file_with_limits(
+            ole,
+            options.doc.and_then(|doc| doc.limits).unwrap_or_default(),
+        )?;
         let opened = if options.doc.is_none() && password.is_none() {
             package.document()
         } else {
@@ -112,19 +215,36 @@ impl Doc {
             },
             Err(error) => return Err(error.into()),
         };
+        let package_limits = package.limits();
+        let doc_leniency = options
+            .doc
+            .map_or(litchi_doc::Leniency::Strict, |doc| doc.leniency);
         let metadata = package
             .ole_file()
             .get_metadata()
             .map(Metadata::from)
             .unwrap_or_default();
         let source = if options.retain_source {
-            retain(package.into_ole_file())?
+            DocSource::Retained {
+                shared: retain(package.into_ole_file())?,
+                snapshot: OnceLock::new(),
+            }
         } else {
             DocSource::Released
         };
+        let reader_cell = OnceLock::new();
+        if reader_cell.set(Ok(reader)).is_err() {
+            return Err(crate::Error::new(
+                crate::Code::InternalError,
+                "DOC reader initialization was repeated",
+            )
+            .with_format(FileFormat::Doc));
+        }
         Ok(LegacyOpen::Opened(Self(Opened::new(DocState {
-            reader,
+            reader: reader_cell,
             metadata,
+            package_limits,
+            doc_leniency,
             source,
         }))))
     }
@@ -145,7 +265,9 @@ impl Doc {
     ///
     /// Returns a typed DOC error when a text story cannot be decoded.
     pub fn text(&self) -> Result<String> {
-        Ok(self.0.reader.text()?)
+        let result = (|| -> Result<String> { Ok(self.reader()?.text()?) })();
+        self.check_source()?;
+        result
     }
 
     /// The document's OLE property-set metadata, read at open. Always
@@ -154,24 +276,74 @@ impl Doc {
     ///
     /// # Errors
     ///
-    /// Never fails today; the `Result` matches the unified read surface.
+    /// Returns a source error if the retained input changed after opening.
     pub fn metadata(&self) -> Result<Option<Metadata>> {
-        Ok(Some(self.0.metadata.clone()))
+        self.check_source()?;
+        let metadata = self.0.metadata.clone();
+        self.check_source()?;
+        Ok(Some(metadata))
     }
 
     /// Everything the reader repaired while the document was opened.
     ///
     /// # Errors
     ///
-    /// Never fails today; the `Result` matches the unified read surface.
+    /// Returns a source error if the retained input changed after opening.
     pub fn tolerance_report(&self) -> Result<litchi_doc::ToleranceReport> {
-        Ok(self.0.reader.tolerance_report().clone())
+        let result = (|| -> Result<litchi_doc::ToleranceReport> {
+            Ok(self.reader()?.tolerance_report().clone())
+        })();
+        self.check_source()?;
+        result
     }
 
     /// The reader the family views read paragraphs, tables and elements
     /// from.
-    pub(crate) fn reader(&self) -> &litchi_doc::Document {
-        &self.0.reader
+    pub(crate) fn reader(&self) -> Result<&litchi_doc::Document> {
+        if let DocSource::Retained { shared, .. } = &self.0.source {
+            shared.source_version()?;
+        }
+        self.0
+            .reader
+            .get_or_init(|| self.build_reader())
+            .as_ref()
+            .map_err(Clone::clone)
+    }
+
+    /// Borrow the ordinary main-story paragraph stream used by the unified
+    /// body axis.  The generic DOC reader's `Document::paragraphs` includes
+    /// headers, footnotes, comments and other subdocuments, so it must never
+    /// be used to resolve `/body/p[N]`.
+    pub(crate) fn body_paragraphs(&self) -> Result<litchi_doc::BodyParagraphs<'_>> {
+        Ok(self.reader()?.body_paragraphs())
+    }
+
+    /// Collect the ordinary main-story paragraph text for a whole-document
+    /// view.  Collection is local to the view request; the handle retains no
+    /// second paragraph model or full-document text cache.
+    pub(crate) fn body_paragraph_texts(&self) -> Result<Vec<String>> {
+        let result = (|| -> Result<Vec<String>> {
+            self.body_paragraphs()?
+                .map(|paragraph| paragraph.map(str::to_owned).map_err(Into::into))
+                .collect()
+        })();
+        self.check_source()?;
+        result
+    }
+
+    /// Read one ordinary main-story paragraph without crossing into any DOC
+    /// subdocument.  This is the identity boundary shared by read and write.
+    pub(crate) fn body_paragraph_at(&self, position: Position) -> Result<Option<&str>> {
+        let result =
+            (|| -> Result<Option<&str>> { Ok(self.reader()?.body_paragraph_text(position)?) })();
+        self.check_source()?;
+        result
+    }
+
+    pub(crate) fn body_paragraph_count(&self) -> Result<usize> {
+        let result = (|| -> Result<usize> { Ok(self.reader()?.body_paragraph_count()?) })();
+        self.check_source()?;
+        result
     }
 
     /// Builds the source-backed main-story editor over the retained source
@@ -189,17 +361,23 @@ impl Doc {
     /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
     /// while the document is still signed, with a suggestion naming
     /// `Signed::unsign`, and the leaf's typed refusal otherwise.
-    #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive in M2"))]
+    #[cfg_attr(
+        not(test),
+        expect(
+            dead_code,
+            reason = "the narrow equal-width source route is retained for native regression tests"
+        )
+    )]
     pub(crate) fn body_text_editor(&self) -> Result<Option<SourceSnapshot>> {
         if self.0.signature() == Signature::Signed {
             return Err(signature::refusal(FileFormat::Doc));
         }
-        let DocSource::Retained(shared) = &self.0.source else {
+        let DocSource::Retained { shared, .. } = &self.0.source else {
             return Ok(None);
         };
         if self.0.signature() == Signature::RemovalAuthorized {
             let bytes = signature::unsign_compound_file(
-                signature::compound_file_bytes(shared)?,
+                read_shared_bytes(shared)?,
                 litchi_sign::cfb::Format::Doc,
             )?;
             return Ok(Some(SourceSnapshot::from_bytes(bytes)?));
@@ -207,14 +385,322 @@ impl Doc {
         Ok(Some(SourceSnapshot::from_shared(Arc::clone(shared))?))
     }
 
+    /// Opens the variable-width body-text owner used by unified DOC writes.
+    ///
+    /// The narrow [`SourceSnapshot`] remains useful for source-backed
+    /// equal-width callers, but paragraph writes need the leaf's full
+    /// `body_text::Edit`: it can rebuild the CLX and shift dependent CPs when
+    /// replacement text changes width.  This owner is created only at the
+    /// first edit and retains the exact source bytes for no-op publication.
+    pub(crate) fn body_text_snapshot(&self) -> Result<Option<Snapshot>> {
+        if let DocSource::Retained { shared, .. } = &self.0.source {
+            shared.source_version()?;
+        }
+        if self.0.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Doc));
+        }
+        match &self.0.source {
+            DocSource::Retained { shared, snapshot } => snapshot
+                .get_or_init(|| {
+                    let bytes = read_shared_bytes(shared)?;
+                    let bytes = if self.0.signature() == Signature::RemovalAuthorized {
+                        signature::unsign_compound_file(bytes, litchi_sign::cfb::Format::Doc)?
+                    } else {
+                        bytes
+                    };
+                    Snapshot::from_bytes_with_options(
+                        bytes,
+                        body_open_options(self.0.package_limits),
+                    )
+                    .map(Arc::new)
+                    .map_err(Into::into)
+                })
+                .clone()
+                .map(|snapshot| (*snapshot).clone())
+                .map(Some),
+            DocSource::Edited(snapshot) => Ok(Some((**snapshot).clone())),
+            DocSource::Released => Ok(None),
+        }
+    }
+
+    /// Apply text to one paragraph or every paragraph matched by a scoped
+    /// query.  Resolution happens against this immutable handle; all selected
+    /// replacements then commit through one native body-text transaction.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: TargetArg<'p>,
+        props: impl IntoProps<'v>,
+    ) -> Result<WriteCommit> {
+        self.set_with_limits(target, props, &SemanticLimits::default())
+    }
+
+    /// Apply a DOC paragraph text assignment under one unified semantic
+    /// resource profile. Query expansion and the native body transaction use
+    /// the same profile, so a large selector cannot bypass the facade limit.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: TargetArg<'p>,
+        props: impl IntoProps<'v>,
+        limits: &SemanticLimits,
+    ) -> Result<WriteCommit> {
+        self.check_source()?;
+        let result = (|| -> Result<WriteCommit> {
+            let text = paragraph_text_assignment(&Props::from_props(props)?)?;
+            let positions =
+                resolve_paragraph_targets(self, &target, limits.max_expanded_targets())?;
+            if positions.len() > limits.max_operations() {
+                return Err(TransactionError::Limit {
+                    kind: LimitKind::Operations,
+                    observed: positions.len(),
+                    maximum: limits.max_operations(),
+                }
+                .into());
+            }
+            let Some(snapshot) = self.body_text_snapshot()? else {
+                return Err(crate::Error::new(
+                    crate::Code::UnsupportedCapability,
+                    "the DOC document was opened without retaining its source for editing",
+                )
+                .with_format(FileFormat::Doc)
+                .with_suggestion(
+                    "reopen the document without `OpenOptions::retain_source(false)`",
+                ));
+            };
+            let mut edit = snapshot.edit_with_limits(body_transaction_limits(
+                *limits,
+                limits.max_expanded_targets(),
+            ))?;
+            let operations = positions.len();
+            for position in positions {
+                edit.replace_paragraph(position, &text)?;
+            }
+            let commit = edit.commit()?;
+            let changed = commit.changed();
+            let (snapshot, patch) = commit.into_parts();
+            let snapshot_bytes = patch_snapshot_bytes(&patch);
+            if snapshot_bytes > limits.max_snapshot_bytes() {
+                return Err(TransactionError::Limit {
+                    kind: LimitKind::SnapshotBytes,
+                    observed: snapshot_bytes,
+                    maximum: limits.max_snapshot_bytes(),
+                }
+                .into());
+            }
+            let after = if changed {
+                self.with_snapshot(snapshot)
+            } else {
+                self.clone()
+            };
+            Ok(WriteCommit {
+                before: self.clone(),
+                after,
+                patch,
+                operations,
+                snapshot_bytes,
+            })
+        })();
+        self.check_source()?;
+        result
+    }
+
+    /// Publish the exact compound source, preserving signatures until an
+    /// explicitly authorized unsigned handle is written.
+    pub(crate) fn write_to<W: Write>(&self, sink: &mut W) -> Result<u64> {
+        match &self.0.source {
+            DocSource::Retained { shared, .. }
+                if self.0.signature() == Signature::RemovalAuthorized =>
+            {
+                let bytes = signature::unsign_compound_file(
+                    read_shared_bytes(shared)?,
+                    litchi_sign::cfb::Format::Doc,
+                )?;
+                sink.write_all(&bytes).map_err(crate::Error::from)?;
+                Ok(u64::try_from(bytes.len()).unwrap_or(u64::MAX))
+            },
+            DocSource::Retained { shared, .. } => stream_shared(shared, sink),
+            DocSource::Edited(snapshot) => {
+                sink.write_all(snapshot.bytes())
+                    .map_err(crate::Error::from)?;
+                Ok(u64::try_from(snapshot.bytes().len()).unwrap_or(u64::MAX))
+            },
+            DocSource::Released => {
+                return Err(crate::Error::new(
+                    crate::Code::UnsupportedCapability,
+                    "the DOC source was released before publication",
+                )
+                .with_format(FileFormat::Doc));
+            },
+        }
+    }
+
+    fn with_snapshot(&self, snapshot: Snapshot) -> Self {
+        Self(
+            Opened::new(DocState {
+                reader: OnceLock::new(),
+                metadata: self.0.metadata.clone(),
+                package_limits: snapshot.package_limits(),
+                doc_leniency: self.0.doc_leniency,
+                source: DocSource::Edited(Arc::new(snapshot)),
+            })
+            .with_origin(self.origin()),
+        )
+    }
+
+    fn build_reader(&self) -> Result<litchi_doc::Document> {
+        let bytes = match &self.0.source {
+            DocSource::Retained { shared, .. } => read_shared_bytes(shared)?,
+            DocSource::Edited(snapshot) => snapshot.bytes().to_vec(),
+            DocSource::Released => {
+                return Err(crate::Error::new(
+                    crate::Code::UnsupportedCapability,
+                    "the DOC reader was released before lazy materialization",
+                )
+                .with_format(FileFormat::Doc));
+            },
+        };
+        let mut package = litchi_doc::Package::from_bytes_with_options(
+            &bytes,
+            litchi_doc::package::PackageOpenOptions::default().with_limits(self.0.package_limits),
+        )?;
+        let options = litchi_doc::OpenOptions::default().with_leniency(self.0.doc_leniency);
+        Ok(package.document_with_options(options)?)
+    }
+
     /// The length of the retained input, or `None` when it was released.
     #[cfg(test)]
     fn retained_source_len(&self) -> Option<u64> {
         match &self.0.source {
-            DocSource::Retained(shared) => Some(shared.file_size()),
+            DocSource::Retained { shared, .. } => Some(shared.file_size()),
+            DocSource::Edited(snapshot) => Some(snapshot.bytes().len() as u64),
             DocSource::Released => None,
         }
     }
+}
+
+/// The format-specific result retained by the generic transaction history.
+pub(crate) struct WriteCommit {
+    pub(crate) before: Doc,
+    pub(crate) after: Doc,
+    pub(crate) patch: litchi_doc::body_text::Patch,
+    pub(crate) operations: usize,
+    pub(crate) snapshot_bytes: usize,
+}
+
+fn paragraph_text_assignment(props: &Props<'_>) -> Result<String> {
+    if props.len() != 1 {
+        return Err(crate::Error::new(
+            crate::Code::UnsupportedCapability,
+            "DOC paragraph writes accept exactly one `text` property",
+        )
+        .with_format(FileFormat::Doc));
+    }
+    let Some((key, value)) = props.iter().next() else {
+        unreachable!("the length check above admits one property")
+    };
+    if !key.eq_ignore_ascii_case("text") {
+        return Err(crate::Error::new(
+            crate::Code::UnsupportedCapability,
+            "the requested DOC property is not writable",
+        )
+        .with_property(key.as_str().to_owned())
+        .with_format(FileFormat::Doc));
+    }
+    value.as_text().map(str::to_owned).ok_or_else(|| {
+        crate::Error::new(
+            crate::Code::InvalidValue,
+            "DOC paragraph text requires a text property value",
+        )
+        .with_property(key.as_str().to_owned())
+        .with_format(FileFormat::Doc)
+    })
+}
+
+/// The facade's body owner must not inherit the native leaf default of 256
+/// staged operations.  The outer `SemanticLimits` profile is the authority
+/// for unified transactions; this opening profile is deliberately broad and
+/// is narrowed by `Snapshot::edit_with_limits` for each operation.
+fn body_open_options(package_limits: litchi_doc::package::Limits) -> BodyOpenOptions {
+    BodyOpenOptions::default()
+        .with_package_limits(package_limits)
+        .with_transaction_limits(
+            BodyTransactionLimits::new(isize::MAX as usize, usize::MAX, usize::MAX)
+                .with_max_retained_render_bytes(usize::MAX),
+        )
+}
+
+fn body_transaction_limits(
+    limits: SemanticLimits,
+    maximum_targets: usize,
+) -> BodyTransactionLimits {
+    BodyTransactionLimits::new(
+        limits.max_operations().min(maximum_targets),
+        usize::MAX,
+        usize::MAX,
+    )
+    .with_max_retained_render_bytes(limits.max_snapshot_bytes())
+}
+
+fn resolve_paragraph_targets(
+    doc: &Doc,
+    target: &TargetArg<'_>,
+    maximum: usize,
+) -> Result<Vec<Position>> {
+    let mut positions = Vec::new();
+    if let Some(path) = target.path() {
+        let node = crate::path::resolve::get(&Nav::new(doc), path)?;
+        let Some(position) = node.paragraph_position() else {
+            return Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "DOC text writes target paragraph nodes",
+            )
+            .with_format(FileFormat::Doc));
+        };
+        push_position(&mut positions, position, maximum)?;
+    } else if let Some(query) = target.query() {
+        let walk = crate::query::run(Nav::new(doc), query.clone())?;
+        if !walk.plan().diagnostics().is_empty() {
+            return Err(crate::Error::new(
+                crate::Code::InvalidSelector,
+                "the DOC mutation selector contains an unsupported predicate",
+            )
+            .with_format(FileFormat::Doc));
+        }
+        for node in walk {
+            let node = node?;
+            let Some(position) = node.paragraph_position() else {
+                return Err(crate::Error::new(
+                    crate::Code::UnsupportedCapability,
+                    "DOC text writes target paragraph nodes",
+                )
+                .with_format(FileFormat::Doc));
+            };
+            push_position(&mut positions, position, maximum)?;
+        }
+    }
+    if positions.is_empty() {
+        return Err(crate::Error::new(
+            crate::Code::ZeroMatches,
+            "the DOC mutation selector matched no paragraph",
+        )
+        .with_format(FileFormat::Doc));
+    }
+    Ok(positions)
+}
+
+fn push_position(positions: &mut Vec<Position>, position: Position, maximum: usize) -> Result<()> {
+    if positions.len() >= maximum {
+        return Err(TransactionError::Limit {
+            kind: LimitKind::ExpandedTargets,
+            observed: positions.len().saturating_add(1),
+            maximum,
+        }
+        .into());
+    }
+    positions
+        .try_reserve(1)
+        .map_err(|source| TransactionError::Allocation { source })?;
+    positions.push(position);
+    Ok(())
 }
 
 impl std::fmt::Debug for Doc {
@@ -223,23 +709,102 @@ impl std::fmt::Debug for Doc {
             .debug_struct("Doc")
             .field(
                 "source_retained",
-                &matches!(self.0.source, DocSource::Retained(_)),
+                &matches!(
+                    self.0.source,
+                    DocSource::Retained { .. } | DocSource::Edited(_)
+                ),
             )
             .finish_non_exhaustive()
     }
 }
 
 /// Seals a parsed in-memory OLE file as the retained source.
-fn retain(ole: OleFile<Cursor<Vec<u8>>>) -> Result<DocSource> {
+fn retain(ole: OleFile<Cursor<Vec<u8>>>) -> Result<Arc<SharedOleFile>> {
     let shared =
         SharedOleFile::from_owned_ole_file(ole, sealed_version()?, SharedOleFileLimits::default())?;
-    Ok(DocSource::Retained(Arc::new(shared)))
+    Ok(Arc::new(shared))
 }
 
 /// A process-unique identity for a sealed in-memory source, minted by the
 /// same counter as every other [`OwnedSource`].
 fn sealed_version() -> Result<SourceVersion> {
     Ok(OwnedSource::new(Vec::new()).version()?)
+}
+
+/// Check the positional source identity without materializing the compound
+/// file.  Payload reads below repeat the check after the read as well.
+fn check_shared_source(shared: &SharedOleFile) -> Result<()> {
+    let source = shared.source_arc();
+    let expected = shared.captured_source_version();
+    let observed = source.version()?;
+    if observed != expected {
+        return Err(litchi_core::Error::SourceChanged { expected, observed }.into());
+    }
+    Ok(())
+}
+
+/// Materialize a retained source only for a native snapshot or a signature
+/// transformation.  Ordinary publication uses [`stream_shared`] instead.
+fn read_shared_bytes(shared: &SharedOleFile) -> Result<Vec<u8>> {
+    signature::compound_file_bytes(shared)
+}
+
+fn stream_shared<W: Write>(shared: &SharedOleFile, sink: &mut W) -> Result<u64> {
+    let source = shared.source_arc();
+    let expected = shared.captured_source_version();
+    let before = source.version()?;
+    if before != expected {
+        return Err(litchi_core::Error::SourceChanged {
+            expected,
+            observed: before,
+        }
+        .into());
+    }
+    let length = source.len()?;
+    let mut offset = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    while offset < length {
+        let remaining = length.saturating_sub(offset);
+        let size = usize::try_from(remaining)
+            .unwrap_or(buffer.len())
+            .min(buffer.len());
+        source.read_exact_at(offset, &mut buffer[..size])?;
+        sink.write_all(&buffer[..size])
+            .map_err(crate::Error::from)?;
+        offset = offset.saturating_add(u64::try_from(size).unwrap_or(u64::MAX));
+    }
+    let after = source.version()?;
+    if after != expected {
+        return Err(litchi_core::Error::SourceChanged {
+            expected,
+            observed: after,
+        }
+        .into());
+    }
+    Ok(length)
+}
+
+/// Charge both immutable endpoint snapshots and the semantic patch payload.
+/// Text is retained in the patch in addition to the endpoint bytes; fixed
+/// change descriptors account for formatting/resource operations.
+pub(crate) fn patch_snapshot_bytes(patch: &litchi_doc::body_text::Patch) -> usize {
+    let endpoints = patch
+        .before()
+        .bytes()
+        .len()
+        .saturating_add(patch.after().bytes().len());
+    let descriptors = size_of::<litchi_doc::body_text::ChangeRef<'static>>()
+        .saturating_mul(patch.changes().len());
+    let text = patch.changes().fold(0usize, |total, change| match change {
+        litchi_doc::body_text::ChangeRef::Text { before, after, .. } => total
+            .saturating_add(before.len())
+            .saturating_add(after.len()),
+        _ => total,
+    });
+    size_of::<litchi_doc::body_text::Patch>()
+        .saturating_add(endpoints)
+        .saturating_add(descriptors)
+        .saturating_add(text)
 }
 
 #[cfg(test)]
@@ -361,7 +926,9 @@ mod tests {
                     "{name}"
                 );
                 assert_eq!(
-                    doc.reader().paragraph_count().ok(),
+                    doc.reader()
+                        .ok()
+                        .and_then(|reader| reader.paragraph_count().ok()),
                     document.paragraph_count().ok(),
                     "{name}"
                 );
@@ -434,14 +1001,14 @@ mod tests {
         let editor = doc.body_text_editor().unwrap().expect("retained source");
         let oracle = SourceSnapshot::from_bytes(bytes).unwrap();
         assert_eq!(editor.fingerprint(), oracle.fingerprint());
-        let first = litchi_core::Position::new(0);
+        let first = Position::new(0);
         assert_eq!(
             editor.paragraph(first).unwrap().text(),
             oracle.paragraph(first).unwrap().text()
         );
         // The editor is built over the retained source, not over a copy:
         // the sealed source's process-unique identity carries over.
-        let DocSource::Retained(shared) = &doc.0.source else {
+        let DocSource::Retained { shared, .. } = &doc.0.source else {
             panic!("source not retained");
         };
         assert_eq!(editor.source_version(), shared.captured_source_version());

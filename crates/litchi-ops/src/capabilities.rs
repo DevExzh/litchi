@@ -88,7 +88,13 @@
 // helpers that read spec tables are unused. Those lints are allowed in such
 // builds only; each adapter adds its feature to this list.
 #![cfg_attr(
-    not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb")),
+    not(any(
+        feature = "doc",
+        feature = "docx",
+        feature = "xlsx",
+        feature = "pptx",
+        feature = "xlsb"
+    )),
     allow(
         dead_code,
         unreachable_code,
@@ -423,7 +429,13 @@ const CREATE_PENDING: Refusal = Refusal {
 };
 
 /// A retained edit source is required for file-specific writes.
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xlsb"
+))]
 const RETAINED_SOURCE: Refusal = Refusal {
     code: Code::UnsupportedCapability,
     follow_up: "reopen with OpenOptions::retain_source(true)",
@@ -611,6 +623,15 @@ impl Capabilities {
             }.support();
         }
         if verb.is_edit() {
+            #[cfg(feature = "doc")]
+            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
+                && self.adapter() == Some(Adapter::Doc)
+            {
+                if self.retains_source == Some(false) {
+                    return RETAINED_SOURCE.support();
+                }
+                return Support::Supported;
+            }
             #[cfg(feature = "docx")]
             if matches!(
                 verb,
@@ -728,7 +749,13 @@ impl Capabilities {
     fn publication_support(&self) -> Support {
         if matches!(
             self.format,
-            Some(FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx | FileFormat::Xlsb)
+            Some(
+                FileFormat::Doc
+                    | FileFormat::Docx
+                    | FileFormat::Xlsx
+                    | FileFormat::Pptx
+                    | FileFormat::Xlsb,
+            )
         ) && self.adapter().is_some()
         {
             Support::Supported
@@ -743,7 +770,13 @@ impl Capabilities {
     fn creation_support(&self) -> Support {
         if matches!(
             self.format,
-            Some(FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx | FileFormat::Xlsb)
+            Some(
+                FileFormat::Doc
+                    | FileFormat::Docx
+                    | FileFormat::Xlsx
+                    | FileFormat::Pptx
+                    | FileFormat::Xlsb,
+            )
         ) && self.adapter().is_some()
         {
             Support::Supported
@@ -1026,6 +1059,100 @@ static PDF_GAP: GapSpec = view_gap_spec(
     "design §10 (rendering is out of scope)",
     "visual rendering is outside the unified layer",
 );
+
+/// DOC creator options that the canonical ordinary-document builder cannot
+/// honor. They remain visible in the report so callers can discover the
+/// accepted flavor, conformance and metadata policy before calling create.
+#[cfg(feature = "doc")]
+static DOC_CREATION_OPTION_GAPS: [GapSpec; 3] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "document",
+            context: "template",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "CreateOptions::flavor(Flavor::Document)",
+        reason: "the DOC creator emits ordinary documents and refuses template flavor rather than silently changing the requested content type",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "document",
+            context: "strict-conformance",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "CreateOptions::conformance(Conformance::Transitional)",
+        reason: "legacy DOC has one canonical binary writer and does not accept an OOXML Strict conformance request",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "document",
+            context: "initial-metadata",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 DOC initial metadata authoring",
+        reason: "the DOC creator currently emits a blank body only and refuses initial metadata rather than dropping it",
+    },
+];
+
+/// DOC structural and batch contexts outside the deliberately narrow body
+/// paragraph text setter. `batch` remains supported for atomic text sets;
+/// structural commands are listed here so the report does not overclaim it.
+#[cfg(feature = "doc")]
+static DOC_WRITE_GAPS: [GapSpec; 5] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "body",
+            context: "structural-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 DOC structural body editing",
+        reason: "the DOC write adapter currently replaces existing ordinary paragraph text and does not add elements",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "body",
+            context: "structural-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 DOC structural body editing",
+        reason: "the DOC write adapter currently replaces existing ordinary paragraph text and does not remove elements",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "body",
+            context: "structural-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 DOC structural body editing",
+        reason: "the DOC write adapter currently replaces existing ordinary paragraph text and does not move elements",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "body",
+            context: "structural-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 DOC structural body editing",
+        reason: "the DOC write adapter currently replaces existing ordinary paragraph text and does not reorder elements",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "batch",
+            element: "body",
+            context: "non-text-command",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 DOC structural batch commands",
+        reason: "DOC atomic batches currently admit paragraph text sets only; structural and read commands remain refused",
+    },
+];
 
 /// DOCX creator options that are intentionally refused by the leaf creator.
 /// They are format-level operation gaps rather than element properties: the
@@ -1657,6 +1784,22 @@ const fn encrypted_docx_edit_gap(verb: &'static str) -> GapSpec {
     }
 }
 
+#[cfg(feature = "doc")]
+const _: () = {
+    let mut index = 0;
+    while index < DOC_CREATION_OPTION_GAPS.len() {
+        assert!(crate::node::spec::gap_valid(
+            &DOC_CREATION_OPTION_GAPS[index]
+        ));
+        index += 1;
+    }
+    let mut index = 0;
+    while index < DOC_WRITE_GAPS.len() {
+        assert!(crate::node::spec::gap_valid(&DOC_WRITE_GAPS[index]));
+        index += 1;
+    }
+};
+
 #[cfg(feature = "docx")]
 const _: () = {
     let mut index = 0;
@@ -1720,6 +1863,8 @@ const _: () = {
 /// §6.1). The liveness tests check each adapter's views against it.
 const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
     match adapter {
+        #[cfg(feature = "doc")]
+        Adapter::Doc => m1_view_gap(mode),
         #[cfg(feature = "docx")]
         Adapter::Docx => m1_view_gap(mode),
         #[cfg(feature = "xlsx")]
@@ -1839,6 +1984,9 @@ macro_rules! check_capabilities {
         };
     };
 }
+
+#[cfg(feature = "doc")]
+check_capabilities!(crate::format::doc::SPEC);
 
 #[cfg(feature = "docx")]
 check_capabilities!(crate::format::docx::SPEC);
@@ -2079,6 +2227,12 @@ impl Element {
                 false
             }
         };
+        #[cfg(feature = "doc")]
+        let settable = settable
+            || (self.adapter == Adapter::Doc
+                && self.retains_source != Some(false)
+                && self.data().canonical == "p"
+                && readable);
         #[cfg(feature = "xlsx")]
         let settable = settable
             || (self.adapter == Adapter::Xlsx
@@ -2444,6 +2598,15 @@ static PPTX_WRITE_GAPS: [GapSpec; 14] = [
 
 /// Format-level option gaps that do not belong to the read spec table.
 fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>> {
+    #[cfg(feature = "doc")]
+    if adapter == Adapter::Doc {
+        if let Some(gap) = DOC_CREATION_OPTION_GAPS.get(index) {
+            return Some(Some(gap));
+        }
+        return DOC_WRITE_GAPS
+            .get(index.saturating_sub(DOC_CREATION_OPTION_GAPS.len()))
+            .map(Some);
+    }
     #[cfg(feature = "pptx")]
     if adapter == Adapter::Pptx {
         return PPTX_WRITE_GAPS.get(index).map(Some);

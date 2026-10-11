@@ -211,7 +211,11 @@ impl<'a> DocumentView<'a> {
                 ),
             },
             #[cfg(feature = "doc")]
-            Inner::Doc(doc) => Ok(doc.reader().paragraph_count()?),
+            Inner::Doc(doc) => {
+                let result = (|| Ok(doc.reader()?.paragraph_count()?))();
+                doc.check_source()?;
+                result
+            },
             #[cfg(feature = "rtf")]
             Inner::Rtf(rtf) => Ok(rtf.document().paragraph_count()),
             #[cfg(feature = "odt")]
@@ -245,13 +249,18 @@ impl<'a> DocumentView<'a> {
                 ),
             },
             #[cfg(feature = "doc")]
-            Inner::Doc(doc) => doc
-                .reader()
-                .paragraphs()?
-                .into_iter()
-                .nth(index)
-                .map(|paragraph| Ok(paragraph.text()?.to_owned()))
-                .transpose(),
+            Inner::Doc(doc) => {
+                let result = (|| {
+                    doc.reader()?
+                        .paragraphs()?
+                        .into_iter()
+                        .nth(index)
+                        .map(|paragraph| Ok(paragraph.text()?.to_owned()))
+                        .transpose()
+                })();
+                doc.check_source()?;
+                result
+            },
             #[cfg(feature = "rtf")]
             Inner::Rtf(rtf) => Ok(rtf
                 .document()
@@ -298,12 +307,18 @@ impl<'a> DocumentView<'a> {
                 ),
             },
             #[cfg(feature = "doc")]
-            Inner::Doc(doc) => Ok(doc
-                .reader()
-                .paragraphs()?
-                .into_iter()
-                .nth(index)
-                .map(Paragraph::Doc)),
+            Inner::Doc(doc) => {
+                let result = (|| {
+                    Ok(doc
+                        .reader()?
+                        .paragraphs()?
+                        .into_iter()
+                        .nth(index)
+                        .map(Paragraph::Doc))
+                })();
+                doc.check_source()?;
+                result
+            },
             #[cfg(feature = "rtf")]
             Inner::Rtf(_) => Ok(self.paragraphs()?.into_iter().nth(index)),
             #[cfg(feature = "odt")]
@@ -349,12 +364,18 @@ impl<'a> DocumentView<'a> {
                 })()),
             },
             #[cfg(feature = "doc")]
-            Inner::Doc(doc) => Ok(doc
-                .reader()
-                .paragraphs()?
-                .into_iter()
-                .map(Paragraph::Doc)
-                .collect()),
+            Inner::Doc(doc) => {
+                let result = (|| {
+                    Ok(doc
+                        .reader()?
+                        .paragraphs()?
+                        .into_iter()
+                        .map(Paragraph::Doc)
+                        .collect())
+                })();
+                doc.check_source()?;
+                result
+            },
             #[cfg(feature = "rtf")]
             Inner::Rtf(rtf) => Ok(rtf
                 .document()
@@ -412,12 +433,18 @@ impl<'a> DocumentView<'a> {
                 })()),
             },
             #[cfg(feature = "doc")]
-            Inner::Doc(doc) => Ok(doc
-                .reader()
-                .tables()?
-                .into_iter()
-                .map(|table| Table::Doc(Box::new(table)))
-                .collect()),
+            Inner::Doc(doc) => {
+                let result = (|| {
+                    Ok(doc
+                        .reader()?
+                        .tables()?
+                        .into_iter()
+                        .map(|table| Table::Doc(Box::new(table)))
+                        .collect())
+                })();
+                doc.check_source()?;
+                result
+            },
             // Detach each table from the source buffer without flattening it:
             // `into_owned` keeps merge roles, borders, widths, nested tables
             // and drawings that a text-only rebuild would discard.
@@ -473,19 +500,25 @@ impl<'a> DocumentView<'a> {
                 },
             },
             #[cfg(feature = "doc")]
-            Inner::Doc(doc) => Ok(doc
-                .reader()
-                .elements()?
-                .into_iter()
-                .map(|element| match element {
-                    litchi_doc::Element::Paragraph(paragraph) => {
-                        DocumentElement::Paragraph(Box::new(Paragraph::Doc(*paragraph)))
-                    },
-                    litchi_doc::Element::Table(table) => {
-                        DocumentElement::Table(Box::new(Table::Doc(table)))
-                    },
-                })
-                .collect()),
+            Inner::Doc(doc) => {
+                let result = (|| {
+                    Ok(doc
+                        .reader()?
+                        .elements()?
+                        .into_iter()
+                        .map(|element| match element {
+                            litchi_doc::Element::Paragraph(paragraph) => {
+                                DocumentElement::Paragraph(Box::new(Paragraph::Doc(*paragraph)))
+                            },
+                            litchi_doc::Element::Table(table) => {
+                                DocumentElement::Table(Box::new(Table::Doc(table)))
+                            },
+                        })
+                        .collect())
+                })();
+                doc.check_source()?;
+                result
+            },
             #[cfg(feature = "rtf")]
             Inner::Rtf(rtf) => Ok(rtf
                 .document()

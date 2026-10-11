@@ -563,6 +563,32 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
             /comments/comment[N], /styles/<style id>, /numbering or /section[N]",
 };
 
+/// Legacy Word shares the semantic path spelling but has no OOXML paragraph
+/// wire identities. Keep the known unsupported concepts for typed refusals.
+#[cfg(feature = "doc")]
+pub(crate) static DOC: Vocabulary = Vocabulary {
+    family: WORD.family,
+    root: WORD.root,
+    aliases: WORD.aliases,
+    elements: &doc_elements(),
+    roots: WORD.roots,
+};
+
+#[cfg(feature = "doc")]
+const fn doc_elements() -> [ElementRule; WORD.elements.len()] {
+    let mut rules = [ElementRule::new(""); WORD.elements.len()];
+    let mut index = 0;
+    while index < rules.len() {
+        rules[index] = WORD.elements[index];
+        let name = rules[index].name.as_bytes();
+        if name.len() == 1 && name[0] == b'p' {
+            rules[index].identities = &[];
+        }
+        index += 1;
+    }
+    rules
+}
+
 /// Presentations: PPTX, PPT, ODP.
 ///
 /// In paths, `textbox` and `title` are plain aliases of `shape`, counted with

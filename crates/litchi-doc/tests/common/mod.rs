@@ -1,7 +1,7 @@
 //! Shared DOC fixture normalization for integration tests.
 
+use litchi_doc::builder::Builder;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::writer::Writer;
 use litchi_ole_common::object::{Editor as ObjectEditor, Limits, Targets};
 use std::io::Cursor;
 
@@ -35,12 +35,16 @@ fn extract_dop(bytes: Vec<u8>) -> (Vec<u8>, FileInformationBlock) {
 
 /// Returns a canonical, valid Word 97 DOP payload from the checked-in writer.
 pub(crate) fn valid_word97_dop() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_paragraph("DOP fixture")
         .expect("DOP fixture paragraph");
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("DOP fixture DOC");
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut output)
+        .expect("DOP fixture DOC");
     let (mut dop, _) = extract_dop(output.into_inner());
     dop.truncate(WORD97_DOP_LENGTH);
     assert_eq!(dop.len(), WORD97_DOP_LENGTH);
