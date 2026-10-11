@@ -32,7 +32,7 @@ use litchi_cfb::{
     ArtifactFingerprint, ComposedOverlaySource, OverlayError, OverlayOperationShape, PublishReport,
     SameLengthStreamSplice, StreamSpliceLimits, ValidatedOverlayPlan,
 };
-use litchi_cfb::{OleFileLimits, consts::STGTY_STORAGE};
+use litchi_cfb::{OleFileLimits, SharedOleFileLimits, consts::STGTY_STORAGE};
 use litchi_core::binary;
 pub use litchi_core::patch::HistoryLimits;
 use litchi_core::patch::{
@@ -492,7 +492,7 @@ impl SourcePolicyFacts {
 /// the only thing that changed is which complete `Workbook` parse answers
 /// them. The two parses read the same sealed bytes (`expected_bytes`, proved
 /// identical by the first check) through the same `Workbook::new` under the
-/// same default `Limits`.
+/// same retained object and CFB limits.
 #[derive(Clone, Copy)]
 struct NumericTargetVerification<'a> {
     expected_bytes: &'a [u8],
@@ -535,6 +535,8 @@ impl NumericTargetVerification<'_> {
 struct Inner {
     bytes: Arc<[u8]>,
     source_version: SourceVersion,
+    limits: Limits,
+    cfb_limits: OleFileLimits,
     workbook_path: Vec<String>,
     workbook_stream: Arc<[u8]>,
     shared_strings: Arc<Vec<String>>,
@@ -546,6 +548,12 @@ struct Inner {
 }
 
 /// Immutable, cheaply cloned snapshot of an editable XLS package.
+///
+/// A snapshot retains the object-capture and low-level CFB admission profiles
+/// accepted at ingress. Those profiles are part of the snapshot's policy
+/// identity: equal bytes opened under different profiles cannot be joined,
+/// and every candidate derived from a snapshot remains subject to its
+/// retained profiles.
 #[derive(Clone)]
 pub struct Snapshot {
     inner: Arc<Inner>,
@@ -575,7 +583,12 @@ impl Snapshot {
     /// The bounded corpus and other security-sensitive callers use this entry
     /// point instead of inheriting the broad convenience defaults.
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        let package = PackageEditor::open(bytes, Targets::default(), limits)?;
+        let package = PackageEditor::open_with_cfb_limits(
+            bytes,
+            Targets::default(),
+            limits,
+            OleFileLimits::default(),
+        )?;
         Self::from_package_editor(package)
     }
 
@@ -675,6 +688,8 @@ impl Snapshot {
         rendered: Option<Vec<u8>>,
         verification: Option<NumericTargetVerification<'_>>,
     ) -> Result<Self> {
+        let limits = package.limits();
+        let cfb_limits = package.cfb_limits();
         let workbook_path = [vec!["Workbook".to_string()], vec!["Book".to_string()]]
             .into_iter()
             .find(|path| package.stream(path).is_some())
@@ -703,7 +718,11 @@ impl Snapshot {
             Some(verification) => verification.kept_cells()?,
             None => KeptCells::none(),
         };
-        let workbook = Workbook::validation_only(Cursor::new(source.as_slice()), kept)?;
+        let workbook = Workbook::validation_only_with_cfb_limits(
+            Cursor::new(source.as_slice()),
+            kept,
+            cfb_limits,
+        )?;
         let source_policy = SourcePolicyFacts::from_workbook(&workbook, &sheets)?;
         let shared_strings = workbook.shared_strings_shared();
         let shared_string_properties =
@@ -724,6 +743,8 @@ impl Snapshot {
             inner: Arc::new(Inner {
                 bytes: Arc::from(source),
                 source_version,
+                limits,
+                cfb_limits,
                 workbook_path,
                 workbook_stream,
                 shared_strings,
@@ -754,9 +775,10 @@ impl Snapshot {
         // Only the private offset inventory is carried forward after proving
         // that every other Workbook-stream byte is unchanged. Its
         // validation-only mode decodes just the cells the readback reads.
-        let workbook = Workbook::validation_only(
+        let workbook = Workbook::validation_only_with_cfb_limits(
             Cursor::new(source.as_slice()),
             numeric_readback_cells(source_snapshot, changes)?,
+            source_snapshot.inner.cfb_limits,
         )?;
         let source_policy = SourcePolicyFacts::from_workbook(&workbook, &sheets)?;
         verify_public_numeric_readback(&workbook, source_snapshot, changes)?;
@@ -765,6 +787,8 @@ impl Snapshot {
             inner: Arc::new(Inner {
                 bytes: Arc::from(source),
                 source_version: fresh_snapshot_source_version(),
+                limits: package.limits(),
+                cfb_limits: package.cfb_limits(),
                 workbook_path: source_snapshot.inner.workbook_path.clone(),
                 workbook_stream,
                 shared_strings: Arc::clone(&source_snapshot.inner.shared_strings),
@@ -788,6 +812,8 @@ impl Snapshot {
             inner: Arc::new(Inner {
                 bytes: Arc::clone(&inner.bytes),
                 source_version,
+                limits: inner.limits,
+                cfb_limits: inner.cfb_limits,
                 workbook_path: inner.workbook_path.clone(),
                 workbook_stream: Arc::clone(&inner.workbook_stream),
                 shared_strings: Arc::clone(&inner.shared_strings),
@@ -1118,6 +1144,9 @@ impl CellConflict {
 pub enum JoinError {
     /// Transactions do not share the same exact immutable source artifact.
     DifferentSource,
+    /// Transactions have equal source bytes but different retained admission
+    /// profiles and therefore cannot be composed without discarding policy.
+    DifferentLimits,
     /// At least one cell has incompatible requested outcomes.
     Conflicts(Box<[CellConflict]>),
     /// Structural operations overlap or request divergent outcomes.
@@ -1141,6 +1170,11 @@ impl Edit {
     pub fn join(&mut self, incoming: Self) -> std::result::Result<&mut Self, JoinError> {
         if self.source.bytes() != incoming.source.bytes() {
             return Err(JoinError::DifferentSource);
+        }
+        if self.source.inner.limits != incoming.source.inner.limits
+            || self.source.inner.cfb_limits != incoming.source.inner.cfb_limits
+        {
+            return Err(JoinError::DifferentLimits);
         }
         let mut conflicts = Vec::new();
         let mut additions = 0_usize;
@@ -2804,10 +2838,15 @@ impl Edit {
         }
 
         let workbook: Arc<[u8]> = Arc::from(workbook_bytes);
-        let mut package = PackageEditor::open(
+        // Candidate admission must retain both profiles accepted by the
+        // immutable source owner.  The CFB profile is part of the source
+        // contract even when the object profile alone would accept the
+        // replacement stream.
+        let mut package = PackageEditor::open_with_cfb_limits(
             self.source.inner.bytes.to_vec(),
             Targets::default(),
-            Limits::default(),
+            self.source.inner.limits,
+            self.source.inner.cfb_limits,
         )?;
         // The committed package editor has already rendered, reopened, and
         // recaptured the candidate CFB, and it hands back the exact artifact
@@ -3268,7 +3307,8 @@ impl fmt::Debug for Commit {
 }
 
 impl Commit {
-    /// Records this commit in bounded history after checking its exact base.
+    /// Records this commit in bounded history after checking its exact base
+    /// and matching retained admission profiles.
     ///
     /// # Errors
     ///
@@ -3278,6 +3318,13 @@ impl Commit {
         if history.current().bytes() != self.patch.before() {
             return Err(Error::UnsafeEdit(
                 "XLS cell history current snapshot does not match commit base".into(),
+            ));
+        }
+        if history.current().inner.limits != self.snapshot.inner.limits
+            || history.current().inner.cfb_limits != self.snapshot.inner.cfb_limits
+        {
+            return Err(Error::UnsafeEdit(
+                "XLS cell history source profiles do not match commit profiles".into(),
             ));
         }
         let weight = u64::try_from(self.patch.before.len())
@@ -5252,7 +5299,11 @@ impl Patch {
         if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::from_bytes(self.after.to_vec())
+        Snapshot::from_bytes_with_limits_and_cfb(
+            self.after.to_vec(),
+            source.inner.limits,
+            source.inner.cfb_limits,
+        )
     }
 
     /// Returns the exact inverse patch.
@@ -5357,9 +5408,10 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
     // still checked independently below over the composed positional reader.
     source.inner.source_policy.require()?;
 
-    let publisher = SourceBackedOverlayPublisher::open_owned(
+    let publisher = SourceBackedOverlayPublisher::open_owned_with_limits(
         Arc::clone(&source.inner.bytes),
         source.inner.source_version,
+        shared_ole_limits(source.inner.cfb_limits)?,
     )
     .map_err(source_backed_overlay_error)?;
     let source_version = publisher
@@ -5437,9 +5489,10 @@ fn verify_source_backed_numeric_plan_target(
     source: &Snapshot,
     changes: &[Change],
 ) -> Result<SourceVersion> {
-    let workbook = Workbook::validation_only(
+    let workbook = Workbook::validation_only_with_cfb_limits(
         ComposedPositionalReader::new(candidate.clone()),
         numeric_readback_cells(source, changes)?,
+        source.inner.cfb_limits,
     )?;
     require_public_worksheet_coverage(&workbook, &source.inner.sheets)?;
     require_unprotected_workbook(&workbook)?;
@@ -5478,9 +5531,10 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
     // complete reopen.
     source.inner.source_policy.require()?;
 
-    let publisher = SourceBackedOverlayPublisher::open_owned(
+    let publisher = SourceBackedOverlayPublisher::open_owned_with_limits(
         Arc::clone(&source.inner.bytes),
         source.inner.source_version,
+        shared_ole_limits(source.inner.cfb_limits)?,
     )
     .map_err(source_backed_overlay_error)?;
     let source_version = publisher
@@ -5527,8 +5581,12 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         source.clone()
     } else {
         let target_bytes = materialize_numeric_plan(&plan, source.bytes().len())?;
-        let package =
-            PackageEditor::open(target_bytes.clone(), Targets::default(), Limits::default())?;
+        let package = PackageEditor::open_with_cfb_limits(
+            target_bytes.clone(),
+            Targets::default(),
+            source.inner.limits,
+            source.inner.cfb_limits,
+        )?;
         // The publication boundary's complete reopen already parses this
         // target in full. The target checks below used to run on a second,
         // independent `Workbook::new` over the identical bytes; they now read
@@ -5715,6 +5773,16 @@ fn materialize_numeric_plan(plan: &ValidatedOverlayPlan, capacity: usize) -> Res
         ));
     }
     Ok(bytes)
+}
+
+fn shared_ole_limits(limits: OleFileLimits) -> Result<SharedOleFileLimits> {
+    let max_input_bytes = limits.max_input_bytes();
+    let max_directory_bytes = limits.max_directory_bytes();
+    let max_allocation_table_bytes = limits.max_allocation_table_bytes();
+    SharedOleFileLimits::new(max_input_bytes)
+        .and_then(|limits| limits.with_max_directory_bytes(max_directory_bytes))
+        .and_then(|limits| limits.with_max_allocation_table_bytes(max_allocation_table_bytes))
+        .map_err(Error::Cfb)
 }
 
 fn source_backed_overlay_error(error: OverlayError) -> Error {

@@ -1234,3 +1234,13 @@ immutable `Package`/read-only `Workbook` migration, package commit accessors,
 source/options vocabulary, and remaining focused aliases are still pending;
 this family is not yet registered as fully conformant. See
 [0194](unified-ops/0194-xls-edit-vocabulary.md).
+
+## XLS retained policies (record 0195)
+
+The focused cell-values Snapshot retains its object and physical CFB profiles
+through edits and replay. Exact patch application uses the destination's
+profile; joins and history recording refuse mismatched profiles. Shared CFB
+and OLE ownership retains the selected bounds through candidate validation,
+copy-through and layout changes. This policy fix precedes the canonical XLS
+SourceLimits/OpenOptions and Package migration; it does not mark that API
+family complete. See [0195](unified-ops/0195-xls-retained-limits.md).

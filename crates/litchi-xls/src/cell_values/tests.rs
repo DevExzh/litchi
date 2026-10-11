@@ -5,7 +5,9 @@
 )]
 
 use super::*;
-use litchi_cfb::{OleFile, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile};
+use litchi_cfb::{
+    OleFile, OleFileLimits, OleWriter, OutputProgress, OverlaySourceMode, SharedOleFile,
+};
 use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 
@@ -358,6 +360,18 @@ fn stream(bytes: &[u8], name: &str) -> Vec<u8> {
         .unwrap()
 }
 
+fn retained_edit_limits(bytes: &[u8]) -> (Limits, OleFileLimits) {
+    let workbook_bytes = u64::try_from(stream(bytes, "Workbook").len()).unwrap();
+    let package_bytes = u64::try_from(bytes.len()).unwrap();
+    let limits = Limits {
+        max_stream_size: workbook_bytes,
+        max_total_size: package_bytes,
+        ..Limits::default()
+    };
+    let cfb_limits = OleFileLimits::new(package_bytes).unwrap();
+    (limits, cfb_limits)
+}
+
 #[test]
 fn edits_only_one_number_field_and_round_trips_patch() {
     let source = Snapshot::from_bytes(package()).unwrap();
@@ -423,6 +437,108 @@ fn edits_only_one_number_field_and_round_trips_patch() {
         commit.patch().inverse().apply(&applied).unwrap().bytes(),
         source.bytes()
     );
+}
+
+#[test]
+fn retained_limits_survive_noop_changed_and_inverse_publication() {
+    let bytes = package();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let source = Snapshot::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits).unwrap();
+
+    let noop = source.edit().commit().unwrap();
+    assert!(Arc::ptr_eq(
+        &source.inner.bytes,
+        &noop.snapshot().inner.bytes
+    ));
+    assert_eq!(noop.snapshot().inner.limits, limits);
+    assert_eq!(noop.snapshot().inner.cfb_limits, cfb_limits);
+
+    let reference = Reference::new(3, 2).unwrap();
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.snapshot().inner.limits, limits);
+    assert_eq!(commit.snapshot().inner.cfb_limits, cfb_limits);
+
+    let applied = commit.patch().apply(&source).unwrap();
+    assert_eq!(applied.inner.limits, limits);
+    assert_eq!(applied.inner.cfb_limits, cfb_limits);
+    let reverted = commit.patch().inverse().apply(&applied).unwrap();
+    assert_eq!(reverted.bytes(), source.bytes());
+    assert_eq!(reverted.inner.limits, limits);
+    assert_eq!(reverted.inner.cfb_limits, cfb_limits);
+}
+
+#[test]
+fn retained_limits_survive_source_backed_and_plan_publication() {
+    let bytes = package();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let source = Snapshot::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+
+    let mut edit = source.edit();
+    edit.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let commit = edit.commit_source_backed().unwrap();
+    assert_eq!(commit.source().inner.limits, limits);
+    assert_eq!(commit.snapshot().inner.limits, limits);
+    assert_eq!(commit.source().inner.cfb_limits, cfb_limits);
+    assert_eq!(commit.snapshot().inner.cfb_limits, cfb_limits);
+
+    let mut plan_edit = source.edit();
+    plan_edit
+        .set_number("Sheet1".into(), reference, 9.25)
+        .unwrap();
+    let plan = plan_edit.commit_source_backed_plan().unwrap();
+    assert_eq!(plan.source().inner.limits, limits);
+    assert_eq!(plan.source().inner.cfb_limits, cfb_limits);
+}
+
+#[test]
+fn retained_stream_limit_rejects_a_growing_candidate() {
+    let bytes = package();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let source = Snapshot::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits).unwrap();
+    let before = source.bytes().to_vec();
+
+    let mut edit = source.edit();
+    edit.rename_sheet("Sheet1".into(), "Renamed").unwrap();
+    let error = edit.commit().unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Cfb(litchi_cfb::OleError::InvalidFormat(message))
+            if message.contains("replacement stream exceeds size limit")
+    ));
+    assert_eq!(source.bytes(), before.as_slice());
+}
+
+#[test]
+fn broad_patch_cannot_widen_a_narrow_same_bytes_destination() {
+    let bytes = package();
+    let broad = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let narrow = Snapshot::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits).unwrap();
+    let before = narrow.bytes().to_vec();
+
+    let mut edit = broad.edit();
+    edit.rename_sheet("Sheet1".into(), "Renamed").unwrap();
+    let broad_commit = edit.commit().unwrap();
+    let error = broad_commit.patch().apply(&narrow).unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Cfb(litchi_cfb::OleError::InvalidFormat(message))
+            if message.contains("Workbook") && message.contains("exceeds size limit")
+    ));
+    assert_eq!(narrow.bytes(), before.as_slice());
+    assert_eq!(narrow.inner.limits, limits);
+    assert_eq!(narrow.inner.cfb_limits, cfb_limits);
+    let mut history = narrow.history(HistoryLimits::new(2, 1024 * 1024));
+    assert!(
+        matches!(broad_commit.record_in(&mut history), Err(Error::UnsafeEdit(message))
+        if message.contains("source profiles"))
+    );
+    assert_eq!(history.current().bytes(), narrow.bytes());
+    assert_eq!(history.current().inner.limits, limits);
+    assert_eq!(history.current().inner.cfb_limits, cfb_limits);
 }
 
 #[test]
@@ -2012,6 +2128,43 @@ fn joins_disjoint_work_and_reports_cell_conflicts() {
     assert_eq!(conflicts.len(), 1);
     assert_eq!(conflicts[0].reference(), Reference::new(7, 0).unwrap());
     assert_eq!(left.commit().unwrap().diagnostics().changed_cells(), 1);
+}
+
+#[test]
+fn joins_refuse_equal_bytes_with_different_retained_limits_in_both_orders() {
+    let bytes = package();
+    let broad = Snapshot::from_bytes(bytes.clone()).unwrap();
+    let (limits, cfb_limits) = retained_edit_limits(&bytes);
+    let narrow = Snapshot::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+
+    let mut left = broad.edit();
+    left.set_number("Sheet1".into(), reference, 9.25).unwrap();
+    let mut incoming = narrow.edit();
+    incoming
+        .set_number("Sheet1".into(), reference, 10.25)
+        .unwrap();
+    assert!(matches!(
+        left.join(incoming),
+        Err(JoinError::DifferentLimits)
+    ));
+    let unchanged_after_failed_join = left.commit().unwrap();
+    assert_eq!(unchanged_after_failed_join.diagnostics().changed_cells(), 1);
+
+    let mut unchanged_left = narrow.edit();
+    let mut broad_incoming = broad.edit();
+    broad_incoming
+        .set_number("Sheet1".into(), reference, 11.25)
+        .unwrap();
+    assert!(matches!(
+        unchanged_left.join(broad_incoming),
+        Err(JoinError::DifferentLimits)
+    ));
+    let unchanged_commit = unchanged_left.commit().unwrap();
+    assert!(!unchanged_commit.diagnostics().changed());
+    assert!(unchanged_commit.patch().is_noop());
+    assert_eq!(unchanged_commit.snapshot().inner.limits, limits);
+    assert_eq!(unchanged_commit.snapshot().inner.cfb_limits, cfb_limits);
 }
 
 #[test]

@@ -56,6 +56,20 @@ impl SourceBackedOverlayPublisher {
         Ok(Self { cfb: Arc::new(cfb) })
     }
 
+    /// Opens sealed bytes under caller-selected physical CFB bounds.
+    ///
+    /// Preserves the owned-source optimizations and protection policy of
+    /// [`Self::open_owned`]. Returns a typed physical or protection error.
+    pub fn open_owned_with_limits(
+        source: Arc<[u8]>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OverlayError> {
+        let cfb = SharedOleFile::open_owned_with_limits(source, version, limits)?;
+        reject_protected_shared_container(&cfb, "source-backed stream overlay publication")?;
+        Ok(Self { cfb: Arc::new(cfb) })
+    }
+
     /// Opens under a caller-selected positional CFB ingress ceiling, then
     /// applies the common signed/encrypted/DRM mutation guard.
     pub fn open_with_limits(

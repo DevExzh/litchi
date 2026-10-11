@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0195 | [XLS retained limits](0195-xls-retained-limits.md) | Object/CFB policies retained across edits, replay, overlays, joins and history; shared candidate/layout gates; 5,844 combined tests/doctests plus final history checks, lint/docs/glossary/boundaries and consumer checks pass; canonical owner/API migration and full goal remain open |
 | 0194 | [XLS cell-edit vocabulary](0194-xls-edit-vocabulary.md) | Concrete Edit, pair split, is_noop and exact Diagnostics::changed; 2,178 tests/doctests, lint/docs/glossary/boundaries and consumer checks pass; retained-limit gap identified; immutable owner, unified XLS writes and full goal remain open |
 | 0193 | [DOC strict-owner admission](0193-doc-strict-owner-admission.md) | Typed preflight before strict payload capture across body opens/reopens; one parsed CFB retained; 5,276 combined + 1,913 final DOC/facade tests/doctests, lint/docs/glossary/boundaries pass; full goal remains open |
 | 0192 | [DOC source limits](0192-doc-source-limits.md) | Canonical checked SourceLimits, inline typed errors, shared defaults and all-stream reader preflight; 2,713 tests/doctests, lint/docs/glossary/boundaries pass; focused strict-owner allocation ordering and full goal remain open |

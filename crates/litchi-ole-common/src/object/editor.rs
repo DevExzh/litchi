@@ -82,12 +82,14 @@ fn observe_cfb_parse<T>(
 pub struct Editor {
     targets: Targets,
     limits: Limits,
+    cfb_limits: OleFileLimits,
     original: Arc<Vec<u8>>,
     base_package: Package,
     package: Package,
     objects: Objects,
     changed: bool,
     layout: SectorLayoutPolicy,
+    validated_layout: SectorLayoutPolicy,
 }
 
 impl Editor {
@@ -102,7 +104,12 @@ impl Editor {
         let mut ole = OleFile::open(Cursor::new(bytes))?;
         let admitted = Self::admit_open(&mut ole, targets, limits)?;
         let original = Arc::new(ole.into_inner().into_inner());
-        Ok(Self::from_admitted(original, limits, admitted))
+        Ok(Self::from_admitted(
+            original,
+            limits,
+            OleFileLimits::default(),
+            admitted,
+        ))
     }
 
     /// Opens a package with an explicit low-level CFB admission profile.
@@ -122,7 +129,7 @@ impl Editor {
         let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
         let admitted = Self::admit_open(&mut ole, targets, limits)?;
         let original = Arc::new(ole.into_inner().into_inner());
-        Ok(Self::from_admitted(original, limits, admitted))
+        Ok(Self::from_admitted(original, limits, cfb_limits, admitted))
     }
 
     /// Opens a package and returns the validated physical OLE context used by
@@ -201,7 +208,7 @@ impl Editor {
         admission(&ole)?;
         let admitted = Self::admit_open(&mut ole, targets, limits).map_err(E::from)?;
         let original = Arc::new(ole.get_ref().get_ref().clone());
-        let editor = Self::from_admitted(original, limits, admitted);
+        let editor = Self::from_admitted(original, limits, OleFileLimits::default(), admitted);
         Ok((editor, ole))
     }
 
@@ -285,7 +292,7 @@ impl Editor {
         admission(&ole)?;
         let admitted = Self::admit_open(&mut ole, targets, limits).map_err(E::from)?;
         let original = Arc::new(ole.get_ref().get_ref().clone());
-        let editor = Self::from_admitted(original, limits, admitted);
+        let editor = Self::from_admitted(original, limits, OleFileLimits::default(), admitted);
         Ok((editor, ole))
     }
 
@@ -330,17 +337,20 @@ impl Editor {
     fn from_admitted(
         original: Arc<Vec<u8>>,
         limits: Limits,
+        cfb_limits: OleFileLimits,
         (targets, package, objects): (Targets, Package, Objects),
     ) -> Self {
         Self {
             targets,
             limits,
+            cfb_limits,
             original,
             base_package: package.clone(),
             package,
             objects,
             changed: false,
             layout: SectorLayoutPolicy::default(),
+            validated_layout: SectorLayoutPolicy::default(),
         }
     }
 
@@ -353,12 +363,14 @@ impl Editor {
         Snapshot::new(
             self.targets.clone(),
             self.limits,
+            self.cfb_limits,
             Arc::clone(&self.original),
             self.base_package.clone(),
             self.package.clone(),
             self.objects.clone(),
             self.changed,
             self.layout,
+            self.validated_layout,
         )
     }
 
@@ -366,13 +378,27 @@ impl Editor {
         Self {
             targets: snapshot.targets().clone(),
             limits: snapshot.limits(),
+            cfb_limits: snapshot.cfb_limits(),
             original: snapshot.original(),
             base_package: snapshot.base_package(),
             package: snapshot.package(),
             objects: snapshot.objects_clone(),
             changed: snapshot.changed(),
             layout: snapshot.layout(),
+            validated_layout: snapshot.validated_layout(),
         }
+    }
+
+    /// Object capture bounds retained by this editor and its snapshots.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Physical CFB bounds retained for changed candidate validation.
+    #[must_use]
+    pub const fn cfb_limits(&self) -> OleFileLimits {
+        self.cfb_limits
     }
 
     /// The target catalog used by this editor.
@@ -475,7 +501,8 @@ impl Editor {
         if object.compound() == compound_file.as_slice() {
             return Ok(None);
         }
-        let mut replacement_ole = OleFile::open(Cursor::new(compound_file))?;
+        let mut replacement_ole =
+            OleFile::open_with_limits(Cursor::new(compound_file), self.cfb_limits)?;
         codec::open(
             &replacement_ole,
             self.limits
@@ -974,7 +1001,8 @@ impl Editor {
                 "new object exceeds size limit".into(),
             ));
         }
-        let mut nested_ole = OleFile::open(Cursor::new(compound_file))?;
+        let mut nested_ole =
+            OleFile::open_with_limits(Cursor::new(compound_file), self.cfb_limits)?;
         codec::open(
             &nested_ole,
             self.limits
@@ -1044,12 +1072,20 @@ impl Editor {
                     &self.base_package,
                     &self.original,
                     self.limits,
+                    self.cfb_limits,
                 )?
             {
                 return Ok(rendered);
             }
-            self.package
-                .render_with_layout(Some(self.original.as_slice()), self.layout)
+            let rendered = self
+                .package
+                .render_with_layout(Some(self.original.as_slice()), self.layout)?;
+            // Ordinary publication repeats the already validated deterministic
+            // render. A caller-selected layout change needs a new physical gate.
+            if self.layout != self.validated_layout {
+                OleFile::open_with_limits(Cursor::new(rendered.as_slice()), self.cfb_limits)?;
+            }
+            Ok(rendered)
         } else {
             Ok(match Arc::try_unwrap(self.original) {
                 Ok(bytes) => bytes,
@@ -1084,7 +1120,12 @@ impl Editor {
         self.package.check(self.limits)?;
         let rendered = if self.layout == SectorLayoutPolicy::Reuse {
             self.package
-                .render_copy_through(&self.base_package, &self.original, self.limits)?
+                .render_copy_through(
+                    &self.base_package,
+                    &self.original,
+                    self.limits,
+                    self.cfb_limits,
+                )?
                 .map_or_else(
                     || {
                         self.package
@@ -1096,13 +1137,15 @@ impl Editor {
             self.package
                 .render_with_layout(Some(self.original.as_slice()), self.layout)?
         };
-        let mut check = OleFile::open(Cursor::new(rendered.as_slice()))?;
+        let mut check =
+            OleFile::open_with_limits(Cursor::new(rendered.as_slice()), self.cfb_limits)?;
         codec::open(&check, self.limits.max_package_directory_entries())?;
         let mut parsed = Package::capture(&mut check, self.limits)?;
         parsed.reuse_stream_allocations(&self.package)?;
         self.package = parsed;
         self.objects = discovery::from_package(&self.package, &self.targets, self.limits)?;
         self.changed = true;
+        self.validated_layout = self.layout;
         Ok((self, rendered))
     }
 }

@@ -7,8 +7,8 @@ use super::target::Target;
 use crate::property_set::Guid;
 use crate::protection::reject_protected_container;
 use litchi_cfb::{
-    OleError, OleFile, OleWriter, OverlayError, OverlayLimits, SameLengthStreamOverlay,
-    SectorLayoutPolicy, SharedOleFile,
+    OleError, OleFile, OleFileLimits, OleWriter, OverlayError, OverlayLimits,
+    SameLengthStreamOverlay, SectorLayoutPolicy, SharedOleFile, SharedOleFileLimits,
 };
 use litchi_core::SourceVersion;
 use std::collections::HashMap;
@@ -741,6 +741,7 @@ impl Package {
         baseline: &Self,
         source: &Arc<Vec<u8>>,
         limits: Limits,
+        cfb_limits: OleFileLimits,
     ) -> Result<Option<Vec<u8>>, OleError> {
         let Some(overlays) = self.same_length_overlays(baseline, limits)? else {
             return Ok(None);
@@ -764,7 +765,14 @@ impl Package {
         // alive; the allocation identity serves, as it does for the XLS
         // comments and visibility owners.
         let version = SourceVersion::new(source.as_ptr() as usize as u64, source.len() as u64);
-        let shared = match SharedOleFile::open_owned_vec(Arc::clone(source), version) {
+        let shared_limits = SharedOleFileLimits::new(cfb_limits.max_input_bytes())?
+            .with_max_directory_bytes(cfb_limits.max_directory_bytes())?
+            .with_max_allocation_table_bytes(cfb_limits.max_allocation_table_bytes())?;
+        let shared = match SharedOleFile::open_owned_vec_with_limits(
+            Arc::clone(source),
+            version,
+            shared_limits,
+        ) {
             Ok(shared) => shared,
             Err(error) => return overlay_fallback(error.into()),
         };
@@ -788,7 +796,7 @@ impl Package {
             Ok(composed) => composed,
             Err(error) => return overlay_fallback(error),
         };
-        let candidate = match SharedOleFile::open(Arc::new(composed)) {
+        let candidate = match SharedOleFile::open_with_limits(Arc::new(composed), shared_limits) {
             Ok(candidate) => candidate,
             Err(error) => return overlay_fallback(error.into()),
         };

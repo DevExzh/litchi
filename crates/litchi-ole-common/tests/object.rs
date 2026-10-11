@@ -1497,3 +1497,29 @@ fn changed_snapshot_finish_keeps_the_source_layout_used_by_doc_editors() {
         "the source-backed route should retain its adopted physical layout"
     );
 }
+
+#[test]
+fn physical_candidate_limit_survives_snapshot_reopening_and_refusal() {
+    let original = write_cfb(|writer| {
+        writer.create_stream(&["Target"], b"before").unwrap();
+    });
+    let maximum = u64::try_from(original.len()).unwrap();
+    let limits = litchi_cfb::OleFileLimits::new(maximum).unwrap();
+    let editor = Editor::open_with_cfb_limits(
+        original.clone(),
+        Targets::default(),
+        Limits::default(),
+        limits,
+    )
+    .unwrap();
+    let snapshot = editor.snapshot();
+    let mut reopened = snapshot.edit();
+    let path = vec!["Target".to_string()];
+    let error = reopened.put_stream(&path, vec![0; 100_000]).unwrap_err();
+    assert!(matches!(error, litchi_cfb::OleError::LimitExceeded {
+        resource: "input bytes", observed, maximum: actual,
+    } if observed > maximum && actual == maximum));
+    assert_eq!(reopened.cfb_limits(), limits);
+    assert_eq!(reopened.finish().unwrap(), original);
+    assert_eq!(snapshot.finish().unwrap(), original);
+}

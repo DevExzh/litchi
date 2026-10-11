@@ -636,7 +636,23 @@ impl SharedOleFile {
     /// Returns an error when the source exceeds the default limit or is not a
     /// valid CFB file.
     pub fn open_owned(source: Arc<[u8]>, version: SourceVersion) -> Result<Self, OleError> {
-        Self::open_sealed(SealedBytes::Slice(source), version)
+        Self::open_owned_with_limits(source, version, SharedOleFileLimits::default())
+    }
+
+    /// Opens sealed immutable bytes under explicit physical CFB bounds.
+    ///
+    /// Retains the same ownership and source-version guarantees as
+    /// [`Self::open_owned`]. Selected bounds apply before parser allocations.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed CFB limit or validation error.
+    pub fn open_owned_with_limits(
+        source: Arc<[u8]>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
+        Self::open_sealed_with_limits(SealedBytes::Slice(source), version, limits)
     }
 
     /// Opens a shared vector whose immutable ownership is retained by the CFB
@@ -654,7 +670,19 @@ impl SharedOleFile {
     /// Returns an error when the source exceeds the default limit or is not a
     /// valid CFB file.
     pub fn open_owned_vec(source: Arc<Vec<u8>>, version: SourceVersion) -> Result<Self, OleError> {
-        Self::open_sealed(SealedBytes::Vec(source), version)
+        Self::open_owned_vec_with_limits(source, version, SharedOleFileLimits::default())
+    }
+
+    /// Opens a sealed shared vector under explicit physical CFB bounds.
+    ///
+    /// Retains the ownership guarantees of [`Self::open_owned_vec`].
+    /// Returns a typed limit or CFB validation error.
+    pub fn open_owned_vec_with_limits(
+        source: Arc<Vec<u8>>,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
+        Self::open_sealed_with_limits(SealedBytes::Vec(source), version, limits)
     }
 
     /// Adopts an in-memory [`OleFile`] that is already parsed, without parsing
@@ -725,14 +753,18 @@ impl SharedOleFile {
         self.source_is_owned_immutable
     }
 
-    fn open_sealed(bytes: SealedBytes, version: SourceVersion) -> Result<Self, OleError> {
+    fn open_sealed_with_limits(
+        bytes: SealedBytes,
+        version: SourceVersion,
+        limits: SharedOleFileLimits,
+    ) -> Result<Self, OleError> {
         let source: Arc<dyn ReadAt> = Arc::new(OwnedArcSource {
             bytes,
             version,
             #[cfg(test)]
             read_count: None,
         });
-        Self::open_source_with_limits(source, SharedOleFileLimits::default(), true)
+        Self::open_source_with_limits(source, limits, true)
     }
 
     /// Opens and validates a positional source under caller-selected limits.
@@ -4099,6 +4131,28 @@ mod tests {
 
         let positional = SharedOleFile::open(Arc::new(TestSource::new(bytes))).unwrap();
         assert!(!positional.is_owned_immutable());
+    }
+
+    #[test]
+    fn owned_open_with_limits_preserves_provenance_and_all_physical_bounds() {
+        let bytes: Arc<[u8]> = multi_mini_bytes().into();
+        let version = SourceVersion::new(0x0195, 0);
+        let exact = SharedOleFileLimits::new(bytes.len() as u64).unwrap();
+        let opened =
+            SharedOleFile::open_owned_with_limits(Arc::clone(&bytes), version, exact).unwrap();
+        assert!(opened.is_owned_immutable());
+        assert_eq!(opened.source_version().unwrap(), version);
+        assert_eq!(opened.open_stream(&["Mini"]).unwrap().len(), 200);
+        for limits in [
+            SharedOleFileLimits::new(bytes.len() as u64 - 1).unwrap(),
+            exact.with_max_directory_bytes(1).unwrap(),
+            exact.with_max_allocation_table_bytes(1).unwrap(),
+        ] {
+            assert!(matches!(
+                SharedOleFile::open_owned_with_limits(Arc::clone(&bytes), version, limits),
+                Err(OleError::LimitExceeded { .. })
+            ));
+        }
     }
 
     #[test]

@@ -11,19 +11,22 @@ use super::link::Link;
 use super::model::Objects;
 use super::target::Targets;
 use crate::ole_streams::{self, NativeSnapshot, PresentationSnapshot};
-use litchi_cfb::{OleError, SectorLayoutPolicy};
+use litchi_cfb::{OleError, OleFile, OleFileLimits, SectorLayoutPolicy};
+use std::io::Cursor;
 use std::sync::Arc;
 
 #[derive(Debug, Clone)]
 struct State {
     targets: Targets,
     limits: super::model::Limits,
+    cfb_limits: OleFileLimits,
     original: Arc<Vec<u8>>,
     base_package: Package,
     package: Package,
     objects: Objects,
     changed: bool,
     layout: SectorLayoutPolicy,
+    validated_layout: SectorLayoutPolicy,
 }
 
 /// Immutable, cheap-to-clone view of a captured OLE object package.
@@ -42,23 +45,27 @@ impl Snapshot {
     pub(crate) fn new(
         targets: Targets,
         limits: super::model::Limits,
+        cfb_limits: OleFileLimits,
         original: Arc<Vec<u8>>,
         base_package: Package,
         package: Package,
         objects: Objects,
         changed: bool,
         layout: SectorLayoutPolicy,
+        validated_layout: SectorLayoutPolicy,
     ) -> Self {
         Self {
             state: Arc::new(State {
                 targets,
                 limits,
+                cfb_limits,
                 original,
                 base_package,
                 package,
                 objects,
                 changed,
                 layout,
+                validated_layout,
             }),
         }
     }
@@ -218,16 +225,30 @@ impl Snapshot {
                     &self.state.base_package,
                     &self.state.original,
                     self.state.limits,
+                    self.state.cfb_limits,
                 )?
             {
                 return Ok(rendered);
             }
-            self.state
+            let rendered = self
+                .state
                 .package
-                .render_with_layout(Some(self.state.original.as_slice()), self.state.layout)
+                .render_with_layout(Some(self.state.original.as_slice()), self.state.layout)?;
+            if self.state.layout != self.state.validated_layout {
+                OleFile::open_with_limits(Cursor::new(rendered.as_slice()), self.state.cfb_limits)?;
+            }
+            Ok(rendered)
         } else {
             Ok(self.state.original.as_ref().clone())
         }
+    }
+
+    pub(crate) fn validated_layout(&self) -> SectorLayoutPolicy {
+        self.state.validated_layout
+    }
+
+    pub(crate) fn cfb_limits(&self) -> OleFileLimits {
+        self.state.cfb_limits
     }
 
     pub(crate) fn limits(&self) -> super::model::Limits {

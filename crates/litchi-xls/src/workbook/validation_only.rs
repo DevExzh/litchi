@@ -23,7 +23,7 @@ use crate::error::{Error, Result};
 use crate::protection::{SheetProtection, WorkbookProtection};
 use crate::records::SharedStringProperties;
 use crate::sheet_metadata::SheetMetadata;
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleFile, OleFileLimits};
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
@@ -124,7 +124,19 @@ impl<R: Read + Seek> Workbook<R> {
     /// reader did not publish, and the comments owner reports a worksheet
     /// substream that was not completely parsed.
     pub(crate) fn validation_only(reader: R, kept: KeptCells) -> Result<ValidationWorkbook<R>> {
-        let mut workbook = Self::empty(OleFile::open(reader)?);
+        Self::validation_only_with_cfb_limits(reader, kept, OleFileLimits::default())
+    }
+
+    /// Runs validation over a CFB source under the caller's retained CFB
+    /// admission profile. Format owners that reopen a candidate after an
+    /// immutable package edit use this path so the semantic reader cannot
+    /// silently widen the low-level source budget back to its defaults.
+    pub(crate) fn validation_only_with_cfb_limits(
+        reader: R,
+        kept: KeptCells,
+        cfb_limits: OleFileLimits,
+    ) -> Result<ValidationWorkbook<R>> {
+        let mut workbook = Self::empty(OleFile::open_with_limits(reader, cfb_limits)?);
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
         workbook.parse_workbook(&OpenOptions::default(), CellDecoding::Kept(&kept))?;
         Ok(ValidationWorkbook { workbook, kept })

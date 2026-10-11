@@ -50,6 +50,7 @@ The current `Inner` does not retain the object/CFB profiles accepted by the
 configured constructors. Source-backed publication has analogous default
 reopen paths. Tightened bounds must survive those transitions, including
 inverse/replay; this is a prerequisite to claiming the package policy contract.
+[Record 0195](0195-xls-retained-limits.md) addresses these retained profiles.
 
 The native cell engine already has guarded scalar/structural changes, exact
 patch replay, and source-backed numeric publication. The public reader still
