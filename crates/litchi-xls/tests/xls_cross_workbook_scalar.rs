@@ -545,7 +545,7 @@ fn bounds_noop_and_stale_or_foreign_artifacts_are_checked() {
     )
     .unwrap();
     let noop_commit = noop.commit().unwrap();
-    assert!(noop_commit.patch().is_empty());
+    assert!(noop_commit.patch().is_noop());
 
     let mut copy = target.edit();
     copy.copy_scalar_cell_from(

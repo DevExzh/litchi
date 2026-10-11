@@ -24,7 +24,7 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
         Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/SimpleWithChoose.xls");
     let source = Snapshot::from_bytes(std::fs::read(path).expect("read Microsoft Excel fixture"))
         .expect("open Microsoft Excel formula fixture");
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .insert_rows(Selector::Position(0), 0, 1)
         .expect("stage reference-bearing Formula shift");
@@ -133,7 +133,7 @@ fn real_mulrk_edge_deletion_rebuilds_and_semantically_repacks() {
                 .map(|cell| (sheet.position(), cell.reference()))
         })
         .expect("fixture contains a MulRk edge");
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .remove_cell(Selector::Position(sheet_position), reference)
         .expect("stage packed edge removal");
@@ -266,7 +266,7 @@ fn multiple_real_fixtures_rename_and_fully_reopen() {
             .next()
             .expect("fixture has a worksheet")
             .position();
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         transaction
             .rename_sheet(Selector::Position(position), replacement)
             .expect("stage real-fixture rename");

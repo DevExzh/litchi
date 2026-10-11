@@ -678,7 +678,7 @@ fn edits_for(
 }
 
 fn stage(
-    transaction: &mut litchi_xls::cell_values::Transaction,
+    transaction: &mut litchi_xls::cell_values::Edit,
     edits: &[CellEdit],
     family: Family,
 ) -> Result<(), Box<dyn std::error::Error>> {
@@ -740,7 +740,7 @@ impl Publication {
 
     fn is_noop(&self) -> bool {
         match self {
-            Self::Eager(commit) => commit.patch().is_empty(),
+            Self::Eager(commit) => commit.patch().is_noop(),
             Self::SourceBacked(commit) => commit.is_noop(),
             Self::PlanOnly(commit) => commit.is_noop(),
         }
@@ -979,7 +979,7 @@ fn verify_noop_and_security(
     use litchi_xls::cell_values::{Snapshot, Value};
 
     let source = Snapshot::from_bytes(clone_bytes(&corpus.archive, "XLS numeric no-op source")?)?;
-    let noop = commit_source_backed_transaction(source.transaction(), implementation)?;
+    let noop = commit_source_backed_transaction(source.edit(), implementation)?;
     if !noop.is_noop() || noop.snapshot().bytes() != source.bytes() {
         return Err("XLS numeric source-backed no-op changed source identity".into());
     }
@@ -1063,13 +1063,13 @@ fn verify_noop_and_security(
 }
 
 fn commit_source_backed_transaction(
-    transaction: litchi_xls::cell_values::Transaction,
+    transaction: litchi_xls::cell_values::Edit,
     implementation: Implementation,
 ) -> Result<Publication, Box<dyn std::error::Error>> {
     match implementation {
         // Guard replays for eager cases intentionally use the established
         // source-backed contract, matching the pre-plan-only harness gates.
-        // The measured eager publication still calls `Transaction::commit`
+        // The measured eager publication still calls `Edit::commit`
         // directly in the timed loop.
         Implementation::Eager | Implementation::SourceBacked => Ok(Publication::SourceBacked(
             Box::new(transaction.commit_source_backed()?),

@@ -240,7 +240,7 @@ fn source_backed_formula_access_reaches_the_native_ancillary_parser() {
 #[test]
 fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames() {
     let native = Snapshot::from_bytes(native_bytes()).expect("open native cell-value snapshot");
-    let no_op = native.transaction().commit().expect("exact no-op commit");
+    let no_op = native.edit().commit().expect("exact no-op commit");
     assert_eq!(no_op.snapshot().bytes(), native.bytes());
     assert!(std::ptr::eq(
         no_op.snapshot().bytes().as_ptr(),
@@ -262,7 +262,7 @@ fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames
         })
         .expect("synthetic fixture contains an editable Number record");
 
-    let mut source_backed_noop = source.transaction();
+    let mut source_backed_noop = source.edit();
     source_backed_noop
         .set_number(
             Selector::Position(sheet_position),
@@ -286,7 +286,7 @@ fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames
         12_345.25
     };
 
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_number(
         Selector::Position(sheet_position),
         number.reference(),
@@ -345,7 +345,7 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
         Value::FormulaCache(FormulaCache::Empty) => FormulaCache::Number(1.0),
         _ => FormulaCache::Empty,
     };
-    let mut cache_edit = source.transaction();
+    let mut cache_edit = source.edit();
     cache_edit
         .set_value(
             Selector::Position(0),
@@ -377,7 +377,7 @@ fn formula_cache_and_style_edits_preserve_the_untouched_rgb_extra() {
         .expect("unique census cell")
         .expect("census cell exists")
         .style();
-    let mut style_edit = source.transaction();
+    let mut style_edit = source.edit();
     let replacement_style = style_edit
         .duplicate_style(style)
         .expect("duplicate existing XF resource");
@@ -469,13 +469,13 @@ fn row_and_column_shift_refuse_rgb_extra_atomically() {
     let source = Snapshot::from_bytes(bytes).expect("open isolated ancillary package");
     let before = source.bytes().to_vec();
 
-    let mut rows = source.transaction();
+    let mut rows = source.edit();
     assert!(matches!(
         rows.insert_rows(Selector::Position(0), 0, 1),
         Err(Error::UnsafeEdit(_))
     ));
 
-    let mut columns = source.transaction();
+    let mut columns = source.edit();
     assert!(matches!(
         columns.insert_columns(Selector::Position(0), 0, 1),
         Err(Error::UnsafeEdit(_))

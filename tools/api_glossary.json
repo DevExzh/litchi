@@ -2334,6 +2334,35 @@
       "families": [
         "litchi_doc::package::edit"
       ]
+    },
+    {
+      "id": "xls-minimal",
+      "package": "litchi-xls",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "Transaction",
+          "scope": "litchi_xls::cell_values",
+          "replacement": "use cell_values::Edit"
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_xls::cell_values::Snapshot",
+          "replacement": "use Snapshot::edit()"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xls::cell_values::Patch",
+          "replacement": "use is_noop()"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_xls::cell_values::SemanticPatch",
+          "replacement": "use is_noop()"
+        }
+      ],
+      "families": []
     }
   ]
 }

@@ -851,7 +851,7 @@ fn source_backed_numeric_noop_reuses_identity_and_fingerprint() {
     let commit = edit.commit_source_backed().unwrap();
 
     assert!(commit.is_noop());
-    assert!(commit.patch().is_empty());
+    assert!(commit.patch().is_noop());
     assert!(std::ptr::eq(
         commit.snapshot().bytes().as_ptr(),
         source.bytes().as_ptr()
@@ -1457,9 +1457,13 @@ fn rejected_and_noop_edits_are_failure_atomic() {
     edit.set_number("sHeEt1".into(), reference, 0.0).unwrap();
     edit.set_number("Sheet1".into(), reference, 4.5).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.patch().is_empty());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
-    assert_eq!(commit.diagnostics(), Diagnostics::default());
+    let diagnostics = commit.diagnostics();
+    assert!(!diagnostics.changed());
+    let (snapshot, patch) = commit.into_parts();
+    assert!(patch.is_noop());
+    assert!(patch.semantic().is_noop());
+    assert_eq!(snapshot.bytes(), source.bytes());
+    assert_eq!(diagnostics, Diagnostics::default());
 }
 
 #[test]
@@ -1546,6 +1550,7 @@ fn edits_boolean_text_and_formula_cache() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().changed_cells(), 4);
     let sheet = commit
         .snapshot()
@@ -1590,7 +1595,7 @@ fn edits_boolean_text_and_formula_cache() {
 fn formula_string_cache_resizes_and_semantically_inverts() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let reference = Reference::new(8, 0).unwrap();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .set_value(
             "Sheet1".into(),
@@ -1631,7 +1636,7 @@ fn formula_string_cache_resizes_and_semantically_inverts() {
 #[test]
 fn formula_cache_transfer_requires_identical_tokens() {
     let source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .set_value(
             "Formula".into(),
@@ -1673,7 +1678,7 @@ fn canonical_formula_resource_matching_refuses_rgb_extra_atomically() {
 fn authored_formula_string_constants_are_refused_past_255_units_not_truncated() {
     let source = Snapshot::from_bytes(formula_free_package()).unwrap();
     let reference = Reference::new(1, 1).unwrap();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     for literal in ["a".repeat(256), format!("{}😀", "a".repeat(254))] {
         let error = transaction
             .insert_formula("Plain".into(), reference, &format!("\"{literal}\""))
@@ -1717,9 +1722,9 @@ fn authored_formulas_join_reopen_and_durably_invert() {
     let source = Snapshot::from_bytes(formula_free_package()).unwrap();
     let first = Reference::new(1, 1).unwrap();
     let second = Reference::new(3, 2).unwrap();
-    let mut left = source.transaction();
+    let mut left = source.edit();
     left.insert_formula("Plain".into(), first, "A2+1").unwrap();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .insert_formula("Plain".into(), second, "B4*2")
         .unwrap();
@@ -1759,7 +1764,7 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
         .unwrap()
         .unwrap()
         .style();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     let mut xf_payload = source.inner.xf_records[usize::from(base_style.get())].clone();
     xf_payload[6] ^= 0x08;
     let authored_style = transaction.author_style(&xf_payload).unwrap();
@@ -1821,7 +1826,7 @@ fn rich_sst_resource_round_trips_and_semantically_inverts() {
     let reference = Reference::new(6, 3).unwrap();
     let reused_reference = Reference::new(7, 3).unwrap();
     let text = "λ".repeat(5_000);
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .insert_rich_text_cell("Sheet1".into(), reference, text.clone(), runs.clone())
         .unwrap();
@@ -1939,7 +1944,7 @@ fn converts_fixed_width_labelsst_and_rk_with_sst_accounting() {
 fn durable_semantic_patch_round_trips_and_checks_preconditions() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let reference = Reference::new(7, 0).unwrap();
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_value("Sheet1".into(), reference, Value::Boolean(false))
         .unwrap();
     let commit = edit.commit().unwrap();
@@ -1967,14 +1972,14 @@ fn durable_semantic_patch_round_trips_and_checks_preconditions() {
 #[test]
 fn joins_disjoint_work_and_reports_cell_conflicts() {
     let source = Snapshot::from_bytes(package()).unwrap();
-    let mut left = source.transaction();
+    let mut left = source.edit();
     left.set_value(
         "Sheet1".into(),
         Reference::new(7, 0).unwrap(),
         Value::Boolean(false),
     )
     .unwrap();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .set_value(
             "Sheet1".into(),
@@ -1985,14 +1990,14 @@ fn joins_disjoint_work_and_reports_cell_conflicts() {
     left.join(right).unwrap();
     assert_eq!(left.commit().unwrap().diagnostics().changed_cells(), 2);
 
-    let mut left = source.transaction();
+    let mut left = source.edit();
     left.set_value(
         "Sheet1".into(),
         Reference::new(7, 0).unwrap(),
         Value::Boolean(false),
     )
     .unwrap();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .set_value(
             "Sheet1".into(),
@@ -2013,7 +2018,7 @@ fn joins_disjoint_work_and_reports_cell_conflicts() {
 fn bounded_history_undoes_and_redoes_immutable_snapshots() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let mut history = source.history(HistoryLimits::new(2, u64::MAX));
-    let mut edit = source.transaction();
+    let mut edit = source.edit();
     edit.set_number("Sheet1".into(), Reference::new(3, 2).unwrap(), 99.0)
         .unwrap();
     edit.commit().unwrap().record_in(&mut history).unwrap();
@@ -2047,7 +2052,7 @@ fn structural_cell_style_and_sheet_name_round_trip_semantically() {
         .unwrap()
         .unwrap()
         .style();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction
         .insert_cell_with_style("Sheet1".into(), reference, Value::Number(27.5), style)
         .unwrap();
@@ -2055,6 +2060,7 @@ fn structural_cell_style_and_sheet_name_round_trip_semantically() {
         .rename_sheet("Sheet1".into(), "Renamed")
         .unwrap();
     let commit = transaction.commit().unwrap();
+    assert!(commit.diagnostics().changed());
     let cell = commit
         .snapshot()
         .worksheet("Renamed".into())
@@ -2082,14 +2088,14 @@ fn structural_cell_style_and_sheet_name_round_trip_semantically() {
 #[test]
 fn structural_join_three_way_and_transfer_are_deterministic() {
     let source = Snapshot::from_bytes(package()).unwrap();
-    let mut left = source.transaction();
+    let mut left = source.edit();
     left.insert_cell(
         "Sheet1".into(),
         Reference::new(3, 3).unwrap(),
         Value::Number(10.0),
     )
     .unwrap();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .insert_cell(
             "Sheet1".into(),
@@ -2100,7 +2106,7 @@ fn structural_join_three_way_and_transfer_are_deterministic() {
     left.join(right).unwrap();
     assert_eq!(left.commit().unwrap().diagnostics().changed_cells(), 2);
 
-    let mut left = source.transaction();
+    let mut left = source.edit();
     left.set_value(
         "Sheet1".into(),
         Reference::new(7, 0).unwrap(),
@@ -2108,7 +2114,7 @@ fn structural_join_three_way_and_transfer_are_deterministic() {
     )
     .unwrap();
     let left = left.commit().unwrap().patch().semantic().clone();
-    let mut right = source.transaction();
+    let mut right = source.edit();
     right
         .set_value(
             "Sheet1".into(),
@@ -2129,7 +2135,7 @@ fn structural_join_three_way_and_transfer_are_deterministic() {
 #[test]
 fn dependency_safe_row_insertion_reopens_and_inverts() {
     let source = Snapshot::from_bytes(formula_free_package()).unwrap();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction.insert_rows("Plain".into(), 2, 2).unwrap();
     let commit = transaction.commit().unwrap();
     let moved = commit
@@ -2160,7 +2166,7 @@ fn dependency_safe_row_insertion_reopens_and_inverts() {
 #[test]
 fn reference_free_formula_shifts_reopen_and_invert_exactly() {
     let source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction.insert_rows("Formula".into(), 0, 2).unwrap();
     let commit = transaction.commit().unwrap();
     assert_eq!(
@@ -2190,7 +2196,7 @@ fn reference_free_formula_shifts_reopen_and_invert_exactly() {
     assert_eq!(restored.snapshot().bytes(), source.bytes());
 
     let column_source = Snapshot::from_bytes(formula_package("1+1")).unwrap();
-    let mut columns = column_source.transaction();
+    let mut columns = column_source.edit();
     columns.insert_columns("Formula".into(), 0, 2).unwrap();
     let column_commit = columns.commit().unwrap();
     assert_eq!(
@@ -2217,7 +2223,7 @@ fn reference_free_formula_shifts_reopen_and_invert_exactly() {
 #[test]
 fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
     let source = Snapshot::from_bytes(positioned_formula_package("A1+$B$2+C1:C3", 4, 4)).unwrap();
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction.insert_rows("Formula".into(), 1, 2).unwrap();
     let commit = transaction.commit().unwrap();
 
@@ -2248,7 +2254,7 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
     assert!(history.redo());
     assert_eq!(history.current().bytes(), commit.snapshot().bytes());
 
-    let mut rename = source.transaction();
+    let mut rename = source.edit();
     rename.rename_sheet("Formula".into(), "Shifted").unwrap();
     let rename = rename.commit().unwrap().patch().semantic().clone();
     let plan = SemanticPatch::plan_three_way(&source, &durable, &rename).unwrap();
@@ -2268,7 +2274,7 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
 
     let column_source =
         Snapshot::from_bytes(positioned_formula_package("A1+$B$2+C1:C3", 4, 4)).unwrap();
-    let mut columns = column_source.transaction();
+    let mut columns = column_source.edit();
     columns.insert_columns("Formula".into(), 1, 2).unwrap();
     let column_commit = columns.commit().unwrap();
     let column_reopen = Workbook::new(Cursor::new(column_commit.snapshot().bytes())).unwrap();
@@ -2296,7 +2302,7 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
     let dependent = Snapshot::from_bytes(positioned_formula_package("A2", 4, 4)).unwrap();
     assert!(
         dependent
-            .transaction()
+            .edit()
             .delete_rows("Formula".into(), 1, 1)
             .is_err()
     );
@@ -2794,7 +2800,7 @@ fn rename_refuses_every_worksheet_name_the_reader_refuses() {
     for name in [
         "", "a\u{3}b", "a\0b", "a:b", "a\\b", "a/b", "a?b", "a*b", "a[b", "a]b", "'a", "a'",
     ] {
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         assert!(
             matches!(
                 transaction.rename_sheet("Sheet1".into(), name),
@@ -2804,11 +2810,11 @@ fn rename_refuses_every_worksheet_name_the_reader_refuses() {
         );
     }
     let long = format!("{}\u{1F600}", "a".repeat(30));
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     assert!(transaction.rename_sheet("Sheet1".into(), &long).is_err());
 
     let astral = format!("{}\u{1F600}", "a".repeat(29));
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     transaction.rename_sheet("Sheet1".into(), &astral).unwrap();
     let commit = transaction.commit().unwrap();
     let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();

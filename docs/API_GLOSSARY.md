@@ -1222,3 +1222,15 @@ owner before payload capture, including candidate and profiled reopens.
 Complete allocation-budget coverage for raw escape paths and full DOC
 acceptance remain open. See [0192](unified-ops/0192-doc-source-limits.md) and
 [0193](unified-ops/0193-doc-strict-owner-admission.md).
+
+## XLS focused cell edits (record 0194)
+
+`cell_values::Edit` is now the concrete type; `Transaction` and the duplicate
+`Snapshot::transaction()` entry are removed. `Patch` and `SemanticPatch` use
+`is_noop()`, and `Diagnostics::changed()` reports exact artifact change. The
+focused commit splits into `(Snapshot, Patch)`, with diagnostics read before
+consumption. The XLS glossary profile guards these removed spellings. The
+immutable `Package`/read-only `Workbook` migration, package commit accessors,
+source/options vocabulary, and remaining focused aliases are still pending;
+this family is not yet registered as fully conformant. See
+[0194](unified-ops/0194-xls-edit-vocabulary.md).

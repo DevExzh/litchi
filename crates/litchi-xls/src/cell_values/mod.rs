@@ -1,4 +1,4 @@
-//! Lossless opened-workbook transactions for BIFF8 cell records and sheets.
+//! Lossless opened-workbook edits for BIFF8 cell records and sheets.
 //!
 //! The owner covers `Number` (`[MS-XLS]` 2.4.180), standalone and packed `RK`,
 //! `BoolErr`, `Blank`, `LabelSst`, and non-string `Formula` caches. Every
@@ -853,19 +853,13 @@ impl Snapshot {
 
     /// Starts a detached edit against this immutable artifact.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             changes: Vec::new(),
             structural_changes: Vec::new(),
             resource_changes: Vec::new(),
         }
-    }
-
-    /// Starts the unified immutable-workbook transaction.
-    #[must_use]
-    pub fn transaction(&self) -> Transaction {
-        self.edit()
     }
 
     /// Starts bounded undo/redo history at this immutable snapshot.
@@ -1062,15 +1056,12 @@ enum ResourceChange {
 
 /// Detached, failure-atomic edits of existing fixed-width BIFF8 cell fields.
 #[derive(Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     changes: Vec<Change>,
     structural_changes: Vec<StructuralChange>,
     resource_changes: Vec<ResourceChange>,
 }
-
-/// Backward-compatible name for [`Transaction`].
-pub type Edit = Transaction;
 
 /// One exact cell targeted differently by independently prepared transactions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1137,7 +1128,7 @@ pub enum JoinError {
     Allocation,
 }
 
-impl Transaction {
+impl Edit {
     /// Joins independently prepared changes against the same exact snapshot.
     ///
     /// Disjoint and byte-equivalent cell outcomes compose deterministically.
@@ -2853,10 +2844,12 @@ impl Transaction {
             Arc::clone(&snapshot.inner.bytes),
             semantic,
         );
+        let changed = !patch.is_noop();
         Ok(Commit {
             snapshot,
             patch,
             diagnostics: Diagnostics {
+                changed,
                 changed_cells,
                 changed_number_fields: self
                     .changes
@@ -2875,7 +2868,7 @@ impl Transaction {
     }
 }
 
-impl fmt::Debug for Transaction {
+impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
             .debug_struct("Edit")
@@ -2951,7 +2944,7 @@ fn inverse_target_reference(
 }
 
 fn ensure_transfer_has_no_staged_target_overlap(
-    transaction: &Transaction,
+    transaction: &Edit,
     sheet: usize,
     target_range: CellRange,
 ) -> Result<()> {
@@ -3223,12 +3216,19 @@ fn transfer_protected_record(kind: u16, payload: &[u8]) -> bool {
 /// Content-free publication diagnostics.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct Diagnostics {
+    changed: bool,
     changed_cells: usize,
     changed_number_fields: usize,
     touched_streams: usize,
 }
 
 impl Diagnostics {
+    /// Whether the committed artifact changed exact bytes.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
     /// Number of semantically changed cells.
     #[must_use]
     pub const fn changed_cells(self) -> usize {
@@ -3311,10 +3311,13 @@ impl Commit {
         self.diagnostics
     }
 
-    /// Splits this commit into its snapshot, patch, and diagnostics.
+    /// Splits this commit into its snapshot and exact-source patch.
+    ///
+    /// Publication diagnostics remain available through [`Self::diagnostics`]
+    /// before consuming the commit.
     #[must_use]
-    pub fn into_parts(self) -> (Snapshot, Patch, Diagnostics) {
-        (self.snapshot, self.patch, self.diagnostics)
+    pub fn into_parts(self) -> (Snapshot, Patch) {
+        (self.snapshot, self.patch)
     }
 }
 
@@ -3543,7 +3546,7 @@ impl fmt::Debug for SourceBackedCommit {
 /// The plan is intentionally forward-only. An exact artifact inverse would
 /// need a source-bound reverse plan rooted in the composed target; the
 /// existing [`Patch`] contract instead retains complete before/after
-/// artifacts. Use [`Transaction::commit_source_backed`] when that inverse
+/// artifacts. Use [`Edit::commit_source_backed`] when that inverse
 /// contract is required.
 pub struct SourceBackedPlanCommit {
     source: Snapshot,
@@ -3775,13 +3778,17 @@ impl SemanticPatch {
 
     /// Number of semantic cell operations.
     #[must_use]
+    #[expect(
+        clippy::len_without_is_empty,
+        reason = "patch no-op introspection uses the canonical is_noop vocabulary"
+    )]
     pub fn len(&self) -> usize {
         self.inner.operations().len()
     }
 
     /// Whether this patch has no semantic operation.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.inner.operations().is_empty()
     }
 
@@ -3803,7 +3810,7 @@ impl SemanticPatch {
     /// Returns a malformed-operation, stale-precondition, storage, or commit
     /// error without changing the source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Commit> {
-        let mut transaction = source.transaction();
+        let mut transaction = source.edit();
         let mut sheet_names = semantic_sheet_names(source);
         for operation in self.inner.operations() {
             apply_semantic_operation(source, &mut transaction, operation, &mut sheet_names)?;
@@ -3835,7 +3842,7 @@ impl SemanticPatch {
     #[must_use]
     pub fn plan_transfer(&self, target: &Snapshot) -> TransferPlan {
         let mut refusals = Vec::new();
-        let mut transaction = target.transaction();
+        let mut transaction = target.edit();
         let mut sheet_names = semantic_sheet_names(target);
         for operation in self.inner.operations() {
             if let Err(error) =
@@ -4457,7 +4464,7 @@ fn effective_xf_fingerprint(
 }
 
 fn preflight_semantic(source: &Snapshot, patch: &SemanticPatch) -> Result<()> {
-    let mut transaction = source.transaction();
+    let mut transaction = source.edit();
     let mut sheet_names = semantic_sheet_names(source);
     for operation in patch.inner.operations() {
         apply_semantic_operation(source, &mut transaction, operation, &mut sheet_names)?;
@@ -4600,7 +4607,7 @@ fn semantic_operation_sheet(operation: &PatchOperation) -> Option<usize> {
 
 fn apply_semantic_operation(
     source: &Snapshot,
-    transaction: &mut Transaction,
+    transaction: &mut Edit,
     operation: &PatchOperation,
     sheet_names: &mut [String],
 ) -> Result<()> {
@@ -4656,7 +4663,7 @@ fn apply_semantic_operation(
     }
 }
 
-fn apply_sst_semantic(transaction: &mut Transaction, operation: &PatchOperation) -> Result<()> {
+fn apply_sst_semantic(transaction: &mut Edit, operation: &PatchOperation) -> Result<()> {
     let text = operation
         .value
         .as_str()
@@ -4682,10 +4689,7 @@ fn apply_sst_semantic(transaction: &mut Transaction, operation: &PatchOperation)
     })
 }
 
-fn apply_rich_sst_semantic(
-    transaction: &mut Transaction,
-    operation: &PatchOperation,
-) -> Result<()> {
+fn apply_rich_sst_semantic(transaction: &mut Edit, operation: &PatchOperation) -> Result<()> {
     let object = operation
         .value
         .as_object()
@@ -4749,7 +4753,7 @@ fn apply_rich_sst_semantic(
     })
 }
 
-fn apply_xf_semantic(transaction: &mut Transaction, operation: &PatchOperation) -> Result<()> {
+fn apply_xf_semantic(transaction: &mut Edit, operation: &PatchOperation) -> Result<()> {
     let encoded_index = operation
         .target
         .strip_prefix("resource/xf/")
@@ -4790,7 +4794,7 @@ fn apply_xf_semantic(transaction: &mut Transaction, operation: &PatchOperation) 
 
 fn apply_formula_semantic(
     source: &Snapshot,
-    transaction: &mut Transaction,
+    transaction: &mut Edit,
     operation: &PatchOperation,
     sheet_names: &[String],
 ) -> Result<()> {
@@ -4909,7 +4913,7 @@ fn parse_hex(value: &str) -> Result<Vec<u8>> {
 
 fn apply_fixed_semantic(
     source: &Snapshot,
-    transaction: &mut Transaction,
+    transaction: &mut Edit,
     operation: &PatchOperation,
     sheet_names: &[String],
 ) -> Result<()> {
@@ -4948,7 +4952,7 @@ fn apply_fixed_semantic(
 
 fn apply_structural_cell_semantic(
     source: &Snapshot,
-    transaction: &mut Transaction,
+    transaction: &mut Edit,
     operation: &PatchOperation,
     sheet_names: &[String],
 ) -> Result<()> {
@@ -5209,9 +5213,9 @@ impl Patch {
         }
     }
 
-    /// Returns whether the patch is byte-exactly empty.
+    /// Returns whether the patch is a byte-exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -5245,7 +5249,7 @@ impl Patch {
                 "XLS cell-value patch source does not match its base snapshot".into(),
             ));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(source.clone());
         }
         Snapshot::from_bytes(self.after.to_vec())
@@ -5268,7 +5272,7 @@ impl fmt::Debug for Patch {
             .debug_struct("Patch")
             .field("before_bytes", &self.before.len())
             .field("after_bytes", &self.after.len())
-            .field("is_empty", &self.is_empty())
+            .field("is_noop", &self.is_noop())
             .finish()
     }
 }
@@ -5329,8 +5333,8 @@ impl Seek for ComposedPositionalReader {
     }
 }
 
-fn commit_source_backed_numeric_plan(transaction: Transaction) -> Result<SourceBackedPlanCommit> {
-    let Transaction {
+fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPlanCommit> {
+    let Edit {
         source,
         changes,
         structural_changes,
@@ -5445,8 +5449,8 @@ fn verify_source_backed_numeric_plan_target(
     candidate.version().map_err(Error::Io)
 }
 
-fn commit_source_backed_numeric(transaction: Transaction) -> Result<SourceBackedCommit> {
-    let Transaction {
+fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit> {
+    let Edit {
         source,
         changes,
         structural_changes,
@@ -6365,7 +6369,7 @@ fn validate_xf_payload(payload: &[u8]) -> Result<()> {
 }
 
 fn validate_rich_text(
-    transaction: &Transaction,
+    transaction: &Edit,
     text: &str,
     formatting_runs: &[crate::records::SharedStringFormatRun],
 ) -> Result<()> {

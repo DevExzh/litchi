@@ -30765,7 +30765,8 @@ fn run_semantic_xls(
                 let bytes = commit.snapshot().bytes().to_vec();
                 let duration = started.elapsed();
                 let diagnostics = commit.diagnostics();
-                if commit.patch().is_empty() == updated
+                if commit.patch().is_noop() == updated
+                    || diagnostics.changed() != updated
                     || diagnostics.changed_cells() != usize::from(updated)
                     || diagnostics.changed_number_fields() != usize::from(updated)
                     || diagnostics.touched_streams() != usize::from(updated)
