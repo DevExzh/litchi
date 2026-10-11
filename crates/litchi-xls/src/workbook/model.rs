@@ -27,10 +27,11 @@ use std::sync::Arc;
 #[derive(Debug)]
 pub struct Reader<R: Read + Seek> {
     pub(super) ole_file: OleFile<R>,
-    /// Whether the Workbook stream was opened through a BIFF `FILEPASS`
-    /// encryption record. The parsed bytes may be clear after decryption, but
-    /// package publication must retain this source protection state.
-    pub(super) encrypted_source: bool,
+    /// Password-to-open profile selected by the Workbook stream's BIFF
+    /// `FILEPASS` record. The parsed bytes may be clear after decryption, but
+    /// package publication must retain this source protection state and its
+    /// exact mode parameters.
+    pub(super) encryption: Option<crate::EncryptionProfile>,
     pub(super) worksheets: Vec<Worksheet>,
     pub(super) worksheet_names: Vec<String>,
     pub(super) sheets: Vec<SheetMetadata>,
@@ -215,7 +216,17 @@ impl<R: Read + Seek> Reader<R> {
     /// need to preserve the source's encrypted protection policy.
     #[must_use]
     pub fn encrypted_source(&self) -> bool {
-        self.encrypted_source
+        self.encryption.is_some()
+    }
+
+    /// Returns the password-to-open profile found in this source, if any.
+    ///
+    /// The profile is retained after decryption so an owning package can
+    /// report the original mode and, for CryptoAPI RC4, the original key
+    /// length without rescanning the raw Workbook stream.
+    #[must_use]
+    pub fn encryption(&self) -> Option<crate::EncryptionProfile> {
+        self.encryption
     }
 
     pub(crate) fn shared_strings_shared(&self) -> Arc<Vec<String>> {

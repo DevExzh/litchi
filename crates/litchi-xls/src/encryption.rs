@@ -17,7 +17,8 @@ const BOF_SID: u16 = 0x0809;
 const EOF_SID: u16 = 0x000a;
 const CRYPTOAPI_RC4_PROVIDER: &str = "Microsoft Enhanced Cryptographic Provider v1.0";
 
-/// Password-to-open encryption profiles supported by the BIFF8 writer.
+/// Password-to-open encryption profiles supported by the BIFF8 reader and
+/// writer.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EncryptionProfile {
     /// Legacy BIFF8 XOR obfuscation. Passwords are limited to 15 ANSI characters.
@@ -130,7 +131,7 @@ struct XorObfuscation {
 enum FilePassRecord {
     Xor(XorObfuscation),
     BinaryRc4(legacy_rc4::Header),
-    CryptoApi(Header),
+    CryptoApi { header: Header, key_bits: u16 },
     Unsupported(EncryptionKind),
 }
 
@@ -150,7 +151,7 @@ pub(crate) fn inspect_filepass(data: &[u8]) -> Result<FilePassKind> {
     match FilePassRecord::parse(data) {
         Ok(FilePassRecord::Xor(_)) => Ok(FilePassKind::Xor),
         Ok(FilePassRecord::BinaryRc4(_)) => Ok(FilePassKind::BinaryRc4),
-        Ok(FilePassRecord::CryptoApi(_)) => Ok(FilePassKind::CryptoApi),
+        Ok(FilePassRecord::CryptoApi { .. }) => Ok(FilePassKind::CryptoApi),
         Ok(FilePassRecord::Unsupported(kind)) => Ok(FilePassKind::Unsupported(kind)),
         Err(Error::UnsupportedEncryption(kind)) => Ok(FilePassKind::Unsupported(kind)),
         Err(error) => Err(error),
@@ -189,7 +190,9 @@ impl FilePassRecord {
                 if matches!((major, minor), (2..=4, 2)) {
                     let header =
                         office_rc4::parse_header(&data[2..]).map_err(map_cryptoapi_header_error)?;
-                    return Ok(Self::CryptoApi(header));
+                    let key_bits = u16::try_from(header.key_bits())
+                        .map_err(|_| Error::UnsupportedEncryption(EncryptionKind::CryptoApi))?;
+                    return Ok(Self::CryptoApi { header, key_bits });
                 }
                 if (major, minor) != (1, 1) {
                     return Ok(Self::Unsupported(EncryptionKind::CryptoApi));
@@ -518,17 +521,18 @@ pub(crate) fn prepare_workbook_stream(
     prepare_workbook_stream_with_state(workbook, password).map(|(workbook, _)| workbook)
 }
 
-/// Validate/decrypt a Workbook stream and retain whether a `FILEPASS` record
-/// selected an encryption family. The state is returned with the transformed
-/// bytes so an eager owner can carry it into a package publication guard
-/// without rescanning the BIFF payload.
+/// Validate/decrypt a Workbook stream and retain the exact profile selected by
+/// its `FILEPASS` record. The state is returned with the transformed bytes so
+/// an eager owner can carry it into a package publication guard and encryption
+/// projection without rescanning the BIFF payload.
 pub(crate) fn prepare_workbook_stream_with_state(
     mut workbook: Vec<u8>,
     password: Option<&str>,
-) -> Result<(Vec<u8>, bool)> {
+) -> Result<(Vec<u8>, Option<EncryptionProfile>)> {
     let mut position = 0usize;
     let mut cipher = None;
     let mut saw_filepass = false;
+    let mut encryption = None;
 
     while position < workbook.len() {
         let header_end = position.checked_add(4).ok_or_else(|| {
@@ -555,7 +559,7 @@ pub(crate) fn prepare_workbook_stream_with_state(
         // reached without one, worksheet substreams and trailing OLE padding
         // cannot change the workbook's encryption state.
         if sid == 0x000A && !saw_filepass {
-            return Ok((workbook, false));
+            return Ok((workbook, None));
         }
 
         if sid == FILEPASS_SID {
@@ -574,6 +578,7 @@ pub(crate) fn prepare_workbook_stream_with_state(
                         return Err(Error::InvalidPassword);
                     }
                     cipher = Some(WorkbookCipher::Xor(create_xor_array(password)));
+                    encryption = Some(EncryptionProfile::XorObfuscation);
                 },
                 FilePassRecord::BinaryRc4(filepass) => {
                     let password = password.ok_or(Error::PasswordRequired)?;
@@ -581,13 +586,15 @@ pub(crate) fn prepare_workbook_stream_with_state(
                         .map_err(map_legacy_runtime_error)?
                         .ok_or(Error::InvalidPassword)?;
                     cipher = Some(WorkbookCipher::BinaryRc4(context));
+                    encryption = Some(EncryptionProfile::OfficeBinaryRc4);
                 },
-                FilePassRecord::CryptoApi(header) => {
+                FilePassRecord::CryptoApi { header, key_bits } => {
                     let password = password.ok_or(Error::PasswordRequired)?;
                     let context = office_rc4::verify(&header, password)
                         .map_err(map_cryptoapi_runtime_error)?
                         .ok_or(Error::InvalidPassword)?;
                     cipher = Some(WorkbookCipher::CryptoApi(context));
+                    encryption = Some(EncryptionProfile::CryptoApiRc4 { key_bits });
                 },
                 FilePassRecord::Unsupported(kind) => {
                     return Err(Error::UnsupportedEncryption(kind));
@@ -633,7 +640,7 @@ pub(crate) fn prepare_workbook_stream_with_state(
         position = record_end;
     }
 
-    Ok((workbook, saw_filepass))
+    Ok((workbook, encryption))
 }
 
 fn map_cryptoapi_header_error(error: CryptoError) -> Error {
@@ -911,7 +918,7 @@ mod tests {
         for (major, key_bits) in [(2, 40), (3, 56), (4, 120), (4, 128)] {
             assert!(matches!(
                 FilePassRecord::parse(&cryptoapi_filepass(major, key_bits)),
-                Ok(FilePassRecord::CryptoApi(_))
+                Ok(FilePassRecord::CryptoApi { .. })
             ));
         }
 

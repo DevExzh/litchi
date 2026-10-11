@@ -32,7 +32,7 @@ impl<R: Read + Seek> Reader<R> {
     pub(super) fn empty(ole_file: OleFile<R>) -> Self {
         Self {
             ole_file,
-            encrypted_source: false,
+            encryption: None,
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
             sheets: Vec::new(),
@@ -200,9 +200,9 @@ impl<R: Read + Seek> Reader<R> {
             .ole_file
             .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
-        let (workbook_data, encrypted_source) =
+        let (workbook_data, encryption) =
             prepare_workbook_stream_with_state(workbook_data, options.get_password())?;
-        self.encrypted_source = encrypted_source;
+        self.encryption = encryption;
         let mut tolerance = ToleranceLog::new(options.get_leniency());
         // Container repairs come first: the compound-file reader applied them
         // while the OLE file was opened, before any BIFF record was read.

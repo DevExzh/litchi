@@ -145,13 +145,15 @@ enum PackageState {
     /// A fully parsed reader retaining the exact source cursor bytes.
     Eager {
         reader: Arc<RawReader>,
-        encrypted: bool,
+        encryption: Option<crate::EncryptionProfile>,
     },
     /// A validated positional source and its lazy semantic projection.
     Source {
         cfb: Arc<SharedOleFile>,
         workbook: SourceBackedWorkbook,
-        encrypted: bool,
+        /// Source-backed admission currently accepts clear Workbook streams
+        /// only, so no password-to-open profile is retained on this path.
+        encryption: Option<crate::EncryptionProfile>,
         /// Materialization is deliberately demand-driven.  A source package
         /// can serve source-backed reads without ever constructing this
         /// eager reader.
@@ -181,20 +183,20 @@ enum RetainedPolicy {
 impl fmt::Debug for PackageState {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Eager { encrypted, .. } => formatter
+            Self::Eager { encryption, .. } => formatter
                 .debug_struct("Eager")
-                .field("encrypted", encrypted)
+                .field("encryption", encryption)
                 .finish_non_exhaustive(),
             Self::Source {
                 cfb,
                 workbook,
-                encrypted,
+                encryption,
                 ..
             } => formatter
                 .debug_struct("Source")
                 .field("file_size", &cfb.file_size())
                 .field("workbook", workbook)
-                .field("encrypted", encrypted)
+                .field("encryption", encryption)
                 .finish_non_exhaustive(),
         }
     }
@@ -295,6 +297,16 @@ impl Package {
         Self::open_with_options(path, OpenOptions::default())
     }
 
+    /// Open a password-to-open encrypted XLS path.
+    ///
+    /// The returned package retains the source encryption profile. Ordinary
+    /// publication remains protected by the encryption policy; callers must
+    /// choose an explicit encrypted-source route when writing it.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_password(path: impl AsRef<Path>, password: &str) -> Result<Self> {
+        Self::open_with_options(path, OpenOptions::new().password(password))
+    }
+
     /// Open a filesystem path under explicit policies.
     #[cfg(any(unix, windows))]
     pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions<'_>) -> Result<Self> {
@@ -340,7 +352,7 @@ impl Package {
                 state: PackageState::Source {
                     cfb,
                     workbook,
-                    encrypted: false,
+                    encryption: None,
                     materialized: OnceLock::new(),
                 },
                 policy: RetainedPolicy::Source {
@@ -368,14 +380,14 @@ impl Package {
         options: OpenOptions<'_>,
         metadata: Metadata,
     ) -> Result<Self> {
-        let encrypted = reader.encrypted_source();
+        let encryption = reader.encryption();
         let metadata_cache = OnceLock::new();
         let _ = metadata_cache.set(metadata);
         Ok(Self {
             inner: Arc::new(PackageInner {
                 state: PackageState::Eager {
                     reader: Arc::new(reader),
-                    encrypted,
+                    encryption,
                 },
                 policy: RetainedPolicy::Eager {
                     source_limits: options.get_source_limits(),
@@ -546,9 +558,18 @@ impl Package {
     /// Ordinary publication refuses these inputs to avoid emitting plaintext.
     #[must_use]
     pub fn is_encrypted(&self) -> bool {
+        self.encryption().is_some()
+    }
+
+    /// Return the password-to-open profile retained from source admission.
+    ///
+    /// A CryptoAPI RC4 profile includes its exact key length. Source-backed
+    /// XLS admission is currently clear-only and therefore returns `None`.
+    #[must_use]
+    pub fn encryption(&self) -> Option<crate::EncryptionProfile> {
         match &self.inner.state {
-            PackageState::Eager { encrypted, .. } | PackageState::Source { encrypted, .. } => {
-                *encrypted
+            PackageState::Eager { encryption, .. } | PackageState::Source { encryption, .. } => {
+                *encryption
             },
         }
     }
@@ -1069,8 +1090,8 @@ fn source_read_error(
 
 fn ensure_publication_allowed(inner: &Arc<PackageInner>) -> Result<()> {
     let encrypted = match &inner.state {
-        PackageState::Eager { encrypted, .. } | PackageState::Source { encrypted, .. } => {
-            *encrypted
+        PackageState::Eager { encryption, .. } | PackageState::Source { encryption, .. } => {
+            encryption.is_some()
         },
     };
     if encrypted {

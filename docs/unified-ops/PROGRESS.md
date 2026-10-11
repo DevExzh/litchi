@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0201 | [XLS encryption profile](0201-xls-encryption-profile.md) | Retained exact encryption mode/key length and canonical password opening; 2,323 tests/doctests, lint/docs/glossary/boundaries pass; security publication verbs, Builder entropy, unified XLS CRUD and full goal remain open |
 | 0200 | [Canonical XLS Builder](0200-xls-canonical-builder.md) | Concrete Builder and Package-returning build replace Writer publication; encrypted owners retain explicit output; 2,234 tests/doctests plus focused Builder checks, lint/docs/glossary/boundaries and harness compilation pass; encrypted-build determinism, unified XLS CRUD and full goal remain open |
 | 0199 | [XLS creation and publication](0199-xls-creation-publication.md) | Native minimal Package, unified creation and atomic publication, origin retention, first-cell row-table creation and explicit option gaps; 2,229 combined tests/doctests plus final owner/publication checks pass; Builder, unified XLS CRUD and full goal remain open |
 | 0198 | [XLS primary transactions](0198-xls-primary-transactions.md) | Package Edit/Commit/Patch/Diagnostics, retained profiles and positional reads, exact replay/inverse, typed staging limits and publication fences; 2,223 combined tests/doctests plus 1,747 final native checks, lint/docs/glossary/boundaries and consumer compilation pass; Builder, facade XLS CRUD/batching and full goal remain open |

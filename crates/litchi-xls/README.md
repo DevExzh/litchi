@@ -50,6 +50,10 @@ uses `Builder::build()` to produce a validated Package; publication belongs to
 that owner. Builders have no save, stream or byte-output methods. Encrypted
 builds retain the encrypted image and publish it explicitly through
 `Package::to_encrypted_bytes()`; ordinary publication refuses encrypted owners.
+`Package::open_with_password(path, password)` opens a protected source with the
+default limits. `Package::encryption()` reports its retained `EncryptionProfile`,
+including the CryptoAPI RC4 key length, after successful password verification.
+Plain owners report `None`; this metadata does not authorize a security downgrade.
 
 ## Eager reader limits
 

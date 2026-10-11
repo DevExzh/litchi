@@ -837,11 +837,12 @@ fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> R
         .leniency(source.leniency())
         .compatibility_profile(source.compatibility_profile().unwrap_or_default());
     let reader = crate::raw::Reader::from_admitted_ole_file(ole, options)?;
+    let encryption = reader.encryption();
     Ok(Package {
         inner: Arc::new(super::PackageInner {
             state: PackageState::Eager {
                 reader: Arc::new(reader),
-                encrypted: false,
+                encryption,
             },
             policy: source.inner.policy,
             metadata: std::sync::OnceLock::from(metadata),
