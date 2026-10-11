@@ -155,6 +155,7 @@ pub mod package;
 /// Low-level cursor-backed CFB access for format-specific callers.
 pub mod raw {
     pub use crate::package::raw::Package;
+    pub use crate::package::raw::{OpenOutcome, open_package};
 }
 pub mod paragraph;
 pub mod parts;
@@ -208,8 +209,8 @@ pub use leniency::{
     StylesheetDefect, TableDefinitionDefect, ToleranceReport, ToleratedDefect,
 };
 pub use package::{
-    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, Password, ResourceKind,
-    ResourceLimit, Result,
+    Commit, Diagnostics, Edit, EditOptions, EncryptionKind, Error, LimitKind, Limits, LimitsError,
+    OpenOptions, Package, Password, Patch, ResourceKind, ResourceLimit, Result,
 };
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};

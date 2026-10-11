@@ -1190,7 +1190,20 @@ Legacy DOC now exports `Builder::build() -> Package`; `Writer` and its direct
 output methods are removed. `Package` owns byte, sequential-stream and atomic
 path publication, and `from_bytes` borrows its input slice. The DOC minimal and
 full glossary profiles guard this completed naming slice. Native package
-transaction ownership, commit diagnostics, and the unified native ingress
-options envelope remain pending; separate body-text transaction types are not
-registered as a completed glossary family. See
-[0188](unified-ops/0188-doc-paragraph-loop.md).
+transaction ownership and the merged ingress envelope follow in records
+0190–0191. See [0188](unified-ops/0188-doc-paragraph-loop.md).
+
+
+## DOC primary package transactions (record 0191)
+
+The immutable DOC `Package` exposes `edit`, `edit_with_options`, and `apply`.
+`package::edit` exports the canonical `Edit`, `Commit`, `Patch`, `Diagnostics`,
+`Error`, and `LimitKind` family. Commits expose `package`, `patch`, and
+`diagnostics`; `into_parts` returns `(Package, Patch)`. Focused property-set
+transactions live under `package::property_set` instead of claiming the
+primary package names. The unified adapter retains and edits the native
+package, including its shared parsed document projection.
+
+Physical `Limits` naming, comprehensive options builders, and the remaining
+focused/raw vocabulary audit are still pending. Registering this transaction
+family establishes its shape, not complete DOC CRUD or performance acceptance.

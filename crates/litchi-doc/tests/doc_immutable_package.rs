@@ -150,3 +150,25 @@ fn path_open_seals_an_owned_snapshot_and_checks_input_limit() {
     std::fs::remove_file(path).unwrap();
     result.unwrap();
 }
+
+#[test]
+fn lenient_read_owner_does_not_bypass_strict_transaction_validation() {
+    let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+        .join("../../test-data/ole/doc/duplicate-style-names.doc");
+    let bytes = std::fs::read(path).unwrap();
+    let package = Package::from_bytes_with_options(
+        &bytes,
+        OpenOptions::default().with_leniency(litchi_doc::Leniency::TolerateStylesheetDefects),
+    )
+    .unwrap();
+    assert_eq!(
+        package.leniency(),
+        litchi_doc::Leniency::TolerateStylesheetDefects
+    );
+    assert!(!package.document().tolerance_report().defects().is_empty());
+    assert!(
+        package.edit().is_err(),
+        "the body engine still requires strict validation"
+    );
+    assert_eq!(package.to_bytes().unwrap(), bytes);
+}

@@ -593,6 +593,18 @@ impl<R: Read + Seek> std::fmt::Debug for RawPackage<R> {
     }
 }
 
+/// Private body transaction profile retained by packages produced through the
+/// canonical primary edit path.  Fresh ingress keeps this absent so its
+/// ordinary `Package::edit()` uses the body engine's default profile; an
+/// explicit edit or patch application records the effective profile for the
+/// next immutable revision.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct EditProfile {
+    pub(crate) revision_limits: crate::tracked_revision::Limits,
+    pub(crate) transaction_limits: crate::body_text::TransactionLimits,
+    pub(crate) protection_policy: crate::parts::protection::ProtectionPolicy,
+}
+
 /// An immutable, owned DOC package snapshot.
 ///
 /// The raw seek-cursor owner remains available under [`crate::package::raw`]
@@ -619,6 +631,7 @@ pub struct Package {
     pub(super) metadata: Arc<litchi_core::Metadata>,
     pub(super) limits: Limits,
     pub(super) leniency: crate::leniency::Leniency,
+    pub(super) edit_profile: Option<EditProfile>,
 }
 
 impl Clone for Package {
@@ -629,6 +642,7 @@ impl Clone for Package {
             metadata: Arc::clone(&self.metadata),
             limits: self.limits,
             leniency: self.leniency,
+            edit_profile: self.edit_profile.clone(),
         }
     }
 }

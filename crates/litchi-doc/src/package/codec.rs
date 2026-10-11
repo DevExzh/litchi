@@ -2,6 +2,7 @@ use super::model::{
     Error, Limits, OpenOptions, Package, RawPackage, ResourceKind, ResourceLimit, Result,
 };
 use crate::document::Document;
+use crate::leniency::Leniency;
 use litchi_cfb::{OleError, OleFile, SharedOleFile, SharedOleFileLimits};
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_ole_common::property_set::{
@@ -459,6 +460,37 @@ impl RawPackage<Cursor<Vec<u8>>> {
     }
 }
 
+/// Result of parsing a raw owned CFB at the semantic package boundary.
+///
+/// A password-protected source is returned with its parsed CFB intact so a
+/// caller that exposes a locked state can retain the original source and ask
+/// for credentials later.  Other failures consume no successful package
+/// owner.  The helper is intentionally under `raw`, because handing around a
+/// cursor-backed `OleFile` is an escape hatch for format-aware facades.
+pub enum OpenOutcome {
+    /// A fully validated immutable package owner.
+    Opened(Package),
+    /// The source is encrypted and needs a password before projection.
+    PasswordRequired(Box<OleFile<Cursor<Vec<u8>>>>),
+}
+
+/// Validate and adopt one already parsed owned CFB under one options envelope.
+pub fn open_package(
+    mut ole: OleFile<Cursor<Vec<u8>>>,
+    options: OpenOptions,
+) -> Result<OpenOutcome> {
+    let limits = options.limits();
+    RawPackage::<Cursor<Vec<u8>>>::validate_package_ole_file(&ole, limits)?;
+    let leniency = options.leniency;
+    match Document::from_ole_with_options(&mut ole, options) {
+        Ok(document) => {
+            Package::from_validated_ole(ole, document, limits, leniency).map(OpenOutcome::Opened)
+        },
+        Err(Error::PasswordRequired) => Ok(OpenOutcome::PasswordRequired(Box::new(ole))),
+        Err(error) => Err(error),
+    }
+}
+
 impl Package {
     /// Open an immutable DOC package from a path under the default policy.
     ///
@@ -507,9 +539,10 @@ impl Package {
         ole: OleFile<Cursor<Vec<u8>>>,
         options: OpenOptions,
     ) -> Result<Self> {
-        let limits = options.limits();
-        let raw = RawPackage::from_ole_file_with_limits(ole, limits)?;
-        Self::from_raw(raw, options)
+        match open_package(ole, options)? {
+            OpenOutcome::Opened(package) => Ok(package),
+            OpenOutcome::PasswordRequired(_) => Err(Error::PasswordRequired),
+        }
     }
 
     /// Construct the minimal valid DOC package through the canonical builder.
@@ -549,7 +582,7 @@ impl Package {
 
     /// Leniency policy retained by this immutable package.
     #[must_use]
-    pub const fn leniency(&self) -> crate::leniency::Leniency {
+    pub const fn leniency(&self) -> Leniency {
         self.leniency
     }
 
@@ -651,9 +684,21 @@ impl Package {
         let limits = options.limits();
         let leniency = options.leniency;
         let document = Document::from_ole_with_options(&mut raw.ole, options)?;
+        Self::from_validated_ole(raw.ole, document, limits, leniency)
+    }
+
+    /// Adopt an already parsed and fully validated candidate without opening
+    /// its CFB container a second time.  The caller must have applied the same
+    /// package and semantic validation gates used by [`Self::from_raw`].
+    pub(crate) fn from_validated_ole(
+        ole: OleFile<Cursor<Vec<u8>>>,
+        document: Document,
+        limits: Limits,
+        leniency: Leniency,
+    ) -> Result<Self> {
         let version = OwnedSource::new(Vec::new()).version()?;
         let shared = Arc::new(SharedOleFile::from_owned_ole_file(
-            raw.ole,
+            ole,
             version,
             SharedOleFileLimits::new(
                 u64::try_from(limits.max_package_bytes()).unwrap_or(u64::MAX),
@@ -666,6 +711,7 @@ impl Package {
             metadata: Arc::new(metadata),
             limits,
             leniency,
+            edit_profile: None,
         })
     }
 

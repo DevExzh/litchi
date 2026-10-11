@@ -2014,9 +2014,16 @@
           "name": "ole_file",
           "scope": "litchi_doc::Package",
           "replacement": "use explicit raw boundary for physical container access"
+        },
+        {
+          "name": "edit_with_limits",
+          "scope": "litchi_doc::Package",
+          "replacement": "use edit_with_options and EditOptions"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_doc::package::edit"
+      ]
     },
     {
       "id": "doc-full",
@@ -2081,9 +2088,16 @@
           "name": "ole_file",
           "scope": "litchi_doc::Package",
           "replacement": "use explicit raw boundary for physical container access"
+        },
+        {
+          "name": "edit_with_limits",
+          "scope": "litchi_doc::Package",
+          "replacement": "use edit_with_options and EditOptions"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_doc::package::edit"
+      ]
     }
   ]
 }

@@ -36,7 +36,7 @@
 
 use litchi_doc::{
     FieldType, FieldsTable, HyperlinkAssociation, UserDefinedHyperlinks,
-    package::Snapshot,
+    package::property_set::Snapshot,
     parts::protection::{ProtectionAuthorization, ProtectionPolicy},
     raw::Package,
     user_defined_hyperlinks::{Hyperlink, Hyperlinks, Limits},

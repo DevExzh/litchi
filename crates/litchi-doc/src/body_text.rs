@@ -24,7 +24,7 @@
 pub mod source;
 
 use crate::DateTime;
-use crate::package::Error as PackageError;
+use crate::package::{Error as PackageError, OpenOptions as PackageOpenOptions};
 use crate::parts::dofr::{DofrArray, DofrPatch};
 use crate::parts::protection::ProtectionPolicy;
 use crate::parts::saved_selection::{
@@ -32,6 +32,7 @@ use crate::parts::saved_selection::{
     SavedSelectionTransaction,
 };
 use crate::tracked_revision::{Limits, Revision, RevisionEditor, RevisionKind, RevisionMetadata};
+use litchi_cfb::OleFile;
 use litchi_core::Position;
 use litchi_core::patch::{
     BlobBundle, BlobId, CompositionError, JoinedSubEdits, PatchError, PatchLimits, PatchOperation,
@@ -43,6 +44,20 @@ pub use litchi_ole_common::object::{CfbParseEvent, CfbParseOutcome};
 use std::collections::{BTreeMap, BTreeSet};
 use std::io::Cursor;
 use std::sync::{Arc, OnceLock};
+
+pub(crate) fn intersect_revision_limits(left: Limits, right: Limits) -> Limits {
+    Limits {
+        max_objects: left.max_objects.min(right.max_objects),
+        max_storage_depth: left.max_storage_depth.min(right.max_storage_depth),
+        max_streams_per_object: left
+            .max_streams_per_object
+            .min(right.max_streams_per_object),
+        max_streams: left.max_streams.min(right.max_streams),
+        max_stream_size: left.max_stream_size.min(right.max_stream_size),
+        max_object_size: left.max_object_size.min(right.max_object_size),
+        max_total_size: left.max_total_size.min(right.max_total_size),
+    }
+}
 
 /// Bounded undo/redo history over immutable DOC snapshots.
 pub type History = litchi_core::patch::History<Snapshot>;
@@ -936,6 +951,16 @@ impl Snapshot {
         self.transaction_limits
     }
 
+    /// Revision-owner limits retained by this immutable body snapshot.
+    pub(crate) const fn revision_limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Protected-publication policy retained by this immutable body snapshot.
+    pub(crate) fn protection_policy(&self) -> ProtectionPolicy {
+        self.protection_policy.clone()
+    }
+
     /// Configured outer-package and aggregate stream limits retained by this
     /// immutable source owner.
     #[must_use]
@@ -1482,6 +1507,24 @@ impl PartialEq for Snapshot {
 
 impl Eq for Snapshot {}
 
+/// Package-owned commit carrier used by the canonical `package::edit`
+/// boundary.  Unlike the ordinary body [`Commit`], a changed candidate keeps
+/// the already parsed CFB and semantic document projection alive so the
+/// immutable package owner can adopt them without opening the container a
+/// second time.  The carrier is crate-private because the body snapshot and
+/// package limits remain the authority for all validation.
+pub(crate) struct PackageCommit {
+    pub(crate) snapshot: Snapshot,
+    pub(crate) patch: Patch,
+    pub(crate) validated: Option<ValidatedPackage>,
+}
+
+/// Already validated package parts transferred from one body commit.
+pub(crate) struct ValidatedPackage {
+    pub(crate) ole: OleFile<Cursor<Vec<u8>>>,
+    pub(crate) document: crate::Document,
+}
+
 /// Clone-first staged text edit over one immutable source snapshot.
 pub struct Edit {
     source: Snapshot,
@@ -1625,6 +1668,18 @@ impl Edit {
     #[must_use]
     pub const fn source(&self) -> &Snapshot {
         &self.source
+    }
+
+    /// Exact source bytes retained by this staged edit.
+    #[must_use]
+    pub fn source_bytes(&self) -> &[u8] {
+        self.source.bytes()
+    }
+
+    /// Borrowed semantic changes staged so far, including authored text.
+    #[must_use]
+    pub fn changes(&self) -> impl ExactSizeIterator<Item = ChangeRef<'_>> {
+        self.changes.iter().map(Change::as_ref)
     }
 
     /// Allocation capacity held by the already-validated rendered handoff,
@@ -2252,6 +2307,62 @@ impl Edit {
         Ok(Commit { snapshot, patch })
     }
 
+    /// Publishes a package-owned commit while transferring the validated
+    /// changed candidate's CFB and semantic projection to the package owner.
+    ///
+    /// The changed path performs the same ordered gates as the ordinary body
+    /// commit: finish and protection authorization, strict revision-owner
+    /// reopening, and complete public `Document` validation.  It retains the
+    /// resulting `OleFile` and `Document` instead of reopening the candidate
+    /// from bytes in `package::Package`.  Exact no-ops retain the original
+    /// snapshot and carry no candidate owner.
+    pub(crate) fn commit_with_package(mut self) -> Result<PackageCommit> {
+        let bytes = self.take_candidate()?;
+        let (snapshot, validated) = if bytes == self.source.bytes() {
+            (self.source.clone(), None)
+        } else {
+            self.editor
+                .authorize_rendered(&bytes)
+                .map_err(map_protection_error)?;
+            crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
+                bytes.len(),
+                self.source.package_limits,
+            )
+            .map_err(Error::Invalid)?;
+            let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
+                bytes.clone(),
+                self.source.limits,
+                self.source.protection_policy.clone(),
+            )
+            .map_err(Error::Invalid)?;
+            let document = crate::Document::from_ole_with_options(
+                &mut ole,
+                PackageOpenOptions::default().with_limits(self.source.package_limits),
+            )
+            .map_err(Error::Invalid)?;
+            let snapshot = Snapshot {
+                source: Arc::from(bytes.into_boxed_slice()),
+                fingerprint_cache: OnceLock::new(),
+                limits: self.source.limits,
+                package_limits: self.source.package_limits,
+                transaction_limits: self.source.transaction_limits,
+                protection_policy: self.source.protection_policy.clone(),
+            };
+            (snapshot, Some(ValidatedPackage { ole, document }))
+        };
+        let patch = Patch::new(
+            self.source,
+            snapshot.clone(),
+            self.changes,
+            self.auxiliary_changed,
+        );
+        Ok(PackageCommit {
+            snapshot,
+            patch,
+            validated,
+        })
+    }
+
     /// Publishes a commit while reporting deterministic, content-free phase
     /// boundaries to an external observer.
     ///
@@ -2578,6 +2689,10 @@ impl Patch {
     /// Returns [`Error::Conflict`] unless `source` has byte-for-byte equality
     /// with this patch's captured source snapshot.
     pub fn apply(&self, source: &Snapshot) -> Result<Snapshot> {
+        let limits = intersect_revision_limits(
+            intersect_revision_limits(source.limits, self.before.limits),
+            self.after.limits,
+        );
         let transaction_limits = source
             .transaction_limits
             .intersect(self.before.transaction_limits)
@@ -2598,7 +2713,7 @@ impl Patch {
         }
         if self.is_noop() {
             return Ok(source.with_policies(
-                source.limits,
+                limits,
                 package_limits,
                 transaction_limits,
                 source.protection_policy.clone(),
@@ -2609,11 +2724,11 @@ impl Patch {
             .authorize_rendered(self.after.bytes())
             .map_err(map_protection_error)?;
         if self.after.package_limits == package_limits
-            && self.after.limits == source.limits
+            && self.after.limits == limits
             && self.after.protection_policy == source.protection_policy
         {
             return Ok(self.after.with_policies(
-                source.limits,
+                limits,
                 package_limits,
                 transaction_limits,
                 source.protection_policy.clone(),
@@ -2623,7 +2738,7 @@ impl Patch {
             self.after.bytes().to_vec(),
             OpenOptions::default()
                 .with_package_limits(package_limits)
-                .with_revision_limits(source.limits)
+                .with_revision_limits(limits)
                 .with_transaction_limits(transaction_limits)
                 .with_protection_policy(source.protection_policy.clone()),
         )

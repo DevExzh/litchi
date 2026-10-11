@@ -106,7 +106,7 @@ struct Step {
 }
 enum Leaf {
     #[cfg(feature = "doc")]
-    Doc(Box<litchi_doc::body_text::Patch>),
+    Doc(Box<litchi_doc::Patch>),
     #[cfg(feature = "xlsb")]
     Xlsb(Box<crate::format::xlsb::write::Patch>),
     #[cfg(feature = "pptx")]
@@ -1542,7 +1542,7 @@ fn changed(steps: &[Step]) -> Result<bool> {
     };
     match (&first.leaf, &last.leaf) {
         #[cfg(feature = "doc")]
-        (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before() != last.after()),
+        (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before_bytes() != last.after_bytes()),
         #[cfg(feature = "xlsb")]
         (Leaf::Xlsb(first), Leaf::Xlsb(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "pptx")]
@@ -1580,8 +1580,11 @@ fn admit(file: &File) -> Result<()> {
             if handle.signature() == crate::format::signature::Signature::Signed {
                 return Err(crate::Error::signed(litchi_core::FileFormat::Doc));
             }
-            match handle.body_text_snapshot()? {
-                Some(_) => Ok(()),
+            match handle.editable_package()? {
+                Some(package) => {
+                    drop(package.edit()?);
+                    Ok(())
+                },
                 None => Err(crate::Error::new(
                     Code::UnsupportedCapability,
                     "explicit transactions for DOC require retained source bytes",

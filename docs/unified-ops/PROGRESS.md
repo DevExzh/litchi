@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0191 | [DOC primary transactions](0191-doc-primary-transactions.md) | Native Package Edit/Commit/Patch/Diagnostics, retained policies and validated owner handoff; facade adopts canonical package; 2,707 tests/doctests, lint/docs/glossary/boundaries pass; scoped ratios under 10%, absolute large-case slowdown and full goal remain open |
 | 0190 | [Immutable DOC owner](0190-doc-immutable-owner.md) | Concrete immutable Package, cheap detached Document, merged OpenOptions and explicit raw reader; encrypted/exact publication checks; 2,696 combined tests/doctests, lint/docs/glossary/boundaries pass; repeated 100-paragraph overhead 13.6%, primary transactions and full goal remain open |
 | 0189 | [DOC paragraph controls](0189-doc-paragraph-controls.md) | Opt-in policy and retained-reader diagnostics; repeated exact outputs; retained native reader reproduces similar large-corpus overhead; release build/Clippy and smoke pass; performance acceptance and full goal remain open |
 | 0188 | [DOC paragraph loop](0188-doc-paragraph-loop.md) | Native Builder/Package publication and borrowed body traversal; unified paragraph text create/read/set/batch/history/save; guarded limits and atomic publication; 3,231 combined + 11 final focused tests, lint/docs/glossary/boundaries pass; exact paired outputs, up to 20.4% overhead leaves performance acceptance open; broader DOC CRUD and full goal remain open |

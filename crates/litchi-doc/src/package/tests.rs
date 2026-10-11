@@ -1,5 +1,7 @@
 use super::{Error, OpenOptions};
-use crate::raw::Package;
+use crate::raw::{OpenOutcome, Package, open_package};
+use litchi_cfb::OleFile;
+use std::io::Cursor;
 use std::path::Path;
 
 #[test]
@@ -65,6 +67,26 @@ fn opens_apache_poi_cryptoapi_document() {
         .document_with_options(OpenOptions::default().with_password("password".to_owned().into()))
         .unwrap();
     assert!(!document.text().unwrap().trim().is_empty());
+}
+
+#[test]
+fn raw_open_outcome_retains_encrypted_cfb_for_later_password_ingress() {
+    let bytes = std::fs::read(poi_fixture("password_tika_binaryrc4.doc")).unwrap();
+    let ole = OleFile::open(Cursor::new(bytes)).unwrap();
+    let ole = match open_package(ole, OpenOptions::default()).unwrap() {
+        OpenOutcome::PasswordRequired(ole) => *ole,
+        OpenOutcome::Opened(_) => panic!("encrypted fixture unexpectedly opened without password"),
+    };
+    let package = match open_package(
+        ole,
+        OpenOptions::default().with_password("tika".to_owned().into()),
+    )
+    .unwrap()
+    {
+        OpenOutcome::Opened(package) => package,
+        OpenOutcome::PasswordRequired(_) => panic!("correct password remained locked"),
+    };
+    assert!(!package.document().text().unwrap().trim().is_empty());
 }
 
 #[test]

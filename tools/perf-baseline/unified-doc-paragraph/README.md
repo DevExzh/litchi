@@ -12,11 +12,10 @@ The default matrix uses `N = 1, 10, 100, 1000` and nine ABBA rounds.  The
 corpus is produced through the canonical `litchi_doc::Builder::build()` then
 `Package::to_bytes()` publication boundary.  A fresh unified `File` is opened
 from that corpus with source retention and `SourceMode::Auto` before every
-unified timed sample, so the facade's promoted body-text `Snapshot` cache
-cannot warm later samples.  Every native sample opens a
+unified timed sample, so retained edit state cannot warm later samples.  Every native sample opens a
 `body_text::Snapshot` from the prepared source bytes inside the clock.  Every
 unified sample then calls `File::set` against a parsed path; the DOC facade
-promotes its fresh retained source into the variable-width body-text owner
+opens the native package transaction and its variable-width body-text engine
 inside that call.  File opening remains outside timing.  Path parsing, input
 corpus construction, warm-up, post-operation output serialization, paragraph
 readback, exact-byte comparison, and destruction are outside the timed

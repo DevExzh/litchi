@@ -341,6 +341,9 @@ pub enum Source {
     /// A legacy Word main-story semantic edit error.
     #[cfg(feature = "doc")]
     DocEdit(litchi_doc::body_text::Error),
+    /// A canonical legacy Word package transaction error.
+    #[cfg(feature = "doc")]
+    DocTransaction(litchi_doc::package::edit::Error),
     /// A legacy Word package creation/publication error.
     #[cfg(feature = "doc")]
     DocWrite(litchi_doc::writer::WriteError),
@@ -419,6 +422,8 @@ impl Source {
             Self::Doc(error) => Some(error),
             #[cfg(feature = "doc")]
             Self::DocEdit(error) => Some(error),
+            #[cfg(feature = "doc")]
+            Self::DocTransaction(error) => Some(error),
             #[cfg(feature = "doc")]
             Self::DocWrite(error) => Some(error),
             #[cfg(feature = "doc")]
@@ -1264,6 +1269,18 @@ impl Classify for litchi_core::patch::CompositionError {
 }
 
 #[cfg(feature = "doc")]
+impl Classify for litchi_doc::package::edit::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Package(error) => error.classify(),
+            Self::Body(error) => error.classify(),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "doc")]
 impl Classify for litchi_doc::body_text::Error {
     fn classify(&self) -> Class {
         use litchi_doc::body_text::Refusal;
@@ -1596,6 +1613,19 @@ impl From<litchi_xlsb::Error> for Error {
     }
 }
 from_leaf!(#[cfg(feature = "doc")] litchi_doc::Error => Doc, Some(FileFormat::Doc));
+#[cfg(feature = "doc")]
+impl From<litchi_doc::package::edit::Error> for Error {
+    fn from(error: litchi_doc::package::edit::Error) -> Self {
+        let class = error.classify();
+        let message = class.code.summary();
+        Self::from_class(
+            class,
+            message,
+            Some(FileFormat::Doc),
+            Source::DocTransaction(error),
+        )
+    }
+}
 #[cfg(feature = "doc")]
 impl From<litchi_doc::body_text::Error> for Error {
     fn from(error: litchi_doc::body_text::Error) -> Self {

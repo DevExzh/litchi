@@ -1370,3 +1370,37 @@ fn pptx_slide_order_refusals_distinguish_protection_capability_and_corruption() 
         );
     }
 }
+
+#[cfg(feature = "doc")]
+#[test]
+fn doc_primary_transactions_preserve_typed_causes_and_safe_messages() {
+    use litchi_doc::package::edit::{Error as Native, LimitKind};
+    for (native, expected) in [
+        (
+            Native::Limit {
+                kind: LimitKind::Operations,
+                observed: 2,
+                maximum: 1,
+            },
+            Code::LimitExceeded,
+        ),
+        (
+            Native::Body(litchi_doc::body_text::Error::Conflict),
+            Code::InvalidInput,
+        ),
+        (
+            Native::Body(litchi_doc::body_text::Error::Refused(
+                litchi_doc::body_text::Refusal::Protected,
+            )),
+            Code::DocumentProtected,
+        ),
+        (
+            Native::Package(litchi_doc::Error::PasswordRequired),
+            Code::DocumentProtected,
+        ),
+    ] {
+        let error = assert_code(native, expected);
+        assert!(matches!(error.0.source.as_ref(), Source::DocTransaction(_)));
+        assert_eq!(error.message(), expected.summary());
+    }
+}

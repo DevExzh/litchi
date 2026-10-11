@@ -1,12 +1,12 @@
 //! Coalesced ordinary body-paragraph text writes for the DOC adapter.
 //!
-//! A run owns one native `body_text::Edit`.  Direct paragraph paths are stable
+//! A run owns one native `Edit`.  Direct paragraph paths are stable
 //! while their text is replaced, so consecutive `set` calls can resolve once,
 //! stage in order, and publish one variable-width commit.  Queries and any
 //! non-text property remain barriers and use the ordinary isolated setter.
 
 use litchi_core::Position;
-use litchi_doc::body_text::Edit;
+use litchi_doc::Edit;
 
 use super::{Doc, WriteCommit};
 use crate::error::{Code, Error, Result};
@@ -73,7 +73,7 @@ impl Doc {
 impl Run {
     pub(crate) fn new(base: &Doc, limits: &SemanticLimits) -> Result<Self> {
         base.check_source()?;
-        let snapshot = base.body_text_snapshot()?.ok_or_else(|| {
+        let package = base.editable_package()?.ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the DOC document was opened without retaining its source for editing",
@@ -81,8 +81,8 @@ impl Run {
             .with_format(litchi_core::FileFormat::Doc)
             .with_suggestion("reopen the document with source retention enabled")
         })?;
-        let edit =
-            snapshot.edit_with_limits(super::body_transaction_limits(*limits, usize::MAX))?;
+        let edit = package
+            .edit_with_options(super::edit_options(super::body_transaction_limits(*limits)))?;
         Ok(Self {
             base: base.clone(),
             edit,
@@ -128,13 +128,13 @@ impl Run {
     /// Conservative retained-snapshot charge used before commit. The final
     /// rendered snapshot is charged again by `flush_pending`.
     pub(crate) fn snapshot_bytes(&self) -> usize {
-        let source = self.edit.source().bytes().len().saturating_mul(2);
+        let source = self.edit.source_bytes().len().saturating_mul(2);
         let text = self.items.iter().fold(0usize, |total, item| {
             total.saturating_add(item.text.len().saturating_mul(2))
         });
         source
             .saturating_add(text)
-            .saturating_add(size_of::<litchi_doc::body_text::Patch>())
+            .saturating_add(size_of::<litchi_doc::Patch>())
     }
 
     pub(crate) fn stage(
@@ -188,11 +188,11 @@ impl Run {
         let before = base.clone();
         let commit = edit.commit()?;
         base.check_source()?;
-        let changed = commit.changed();
-        let (snapshot, patch) = commit.into_parts();
+        let changed = commit.diagnostics().changed();
+        let (package, patch) = commit.into_parts();
         let snapshot_bytes = super::patch_snapshot_bytes(&patch);
         let after = if changed {
-            base.with_snapshot(snapshot)
+            base.with_package(package)
         } else {
             base.clone()
         };

@@ -126,7 +126,7 @@ fn public_property_set_facade_reads_and_edits_vba_signature_payloads() {
     let package_signature = package.vba_signature().unwrap().unwrap();
     assert_eq!(package_signature.info().signature(), [1, 2, 3]);
 
-    let source = litchi_doc::package::Snapshot::from_bytes(bytes).unwrap();
+    let source = litchi_doc::package::property_set::Snapshot::from_bytes(bytes).unwrap();
     let signature = source.vba_signature().unwrap().unwrap();
     assert_eq!(signature.kind(), litchi_doc::vba_signature::Kind::Property);
     assert_eq!(signature.info().signature(), [1, 2, 3]);
