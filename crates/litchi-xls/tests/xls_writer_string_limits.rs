@@ -22,7 +22,7 @@ use litchi_xls::writer::{
 use litchi_xls::writer::{DefinedNameFutureRecords, DefinedNameRecordOptions, NamePublish};
 use litchi_xls::{DefinedNameKind, Error, NameScope};
 
-type Workbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
+type Reader = litchi_xls::raw::Reader<Cursor<Vec<u8>>>;
 
 fn written(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
@@ -30,8 +30,8 @@ fn written(writer: &mut Writer) -> Vec<u8> {
     output.into_inner()
 }
 
-fn read(bytes: Vec<u8>) -> Workbook {
-    Workbook::new(Cursor::new(bytes)).unwrap()
+fn read(bytes: Vec<u8>) -> Reader {
+    Reader::new(Cursor::new(bytes)).unwrap()
 }
 
 /// The field, length and limit of a [`Error::StringTooLong`] refusal.
@@ -58,7 +58,7 @@ fn strings_of(units: usize) -> Vec<String> {
     ]
 }
 
-fn cell_text(workbook: &Workbook, sheet: usize, row: u32, column: u32) -> CellValue {
+fn cell_text(workbook: &Reader, sheet: usize, row: u32, column: u32) -> CellValue {
     workbook
         .xls_worksheet(sheet)
         .unwrap()
@@ -246,7 +246,7 @@ fn defined_name_comments_up_to_255_units_are_written_and_one_more_is_refused() {
 }
 
 /// Decodes the `PtgStr` a one-token formula consists of.
-fn formula_string(workbook: &Workbook) -> String {
+fn formula_string(workbook: &Reader) -> String {
     let tokens = workbook
         .xls_worksheet(0)
         .unwrap()

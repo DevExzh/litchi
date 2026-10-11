@@ -1,23 +1,23 @@
 //! The validation-only mode of the complete XLS reader.
 //!
-//! Several edit owners open a complete [`Workbook`] only to validate a package
+//! Several edit owners open a complete [`Reader`] only to validate a package
 //! and to read a handful of facts from it: sheet coverage, protection, macro
 //! markers, the shared-string table, and at most the few cells an edit
-//! changed. [`Workbook::new`] decodes every cell of every worksheet into a
+//! changed. [`Reader::new`] decodes every cell of every worksheet into a
 //! per-cell map with cloned strings and rendered formulas, which those owners
 //! then drop unread.
 //!
 //! This mode runs the same parser. Every CFB, globals, worksheet and package
 //! record is framed, decoded and checked by the same code, in the same order,
 //! under the same limits and the same default [`OpenOptions`], so it accepts
-//! exactly the packages [`Workbook::new`] accepts and refuses the others with
+//! exactly the packages [`Reader::new`] accepts and refuses the others with
 //! the same first error. The one difference is inside each worksheet: a
 //! validated cell record is counted in a compact occupancy map, which answers
 //! the duplicate-cell and `Array` ownership checks, and is decoded into a cell
 //! only when its position was asked for.
 
 use super::codec::{DecodeEveryCell, Position, ValidateCells};
-use super::model::{OpenOptions, Workbook};
+use super::model::{OpenOptions, Reader};
 use crate::cell::Cell;
 use crate::error::{Error, Result};
 use crate::protection::{SheetProtection, WorkbookProtection};
@@ -103,7 +103,7 @@ pub(super) enum CellDecoding<'a> {
     Kept(&'a KeptCells),
 }
 
-impl<R: Read + Seek> Workbook<R> {
+impl<R: Read + Seek> Reader<R> {
     /// Runs the complete validation of [`Self::new`] and keeps every fact of
     /// the workbook except the decoded cells, of which it keeps only `kept`.
     ///
@@ -176,15 +176,15 @@ impl<R: Read + Seek> Workbook<R> {
 
 /// A complete, independent validation open of an XLS package.
 ///
-/// It holds everything [`Workbook::new`] would hold except the decoded cells:
+/// It holds everything [`Reader::new`] would hold except the decoded cells:
 /// the same sheet directory, protection, macro markers, shared-string table,
 /// worksheet collectors and package facts, reached through accessors of the
-/// same names. It is deliberately not a [`Workbook`]: its worksheets carry
+/// same names. It is deliberately not a [`Reader`]: its worksheets carry
 /// only the cells it was asked to keep, so the one cell accessor it offers
 /// refuses any other position rather than answering it as empty.
 #[derive(Debug)]
 pub(crate) struct ValidationWorkbook<R: Read + Seek> {
-    workbook: Workbook<R>,
+    workbook: Reader<R>,
     kept: KeptCells,
 }
 
@@ -208,7 +208,7 @@ impl<R: Read + Seek> ValidationWorkbook<R> {
     ///
     /// # Errors
     ///
-    /// Returns the [`Workbook::xls_worksheet`] error for an index that names
+    /// Returns the [`Reader::xls_worksheet`] error for an index that names
     /// no parsed worksheet.
     pub(crate) fn worksheet_protection(&self, worksheet_index: usize) -> Result<&SheetProtection> {
         Ok(self.workbook.xls_worksheet(worksheet_index)?.protection())
@@ -218,7 +218,7 @@ impl<R: Read + Seek> ValidationWorkbook<R> {
     ///
     /// # Errors
     ///
-    /// Returns the [`Workbook::xls_worksheet`] error for an index that names
+    /// Returns the [`Reader::xls_worksheet`] error for an index that names
     /// no parsed worksheet.
     pub(crate) fn worksheet_comments(
         &self,
@@ -227,12 +227,12 @@ impl<R: Read + Seek> ValidationWorkbook<R> {
         Ok(self.workbook.xls_worksheet(worksheet_index)?.comments())
     }
 
-    /// Inert VBA project metadata, as [`Workbook::vba_metadata`] reports it.
+    /// Inert VBA project metadata, as [`Reader::vba_metadata`] reports it.
     pub(crate) fn vba_metadata(&self) -> crate::vba::VbaMetadata {
         self.workbook.vba_metadata()
     }
 
-    /// The `_VBA_PROJECT_CUR` storage, as [`Workbook::vba_project_storage`]
+    /// The `_VBA_PROJECT_CUR` storage, as [`Reader::vba_project_storage`]
     /// discovers it.
     pub(crate) fn vba_project_storage(&self) -> Option<crate::VbaProjectStorage> {
         self.workbook.vba_project_storage()
@@ -261,7 +261,7 @@ impl<R: Read + Seek> ValidationWorkbook<R> {
     ///
     /// # Errors
     ///
-    /// Returns the [`Workbook::xls_worksheet`] error for an index that names
+    /// Returns the [`Reader::xls_worksheet`] error for an index that names
     /// no parsed worksheet, and an unsafe-edit refusal for a position this
     /// open was not asked to keep, which it cannot answer.
     pub(crate) fn kept_cell(
@@ -288,7 +288,7 @@ impl<R: Read + Seek> ValidationWorkbook<R> {
     /// The complete reader's workbook, for differential tests that compare
     /// every non-cell fact of the two modes.
     #[cfg(test)]
-    pub(crate) fn as_workbook_for_tests(&self) -> &Workbook<R> {
+    pub(crate) fn as_workbook_for_tests(&self) -> &Reader<R> {
         &self.workbook
     }
 }

@@ -3,7 +3,7 @@
 //!
 //! Every case builds a conforming workbook with the crate writer, plants
 //! exactly one cataloged non-conformity in its Workbook stream, and opens it
-//! through both public read paths — the eager [`Workbook`] and the
+//! through both public read paths — the eager [`litchi_xls::raw::Reader`] and the
 //! source-backed [`SourceBackedWorkbook`] — asserting that the workbook
 //! opens, that the repair is recorded with its location, and that the same
 //! workbook without the deviation records nothing.
@@ -17,7 +17,7 @@ use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::{
     CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions,
     PaletteDefect, SharedStringDefect, SheetDefect, SheetNameDefect, SourceBackedOptions,
-    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Workbook, Writer,
+    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Writer, raw::Reader,
 };
 
 const CODEPAGE: u16 = 0x0042;
@@ -175,10 +175,10 @@ fn try_open_both(
     package: &[u8],
     leniency: Leniency,
 ) -> (
-    Result<Workbook<Cursor<Vec<u8>>>, String>,
+    Result<Reader<Cursor<Vec<u8>>>, String>,
     Result<ToleranceReport, String>,
 ) {
-    let workbook = Workbook::new_with_options(
+    let workbook = Reader::new_with_options(
         Cursor::new(package.to_vec()),
         OpenOptions::new().leniency(leniency),
     )
@@ -194,7 +194,7 @@ fn try_open_both(
 
 /// Open `package` through both public read paths under `leniency` and return
 /// the eager workbook plus both reports.
-fn open_both(package: &[u8], leniency: Leniency) -> (Workbook<Cursor<Vec<u8>>>, ToleranceReport) {
+fn open_both(package: &[u8], leniency: Leniency) -> (Reader<Cursor<Vec<u8>>>, ToleranceReport) {
     let (workbook, owner) = try_open_both(package, leniency);
     (
         workbook.expect("the eager open applies the repair"),
@@ -208,7 +208,7 @@ fn assert_repairs_under(
     package: &[u8],
     leniency: Leniency,
     expected: &[(Defect, u32, u32)],
-) -> Workbook<Cursor<Vec<u8>>> {
+) -> Reader<Cursor<Vec<u8>>> {
     let (workbook, source_report) = open_both(package, leniency);
     for (path, report) in [
         ("eager", workbook.tolerance_report()),
@@ -230,7 +230,7 @@ fn assert_repairs_under(
 
 /// Both read paths open `package` under the *default* policy and record
 /// exactly the `expected` repairs, in order. Returns the eager workbook.
-fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Workbook<Cursor<Vec<u8>>> {
+fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Reader<Cursor<Vec<u8>>> {
     assert_repairs_under(package, Leniency::default(), expected)
 }
 
@@ -240,7 +240,7 @@ fn assert_repairs(package: &[u8], expected: &[(Defect, u32, u32)]) -> Workbook<C
 fn assert_eager_repairs(
     package: &[u8],
     expected: &[(Defect, u32, u32)],
-) -> Workbook<Cursor<Vec<u8>>> {
+) -> Reader<Cursor<Vec<u8>>> {
     let (workbook, source_report) = open_both(package, Leniency::default());
     let found = workbook
         .tolerance_report()
@@ -523,7 +523,7 @@ fn a_palette_whose_length_contradicts_its_count_is_still_refused() {
     let mut payload = palette_payload(56, 0);
     payload.truncate(payload.len() - 4);
     let (package, _) = with_palettes(&[payload]);
-    let Err(error) = Workbook::new(Cursor::new(package)) else {
+    let Err(error) = Reader::new(Cursor::new(package)) else {
         panic!("record framing stays a hard error");
     };
     let error = error.to_string();
@@ -544,8 +544,8 @@ fn with_font_fields(nth: usize, weight: u16, charset: u8) -> Vec<u8> {
     stream.package()
 }
 
-fn open_eager(package: &[u8], leniency: Leniency) -> Result<Workbook<Cursor<Vec<u8>>>, String> {
-    Workbook::new_with_options(
+fn open_eager(package: &[u8], leniency: Leniency) -> Result<Reader<Cursor<Vec<u8>>>, String> {
+    Reader::new_with_options(
         Cursor::new(package.to_vec()),
         OpenOptions::new().leniency(leniency),
     )
@@ -1060,7 +1060,7 @@ fn container_repairs_join_the_workbook_report_on_both_paths() {
     assert_eq!(workbook.sheets()[0].name(), "Sheet1");
     // The eager path built from an already-opened container folds it too.
     let ole = OleFile::open(Cursor::new(package)).unwrap();
-    let workbook = Workbook::from_ole_file(ole).unwrap();
+    let workbook = Reader::from_ole_file(ole).unwrap();
     assert_eq!(workbook.tolerance_report().defects().len(), expected.len());
 }
 

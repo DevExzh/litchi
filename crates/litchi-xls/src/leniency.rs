@@ -22,7 +22,7 @@
 //! The compound-file repairs the container reader applied while the
 //! workbook's OLE file was opened join the same report as
 //! [`Defect::Container`] entries, ahead of every BIFF-level repair, and the
-//! property-set repairs made while the eager [`crate::Workbook`] open reads
+//! property-set repairs made while the eager [`crate::raw::Reader`] open reads
 //! the standard metadata streams join it as [`Defect::PropertySet`] entries,
 //! after them. (The source-backed owner reads no metadata stream, so its
 //! report never lists a property-set repair.)
@@ -695,7 +695,7 @@ pub enum Defect {
     /// A property-set repair the metadata reader applied while the
     /// workbook's `\u{5}SummaryInformation` or
     /// `\u{5}DocumentSummaryInformation` stream was read by the eager
-    /// [`crate::Workbook`] open (the source-backed owner reads neither); see
+    /// [`crate::raw::Reader`] open (the source-backed owner reads neither); see
     /// [`litchi_ole_common::leniency::Defect`] for the closed set of
     /// property-set repairs and their substitutions. Applied under every
     /// [`Leniency`] variant.
@@ -995,7 +995,7 @@ impl ToleranceReport {
     /// depends on the metadata, and the property-set accessors still report
     /// the failure when the metadata is asked for.
     ///
-    /// The eager [`Workbook`](crate::Workbook) open does this itself. A
+    /// The eager [`Reader`](crate::raw::Reader) open does this itself. A
     /// [`SourceBackedWorkbook`](crate::SourceBackedWorkbook) never reads the
     /// metadata streams, so a caller that reads them alongside it (the
     /// `litchi` facade does) folds their repairs in with this method, for

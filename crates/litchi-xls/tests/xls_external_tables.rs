@@ -6,7 +6,7 @@ use litchi_xls::{
     ListObjectColumn, ListObjectFeatureVersion, ListObjectId, ListObjectRange,
     ListObjectSourceMetadata, ListObjectStyleOptions, Map, MapId, MapInfo, OpaqueXml, Schema,
     SchemaId, WebColumnType, WebDefaultValue, WebFieldInfo, WebInvalidCell, WebTableField,
-    WebTableMetadata, Workbook, XmlColumnMapping, XmlDataType, XmlTableField, XmlTableMetadata,
+    WebTableMetadata, XmlColumnMapping, XmlDataType, XmlTableField, XmlTableMetadata, raw::Reader,
 };
 
 fn map_info(id: u32, name: &str, root: &str) -> MapInfo {
@@ -69,7 +69,7 @@ fn feature12_external_metadata_round_trips_inertly() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     let first = output.into_inner();
-    let workbook = Workbook::new(Cursor::new(first.clone())).unwrap();
+    let workbook = Reader::new(Cursor::new(first.clone())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.feature_version(), ListObjectFeatureVersion::Feature12);
     let metadata = table.external_metadata().unwrap();
@@ -183,7 +183,7 @@ fn feature11_web_source_round_trips_typed_inert_sync_metadata() {
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.feature_version(), ListObjectFeatureVersion::Feature11);
     let ListObjectSourceMetadata::Web(metadata) = table.source_metadata().unwrap() else {
@@ -259,7 +259,7 @@ fn feature11_xml_source_round_trips_typed_mapping() {
     let xml = package.open_stream(&["XML"]).unwrap();
     assert!(!xml.iter().any(|byte| matches!(byte, b'\n' | b'\r' | b'\t')));
     assert!(!xml.windows(2).any(|bytes| bytes == b"> "));
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.xml_map().unwrap().maps()[0].id().get(), 9);
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     let ListObjectSourceMetadata::Xml(metadata) = table.source_metadata().unwrap() else {
@@ -312,7 +312,7 @@ fn feature12_web_source_round_trips_typed_with_loaded_total_formula() {
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.feature_version(), ListObjectFeatureVersion::Feature12);
     let ListObjectSourceMetadata::Web(metadata) = table.source_metadata().unwrap() else {
@@ -365,7 +365,7 @@ fn feature12_xml_source_round_trips_typed_with_loaded_total_formula() {
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.feature_version(), ListObjectFeatureVersion::Feature12);
     let ListObjectSourceMetadata::Xml(metadata) = table.source_metadata().unwrap() else {

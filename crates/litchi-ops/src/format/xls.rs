@@ -1,79 +1,27 @@
-//! Handle for Excel binary (`.xls`) inputs (record 0003 §2.3, M0a step S5d).
+//! Immutable legacy Excel handle backed by the native XLS Package.
 //!
-//! The facade's workbook enum had three XLS variants. `XlsFile` and `Other`
-//! were never constructed (finding F12) and are gone. The two live routes
-//! become the two states of one owner:
-//!
-//! - **Source**: the filesystem route, where detection opened a positional
-//!   [`SourceBackedWorkbook`] over a [`SharedOleFile`]
-//!   (`Xls::from_source`). Worksheets are read lazily through the
-//!   retained source, and every read is fenced against a source change.
-//! - **Eager**: the byte route, where detection parsed the input into an
-//!   in-memory [`OleFile`] and the eager [`litchi_xls::Workbook`] reads it
-//!   (`Xls::from_ole_file`).
-//!
-//! Record 0003 proposed moving the byte route onto the source-backed owner
-//! as well. That would change what the byte route reads. The source owner
-//! refuses BIFF5 and older workbooks (`UnsupportedBiffVersion`), which the
-//! eager reader reads. Over the 54 workbooks in `test-data/ole/xls`, the
-//! source owner's text read fails on 4 that the eager reader reads, and the
-//! eager reader omits worksheets of 8 that the source owner reads in full;
-//! the two routes of the facade already differ on those files today. The
-//! tolerance report and the metadata error policy differ as well. The byte
-//! route therefore keeps the eager reader, which is `Sync` and already owns
-//! the input bytes, so it needs no extra retention.
+//! Detection hands its existing CFB parse or positional reader to the native
+//! owner. Byte inputs retain eager BIFF coverage; filesystem inputs retain
+//! lazy reads and source-change fences. The facade keeps signature disposition
+//! and delegates semantic reads to the native Workbook projection.
 
 use std::io::Cursor;
-use std::sync::{Arc, OnceLock};
+use std::sync::Arc;
 
-use litchi_cfb::{OleError, OleFile, OleFileLimits, SharedOleFile};
-use litchi_core::sheet::{Cell as _, CellValue, WorkbookTrait, Worksheet as _};
+use litchi_cfb::{OleFile, OleFileLimits};
+use litchi_core::sheet::WorkbookTrait;
 use litchi_core::{FileFormat, Metadata};
-use litchi_ole_common::property_set::{PropertySetReader, SharedPropertySetReader};
-use litchi_xls::{SourceBackedError, SourceBackedWorkbook, cell_values};
+use litchi_xls::{Package, SourceBackedWorkbook, cell_values};
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
-/// An opened legacy Excel (`.xls`) workbook.
-///
-/// One `Arc` wide: cloning is one atomic increment, and the handle is
-/// `Send + Sync`.
+/// An immutable legacy Excel workbook. Cloning shares its native package.
 #[derive(Clone)]
-pub struct Xls(Arc<Opened<XlsOwner>>);
+pub struct Xls(Arc<Opened<Package>>);
 
-/// The two states of [`Xls`] (record 0003 §2.3).
-#[allow(
-    clippy::large_enum_variant,
-    reason = "one owner per handle, behind its `Arc`; boxing the source state would add an allocation to every filesystem open"
-)]
-enum XlsOwner {
-    /// Filesystem route: the positional owner and its CFB view.
-    Source(XlsSource),
-    /// Byte route: the eager reader over the in-memory input.
-    Eager(Box<EagerXls>),
-}
-
-struct XlsSource {
-    workbook: SourceBackedWorkbook,
-    /// The CFB view the owner was opened over. The owner holds it too; the
-    /// handle keeps its own `Arc` for the metadata streams and for editors.
-    cfb: Arc<SharedOleFile>,
-    /// Metadata, read on first use and kept once it has been read.
-    metadata: OnceLock<Metadata>,
-    /// The eager reader the generic sheet traits read through, materialized
-    /// from the retained source on their first use, never at open.
-    eager: OnceLock<std::result::Result<Box<EagerWorkbook>, crate::Error>>,
-}
-
-type EagerWorkbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
-
-struct EagerXls {
-    workbook: EagerWorkbook,
-    /// Metadata, read at open as the facade reads it.
-    metadata: Metadata,
-}
+type EagerWorkbook = litchi_xls::raw::Reader<Cursor<Vec<u8>>>;
 
 const _: () = {
     const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -82,173 +30,92 @@ const _: () = {
 };
 
 impl Xls {
-    /// Whether this handle retains an edit source, without reading any payload.
     pub(crate) fn retains_source(&self) -> bool {
         true
     }
 
-    /// Adopts the positional owner filesystem detection opened (the facade's
-    /// `WorkbookSourcePathDetection::Xls` arm). Nothing is read here.
-    ///
-    /// The owner already retains `cfb`, so [`OpenOptions::retain_source`]
-    /// changes nothing on this route.
-    pub(crate) fn from_source(
-        workbook: SourceBackedWorkbook,
-        cfb: Arc<SharedOleFile>,
-        options: &OpenOptions,
-    ) -> Self {
-        let _ = options;
-        Self(Opened::new(XlsOwner::Source(XlsSource {
-            workbook,
-            cfb,
-            metadata: OnceLock::new(),
-            eager: OnceLock::new(),
-        })))
+    pub(crate) fn from_source(workbook: SourceBackedWorkbook) -> Result<Self> {
+        Ok(Self(Opened::new(Package::from_source(workbook)?)))
     }
 
-    /// Opens the workbook from the OLE file byte detection already parsed
-    /// (the facade's `DetectedFormat::Xls` arm): the metadata streams are
-    /// projected, with an unreadable projection reported as empty metadata,
-    /// and the eager reader adopts the parse (with `password` when
-    /// [`Locked::unlock`] supplies one).
-    ///
-    /// The eager reader owns the input bytes for its lifetime, so
-    /// [`OpenOptions::retain_source`] changes nothing on this route either.
-    /// An encrypted workbook opened without a password comes back as
-    /// [`LegacyOpen::PasswordRequired`] with the container unchanged.
-    ///
-    /// [`Locked::unlock`]: crate::Locked
     pub(crate) fn from_ole_file(
-        mut ole: OleFile<Cursor<Vec<u8>>>,
+        ole: OleFile<Cursor<Vec<u8>>>,
         options: &OpenOptions,
         password: Option<&str>,
     ) -> Result<LegacyOpen<Self>> {
-        let _ = options;
-        litchi_xls::raw::preflight_ole_file(&ole, litchi_xls::SourceLimits::default())?;
-        let metadata = ole.get_metadata().map(Metadata::from).unwrap_or_default();
-        let leaf_options = litchi_xls::OpenOptions::new().password(password);
-        match litchi_xls::Workbook::from_ole_file_or_password_required(ole, leaf_options)? {
-            Ok(workbook) => Ok(LegacyOpen::Opened(Self(Opened::new(XlsOwner::Eager(
-                Box::new(EagerXls { workbook, metadata }),
-            ))))),
+        let mut leaf_options = litchi_xls::OpenOptions::new().password(password);
+        if let Some(maximum) = options.max_input_bytes {
+            let maximum = maximum.min(litchi_xls::SourceLimits::DEFAULT_MAX_INPUT_BYTES as u64);
+            let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
+            let limits = litchi_xls::SourceLimits::builder()
+                .max_input_bytes(maximum)?
+                .build()?;
+            leaf_options = leaf_options.source_limits(limits);
+        }
+        match Package::from_ole_file_or_password_required(ole, leaf_options)? {
+            Ok(package) => Ok(LegacyOpen::Opened(Self(Opened::new(package)))),
             Err(ole) => Ok(LegacyOpen::PasswordRequired(Box::new(ole))),
         }
     }
 
-    /// The same workbook under another signature disposition (record 0013).
     pub(crate) fn with_signature(&self, signature: Signature) -> Self {
         Self(self.0.with_signature(signature))
     }
 
-    /// This handle's signature disposition (record 0013).
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
     }
 
-    /// The owner every read goes through.
-    fn owner(&self) -> &XlsOwner {
+    fn owner(&self) -> &Package {
         &self.0
     }
 
-    /// Whether the owner is the positional source-backed workbook, for the
-    /// tests that pin each route's owner.
     #[cfg(test)]
     pub(crate) fn is_source_backed(&self) -> bool {
-        matches!(self.owner(), XlsOwner::Source(_))
+        self.owner().is_source_backed()
     }
 
-    /// The names of the ordinary worksheets, in tab order.
+    /// Return ordinary worksheet names in tab order.
     ///
     /// # Errors
-    ///
-    /// On the filesystem route, returns a typed error when the source changed
-    /// or the workbook globals cannot be read.
+    /// Returns the native source or semantic read error.
     pub fn worksheet_names(&self) -> Result<Vec<String>> {
-        match self.owner() {
-            XlsOwner::Source(source) => Ok(source.workbook.worksheet_names()?),
-            XlsOwner::Eager(eager) => Ok(eager.workbook.worksheet_names().to_vec()),
-        }
+        Ok(self.owner().workbook().worksheet_names()?)
     }
 
-    /// The number of ordinary worksheets.
+    /// Return the number of ordinary worksheets.
     ///
     /// # Errors
-    ///
-    /// On the filesystem route, returns a typed error when the source
-    /// changed.
+    /// Returns the native source or semantic read error.
     pub fn worksheet_count(&self) -> Result<usize> {
-        match self.owner() {
-            XlsOwner::Source(source) => Ok(source.workbook.worksheet_count()?),
-            XlsOwner::Eager(eager) => Ok(eager.workbook.worksheet_count()),
-        }
+        Ok(self.owner().workbook().worksheet_count()?)
     }
 
-    /// All worksheet text: one line per row, cells separated by tabs, as the
-    /// facade's `Workbook::text` returns it.
+    /// Extract worksheet text through the retained native read route.
     ///
     /// # Errors
-    ///
-    /// Returns a typed error when a worksheet cannot be read or, on the
-    /// filesystem route, when the source changed before or after the read.
+    /// Returns the native source or semantic read error.
     pub fn text(&self) -> Result<String> {
-        match self.owner() {
-            XlsOwner::Source(source) => source.text(),
-            XlsOwner::Eager(eager) => eager.text(),
-        }
+        Ok(self.owner().workbook().text()?)
     }
 
-    /// The workbook's OLE property-set metadata.
-    ///
-    /// The byte route read it at open. The filesystem route reads it on
-    /// first use, keeps it, and fences every call against a source change;
-    /// absent or malformed metadata streams read as empty metadata.
-    ///
-    /// Always `Some` when it succeeds.
+    /// Read package metadata under the native source consistency fence.
     ///
     /// # Errors
-    ///
-    /// On the filesystem route, returns a typed error when the source changed
-    /// or a metadata stream cannot be read for a reason other than its
-    /// content.
+    /// Returns a typed source or metadata read error.
     pub fn metadata(&self) -> Result<Option<Metadata>> {
-        match self.owner() {
-            XlsOwner::Source(source) => source.metadata().map(Some),
-            XlsOwner::Eager(eager) => Ok(Some(eager.metadata.clone())),
-        }
+        Ok(Some(self.owner().metadata()?))
     }
 
-    /// Everything the reader repaired so far: the globals parse, the
-    /// metadata streams, and the worksheet scans performed so far.
+    /// Return the native report of accepted reader repairs.
     ///
     /// # Errors
-    ///
-    /// On the filesystem route, returns a typed error when the source
-    /// changed.
+    /// Returns a typed source-change error.
     pub fn tolerance_report(&self) -> Result<litchi_xls::ToleranceReport> {
-        match self.owner() {
-            XlsOwner::Source(source) => source.tolerance_report(),
-            XlsOwner::Eager(eager) => Ok(eager.workbook.tolerance_report().clone()),
-        }
+        Ok(self.owner().workbook().tolerance_report()?)
     }
 
-    /// Builds the cell-value editor (L-XLS-1).
-    ///
-    /// The filesystem route builds it over the retained CFB view through
-    /// [`cell_values::Snapshot::from_shared_ole_file`]; the byte route from
-    /// the eager reader's own bytes. Both copy the input once and let the
-    /// editor index it, because the editor's package capture runs on the
-    /// cursor-based reader (the fallback of record 0003, risk R2). Both costs
-    /// fall here, at the first edit, not at open. After
-    /// [`Signed::unsign`](crate::Signed::unsign) the copy is one whose
-    /// signature storages the signature leaf removed
-    /// (`litchi_sign::cfb::Editor::clear`, record 0013), so a commit from it
-    /// carries no signature.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`Code::DocumentProtected`](crate::Code::DocumentProtected)
-    /// while the workbook is still signed, with a suggestion naming
-    /// `Signed::unsign`, and the leaf's typed refusal otherwise.
+    /// Open the retained native cell-value engine after signature admission.
     #[cfg_attr(not(test), expect(dead_code, reason = "edit verbs arrive in M2"))]
     pub(crate) fn cell_values_editor(&self) -> Result<cell_values::Snapshot> {
         if self.0.signature() == Signature::Signed {
@@ -256,147 +123,20 @@ impl Xls {
         }
         let limits = litchi_ole_common::object::Limits::default();
         if self.0.signature() == Signature::RemovalAuthorized {
-            let bytes = match self.owner() {
-                XlsOwner::Source(source) => signature::compound_file_bytes(&source.cfb)?,
-                XlsOwner::Eager(eager) => eager.workbook.get_ref().get_ref().clone(),
-            };
+            let bytes = self.owner().source_bytes()?;
             let bytes = signature::unsign_compound_file(bytes, litchi_sign::cfb::Format::Xls)?;
-            return Ok(cell_values::Snapshot::from_bytes_with_limits(
-                bytes, limits,
+            return Ok(litchi_xls::raw::cell_values_snapshot_from_bytes(
+                self.owner(),
+                bytes,
             )?);
         }
-        Ok(match self.owner() {
-            XlsOwner::Source(source) => cell_values::Snapshot::from_shared_ole_file(
-                &source.cfb,
-                limits,
-                OleFileLimits::default(),
-            )?,
-            XlsOwner::Eager(eager) => cell_values::Snapshot::from_bytes_with_limits(
-                eager.workbook.get_ref().get_ref().clone(),
-                limits,
-            )?,
-        })
-    }
-}
-
-impl XlsSource {
-    /// The TOCTOU fence of the facade's source adapter: the owner's source
-    /// must still be the one it was opened over.
-    fn ensure_current(&self) -> Result<()> {
-        self.workbook.source_version()?;
-        Ok(())
+        Ok(self
+            .owner()
+            .edit_snapshot_with_limits(limits, OleFileLimits::default())?)
     }
 
-    fn text(&self) -> Result<String> {
-        self.ensure_current()?;
-        let result = self.workbook.text();
-        self.ensure_current()?;
-        Ok(result?)
-    }
-
-    fn metadata(&self) -> Result<Metadata> {
-        self.ensure_current()?;
-        if let Some(metadata) = self.metadata.get() {
-            let metadata = metadata.clone();
-            self.ensure_current()?;
-            return Ok(metadata);
-        }
-        let metadata = match self.cfb.get_metadata() {
-            Ok(metadata) => Metadata::from(metadata),
-            Err(error) if metadata_error_is_soft(&error) => Metadata::default(),
-            Err(error) => return Err(SourceBackedError::from(error).into()),
-        };
-        self.ensure_current()?;
-        let metadata = self.metadata.get_or_init(|| metadata).clone();
-        self.ensure_current()?;
-        Ok(metadata)
-    }
-
-    fn tolerance_report(&self) -> Result<litchi_xls::ToleranceReport> {
-        self.ensure_current()?;
-        // The source owner never reads the metadata streams; their repairs
-        // are folded in here, as the eager owner records them at open.
-        let mut report = self.workbook.tolerance_report();
-        report.append_property_sets(|path| self.cfb.property_set_stream(path));
-        self.ensure_current()?;
-        Ok(report)
-    }
-}
-
-impl EagerXls {
-    fn text(&self) -> Result<String> {
-        let mut out = String::new();
-        for index in 0..self.workbook.worksheet_count() {
-            let worksheet = self.workbook.xls_worksheet(index)?;
-            for row in 0..worksheet.row_count() {
-                for column in 0..worksheet.column_count() {
-                    if column > 0 {
-                        out.push('\t');
-                    }
-                    if let Some(cell) = worksheet.get_cell(cell_index(row), cell_index(column)) {
-                        append_cell_text(&mut out, cell.value());
-                    }
-                }
-                out.push('\n');
-            }
-        }
-        Ok(out)
-    }
-}
-
-/// Worksheet dimensions come from `u32` cell coordinates (`max + 1`), so
-/// every index below them fits back into `u32`.
-fn cell_index(index: usize) -> u32 {
-    u32::try_from(index).unwrap_or(u32::MAX)
-}
-
-/// One cell's text, exactly as the facade's workbook text projection writes
-/// it.
-fn append_cell_text(out: &mut String, cell: &CellValue) {
-    match cell {
-        CellValue::Empty => {},
-        CellValue::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
-        CellValue::Int(value) => out.push_str(&value.to_string()),
-        CellValue::Float(value) => out.push_str(&value.to_string()),
-        CellValue::String(value) | CellValue::Error(value) => out.push_str(value),
-        CellValue::DateTime(value) => out.push_str(&value.to_string()),
-        CellValue::Formula {
-            formula,
-            cached_value,
-            ..
-        } => match cached_value.as_deref() {
-            Some(CellValue::String(value)) => out.push_str(value),
-            Some(CellValue::Int(value)) => out.push_str(&value.to_string()),
-            Some(CellValue::Float(value)) => out.push_str(&value.to_string()),
-            Some(CellValue::Bool(value)) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
-            _ => {
-                out.push('=');
-                out.push_str(formula);
-            },
-        },
-    }
-}
-
-impl Xls {
-    /// The eager reader behind the generic sheet traits: the byte route's
-    /// own, or one materialized once from the filesystem route's retained
-    /// source. The facade's `open_xls_workbook_dyn` read paths through the
-    /// same eager reader, so trait reads keep its semantics on both routes.
     fn trait_workbook(&self) -> Result<&EagerWorkbook> {
-        match self.owner() {
-            XlsOwner::Eager(eager) => Ok(&eager.workbook),
-            XlsOwner::Source(source) => source
-                .eager
-                .get_or_init(|| {
-                    source
-                        .workbook
-                        .materialize_eager()
-                        .map(Box::new)
-                        .map_err(crate::Error::from)
-                })
-                .as_deref()
-                .map_err(Clone::clone),
-        }
+        Ok(self.owner().reader_ref()?)
     }
 }
 
@@ -458,13 +198,9 @@ impl WorkbookTrait for Xls {
 
 impl std::fmt::Debug for Xls {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let owner = match self.owner() {
-            XlsOwner::Source(_) => "source",
-            XlsOwner::Eager(_) => "eager",
-        };
         formatter
             .debug_struct("Xls")
-            .field("owner", &owner)
+            .field("source_backed", &self.owner().is_source_backed())
             .finish_non_exhaustive()
     }
 }
@@ -478,20 +214,6 @@ impl<'a> litchi_core::sheet::WorksheetIterator<'a> for Failed {
     }
 }
 
-/// Metadata stream failures that mean "no usable metadata" rather than an
-/// I/O, limit or source-change failure (the facade's
-/// `xls_metadata_error_is_soft`).
-fn metadata_error_is_soft(error: &OleError) -> bool {
-    matches!(
-        error,
-        OleError::InvalidFormat(_)
-            | OleError::InvalidData(_)
-            | OleError::NotOleFile
-            | OleError::CorruptedFile(_)
-            | OleError::StreamNotFound
-    )
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(
@@ -503,8 +225,37 @@ mod tests {
     use super::*;
     use crate::Code;
     use crate::detect::{DetectedFormat, detect_format_smart};
+    use litchi_cfb::SharedOleFile;
+    use litchi_core::sheet::CellValue;
+    use litchi_ole_common::property_set::PropertySetReader;
+    use litchi_xls::SourceBackedError;
     use std::io::Write;
     use std::path::{Path, PathBuf};
+
+    fn append_cell_text(out: &mut String, cell: &CellValue) {
+        match cell {
+            CellValue::Empty => {},
+            CellValue::Bool(value) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+            CellValue::Int(value) => out.push_str(&value.to_string()),
+            CellValue::Float(value) => out.push_str(&value.to_string()),
+            CellValue::String(value) | CellValue::Error(value) => out.push_str(value),
+            CellValue::DateTime(value) => out.push_str(&value.to_string()),
+            CellValue::Formula {
+                formula,
+                cached_value,
+                ..
+            } => match cached_value.as_deref() {
+                Some(CellValue::String(value)) => out.push_str(value),
+                Some(CellValue::Int(value)) => out.push_str(&value.to_string()),
+                Some(CellValue::Float(value)) => out.push_str(&value.to_string()),
+                Some(CellValue::Bool(value)) => out.push_str(if *value { "TRUE" } else { "FALSE" }),
+                _ => {
+                    out.push('=');
+                    out.push_str(formula);
+                },
+            },
+        }
+    }
 
     fn fixture_path(name: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -545,7 +296,7 @@ mod tests {
     /// The facade's eager text projection over the leaf `WorkbookTrait`, as
     /// an independent oracle for the handle's inherent-API port.
     fn trait_text(name: &str) -> String {
-        let workbook = litchi_xls::Workbook::new(Cursor::new(fixture(name))).unwrap();
+        let workbook = litchi_xls::raw::Reader::new(Cursor::new(fixture(name))).unwrap();
         let mut out = String::new();
         for index in 0..workbook.worksheet_count() {
             let worksheet = workbook.worksheet_by_index(index).unwrap();
@@ -601,7 +352,7 @@ mod tests {
                 continue;
             };
             let metadata = leaf.get_metadata().map(Metadata::from).unwrap_or_default();
-            let workbook = litchi_xls::Workbook::from_ole_file(leaf);
+            let workbook = litchi_xls::raw::Reader::from_ole_file(leaf);
             let xls = match (open_bytes(fixture(&name)), workbook) {
                 (Ok(xls), Ok(workbook)) => {
                     assert_eq!(
@@ -628,7 +379,7 @@ mod tests {
                 ),
             };
             opened += 1;
-            assert!(matches!(xls.owner(), XlsOwner::Eager(_)));
+            assert!(!xls.is_source_backed());
             assert_eq!(xls.text().unwrap(), trait_text(&name), "{name}");
             assert_eq!(
                 format!("{:?}", xls.metadata().unwrap()),
@@ -668,7 +419,7 @@ mod tests {
             let Ok(crate::File::Xls(xls)) = crate::open(&path) else {
                 continue;
             };
-            if !matches!(xls.owner(), XlsOwner::Source(_)) {
+            if !xls.is_source_backed() {
                 continue;
             }
             let owner = SourceBackedWorkbook::from_path(&path).unwrap();

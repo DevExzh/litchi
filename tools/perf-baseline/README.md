@@ -4668,7 +4668,7 @@ native-Office claim is made.
   This is correctness/attribution evidence only, with no speedup, physical-I/O,
   allocation, RSS, cold-cache, or real-producer claim.
 - `xls_semantic_open`: open the generated native workbook through the ordinary
-  `litchi_xls::Workbook` reader.
+  `litchi_xls::raw::Reader` reader.
 - `xls_semantic_list_worksheets` / `xls_semantic_one_cell` /
   `xls_semantic_full_cell_scan`: enumerate workbook tabs, resolve one middle
   numeric cell, or traverse every stored cell through the ordinary public

@@ -1260,3 +1260,13 @@ This applies to eager reader ingress and raw CFB adoption. Positional-reader
 options, focused edit profile convergence, and the immutable Package/Workbook
 split remain open; this is not a complete canonical owner registration.
 See [0196](unified-ops/0196-xls-source-limits.md).
+
+## XLS package ownership (record 0197)
+
+`litchi_xls::Package` owns immutable source state and returns an owned read-only
+`Workbook`. The old generic reader is available only as `raw::Reader`; its
+constructors are banned on the canonical Workbook. Native Package publication
+preserves exact source bytes and applies source/encryption fences. Facade reads
+delegate to this owner. Package primary edits, Builder creation and positional
+option-envelope migration remain open; no complete transaction family is
+registered by this wave. See [0197](unified-ops/0197-xls-immutable-owner.md).

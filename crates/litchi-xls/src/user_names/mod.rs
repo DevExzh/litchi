@@ -2,7 +2,7 @@
 //!
 //! The owner implements the MS-XLS 2.1.7.17 sequence
 //! `CUsr UsrChk CbUsr BCUsrs *UsrInfo`.  Opening a workbook does not read this
-//! stream; [`crate::workbook::Workbook::user_names`] reads it on demand and,
+//! stream; [`crate::raw::Reader::user_names`] reads it on demand and,
 //! when the `Revision Log` exists, proves every `UsrInfo.guid` dependency.
 //! Editing never acquires shared-workbook locks, merges revisions, or executes
 //! any collaboration behavior.

@@ -33,7 +33,7 @@ use litchi_doc::{
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_opc::{OpcError, OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_sign::{Policy, Status};
-use litchi_xls::Workbook as XlsWorkbook;
+use litchi_xls::raw::Reader as XlsReader;
 use litchi_xlsx::Workbook as XlsxWorkbook;
 use serde::Serialize;
 use serde_json::{Value, json};
@@ -1026,7 +1026,7 @@ fn validate_cfb(fixture: &Fixture, bytes: &[u8]) -> Result<OperationResult> {
     let mut ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
     match fixture.oracle {
         Oracle::Macro => {
-            let mut workbook = XlsWorkbook::from_ole_file(OleFile::open_with_limits(
+            let mut workbook = XlsReader::from_ole_file(OleFile::open_with_limits(
                 Cursor::new(bytes),
                 cfb_limits()?,
             )?)?;

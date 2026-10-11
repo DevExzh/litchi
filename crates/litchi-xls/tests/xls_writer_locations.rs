@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::writer::{Column, FrozenPanes, Row, Writer};
 
 #[test]
@@ -27,7 +27,7 @@ fn row_and_column_property_apis_round_trip_checked_locations() {
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
     bytes.set_position(0);
-    let workbook = Workbook::new(bytes).unwrap();
+    let workbook = Reader::new(bytes).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert_eq!(worksheet.row_layout(40).unwrap().height_twips(), 360);
     assert_eq!(worksheet.column_layout(12).unwrap().width_256ths(), 5120);

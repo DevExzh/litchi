@@ -869,6 +869,14 @@ impl SharedOleFile {
         Self::open_source_with_limits(source, SharedOleFileLimits::default(), true)
     }
 
+    /// Physical admission profile retained by this source owner.
+    /// Format owners use it when admitting later edits so a reopen cannot
+    /// silently widen the source's selected input or metadata bounds.
+    #[must_use]
+    pub const fn limits(&self) -> SharedOleFileLimits {
+        self.limits
+    }
+
     /// Physical length captured while parsing this CFB file.
     #[must_use]
     pub fn file_size(&self) -> u64 {
@@ -4140,6 +4148,7 @@ mod tests {
         let exact = SharedOleFileLimits::new(bytes.len() as u64).unwrap();
         let opened =
             SharedOleFile::open_owned_with_limits(Arc::clone(&bytes), version, exact).unwrap();
+        assert_eq!(opened.limits(), exact);
         assert!(opened.is_owned_immutable());
         assert_eq!(opened.source_version().unwrap(), version);
         assert_eq!(opened.open_stream(&["Mini"]).unwrap().len(), 200);

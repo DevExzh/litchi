@@ -127,7 +127,7 @@ fn accepts_and_retains_nonstandard_hlink_producer_clsid() {
 
 #[test]
 fn reads_poi_hyperlink_fixtures() {
-    use crate::Workbook;
+    use crate::raw::Reader;
     use std::fs::File;
     use std::path::Path;
     let fixture = |name: &str| {
@@ -135,15 +135,14 @@ fn reads_poi_hyperlink_fixtures() {
             .join("../../test-data/poi/test-data/spreadsheet")
             .join(name)
     };
-    let workbook = Workbook::new(File::open(fixture("WithTwoHyperLinks.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture("WithTwoHyperLinks.xls")).unwrap()).unwrap();
     let links = workbook.xls_worksheet(0).unwrap().hyperlinks();
     assert_eq!(links.len(), 2);
     assert_eq!(links[0].range().first_row(), 4);
     assert_eq!(links[0].display_name(), Some("Foo"));
     assert_eq!(links[0].address(), Some("http://poi.apache.org/"));
     assert_eq!(links[1].range().first_column(), 1);
-    let workbook =
-        Workbook::new(File::open(fixture("HyperlinksOnManySheets.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture("HyperlinksOnManySheets.xls")).unwrap()).unwrap();
     assert_eq!(workbook.xls_worksheet(0).unwrap().hyperlinks().len(), 2);
     let email = &workbook.xls_worksheet(1).unwrap().hyperlinks()[0];
     assert_eq!(email.target_kind(), HyperlinkTargetKind::Email);

@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use litchi_xls::{Scenario, ScenarioCell, ScenarioManager, ScenarioRange, Workbook, Writer};
+use litchi_xls::{Scenario, ScenarioCell, ScenarioManager, ScenarioRange, Writer, raw::Reader};
 
 fn poi_fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -38,7 +38,7 @@ fn scenario_manager_round_trip_keeps_values_inert() {
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let manager = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -58,7 +58,7 @@ fn scenario_manager_round_trip_keeps_values_inert() {
 
 #[test]
 fn reads_poi_empty_scenario_manager_fixture() {
-    let workbook = Workbook::new(File::open(poi_fixture("15228.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("15228.xls")).unwrap()).unwrap();
     let manager = (0..workbook.sheets().len())
         .filter_map(|index| workbook.xls_worksheet(index).ok())
         .find_map(|sheet| sheet.scenario_manager())

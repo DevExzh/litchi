@@ -14,7 +14,7 @@ use crate::number_format::Formatting;
 use crate::records::{
     BoundSheetRecord, CellRecord, DimensionsRecord, Encoding, FormulaValue, SharedStringProperties,
 };
-use crate::workbook::model::Workbook;
+use crate::workbook::model::Reader;
 use crate::worksheet::Worksheet;
 use crate::{
     autofilter, comments, compatibility::CompatibilityProfile, conditional_format, hyperlinks,
@@ -220,7 +220,7 @@ fn claim_array_range(occupancy: &mut HashMap<u16, [u64; 4]>, owner: &ArrayFormul
     Ok(())
 }
 
-impl<R: Read + Seek> Workbook<R> {
+impl<R: Read + Seek> Reader<R> {
     /// Parse a worksheet from its position in the workbook stream.
     ///
     /// `store` decides which validated cell records become decoded cells; it

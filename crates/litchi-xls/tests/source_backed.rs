@@ -6,7 +6,7 @@ use litchi_core::{
 };
 use litchi_xls::{
     CellFormatDefect, Defect, FormattingDefect, Leniency, SourceBackedCell, SourceBackedError,
-    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, Workbook,
+    SourceBackedLimits, SourceBackedOptions, SourceBackedWorkbook, raw::Reader,
 };
 use std::io::{self, Cursor};
 use std::num::{NonZeroU64, NonZeroUsize};
@@ -1474,7 +1474,7 @@ fn opens_without_worksheet_payload_and_matches_eager_selected_cells() {
     assert_eq!(owner.worksheet_names().unwrap().len(), worksheet_count);
     assert!(source.bytes_read() < bytes.len());
 
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let mut saw_string = false;
     for worksheet_index in 0..worksheet_count {
         let eager_sheet = eager.xls_worksheet(worksheet_index).unwrap();
@@ -1506,7 +1506,7 @@ fn column_beyond_biff8_visible_range_returns_none_without_reading_worksheet() {
 fn materialize_eager_returns_typed_semantic_workbook_with_matching_values() {
     let bytes = fixture("Simple.xls");
     let owner = SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
-    let materialized: Workbook<Cursor<Vec<u8>>> = owner.materialize_eager().unwrap();
+    let materialized: Reader<Cursor<Vec<u8>>> = owner.materialize_eager().unwrap();
     let sheet = materialized.xls_worksheet(0).unwrap();
     for row in 0..4 {
         for column in 0..4 {
@@ -1538,7 +1538,7 @@ fn late_codepage_bound_sheet_names_match_eager_workbook() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager.sheet(0).unwrap().name().to_owned();
     assert_eq!(owner.worksheet_names().unwrap()[0], expected);
 }
@@ -1551,7 +1551,7 @@ fn split_global_sst_continue_matches_eager_workbook() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let source = Arc::new(CountingSource::new(bytes.clone()));
     let owner = SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -1632,7 +1632,7 @@ fn formula_fixture_matches_eager_cached_values() {
     let bytes = ole_fixture("FormulaSheetRange.xls");
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     for worksheet_index in 0..owner.worksheet_count().unwrap() {
         let eager_sheet = eager.xls_worksheet(worksheet_index).unwrap();
         for row in 0..12 {
@@ -1652,7 +1652,7 @@ fn date_fixture_matches_eager_date_values() {
     let bytes = libreoffice_fixture("pivottable_dates_grouping.xls");
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let mut dates = Vec::new();
     for worksheet_index in 0..owner.worksheet_count().unwrap() {
         let eager_sheet = eager.xls_worksheet(worksheet_index).unwrap();
@@ -1792,7 +1792,7 @@ fn duplicate_scalar_keeps_the_latest_value_like_eager_workbook() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -1813,7 +1813,7 @@ fn duplicate_cached_formula_keeps_the_latest_value_like_eager_workbook() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -1838,7 +1838,7 @@ fn out_of_order_late_packed_duplicate_keeps_the_latest_value() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -1864,7 +1864,7 @@ fn synthetic_supported_cell_families_match_eager_values() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let eager_sheet = eager.xls_worksheet(0).unwrap();
     for (row, column) in [
         (60_000, 1),
@@ -1892,7 +1892,7 @@ fn scalar_label_blank_and_error_boolerr_match_eager_values() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let eager_sheet = eager.xls_worksheet(0).unwrap();
     for (row, column) in [(60_006, 7), (60_007, 8), (60_008, 9)] {
         let expected = eager_sheet.get_cell(row, column).map(CellTrait::value);
@@ -1929,7 +1929,7 @@ fn cached_formula_string_with_multiple_continues_matches_eager_value() {
     let bytes = cfb_with_streams(&[("Workbook", &modified)]);
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -2050,7 +2050,7 @@ fn supported_unknown_payload_is_skipped_without_a_read_of_its_own() {
 
     let actual = owner.cell_value_by_index(0, 0, 0).unwrap();
     let query_ranges = source.ranges();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -2701,7 +2701,7 @@ fn opaque_heavy_worksheet_falls_back_to_exact_fills() {
     let value = owner.cell_value_by_index(0, 0, 0).unwrap();
     let actual = source.ranges();
 
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -2806,7 +2806,7 @@ fn worksheet_density_gate_releases_when_the_running_mean_falls() {
     let value = owner.cell_value_by_index(0, 0, 0).unwrap();
     let actual = source.ranges();
 
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     let expected = eager
         .xls_worksheet(0)
         .unwrap()
@@ -2902,7 +2902,7 @@ fn append_eager_text_cell(output: &mut String, value: &CellValue) {
     }
 }
 
-fn eager_text(workbook: &Workbook<Cursor<Vec<u8>>>) -> String {
+fn eager_text(workbook: &Reader<Cursor<Vec<u8>>>) -> String {
     let mut output = String::new();
     for worksheet_index in 0..workbook.worksheet_count() {
         let worksheet = workbook.worksheet_by_index(worksheet_index).unwrap();
@@ -2924,7 +2924,7 @@ fn eager_text(workbook: &Workbook<Cursor<Vec<u8>>>) -> String {
 fn assert_source_text_matches_eager(bytes: Vec<u8>) {
     let owner =
         SourceBackedWorkbook::from_read_at(Arc::new(CountingSource::new(bytes.clone()))).unwrap();
-    let eager = Workbook::new(Cursor::new(bytes)).unwrap();
+    let eager = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(owner.text().unwrap(), eager_text(&eager));
 }
 

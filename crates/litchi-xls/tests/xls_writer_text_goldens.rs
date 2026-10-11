@@ -312,7 +312,7 @@ fn multi_string_worksheets_are_pinned_across_processes() {
 fn the_sst_lists_strings_in_first_occurrence_order() {
     use litchi_core::sheet::{Cell as _, CellValue};
 
-    let workbook = litchi_xls::Workbook::new(Cursor::new(scrambled_strings_workbook())).unwrap();
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(scrambled_strings_workbook())).unwrap();
     let mut expected: Vec<String> = Vec::new();
     for sheet in 0..3usize {
         let worksheet = workbook.xls_worksheet(sheet).unwrap();
@@ -338,7 +338,7 @@ fn many_distinct_and_repeated_strings_read_back_cell_by_cell() {
     use litchi_core::sheet::{Cell as _, CellValue};
 
     let (writer, expected) = many_strings();
-    let workbook = litchi_xls::Workbook::new(Cursor::new(written(writer))).unwrap();
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(written(writer))).unwrap();
     for (sheet, row, column, value) in expected {
         let sheet_index = if sheet >= 2 { sheet + 1 } else { sheet };
         let worksheet = workbook.xls_worksheet(sheet_index).unwrap();
@@ -374,7 +374,7 @@ fn a_writer_written_twice_and_extended_restages_its_strings() {
     writer.write_string(sheet, 1, 1, "value 3 ✓").unwrap();
     let mut third = Cursor::new(Vec::new());
     writer.write_to(&mut third).unwrap();
-    let workbook = litchi_xls::Workbook::new(Cursor::new(third.into_inner())).unwrap();
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(third.into_inner())).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     for row in 0..50u32 {
         assert_eq!(

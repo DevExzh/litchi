@@ -25,8 +25,12 @@ use std::sync::Arc;
 
 /// XLS workbook implementation
 #[derive(Debug)]
-pub struct Workbook<R: Read + Seek> {
+pub struct Reader<R: Read + Seek> {
     pub(super) ole_file: OleFile<R>,
+    /// Whether the Workbook stream was opened through a BIFF `FILEPASS`
+    /// encryption record. The parsed bytes may be clear after decryption, but
+    /// package publication must retain this source protection state.
+    pub(super) encrypted_source: bool,
     pub(super) worksheets: Vec<Worksheet>,
     pub(super) worksheet_names: Vec<String>,
     pub(super) sheets: Vec<SheetMetadata>,
@@ -103,7 +107,7 @@ pub struct OpenOptions<'a> {
     /// [`Leniency::TolerateFormattingDefects`] to open the widespread
     /// real-world workbooks whose cosmetic formatting metadata is
     /// self-contradictory; everything repaired is then enumerable through
-    /// [`Workbook::tolerance_report`]. Set
+    /// [`Reader::tolerance_report`]. Set
     /// [`Leniency::TolerateSheetNameDefects`] to keep worksheet names that
     /// break the MS-XLS naming rules (see [`crate::SheetNameDefect`]), or
     /// [`Leniency::TolerateAllDefects`] for both opt-in classes. The
@@ -204,7 +208,16 @@ impl Default for OpenOptions<'_> {
     }
 }
 
-impl<R: Read + Seek> Workbook<R> {
+impl<R: Read + Seek> Reader<R> {
+    /// Returns whether this source contained a BIFF `FILEPASS` record.
+    ///
+    /// A successful open may expose decrypted projections, while edits still
+    /// need to preserve the source's encrypted protection policy.
+    #[must_use]
+    pub fn encrypted_source(&self) -> bool {
+        self.encrypted_source
+    }
+
     pub(crate) fn shared_strings_shared(&self) -> Arc<Vec<String>> {
         self.shared_strings
             .as_ref()
@@ -601,7 +614,7 @@ impl<R: Read + Seek> Workbook<R> {
 }
 
 impl<R: Read + Seek + std::fmt::Debug + Send + Sync> litchi_core::sheet::WorkbookTrait
-    for Workbook<R>
+    for Reader<R>
 {
     fn active_worksheet(&self) -> SheetResult<Box<dyn SheetTrait + '_>> {
         if self.worksheets.is_empty() {

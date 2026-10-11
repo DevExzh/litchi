@@ -1,0 +1,1169 @@
+//! Canonical immutable owner for legacy XLS packages.
+//!
+//! `Package` is the source-preserving owner used by the unified operations
+//! layer.  An eager package retains the parsed raw reader and its original
+//! cursor bytes.  A source-backed package retains the validated positional CFB
+//! view and the lazy semantic reader.  Neither path reserializes an opened
+//! package through [`crate::Writer`] merely to publish an unchanged artifact.
+//!
+//! The raw, generic reader lives under [`crate::raw`] and is intentionally
+//! available only through the explicit `reader_ref` escape on the canonical
+//! [`Workbook`] projection.  This keeps format-specific read capability while
+//! leaving the package and projection shapes unambiguous for facade callers.
+
+use crate::{
+    CompatibilityProfile, Error as ReaderError, Leniency, OpenOptions, SourceBackedError,
+    SourceBackedLimits, SourceBackedWorkbook, SourceLimits, ToleranceReport,
+};
+use litchi_cfb::{OleError, OleFile, SharedOleFile, SharedOleFileLimits};
+use litchi_core::sheet::{Cell as CellTrait, CellValue, Worksheet as WorksheetTrait};
+use litchi_core::{Durability, Metadata, ReadAt};
+use litchi_ole_common::property_set::{PropertySetReader, SharedPropertySetReader};
+use std::fmt;
+use std::io::{self, Cursor, Read, Write};
+use std::path::Path;
+use std::sync::{Arc, OnceLock};
+
+/// The parsed eager raw reader retained by the canonical owner.
+///
+/// The `Reader` name is supplied by the raw-reader migration.  Keeping this
+/// alias local makes the owner independent of the public root re-exports.
+type RawReader = crate::raw::Reader<Cursor<Vec<u8>>>;
+
+/// Errors returned by the canonical XLS package and projection APIs.
+#[non_exhaustive]
+pub enum Error {
+    /// A legacy XLS semantic reader rejected the package.
+    Reader(ReaderError),
+    /// A source-backed semantic read failed.
+    Source(SourceBackedError),
+    /// A previously attempted source-backed materialization failed.
+    CachedSource(Arc<SourceBackedError>),
+    /// The retained CFB source or its atomic publisher failed.
+    Cfb(OleError),
+    /// Sequential output failed.
+    Io(io::Error),
+    /// A checked allocation could not be reserved.
+    Allocation {
+        /// Logical output being allocated.
+        resource: &'static str,
+        /// Original allocator failure.
+        source: std::collections::TryReserveError,
+    },
+    /// Ordinary publication cannot preserve the active password-to-open
+    /// encryption state.  Use [`Package::to_encrypted_bytes`] only when the
+    /// caller explicitly wants the original encrypted artifact byte-for-byte.
+    EncryptionPolicy,
+    /// A requested canonical projection is unavailable for this owner state.
+    InvalidData(&'static str),
+}
+
+/// Result type for canonical XLS package operations.
+pub type Result<T> = std::result::Result<T, Error>;
+
+impl From<ReaderError> for Error {
+    fn from(error: ReaderError) -> Self {
+        Self::Reader(error)
+    }
+}
+
+impl From<SourceBackedError> for Error {
+    fn from(error: SourceBackedError) -> Self {
+        Self::Source(error)
+    }
+}
+
+impl From<OleError> for Error {
+    fn from(error: OleError) -> Self {
+        Self::Cfb(error)
+    }
+}
+
+impl From<io::Error> for Error {
+    fn from(error: io::Error) -> Self {
+        Self::Io(error)
+    }
+}
+
+impl fmt::Debug for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        let kind = match self {
+            Self::Reader(_) => "Reader",
+            Self::Source(_) => "Source",
+            Self::CachedSource(_) => "CachedSource",
+            Self::Cfb(_) => "Cfb",
+            Self::Io(_) => "Io",
+            Self::Allocation { .. } => "Allocation",
+            Self::EncryptionPolicy => "EncryptionPolicy",
+            Self::InvalidData(_) => "InvalidData",
+        };
+        formatter.debug_tuple(kind).finish()
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Reader(error) => fmt::Display::fmt(error, formatter),
+            Self::Source(error) => fmt::Display::fmt(error, formatter),
+            Self::CachedSource(error) => fmt::Display::fmt(error.as_ref(), formatter),
+            Self::Cfb(error) => fmt::Display::fmt(error, formatter),
+            Self::Io(error) => fmt::Display::fmt(error, formatter),
+            Self::Allocation { resource, source } => {
+                write!(formatter, "could not reserve {resource}: {source}")
+            },
+            Self::EncryptionPolicy => formatter.write_str(
+                "ordinary XLS publication is refused for a password-to-open encrypted source",
+            ),
+            Self::InvalidData(message) => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Reader(error) => Some(error),
+            Self::Source(error) => Some(error),
+            Self::CachedSource(error) => Some(error.as_ref()),
+            Self::Cfb(error) => Some(error),
+            Self::Io(error) => Some(error),
+            Self::Allocation { source, .. } => Some(source),
+            Self::EncryptionPolicy | Self::InvalidData(_) => None,
+        }
+    }
+}
+
+/// The immutable state held by one package.
+enum PackageState {
+    /// A fully parsed reader retaining the exact source cursor bytes.
+    Eager {
+        reader: Arc<RawReader>,
+        encrypted: bool,
+    },
+    /// A validated positional source and its lazy semantic projection.
+    Source {
+        cfb: Arc<SharedOleFile>,
+        workbook: SourceBackedWorkbook,
+        encrypted: bool,
+        /// Materialization is deliberately demand-driven.  A source package
+        /// can serve source-backed reads without ever constructing this
+        /// eager reader.
+        materialized: OnceLock<std::result::Result<Arc<RawReader>, Arc<SourceBackedError>>>,
+    },
+}
+
+/// Policies retained by the owner that admitted its source.
+///
+/// The eager reader uses the physical CFB limits and compatibility knobs from
+/// [`OpenOptions`].  A source-backed handoff retains the source owner's full
+/// scan/materialization profile; converting it to the eager profile would
+/// silently widen or narrow later edit admission.
+#[derive(Debug, Clone, Copy)]
+enum RetainedPolicy {
+    Eager {
+        source_limits: SourceLimits,
+        leniency: Leniency,
+        compatibility_profile: CompatibilityProfile,
+    },
+    Source {
+        limits: SourceBackedLimits,
+        leniency: Leniency,
+    },
+}
+
+impl fmt::Debug for PackageState {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Eager { encrypted, .. } => formatter
+                .debug_struct("Eager")
+                .field("encrypted", encrypted)
+                .finish_non_exhaustive(),
+            Self::Source {
+                cfb,
+                workbook,
+                encrypted,
+                ..
+            } => formatter
+                .debug_struct("Source")
+                .field("file_size", &cfb.file_size())
+                .field("workbook", workbook)
+                .field("encrypted", encrypted)
+                .finish_non_exhaustive(),
+        }
+    }
+}
+
+/// An immutable, cheaply cloned legacy XLS package.
+pub struct Package {
+    inner: Arc<PackageInner>,
+}
+
+struct PackageInner {
+    state: PackageState,
+    policy: RetainedPolicy,
+    metadata: OnceLock<Metadata>,
+}
+
+impl fmt::Debug for PackageInner {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("PackageInner")
+            .field("state", &self.state)
+            .field("policy", &self.policy)
+            .finish_non_exhaustive()
+    }
+}
+
+impl Clone for Package {
+    fn clone(&self) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+        }
+    }
+}
+
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("source_backed", &self.is_source_backed())
+            .finish_non_exhaustive()
+    }
+}
+
+impl Package {
+    /// Open an XLS package from a copied byte slice under default policies.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
+    }
+
+    /// Open an XLS package from a copied byte slice under explicit policies.
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions<'_>) -> Result<Self> {
+        if bytes.len() > options.get_source_limits().max_input_bytes() {
+            return Err(Error::Reader(ReaderError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                maximum: u64::try_from(options.get_source_limits().max_input_bytes())
+                    .unwrap_or(u64::MAX),
+            }));
+        }
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(bytes.len())
+            .map_err(|source| Error::Allocation {
+                resource: "XLS package input",
+                source,
+            })?;
+        owned.extend_from_slice(bytes);
+        Self::from_owned_bytes(owned, options)
+    }
+
+    /// Read an XLS package from a sequential source.
+    pub fn from_reader<R: Read>(mut reader: R) -> Result<Self> {
+        Self::from_reader_with_options(&mut reader, OpenOptions::default())
+    }
+
+    /// Read a sequential source under explicit policies.
+    pub fn from_reader_with_options<R: Read>(
+        reader: &mut R,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        let bytes = read_bounded(reader, options.get_source_limits())?;
+        Self::from_owned_bytes(bytes, options)
+    }
+
+    /// Open a filesystem path under default policies.
+    #[cfg(any(unix, windows))]
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_options(path, OpenOptions::default())
+    }
+
+    /// Open a filesystem path under explicit policies.
+    #[cfg(any(unix, windows))]
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions<'_>) -> Result<Self> {
+        let mut file = std::fs::File::open(path).map_err(Error::Io)?;
+        Self::from_reader_with_options(&mut file, options)
+    }
+
+    /// Open an already parsed in-memory CFB file, preserving the password
+    /// handoff when the `FILEPASS` record needs a password.
+    pub fn from_ole_file_or_password_required(
+        mut ole_file: OleFile<Cursor<Vec<u8>>>,
+        options: OpenOptions<'_>,
+    ) -> Result<std::result::Result<Self, OleFile<Cursor<Vec<u8>>>>> {
+        crate::raw::preflight_ole_file(&ole_file, options.get_source_limits())?;
+        let metadata = eager_metadata(&mut ole_file);
+        let reader = match RawReader::from_ole_file_or_password_required(ole_file, options) {
+            Ok(Ok(reader)) => reader,
+            Ok(Err(ole_file)) => return Ok(Err(ole_file)),
+            Err(error) => return Err(Error::Reader(error)),
+        };
+        Ok(Ok(Self::from_reader_parts(reader, options, metadata)?))
+    }
+
+    /// Open an already parsed in-memory CFB file.
+    pub fn from_ole_file(
+        mut ole_file: OleFile<Cursor<Vec<u8>>>,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        crate::raw::preflight_ole_file(&ole_file, options.get_source_limits())?;
+        let metadata = eager_metadata(&mut ole_file);
+        let reader = RawReader::from_ole_file_with_options(ole_file, options)?;
+        Self::from_reader_parts(reader, options, metadata)
+    }
+
+    /// Adopt a source-backed semantic reader and the exact CFB view it came
+    /// from. This handoff performs no payload read or second semantic parse.
+    pub fn from_source(workbook: SourceBackedWorkbook) -> Result<Self> {
+        let cfb = workbook.shared_cfb();
+        let source_limits = workbook.retained_limits();
+        let leniency = workbook.retained_leniency();
+        Ok(Self {
+            inner: Arc::new(PackageInner {
+                state: PackageState::Source {
+                    cfb,
+                    workbook,
+                    encrypted: false,
+                    materialized: OnceLock::new(),
+                },
+                policy: RetainedPolicy::Source {
+                    limits: source_limits,
+                    leniency,
+                },
+                metadata: OnceLock::new(),
+            }),
+        })
+    }
+
+    fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
+        let cfb_limits =
+            litchi_cfb::OleFileLimits::new(options.get_source_limits().max_input_bytes() as u64)?;
+        let mut ole_file = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;
+        crate::raw::preflight_ole_file(&ole_file, options.get_source_limits())?;
+        let metadata = eager_metadata(&mut ole_file);
+        let reader = RawReader::from_ole_file_with_options(ole_file, options)?;
+        Self::from_reader_parts(reader, options, metadata)
+    }
+
+    fn from_reader_parts(
+        reader: RawReader,
+        options: OpenOptions<'_>,
+        metadata: Metadata,
+    ) -> Result<Self> {
+        let encrypted = reader.encrypted_source();
+        let metadata_cache = OnceLock::new();
+        let _ = metadata_cache.set(metadata);
+        Ok(Self {
+            inner: Arc::new(PackageInner {
+                state: PackageState::Eager {
+                    reader: Arc::new(reader),
+                    encrypted,
+                },
+                policy: RetainedPolicy::Eager {
+                    source_limits: options.get_source_limits(),
+                    leniency: options.get_leniency(),
+                    compatibility_profile: options.get_compatibility_profile(),
+                },
+                metadata: metadata_cache,
+            }),
+        })
+    }
+
+    /// Physical source limits on an eager owner. Positional owners retain
+    /// their own scan and materialization profile instead.
+    #[must_use]
+    pub fn source_limits(&self) -> Option<SourceLimits> {
+        match self.inner.policy {
+            RetainedPolicy::Eager { source_limits, .. } => Some(source_limits),
+            RetainedPolicy::Source { .. } => None,
+        }
+    }
+
+    /// Positional read policy, when this package adopts a lazy reader.
+    #[must_use]
+    pub fn source_backed_limits(&self) -> Option<SourceBackedLimits> {
+        match self.inner.policy {
+            RetainedPolicy::Source { limits, .. } => Some(limits),
+            RetainedPolicy::Eager { .. } => None,
+        }
+    }
+
+    /// Retained policy for tolerated reader defects.
+    #[must_use]
+    pub fn leniency(&self) -> Leniency {
+        match self.inner.policy {
+            RetainedPolicy::Eager { leniency, .. } | RetainedPolicy::Source { leniency, .. } => {
+                leniency
+            },
+        }
+    }
+
+    /// Explicit eager-reader compatibility policy, if this is an eager owner.
+    #[must_use]
+    pub fn compatibility_profile(&self) -> Option<CompatibilityProfile> {
+        match self.inner.policy {
+            RetainedPolicy::Eager {
+                compatibility_profile,
+                ..
+            } => Some(compatibility_profile),
+            RetainedPolicy::Source { .. } => None,
+        }
+    }
+
+    /// Return the immutable read projection.
+    #[must_use]
+    pub fn workbook(&self) -> Workbook {
+        Workbook {
+            package: Arc::clone(&self.inner),
+        }
+    }
+
+    /// Return package metadata.
+    ///
+    /// Eager metadata is captured before BIFF parsing, matching the existing
+    /// reader's property-set repair ordering. Source-backed metadata is read
+    /// on first use and retained only after both source-version fences pass;
+    /// absent or malformed property sets are an empty metadata projection.
+    pub fn metadata(&self) -> Result<Metadata> {
+        match &self.inner.state {
+            PackageState::Eager { .. } => {
+                Ok(self.inner.metadata.get().cloned().unwrap_or_default())
+            },
+            PackageState::Source { cfb, .. } => {
+                let expected = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                let metadata = if let Some(metadata) = self.inner.metadata.get() {
+                    metadata.clone()
+                } else {
+                    match cfb.get_metadata() {
+                        Ok(metadata) => Metadata::from(metadata),
+                        Err(error) if metadata_error_is_soft(&error) => Metadata::default(),
+                        Err(error) => {
+                            return Err(Error::Source(SourceBackedError::from(error)));
+                        },
+                    }
+                };
+                let observed = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                if observed != expected {
+                    return Err(Error::Source(SourceBackedError::SourceChanged {
+                        expected,
+                        observed,
+                    }));
+                }
+                Ok(self.inner.metadata.get_or_init(|| metadata).clone())
+            },
+        }
+    }
+
+    /// Whether this package uses the positional source-backed owner.
+    #[must_use]
+    pub fn is_source_backed(&self) -> bool {
+        matches!(self.inner.state, PackageState::Source { .. })
+    }
+
+    /// The retained shared CFB source, if this is a source-backed package.
+    #[must_use]
+    pub fn source(&self) -> Option<&SharedOleFile> {
+        match &self.inner.state {
+            PackageState::Source { cfb, .. } => Some(cfb.as_ref()),
+            PackageState::Eager { .. } => None,
+        }
+    }
+
+    /// Clone the retained shared CFB source, if this is source-backed.
+    #[must_use]
+    pub fn shared_source(&self) -> Option<Arc<SharedOleFile>> {
+        match &self.inner.state {
+            PackageState::Source { cfb, .. } => Some(Arc::clone(cfb)),
+            PackageState::Eager { .. } => None,
+        }
+    }
+
+    /// The source-backed semantic owner, if present.
+    #[must_use]
+    pub fn source_workbook(&self) -> Option<&SourceBackedWorkbook> {
+        match &self.inner.state {
+            PackageState::Source { workbook, .. } => Some(workbook),
+            PackageState::Eager { .. } => None,
+        }
+    }
+
+    /// Borrow the retained eager reader, materializing a source-backed reader
+    /// only on this explicit compatibility escape.
+    pub fn reader_ref(&self) -> Result<&crate::raw::Reader<Cursor<Vec<u8>>>> {
+        reader_ref(&self.inner)
+    }
+
+    /// Return the exact source bytes, including password-to-open encryption.
+    ///
+    /// This method is deliberately named as a source escape.  Ordinary
+    /// `to_bytes`, `write_to`, and `save` refuse encrypted input.
+    pub fn source_bytes(&self) -> Result<Vec<u8>> {
+        exact_bytes(&self.inner)
+    }
+
+    /// Return bytes suitable for ordinary publication.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        ensure_publication_allowed(&self.inner)?;
+        exact_bytes(&self.inner)
+    }
+
+    /// Return the original encrypted artifact exactly, without attempting to
+    /// decrypt or reserialize it.
+    pub fn to_encrypted_bytes(&self) -> Result<Vec<u8>> {
+        exact_bytes(&self.inner)
+    }
+
+    /// Explicit plain-output route.  A password-to-open source is refused
+    /// until a supported decrypt/re-encrypt owner is available.
+    pub fn to_plain_bytes(&self) -> Result<Vec<u8>> {
+        self.to_bytes()
+    }
+
+    /// Stream the exact package bytes to a sequential sink.
+    pub fn write_to<W: Write>(&self, writer: &mut W) -> Result<()> {
+        ensure_publication_allowed(&self.inner)?;
+        stream_exact(&self.inner, writer)
+    }
+
+    /// Atomically replace a destination with the exact package bytes.
+    pub fn save<P: AsRef<Path>>(&self, path: P) -> Result<()> {
+        self.save_with_durability(path, Durability::Full)
+    }
+
+    /// Atomically replace a destination with explicit durability.
+    pub fn save_with_durability<P: AsRef<Path>>(
+        &self,
+        path: P,
+        durability: Durability,
+    ) -> Result<()> {
+        ensure_publication_allowed(&self.inner)?;
+        match &self.inner.state {
+            PackageState::Eager { reader, .. } => {
+                let bytes = reader.get_ref().get_ref();
+                litchi_cfb::atomic::save(
+                    path,
+                    durability,
+                    litchi_cfb::atomic::Overwrite::Replace,
+                    |writer| {
+                        writer.write_all(bytes).map_err(Error::Io)?;
+                        Ok(())
+                    },
+                    || Ok(()),
+                )
+            },
+            PackageState::Source { cfb, .. } => {
+                let source = cfb.source_arc();
+                let expected = cfb.captured_source_version();
+                litchi_cfb::atomic::save(
+                    path,
+                    durability,
+                    litchi_cfb::atomic::Overwrite::Replace,
+                    |writer| {
+                        let before = source.version()?;
+                        if before != expected {
+                            return Err(Error::Source(SourceBackedError::SourceChanged {
+                                expected,
+                                observed: before,
+                            }));
+                        }
+                        stream_source(&*source, cfb.file_size(), writer)
+                    },
+                    || {
+                        let after = source.version()?;
+                        if after != expected {
+                            return Err(Error::Source(SourceBackedError::SourceChanged {
+                                expected,
+                                observed: after,
+                            }));
+                        }
+                        Ok(())
+                    },
+                )
+            },
+        }
+    }
+
+    /// Begin the editable cell-values adapter on demand.
+    ///
+    /// No snapshot is constructed while a package is opened.  This method is
+    /// the low-level seam used by the next canonical edit wave.
+    pub fn edit_snapshot_with_limits(
+        &self,
+        limits: litchi_ole_common::object::Limits,
+        cfb_limits: litchi_cfb::OleFileLimits,
+    ) -> Result<crate::cell_values::Snapshot> {
+        let (limits, cfb_limits) = self.edit_profile(limits, cfb_limits)?;
+        match &self.inner.state {
+            PackageState::Eager { reader, .. } => {
+                crate::cell_values::Snapshot::from_bytes_with_limits_and_cfb(
+                    reader.get_ref().get_ref().clone(),
+                    limits,
+                    cfb_limits,
+                )
+                .map_err(Error::Reader)
+            },
+            PackageState::Source { cfb, .. } => {
+                crate::cell_values::Snapshot::from_shared_ole_file(cfb, limits, cfb_limits)
+                    .map_err(Error::Reader)
+            },
+        }
+    }
+
+    pub(crate) fn edit_profile(
+        &self,
+        limits: litchi_ole_common::object::Limits,
+        cfb_limits: litchi_cfb::OleFileLimits,
+    ) -> Result<(litchi_ole_common::object::Limits, litchi_cfb::OleFileLimits)> {
+        let limits = intersect_object_limits(limits, self.inner.policy);
+        let retained_input = retained_input_limit(&self.inner);
+        let source_cfb_limits = match &self.inner.state {
+            PackageState::Source { cfb, .. } => Some(cfb.limits()),
+            PackageState::Eager { .. } => None,
+        };
+        let cfb_limits = if source_cfb_limits.is_none() {
+            let admitted = litchi_cfb::OleFileLimits::default();
+            cfb_limits
+                .with_max_directory_bytes(
+                    cfb_limits
+                        .max_directory_bytes()
+                        .min(admitted.max_directory_bytes()),
+                )?
+                .with_max_allocation_table_bytes(
+                    cfb_limits
+                        .max_allocation_table_bytes()
+                        .min(admitted.max_allocation_table_bytes()),
+                )?
+        } else {
+            cfb_limits
+        };
+        let cfb_limits = intersect_cfb_limits(cfb_limits, retained_input, source_cfb_limits)?;
+        Ok((limits, cfb_limits))
+    }
+
+    /// Begin the editable cell-values adapter with its default object limits.
+    pub fn edit_snapshot(&self) -> Result<crate::cell_values::Snapshot> {
+        self.edit_snapshot_with_limits(
+            litchi_ole_common::object::Limits::default(),
+            litchi_cfb::OleFileLimits::default(),
+        )
+    }
+}
+
+/// An owned read-only workbook projection.
+pub struct Workbook {
+    package: Arc<PackageInner>,
+}
+
+impl Clone for Workbook {
+    fn clone(&self) -> Self {
+        Self {
+            package: Arc::clone(&self.package),
+        }
+    }
+}
+
+impl fmt::Debug for Workbook {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Workbook")
+            .field(
+                "source_backed",
+                &matches!(self.package.state, PackageState::Source { .. }),
+            )
+            .finish_non_exhaustive()
+    }
+}
+
+impl Workbook {
+    /// Borrow the eager reader, materializing source-backed input only here.
+    pub fn reader_ref(&self) -> Result<&crate::raw::Reader<Cursor<Vec<u8>>>> {
+        reader_ref(&self.package)
+    }
+
+    /// Borrow the source-backed projection when this package has one.
+    #[must_use]
+    pub fn source_backed_ref(&self) -> Option<&SourceBackedWorkbook> {
+        match &self.package.state {
+            PackageState::Source { workbook, .. } => Some(workbook),
+            PackageState::Eager { .. } => None,
+        }
+    }
+
+    /// Return ordinary worksheet names.
+    pub fn worksheet_names(&self) -> Result<Vec<String>> {
+        match &self.package.state {
+            PackageState::Source { workbook, .. } => {
+                workbook.worksheet_names().map_err(Error::Source)
+            },
+            PackageState::Eager { reader, .. } => {
+                Ok(litchi_core::sheet::WorkbookTrait::worksheet_names(reader.as_ref()).to_vec())
+            },
+        }
+    }
+
+    /// Return the ordinary worksheet count.
+    pub fn worksheet_count(&self) -> Result<usize> {
+        match &self.package.state {
+            PackageState::Source { workbook, .. } => {
+                workbook.worksheet_count().map_err(Error::Source)
+            },
+            PackageState::Eager { reader, .. } => Ok(
+                litchi_core::sheet::WorkbookTrait::worksheet_count(reader.as_ref()),
+            ),
+        }
+    }
+
+    /// Return the source-backed tolerance report or the eager reader report.
+    pub fn tolerance_report(&self) -> Result<ToleranceReport> {
+        match &self.package.state {
+            PackageState::Source { cfb, workbook, .. } => {
+                let expected = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                let mut report = workbook.tolerance_report();
+                report.append_property_sets(|path| cfb.property_set_stream(path));
+                let observed = cfb
+                    .source_version()
+                    .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+                if observed != expected {
+                    return Err(Error::Source(SourceBackedError::SourceChanged {
+                        expected,
+                        observed,
+                    }));
+                }
+                Ok(report)
+            },
+            PackageState::Eager { reader, .. } => Ok(reader.tolerance_report().clone()),
+        }
+    }
+
+    /// Extract ordinary worksheet text using the owner route.
+    pub fn text(&self) -> Result<String> {
+        match &self.package.state {
+            PackageState::Source { workbook, .. } => workbook.text().map_err(Error::Source),
+            PackageState::Eager { reader, .. } => eager_text(reader.as_ref()),
+        }
+    }
+
+    /// Resolve one worksheet by a canonical name or zero-based position.
+    pub fn worksheet<'a>(
+        &self,
+        selector: impl Into<litchi_core::selector::Selector<'a, std::convert::Infallible>>,
+    ) -> Result<Option<Worksheet>> {
+        let selector = selector.into();
+        match &self.package.state {
+            PackageState::Source { workbook, .. } => match selector {
+                litchi_core::selector::Selector::Name(name) => workbook
+                    .worksheet_by_name(name.as_ref())
+                    .map(|worksheet| worksheet.map(Worksheet::source))
+                    .map_err(Error::Source),
+                litchi_core::selector::Selector::Position(position) => workbook
+                    .worksheet_by_index(position.get())
+                    .map(|worksheet| worksheet.map(Worksheet::source))
+                    .map_err(Error::Source),
+                litchi_core::selector::Selector::Id(id) => match id {},
+                _ => return Err(Error::InvalidData("unsupported worksheet selector")),
+            },
+            PackageState::Eager { reader, .. } => {
+                let index = match selector {
+                    litchi_core::selector::Selector::Name(name) => {
+                        let names =
+                            litchi_core::sheet::WorkbookTrait::worksheet_names(reader.as_ref());
+                        names
+                            .iter()
+                            .position(|candidate| candidate.eq_ignore_ascii_case(name.as_ref()))
+                    },
+                    litchi_core::selector::Selector::Position(position) => Some(position.get()),
+                    litchi_core::selector::Selector::Id(id) => match id {},
+                    _ => return Err(Error::InvalidData("unsupported worksheet selector")),
+                };
+                Ok(index
+                    .filter(|index| {
+                        *index < litchi_core::sheet::WorkbookTrait::worksheet_count(reader.as_ref())
+                    })
+                    .map(|index| Worksheet::eager(Arc::clone(reader), index)))
+            },
+        }
+    }
+
+    /// Enumerate ordinary worksheets as owned handles.
+    pub fn worksheets(&self) -> Result<Vec<Worksheet>> {
+        let count = self.worksheet_count()?;
+        let mut worksheets = Vec::new();
+        worksheets
+            .try_reserve_exact(count)
+            .map_err(|source| Error::Allocation {
+                resource: "XLS workbook worksheet projection",
+                source,
+            })?;
+        for index in 0..count {
+            if let Some(worksheet) = self.worksheet(index)? {
+                worksheets.push(worksheet);
+            }
+        }
+        Ok(worksheets)
+    }
+}
+
+/// A read-only owned worksheet handle from either lazy or eager XLS storage.
+pub struct Worksheet {
+    inner: WorksheetInner,
+}
+
+enum WorksheetInner {
+    Source(crate::SourceBackedWorksheet),
+    Eager {
+        reader: Arc<RawReader>,
+        index: usize,
+    },
+}
+
+impl fmt::Debug for Worksheet {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.debug_struct("Worksheet").finish_non_exhaustive()
+    }
+}
+
+impl Clone for Worksheet {
+    fn clone(&self) -> Self {
+        match &self.inner {
+            WorksheetInner::Source(worksheet) => Self::source(worksheet.clone()),
+            WorksheetInner::Eager { reader, index } => Self::eager(Arc::clone(reader), *index),
+        }
+    }
+}
+
+impl Worksheet {
+    fn source(worksheet: crate::SourceBackedWorksheet) -> Self {
+        Self {
+            inner: WorksheetInner::Source(worksheet),
+        }
+    }
+
+    fn eager(reader: Arc<RawReader>, index: usize) -> Self {
+        Self {
+            inner: WorksheetInner::Eager { reader, index },
+        }
+    }
+
+    /// Zero-based worksheet index.
+    pub fn index(&self) -> Result<usize> {
+        match &self.inner {
+            WorksheetInner::Source(worksheet) => worksheet.index().map_err(Error::Source),
+            WorksheetInner::Eager { index, .. } => Ok(*index),
+        }
+    }
+
+    /// Worksheet name.
+    pub fn name(&self) -> Result<String> {
+        match &self.inner {
+            WorksheetInner::Source(worksheet) => worksheet.name().map_err(Error::Source),
+            WorksheetInner::Eager { reader, index } => {
+                let worksheet = reader.xls_worksheet(*index)?;
+                Ok(worksheet.name().to_string())
+            },
+        }
+    }
+
+    /// Read one cell value at zero-based row and column coordinates.
+    pub fn cell_value(
+        &self,
+        reference: crate::cell_values::Reference,
+    ) -> Result<Option<CellValue>> {
+        let row = u32::from(reference.row());
+        let column = u32::from(reference.column());
+        match &self.inner {
+            WorksheetInner::Source(worksheet) => {
+                worksheet.cell_value(row, column).map_err(Error::Source)
+            },
+            WorksheetInner::Eager { reader, index } => {
+                let worksheet = reader.xls_worksheet(*index)?;
+                Ok(worksheet
+                    .get_cell(row, column)
+                    .map(|cell| cell.value().clone()))
+            },
+        }
+    }
+
+    /// Return the underlying source-backed worksheet for advanced lazy reads.
+    #[must_use]
+    pub fn source_backed_ref(&self) -> Option<&crate::SourceBackedWorksheet> {
+        match &self.inner {
+            WorksheetInner::Source(worksheet) => Some(worksheet),
+            WorksheetInner::Eager { .. } => None,
+        }
+    }
+}
+
+fn reader_ref(inner: &Arc<PackageInner>) -> Result<&RawReader> {
+    match &inner.state {
+        PackageState::Eager { reader, .. } => Ok(reader.as_ref()),
+        PackageState::Source {
+            workbook,
+            materialized,
+            cfb,
+            ..
+        } => {
+            cfb.source_version().map_err(SourceBackedError::from)?;
+            let result = materialized
+                .get_or_init(|| workbook.materialize_eager().map(Arc::new).map_err(Arc::new));
+            cfb.source_version().map_err(SourceBackedError::from)?;
+            match result {
+                Ok(reader) => Ok(reader.as_ref()),
+                Err(error) => Err(Error::CachedSource(Arc::clone(error))),
+            }
+        },
+    }
+}
+
+fn exact_bytes(inner: &Arc<PackageInner>) -> Result<Vec<u8>> {
+    match &inner.state {
+        PackageState::Eager { reader, .. } => Ok(reader.get_ref().get_ref().clone()),
+        PackageState::Source { cfb, .. } => {
+            let length = usize::try_from(cfb.file_size()).map_err(|_| {
+                Error::InvalidData("XLS source size does not fit the current address space")
+            })?;
+            let mut bytes = Vec::new();
+            bytes
+                .try_reserve_exact(length)
+                .map_err(|source| Error::Allocation {
+                    resource: "XLS package output",
+                    source,
+                })?;
+            bytes.resize(length, 0);
+            let source = cfb.source_arc();
+            let expected = cfb
+                .source_version()
+                .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+            source.read_exact_at(0, &mut bytes).map_err(Error::Io)?;
+            let observed = cfb
+                .source_version()
+                .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+            if observed != expected {
+                return Err(Error::Source(SourceBackedError::SourceChanged {
+                    expected,
+                    observed,
+                }));
+            }
+            Ok(bytes)
+        },
+    }
+}
+
+fn stream_exact<W: Write>(inner: &Arc<PackageInner>, writer: &mut W) -> Result<()> {
+    match &inner.state {
+        PackageState::Eager { reader, .. } => writer
+            .write_all(reader.get_ref().get_ref())
+            .map_err(Error::Io),
+        PackageState::Source { cfb, .. } => {
+            let source = cfb.source_arc();
+            let expected = cfb
+                .source_version()
+                .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+            stream_source(&*source, cfb.file_size(), writer)?;
+            let observed = cfb
+                .source_version()
+                .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
+            if observed != expected {
+                return Err(Error::Source(SourceBackedError::SourceChanged {
+                    expected,
+                    observed,
+                }));
+            }
+            Ok(())
+        },
+    }
+}
+
+fn stream_source<W: Write + ?Sized>(
+    source: &dyn ReadAt,
+    length: u64,
+    writer: &mut W,
+) -> Result<()> {
+    let mut offset = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    while offset < length {
+        let count = usize::try_from((length - offset).min(buffer.len() as u64))
+            .map_err(|_| Error::InvalidData("XLS source range does not fit usize"))?;
+        source
+            .read_exact_at(offset, &mut buffer[..count])
+            .map_err(Error::Io)?;
+        writer.write_all(&buffer[..count]).map_err(Error::Io)?;
+        offset = offset
+            .checked_add(count as u64)
+            .ok_or(Error::InvalidData("XLS source offset overflow"))?;
+    }
+    Ok(())
+}
+
+fn ensure_publication_allowed(inner: &Arc<PackageInner>) -> Result<()> {
+    let encrypted = match &inner.state {
+        PackageState::Eager { encrypted, .. } | PackageState::Source { encrypted, .. } => {
+            *encrypted
+        },
+    };
+    if encrypted {
+        Err(Error::EncryptionPolicy)
+    } else {
+        Ok(())
+    }
+}
+
+fn retained_input_limit(inner: &Arc<PackageInner>) -> u64 {
+    match inner.policy {
+        RetainedPolicy::Eager { source_limits, .. } => {
+            u64::try_from(source_limits.max_input_bytes()).unwrap_or(u64::MAX)
+        },
+        RetainedPolicy::Source { limits, .. } => limits.max_input_bytes,
+    }
+}
+
+fn intersect_object_limits(
+    mut limits: litchi_ole_common::object::Limits,
+    policy: RetainedPolicy,
+) -> litchi_ole_common::object::Limits {
+    if let RetainedPolicy::Eager { source_limits, .. } = policy {
+        limits.max_stream_size = limits
+            .max_stream_size
+            .min(u64::try_from(source_limits.max_entry_bytes()).unwrap_or(u64::MAX));
+        limits.max_total_size = limits
+            .max_total_size
+            .min(u64::try_from(source_limits.max_aggregate_bytes()).unwrap_or(u64::MAX));
+    }
+    limits
+}
+
+fn intersect_cfb_limits(
+    requested: litchi_cfb::OleFileLimits,
+    retained_input: u64,
+    source: Option<SharedOleFileLimits>,
+) -> Result<litchi_cfb::OleFileLimits> {
+    let input = requested
+        .max_input_bytes()
+        .min(retained_input)
+        .min(source.map_or(u64::MAX, SharedOleFileLimits::max_input_bytes));
+    let directory = requested
+        .max_directory_bytes()
+        .min(source.map_or(u64::MAX, SharedOleFileLimits::max_directory_bytes));
+    let allocation = requested
+        .max_allocation_table_bytes()
+        .min(source.map_or(u64::MAX, SharedOleFileLimits::max_allocation_table_bytes));
+    litchi_cfb::OleFileLimits::new(input)
+        .map_err(Error::Cfb)?
+        .with_max_directory_bytes(directory)
+        .map_err(Error::Cfb)?
+        .with_max_allocation_table_bytes(allocation)
+        .map_err(Error::Cfb)
+}
+
+fn eager_metadata(ole_file: &mut OleFile<Cursor<Vec<u8>>>) -> Metadata {
+    ole_file
+        .get_metadata()
+        .map(Metadata::from)
+        .unwrap_or_default()
+}
+
+fn metadata_error_is_soft(error: &OleError) -> bool {
+    matches!(
+        error,
+        OleError::InvalidFormat(_)
+            | OleError::InvalidData(_)
+            | OleError::NotOleFile
+            | OleError::CorruptedFile(_)
+            | OleError::StreamNotFound
+    )
+}
+
+fn eager_text(reader: &RawReader) -> Result<String> {
+    let mut output = String::new();
+    for index in 0..litchi_core::sheet::WorkbookTrait::worksheet_count(reader) {
+        let worksheet = reader.xls_worksheet(index)?;
+        for row in 0..worksheet.row_count() {
+            for column in 0..worksheet.column_count() {
+                if column > 0 {
+                    output.push('\t');
+                }
+                if let Some(cell) = worksheet.get_cell(
+                    u32::try_from(row).unwrap_or(u32::MAX),
+                    u32::try_from(column).unwrap_or(u32::MAX),
+                ) {
+                    append_cell_text(&mut output, cell.value());
+                }
+            }
+            output.push('\n');
+        }
+    }
+    Ok(output)
+}
+
+fn append_cell_text(output: &mut String, cell: &CellValue) {
+    match cell {
+        CellValue::Empty => {},
+        CellValue::Bool(value) => output.push_str(if *value { "TRUE" } else { "FALSE" }),
+        CellValue::Int(value) => output.push_str(&value.to_string()),
+        CellValue::Float(value) => output.push_str(&value.to_string()),
+        CellValue::String(value) | CellValue::Error(value) => output.push_str(value),
+        CellValue::DateTime(value) => output.push_str(&value.to_string()),
+        CellValue::Formula {
+            formula,
+            cached_value,
+            ..
+        } => match cached_value.as_deref() {
+            Some(CellValue::String(value)) => output.push_str(value),
+            Some(CellValue::Int(value)) => output.push_str(&value.to_string()),
+            Some(CellValue::Float(value)) => output.push_str(&value.to_string()),
+            Some(CellValue::Bool(value)) => output.push_str(if *value { "TRUE" } else { "FALSE" }),
+            _ => {
+                output.push('=');
+                output.push_str(formula);
+            },
+        },
+    }
+}
+
+fn read_bounded<R: Read>(reader: &mut R, limits: SourceLimits) -> Result<Vec<u8>> {
+    let maximum = limits.max_input_bytes();
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(maximum.min(64 * 1024))
+        .map_err(|source| Error::Allocation {
+            resource: "XLS package input",
+            source,
+        })?;
+    bytes.clear();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let request = maximum
+            .saturating_sub(bytes.len())
+            .saturating_add(1)
+            .min(buffer.len());
+        let count = reader.read(&mut buffer[..request])?;
+        if count == 0 {
+            break;
+        }
+        let next = bytes
+            .len()
+            .checked_add(count)
+            .ok_or(Error::InvalidData("XLS package input length overflow"))?;
+        if next > maximum {
+            return Err(Error::Reader(ReaderError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: next as u64,
+                maximum: maximum as u64,
+            }));
+        }
+        bytes
+            .try_reserve(count)
+            .map_err(|source| Error::Allocation {
+                resource: "XLS package input",
+                source,
+            })?;
+        bytes.extend_from_slice(&buffer[..count]);
+    }
+    Ok(bytes)
+}

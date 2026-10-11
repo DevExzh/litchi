@@ -1447,3 +1447,20 @@ fn xls_source_limits_preserve_error_codes() {
         Code::LimitExceeded,
     );
 }
+
+#[cfg(feature = "xls")]
+#[test]
+fn xls_package_errors_preserve_classification() {
+    assert_code(
+        litchi_xls::package::Error::EncryptionPolicy,
+        Code::DocumentProtected,
+    );
+    assert_code(
+        litchi_xls::package::Error::Reader(litchi_xls::Error::Limit {
+            kind: litchi_xls::SourceLimitKind::EntryBytes,
+            observed: 101,
+            maximum: 100,
+        }),
+        Code::LimitExceeded,
+    );
+}

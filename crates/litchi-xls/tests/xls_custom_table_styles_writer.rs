@@ -3,7 +3,7 @@ use std::io::Cursor;
 use litchi_xls::writer::{CustomTableStyles, Writer};
 use litchi_xls::{
     DifferentialFormat, DifferentialFormatId, TableStyle, TableStyleElement, TableStyleRegion,
-    TableStyles, Workbook, XfProperty,
+    TableStyles, XfProperty, raw::Reader,
 };
 
 fn configured_styles(number_format_id: u16) -> CustomTableStyles {
@@ -48,7 +48,7 @@ fn custom_table_styles_round_trip_from_writer_to_reader() {
 
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
 
     assert_eq!(workbook.differential_formats().len(), 2);
     assert_eq!(
@@ -123,7 +123,7 @@ fn replacement_is_atomic_and_clear_restores_unset_bytes() {
 
     let mut retained = Cursor::new(Vec::new());
     writer.write_to(&mut retained).unwrap();
-    let workbook = Workbook::new(Cursor::new(retained.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(retained.into_inner())).unwrap();
     assert_eq!(
         workbook.differential_formats()[0].properties().properties(),
         &[XfProperty::NumberFormatId(0)]

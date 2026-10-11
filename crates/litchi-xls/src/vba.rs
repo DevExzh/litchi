@@ -480,7 +480,7 @@ fn invalid_data<T>(message: impl Into<String>) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Workbook, Writer};
+    use crate::{Writer, raw::Reader};
     use litchi_cfb::{OleFile, OleWriter};
     use std::io::Cursor;
 
@@ -642,7 +642,7 @@ mod tests {
         let mut bytes = Cursor::new(Vec::new());
         writer.write_to(&mut bytes).unwrap();
 
-        let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+        let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
         let storage = workbook.vba_project_storage().unwrap();
         assert!(storage.is_structurally_complete());
         assert!(storage.may_contain_macro_code());
@@ -656,7 +656,7 @@ mod tests {
     fn parses_real_xls_vba_project_and_inert_module_source() {
         let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/spreadsheet/SimpleMacro.xls");
-        let mut workbook = Workbook::new(std::fs::File::open(fixture).unwrap()).unwrap();
+        let mut workbook = Reader::new(std::fs::File::open(fixture).unwrap()).unwrap();
         let project = workbook.vba().unwrap().unwrap();
 
         assert!(!project.name().is_empty());

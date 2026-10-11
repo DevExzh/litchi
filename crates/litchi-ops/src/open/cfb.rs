@@ -487,7 +487,12 @@ fn xls_source(
         let shared = Arc::new(shared);
         match litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
             Arc::clone(&shared),
-            litchi_xls::SourceBackedLimits::default(),
+            litchi_xls::SourceBackedLimits::default().with_max_input_bytes(
+                options
+                    .max_input_bytes
+                    .unwrap_or(super::NEUTRAL_MAX_INPUT_BYTES)
+                    .min(litchi_cfb::SharedOleFileLimits::MAX_INPUT_BYTES),
+            ),
         ) {
             Ok(workbook) => {
                 let observed = workbook.source_version()?;
@@ -499,9 +504,7 @@ fn xls_source(
                     .into());
                 }
                 Ok(super::signed_if(
-                    File::Xls(crate::format::xls::Xls::from_source(
-                        workbook, shared, options,
-                    )),
+                    File::Xls(crate::format::xls::Xls::from_source(workbook)?),
                     FileFormat::Xls,
                     is_signed,
                     crate::SignatureOrigin::Cfb,

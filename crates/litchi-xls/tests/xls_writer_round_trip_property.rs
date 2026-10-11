@@ -34,7 +34,7 @@ use litchi_xls::writer::{
 };
 use litchi_xls::{DefinedNameKind, Error, FontUnderline, NameScope};
 
-type Workbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
+type Reader = litchi_xls::raw::Reader<Cursor<Vec<u8>>>;
 
 /// xorshift64*: small, deterministic and good enough to pick test inputs.
 struct Random(u64);
@@ -669,12 +669,12 @@ fn check_case(seed: u64, tally: &mut Tally) {
         bytes,
         "seed {seed:#x}: a refused call changed the writer"
     );
-    let workbook = Workbook::new(Cursor::new(bytes))
+    let workbook = Reader::new(Cursor::new(bytes))
         .unwrap_or_else(|error| panic!("seed {seed:#x}: the reader refused the workbook: {error}"));
     compare(seed, &workbook, &expected);
 }
 
-fn compare(seed: u64, workbook: &Workbook, expected: &Expected) {
+fn compare(seed: u64, workbook: &Reader, expected: &Expected) {
     let names = workbook
         .sheets()
         .iter()
@@ -789,7 +789,7 @@ fn compare(seed: u64, workbook: &Workbook, expected: &Expected) {
     assert_eq!(read_names, wanted, "seed {seed:#x}: defined names");
 }
 
-fn check_style(seed: u64, workbook: &Workbook, xf_index: u16, style: u16, expected: &Expected) {
+fn check_style(seed: u64, workbook: &Reader, xf_index: u16, style: u16, expected: &Expected) {
     if style == 0 {
         assert_eq!(xf_index, 15, "seed {seed:#x}: an unstyled cell uses XF 15");
         return;
@@ -942,7 +942,7 @@ fn surrogate_pairs_at_each_limit_round_trip_or_are_refused() {
         .unwrap();
     writer.define_name(&at(255), "A1").unwrap();
 
-    let workbook = Workbook::new(Cursor::new(write(&mut writer))).unwrap();
+    let workbook = Reader::new(Cursor::new(write(&mut writer))).unwrap();
     assert_eq!(workbook.sheets()[0].name(), at(31));
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert_eq!(

@@ -1,4 +1,4 @@
-use litchi_xls::{ExtendedFormatKind, Workbook};
+use litchi_xls::{ExtendedFormatKind, raw::Reader};
 use std::fs::File;
 use std::path::{Path, PathBuf};
 
@@ -14,7 +14,7 @@ fn libreoffice_fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn assert_effective_links<R: std::io::Read + std::io::Seek>(workbook: &Workbook<R>) {
+fn assert_effective_links<R: std::io::Read + std::io::Seek>(workbook: &Reader<R>) {
     let mut cell_count = 0;
     for xf in workbook.extended_formats() {
         let effective = workbook.effective_extended_format(xf.index()).unwrap();
@@ -35,12 +35,12 @@ fn assert_effective_links<R: std::io::Read + std::io::Seek>(workbook: &Workbook<
 
 #[test]
 fn resolves_poi_xf_inheritance() {
-    let workbook = Workbook::new(File::open(poi_fixture("Formatting.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("Formatting.xls")).unwrap()).unwrap();
     assert_effective_links(&workbook);
 }
 
 #[test]
 fn resolves_libreoffice_xf_inheritance() {
-    let workbook = Workbook::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
     assert_effective_links(&workbook);
 }

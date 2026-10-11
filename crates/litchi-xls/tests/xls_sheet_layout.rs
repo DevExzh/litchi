@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::writer::{WorksheetLayoutOptions, Writer};
 
 #[test]
@@ -38,7 +38,7 @@ fn worksheet_layout_round_trip() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let layout = workbook.xls_worksheet(0).unwrap().layout();
     assert_eq!(layout.default_row_height_twips(), 360);
     assert!(layout.empty_rows_hidden());
@@ -65,7 +65,7 @@ fn worksheet_layout_round_trip() {
 fn reads_poi_column_width_fixture_defaults() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/colwidth.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     let layout = workbook.xls_worksheet(0).unwrap().layout();
     assert_eq!(layout.default_row_height_twips(), 255);
     assert_eq!(layout.default_column_width_chars(), 8);

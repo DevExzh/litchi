@@ -2342,6 +2342,31 @@
       "features": [],
       "banned_names": [
         {
+          "name": "new",
+          "scope": "litchi_xls::Workbook",
+          "replacement": "open the immutable Package; low-level ingress lives in raw::Reader"
+        },
+        {
+          "name": "new_with_options",
+          "scope": "litchi_xls::Workbook",
+          "replacement": "open the immutable Package; low-level ingress lives in raw::Reader"
+        },
+        {
+          "name": "from_ole_file",
+          "scope": "litchi_xls::Workbook",
+          "replacement": "open the immutable Package; low-level ingress lives in raw::Reader"
+        },
+        {
+          "name": "from_ole_file_with_options",
+          "scope": "litchi_xls::Workbook",
+          "replacement": "open the immutable Package; low-level ingress lives in raw::Reader"
+        },
+        {
+          "name": "from_ole_file_or_password_required",
+          "scope": "litchi_xls::Workbook",
+          "replacement": "open the immutable Package; low-level ingress lives in raw::Reader"
+        },
+        {
           "name": "with_password",
           "scope": "litchi_xls::OpenOptions",
           "replacement": "use OpenOptions::password()"

@@ -2,7 +2,7 @@
 
 use litchi_core::sheet::Cell;
 use litchi_xls::writer::Writer;
-use litchi_xls::{DataTable, DataTableInputCell, DataTableKind, DataTableRange, Workbook};
+use litchi_xls::{DataTable, DataTableInputCell, DataTableKind, DataTableRange, raw::Reader};
 use std::io::Cursor;
 
 #[test]
@@ -27,7 +27,7 @@ fn data_tables_round_trip_through_writer_and_reader() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     let tables = worksheet.data_tables();
     assert_eq!(tables, &[one_variable, two_variable]);

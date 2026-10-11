@@ -7,7 +7,7 @@ use litchi_xls::writer::{
 };
 use litchi_xls::{
     PivotAxis, PivotAxisField, PivotCacheGrouping, PivotCacheItem, PivotCacheNumericGrouping,
-    PivotViewEditor, Workbook,
+    PivotViewEditor, raw::Reader,
 };
 
 fn generated_workbook() -> Vec<u8> {
@@ -104,7 +104,7 @@ fn generated_workbook() -> Vec<u8> {
 
 #[test]
 fn writer_view_records_reopen_with_identical_layout_and_cache_link() {
-    let workbook = Workbook::new(Cursor::new(generated_workbook())).unwrap();
+    let workbook = Reader::new(Cursor::new(generated_workbook())).unwrap();
     let table = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -153,7 +153,7 @@ fn libreoffice_pivot_views_parse_with_cache_links() {
         "pivottable_number_grouping.xls",
         "pivottable_dates_grouping.xls",
     ] {
-        let workbook = Workbook::new(std::fs::File::open(root.join(name)).unwrap()).unwrap();
+        let workbook = Reader::new(std::fs::File::open(root.join(name)).unwrap()).unwrap();
         let tables = (0..workbook.sheets().len())
             .filter_map(|index| workbook.worksheet_pivot_tables(index).ok())
             .flatten()
@@ -187,7 +187,7 @@ fn pivot_view_editor_is_byte_exact_for_noop_and_reopens_mutations() {
         })
         .unwrap();
     let rewritten = editor.finish().unwrap();
-    let workbook = Workbook::new(Cursor::new(rewritten)).unwrap();
+    let workbook = Reader::new(Cursor::new(rewritten)).unwrap();
     let table = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -211,7 +211,7 @@ fn pivot_view_editor_rolls_back_invalid_cache_and_supports_remove_add() {
     let mut editor = PivotViewEditor::new(original).unwrap();
     let table = editor.remove_by_name(0, "SalesPivot").unwrap();
     editor.add(0, table).unwrap();
-    let reopened = Workbook::new(Cursor::new(editor.finish().unwrap())).unwrap();
+    let reopened = Reader::new(Cursor::new(editor.finish().unwrap())).unwrap();
     assert!(
         reopened
             .xls_worksheet(0)
@@ -238,7 +238,7 @@ fn pivot_view_editor_regenerates_grouping_cache_and_preserves_fixture_noops() {
             })),
         )
         .unwrap();
-    let workbook = Workbook::new(Cursor::new(editor.finish().unwrap())).unwrap();
+    let workbook = Reader::new(Cursor::new(editor.finish().unwrap())).unwrap();
     assert!(matches!(
         workbook.pivot_caches()[0].fields()[1].grouping(),
         Some(PivotCacheGrouping::Numeric(_))

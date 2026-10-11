@@ -25,7 +25,7 @@ use litchi_xls::{
     XfProperty,
 };
 
-type Workbook = litchi_xls::Workbook<Cursor<Vec<u8>>>;
+type Reader = litchi_xls::raw::Reader<Cursor<Vec<u8>>>;
 
 fn written(writer: &mut Writer) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
@@ -33,8 +33,8 @@ fn written(writer: &mut Writer) -> Vec<u8> {
     output.into_inner()
 }
 
-fn read(bytes: Vec<u8>) -> Workbook {
-    Workbook::new(Cursor::new(bytes)).unwrap()
+fn read(bytes: Vec<u8>) -> Reader {
+    Reader::new(Cursor::new(bytes)).unwrap()
 }
 
 /// The field, length and limit of a [`Error::StringTooLong`] refusal.
@@ -98,7 +98,7 @@ fn one_sheet_writer(name: &str) -> (Writer, usize) {
     (writer, sheet)
 }
 
-fn cell_value(workbook: &Workbook, sheet: usize, row: u32, column: u32) -> Option<CellValue> {
+fn cell_value(workbook: &Reader, sheet: usize, row: u32, column: u32) -> Option<CellValue> {
     workbook
         .xls_worksheet(sheet)
         .unwrap()

@@ -18,7 +18,7 @@ use crate::records::{
     MeasuredCell, SharedStringEntryLocation, SharedStringScanError, SharedStringSstScan,
     SharedStringSstSegment, SheetType, decode_shared_string_entry, scan_shared_string_records,
 };
-use crate::{SheetKind, SheetVisibility, Workbook};
+use crate::{SheetKind, SheetVisibility, raw::Reader};
 use litchi_biff::{Limits as BiffLimits, RecordRef, Records as BiffRecords};
 use litchi_cfb::{
     OleError, SharedOleFile, SharedOleFileLimits, SharedOleStreamCursor, StreamChainHint,
@@ -475,6 +475,7 @@ struct SourceInner {
     formatting: Arc<Formatting>,
     encoding: Encoding,
     limits: SourceBackedLimits,
+    leniency: Leniency,
     query_cache: Arc<QueryIndexCache>,
     /// Repairs applied so far: the globals repairs the open made, plus the
     /// cell-XF repairs lazy worksheet scans record as queries run.
@@ -865,6 +866,26 @@ fn retained_text_bytes(value: &litchi_core::sheet::CellValue) -> u64 {
 }
 
 impl SourceBackedWorkbook {
+    /// Returns the exact shared CFB view retained by this source owner.
+    ///
+    /// This crate-private handoff lets the canonical XLS package owner adopt
+    /// the same source catalog and provenance without accepting a separately
+    /// supplied, potentially forged CFB/source pair.
+    pub(crate) fn shared_cfb(&self) -> Arc<SharedOleFile> {
+        Arc::clone(&self.inner.cfb)
+    }
+
+    /// Returns the finite limits retained when this source owner was opened.
+    pub(crate) fn retained_limits(&self) -> SourceBackedLimits {
+        self.inner.limits
+    }
+
+    /// Returns the formatting-defect policy retained when this source owner
+    /// was opened.
+    pub(crate) fn retained_leniency(&self) -> Leniency {
+        self.inner.leniency
+    }
+
     /// Opens a positional source with default finite limits.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
         Self::from_read_at_with_options(source, SourceBackedOptions::default())
@@ -1054,8 +1075,8 @@ impl SourceBackedWorkbook {
     /// reopening the path or exposing raw CFB bytes. The copy is bounded by
     /// [`SourceBackedLimits::max_materialize_bytes`]. It is not ordinary
     /// source-backed CRUD; callers should prefer the source-backed selectors
-    /// when they do not specifically need the eager `Workbook` API.
-    pub fn materialize_eager(&self) -> Result<Workbook<Cursor<Vec<u8>>>> {
+    /// when they do not specifically need the eager `raw::Reader` API.
+    pub fn materialize_eager(&self) -> Result<Reader<Cursor<Vec<u8>>>> {
         self.materialize_eager_impl(None)
     }
 
@@ -1069,14 +1090,14 @@ impl SourceBackedWorkbook {
     pub fn materialize_eager_with_execution(
         &self,
         execution: &ExecutionContext,
-    ) -> Result<Workbook<Cursor<Vec<u8>>>> {
+    ) -> Result<Reader<Cursor<Vec<u8>>>> {
         self.materialize_eager_impl(Some(execution))
     }
 
     fn materialize_eager_impl(
         &self,
         execution: Option<&ExecutionContext>,
-    ) -> Result<Workbook<Cursor<Vec<u8>>>> {
+    ) -> Result<Reader<Cursor<Vec<u8>>>> {
         if let Some(execution) = execution {
             execution.check()?;
         }
@@ -1151,7 +1172,7 @@ impl SourceBackedWorkbook {
         // reader's separate default SourceLimits after copying the input.
         let parsed = litchi_cfb::OleFile::open(Cursor::new(bytes))
             .map_err(Error::from)
-            .and_then(|ole| Workbook::from_admitted_ole_file(ole, crate::OpenOptions::default()));
+            .and_then(|ole| Reader::from_admitted_ole_file(ole, crate::OpenOptions::default()));
         let workbook = match parsed {
             Ok(workbook) => workbook,
             Err(error) => {
@@ -1231,6 +1252,7 @@ impl SourceBackedWorkbook {
             formatting: Arc::new(parsed.formatting),
             encoding: parsed.encoding,
             limits,
+            leniency: options.leniency(),
             query_cache: Arc::new(QueryIndexCache::new(
                 limits.max_query_index_bytes,
                 cache_sheet_count,

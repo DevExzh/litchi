@@ -51,7 +51,7 @@ fn selected_source_profile_survives_other_option_setters() {
 
 #[test]
 fn valid_workbook_opens_at_exact_physical_and_stream_boundaries() {
-    use litchi_xls::{SourceLimits, Workbook, Writer};
+    use litchi_xls::{SourceLimits, Writer, raw::Reader};
     use std::io::Cursor;
     let mut writer = Writer::new();
     let sheet = writer.add_worksheet("Data").unwrap();
@@ -75,11 +75,11 @@ fn valid_workbook_opens_at_exact_physical_and_stream_boundaries() {
         .build()
         .unwrap();
     let options = OpenOptions::new().source_limits(limits);
-    Workbook::new_with_options(Cursor::new(&bytes), options).unwrap();
-    Workbook::from_ole_file_with_options(ole, options).unwrap();
+    Reader::new_with_options(Cursor::new(&bytes), options).unwrap();
+    Reader::from_ole_file_with_options(ole, options).unwrap();
     let ole = litchi_cfb::OleFile::open(Cursor::new(&bytes)).unwrap();
     assert!(
-        Workbook::from_ole_file_or_password_required(ole, options)
+        Reader::from_ole_file_or_password_required(ole, options)
             .unwrap()
             .is_ok()
     );

@@ -32,14 +32,21 @@ explicit `WeakEncryptionPolicy::allow_xor_obfuscation()` capability and
 `Writer::set_xor_obfuscation_password`; it is not confidentiality protection.
 
 ```rust
-use litchi_xls::Workbook;
-use std::fs::File;
+use litchi_xls::Package;
 
-let workbook = Workbook::new(File::open("example.xls")?)?;
-let _sheet = workbook.xls_worksheet(0)?;
-println!("sheets: {}", workbook.sheets().len());
+let package = Package::open("example.xls")?;
+let workbook = package.workbook();
+let _sheet = workbook.worksheet(0_usize)?;
+println!("sheets: {}", workbook.worksheet_count()?);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+`Package` retains an immutable source and returns cheap owned read projections.
+It publishes exact bytes through `to_bytes`, `write_to`, and atomic `save`.
+Encrypted inputs require explicit source export; ordinary publication refuses
+them. The old generic eager reader is available only as `raw::Reader`.
+Canonical package edits and Builder creation remain under migration; focused
+feature edit engines and `Writer` remain available.
 
 ## Eager reader limits
 
@@ -51,19 +58,18 @@ handoff checks its catalog before decoding; it cannot undo earlier container
 allocations. Invalid profiles and excess input have typed errors.
 
 ```rust
-use litchi_xls::{OpenOptions, SourceLimits, Workbook};
-use std::fs::File;
+use litchi_xls::{OpenOptions, Package, SourceLimits};
 
 let limits = SourceLimits::builder()
     .max_input_bytes(64 * 1024 * 1024)?
     .max_entry_bytes(16 * 1024 * 1024)?
     .max_aggregate_bytes(64 * 1024 * 1024)?
     .build()?;
-let workbook = Workbook::new_with_options(
-    File::open("example.xls")?,
+let package = Package::open_with_options(
+    "example.xls",
     OpenOptions::new().source_limits(limits),
 )?;
-# Ok::<(), litchi_xls::Error>(())
+# Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
 The positional reader continues to use `SourceBackedLimits`; its explicit

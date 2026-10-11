@@ -239,7 +239,7 @@ fn enforces_record_and_opaque_payload_bounds() {
 
 #[test]
 fn reads_poi_comment_fixtures() {
-    use crate::Workbook;
+    use crate::raw::Reader;
     use std::fs::File;
     use std::path::Path;
 
@@ -249,7 +249,7 @@ fn reads_poi_comment_fixtures() {
             .join(name)
     };
 
-    let simple = Workbook::new(File::open(fixture("SimpleWithComments.xls")).unwrap()).unwrap();
+    let simple = Reader::new(File::open(fixture("SimpleWithComments.xls")).unwrap()).unwrap();
     let comments = simple.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 3);
     assert_eq!(comments[0].author(), "Yegor Kozlov");
@@ -260,12 +260,12 @@ fn reads_poi_comment_fixtures() {
     assert_ne!(comments[0].identity().guid(), &[0; 16]);
     assert_eq!(comments[0].text_runs().len(), 2);
 
-    let drawing = Workbook::new(File::open(fixture("DrawingAndComments.xls")).unwrap()).unwrap();
+    let drawing = Reader::new(File::open(fixture("DrawingAndComments.xls")).unwrap()).unwrap();
     let comments = drawing.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 3);
     assert!(comments.iter().all(|comment| !comment.text().is_empty()));
 
-    let libreoffice = Workbook::new(File::open(fixture("comments.xls")).unwrap()).unwrap();
+    let libreoffice = Reader::new(File::open(fixture("comments.xls")).unwrap()).unwrap();
     let comments = libreoffice.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 3);
     assert!(

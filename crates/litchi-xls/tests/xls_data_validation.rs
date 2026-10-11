@@ -5,7 +5,9 @@ use litchi_xls::writer::{
     DataValidationImeMode as WriterImeMode, DataValidationOperator, DataValidationOptions,
     DataValidationRange, DataValidationTableOptions, DataValidationType, Writer,
 };
-use litchi_xls::{DataValidationErrorStyle, DataValidationImeMode, DataValidationKind, Workbook};
+use litchi_xls::{
+    DataValidationErrorStyle, DataValidationImeMode, DataValidationKind, raw::Reader,
+};
 
 fn validation(row: u32, validation_type: DataValidationType) -> DataValidation {
     DataValidation {
@@ -142,7 +144,7 @@ fn complete_validation_family_round_trips_as_inert_metadata() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let sheet = workbook.xls_worksheet(0).unwrap();
     let settings = sheet.data_validation_settings().unwrap();
     assert!(settings.window_closed());
@@ -205,7 +207,7 @@ fn malformed_writer_metadata_is_rejected() {
     );
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     assert!(
         workbook
             .xls_worksheet(0)
@@ -228,7 +230,7 @@ fn validation_surrogate_pair_messages_round_trip() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let rule = &workbook.xls_worksheet(0).unwrap().data_validations()[0];
     assert_eq!(rule.prompt_title(), Some("😀"));
     assert_eq!(rule.prompt(), Some("😀"));
@@ -253,7 +255,7 @@ fn explicit_zero_rule_dval_and_oversized_dv_are_handled_deterministically() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let settings = workbook
         .xls_worksheet(0)
         .unwrap()

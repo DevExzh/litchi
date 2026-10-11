@@ -99,11 +99,11 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// for each sheet.
 fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     use litchi_core::sheet::WorkbookTrait;
-    use litchi_xls::Workbook;
+    use litchi_xls::raw::Reader;
     use std::io::Cursor;
 
     let data = std::fs::read(path)?;
-    let wb = Workbook::new(Cursor::new(data))?;
+    let wb = Reader::new(Cursor::new(data))?;
 
     println!("Worksheets: {:?}", wb.worksheet_names());
 

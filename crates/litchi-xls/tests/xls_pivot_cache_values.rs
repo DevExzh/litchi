@@ -4,7 +4,7 @@ use std::path::PathBuf;
 use litchi_xls::writer::{
     PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig, Writer,
 };
-use litchi_xls::{PivotCacheDateTime, PivotCacheError, PivotCacheItem, Workbook};
+use litchi_xls::{PivotCacheDateTime, PivotCacheError, PivotCacheItem, raw::Reader};
 
 fn typed_items() -> Vec<PivotCacheItem> {
     vec![
@@ -139,7 +139,7 @@ fn typed_cache_items_emit_exact_flags_payloads_and_rows() {
         vec![vec![0], vec![1], vec![2], vec![3], vec![4]]
     );
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.pivot_caches().len(), 1);
     assert_eq!(
         workbook.pivot_caches()[0].fields()[0].items(),
@@ -160,7 +160,7 @@ fn typed_caches_coexist_with_workbook_global_stream_ids() {
     let bytes = write_typed_workbook(2);
     assert!(!cache_stream(&bytes, 1).is_empty());
     assert!(!cache_stream(&bytes, 2).is_empty());
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         workbook
             .pivot_caches()
@@ -188,7 +188,7 @@ fn reads_libreoffice_boolean_and_empty_pivot_caches() {
         let path = root
             .join("../../test-data/libreoffice-core/sc/qa/unit/data/xls")
             .join(name);
-        let workbook = Workbook::new(std::fs::File::open(path).unwrap()).unwrap();
+        let workbook = Reader::new(std::fs::File::open(path).unwrap()).unwrap();
         assert!(
             workbook
                 .pivot_caches()
@@ -223,6 +223,6 @@ fn malformed_typed_records_are_rejected_and_invalid_add_is_atomic() {
     assert!(writer.add_pivot_table(sheet, invalid).is_err());
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.pivot_caches().is_empty());
 }

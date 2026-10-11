@@ -7,8 +7,8 @@
 
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Cell as _, CellValue};
-use litchi_xls::Workbook;
 use litchi_xls::cell_values::{Reference, Selector, Snapshot, Storage};
+use litchi_xls::raw::Reader;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
@@ -32,7 +32,7 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
         .commit()
         .expect("commit and fully reopen real Formula shift");
 
-    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes()))
+    let reopened = Reader::new(Cursor::new(commit.snapshot().bytes()))
         .expect("reopen shifted Microsoft Excel fixture");
     assert_eq!(
         reopened
@@ -51,7 +51,7 @@ fn real_excel_formula_references_shift_reopen_and_invert() {
         .inverse()
         .apply(commit.snapshot())
         .expect("semantically invert real Formula shift");
-    let restored_reopen = Workbook::new(Cursor::new(restored.snapshot().bytes()))
+    let restored_reopen = Reader::new(Cursor::new(restored.snapshot().bytes()))
         .expect("reopen semantically restored Microsoft Excel fixture");
     assert_eq!(
         restored_reopen
@@ -215,7 +215,7 @@ fn real_fixture_number_commit_reopens_and_preserves_other_streams() {
     );
 
     assert_other_streams_equal(source.bytes(), commit.snapshot().bytes());
-    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes()))
+    let reopened = Reader::new(Cursor::new(commit.snapshot().bytes()))
         .expect("committed package reopens through the public workbook reader");
     let parsed_index = reopened
         .sheet(sheet_position)
@@ -283,7 +283,7 @@ fn multiple_real_fixtures_rename_and_fully_reopen() {
             replacement
         );
         assert_other_streams_equal(source.bytes(), commit.snapshot().bytes());
-        Workbook::new(Cursor::new(commit.snapshot().bytes()))
+        Reader::new(Cursor::new(commit.snapshot().bytes()))
             .expect("renamed real fixture fully reopens");
     }
 }

@@ -2,7 +2,7 @@
 
 use litchi_xls::writer::Writer;
 use litchi_xls::{
-    PhoneticAlignment, PhoneticFormat, PhoneticInfo, PhoneticRange, PhoneticType, Workbook,
+    PhoneticAlignment, PhoneticFormat, PhoneticInfo, PhoneticRange, PhoneticType, raw::Reader,
 };
 use std::io::Cursor;
 
@@ -26,7 +26,7 @@ fn phonetic_info_round_trips() {
         ],
     )
     .unwrap();
-    let workbook = Workbook::new(Cursor::new(written_workbook(Some(info.clone())))).unwrap();
+    let workbook = Reader::new(Cursor::new(written_workbook(Some(info.clone())))).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().phonetic_info(),
         Some(&info)
@@ -44,7 +44,7 @@ fn long_range_list_round_trips_across_continues() {
         ranges,
     )
     .unwrap();
-    let workbook = Workbook::new(Cursor::new(written_workbook(Some(info.clone())))).unwrap();
+    let workbook = Reader::new(Cursor::new(written_workbook(Some(info.clone())))).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().phonetic_info(),
         Some(&info)
@@ -53,6 +53,6 @@ fn long_range_list_round_trips_across_continues() {
 
 #[test]
 fn worksheet_without_phonetic_info_has_none() {
-    let workbook = Workbook::new(Cursor::new(written_workbook(None))).unwrap();
+    let workbook = Reader::new(Cursor::new(written_workbook(None))).unwrap();
     assert!(workbook.xls_worksheet(0).unwrap().phonetic_info().is_none());
 }

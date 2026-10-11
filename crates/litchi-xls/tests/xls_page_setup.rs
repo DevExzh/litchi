@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::writer::{PageSetupOptions, Writer};
 use litchi_xls::{PrintComments, PrintErrors, PrintOrder, PrintOrientation};
 
@@ -45,7 +45,7 @@ fn page_settings_round_trip_with_breaks_and_continued_pls() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let page = workbook.xls_worksheet(0).unwrap().page_setup().unwrap();
 
     assert!(page.print_headers());

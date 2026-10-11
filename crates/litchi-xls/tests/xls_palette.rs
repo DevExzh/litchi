@@ -1,4 +1,4 @@
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use std::fs::File;
 use std::path::PathBuf;
 
@@ -10,8 +10,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_palette_used_by_poi_colour_fixture() {
-    let workbook =
-        Workbook::new(File::open(poi_fixture("SimpleWithColours.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("SimpleWithColours.xls")).unwrap()).unwrap();
     let palette = workbook.palette();
 
     assert!(palette.is_custom());
@@ -24,7 +23,7 @@ fn reads_palette_used_by_poi_colour_fixture() {
 
 #[test]
 fn supplies_default_palette_for_poi_cell_colour_regression_fixture() {
-    let workbook = Workbook::new(File::open(poi_fixture("45492.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("45492.xls")).unwrap()).unwrap();
     let palette = workbook.palette();
 
     assert!(!palette.is_custom());

@@ -1,7 +1,7 @@
 //! Round-trip tests for the BIFF8 `WebPub` record (published Web pages).
 
 use litchi_xls::writer::Writer;
-use litchi_xls::{WebPageType, WebPub, WebPubRange, WebSourceType, Workbook};
+use litchi_xls::{WebPageType, WebPub, WebPubRange, WebSourceType, raw::Reader};
 use std::io::Cursor;
 
 fn workbook_publication() -> WebPub {
@@ -49,7 +49,7 @@ fn workbook_web_pub_round_trips_through_writer_and_reader() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(workbook.web_publications(), &[publication]);
 }
 
@@ -66,7 +66,7 @@ fn worksheet_web_pub_round_trips_through_writer_and_reader() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.web_publications().is_empty());
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert_eq!(worksheet.web_publications(), &[publication]);
@@ -90,7 +90,7 @@ fn workbook_without_web_pub_has_none() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.web_publications().is_empty());
     assert!(
         workbook

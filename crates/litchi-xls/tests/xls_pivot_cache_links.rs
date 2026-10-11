@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::writer::{
     PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotTableConfig, Writer,
 };
@@ -146,7 +146,7 @@ fn pivot_cache_links_progress_across_two_worksheets() {
     assert!(contains_f64(&caches[1], 22.0));
     assert!(!contains_f64(&caches[1], 11.0));
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.sheets().len(), 2);
     assert!(workbook.xls_worksheet(0).is_ok());
     assert!(workbook.xls_worksheet(1).is_ok());
@@ -164,7 +164,7 @@ fn pivot_cache_links_progress_from_same_sheet_to_later_sheet() {
         assert!(contains_f64(&caches[cache_index], expected_value));
     }
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(workbook.sheets().len(), 2);
     assert!(workbook.xls_worksheet(0).is_ok());
     assert!(workbook.xls_worksheet(1).is_ok());

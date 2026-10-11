@@ -5,7 +5,6 @@ use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
 
-use super::Workbook;
 use super::error::{Error, Result};
 use super::pivot_table::{
     PivotAdditionalExtension, PivotAxisField, PivotCache, PivotCacheGrouping, PivotCacheItem,
@@ -14,6 +13,7 @@ use super::pivot_table::{
     SXLI_TYPE, SXPI_TYPE, SXVD_TYPE, SXVDEX_TYPE, SXVIEW_TYPE, SXVIEWEX9_TYPE,
     is_worksheet_view_record, parse_qsi_sx_tag,
 };
+use super::raw::Reader;
 use super::writer::biff;
 
 const BOUNDSHEET: u16 = 0x0085;
@@ -37,7 +37,7 @@ impl PivotViewEditor {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new(bytes: Vec<u8>) -> Result<Self> {
-        let workbook = Workbook::new(Cursor::new(bytes.clone()))?;
+        let workbook = Reader::new(Cursor::new(bytes.clone()))?;
         let worksheet_count = workbook
             .sheets()
             .iter()

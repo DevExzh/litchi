@@ -9,10 +9,10 @@
 pub mod property_set;
 
 use super::codec::{WorkbookGlobalsSink, pivot_cache_stream_paths};
-use super::model::{OpenOptions, Workbook};
+use super::model::{OpenOptions, Reader};
 use super::validation_only::CellDecoding;
 use crate::defined_names::DefinedNameSlot;
-use crate::encryption::prepare_workbook_stream;
+use crate::encryption::prepare_workbook_stream_with_state;
 use crate::error::{Error, Result};
 use crate::leniency::{ToleranceLog, ToleranceReport};
 use crate::number_format::Formatting;
@@ -28,10 +28,11 @@ use litchi_ole_common::property_set::{
 use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
-impl<R: Read + Seek> Workbook<R> {
+impl<R: Read + Seek> Reader<R> {
     pub(super) fn empty(ole_file: OleFile<R>) -> Self {
         Self {
             ole_file,
+            encrypted_source: false,
             worksheets: Vec::new(),
             worksheet_names: Vec::new(),
             sheets: Vec::new(),
@@ -199,7 +200,9 @@ impl<R: Read + Seek> Workbook<R> {
             .ole_file
             .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
-        let workbook_data = prepare_workbook_stream(workbook_data, options.get_password())?;
+        let (workbook_data, encrypted_source) =
+            prepare_workbook_stream_with_state(workbook_data, options.get_password())?;
+        self.encrypted_source = encrypted_source;
         let mut tolerance = ToleranceLog::new(options.get_leniency());
         // Container repairs come first: the compound-file reader applied them
         // while the OLE file was opened, before any BIFF record was read.
@@ -742,7 +745,7 @@ fn preflight_declared_streams<R: Read + Seek>(
 #[cfg(test)]
 mod source_limit_tests {
     use super::{preflight_declared_streams, preflight_ole_file, preflight_source_len};
-    use crate::{Error, OpenOptions, SourceLimitKind, SourceLimits, Workbook};
+    use crate::{Error, OpenOptions, SourceLimitKind, SourceLimits, raw::Reader};
     use litchi_cfb::{OleFile, OleWriter};
     use std::io::{Cursor, Read, Seek, SeekFrom};
     use std::sync::{Arc, atomic::AtomicUsize, atomic::Ordering};
@@ -864,7 +867,7 @@ mod source_limit_tests {
             SourceLimits::MAX_AGGREGATE_BYTES,
         );
         let error =
-            Workbook::new_with_options(reader, OpenOptions::new().source_limits(source_limits))
+            Reader::new_with_options(reader, OpenOptions::new().source_limits(source_limits))
                 .unwrap_err();
         assert!(matches!(
             error,
@@ -887,7 +890,7 @@ mod source_limit_tests {
         let ole = OleFile::open(reader).unwrap();
         let reads_after_cfb = reads.load(Ordering::Relaxed);
         let source_limits = limits(bytes.len(), 4, SourceLimits::MAX_AGGREGATE_BYTES);
-        let error = Workbook::from_ole_file_with_options(
+        let error = Reader::from_ole_file_with_options(
             ole,
             OpenOptions::new().source_limits(source_limits),
         )
@@ -914,7 +917,7 @@ mod source_limit_tests {
         let ole = OleFile::open(reader).unwrap();
         let reads_after_cfb = reads.load(Ordering::Relaxed);
         let source_limits = limits(bytes.len(), 4, SourceLimits::MAX_AGGREGATE_BYTES);
-        let error = Workbook::from_ole_file_or_password_required(
+        let error = Reader::from_ole_file_or_password_required(
             ole,
             OpenOptions::new().source_limits(source_limits),
         )

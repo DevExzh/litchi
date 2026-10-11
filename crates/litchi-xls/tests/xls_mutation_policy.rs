@@ -2,14 +2,14 @@ use std::io::Cursor;
 
 use litchi_core::sheet::Worksheet as _;
 use litchi_xls::writer::Writer;
-use litchi_xls::{EncryptionProfile, Error, WeakEncryptionPolicy, Workbook, Worksheet};
+use litchi_xls::{EncryptionProfile, Error, WeakEncryptionPolicy, Worksheet, raw::Reader};
 
 fn decoded_worksheet() -> Worksheet {
     let mut writer = Writer::new();
     writer.add_worksheet("Data").unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     workbook.xls_worksheet(0).unwrap().clone()
 }
 

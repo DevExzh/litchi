@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use litchi_xls::writer::shape::{Anchor, Behavior, Point};
 use litchi_xls::writer::{CommentTextRunWrite, CommentWriteOptions, PivotTableConfig, Writer};
-use litchi_xls::{Visibility, Workbook};
+use litchi_xls::{Visibility, raw::Reader};
 
 fn workbook_records(bytes: Vec<u8>) -> Vec<(u16, Vec<u8>)> {
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
@@ -55,7 +55,7 @@ fn comments_round_trip_unicode_runs_visibility_and_guid() {
         .unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let comments = workbook.xls_worksheet(0).unwrap().comments();
     assert_eq!(comments.len(), 1);
     assert_eq!(comments[0].text(), "Hello 😀");
@@ -73,7 +73,7 @@ fn long_comment_splits_without_breaking_surrogates() {
     writer.add_comment(sheet, 0, 0, "A", &text).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().comments()[0].text(),
         text

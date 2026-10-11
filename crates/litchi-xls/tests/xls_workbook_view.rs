@@ -3,7 +3,7 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_core::sheet::WorkbookTrait;
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::writer::{WorkbookWindowOptions, Writer};
 
 #[test]
@@ -34,7 +34,7 @@ fn workbook_window_and_sheet_ids_round_trip() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let view = workbook.workbook_view();
     assert_eq!(view.sheet_ids(), &[1, 2, 3]);
     let window = view.primary_window().unwrap();
@@ -95,7 +95,7 @@ fn workbook_trait_follows_active_window_worksheet() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let workbook_trait: &dyn WorkbookTrait = &workbook;
     assert_eq!(workbook_trait.active_sheet_index(), 2);
     assert_eq!(workbook_trait.active_worksheet().unwrap().name(), "Three");
@@ -108,7 +108,7 @@ fn workbook_trait_sheet_lookup_is_case_insensitive() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let workbook_trait: &dyn WorkbookTrait = &workbook;
 
     assert_eq!(
@@ -124,7 +124,7 @@ fn workbook_trait_sheet_lookup_is_case_insensitive() {
 fn reads_poi_simple_workbook_window_and_sheet_ids() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/Simple.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     let view = workbook.workbook_view();
     assert_eq!(view.sheet_ids(), &[1, 2, 3]);
     let window = view.primary_window().unwrap();
@@ -182,7 +182,7 @@ fn writer_rejects_window1_window2_selection_disagreement() {
 fn reads_poi_zero_based_sheet_identifiers() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/duprich1.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     assert_eq!(workbook.workbook_view().sheet_ids(), &[0, 1, 2]);
 }
 

@@ -8,7 +8,7 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_xls::cell_values::{FormulaCache, Reference, Selector, Snapshot, Value};
-use litchi_xls::{Error, SourceBackedWorkbook, Workbook, Writer};
+use litchi_xls::{Error, SourceBackedWorkbook, Writer, raw::Reader};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -170,7 +170,7 @@ fn assert_native_census(stream: &[u8]) {
 }
 
 fn assert_eager_formula_metadata(bytes: &[u8]) {
-    let workbook = Workbook::new(Cursor::new(bytes.to_vec())).expect("open native XLS");
+    let workbook = Reader::new(Cursor::new(bytes.to_vec())).expect("open native XLS");
     let worksheet = workbook
         .xls_worksheet(0)
         .expect("EverythingTests worksheet");
@@ -191,7 +191,7 @@ fn assert_eager_formula_metadata(bytes: &[u8]) {
 }
 
 fn assert_single_formula_metadata(bytes: &[u8], row: u16, column: u16) {
-    let workbook = Workbook::new(Cursor::new(bytes.to_vec())).expect("open synthetic XLS");
+    let workbook = Reader::new(Cursor::new(bytes.to_vec())).expect("open synthetic XLS");
     let worksheet = workbook
         .xls_worksheet(0)
         .expect("synthetic Formula worksheet");
@@ -312,7 +312,7 @@ fn native_noop_is_byte_exact_and_source_backed_numeric_edit_keeps_formula_frames
         formula_tail_frames(target.workbook_stream())
     );
     assert_non_workbook_streams_equal(source.bytes(), target.bytes());
-    Workbook::new(Cursor::new(target.bytes().to_vec()))
+    Reader::new(Cursor::new(target.bytes().to_vec()))
         .expect("source-backed target reopens through eager reader");
     assert_single_formula_metadata(target.bytes(), 0, 0);
     assert_eq!(

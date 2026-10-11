@@ -11,7 +11,7 @@ use super::{CONTINUE_TYPE, Comment, MSODRAWING_TYPE, OBJ_TYPE, RECORD_TYPE, TXO_
 use crate::cell_values::{Reference, Selector};
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::workbook::{KeptCells, ValidationWorkbook};
-use crate::{Error, Result, Workbook};
+use crate::{Error, Result, raw::Reader};
 use litchi_biff::Records;
 use litchi_cfb::{
     ArtifactFingerprint, ComposedOverlaySource, OverlayError, PublishReport,
@@ -178,9 +178,9 @@ impl Snapshot {
             None => package.finish()?,
         };
         // The complete reader's validation-only mode: every record is
-        // validated as `Workbook::new` validates it; no cell is decoded, and
+        // validated as `Reader::new` validates it; no cell is decoded, and
         // no cell is read here.
-        let workbook = Workbook::validation_only(Cursor::new(bytes.as_slice()), KeptCells::none())?;
+        let workbook = Reader::validation_only(Cursor::new(bytes.as_slice()), KeptCells::none())?;
         let sheets = parse_inventory(&workbook_stream, &workbook)?;
         Ok(Self {
             inner: Arc::new(Inner {
@@ -1299,7 +1299,7 @@ fn verify_source_backed_candidate(
     source: &Snapshot,
     changes: &[&Change],
 ) -> Result<()> {
-    let workbook = Workbook::validation_only(PositionalReader::new(candidate), KeptCells::none())?;
+    let workbook = Reader::validation_only(PositionalReader::new(candidate), KeptCells::none())?;
     let worksheet_count = workbook
         .sheets()
         .iter()

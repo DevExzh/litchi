@@ -1,7 +1,7 @@
 use litchi_xls::cell_values::{Reference, Selector};
 use litchi_xls::comments::{Snapshot, Update, Value};
 use litchi_xls::writer::Writer;
-use litchi_xls::{Visibility, Workbook};
+use litchi_xls::{Visibility, raw::Reader};
 use std::collections::BTreeMap;
 use std::io::{self, Cursor, Write};
 
@@ -30,7 +30,7 @@ fn authored(comments: usize) -> Vec<u8> {
 }
 
 fn read_value(bytes: &[u8], sheet: usize, comment: usize) -> Value {
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     Value::from_comment(&workbook.xls_worksheet(sheet).unwrap().comments()[comment])
 }
 
@@ -159,7 +159,7 @@ fn orphan_workbook_record_after_first_worksheet_bof(
 #[test]
 fn updates_existing_comments_atomically_and_reversibly() {
     let bytes = authored(3);
-    let before_workbook = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+    let before_workbook = Reader::new(Cursor::new(bytes.as_slice())).unwrap();
     let before_comments = before_workbook
         .xls_worksheet(0)
         .unwrap()
@@ -213,7 +213,7 @@ fn updates_existing_comments_atomically_and_reversibly() {
         read_value(commit.snapshot().bytes(), 1, 0),
         Value::new("Other", "preserve me").unwrap()
     );
-    let after_workbook = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let after_workbook = Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
     assert!(
         after_workbook
             .xls_worksheet(1)
@@ -432,7 +432,7 @@ fn updates_poi_fixture_and_reopens() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let workbook = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let workbook = Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
     let updated = &workbook.xls_worksheet(0).unwrap().comments()[0];
     assert_eq!(updated.author(), "POI");
     assert_eq!(updated.text(), "updated without normalizing OBJ");
@@ -450,7 +450,7 @@ fn updates_poi_fixture_and_reopens() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let workbook = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let workbook = Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().comments()[0].text(),
         "comment beside unrelated drawing shapes"

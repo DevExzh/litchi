@@ -1185,7 +1185,7 @@ mod tests {
 
     #[test]
     fn reads_poi_page_setup_fixtures() {
-        use crate::Workbook;
+        use crate::raw::Reader;
         use std::fs::File;
         use std::path::Path;
 
@@ -1195,7 +1195,7 @@ mod tests {
                 .join(name)
         };
 
-        let dbcs = Workbook::new(File::open(fixture("DBCSHeader.xls")).unwrap()).unwrap();
+        let dbcs = Reader::new(File::open(fixture("DBCSHeader.xls")).unwrap()).unwrap();
         let page = dbcs.xls_worksheet(0).unwrap().page_setup().unwrap();
         assert_eq!(
             page.header(),
@@ -1211,8 +1211,7 @@ mod tests {
         );
         assert_eq!(page.print_setup().paper_size(), Some(1));
 
-        let breaks =
-            Workbook::new(File::open(fixture("SimpleWithPageBreaks.xls")).unwrap()).unwrap();
+        let breaks = Reader::new(File::open(fixture("SimpleWithPageBreaks.xls")).unwrap()).unwrap();
         let page = breaks.xls_worksheet(0).unwrap().page_setup().unwrap();
         assert!(
             !page.horizontal_page_breaks().is_empty() || !page.vertical_page_breaks().is_empty()

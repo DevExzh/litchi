@@ -3,16 +3,16 @@
 
 use litchi_core::sheet::WorkbookTrait;
 use litchi_xls::view::PaneType;
-use litchi_xls::{CustomViewHiddenRows, CustomViewNoteDisplay, ObjectDisplayMode, Workbook};
+use litchi_xls::{CustomViewHiddenRows, CustomViewNoteDisplay, ObjectDisplayMode, raw::Reader};
 
 const EXPECTED_GUID: [u8; 16] = [
     0x98, 0x93, 0x94, 0x42, 0xeb, 0x7b, 0x6b, 0x49, 0xac, 0x82, 0x6b, 0x9c, 0xd9, 0x34, 0x29, 0x8f,
 ];
 
-fn open_fixture() -> Workbook<std::io::BufReader<std::fs::File>> {
+fn open_fixture() -> Reader<std::io::BufReader<std::fs::File>> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ole/xls/WithCustomViews.xls");
-    Workbook::new(std::io::BufReader::new(std::fs::File::open(path).unwrap())).unwrap()
+    Reader::new(std::io::BufReader::new(std::fs::File::open(path).unwrap())).unwrap()
 }
 
 #[test]
@@ -88,7 +88,7 @@ fn workbook_without_custom_views_reads_empty() {
     let path =
         std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/xls/Simple.xls");
     let workbook =
-        Workbook::new(std::io::BufReader::new(std::fs::File::open(path).unwrap())).unwrap();
+        Reader::new(std::io::BufReader::new(std::fs::File::open(path).unwrap())).unwrap();
     assert!(workbook.custom_views().is_empty());
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert!(worksheet.custom_views().is_empty());

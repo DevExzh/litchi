@@ -20,7 +20,7 @@
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType, SheetVisible};
 use crate::workbook::{KeptCells, ValidationWorkbook};
-use crate::{Error, Result, SheetKind, SheetVisibility, Workbook};
+use crate::{Error, Result, SheetKind, SheetVisibility, raw::Reader};
 use litchi_biff::Records;
 use litchi_cfb::{
     ArtifactFingerprint, ComposedOverlaySource, OleFile, OverlayError, PublishReport,
@@ -101,9 +101,9 @@ impl Snapshot {
             None => package.finish()?,
         };
         // The complete reader's validation-only mode: every record is
-        // validated as `Workbook::new` validates it; no cell is decoded, and
+        // validated as `Reader::new` validates it; no cell is decoded, and
         // no cell is read here.
-        let workbook = Workbook::validation_only(Cursor::new(bytes.as_slice()), KeptCells::none())?;
+        let workbook = Reader::validation_only(Cursor::new(bytes.as_slice()), KeptCells::none())?;
         require_unprotected(&workbook)?;
         require_public_readback(&workbook, &sheets)?;
         Ok(Self {
@@ -1346,7 +1346,7 @@ fn verify_source_backed_candidate(
     source: &Snapshot,
     changes: &[&Change],
 ) -> Result<()> {
-    let workbook = Workbook::validation_only(PositionalReader::new(candidate), KeptCells::none())?;
+    let workbook = Reader::validation_only(PositionalReader::new(candidate), KeptCells::none())?;
     require_unprotected(&workbook)?;
 
     let mut sheets = Vec::new();

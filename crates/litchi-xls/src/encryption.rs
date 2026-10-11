@@ -510,10 +510,22 @@ pub(crate) fn encrypt_workbook_for_write(
 }
 
 /// Validate `FILEPASS` and decrypt eligible BIFF8 record payloads in place.
+#[cfg(test)]
 pub(crate) fn prepare_workbook_stream(
-    mut workbook: Vec<u8>,
+    workbook: Vec<u8>,
     password: Option<&str>,
 ) -> Result<Vec<u8>> {
+    prepare_workbook_stream_with_state(workbook, password).map(|(workbook, _)| workbook)
+}
+
+/// Validate/decrypt a Workbook stream and retain whether a `FILEPASS` record
+/// selected an encryption family. The state is returned with the transformed
+/// bytes so an eager owner can carry it into a package publication guard
+/// without rescanning the BIFF payload.
+pub(crate) fn prepare_workbook_stream_with_state(
+    mut workbook: Vec<u8>,
+    password: Option<&str>,
+) -> Result<(Vec<u8>, bool)> {
     let mut position = 0usize;
     let mut cipher = None;
     let mut saw_filepass = false;
@@ -543,7 +555,7 @@ pub(crate) fn prepare_workbook_stream(
         // reached without one, worksheet substreams and trailing OLE padding
         // cannot change the workbook's encryption state.
         if sid == 0x000A && !saw_filepass {
-            return Ok(workbook);
+            return Ok((workbook, false));
         }
 
         if sid == FILEPASS_SID {
@@ -621,7 +633,7 @@ pub(crate) fn prepare_workbook_stream(
         position = record_end;
     }
 
-    Ok(workbook)
+    Ok((workbook, saw_filepass))
 }
 
 fn map_cryptoapi_header_error(error: CryptoError) -> Error {
@@ -772,7 +784,7 @@ fn create_xor_array(password: &str) -> [u8; 16] {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{OpenOptions, Workbook};
+    use crate::{OpenOptions, raw::Reader};
     use litchi_core::sheet::{Cell, CellValue};
 
     fn poi_fixture(name: &str) -> std::path::PathBuf {
@@ -951,7 +963,7 @@ mod tests {
     fn opens_apache_poi_cryptoapi_workbook() {
         let path = poi_fixture("35897-type4.xls");
         let open = |password| {
-            Workbook::new_with_options(
+            Reader::new_with_options(
                 std::fs::File::open(&path).unwrap(),
                 OpenOptions::new().password(password),
             )
@@ -1041,8 +1053,7 @@ mod tests {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls");
         let file = std::fs::File::open(path).unwrap();
-        let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
+        let workbook = Reader::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
         let cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 0).unwrap();
         assert!(matches!(cell.value(), CellValue::Float(value) if *value == 1.0));
     }
@@ -1053,12 +1064,12 @@ mod tests {
             .join("../../test-data/ole/xls/password.xls");
         let wrong_password_file = std::fs::File::open(&path).unwrap();
         assert!(matches!(
-            Workbook::new_with_options(wrong_password_file, OpenOptions::new().password("wrong"),),
+            Reader::new_with_options(wrong_password_file, OpenOptions::new().password("wrong"),),
             Err(Error::InvalidPassword)
         ));
         let file = std::fs::File::open(path).unwrap();
         let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().password("password")).unwrap();
+            Reader::new_with_options(file, OpenOptions::new().password("password")).unwrap();
         let worksheet = workbook.xls_worksheet(0).unwrap();
         let found = (0..128).any(|row| {
             (0..32).any(|column| {

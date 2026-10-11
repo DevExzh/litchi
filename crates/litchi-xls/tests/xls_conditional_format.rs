@@ -2,7 +2,7 @@ use litchi_xls::writer::{
     ConditionalFormatGroup, ConditionalFormatOperator, ConditionalFormatRange,
     ConditionalFormatRule, ConditionalFormatType, ConditionalPattern, FillPattern, Writer,
 };
-use litchi_xls::{ConditionalComparison, ConditionalRuleKind, Workbook};
+use litchi_xls::{ConditionalComparison, ConditionalRuleKind, raw::Reader};
 use std::io::Cursor;
 
 #[test]
@@ -58,7 +58,7 @@ fn grouped_ordered_legacy_rules_round_trip() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let groups = workbook.xls_worksheet(0).unwrap().conditional_formattings();
     assert_eq!(groups.len(), 1);
     assert_eq!(groups[0].ranges().len(), 3);

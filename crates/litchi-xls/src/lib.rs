@@ -63,6 +63,10 @@
 //! The implementation is based on the BIFF (Binary Interchange File Format)
 //! specification and draws inspiration from other spreadsheet libraries.
 
+/// Immutable XLS package ownership and read-only projections.
+pub mod package;
+pub use package::{Package, Workbook};
+
 /// Error types for XLS parsing
 #[allow(
     clippy::wildcard_enum_match_arm,
@@ -755,7 +759,7 @@ pub use vba::{VbaMetadata, VbaProjectStorage};
 pub use web_pub::{WebPageType, WebPub, WebPubRange, WebSourceType};
 pub use workbook::{
     OpenOptions, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
-    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor, Workbook,
+    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor,
 };
 pub use workbook_view::{WorkbookView, WorkbookWindow};
 pub use worksheet::Worksheet;

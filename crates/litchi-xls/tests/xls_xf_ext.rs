@@ -1,7 +1,7 @@
 //! Round-trip tests for the BIFF8 `XFExt` record (formatting extensions).
 
 use litchi_xls::writer::Writer;
-use litchi_xls::{ExtProp, FullColorExt, FullColorType, Workbook, XfExt};
+use litchi_xls::{ExtProp, FullColorExt, FullColorType, XfExt, raw::Reader};
 use std::io::Cursor;
 
 fn extensions() -> Vec<XfExt> {
@@ -25,7 +25,7 @@ fn xf_extensions_round_trip_through_writer_and_reader() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let formatting = workbook.formatting();
     assert_eq!(formatting.xf_extensions(), extensions().as_slice());
 }
@@ -43,7 +43,7 @@ fn xf_extension_index_is_validated_against_the_xf_table() {
     );
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.formatting().xf_extensions().is_empty());
 }
 
@@ -54,6 +54,6 @@ fn workbook_without_xf_extensions_has_none() {
     writer.write_string(sheet, 0, 0, "content").unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.formatting().xf_extensions().is_empty());
 }

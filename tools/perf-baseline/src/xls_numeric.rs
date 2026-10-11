@@ -1372,7 +1372,7 @@ fn verify_output(
         return Err("XLS RK/MulRK output family inventory changed".into());
     }
 
-    let workbook = litchi_xls::Workbook::new(Cursor::new(output))?;
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(output))?;
     let sheet = workbook
         .sheets()
         .iter()

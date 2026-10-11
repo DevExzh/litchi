@@ -7,7 +7,7 @@ use litchi_xls::writer::sort::{Config, Key, On, Parent, Range};
 use litchi_xls::writer::{CustomTableStyles, Writer};
 use litchi_xls::{
     ListColumnId, ListObject, ListObjectColumn, ListObjectFeatureVersion, ListObjectId,
-    ListObjectRange, ListObjectStyleOptions, ListTotalAggregation, TableStyle, Workbook,
+    ListObjectRange, ListObjectStyleOptions, ListTotalAggregation, TableStyle, raw::Reader,
 };
 
 fn workbook_records(bytes: &[u8]) -> Vec<(u16, usize)> {
@@ -59,7 +59,7 @@ fn writer_custom_list_object_round_trips_through_reader() {
     writer.write_number(sheet, 1, 1, 42.0).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.id().value(), 7);
     assert_eq!(table.name(), "SalesTable");
@@ -72,7 +72,7 @@ fn writer_custom_list_object_round_trips_through_reader() {
 fn reads_excel_producer_feature11_and_list12_tables() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     let mut found = None;
     let mut observed = Vec::new();
     for index in 0..workbook.worksheet_count() {
@@ -171,7 +171,7 @@ fn long_feature11_uses_strict_continue_frt11_chain_and_round_trips() {
             .count()
             > 1
     );
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().list_objects()[0]
             .columns()
@@ -219,7 +219,7 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
         .unwrap();
     assert!(feature < last_list12 && last_list12 < sort_position);
     assert_eq!(types[sort_position + 1], 0x087f);
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert_eq!(
         worksheet.list_objects()[0].feature_version(),
@@ -233,7 +233,7 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
 fn producer_table_sort_continue_frt12_chain_remains_attached() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/ConditionalFormattingSamples.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     let mut found = false;
     for index in 0..workbook.worksheet_count() {
         let worksheet = workbook.xls_worksheet(index).unwrap();
@@ -281,7 +281,7 @@ fn feature12_total_formula_string_and_aggregation_round_trip_inertly() {
     writer.add_list_object(sheet, value).unwrap();
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let parsed = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(
         parsed.feature_version(),

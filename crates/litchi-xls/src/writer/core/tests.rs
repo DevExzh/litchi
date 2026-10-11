@@ -175,7 +175,7 @@ fn cell_grid_bounds_are_atomic_and_never_unwind() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.set_position(0);
-    let workbook = crate::Workbook::new(output).unwrap();
+    let workbook = crate::raw::Reader::new(output).unwrap();
     let cell = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -382,7 +382,7 @@ fn worksheet_location_bounds_are_atomic_and_never_unwind() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.set_position(0);
-    let workbook = crate::Workbook::new(output).unwrap();
+    let workbook = crate::raw::Reader::new(output).unwrap();
     let worksheet = workbook.xls_worksheet(sheet).unwrap();
     assert!(
         worksheet
@@ -603,7 +603,7 @@ fn test_formula_round_trips_through_xls_reader() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.set_position(0);
-    let workbook = crate::Workbook::new(output).unwrap();
+    let workbook = crate::raw::Reader::new(output).unwrap();
     let formula_cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 2).unwrap();
 
     assert!(formula_cell.is_formula());
@@ -645,7 +645,7 @@ fn shared_formula_round_trips_with_inert_relative_references() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     output.set_position(0);
-    let workbook = crate::Workbook::new(output).unwrap();
+    let workbook = crate::raw::Reader::new(output).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     let first = worksheet.get_cell(0, 0).unwrap();
     let second = worksheet.get_cell(1, 0).unwrap();
@@ -1151,7 +1151,7 @@ fn string_cells_after_a_data_table_anchor_keep_their_shared_strings() {
 
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = crate::Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = crate::raw::Reader::new(Cursor::new(output.into_inner())).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();
     assert!(worksheet.get_cell(0, 0).unwrap().formula_bytes().is_some());
     for (row, col, value) in expected {

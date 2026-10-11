@@ -1,7 +1,7 @@
 //! Focused tests for the layered XLS workbook owner.
 
-use super::super::{OpenOptions, Workbook};
 use super::codec::pivot_cache_stream_paths;
+use super::model::{OpenOptions, Reader};
 use crate::number_format::Formatting;
 use crate::records::Encoding;
 use litchi_biff::Records;
@@ -11,7 +11,7 @@ use std::sync::Arc;
 
 #[cfg(test)]
 mod defined_name_tests {
-    use super::{OpenOptions, Workbook};
+    use super::{OpenOptions, Reader};
     use crate::{BuiltInName, DefinedNameKind, NameScope};
     use std::fs::File;
     use std::path::{Path, PathBuf};
@@ -22,8 +22,8 @@ mod defined_name_tests {
             .join(name)
     }
 
-    fn open(name: &str) -> Workbook<File> {
-        Workbook::new(File::open(poi_fixture(name)).unwrap()).unwrap()
+    fn open(name: &str) -> Reader<File> {
+        Reader::new(File::open(poi_fixture(name)).unwrap()).unwrap()
     }
 
     #[test]
@@ -107,8 +107,7 @@ mod defined_name_tests {
     #[test]
     fn parses_names_after_xor_decryption() {
         let file = File::open(poi_fixture("xor-encryption-abc.xls")).unwrap();
-        let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
+        let workbook = Reader::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
         assert!(workbook.defined_names().len() <= usize::from(u16::MAX));
     }
 
@@ -117,13 +116,13 @@ mod defined_name_tests {
         let ole =
             litchi_cfb::OleFile::open(File::open(poi_fixture("xor-encryption-abc.xls")).unwrap())
                 .unwrap();
-        let ole = match Workbook::from_ole_file_or_password_required(ole, OpenOptions::new()) {
+        let ole = match Reader::from_ole_file_or_password_required(ole, OpenOptions::new()) {
             Ok(Err(ole)) => ole,
             Ok(Ok(_)) => panic!("an encrypted workbook opened without a password"),
             Err(error) => panic!("expected the container back, got {error}"),
         };
         let workbook =
-            Workbook::from_ole_file_or_password_required(ole, OpenOptions::new().password("abc"))
+            Reader::from_ole_file_or_password_required(ole, OpenOptions::new().password("abc"))
                 .unwrap()
                 .unwrap_or_else(|_| panic!("the returned container opens with its password"));
         assert!(litchi_core::sheet::WorkbookTrait::worksheet_count(&workbook) > 0);
@@ -236,7 +235,7 @@ fn worksheet_expands_packed_numeric_and_blank_cells() {
     push_record(&mut stream, 0x000A, &[]);
     let mut records = Records::new(&stream);
 
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -277,7 +276,7 @@ fn worksheet_resolves_formula_value_from_following_string_record() {
     push_record(&mut stream, 0x000A, &[]);
     let mut records = Records::new(&stream);
 
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -324,7 +323,7 @@ fn worksheet_refuses_several_orphan_ptg_exp_formulas_deterministically() {
     push_record(&mut stream, 0x000A, &[]);
     for _ in 0..32 {
         let mut records = Records::new(&stream);
-        let error = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        let error = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
             0,
@@ -351,7 +350,7 @@ fn worksheet_rejects_formula_missing_its_string_record() {
     push_record(&mut stream, 0x000A, &[]);
     let mut records = Records::new(&stream);
 
-    let result = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let result = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -390,7 +389,7 @@ fn custom_view_closing_record_restores_primary_page_setup_collection() {
     push_record(&mut stream, 0x000A, &[]);
 
     let mut records = Records::new(&stream);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -439,7 +438,7 @@ fn worksheet_resolves_string_formula_across_intervening_array_record() {
     push_record(&mut stream, 0x000A, &[]);
     let mut records = Records::new(&stream);
 
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -483,7 +482,7 @@ fn worksheet_resolves_string_formula_spanning_continue_records() {
     push_record(&mut stream, 0x000A, &[]);
     let mut records = Records::new(&stream);
 
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -515,7 +514,7 @@ fn worksheet_enforces_dval_dv_ordering() {
     );
     push_record(&mut stream, 0x000A, &[]);
     let mut records = Records::new(&stream);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -546,7 +545,7 @@ fn worksheet_enforces_dval_dv_ordering() {
     push_record(&mut stream, 0x000A, &[]);
     let mut records = Records::new(&stream);
     assert!(
-        Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             stream.len() as u64,
             0,
@@ -565,7 +564,7 @@ fn worksheet_enforces_dval_dv_ordering() {
 #[test]
 fn reads_data_validation_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
-    let empty = Workbook::new(
+    let empty = Reader::new(
         std::fs::File::open(root.join("test-data/poi/test-data/spreadsheet/dvEmpty.xls")).unwrap(),
     )
     .unwrap();
@@ -579,7 +578,7 @@ fn reads_data_validation_fixtures() {
     );
     assert!(sheet.data_validations().is_empty());
 
-    let validation = Workbook::new(
+    let validation = Reader::new(
         std::fs::File::open(
             root.join("test-data/libreoffice-core/sc/qa/unit/data/xls/validation.xls"),
         )
@@ -663,7 +662,7 @@ fn worksheet_rejects_malformed_optional_validation_records_and_continue() {
     ] {
         let mut records = Records::new(&stream);
         assert!(
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
                 0,
@@ -704,7 +703,7 @@ fn worksheet_expands_shared_formula_relative_references() {
     push_record(&mut stream, 0x0006, &participant_formula);
     push_record(&mut stream, 0x000a, &[]);
     let mut records = Records::new(&stream);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -746,7 +745,7 @@ fn worksheet_resolves_array_formula_for_every_cell() {
     push_record(&mut stream, 0x0006, &formula_data(1, 2, &anchor));
     push_record(&mut stream, 0x000a, &[]);
     let mut records = Records::new(&stream);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         stream.len() as u64,
         0,
@@ -812,7 +811,7 @@ fn worksheet_rejects_orphan_and_incomplete_array_ptg_exp_links() {
     for stream in [orphan, incomplete] {
         let mut records = Records::new(&stream);
         assert!(
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
                 0,
@@ -884,7 +883,7 @@ fn worksheet_rejects_array_without_dimensions_and_second_formula_companion() {
     ] {
         let mut records = Records::new(&stream);
         assert!(
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
                 0,
@@ -909,7 +908,7 @@ fn worksheet_rejects_formula_companions_without_an_adjacent_formula() {
         push_record(&mut stream, 0x000a, &[]);
         let mut records = Records::new(&stream);
         assert!(
-            Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+            Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
                 &mut records,
                 stream.len() as u64,
                 0,
@@ -944,7 +943,7 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
     }
     push_record(&mut nonoverlap, 0x000a, &[]);
     let mut records = Records::new(&nonoverlap);
-    let worksheet = Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+    let worksheet = Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
         &mut records,
         nonoverlap.len() as u64,
         0,
@@ -971,7 +970,7 @@ fn worksheet_indexes_many_array_ranges_and_rejects_indexed_overlap() {
     push_record(&mut overlap, 0x000a, &[]);
     let mut records = Records::new(&overlap);
     assert!(
-        Workbook::<Cursor<Vec<u8>>>::parse_worksheet_records(
+        Reader::<Cursor<Vec<u8>>>::parse_worksheet_records(
             &mut records,
             overlap.len() as u64,
             0,

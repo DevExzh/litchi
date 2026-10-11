@@ -12,6 +12,14 @@ use litchi_cfb::{OleFile, SharedOleFile};
 use std::io::{Read, Seek};
 use std::sync::Arc;
 
+/// The legacy generic XLS reader.
+///
+/// This low-level reader owns an eager BIFF projection over a caller-provided
+/// `Read + Seek` source. New package ownership APIs live beside this type;
+/// callers that need the legacy eager projection should use this explicit
+/// `raw` namespace.
+pub use crate::workbook::model::Reader;
+
 /// Validate an already-parsed CFB container against an explicit XLS physical
 /// source policy before any XML, Workbook, or other stream payload is read.
 ///
@@ -45,4 +53,22 @@ pub fn source_backed_workbook_from_shared_ole_file(
         cfb,
         SourceBackedOptions::default().with_limits(limits),
     )
+}
+
+/// Admit explicitly transformed source bytes under the original package's
+/// retained edit limits. The caller is responsible for authorizing and
+/// validating the transformation (for example, signature removal).
+///
+/// # Errors
+/// Returns the typed package or cell-values error if admission fails.
+pub fn cell_values_snapshot_from_bytes(
+    package: &crate::Package,
+    bytes: Vec<u8>,
+) -> crate::package::Result<crate::cell_values::Snapshot> {
+    let (limits, cfb_limits) = package.edit_profile(
+        litchi_ole_common::object::Limits::default(),
+        litchi_cfb::OleFileLimits::default(),
+    )?;
+    crate::cell_values::Snapshot::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits)
+        .map_err(crate::package::Error::Reader)
 }

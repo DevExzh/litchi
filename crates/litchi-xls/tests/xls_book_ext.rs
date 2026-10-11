@@ -1,7 +1,9 @@
 //! Round-trip tests for the BIFF8 `BookExt` record (workbook extension flags).
 
 use litchi_xls::writer::Writer;
-use litchi_xls::{BookExt, BookExtConditional11, BookExtConditional12, FactoidDisplay, Workbook};
+use litchi_xls::{
+    BookExt, BookExtConditional11, BookExtConditional12, FactoidDisplay, raw::Reader,
+};
 use std::io::Cursor;
 
 fn written_workbook(book_ext: Option<BookExt>) -> Vec<u8> {
@@ -31,12 +33,12 @@ fn book_ext_round_trips_through_writer_and_reader() {
         }),
         ..BookExt::default()
     };
-    let workbook = Workbook::new(Cursor::new(written_workbook(Some(book_ext.clone())))).unwrap();
+    let workbook = Reader::new(Cursor::new(written_workbook(Some(book_ext.clone())))).unwrap();
     assert_eq!(workbook.book_ext(), Some(&book_ext));
 }
 
 #[test]
 fn workbook_without_book_ext_has_none() {
-    let workbook = Workbook::new(Cursor::new(written_workbook(None))).unwrap();
+    let workbook = Reader::new(Cursor::new(written_workbook(None))).unwrap();
     assert!(workbook.book_ext().is_none());
 }

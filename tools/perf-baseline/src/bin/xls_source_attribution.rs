@@ -906,7 +906,7 @@ fn full_text_outcome(workbook: &litchi_xls::SourceBackedWorkbook) -> String {
 }
 
 fn eager_operation<R: Read + Seek>(
-    workbook: &litchi_xls::Workbook<R>,
+    workbook: &litchi_xls::raw::Reader<R>,
     operation: Operation,
     coordinates: Coordinates,
 ) -> Result<Observation, AnyError> {
@@ -946,7 +946,7 @@ fn eager_operation<R: Read + Seek>(
     }
 }
 
-fn eager_names<R: Read + Seek>(workbook: &litchi_xls::Workbook<R>) -> Vec<String> {
+fn eager_names<R: Read + Seek>(workbook: &litchi_xls::raw::Reader<R>) -> Vec<String> {
     workbook
         .sheets()
         .iter()
@@ -1063,7 +1063,7 @@ fn build_oracle(
         Operation::Open | Operation::List | Operation::OneCell => None,
     };
 
-    let eager_workbook = litchi_xls::Workbook::new(Cursor::new(input.to_vec()))?;
+    let eager_workbook = litchi_xls::raw::Reader::new(Cursor::new(input.to_vec()))?;
     let eager_worksheet_names = eager_names(&eager_workbook);
     let eager_selected_cell = if operation == Operation::OneCell {
         eager_workbook
@@ -1122,7 +1122,7 @@ fn validate_source_observation(
 }
 
 fn validate_eager_observation<R: Read + Seek>(
-    workbook: &litchi_xls::Workbook<R>,
+    workbook: &litchi_xls::raw::Reader<R>,
     observation: &Observation,
     oracle: &SemanticOracle,
 ) -> Result<(), AnyError> {
@@ -1208,7 +1208,7 @@ fn run_eager_sample(
     let cfb_metrics = metrics.snapshot();
 
     let owner_started = Instant::now();
-    let workbook = litchi_xls::Workbook::from_ole_file(ole)?;
+    let workbook = litchi_xls::raw::Reader::from_ole_file(ole)?;
     let xls_owner_ns = duration_ns(owner_started.elapsed());
     let owner_metrics = metrics.snapshot();
 

@@ -3,7 +3,7 @@
 use std::io::Cursor;
 
 use litchi_cfb::{DirectoryEntry, OleFile, OleWriter};
-use litchi_xls::{UserNamesLimits, UserNamesPackageSnapshot, Workbook, Writer};
+use litchi_xls::{UserNamesLimits, UserNamesPackageSnapshot, Writer, raw::Reader};
 
 const USER_NAMES_STREAM_NAME: &str = "User Names";
 const REVISION_LOG_STREAM_NAME: &str = "Revision Log";
@@ -379,7 +379,7 @@ fn directory_metadata(entry: &DirectoryEntry) -> DirectoryMetadata {
 fn workbook_reads_user_names_lazily_and_reopens_after_stream_edit() {
     let guid = [0x4D; 16];
     let bytes = workbook_container(user_names_stream(guid, "Alice"), revision_log_stream(guid));
-    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.has_user_names());
     let source = workbook.user_names().unwrap().unwrap();
     assert_eq!(source.users()[0].user_name(), "Alice");
@@ -389,7 +389,7 @@ fn workbook_reads_user_names_lazily_and_reopens_after_stream_edit() {
     edit.set_user_name(0, "Élodie").unwrap();
     let target = edit.commit().unwrap().into_snapshot();
     let reopened_bytes = workbook_container(target.finish(), revision_log_stream(guid));
-    let mut reopened_workbook = Workbook::new(Cursor::new(reopened_bytes)).unwrap();
+    let mut reopened_workbook = Reader::new(Cursor::new(reopened_bytes)).unwrap();
     let reopened = reopened_workbook.user_names().unwrap().unwrap();
     assert_eq!(reopened.users()[0].user_name(), "Élodie");
 }
@@ -402,7 +402,7 @@ fn workbook_rejects_unclosed_user_guid() {
         user_names_stream(source_guid, "Alice"),
         revision_log_stream(other_guid),
     );
-    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.user_names().is_err());
 }
 
@@ -411,7 +411,7 @@ fn workbook_user_names_requires_rrtabid_from_bound_sheet_count() {
     let guid = [0x21; 16];
     let revision = revision_log_stream_with(guid, 1200, false, 4113);
     let bytes = workbook_container(user_names_stream(guid, "Alice"), revision.clone());
-    let mut workbook = Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes.clone())).unwrap();
     assert!(workbook.user_names().is_err());
     assert!(UserNamesPackageSnapshot::from_bytes(bytes).is_err());
 }
@@ -429,7 +429,7 @@ fn package_owner_rejects_rrtabid_cardinality_mismatch_for_one_sheet() {
             "RRTabId cardinality {:?} was accepted for one sheet",
             tab_ids
         );
-        let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+        let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
         assert!(workbook.user_names().is_err());
     }
 }
@@ -446,7 +446,7 @@ fn package_owner_accepts_rrtabid_omission_for_more_than_4112_sheets() {
     );
     let source = UserNamesPackageSnapshot::from_bytes(bytes.clone()).unwrap();
     assert_eq!(source.user_names().users()[0].user_name(), "Alice");
-    let mut workbook = Workbook::new(Cursor::new(source.finish())).unwrap();
+    let mut workbook = Reader::new(Cursor::new(source.finish())).unwrap();
     assert_eq!(workbook.sheets().len(), 4_113);
     assert!(workbook.user_names().unwrap().is_some());
 }
@@ -470,7 +470,7 @@ fn workbook_rechecks_revision_log_when_user_names_bytes_are_unchanged() {
     let guid = [0x31; 16];
     let names = user_names_stream(guid, "Alice");
     let valid = workbook_container(names.clone(), revision_log_stream(guid));
-    let mut workbook = Workbook::new(Cursor::new(valid)).unwrap();
+    let mut workbook = Reader::new(Cursor::new(valid)).unwrap();
     let source = workbook.user_names().unwrap().unwrap();
 
     // The User Names stream is byte-for-byte identical, but the current
@@ -480,7 +480,7 @@ fn workbook_rechecks_revision_log_when_user_names_bytes_are_unchanged() {
     let mut changed_revision = revision_log_stream(guid);
     changed_revision[4 + 50 + 4 + 35] = b'B'; // RRDHead.stUser[0]
     let changed = workbook_container(names, changed_revision);
-    let mut current = Workbook::new(Cursor::new(changed)).unwrap();
+    let mut current = Reader::new(Cursor::new(changed)).unwrap();
     let current_snapshot = current.user_names().unwrap().unwrap();
     assert_eq!(source.finish(), current_snapshot.finish());
     assert_ne!(source, current_snapshot);
@@ -533,7 +533,7 @@ fn package_owner_accepts_official_rrdhead_code_pages_and_keeps_unicode_user_name
         let target = edit.commit().unwrap().into_snapshot();
         assert_eq!(target.user_names().users()[0].user_name(), "Élodie");
 
-        let mut workbook = Workbook::new(Cursor::new(target.finish())).unwrap();
+        let mut workbook = Reader::new(Cursor::new(target.finish())).unwrap();
         let revision = workbook.revision_log().unwrap().unwrap();
         assert_eq!(revision.headers()[0].head().code_page(), code_page);
         assert_eq!(revision.headers()[0].head().user_name(), "Alice");

@@ -1,5 +1,5 @@
 use litchi_xls::writer::WorkbookEnvironmentOptions;
-use litchi_xls::{LinkUpdateMode, ObjectDisplayMode, Workbook, Writer};
+use litchi_xls::{LinkUpdateMode, ObjectDisplayMode, Writer, raw::Reader};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -18,7 +18,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_libreoffice_environment_fixture_without_refreshing_data() {
-    let workbook = Workbook::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(libreoffice_fixture("formats.xls")).unwrap()).unwrap();
     let environment = workbook.environment();
     assert!(environment.has_excel9_file_marker());
     assert!(environment.supports_natural_language_formulas());
@@ -54,7 +54,7 @@ fn workbook_environment_round_trip() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let environment = workbook.environment();
     assert!(environment.is_template());
     assert!(environment.has_biff5_stream());
@@ -72,7 +72,7 @@ fn workbook_environment_round_trip() {
 #[test]
 fn reads_poi_dual_stream_dsf_value() {
     let workbook =
-        Workbook::new(File::open(poi_fixture("SimpleWithPrintArea.xls")).unwrap()).unwrap();
+        Reader::new(File::open(poi_fixture("SimpleWithPrintArea.xls")).unwrap()).unwrap();
     assert!(workbook.environment().has_biff5_stream());
 }
 

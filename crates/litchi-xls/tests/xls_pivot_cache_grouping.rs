@@ -7,7 +7,7 @@ use litchi_xls::writer::{
 use litchi_xls::{
     PivotCacheDateGroupUnit, PivotCacheDateGrouping, PivotCacheDateTime,
     PivotCacheDiscreteGrouping, PivotCacheGrouping, PivotCacheItem, PivotCacheNumericGrouping,
-    Workbook,
+    raw::Reader,
 };
 
 fn item(index: u16) -> PivotItemConfig {
@@ -220,7 +220,7 @@ fn emits_and_reopens_exact_numeric_date_and_discrete_grouping_records() {
     assert_eq!(u16::from_le_bytes(sxdb.1[10..12].try_into().unwrap()), 1);
     assert_eq!(u16::from_le_bytes(sxdb.1[12..14].try_into().unwrap()), 2);
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert_eq!(
         workbook
             .pivot_caches()
@@ -251,7 +251,7 @@ fn reads_libreoffice_number_and_date_grouping_fixtures() {
         "pivottable_number_grouping.xls",
         "pivottable_dates_grouping.xls",
     ] {
-        let workbook = Workbook::new(std::fs::File::open(root.join(file)).unwrap()).unwrap();
+        let workbook = Reader::new(std::fs::File::open(root.join(file)).unwrap()).unwrap();
         assert!(
             workbook
                 .pivot_caches()
@@ -274,7 +274,7 @@ fn invalid_grouping_is_rejected_without_mutating_writer() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
     assert!(
-        Workbook::new(Cursor::new(output.into_inner()))
+        Reader::new(Cursor::new(output.into_inner()))
             .unwrap()
             .pivot_caches()
             .is_empty()

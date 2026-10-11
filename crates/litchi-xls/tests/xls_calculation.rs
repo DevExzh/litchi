@@ -3,7 +3,7 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{CalculationSettings, Writer};
-use litchi_xls::{CalculationMode, MultithreadedCalculation, ReferenceMode, Workbook};
+use litchi_xls::{CalculationMode, MultithreadedCalculation, ReferenceMode, raw::Reader};
 
 fn workbook_global_record_types(bytes: &[u8]) -> Vec<u16> {
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
@@ -68,7 +68,7 @@ fn calculation_settings_round_trip() {
         relevant,
         vec![0x089A, 0x08A3, 0x008C, 0x01C1, 0x00EB, 0x00FC]
     );
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     let globals = workbook.calculation();
     assert!(!globals.full_precision());
     assert!(globals.force_full_calculation());
@@ -90,7 +90,7 @@ fn calculation_settings_round_trip() {
 fn reads_poi_calculation_fixture() {
     let fixture = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/UncalcedRecord.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     let calculation = workbook.xls_worksheet(0).unwrap().calculation();
     assert_eq!(calculation.mode(), CalculationMode::Automatic);
     assert_eq!(calculation.maximum_iterations(), 100);
@@ -128,7 +128,7 @@ fn automatic_multithreaded_calculation_round_trip() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let threading = workbook.calculation().multithreaded_calculation().unwrap();
     assert!(threading.enabled());
     assert_eq!(threading.user_thread_count(), None);

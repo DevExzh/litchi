@@ -1476,7 +1476,7 @@ fn sequential_number_commits_reuse_resources_and_reopen_publicly() {
         &source.inner.xf_records,
         &second.snapshot().inner.xf_records
     ));
-    let workbook = Workbook::new(Cursor::new(second.snapshot().bytes())).unwrap();
+    let workbook = Reader::new(Cursor::new(second.snapshot().bytes())).unwrap();
     let metadata = workbook.sheet(0).unwrap();
     let worksheet = workbook
         .xls_worksheet(metadata.parsed_worksheet_index().unwrap())
@@ -1817,7 +1817,7 @@ fn authored_formula_string_constants_are_refused_past_255_units_not_truncated() 
         .insert_formula("Plain".into(), reference, &format!("\"{literal}\""))
         .unwrap();
     let commit = transaction.commit().unwrap();
-    let workbook = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let workbook = Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
     let tokens = workbook
         .xls_worksheet(0)
         .unwrap()
@@ -1860,7 +1860,7 @@ fn authored_formulas_join_reopen_and_durably_invert() {
             &Value::FormulaCache(FormulaCache::Empty)
         );
     }
-    Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
     let wire = commit.patch().semantic().to_deterministic_json().unwrap();
     let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
     let replay = durable.apply(&source).unwrap();
@@ -2334,7 +2334,7 @@ fn reference_free_formula_shifts_reopen_and_invert_exactly() {
             .value(),
         &Value::FormulaCache(FormulaCache::Empty)
     );
-    Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
     let wire = commit.patch().semantic().to_deterministic_json().unwrap();
     let durable = SemanticPatch::from_deterministic_json(&wire).unwrap();
     assert!(durable.plan_transfer(&source).is_executable());
@@ -2380,7 +2380,7 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
     transaction.insert_rows("Formula".into(), 1, 2).unwrap();
     let commit = transaction.commit().unwrap();
 
-    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes())).unwrap();
+    let reopened = Reader::new(Cursor::new(commit.snapshot().bytes())).unwrap();
     assert_eq!(
         reopened
             .xls_worksheet(0)
@@ -2413,7 +2413,7 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
     let plan = SemanticPatch::plan_three_way(&source, &durable, &rename).unwrap();
     let merged = plan.merged().unwrap();
     let merged_commit = merged.apply(&source).unwrap();
-    let merged_reopen = Workbook::new(Cursor::new(merged_commit.snapshot().bytes())).unwrap();
+    let merged_reopen = Reader::new(Cursor::new(merged_commit.snapshot().bytes())).unwrap();
     assert_eq!(merged_reopen.sheets()[0].name(), "Shifted");
     assert_eq!(
         merged_reopen
@@ -2430,7 +2430,7 @@ fn reference_formula_shifts_are_durable_mergeable_and_history_safe() {
     let mut columns = column_source.edit();
     columns.insert_columns("Formula".into(), 1, 2).unwrap();
     let column_commit = columns.commit().unwrap();
-    let column_reopen = Workbook::new(Cursor::new(column_commit.snapshot().bytes())).unwrap();
+    let column_reopen = Reader::new(Cursor::new(column_commit.snapshot().bytes())).unwrap();
     assert_eq!(
         column_reopen
             .xls_worksheet(0)
@@ -2553,7 +2553,7 @@ fn matrix_outcome(bytes: Vec<u8>) -> String {
 /// `Snapshot::from_bytes`.
 ///
 /// The private offset inventory (`parse_workbook_stream`) frames the Workbook
-/// stream before the complete eager `Workbook::new` does, and
+/// stream before the complete eager `Reader::new` does, and
 /// `resolve_shared_strings` runs after both. Every row below is a stream that
 /// one of those three owners refuses, and the refusal text says which owner
 /// won. Fusing the two framing passes — deriving the inventory from the eager
@@ -2747,7 +2747,7 @@ fn snapshot_retains_the_open_shared_string_property_table() {
         two_sheet_matrix_package(),
     ] {
         let snapshot = Snapshot::from_bytes(bytes.clone()).unwrap();
-        let workbook = Workbook::new(Cursor::new(bytes.as_slice())).unwrap();
+        let workbook = Reader::new(Cursor::new(bytes.as_slice())).unwrap();
         let strings = workbook.shared_strings_shared();
         assert_eq!(snapshot.inner.shared_strings.len(), strings.len());
         assert_eq!(snapshot.inner.shared_string_properties.len(), strings.len());
@@ -2791,7 +2791,7 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
     // The complete reader's validation-only mode is the owner that answers
     // these checks at publication; the complete open further down is the
     // oracle its kept cell has to agree with.
-    let validated = Workbook::validation_only(
+    let validated = Reader::validation_only(
         Cursor::new(published.as_slice()),
         KeptCells::from_cells([(0, 3, 2)]).unwrap(),
     )
@@ -2831,7 +2831,7 @@ fn source_backed_numeric_target_verification_agrees_with_an_independent_parse() 
     );
     assert!(commit.snapshot().inner.source_policy.macro_free_workbook);
 
-    let independent = Workbook::new(Cursor::new(published.as_slice())).unwrap();
+    let independent = Reader::new(Cursor::new(published.as_slice())).unwrap();
     let complete = independent
         .xls_worksheet(0)
         .unwrap()
@@ -2970,7 +2970,7 @@ fn rename_refuses_every_worksheet_name_the_reader_refuses() {
     let mut transaction = source.edit();
     transaction.rename_sheet("Sheet1".into(), &astral).unwrap();
     let commit = transaction.commit().unwrap();
-    let reopened = Workbook::new(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+    let reopened = Reader::new(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
     assert_eq!(reopened.sheets()[0].name(), astral);
 }
 
@@ -2998,7 +2998,7 @@ fn shared_ole_file_editor_matches_an_owned_byte_open() {
 #[test]
 fn eager_workbook_exposes_its_exact_source_bytes() {
     let bytes = package();
-    let workbook = Workbook::new(Cursor::new(bytes.clone())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.clone())).unwrap();
     assert_eq!(workbook.get_ref().get_ref(), &bytes);
 }
 
@@ -3008,5 +3008,5 @@ const fn assert_send_sync<T: Send + Sync>() {}
 const _: () = {
     assert_send_sync::<Snapshot>();
     assert_send_sync::<crate::SourceBackedWorkbook>();
-    assert_send_sync::<Workbook<Cursor<Vec<u8>>>>();
+    assert_send_sync::<Reader<Cursor<Vec<u8>>>>();
 };

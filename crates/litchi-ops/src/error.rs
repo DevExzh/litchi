@@ -353,6 +353,9 @@ pub enum Source {
     /// A legacy Excel BIFF error.
     #[cfg(feature = "xls")]
     Xls(litchi_xls::Error),
+    /// A canonical legacy Excel package or projection error.
+    #[cfg(feature = "xls")]
+    XlsPackage(litchi_xls::package::Error),
     /// A source-backed legacy Excel error.
     #[cfg(feature = "xls")]
     XlsSource(litchi_xls::SourceBackedError),
@@ -430,6 +433,8 @@ impl Source {
             Self::DocBodyText(error) => Some(error),
             #[cfg(feature = "xls")]
             Self::Xls(error) => Some(error),
+            #[cfg(feature = "xls")]
+            Self::XlsPackage(error) => Some(error),
             #[cfg(feature = "xls")]
             Self::XlsSource(error) => Some(error),
             #[cfg(feature = "ppt")]
@@ -1372,6 +1377,45 @@ impl Classify for litchi_xls::Error {
             | Self::InvalidData(_)
             | Self::UnexpectedRecordType { .. }
             | Self::Eof(_) => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
+#[cfg(feature = "xls")]
+impl Classify for litchi_xls::package::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Reader(error) => error.classify(),
+            Self::Source(error) => error.classify(),
+            Self::CachedSource(error) => error.as_ref().classify(),
+            Self::Cfb(error) => error.classify(),
+            Self::Io(error) => error.classify(),
+            Self::Allocation { .. } => Class::of(Code::InternalError),
+            Self::EncryptionPolicy => Class::suggest(
+                Code::DocumentProtected,
+                "export the original encrypted source explicitly",
+            ),
+            Self::InvalidData(_) => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
+#[cfg(feature = "xls")]
+impl From<litchi_xls::package::Error> for Error {
+    fn from(error: litchi_xls::package::Error) -> Self {
+        use litchi_xls::package::Error as PackageError;
+        match error {
+            PackageError::Reader(error) => error.into(),
+            PackageError::Source(error) => error.into(),
+            PackageError::Cfb(error) => litchi_xls::Error::Cfb(error).into(),
+            PackageError::Io(error) => litchi_xls::Error::Io(error).into(),
+            error => Self::from_class(
+                error.classify(),
+                error.to_string(),
+                Some(FileFormat::Xls),
+                Source::XlsPackage(error),
+            ),
         }
     }
 }

@@ -26,7 +26,7 @@ mod structural;
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::workbook::{KeptCells, ValidationWorkbook};
-use crate::{Error, Result, SheetKind, Workbook};
+use crate::{Error, Result, SheetKind, raw::Reader};
 use litchi_biff::Records;
 use litchi_cfb::{
     ArtifactFingerprint, ComposedOverlaySource, OverlayError, OverlayOperationShape, PublishReport,
@@ -489,9 +489,9 @@ impl SourcePolicyFacts {
 ///
 /// Every check below ran, in this order, inside
 /// `verify_source_backed_numeric_target` after the target snapshot was built;
-/// the only thing that changed is which complete `Workbook` parse answers
+/// the only thing that changed is which complete `Reader` parse answers
 /// them. The two parses read the same sealed bytes (`expected_bytes`, proved
-/// identical by the first check) through the same `Workbook::new` under the
+/// identical by the first check) through the same `Reader::new` under the
 /// same retained object and CFB limits.
 #[derive(Clone, Copy)]
 struct NumericTargetVerification<'a> {
@@ -565,7 +565,7 @@ pub type History = litchi_core::patch::History<Snapshot>;
 impl Snapshot {
     /// Opens an unencrypted, unsigned XLS package and captures exact source bytes.
     ///
-    /// The ordinary [`Workbook`] reader validates the complete candidate. The
+    /// The ordinary [`crate::raw::Reader`] reader validates the complete candidate. The
     /// package transaction layer additionally refuses signed, encrypted, and
     /// DRM CFB containers before exposing an edit.
     ///
@@ -670,7 +670,7 @@ impl Snapshot {
     }
 
     /// Opens a captured package, optionally verifying a source-backed numeric
-    /// commit's materialized target on the complete `Workbook` this open
+    /// commit's materialized target on the complete `raw::Reader` this open
     /// already parses.
     ///
     /// `rendered` is the artifact an edit's package publication already
@@ -712,13 +712,13 @@ impl Snapshot {
         // projections, so this edit owner additionally requires every sheet
         // it can mutate to have survived that complete semantic open. It is
         // the complete reader's validation-only mode: every record is
-        // validated exactly as `Workbook::new` validates it, and no cell is
+        // validated exactly as `Reader::new` validates it, and no cell is
         // decoded except the ones a verification reads back.
         let kept = match verification {
             Some(verification) => verification.kept_cells()?,
             None => KeptCells::none(),
         };
-        let workbook = Workbook::validation_only_with_cfb_limits(
+        let workbook = Reader::validation_only_with_cfb_limits(
             Cursor::new(source.as_slice()),
             kept,
             cfb_limits,
@@ -775,7 +775,7 @@ impl Snapshot {
         // Only the private offset inventory is carried forward after proving
         // that every other Workbook-stream byte is unchanged. Its
         // validation-only mode decodes just the cells the readback reads.
-        let workbook = Workbook::validation_only_with_cfb_limits(
+        let workbook = Reader::validation_only_with_cfb_limits(
             Cursor::new(source.as_slice()),
             numeric_readback_cells(source_snapshot, changes)?,
             source_snapshot.inner.cfb_limits,
@@ -2709,7 +2709,7 @@ impl Edit {
     /// a validated [`ValidatedOverlayPlan`] containing the compact exact
     /// physical replacements derived from the numeric source splices. The
     /// composed candidate is reopened
-    /// through the public [`Workbook`] reader over a positional source before
+    /// through the public [`crate::raw::Reader`] reader over a positional source before
     /// this method returns. The overlay plan computes the exact source and
     /// target fingerprints once, over the snapshot's sealed immutable bytes;
     /// reading or publishing it does not re-hash an artifact that cannot
@@ -2720,14 +2720,14 @@ impl Edit {
     /// artifacts. Callers that require an in-memory target snapshot or an
     /// artifact inverse can continue to use [`Self::commit_source_backed`].
     /// The plan removes the complete target CFB allocation; the bounded
-    /// semantic validation itself may still allocate the Workbook reader's
+    /// semantic validation itself may still allocate the raw reader's
     /// stream and parsed model while this method is running.
     ///
     /// # Errors
     ///
     /// Returns a typed refusal for unsupported staged operations, protected,
     /// signed, encrypted, or macro-bearing sources, stale numeric ranges,
-    /// invalid RK values, CFB limits, failed public Workbook validation, or
+    /// invalid RK values, CFB limits, failed public raw-reader validation, or
     /// source freshness/fingerprint changes.
     pub fn commit_source_backed_plan(self) -> Result<SourceBackedPlanCommit> {
         commit_source_backed_numeric_plan(self)
@@ -2852,7 +2852,7 @@ impl Edit {
         // recaptured the candidate CFB, and it hands back the exact artifact
         // it validated. Publish that artifact instead of rendering the same
         // editor state a second time; snapshot construction then performs the
-        // owner parse and complete Workbook validation once, over the bytes
+        // owner parse and complete raw-reader validation once, over the bytes
         // the CFB reopen already accepted.
         let rendered =
             package.put_stream_shared_with_rendered(&self.source.inner.workbook_path, workbook)?;
@@ -5330,7 +5330,7 @@ impl fmt::Debug for Patch {
 
 /// A seekable adapter for semantic validation over a lazy composed CFB view.
 ///
-/// `Workbook` is intentionally kept generic over `Read + Seek`, while the
+/// `raw::Reader` is intentionally kept generic over `Read + Seek`, while the
 /// CFB overlay plan exposes a positional `ReadAt` source. This adapter keeps
 /// those contracts separate and allocates no artifact-sized buffer.
 struct ComposedPositionalReader {
@@ -5489,7 +5489,7 @@ fn verify_source_backed_numeric_plan_target(
     source: &Snapshot,
     changes: &[Change],
 ) -> Result<SourceVersion> {
-    let workbook = Workbook::validation_only_with_cfb_limits(
+    let workbook = Reader::validation_only_with_cfb_limits(
         ComposedPositionalReader::new(candidate.clone()),
         numeric_readback_cells(source, changes)?,
         source.inner.cfb_limits,
@@ -5589,7 +5589,7 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         )?;
         // The publication boundary's complete reopen already parses this
         // target in full. The target checks below used to run on a second,
-        // independent `Workbook::new` over the identical bytes; they now read
+        // independent `Reader::new` over the identical bytes; they now read
         // that first parse, in the same order and at the same point.
         let target = Snapshot::open_package(
             package,

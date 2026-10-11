@@ -124,8 +124,8 @@ fn resolves_effective_components_by_borrowing_parent_or_cell() {
     ));
 }
 use crate::cell::Cell;
+use crate::raw::Reader;
 use crate::records::CellRecord;
-use crate::workbook::Workbook;
 use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet};
 use std::fs::{self, File};
 use std::io::Cursor;
@@ -386,7 +386,7 @@ fn classifies_numeric_and_formula_caches_without_literal_false_positives() {
 
 #[test]
 fn opens_poi_date_and_epoch_fixtures() {
-    let dates = Workbook::new(
+    let dates = Reader::new(
         File::open(fixture(
             "test-data/poi/test-data/spreadsheet/DateFormats.xls",
         ))
@@ -421,7 +421,7 @@ fn opens_poi_date_and_epoch_fixtures() {
         ),
     ] {
         let mut bytes = fs::read(fixture(path)).unwrap();
-        assert!(Workbook::new(Cursor::new(bytes.clone())).is_err());
+        assert!(Reader::new(Cursor::new(bytes.clone())).is_err());
 
         // Both POI windowing fixtures declare sector 10 as their sole FAT
         // sector but mark FAT[10] ENDOFCHAIN rather than FATSECT. Normalize
@@ -450,7 +450,7 @@ fn opens_poi_date_and_epoch_fixtures() {
             bytes[entry + 64..entry + 66].copy_from_slice(&0u16.to_le_bytes());
         }
 
-        let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+        let workbook = Reader::new(Cursor::new(bytes)).unwrap();
         assert_eq!(workbook.date_system(), expected, "{path}");
     }
 }
@@ -461,7 +461,7 @@ fn opens_libreoffice_format_fixtures_with_ordered_xfs() {
         "test-data/libreoffice-core/sc/qa/unit/data/xls/formats.xls",
         "test-data/libreoffice-core/sc/qa/unit/data/xls/cellformat.xls",
     ] {
-        let workbook = Workbook::new(File::open(fixture(path)).unwrap()).unwrap();
+        let workbook = Reader::new(File::open(fixture(path)).unwrap()).unwrap();
         assert!(workbook.extended_formats().len() >= 16, "{path}");
         for (index, format) in workbook.extended_formats().iter().enumerate() {
             assert_eq!(format.index() as usize, index, "{path}");

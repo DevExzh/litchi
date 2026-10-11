@@ -246,16 +246,16 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-/// Read the generated XLS file back using `Workbook` and print
+/// Read the generated XLS file back using `raw::Reader` and print
 /// the parsed merged cells, hyperlinks, comments, and auto-filter data.
 fn round_trip_verify(path: &std::path::Path) -> Result<(), Box<dyn std::error::Error>> {
     use litchi_core::sheet::WorkbookTrait;
-    use litchi_xls::Workbook;
+    use litchi_xls::raw::Reader;
     use std::io::Cursor;
 
     let data = std::fs::read(path)?;
     let cursor = Cursor::new(data);
-    let wb = Workbook::new(cursor)?;
+    let wb = Reader::new(cursor)?;
 
     println!("Worksheets: {:?}", wb.worksheet_names());
     println!("Sheet count: {}", wb.worksheet_count());

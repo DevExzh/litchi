@@ -532,7 +532,7 @@ fn find_revision_log_path<R: std::io::Read + std::io::Seek>(
 }
 
 fn parse_user_names(bytes: &[u8], limits: UserNamesLimits) -> Result<UserNamesSnapshot> {
-    let mut workbook = crate::Workbook::new(Cursor::new(bytes))?;
+    let mut workbook = crate::raw::Reader::new(Cursor::new(bytes))?;
     workbook
         .user_names_with_limits(limits)?
         .ok_or_else(|| Error::InvalidData("XLS package has no User Names stream".to_string()))

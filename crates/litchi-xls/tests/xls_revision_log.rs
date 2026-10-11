@@ -5,7 +5,7 @@
 use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_xls::{REVISION_LOG_STREAM_NAME, Revision, RevisionType, Workbook, Writer};
+use litchi_xls::{REVISION_LOG_STREAM_NAME, Revision, RevisionType, Writer, raw::Reader};
 
 // BIFF8 record types (MS-XLS 2.3 record enumeration values).
 const EOF_RECORD_TYPE: u16 = 0x000A;
@@ -154,7 +154,7 @@ fn workbook_container(extra_streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
 #[test]
 fn workbook_without_revision_log_reports_none() {
     let bytes = workbook_container(&[]);
-    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(!workbook.has_revision_log());
     assert!(workbook.revision_log().unwrap().is_none());
 }
@@ -162,7 +162,7 @@ fn workbook_without_revision_log_reports_none() {
 #[test]
 fn workbook_exposes_revision_log_stream() {
     let bytes = workbook_container(&[(REVISION_LOG_STREAM_NAME, revision_log_stream())]);
-    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.has_revision_log());
 
     let log = workbook
@@ -202,7 +202,7 @@ fn malformed_revision_log_surfaces_an_error() {
     // A `Revision Log` stream that does not start with RRDInfo.
     let malformed = record(EOF_RECORD_TYPE, &[]);
     let bytes = workbook_container(&[(REVISION_LOG_STREAM_NAME, malformed)]);
-    let mut workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.has_revision_log());
     assert!(workbook.revision_log().is_err());
 }

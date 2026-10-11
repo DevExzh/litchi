@@ -6,7 +6,7 @@
 //! substream -> record layering.
 
 mod codec;
-mod model;
+pub(crate) mod model;
 pub mod package;
 mod query_cache;
 pub mod source;
@@ -18,7 +18,7 @@ mod tests;
 mod validation_only_tests;
 
 pub use crate::source_limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilder};
-pub use model::{OpenOptions, Workbook};
+pub use model::OpenOptions;
 pub use source::{
     SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
     SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor,

@@ -2,7 +2,7 @@ use litchi_vba::{
     Limits,
     build::{Module, Project},
 };
-use litchi_xls::{Workbook, Writer};
+use litchi_xls::{Writer, raw::Reader};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -15,7 +15,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_macro_fixture_without_opening_project_streams() {
-    let workbook = Workbook::new(File::open(poi_fixture("SimpleMacro.xls")).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(poi_fixture("SimpleMacro.xls")).unwrap()).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(metadata.has_project_storage());
@@ -41,7 +41,7 @@ fn empty_project_metadata_round_trips_as_non_executable() {
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(metadata.has_no_macros_marker());
@@ -81,7 +81,7 @@ fn complete_project_with_modules_round_trips_as_inert_source() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let mut workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let mut workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let metadata = workbook.vba_metadata();
     assert!(metadata.has_project_marker());
     assert!(!metadata.has_no_macros_marker());
@@ -131,7 +131,7 @@ fn configured_project_and_sheet_code_names_can_be_cleared() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     assert!(!workbook.vba_metadata().has_project_storage());
     assert_eq!(workbook.xls_worksheet(0).unwrap().vba_code_name(), None);
 }
@@ -157,7 +157,7 @@ fn failed_project_build_does_not_replace_existing_configuration() {
 
     let mut bytes = Cursor::new(Vec::new());
     writer.write_to(&mut bytes).unwrap();
-    let workbook = Workbook::new(Cursor::new(bytes.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     assert_eq!(
         workbook.vba_metadata().workbook_code_name(),
         Some("ExistingBook")

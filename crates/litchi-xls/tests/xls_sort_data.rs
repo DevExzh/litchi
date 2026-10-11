@@ -4,7 +4,7 @@ use litchi_xls::writer::sort::{
     Axis, CONTINUE_FRT12_RECORD_TYPE, Config, Dxf, Icon, IconSet, Key, Method, On, Parent, Range,
     SORT_DATA_RECORD_TYPE,
 };
-use litchi_xls::{Workbook, Writer};
+use litchi_xls::{Writer, raw::Reader};
 
 const LEGACY_SORT_RECORD_TYPE: u16 = 0x0090;
 
@@ -87,7 +87,7 @@ fn writer_stream_round_trip_preserves_extended_sort_and_record_order() {
         &[CONTINUE_FRT12_RECORD_TYPE; 3]
     );
 
-    let workbook = Workbook::new(Cursor::new(bytes)).unwrap();
+    let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     let parsed = workbook.xls_worksheet(0).unwrap().sort().unwrap();
     assert_eq!(parsed, &expected);
 }
@@ -101,7 +101,7 @@ fn writer_and_parser_support_zero_condition_sort_data() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(workbook.xls_worksheet(0).unwrap().sort(), Some(&expected));
 }
 
@@ -138,6 +138,6 @@ fn writer_sort_crud_is_move_first_idempotent_and_failure_atomic() {
 
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(workbook.xls_worksheet(0).unwrap().sort(), None);
 }

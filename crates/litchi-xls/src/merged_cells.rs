@@ -181,7 +181,7 @@ mod tests {
 
     #[test]
     fn reads_poi_merged_cell_fixtures() {
-        use crate::Workbook;
+        use crate::raw::Reader;
         use std::fs::File;
         use std::path::Path;
 
@@ -192,7 +192,7 @@ mod tests {
         };
 
         // Single merged region: rows 8-15, columns C-F (0-based 7-14 / 2-5).
-        let workbook = Workbook::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
+        let workbook = Reader::new(File::open(fixture("53109.xls")).unwrap()).unwrap();
         let merged = workbook.xls_worksheet(0).unwrap().merged_cells();
         assert_eq!(merged.len(), 1);
         assert_eq!(
@@ -210,7 +210,7 @@ mod tests {
         assert!(!merged[0].contains(6, 3));
 
         // A workbook holding many merged regions across several sheets.
-        let workbook = Workbook::new(File::open(fixture("59858.xls")).unwrap()).unwrap();
+        let workbook = Reader::new(File::open(fixture("59858.xls")).unwrap()).unwrap();
         let per_sheet: Vec<usize> = (0..workbook.sheets().len())
             .map(|index| workbook.xls_worksheet(index).unwrap().merged_cells().len())
             .collect();

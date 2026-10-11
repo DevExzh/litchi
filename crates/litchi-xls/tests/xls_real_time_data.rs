@@ -1,6 +1,6 @@
 //! Round-trip tests for the BIFF8 `RealTimeData` record (RTD topics).
 
-use litchi_xls::Workbook;
+use litchi_xls::raw::Reader;
 use litchi_xls::real_time_data::{Cell, Record, Value};
 use litchi_xls::writer::Writer;
 use std::io::Cursor;
@@ -69,7 +69,7 @@ fn real_time_data_round_trips_through_writer_and_reader() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(workbook.real_time_data(), topics.as_slice());
 }
 
@@ -90,7 +90,7 @@ fn real_time_data_prefix_compression_round_trips() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let parsed = workbook.real_time_data();
     assert_eq!(parsed.len(), 2);
     assert_eq!(parsed[0], first);
@@ -111,6 +111,6 @@ fn workbook_without_real_time_data_has_none() {
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
 
-    let workbook = Workbook::new(Cursor::new(output.into_inner())).unwrap();
+    let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.real_time_data().is_empty());
 }

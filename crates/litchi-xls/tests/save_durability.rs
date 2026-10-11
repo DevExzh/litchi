@@ -12,9 +12,9 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::Durability;
-use litchi_xls::Workbook;
 use litchi_xls::cell_values::{Reference, Selector};
 use litchi_xls::comments::{Snapshot, Value};
+use litchi_xls::raw::Reader;
 use litchi_xls::writer::Writer;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
@@ -84,7 +84,7 @@ fn every_writer_level_publishes_the_default_save_bytes() {
         );
     }
 
-    Workbook::new(std::fs::File::open(directory.join("no-sync.xls")).unwrap()).unwrap();
+    Reader::new(std::fs::File::open(directory.join("no-sync.xls")).unwrap()).unwrap();
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 4);
 }
 

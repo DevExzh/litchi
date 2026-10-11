@@ -46,7 +46,7 @@ use litchi_opc::{
     OpcError, OpcPackage, SourceBackedPackage, SourceLimitKind, SourceLimits, TargetMode,
 };
 use litchi_sign::{Policy, Status};
-use litchi_xls::{Workbook as XlsWorkbook, cell_values::Snapshot as XlsSnapshot};
+use litchi_xls::{cell_values::Snapshot as XlsSnapshot, raw::Reader as XlsReader};
 use sha2::{Digest, Sha256};
 
 const SIGNED_DOCX_SHA256: &str = "bc55c0362722818823a6dd95f8e0ca9869e179ace972a0915241feb4677bde5f";
@@ -270,7 +270,7 @@ fn inert_macro_security() -> Result<(), Box<dyn Error>> {
     })?;
     let before_macro_digest = macro_stream_digest(&bytes)?;
 
-    let mut workbook = XlsWorkbook::from_ole_file(OleFile::open_with_limits(
+    let mut workbook = XlsReader::from_ole_file(OleFile::open_with_limits(
         Cursor::new(bytes.clone()),
         security_ole_limits()?,
     )?)?;

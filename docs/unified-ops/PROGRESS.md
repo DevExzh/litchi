@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0197 | [Immutable XLS owner](0197-xls-immutable-owner.md) | Native Package and owned Workbook, raw reader migration, facade delegation, exact publication and retained edit policies; 2,768 tests/doctests plus final owner checks, lint/docs/glossary/boundaries and consumer compilation pass; primary transactions, Builder, unified XLS CRUD and full goal remain open |
 | 0196 | [XLS eager source limits](0196-xls-source-limits.md) | Checked SourceLimits, typed errors and pre-payload admission; canonical option setters and credential redaction; 2,199 tests/doctests, lint/docs/glossary/boundaries and consumer checks pass; positional policy preserved; canonical owner, unified XLS writes and full goal remain open |
 | 0195 | [XLS retained limits](0195-xls-retained-limits.md) | Object/CFB policies retained across edits, replay, overlays, joins and history; shared candidate/layout gates; 5,844 combined tests/doctests plus final history checks, lint/docs/glossary/boundaries and consumer checks pass; canonical owner/API migration and full goal remain open |
 | 0194 | [XLS cell-edit vocabulary](0194-xls-edit-vocabulary.md) | Concrete Edit, pair split, is_noop and exact Diagnostics::changed; 2,178 tests/doctests, lint/docs/glossary/boundaries and consumer checks pass; retained-limit gap identified; immutable owner, unified XLS writes and full goal remain open |

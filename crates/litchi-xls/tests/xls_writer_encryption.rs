@@ -3,7 +3,7 @@ use std::io::Cursor;
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Cell, CellValue, WorkbookTrait};
 use litchi_xls::writer::{EncryptionProfile, Writer};
-use litchi_xls::{Error, OpenOptions, WeakEncryptionPolicy, Workbook};
+use litchi_xls::{Error, OpenOptions, WeakEncryptionPolicy, raw::Reader};
 
 fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     let mut writer = Writer::new();
@@ -27,8 +27,8 @@ fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
     output.into_inner()
 }
 
-fn open<'a>(bytes: &'a [u8], password: Option<&str>) -> Result<Workbook<Cursor<&'a [u8]>>, Error> {
-    Workbook::new_with_options(Cursor::new(bytes), OpenOptions::new().password(password))
+fn open<'a>(bytes: &'a [u8], password: Option<&str>) -> Result<Reader<Cursor<&'a [u8]>>, Error> {
+    Reader::new_with_options(Cursor::new(bytes), OpenOptions::new().password(password))
 }
 
 fn workbook_stream(bytes: &[u8]) -> Vec<u8> {

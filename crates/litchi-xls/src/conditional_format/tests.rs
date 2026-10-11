@@ -74,13 +74,13 @@ fn rejects_malformed_ranges_formulas_and_sequences() {
 
 #[test]
 fn reads_poi_legacy_conditional_formatting_fixture() {
-    use crate::Workbook;
+    use crate::raw::Reader;
     use std::fs::File;
     use std::path::Path;
 
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/WithConditionalFormatting.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     let groups = workbook.xls_worksheet(0).unwrap().conditional_formattings();
     assert_eq!(groups.len(), 3);
     assert_eq!(groups[0].rules().len(), 2);
@@ -106,12 +106,12 @@ fn reads_poi_legacy_conditional_formatting_fixture() {
 
 #[test]
 fn reads_poi_future_conditional_formatting_fixture() {
-    use crate::Workbook;
+    use crate::raw::Reader;
     use std::fs::File;
     use std::path::Path;
     let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/poi/test-data/spreadsheet/NewStyleConditionalFormattings.xls");
-    let workbook = Workbook::new(File::open(fixture).unwrap()).unwrap();
+    let workbook = Reader::new(File::open(fixture).unwrap()).unwrap();
     let mut count = 0usize;
     let mut priorities = HashSet::new();
     for sheet in 0..workbook.worksheet_count() {

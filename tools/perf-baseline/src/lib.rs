@@ -28935,7 +28935,7 @@ fn build_xls_source_layout(corpus: &Corpus) -> Result<XlsSourceLayout, Box<dyn E
     }
 
     use litchi_core::sheet::{Cell as _, Worksheet as _};
-    let eager = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+    let eager = litchi_xls::raw::Reader::new(Cursor::new(corpus.archive.as_slice()))?;
     let mut worksheet_names = Vec::new();
     let mut parsed_cell_count = 0_usize;
     for metadata in eager.sheets() {
@@ -29216,7 +29216,7 @@ fn run_xls_source_backed_case(
             let owned = corpus.archive.clone();
             let allocation_region = allocation_metrics::begin();
             let started = Instant::now();
-            let workbook = litchi_xls::Workbook::new(Cursor::new(owned))?;
+            let workbook = litchi_xls::raw::Reader::new(Cursor::new(owned))?;
             let operation = match case {
                 Case::XlsSemanticOpen => XlsMeasuredOperation::Open {
                     worksheet_count: std::hint::black_box(
@@ -30334,7 +30334,7 @@ fn verify_xls_comments_output(
     if sentinel.author() != "Sentinel" || sentinel.text() != "untouched sentinel" {
         return Err("XLS comment output changed the untouched sentinel".into());
     }
-    let workbook = litchi_xls::Workbook::new(Cursor::new(output))?;
+    let workbook = litchi_xls::raw::Reader::new(Cursor::new(output))?;
     let untouched_metadata = workbook
         .sheets()
         .iter()
@@ -30667,14 +30667,15 @@ fn run_semantic_xls(
             Case::XlsSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let workbook = litchi_xls::Workbook::new(Cursor::new(owned))?;
+                let workbook = litchi_xls::raw::Reader::new(Cursor::new(owned))?;
                 let duration = started.elapsed();
                 verify_semantic_xls(&corpus.archive, shape, None)?;
                 std::hint::black_box(workbook);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticListWorksheets => {
-                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let workbook =
+                    litchi_xls::raw::Reader::new(Cursor::new(corpus.archive.as_slice()))?;
                 let started = Instant::now();
                 let names = workbook
                     .sheets()
@@ -30695,7 +30696,8 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticOneCell => {
-                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let workbook =
+                    litchi_xls::raw::Reader::new(Cursor::new(corpus.archive.as_slice()))?;
                 let started = Instant::now();
                 let metadata = workbook
                     .sheet(selected.0)
@@ -30725,7 +30727,8 @@ fn run_semantic_xls(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::XlsSemanticFullCellScan => {
-                let workbook = litchi_xls::Workbook::new(Cursor::new(corpus.archive.as_slice()))?;
+                let workbook =
+                    litchi_xls::raw::Reader::new(Cursor::new(corpus.archive.as_slice()))?;
                 let started = Instant::now();
                 let mut count = 0_usize;
                 let mut sum = 0.0_f64;
