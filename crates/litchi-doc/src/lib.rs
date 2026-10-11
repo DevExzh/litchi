@@ -209,8 +209,8 @@ pub use leniency::{
     StylesheetDefect, TableDefinitionDefect, ToleranceReport, ToleratedDefect,
 };
 pub use package::{
-    Commit, Diagnostics, Edit, EditOptions, EncryptionKind, Error, LimitKind, Limits, LimitsError,
-    OpenOptions, Package, Password, Patch, ResourceKind, ResourceLimit, Result,
+    Commit, Diagnostics, Edit, EditOptions, EncryptionKind, Error, LimitKind, OpenOptions, Package,
+    Password, Patch, Result, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};

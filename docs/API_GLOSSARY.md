@@ -84,15 +84,15 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · 🔴 ODF/legacy/iWork |
+| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); 🔴 ODF/other legacy/iWork |
 | Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages · 🔴 W1 |
 | Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX ingress envelope (0038–0040); owning lazy-policy support and W1–W4 pending |
-| Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC · 🔴 W1 |
-| Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); other owners pending |
-| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC kind/observed/maximum (0036); broader taxonomy pending |
-| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC and OOXML `SourceLimitKind` (0036); semantic kinds pending |
+| Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC and DOC (0192) · 🔴 other W1 |
+| Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192); other owners pending |
+| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036) and DOC (0192) kind/observed/maximum; broader taxonomy pending |
+| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC/OOXML (0036) and DOC (0192) `SourceLimitKind`; semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
-| Coverage policy | caller-selected limits on **every** public ingress path | — | 🔴 gaps: ppt/xls (W4), ODF (W3) |
+| Coverage policy | caller-selected limits on **every** public ingress path | — | 🔴 gaps: DOC focused strict-owner allocation ordering (0192), ppt/xls (W4), ODF (W3) |
 
 ### OPC source dimensions
 
@@ -1204,6 +1204,20 @@ transactions live under `package::property_set` instead of claiming the
 primary package names. The unified adapter retains and edits the native
 package, including its shared parsed document projection.
 
-Physical `Limits` naming, comprehensive options builders, and the remaining
-focused/raw vocabulary audit are still pending. Registering this transaction
+Physical source-limit naming and checked construction follow in record 0192.
+The remaining focused/raw vocabulary audit is still pending. Registering this transaction
 family establishes its shape, not complete DOC CRUD or performance acceptance.
+
+## DOC source limits (record 0192)
+
+DOC exposes `SourceLimits`, a checked consuming `SourceLimitsBuilder`, and
+`SourceLimitKind` with input/entry/aggregate byte dimensions. Configuration and
+ingress errors carry the canonical inline fields. `OpenOptions` consumes
+`source_limits`, `password`, and `leniency`; `DocOptions` uses `source_limits`.
+Defaults are 512 MiB input, 512 MiB per stream, and 2 GiB aggregate. Canonical
+and raw reader admission checks all declared logical streams before payload
+reads, including metadata and opaque streams. Already-parsed adoption cannot
+retroactively constrain CFB parsing allocations. The focused body Snapshot's
+strict owner still needs this preflight before its own payload reads; complete
+allocation-budget coverage and full DOC acceptance remain open. See
+[0192](unified-ops/0192-doc-source-limits.md).

@@ -13,7 +13,8 @@ pub mod raw {
 mod tests;
 
 pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
+pub(crate) use model::preflight_declared_streams;
 pub use model::{
-    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, Password, ResourceKind,
-    ResourceLimit, Result,
+    EncryptionKind, Error, OpenOptions, Package, Password, Result, SourceLimitKind, SourceLimits,
+    SourceLimitsBuilder,
 };

@@ -1160,7 +1160,7 @@ impl Builder {
             self.encryption
                 .as_ref()
                 .map_or_else(crate::OpenOptions::default, |encryption| {
-                    crate::OpenOptions::default().with_password(crate::Password::new(
+                    crate::OpenOptions::default().password(crate::Password::new(
                         encryption.password.as_str().to_owned(),
                     ))
                 });

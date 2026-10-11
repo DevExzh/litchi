@@ -285,7 +285,7 @@ impl Default for OpenOptions {
 #[non_exhaustive]
 pub struct DocOptions {
     pub(crate) leniency: litchi_doc::Leniency,
-    pub(crate) limits: Option<litchi_doc::package::Limits>,
+    pub(crate) source_limits: Option<litchi_doc::SourceLimits>,
 }
 
 #[cfg(feature = "doc")]
@@ -295,20 +295,22 @@ impl DocOptions {
     pub const fn new() -> Self {
         Self {
             leniency: litchi_doc::Leniency::Strict,
-            limits: None,
+            source_limits: None,
         }
     }
 
     /// Set finite DOC package and stream ingestion limits.
     ///
     /// ```
-    /// let limits = litchi_doc::package::Limits::try_new(1_000_000, 500_000, 800_000)?;
-    /// let options = litchi_ops::DocOptions::new().limits(limits);
-    /// # Ok::<(), litchi_doc::package::LimitsError>(())
+    /// let limits = litchi_doc::SourceLimits::builder()
+    ///     .max_input_bytes(1_000_000)?.max_entry_bytes(500_000)?
+    ///     .max_aggregate_bytes(800_000)?.build()?;
+    /// let options = litchi_ops::DocOptions::new().source_limits(limits);
+    /// # Ok::<(), litchi_doc::Error>(())
     /// ```
     #[must_use]
-    pub const fn limits(mut self, limits: litchi_doc::package::Limits) -> Self {
-        self.limits = Some(limits);
+    pub const fn source_limits(mut self, limits: litchi_doc::SourceLimits) -> Self {
+        self.source_limits = Some(limits);
         self
     }
 

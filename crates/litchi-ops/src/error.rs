@@ -1213,7 +1213,8 @@ impl Classify for litchi_doc::Error {
         match self {
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
-            Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::PasswordRequired => Class::suggest(Code::DocumentProtected, PASSWORD_SUGGESTION),
             Self::ProtectionDenied(_) => Class::suggest(
                 Code::DocumentProtected,

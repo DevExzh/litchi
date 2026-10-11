@@ -2019,6 +2019,124 @@
           "name": "edit_with_limits",
           "scope": "litchi_doc::Package",
           "replacement": "use edit_with_options and EditOptions"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_doc",
+          "replacement": "use SourceLimits",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_doc::package",
+          "replacement": "use SourceLimits",
+          "recursive": false
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_doc",
+          "replacement": "use Error::InvalidLimit",
+          "recursive": false
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_doc::package",
+          "replacement": "use Error::InvalidLimit",
+          "recursive": false
+        },
+        {
+          "name": "ResourceKind",
+          "scope": "litchi_doc",
+          "replacement": "use SourceLimitKind",
+          "recursive": false
+        },
+        {
+          "name": "ResourceKind",
+          "scope": "litchi_doc::package",
+          "replacement": "use SourceLimitKind",
+          "recursive": false
+        },
+        {
+          "name": "ResourceLimit",
+          "scope": "litchi_doc",
+          "replacement": "use Error::Limit",
+          "recursive": false
+        },
+        {
+          "name": "ResourceLimit",
+          "scope": "litchi_doc::package",
+          "replacement": "use Error::Limit",
+          "recursive": false
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_doc::OpenOptions",
+          "replacement": "use the canonical consuming policy setters"
+        },
+        {
+          "name": "with_password",
+          "scope": "litchi_doc::OpenOptions",
+          "replacement": "use the canonical consuming policy setters"
+        },
+        {
+          "name": "with_leniency",
+          "scope": "litchi_doc::OpenOptions",
+          "replacement": "use the canonical consuming policy setters"
+        },
+        {
+          "name": "with_papx_alignment_padding",
+          "scope": "litchi_doc::OpenOptions",
+          "replacement": "use the canonical consuming policy setters"
+        },
+        {
+          "name": "try_new",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "with_max_package_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "with_max_input_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "with_max_aggregate_input_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "max_package_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "max_aggregate_input_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "resource",
+          "scope": "litchi_doc::Error::Limit",
+          "replacement": "use kind/observed/maximum"
+        },
+        {
+          "name": "actual",
+          "scope": "litchi_doc::Error::Limit",
+          "replacement": "use kind/observed/maximum"
+        },
+        {
+          "name": "limit",
+          "scope": "litchi_doc::Error::Limit",
+          "replacement": "use kind/observed/maximum"
+        },
+        {
+          "name": "ResourceLimit",
+          "scope": "litchi_doc::Error",
+          "replacement": "use Error::Limit"
         }
       ],
       "families": [
@@ -2093,6 +2211,124 @@
           "name": "edit_with_limits",
           "scope": "litchi_doc::Package",
           "replacement": "use edit_with_options and EditOptions"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_doc",
+          "replacement": "use SourceLimits",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_doc::package",
+          "replacement": "use SourceLimits",
+          "recursive": false
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_doc",
+          "replacement": "use Error::InvalidLimit",
+          "recursive": false
+        },
+        {
+          "name": "LimitsError",
+          "scope": "litchi_doc::package",
+          "replacement": "use Error::InvalidLimit",
+          "recursive": false
+        },
+        {
+          "name": "ResourceKind",
+          "scope": "litchi_doc",
+          "replacement": "use SourceLimitKind",
+          "recursive": false
+        },
+        {
+          "name": "ResourceKind",
+          "scope": "litchi_doc::package",
+          "replacement": "use SourceLimitKind",
+          "recursive": false
+        },
+        {
+          "name": "ResourceLimit",
+          "scope": "litchi_doc",
+          "replacement": "use Error::Limit",
+          "recursive": false
+        },
+        {
+          "name": "ResourceLimit",
+          "scope": "litchi_doc::package",
+          "replacement": "use Error::Limit",
+          "recursive": false
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_doc::OpenOptions",
+          "replacement": "use the canonical consuming policy setters"
+        },
+        {
+          "name": "with_password",
+          "scope": "litchi_doc::OpenOptions",
+          "replacement": "use the canonical consuming policy setters"
+        },
+        {
+          "name": "with_leniency",
+          "scope": "litchi_doc::OpenOptions",
+          "replacement": "use the canonical consuming policy setters"
+        },
+        {
+          "name": "with_papx_alignment_padding",
+          "scope": "litchi_doc::OpenOptions",
+          "replacement": "use the canonical consuming policy setters"
+        },
+        {
+          "name": "try_new",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "with_max_package_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "with_max_input_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "with_max_aggregate_input_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "max_package_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "max_aggregate_input_bytes",
+          "scope": "litchi_doc::SourceLimits",
+          "replacement": "use SourceLimits::builder and checked max_input_bytes/max_entry_bytes/max_aggregate_bytes setters"
+        },
+        {
+          "name": "resource",
+          "scope": "litchi_doc::Error::Limit",
+          "replacement": "use kind/observed/maximum"
+        },
+        {
+          "name": "actual",
+          "scope": "litchi_doc::Error::Limit",
+          "replacement": "use kind/observed/maximum"
+        },
+        {
+          "name": "limit",
+          "scope": "litchi_doc::Error::Limit",
+          "replacement": "use kind/observed/maximum"
+        },
+        {
+          "name": "ResourceLimit",
+          "scope": "litchi_doc::Error",
+          "replacement": "use Error::Limit"
         }
       ],
       "families": [

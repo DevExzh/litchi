@@ -36,14 +36,13 @@ fn opens_apache_poi_binary_rc4_document() {
 
     let mut package = Package::open(&path).unwrap();
     assert!(matches!(
-        package
-            .document_with_options(OpenOptions::default().with_password("wrong".to_owned().into())),
+        package.document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
         Err(Error::InvalidPassword)
     ));
 
     let mut package = Package::open(path).unwrap();
     let document = package
-        .document_with_options(OpenOptions::default().with_password("tika".to_owned().into()))
+        .document_with_options(OpenOptions::default().password("tika".to_owned().into()))
         .unwrap();
     assert!(!document.text().unwrap().trim().is_empty());
 }
@@ -57,14 +56,13 @@ fn opens_apache_poi_cryptoapi_document() {
 
     let mut package = Package::open(&path).unwrap();
     assert!(matches!(
-        package
-            .document_with_options(OpenOptions::default().with_password("wrong".to_owned().into())),
+        package.document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
         Err(Error::InvalidPassword)
     ));
 
     let mut package = Package::open(path).unwrap();
     let document = package
-        .document_with_options(OpenOptions::default().with_password("password".to_owned().into()))
+        .document_with_options(OpenOptions::default().password("password".to_owned().into()))
         .unwrap();
     assert!(!document.text().unwrap().trim().is_empty());
 }
@@ -79,7 +77,7 @@ fn raw_open_outcome_retains_encrypted_cfb_for_later_password_ingress() {
     };
     let package = match open_package(
         ole,
-        OpenOptions::default().with_password("tika".to_owned().into()),
+        OpenOptions::default().password("tika".to_owned().into()),
     )
     .unwrap()
     {

@@ -5,321 +5,181 @@ use std::io::{self, Read, Seek};
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
-/// Finite resource limits for legacy Word package and stream ingestion.
+/// Finite physical ingress limits for legacy Word packages and streams.
 ///
-/// The package limit is enforced before the CFB container is parsed. Stream
-/// limits are enforced from directory metadata before a stream payload is
-/// materialized, and the aggregate limit covers `WordDocument`, the selected
-/// table stream, and the optional `Data` stream.
+/// `input_bytes` bounds the complete CFB source before it is parsed,
+/// `entry_bytes` bounds each declared CFB stream before a DOC reader materializes it, and
+/// `aggregate_bytes` bounds the declared CFB stream payloads together. The
+/// root mini-stream backing is excluded because mini-stream payload lengths
+/// are already charged through their stream entries. The defaults follow the
+/// shared office source policy (512 MiB, 512 MiB, and 2 GiB).
+/// Selecting a profile stores only these three integer ceilings; it does not
+/// reserve any payload memory.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Limits {
-    max_package_bytes: usize,
-    max_input_bytes: usize,
-    max_aggregate_input_bytes: usize,
+pub struct SourceLimits {
+    input_bytes: usize,
+    entry_bytes: usize,
+    aggregate_bytes: usize,
 }
 
-impl Default for Limits {
+impl Default for SourceLimits {
     fn default() -> Self {
         Self {
-            max_package_bytes: Self::DEFAULT_MAX_PACKAGE_BYTES,
-            max_input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
-            max_aggregate_input_bytes: Self::DEFAULT_MAX_AGGREGATE_INPUT_BYTES,
+            input_bytes: Self::DEFAULT_MAX_INPUT_BYTES,
+            entry_bytes: Self::DEFAULT_MAX_ENTRY_BYTES,
+            aggregate_bytes: Self::DEFAULT_MAX_AGGREGATE_BYTES,
         }
     }
 }
 
-impl Limits {
-    /// Default outer-package limit used by convenience open operations.
-    pub const DEFAULT_MAX_PACKAGE_BYTES: usize = 128 * 1024 * 1024;
-    /// Default per-stream limit used by convenience open operations.
-    pub const DEFAULT_MAX_INPUT_BYTES: usize = 64 * 1024 * 1024;
-    /// Default aggregate DOC-stream limit used by convenience open operations.
-    pub const DEFAULT_MAX_AGGREGATE_INPUT_BYTES: usize = 96 * 1024 * 1024;
-    /// Hard safety ceiling for an outer CFB package.
-    pub const MAX_PACKAGE_BYTES: usize = 1024 * 1024 * 1024;
-    /// Hard safety ceiling for one DOC-owned input stream.
-    pub const MAX_INPUT_BYTES: usize = 512 * 1024 * 1024;
-    /// Hard safety ceiling for aggregate DOC-owned stream bytes.
-    pub const MAX_AGGREGATE_INPUT_BYTES: usize = 768 * 1024 * 1024;
+impl SourceLimits {
+    /// Shared default complete-source input limit.
+    pub const DEFAULT_MAX_INPUT_BYTES: usize = 512 * 1024 * 1024;
+    /// Shared default per-entry input limit.
+    pub const DEFAULT_MAX_ENTRY_BYTES: usize = 512 * 1024 * 1024;
+    /// Shared default aggregate input limit.
+    pub const DEFAULT_MAX_AGGREGATE_BYTES: usize = 2 * 1024 * 1024 * 1024;
+    /// Hard safety ceiling for the complete source.
+    pub const MAX_INPUT_BYTES: usize = 1024 * 1024 * 1024;
+    /// Hard safety ceiling for one declared stream entry.
+    pub const MAX_ENTRY_BYTES: usize = 512 * 1024 * 1024;
+    /// Hard safety ceiling for aggregate declared stream payloads.
+    pub const MAX_AGGREGATE_BYTES: usize = 2 * 1024 * 1024 * 1024;
 
-    /// Construct an explicit limit set within the hard safety ceilings.
+    /// Start a checked builder from the shared defaults.
     ///
-    /// # Errors
+    /// ```rust
+    /// use litchi_doc::SourceLimits;
     ///
-    /// Returns [`LimitsError`] when any requested value exceeds its ceiling.
-    pub const fn try_new(
-        max_package_bytes: usize,
-        max_input_bytes: usize,
-        max_aggregate_input_bytes: usize,
-    ) -> std::result::Result<Self, LimitsError> {
-        if max_package_bytes > Self::MAX_PACKAGE_BYTES {
-            return Err(LimitsError::new(
-                ResourceKind::Package,
-                max_package_bytes,
-                Self::MAX_PACKAGE_BYTES,
-            ));
-        }
-        if max_input_bytes > Self::MAX_INPUT_BYTES {
-            return Err(LimitsError::new(
-                ResourceKind::Stream,
-                max_input_bytes,
-                Self::MAX_INPUT_BYTES,
-            ));
-        }
-        if max_aggregate_input_bytes > Self::MAX_AGGREGATE_INPUT_BYTES {
-            return Err(LimitsError::new(
-                ResourceKind::Aggregate,
-                max_aggregate_input_bytes,
-                Self::MAX_AGGREGATE_INPUT_BYTES,
-            ));
-        }
-        Ok(Self {
-            max_package_bytes,
-            max_input_bytes,
-            max_aggregate_input_bytes,
-        })
-    }
-
-    /// Return the outer-package byte limit.
+    /// let limits = SourceLimits::builder()
+    ///     .max_input_bytes(512 * 1024 * 1024)?
+    ///     .max_entry_bytes(512 * 1024 * 1024)?
+    ///     .max_aggregate_bytes(2 * 1024 * 1024 * 1024)?
+    ///     .build()?;
+    /// assert_eq!(limits.max_entry_bytes(), 512 * 1024 * 1024);
+    /// # Ok::<(), litchi_doc::Error>(())
+    /// ```
     #[must_use]
-    pub const fn max_package_bytes(self) -> usize {
-        self.max_package_bytes
+    pub fn builder() -> SourceLimitsBuilder {
+        SourceLimitsBuilder {
+            limits: Self::default(),
+        }
     }
 
-    /// Return the per-stream byte limit.
+    /// Return the complete-source input limit.
     #[must_use]
     pub const fn max_input_bytes(self) -> usize {
-        self.max_input_bytes
+        self.input_bytes
     }
 
-    /// Return the aggregate DOC-stream byte limit.
+    /// Return the per-entry input limit.
     #[must_use]
-    pub const fn max_aggregate_input_bytes(self) -> usize {
-        self.max_aggregate_input_bytes
+    pub const fn max_entry_bytes(self) -> usize {
+        self.entry_bytes
     }
 
-    /// Return a copy with a checked outer-package byte limit.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`LimitsError`] when `maximum` exceeds the hard safety ceiling.
-    pub const fn with_max_package_bytes(
-        self,
-        maximum: usize,
-    ) -> std::result::Result<Self, LimitsError> {
-        Self::try_new(
-            maximum,
-            self.max_input_bytes,
-            self.max_aggregate_input_bytes,
-        )
+    /// Return the aggregate input limit.
+    #[must_use]
+    pub const fn max_aggregate_bytes(self) -> usize {
+        self.aggregate_bytes
     }
 
-    /// Return a copy with a checked per-stream byte limit.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`LimitsError`] when `maximum` exceeds the hard safety ceiling.
-    pub const fn with_max_input_bytes(
-        self,
-        maximum: usize,
-    ) -> std::result::Result<Self, LimitsError> {
-        Self::try_new(
-            self.max_package_bytes,
-            maximum,
-            self.max_aggregate_input_bytes,
-        )
-    }
-
-    /// Return a copy with a checked aggregate DOC-stream byte limit.
-    ///
-    /// # Errors
-    ///
-    /// Returns [`LimitsError`] when `maximum` exceeds the hard safety ceiling.
-    pub const fn with_max_aggregate_input_bytes(
-        self,
-        maximum: usize,
-    ) -> std::result::Result<Self, LimitsError> {
-        Self::try_new(self.max_package_bytes, self.max_input_bytes, maximum)
-    }
-
-    /// Return the component-wise stricter combination of two limit sets.
+    /// Return the component-wise stricter combination of two profiles.
     #[must_use]
     pub const fn constrained_by(self, other: Self) -> Self {
         Self {
-            max_package_bytes: min_usize(self.max_package_bytes, other.max_package_bytes),
-            max_input_bytes: min_usize(self.max_input_bytes, other.max_input_bytes),
-            max_aggregate_input_bytes: min_usize(
-                self.max_aggregate_input_bytes,
-                other.max_aggregate_input_bytes,
-            ),
+            input_bytes: min_usize(self.input_bytes, other.input_bytes),
+            entry_bytes: min_usize(self.entry_bytes, other.entry_bytes),
+            aggregate_bytes: min_usize(self.aggregate_bytes, other.aggregate_bytes),
         }
     }
 }
 
-/// Resource dimension governed by a DOC read limit.
+/// Consuming builder for a checked [`SourceLimits`] profile.
+#[derive(Debug, Clone, Copy)]
+pub struct SourceLimitsBuilder {
+    limits: SourceLimits,
+}
+
+impl SourceLimitsBuilder {
+    /// Set the complete-source input ceiling. Values must be non-zero and no
+    /// greater than [`SourceLimits::MAX_INPUT_BYTES`].
+    pub fn max_input_bytes(mut self, value: usize) -> Result<Self> {
+        validate_source_limit(
+            SourceLimitKind::InputBytes,
+            value,
+            SourceLimits::MAX_INPUT_BYTES,
+        )?;
+        self.limits.input_bytes = value;
+        Ok(self)
+    }
+
+    /// Set the per-entry input ceiling. Values must be non-zero and no
+    /// greater than [`SourceLimits::MAX_ENTRY_BYTES`].
+    pub fn max_entry_bytes(mut self, value: usize) -> Result<Self> {
+        validate_source_limit(
+            SourceLimitKind::EntryBytes,
+            value,
+            SourceLimits::MAX_ENTRY_BYTES,
+        )?;
+        self.limits.entry_bytes = value;
+        Ok(self)
+    }
+
+    /// Set the aggregate input ceiling. Values must be non-zero and no
+    /// greater than [`SourceLimits::MAX_AGGREGATE_BYTES`].
+    pub fn max_aggregate_bytes(mut self, value: usize) -> Result<Self> {
+        validate_source_limit(
+            SourceLimitKind::AggregateBytes,
+            value,
+            SourceLimits::MAX_AGGREGATE_BYTES,
+        )?;
+        self.limits.aggregate_bytes = value;
+        Ok(self)
+    }
+
+    /// Finish the checked profile.
+    pub fn build(self) -> Result<SourceLimits> {
+        Ok(self.limits)
+    }
+}
+
+fn validate_source_limit(kind: SourceLimitKind, value: usize, maximum: usize) -> Result<()> {
+    if value == 0 || value > maximum {
+        return Err(Error::InvalidLimit {
+            kind,
+            value,
+            maximum,
+        });
+    }
+    Ok(())
+}
+
+/// Physical resource dimension governed by a DOC source limit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
-pub enum ResourceKind {
-    /// Bytes in the outer CFB package.
-    Package,
-    /// Bytes in one named CFB stream.
-    Stream,
-    /// Aggregate bytes in all DOC-owned main streams.
-    Aggregate,
+pub enum SourceLimitKind {
+    /// Complete source bytes, before the CFB container is parsed.
+    InputBytes,
+    /// Bytes in one named CFB entry.
+    EntryBytes,
+    /// Aggregate bytes in all declared CFB stream entries.
+    AggregateBytes,
 }
 
-impl ResourceKind {
+impl SourceLimitKind {
     const fn description(self) -> &'static str {
         match self {
-            Self::Package => "package bytes",
-            Self::Stream => "stream bytes",
-            Self::Aggregate => "aggregate stream bytes",
+            Self::InputBytes => "input bytes",
+            Self::EntryBytes => "entry bytes",
+            Self::AggregateBytes => "aggregate bytes",
         }
     }
 }
 
-/// Invalid custom [`Limits`] configuration.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct LimitsError {
-    resource: ResourceKind,
-    actual: usize,
-    maximum: usize,
-}
-
-impl LimitsError {
-    const fn new(resource: ResourceKind, actual: usize, maximum: usize) -> Self {
-        Self {
-            resource,
-            actual,
-            maximum,
-        }
-    }
-
-    /// Resource dimension whose requested value is invalid.
-    #[must_use]
-    pub const fn resource(&self) -> ResourceKind {
-        self.resource
-    }
-
-    /// Requested limit.
-    #[must_use]
-    pub const fn actual(&self) -> usize {
-        self.actual
-    }
-
-    /// Hard safety ceiling.
-    #[must_use]
-    pub const fn maximum(&self) -> usize {
-        self.maximum
-    }
-}
-
-impl std::fmt::Display for LimitsError {
+impl std::fmt::Display for SourceLimitKind {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            formatter,
-            "requested DOC {} limit {} exceeds safety ceiling {}",
-            self.resource.description(),
-            self.actual,
-            self.maximum
-        )
-    }
-}
-
-impl std::error::Error for LimitsError {}
-
-/// Structured failure raised when input exceeds configured DOC read limits.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct ResourceLimit {
-    resource: ResourceKind,
-    actual: u64,
-    limit: u64,
-    path: Option<&'static str>,
-}
-
-impl ResourceLimit {
-    pub(crate) const fn new(
-        resource: ResourceKind,
-        actual: u64,
-        limit: u64,
-        path: Option<&'static str>,
-    ) -> Self {
-        Self {
-            resource,
-            actual,
-            limit,
-            path,
-        }
-    }
-
-    /// Resource dimension that was exceeded.
-    #[must_use]
-    pub const fn resource(&self) -> ResourceKind {
-        self.resource
-    }
-
-    /// Observed input size.
-    #[must_use]
-    pub const fn actual(&self) -> u64 {
-        self.actual
-    }
-
-    /// Configured maximum size.
-    #[must_use]
-    pub const fn limit(&self) -> u64 {
-        self.limit
-    }
-
-    /// CFB stream path for stream-specific failures.
-    #[must_use]
-    pub const fn path(&self) -> Option<&'static str> {
-        self.path
-    }
-
-    const fn scope(self) -> &'static str {
-        match self.path {
-            Some(path) => path,
-            None => match self.resource {
-                ResourceKind::Package => "DOC package",
-                ResourceKind::Stream => "DOC stream",
-                ResourceKind::Aggregate => "DOC document streams",
-            },
-        }
-    }
-}
-
-impl std::fmt::Display for ResourceLimit {
-    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if let Some(path) = self.path {
-            write!(
-                formatter,
-                "DOC {} at {path} is {} bytes, limit {}",
-                self.resource.description(),
-                self.actual,
-                self.limit
-            )
-        } else {
-            write!(
-                formatter,
-                "DOC {} are {} bytes, limit {}",
-                self.resource.description(),
-                self.actual,
-                self.limit
-            )
-        }
-    }
-}
-
-impl std::error::Error for ResourceLimit {}
-
-impl From<ResourceLimit> for litchi_core::ResourceLimit {
-    fn from(limit: ResourceLimit) -> Self {
-        Self {
-            resource: litchi_core::Resource::InputBytes,
-            observed: limit.actual,
-            limit: limit.limit,
-            scope: Arc::from(limit.scope()),
-        }
+        formatter.write_str(self.description())
     }
 }
 
@@ -362,59 +222,64 @@ impl std::fmt::Debug for Password {
 #[derive(Debug, Default)]
 pub struct OpenOptions {
     password: Option<Password>,
-    limits: Limits,
+    source_limits: SourceLimits,
     /// How opt-in stylesheet-defect repairs are treated.
     ///
     /// Defaults to [`crate::Leniency::Strict`], under which those defects
     /// remain hard errors. The Word-compatible repairs listed by
     /// [`crate::SprmDefect`] are applied under every variant and recorded in
     /// [`crate::Document::tolerance_report`]; this field does not gate them.
-    pub leniency: crate::leniency::Leniency,
+    leniency: crate::leniency::Leniency,
 }
 
 impl OpenOptions {
-    /// Replace the finite package and stream limits used by this open.
+    /// Select the validated physical source limits used by this open.
+    ///
+    /// ```rust
+    /// use litchi_doc::{OpenOptions, SourceLimits};
+    ///
+    /// let source_limits = SourceLimits::builder()
+    ///     .max_input_bytes(64 * 1024 * 1024)?
+    ///     .max_entry_bytes(32 * 1024 * 1024)?
+    ///     .max_aggregate_bytes(96 * 1024 * 1024)?
+    ///     .build()?;
+    /// let options = OpenOptions::default().source_limits(source_limits);
+    /// assert_eq!(options.get_source_limits(), source_limits);
+    /// # Ok::<(), litchi_doc::Error>(())
+    /// ```
     #[must_use]
-    pub const fn with_limits(mut self, limits: Limits) -> Self {
-        self.limits = limits;
+    pub const fn source_limits(mut self, limits: SourceLimits) -> Self {
+        self.source_limits = limits;
         self
     }
 
-    /// Return the finite limits selected for this open operation.
+    /// Return the physical source limits selected for this open operation.
     #[must_use]
-    pub const fn limits(&self) -> Limits {
-        self.limits
+    pub const fn get_source_limits(&self) -> SourceLimits {
+        self.source_limits
     }
 
-    /// Provide a password-to-open credential through the non-cloneable
-    /// [`Password`] boundary.
+    /// Provide a password-to-open credential through the non-cloneable boundary.
     #[must_use]
-    pub fn with_password(mut self, password: Password) -> Self {
+    pub fn password(mut self, password: Password) -> Self {
         self.password = Some(password);
         self
     }
 
     /// Set the stylesheet-defect policy.
     #[must_use]
-    pub const fn with_leniency(mut self, leniency: crate::leniency::Leniency) -> Self {
+    pub const fn leniency(mut self, leniency: crate::leniency::Leniency) -> Self {
         self.leniency = leniency;
         self
     }
 
-    /// Formerly opted into the bounded PAPX producer-compatibility profile.
-    ///
-    /// The profile — one zero byte after a complete odd-length paragraph
-    /// SPRM sequence, admitted only when the `PapxInFkp` consumer proves it
-    /// is the exact one-byte tail the strict parser reports as an incomplete
-    /// opcode — is now applied by default and recorded as
-    /// [`crate::PapxDefect::AlignmentPadding`], so this call changes
-    /// nothing. It is kept so existing callers still compile.
+    /// Return the stylesheet-defect policy selected for this open operation.
     #[must_use]
-    pub const fn with_papx_alignment_padding(self) -> Self {
-        self
+    pub const fn get_leniency(&self) -> crate::leniency::Leniency {
+        self.leniency
     }
 
-    pub(crate) fn password(&self) -> Option<&str> {
+    pub(crate) fn credential(&self) -> Option<&str> {
         self.password.as_ref().map(Password::as_str)
     }
 }
@@ -458,8 +323,24 @@ pub enum Error {
     },
     /// A changed DOC publication was blocked by its active protection state.
     ProtectionDenied(crate::parts::protection::EditProtection),
-    /// A caller-selected finite parsing limit was exceeded.
-    ResourceLimit(ResourceLimit),
+    /// A caller supplied an invalid physical source limit.
+    InvalidLimit {
+        /// Source dimension whose configured value is invalid.
+        kind: SourceLimitKind,
+        /// Requested value.
+        value: usize,
+        /// Hard safety ceiling.
+        maximum: usize,
+    },
+    /// A caller-selected finite source limit was exceeded during ingress.
+    Limit {
+        /// Source dimension that exceeded its selected limit.
+        kind: SourceLimitKind,
+        /// Observed value.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
     /// The document is encrypted and no password was supplied.
     PasswordRequired,
     /// The supplied password did not validate.
@@ -516,7 +397,23 @@ impl std::fmt::Display for Error {
                     "protected DOC publication requires explicit authorization ({state:?})"
                 )
             },
-            Error::ResourceLimit(error) => error.fmt(f),
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid DOC source limit for {kind}: {value} (maximum {maximum})"
+            ),
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "DOC source limit exceeded for {}: {observed} > {maximum}",
+                kind.description()
+            ),
             Error::PasswordRequired => write!(f, "a password is required to open this document"),
             Error::InvalidPassword => write!(f, "the document password is invalid"),
             Error::UnsupportedEncryption(kind) => {
@@ -543,7 +440,8 @@ impl std::error::Error for Error {
             | Self::StreamNotFound(_)
             | Self::Corrupted(_)
             | Self::ProtectionDenied(_)
-            | Self::ResourceLimit(_)
+            | Self::InvalidLimit { .. }
+            | Self::Limit { .. }
             | Self::PasswordRequired
             | Self::InvalidPassword
             | Self::UnsupportedEncryption(_)
@@ -555,6 +453,51 @@ impl std::error::Error for Error {
 
 /// Result type for DOC operations.
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// Preflight every declared CFB stream under the DOC physical source policy.
+/// The returned aggregate includes all stream payload lengths, including
+/// metadata, embedded objects, and opaque format-specific streams. The root
+/// mini-stream backing is excluded because charging it as well would count
+/// mini-stream payloads twice.
+pub(crate) fn preflight_declared_streams<R: Read + Seek>(
+    ole: &OleFile<R>,
+    source_limits: SourceLimits,
+) -> Result<u64> {
+    let entry_maximum = u64::try_from(source_limits.max_entry_bytes()).unwrap_or(u64::MAX);
+    let aggregate_maximum = u64::try_from(source_limits.max_aggregate_bytes()).unwrap_or(u64::MAX);
+    let mut aggregate = 0_u64;
+    for index in 0..ole.directory_entry_count() {
+        let sid = u32::try_from(index).map_err(|_| {
+            Error::InvalidFormat("DOC CFB directory entry index exceeds u32".to_string())
+        })?;
+        let Some(entry) = ole.directory_entry_by_sid(sid) else {
+            continue;
+        };
+        if entry.entry_type != litchi_cfb::consts::STGTY_STREAM {
+            continue;
+        }
+        if entry.size > entry_maximum {
+            return Err(Error::Limit {
+                kind: SourceLimitKind::EntryBytes,
+                observed: entry.size,
+                maximum: entry_maximum,
+            });
+        }
+        aggregate = aggregate.checked_add(entry.size).ok_or(Error::Limit {
+            kind: SourceLimitKind::AggregateBytes,
+            observed: u64::MAX,
+            maximum: aggregate_maximum,
+        })?;
+    }
+    if aggregate > aggregate_maximum {
+        return Err(Error::Limit {
+            kind: SourceLimitKind::AggregateBytes,
+            observed: aggregate,
+            maximum: aggregate_maximum,
+        });
+    }
+    Ok(aggregate)
+}
 
 /// A Word (.doc) package.
 ///
@@ -580,15 +523,15 @@ pub type Result<T> = std::result::Result<T, Error>;
 pub struct RawPackage<R: Read + Seek = File> {
     /// The underlying OLE file
     pub(super) ole: OleFile<R>,
-    /// Limits inherited by [`Package::document`](super::Package::document).
-    pub(super) limits: Limits,
+    /// Source limits inherited by [`Package::document`](super::Package::document).
+    pub(super) source_limits: SourceLimits,
 }
 
 impl<R: Read + Seek> std::fmt::Debug for RawPackage<R> {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("RawPackage")
-            .field("limits", &self.limits)
+            .field("source_limits", &self.source_limits)
             .finish_non_exhaustive()
     }
 }
@@ -629,7 +572,7 @@ pub struct Package {
     pub(super) shared: Arc<SharedOleFile>,
     pub(super) document: Document,
     pub(super) metadata: Arc<litchi_core::Metadata>,
-    pub(super) limits: Limits,
+    pub(super) source_limits: SourceLimits,
     pub(super) leniency: crate::leniency::Leniency,
     pub(super) edit_profile: Option<EditProfile>,
 }
@@ -640,7 +583,7 @@ impl Clone for Package {
             shared: Arc::clone(&self.shared),
             document: self.document.clone(),
             metadata: Arc::clone(&self.metadata),
-            limits: self.limits,
+            source_limits: self.source_limits,
             leniency: self.leniency,
             edit_profile: self.edit_profile.clone(),
         }
@@ -651,7 +594,7 @@ impl std::fmt::Debug for Package {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Package")
-            .field("limits", &self.limits)
+            .field("source_limits", &self.source_limits)
             .field("leniency", &self.leniency)
             .finish_non_exhaustive()
     }
@@ -671,7 +614,23 @@ impl From<Error> for litchi_core::Error {
             Error::ProtectionDenied(state) => litchi_core::Error::InvalidFormat(format!(
                 "protected DOC publication requires explicit authorization ({state:?})"
             )),
-            Error::ResourceLimit(limit) => litchi_core::Error::ResourceLimit(limit.into()),
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => litchi_core::Error::InvalidFormat(format!(
+                "invalid DOC source limit for {kind}: {value} (maximum {maximum})"
+            )),
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => litchi_core::Error::ResourceLimit(litchi_core::ResourceLimit {
+                resource: litchi_core::Resource::InputBytes,
+                observed,
+                limit: maximum,
+                scope: Arc::from(format!("DOC {}", kind.description())),
+            }),
             Error::PasswordRequired => {
                 litchi_core::Error::InvalidFormat("DOC password required".to_string())
             },

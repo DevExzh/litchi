@@ -1,6 +1,6 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, reason = "test assertions")]
 
-use litchi_doc::{Builder, Document, Error, Limits, OpenOptions, Package, ResourceKind};
+use litchi_doc::{Builder, Document, Error, OpenOptions, Package, SourceLimitKind, SourceLimits};
 use std::io::Cursor;
 
 fn corpus() -> Vec<u8> {
@@ -54,27 +54,48 @@ fn canonical_ingress_and_publication_preserve_exact_bytes() {
 #[test]
 fn merged_options_enforce_package_and_stream_limits_at_ingress() {
     let bytes = corpus();
-    let package_limit = Limits::default().with_max_package_bytes(1).unwrap();
+    let package_limit = SourceLimits::builder()
+        .max_input_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
     for error in [
-        Package::from_bytes_with_options(&bytes, OpenOptions::default().with_limits(package_limit))
-            .unwrap_err(),
+        Package::from_bytes_with_options(
+            &bytes,
+            OpenOptions::default().source_limits(package_limit),
+        )
+        .unwrap_err(),
         Package::from_reader_with_options(
             Cursor::new(&bytes),
-            OpenOptions::default().with_limits(package_limit),
+            OpenOptions::default().source_limits(package_limit),
         )
         .unwrap_err(),
     ] {
-        assert!(
-            matches!(error, Error::ResourceLimit(limit) if limit.resource() == ResourceKind::Package)
-        );
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: SourceLimitKind::InputBytes,
+                ..
+            }
+        ));
     }
-    let stream_limit = Limits::default().with_max_input_bytes(1).unwrap();
-    let error =
-        Package::from_bytes_with_options(&bytes, OpenOptions::default().with_limits(stream_limit))
-            .unwrap_err();
-    assert!(
-        matches!(error, Error::ResourceLimit(limit) if limit.resource() == ResourceKind::Stream)
-    );
+    let stream_limit = SourceLimits::builder()
+        .max_entry_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = Package::from_bytes_with_options(
+        &bytes,
+        OpenOptions::default().source_limits(stream_limit),
+    )
+    .unwrap_err();
+    assert!(matches!(
+        error,
+        Error::Limit {
+            kind: SourceLimitKind::EntryBytes,
+            ..
+        }
+    ));
 }
 
 #[test]
@@ -103,13 +124,13 @@ fn encrypted_builder_and_ingress_preserve_ciphertext() {
     assert!(matches!(
         Package::from_bytes_with_options(
             &ciphertext,
-            OpenOptions::default().with_password("wrong".to_owned().into())
+            OpenOptions::default().password("wrong".to_owned().into())
         ),
         Err(Error::InvalidPassword)
     ));
     let opened = Package::from_bytes_with_options(
         &ciphertext,
-        OpenOptions::default().with_password("secret".to_owned().into()),
+        OpenOptions::default().password("secret".to_owned().into()),
     )
     .unwrap();
     assert!(
@@ -134,11 +155,16 @@ fn path_open_seals_an_owned_snapshot_and_checks_input_limit() {
     std::io::Write::write_all(&mut file, &bytes).unwrap();
     drop(file);
     let result = (|| -> Result<(), Box<dyn std::error::Error>> {
-        let limits = Limits::default().with_max_package_bytes(bytes.len() - 1)?;
-        assert!(
-            matches!(Package::open_with_options(&path, OpenOptions::default().with_limits(limits)),
-            Err(Error::ResourceLimit(limit)) if limit.resource() == ResourceKind::Package)
-        );
+        let limits = SourceLimits::builder()
+            .max_input_bytes(bytes.len() - 1)?
+            .build()?;
+        assert!(matches!(
+            Package::open_with_options(&path, OpenOptions::default().source_limits(limits)),
+            Err(Error::Limit {
+                kind: SourceLimitKind::InputBytes,
+                ..
+            })
+        ));
         let package = Package::open(&path)?;
         let version = package.source_version()?;
         let sibling = package.clone();
@@ -158,7 +184,7 @@ fn lenient_read_owner_does_not_bypass_strict_transaction_validation() {
     let bytes = std::fs::read(path).unwrap();
     let package = Package::from_bytes_with_options(
         &bytes,
-        OpenOptions::default().with_leniency(litchi_doc::Leniency::TolerateStylesheetDefects),
+        OpenOptions::default().leniency(litchi_doc::Leniency::TolerateStylesheetDefects),
     )
     .unwrap();
     assert_eq!(

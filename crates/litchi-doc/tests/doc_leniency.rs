@@ -73,9 +73,7 @@ fn opting_in_recovers_the_document_and_records_the_repair() {
     let mut package = Package::open(fixture("duplicate-style-names.doc")).expect("container opens");
 
     let document = package
-        .document_with_options(
-            OpenOptions::default().with_leniency(Leniency::TolerateStylesheetDefects),
-        )
+        .document_with_options(OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects))
         .expect("a duplicated style name is repairable");
 
     let text = document.text().expect("text is extractable");
@@ -128,7 +126,7 @@ fn structural_defects_stay_fatal_when_tolerating_stylesheet_defects() {
     assert!(
         package
             .document_with_options(
-                OpenOptions::default().with_leniency(Leniency::TolerateStylesheetDefects),
+                OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects),
             )
             .is_err(),
         "leniency must not extend past the stylesheet"
@@ -141,7 +139,7 @@ fn a_conforming_document_records_no_repairs() {
     for leniency in [Leniency::Strict, Leniency::TolerateStylesheetDefects] {
         let mut package = Package::open(fixture("Lists.doc")).expect("container opens");
         let document = package
-            .document_with_options(OpenOptions::default().with_leniency(leniency))
+            .document_with_options(OpenOptions::default().leniency(leniency))
             .expect("a conforming document parses under either contract");
 
         if let Some(stylesheet) = document.stylesheet() {

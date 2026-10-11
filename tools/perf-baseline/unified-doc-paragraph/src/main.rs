@@ -121,7 +121,7 @@ fn native_reader_context(
 
 fn facade_body_open_options() -> BodyOpenOptions {
     BodyOpenOptions::default()
-        .with_package_limits(litchi_doc::package::Limits::default())
+        .source_limits(litchi_doc::SourceLimits::default())
         .with_transaction_limits(
             BodyTransactionLimits::new(isize::MAX as usize, usize::MAX, usize::MAX)
                 .with_max_retained_render_bytes(usize::MAX),

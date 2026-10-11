@@ -37,7 +37,9 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource,
 };
-use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, raw::Package as DocPackage};
+use litchi_doc::{
+    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Package as DocPackage,
+};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_ole_common::object::Limits as ObjectLimits;
 use litchi_opc::{
@@ -224,9 +226,8 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
 
         let mut package = open_doc_package(&bytes)?;
         assert!(matches!(
-            package.document_with_options(
-                OpenOptions::default().with_password("wrong".to_owned().into())
-            ),
+            package
+                .document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
             Err(DocError::InvalidPassword)
         ));
 
@@ -236,9 +237,8 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
             "tika"
         };
         let mut package = open_doc_package(&bytes)?;
-        let document = package.document_with_options(
-            OpenOptions::default().with_password(password.to_owned().into()),
-        )?;
+        let document = package
+            .document_with_options(OpenOptions::default().password(password.to_owned().into()))?;
         let text = document.text()?;
         let semantic_digest = sha256_hex(text.as_bytes());
         assert!(!text.trim().is_empty(), "{id} has no semantic text");
@@ -255,9 +255,8 @@ fn encrypted_ole_security() -> Result<(), Box<dyn Error>> {
             sha256,
         })?;
         let mut package = open_doc_package(&second_bytes)?;
-        let document = package.document_with_options(
-            OpenOptions::default().with_password(password.to_owned().into()),
-        )?;
+        let document = package
+            .document_with_options(OpenOptions::default().password(password.to_owned().into()))?;
         assert_eq!(semantic_digest, sha256_hex(document.text()?.as_bytes()));
     }
     Ok(())
@@ -456,12 +455,12 @@ fn security_ole_limits() -> Result<OleFileLimits, Box<dyn Error>> {
         .with_max_allocation_table_bytes(SECURITY_MAX_INPUT_BYTES)?)
 }
 
-fn security_doc_limits() -> Result<DocLimits, Box<dyn Error>> {
-    Ok(DocLimits::try_new(
-        SECURITY_MAX_INPUT_BYTES as usize,
-        SECURITY_MAX_INPUT_BYTES as usize,
-        SECURITY_MAX_INPUT_BYTES as usize,
-    )?)
+fn security_doc_limits() -> Result<DocSourceLimits, Box<dyn Error>> {
+    Ok(DocSourceLimits::builder()
+        .max_input_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .max_entry_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .max_aggregate_bytes(SECURITY_MAX_INPUT_BYTES as usize)?
+        .build()?)
 }
 
 fn security_object_limits() -> ObjectLimits {

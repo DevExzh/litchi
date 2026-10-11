@@ -71,7 +71,7 @@ pub type History = litchi_core::patch::History<Snapshot>;
 /// layout.
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct OpenOptions {
-    package_limits: crate::package::Limits,
+    source_limits: crate::package::SourceLimits,
     revision_limits: Limits,
     transaction_limits: TransactionLimits,
     protection_policy: ProtectionPolicy,
@@ -84,10 +84,10 @@ impl OpenOptions {
         Self::default()
     }
 
-    /// Selects the outer-package and aggregate-stream admission limits.
+    /// Selects the complete-source and DOC-entry admission limits.
     #[must_use]
-    pub const fn with_package_limits(mut self, package_limits: crate::package::Limits) -> Self {
-        self.package_limits = package_limits;
+    pub const fn source_limits(mut self, source_limits: crate::package::SourceLimits) -> Self {
+        self.source_limits = source_limits;
         self
     }
 
@@ -676,7 +676,7 @@ pub struct Snapshot {
     source: Arc<[u8]>,
     fingerprint_cache: OnceLock<u64>,
     limits: Limits,
-    package_limits: crate::package::Limits,
+    source_limits: crate::package::SourceLimits,
     transaction_limits: TransactionLimits,
     protection_policy: ProtectionPolicy,
 }
@@ -693,7 +693,7 @@ impl Clone for Snapshot {
             source: Arc::clone(&self.source),
             fingerprint_cache,
             limits: self.limits,
-            package_limits: self.package_limits,
+            source_limits: self.source_limits,
             transaction_limits: self.transaction_limits,
             protection_policy: self.protection_policy.clone(),
         }
@@ -755,7 +755,7 @@ impl Snapshot {
         let bytes = input.into();
         crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
             bytes.len(),
-            options.package_limits,
+            options.source_limits,
         )
         .map_err(Error::Invalid)?;
         let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
@@ -764,13 +764,13 @@ impl Snapshot {
             options.protection_policy.clone(),
         )
         .map_err(Error::Invalid)?;
-        crate::raw::Package::validate_ole_file(&mut ole, options.package_limits)
+        crate::raw::Package::validate_ole_file(&mut ole, options.source_limits)
             .map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
             fingerprint_cache: OnceLock::new(),
             limits: options.revision_limits,
-            package_limits: options.package_limits,
+            source_limits: options.source_limits,
             transaction_limits: options.transaction_limits,
             protection_policy: options.protection_policy,
         })
@@ -835,27 +835,27 @@ impl Snapshot {
         observer: impl FnMut(DiagnosticEvent),
         cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Self> {
-        Self::open_bounded_profiled_with_package_limits(
+        Self::open_bounded_profiled_with_source_limits(
             input,
             limits,
             transaction_limits,
-            crate::package::Limits::default(),
+            crate::package::SourceLimits::default(),
             observer,
             cfb_observer,
         )
     }
 
     #[cfg(feature = "performance-diagnostics")]
-    fn open_bounded_profiled_with_package_limits(
+    fn open_bounded_profiled_with_source_limits(
         input: impl Into<Vec<u8>>,
         limits: Limits,
         transaction_limits: TransactionLimits,
-        package_limits: crate::package::Limits,
+        source_limits: crate::package::SourceLimits,
         mut observer: impl FnMut(DiagnosticEvent),
         mut cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Self> {
         let bytes = input.into();
-        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), package_limits)
+        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)
             .map_err(Error::Invalid)?;
         let mut ole = observe_phase(
             &mut observer,
@@ -873,7 +873,7 @@ impl Snapshot {
             &mut observer,
             DiagnosticPhase::PublicReaderValidation,
             || {
-                crate::raw::Package::validate_ole_file(&mut ole, package_limits)
+                crate::raw::Package::validate_ole_file(&mut ole, source_limits)
                     .map_err(Error::Invalid)
             },
         )?;
@@ -884,7 +884,7 @@ impl Snapshot {
             source,
             fingerprint_cache: OnceLock::new(),
             limits,
-            package_limits,
+            source_limits,
             transaction_limits,
             protection_policy: ProtectionPolicy::default(),
         })
@@ -964,8 +964,8 @@ impl Snapshot {
     /// Configured outer-package and aggregate stream limits retained by this
     /// immutable source owner.
     #[must_use]
-    pub const fn package_limits(&self) -> crate::package::Limits {
-        self.package_limits
+    pub const fn source_limits(&self) -> crate::package::SourceLimits {
+        self.source_limits
     }
 
     /// Lists ordinary source-body paragraphs under the requested review projection.
@@ -1469,13 +1469,13 @@ impl Snapshot {
     fn with_policies(
         &self,
         limits: Limits,
-        package_limits: crate::package::Limits,
+        source_limits: crate::package::SourceLimits,
         transaction_limits: TransactionLimits,
         protection_policy: ProtectionPolicy,
     ) -> Self {
         let mut snapshot = self.clone();
         snapshot.limits = limits;
-        snapshot.package_limits = package_limits;
+        snapshot.source_limits = source_limits;
         snapshot.transaction_limits = transaction_limits;
         snapshot.protection_policy = protection_policy;
         snapshot
@@ -1493,7 +1493,7 @@ impl std::fmt::Debug for Snapshot {
             .field("bytes", &self.source.len())
             .field("fingerprint", &self.fingerprint())
             .field("limits", &self.limits)
-            .field("package_limits", &self.package_limits)
+            .field("source_limits", &self.source_limits)
             .field("transaction_limits", &self.transaction_limits)
             .finish()
     }
@@ -2292,7 +2292,7 @@ impl Edit {
             Snapshot::open_with_options(
                 bytes,
                 OpenOptions::default()
-                    .with_package_limits(self.source.package_limits)
+                    .source_limits(self.source.source_limits)
                     .with_revision_limits(self.source.limits)
                     .with_transaction_limits(self.source.transaction_limits)
                     .with_protection_policy(self.source.protection_policy.clone()),
@@ -2326,7 +2326,7 @@ impl Edit {
                 .map_err(map_protection_error)?;
             crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
                 bytes.len(),
-                self.source.package_limits,
+                self.source.source_limits,
             )
             .map_err(Error::Invalid)?;
             let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
@@ -2337,14 +2337,14 @@ impl Edit {
             .map_err(Error::Invalid)?;
             let document = crate::Document::from_ole_with_options(
                 &mut ole,
-                PackageOpenOptions::default().with_limits(self.source.package_limits),
+                PackageOpenOptions::default().source_limits(self.source.source_limits),
             )
             .map_err(Error::Invalid)?;
             let snapshot = Snapshot {
                 source: Arc::from(bytes.into_boxed_slice()),
                 fingerprint_cache: OnceLock::new(),
                 limits: self.source.limits,
-                package_limits: self.source.package_limits,
+                source_limits: self.source.source_limits,
                 transaction_limits: self.source.transaction_limits,
                 protection_policy: self.source.protection_policy.clone(),
             };
@@ -2447,11 +2447,11 @@ impl Edit {
                 Ok(self.source.clone())
             })?
         } else {
-            Snapshot::open_bounded_profiled_with_package_limits(
+            Snapshot::open_bounded_profiled_with_source_limits(
                 bytes,
                 self.source.limits,
                 self.source.transaction_limits,
-                self.source.package_limits,
+                self.source.source_limits,
                 &mut observer,
                 &mut cfb_observer,
             )
@@ -2697,10 +2697,10 @@ impl Patch {
             .transaction_limits
             .intersect(self.before.transaction_limits)
             .intersect(self.after.transaction_limits);
-        let package_limits = source
-            .package_limits
-            .constrained_by(self.before.package_limits)
-            .constrained_by(self.after.package_limits);
+        let source_limits = source
+            .source_limits
+            .constrained_by(self.before.source_limits)
+            .constrained_by(self.after.source_limits);
         // The same-allocation shortcut skips only the byte comparison; a
         // changed patch is still authorized under the source's protection
         // policy before its target is published.
@@ -2714,7 +2714,7 @@ impl Patch {
         if self.is_noop() {
             return Ok(source.with_policies(
                 limits,
-                package_limits,
+                source_limits,
                 transaction_limits,
                 source.protection_policy.clone(),
             ));
@@ -2723,13 +2723,13 @@ impl Patch {
             .editor()?
             .authorize_rendered(self.after.bytes())
             .map_err(map_protection_error)?;
-        if self.after.package_limits == package_limits
+        if self.after.source_limits == source_limits
             && self.after.limits == limits
             && self.after.protection_policy == source.protection_policy
         {
             return Ok(self.after.with_policies(
                 limits,
-                package_limits,
+                source_limits,
                 transaction_limits,
                 source.protection_policy.clone(),
             ));
@@ -2737,7 +2737,7 @@ impl Patch {
         Snapshot::open_with_options(
             self.after.bytes().to_vec(),
             OpenOptions::default()
-                .with_package_limits(package_limits)
+                .source_limits(source_limits)
                 .with_revision_limits(limits)
                 .with_transaction_limits(transaction_limits)
                 .with_protection_policy(source.protection_policy.clone()),
@@ -5371,16 +5371,18 @@ mod tests {
     #[cfg(feature = "performance-diagnostics")]
     #[test]
     fn profiled_open_preflights_source_before_any_cfb_parse() {
-        let package_limits = crate::package::Limits::default()
-            .with_max_package_bytes(0)
-            .expect("zero package limit is within the safety ceiling");
+        let source_limits = crate::package::SourceLimits::builder()
+            .max_input_bytes(1)
+            .expect("one-byte input limit is within the safety ceiling")
+            .build()
+            .expect("source limits");
         let mut events = Vec::new();
         let mut cfb_events = Vec::new();
-        let result = Snapshot::open_bounded_profiled_with_package_limits(
+        let result = Snapshot::open_bounded_profiled_with_source_limits(
             doc(&["alpha"]),
             Limits::default(),
             TransactionLimits::default(),
-            package_limits,
+            source_limits,
             |event| events.push(event),
             |event| cfb_events.push(event),
         );
@@ -5723,7 +5725,7 @@ mod tests {
     }
 
     #[test]
-    fn patch_apply_revalidates_and_retains_intersected_package_limits() {
+    fn patch_apply_revalidates_and_retains_intersected_source_limits() {
         let source_bytes = doc(&["alpha"]);
         let source = Snapshot::from_bytes(source_bytes.clone()).expect("source");
         let mut edit = source.edit().expect("edit");
@@ -5733,32 +5735,36 @@ mod tests {
         let commit = edit.commit().expect("changed commit");
         assert!(commit.snapshot().bytes().len() > source.bytes().len());
 
-        let source_limit = crate::package::Limits::default()
-            .with_max_package_bytes(source.bytes().len())
-            .expect("source limit");
+        let source_limit = crate::package::SourceLimits::builder()
+            .max_input_bytes(source.bytes().len())
+            .expect("source limit")
+            .build()
+            .expect("source limits");
         let strict_source = Snapshot::from_bytes_with_options(
             source_bytes.clone(),
-            OpenOptions::default().with_package_limits(source_limit),
+            OpenOptions::default().source_limits(source_limit),
         )
         .expect("source fits strict package limit");
         assert!(matches!(
             commit.patch().apply(&strict_source),
-            Err(Error::Invalid(crate::package::Error::ResourceLimit(_)))
+            Err(Error::Invalid(crate::package::Error::Limit { .. }))
         ));
 
-        let target_limit = crate::package::Limits::default()
-            .with_max_package_bytes(commit.snapshot().bytes().len())
-            .expect("target limit");
+        let target_limit = crate::package::SourceLimits::builder()
+            .max_input_bytes(commit.snapshot().bytes().len())
+            .expect("target limit")
+            .build()
+            .expect("target limits");
         let bounded_source = Snapshot::from_bytes_with_options(
             source_bytes,
-            OpenOptions::default().with_package_limits(target_limit),
+            OpenOptions::default().source_limits(target_limit),
         )
         .expect("source fits target package limit");
         let applied = commit
             .patch()
             .apply(&bounded_source)
             .expect("target fits retained package limit");
-        assert_eq!(applied.package_limits(), target_limit);
+        assert_eq!(applied.source_limits(), target_limit);
         assert_eq!(applied.bytes(), commit.snapshot().bytes());
     }
 
@@ -6230,10 +6236,10 @@ mod tests {
                 .expect("physical DOC context should open");
         crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
             source.len(),
-            crate::package::Limits::default(),
+            crate::package::SourceLimits::default(),
         )
         .expect("public package preflight should pass");
-        crate::raw::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
+        crate::raw::Package::validate_ole_file(&mut ole, crate::package::SourceLimits::default())
             .expect("public reader should validate the shared context");
 
         let source = Snapshot::from_bytes(source).expect("source should open");

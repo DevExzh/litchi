@@ -440,7 +440,7 @@ fn exposes_layout_after_doc_decryption() {
     ] {
         let mut package = Package::open(poi_fixture(name)).unwrap();
         let document = package
-            .document_with_options(OpenOptions::default().with_password(password.to_owned().into()))
+            .document_with_options(OpenOptions::default().password(password.to_owned().into()))
             .unwrap();
         assert!(!document.sections().is_empty());
         assert!(document.sections().iter().all(|section| {

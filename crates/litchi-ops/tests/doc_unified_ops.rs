@@ -239,14 +239,45 @@ fn doc_query_expansion_uses_the_unified_target_budget() {
 }
 
 #[test]
-fn doc_package_limits_are_applied_at_the_ole_constructor() {
-    let limits = litchi_doc::package::Limits::default()
-        .with_max_input_bytes(1)
-        .expect("finite stream limit");
-    let options = OpenOptions::new().doc(DocOptions::new().limits(limits));
-    let error = open_bytes_with(doc_fixture("Lists.doc"), &options)
-        .expect_err("the caller-selected DOC input limit must reject the fixture");
-    assert_eq!(error.code(), Code::LimitExceeded);
+fn doc_source_limits_preserve_dimension_and_values_through_facade_ingress() {
+    use litchi_doc::{SourceLimitKind, SourceLimits};
+    let cases = [
+        (
+            SourceLimits::builder()
+                .max_input_bytes(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            SourceLimitKind::InputBytes,
+        ),
+        (
+            SourceLimits::builder()
+                .max_entry_bytes(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            SourceLimitKind::EntryBytes,
+        ),
+        (
+            SourceLimits::builder()
+                .max_aggregate_bytes(1)
+                .unwrap()
+                .build()
+                .unwrap(),
+            SourceLimitKind::AggregateBytes,
+        ),
+    ];
+    for (limits, expected) in cases {
+        let options = OpenOptions::new().doc(DocOptions::new().source_limits(limits));
+        let error = open_bytes_with(doc_fixture("Lists.doc"), &options)
+            .expect_err("the caller-selected DOC source limit must reject the fixture");
+        assert_eq!(error.code(), Code::LimitExceeded);
+        assert!(
+            matches!(error.leaf(), litchi_ops::error::Source::Doc(litchi_doc::Error::Limit {
+            kind, observed, maximum: 1, ..
+        }) if *kind == expected && *observed > 1)
+        );
+    }
 }
 
 #[test]

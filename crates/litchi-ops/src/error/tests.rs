@@ -494,16 +494,18 @@ fn row_resource_limits_are_limit_exceeded() {
             }
             .into(),
         );
-        let limits = litchi_doc::Limits::default()
-            .with_max_package_bytes(1)
+        let limits = litchi_doc::SourceLimits::builder()
+            .max_input_bytes(1)
+            .unwrap()
+            .build()
             .expect("a one-byte package limit is valid");
         let error = litchi_doc::Package::from_reader_with_options(
             io::Cursor::new(vec![0_u8; 64]),
-            litchi_doc::OpenOptions::default().with_limits(limits),
+            litchi_doc::OpenOptions::default().source_limits(limits),
         )
         .expect_err("a 64-byte package exceeds a one-byte limit");
         assert!(
-            matches!(error, litchi_doc::Error::ResourceLimit(_)),
+            matches!(error, litchi_doc::Error::Limit { .. }),
             "{error:?}"
         );
         check(error.into());
@@ -1403,4 +1405,24 @@ fn doc_primary_transactions_preserve_typed_causes_and_safe_messages() {
         assert!(matches!(error.0.source.as_ref(), Source::DocTransaction(_)));
         assert_eq!(error.message(), expected.summary());
     }
+}
+
+#[cfg(feature = "doc")]
+#[test]
+fn doc_source_limit_configuration_preserves_dimension_and_values() {
+    let native = litchi_doc::SourceLimits::builder()
+        .max_input_bytes(litchi_doc::SourceLimits::MAX_INPUT_BYTES + 1)
+        .unwrap_err();
+    assert!(matches!(
+        native,
+        litchi_doc::Error::InvalidLimit {
+            kind: litchi_doc::SourceLimitKind::InputBytes,
+            ..
+        }
+    ));
+    let error = assert_code(native, Code::InvalidArgument);
+    assert!(matches!(
+        error.leaf(),
+        Source::Doc(litchi_doc::Error::InvalidLimit { .. })
+    ));
 }

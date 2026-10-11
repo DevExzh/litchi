@@ -27,7 +27,9 @@ use std::{
 use litchi_cfb::{OleFile, OleFileLimits};
 use litchi_crypto::ooxml::{self, IntegrityStatus, Kind, Limits as CryptoLimits, Mode};
 use litchi_crypto::spaces;
-use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, raw::Package as DocPackage};
+use litchi_doc::{
+    Error as DocError, OpenOptions, SourceLimits as DocSourceLimits, raw::Package as DocPackage,
+};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_opc::{OpcError, OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_sign::{Policy, Status};
@@ -1116,15 +1118,14 @@ fn validate_encrypted_doc(
     }
     let mut package = open_doc_package(bytes)?;
     if !matches!(
-        package
-            .document_with_options(OpenOptions::default().with_password("wrong".to_owned().into())),
+        package.document_with_options(OpenOptions::default().password("wrong".to_owned().into())),
         Err(DocError::InvalidPassword)
     ) {
         return Err(format!("{} accepted the wrong password", fixture.id).into());
     }
     let mut package = open_doc_package(bytes)?;
     let document = package
-        .document_with_options(OpenOptions::default().with_password(password.to_owned().into()))?;
+        .document_with_options(OpenOptions::default().password(password.to_owned().into()))?;
     let text = document.text()?;
     if text.trim().is_empty() || sha256_hex(text.as_bytes()) != semantic_sha256 {
         return Err(format!("{} semantic password readback changed", fixture.id).into());
@@ -1134,11 +1135,11 @@ fn validate_encrypted_doc(
 
 fn open_doc_package(bytes: &[u8]) -> Result<DocPackage<Cursor<&[u8]>>> {
     let ole = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits()?)?;
-    let limits = DocLimits::try_new(
-        MAX_INPUT_BYTES as usize,
-        MAX_INPUT_BYTES as usize,
-        MAX_INPUT_BYTES as usize,
-    )?;
+    let limits = DocSourceLimits::builder()
+        .max_input_bytes(MAX_INPUT_BYTES as usize)?
+        .max_entry_bytes(MAX_INPUT_BYTES as usize)?
+        .max_aggregate_bytes(MAX_INPUT_BYTES as usize)?
+        .build()?;
     Ok(DocPackage::from_ole_file_with_limits(ole, limits)?)
 }
 

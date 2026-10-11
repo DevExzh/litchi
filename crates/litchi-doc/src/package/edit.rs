@@ -6,12 +6,12 @@
 //! dependency closures.  The package boundary adds the canonical
 //! package-owned publication shape without introducing a second edit engine.
 //!
-//! The current bridge necessarily copies and revalidates the retained source
-//! when an edit is opened. Changed candidates transfer the body engine's
-//! already validated CFB and document projection into the package owner;
-//! exact no-ops retain the original package. Those costs are deliberate: the
-//! body engine's exact-source, protection, and full-candidate validation gates
-//! remain authoritative at every publication boundary.
+//! The current bridge copies and revalidates the retained source when an edit
+//! is opened. Changed candidates transfer the body engine's already validated
+//! CFB and document projection into the package owner; exact no-ops retain the
+//! original package. The body engine's exact-source, protection, and
+//! full-candidate validation gates remain authoritative at every publication
+//! boundary.
 
 use super::{Error as PackageError, OpenOptions, Package, model::EditProfile};
 use crate::body_text;
@@ -395,7 +395,7 @@ impl Commit {
             Some(validated) => Package::from_validated_ole(
                 validated.ole,
                 validated.document,
-                snapshot.package_limits(),
+                snapshot.source_limits(),
                 source.leniency(),
             )
             .map_err(Error::Package)?,
@@ -463,7 +463,7 @@ impl Edit {
         let source = body_text::Snapshot::from_bytes_with_options(
             bytes,
             body_text::OpenOptions::default()
-                .with_package_limits(package.limits())
+                .source_limits(package.source_limits())
                 .with_revision_limits(options.revision_limits)
                 .with_transaction_limits(options.transaction_limits)
                 .with_protection_policy(options.protection_policy),
@@ -667,7 +667,7 @@ impl Package {
         let source = body_text::Snapshot::from_bytes_with_options(
             bytes,
             body_text::OpenOptions::default()
-                .with_package_limits(self.limits())
+                .source_limits(self.source_limits())
                 .with_revision_limits(profile.revision_limits)
                 .with_transaction_limits(profile.transaction_limits)
                 .with_protection_policy(profile.protection_policy),
@@ -681,8 +681,8 @@ impl Package {
         Package::from_bytes_with_options(
             next.bytes(),
             OpenOptions::default()
-                .with_limits(next.package_limits())
-                .with_leniency(self.leniency()),
+                .source_limits(next.source_limits())
+                .leniency(self.leniency()),
         )
         .map_err(Error::Package)
         .map(|package| package.with_edit_profile(next_profile))
@@ -976,15 +976,14 @@ mod tests {
     #[test]
     fn commit_rejects_candidate_over_outer_package_limit_before_public_parse() {
         let source_bytes = package().to_bytes().expect("source bytes");
-        let limits = crate::Limits::try_new(
-            source_bytes.len(),
-            crate::Limits::DEFAULT_MAX_INPUT_BYTES,
-            crate::Limits::DEFAULT_MAX_AGGREGATE_INPUT_BYTES,
-        )
-        .expect("source-sized package limit");
+        let limits = crate::SourceLimits::builder()
+            .max_input_bytes(source_bytes.len())
+            .expect("source-sized package limit")
+            .build()
+            .expect("source-sized package limits");
         let source = crate::Package::from_bytes_with_options(
             &source_bytes,
-            crate::OpenOptions::default().with_limits(limits),
+            crate::OpenOptions::default().source_limits(limits),
         )
         .expect("limited source");
         let mut edit = source.edit().expect("edit");
@@ -996,7 +995,7 @@ mod tests {
         assert!(matches!(
             error,
             Error::Body(body_text::Error::Invalid(
-                crate::package::Error::ResourceLimit(_)
+                crate::package::Error::Limit { .. }
             ))
         ));
     }

@@ -3,7 +3,9 @@
 use super::model::{Document, DocumentState};
 use crate::encryption::decrypt_document_streams;
 use crate::leniency::{AuxiliaryTableDefect, ToleranceReport};
-use crate::package::{Error as PackageError, OpenOptions, ResourceKind, ResourceLimit, Result};
+use crate::package::{
+    Error as PackageError, OpenOptions, Result, SourceLimitKind, preflight_declared_streams,
+};
 use crate::parts::associated_strings::DocumentAssociatedStrings;
 use crate::parts::auto_summary::DocumentAutoSummary;
 use crate::parts::bookmarks::BookmarksTable;
@@ -62,20 +64,25 @@ impl Document {
         ole: &mut OleFile<R>,
         options: OpenOptions,
     ) -> Result<Self> {
-        let limits = options.limits();
+        let source_limits = options.get_source_limits();
+        // Charge every declared CFB stream before any DOC-owned payload is
+        // materialized. This covers metadata, Equation Native, embedded
+        // objects, VBA, and opaque streams that format-specific readers may
+        // inspect later.
+        preflight_declared_streams(ole, source_limits)?;
         // Resolve hostile lengths before materializing the corresponding payload.
-        let word_document_size = locate_stream(
+        let _word_document_size = locate_stream(
             ole,
             &["WordDocument"],
-            limits.max_input_bytes(),
+            source_limits.max_entry_bytes(),
             "WordDocument",
         )?
         .ok_or_else(|| PackageError::StreamNotFound("WordDocument".to_string()))?;
 
-        // The FIB selects the table stream, so only WordDocument must be read
-        // before every remaining DOC-owned stream can be charged as a group.
-        // The stream is shared rather than copied: the FIB, the attached
-        // glossary FIB, and this document all read the same bytes.
+        // The global preflight above has charged WordDocument before this
+        // stream is materialized. The stream is shared rather than copied:
+        // the FIB, the attached glossary FIB, and this document all read the
+        // same bytes.
         let mut word_document = Arc::new(ole.open_stream(&["WordDocument"])?);
 
         // Parse the File Information Block (FIB) from the start of WordDocument
@@ -93,10 +100,10 @@ impl Document {
         // format: Word 6.0 and Word 95 keep those structures inside
         // `WordDocument`. Naming the version is far more actionable for the
         // caller than reporting a missing stream.
-        let table_stream_size = locate_stream(
+        let _table_stream_size = locate_stream(
             ole,
             &[table_stream_name],
-            limits.max_input_bytes(),
+            source_limits.max_entry_bytes(),
             table_stream_name,
         )?
         .ok_or_else(|| {
@@ -110,31 +117,12 @@ impl Document {
             }
         })?;
 
-        let data_stream_size = locate_stream(ole, &["Data"], limits.max_input_bytes(), "Data")?;
-        let aggregate_size = word_document_size
-            .checked_add(table_stream_size)
-            .and_then(|value| value.checked_add(data_stream_size.unwrap_or(0)))
-            .ok_or_else(|| {
-                PackageError::ResourceLimit(ResourceLimit::new(
-                    ResourceKind::Aggregate,
-                    u64::MAX,
-                    u64::try_from(limits.max_aggregate_input_bytes()).unwrap_or(u64::MAX),
-                    None,
-                ))
-            })?;
-        let aggregate_limit = u64::try_from(limits.max_aggregate_input_bytes()).unwrap_or(u64::MAX);
-        if aggregate_size > aggregate_limit {
-            return Err(PackageError::ResourceLimit(ResourceLimit::new(
-                ResourceKind::Aggregate,
-                aggregate_size,
-                aggregate_limit,
-                None,
-            )));
-        }
+        let data_stream_present =
+            locate_stream(ole, &["Data"], source_limits.max_entry_bytes(), "Data")?;
 
         let mut table_stream = ole.open_stream(&[table_stream_name])?;
         // According to Apache POI, pictures are stored in Data, not WordDocument.
-        let mut data_stream = data_stream_size
+        let mut data_stream = data_stream_present
             .map(|_| ole.open_stream(&["Data"]))
             .transpose()?;
 
@@ -147,7 +135,7 @@ impl Document {
                 &mut decrypted,
                 &mut table_stream,
                 data_stream.as_deref_mut(),
-                options.password(),
+                options.credential(),
             )?;
             word_document = Arc::new(decrypted);
             // FibBase is clear, but the rest of the FIB was encrypted and must be
@@ -346,7 +334,7 @@ impl Document {
         // Word 97+ files are required to carry a stylesheet. Older Word files use
         // a different FIB and stylesheet representation that is not interpreted here.
         let mut stylesheet = (fib.version() >= 0x00C1)
-            .then(|| StyleSheet::parse_with_leniency(&fib, &table_stream, options.leniency))
+            .then(|| StyleSheet::parse_with_leniency(&fib, &table_stream, options.get_leniency()))
             .transpose()?;
         if let Some(stylesheet) = &mut stylesheet {
             stylesheet.resolve_revision_authors(&revision_authors);
@@ -631,18 +619,17 @@ fn locate_stream<R: Read + Seek>(
     ole: &OleFile<R>,
     path: &[&str],
     max_bytes: usize,
-    label: &'static str,
+    _label: &'static str,
 ) -> Result<Option<u64>> {
     match ole.stream_len(path) {
         Ok(size) => {
             let maximum = u64::try_from(max_bytes).unwrap_or(u64::MAX);
             if size > maximum {
-                return Err(PackageError::ResourceLimit(ResourceLimit::new(
-                    ResourceKind::Stream,
-                    size,
+                return Err(PackageError::Limit {
+                    kind: SourceLimitKind::EntryBytes,
+                    observed: size,
                     maximum,
-                    Some(label),
-                )));
+                });
             }
             Ok(Some(size))
         },
@@ -650,12 +637,6 @@ fn locate_stream<R: Read + Seek>(
         Err(error) => Err(error.into()),
     }
 }
-
-/// The standard OLE property-set streams carrying the document metadata.
-const PROPERTY_SET_STREAMS: [&str; 2] = [
-    "\u{0005}SummaryInformation",
-    "\u{0005}DocumentSummaryInformation",
-];
 
 /// Record the repairs the property-set reader applies to the document
 /// metadata streams, so a lossy metadata decode is enumerable from
@@ -669,7 +650,14 @@ fn append_property_set_repairs<R: Read + Seek>(
     ole: &mut OleFile<R>,
     tolerance: &mut ToleranceReport,
 ) {
-    for name in PROPERTY_SET_STREAMS {
+    // `from_ole_with_options` runs the allocation-free declared-stream
+    // preflight before this function is reached. Keep this comment beside
+    // the reads because property-set payloads are otherwise a separate
+    // metadata path from the main DOC streams.
+    for name in [
+        "\u{0005}SummaryInformation",
+        "\u{0005}DocumentSummaryInformation",
+    ] {
         if let Ok(stream) = ole.property_set_stream(&[name]) {
             tolerance.append_property_set(stream.tolerance_report());
         }

@@ -158,14 +158,17 @@ impl Doc {
         options: &OpenOptions,
         password: Option<&str>,
     ) -> Result<LegacyOpen<Self>> {
-        let mut leaf_options = litchi_doc::OpenOptions::default()
-            .with_limits(options.doc.and_then(|doc| doc.limits).unwrap_or_default());
+        let mut leaf_options = litchi_doc::OpenOptions::default().source_limits(
+            options
+                .doc
+                .and_then(|doc| doc.source_limits)
+                .unwrap_or_default(),
+        );
         if let Some(doc) = options.doc {
-            leaf_options = leaf_options.with_leniency(doc.leniency);
+            leaf_options = leaf_options.leniency(doc.leniency);
         }
         if let Some(password) = password {
-            leaf_options =
-                leaf_options.with_password(litchi_doc::Password::new(password.to_owned()));
+            leaf_options = leaf_options.password(litchi_doc::Password::new(password.to_owned()));
         }
         match litchi_doc::raw::open_package(ole, leaf_options)? {
             litchi_doc::raw::OpenOutcome::Opened(package) => Ok(LegacyOpen::Opened(
@@ -324,8 +327,8 @@ impl Doc {
             return Ok(Some(litchi_doc::Package::from_bytes_with_options(
                 &bytes,
                 litchi_doc::OpenOptions::default()
-                    .with_limits(package.limits())
-                    .with_leniency(package.leniency()),
+                    .source_limits(package.source_limits())
+                    .leniency(package.leniency()),
             )?));
         }
         Ok(Some(package.clone()))
@@ -740,8 +743,7 @@ mod tests {
         let mut package = Package::from_reader(Cursor::new(fixture(name))).unwrap();
         let document = package
             .document_with_options(
-                litchi_doc::OpenOptions::default()
-                    .with_leniency(Leniency::TolerateStylesheetDefects),
+                litchi_doc::OpenOptions::default().leniency(Leniency::TolerateStylesheetDefects),
             )
             .unwrap();
         let doc = open_path(name, &options).unwrap();
