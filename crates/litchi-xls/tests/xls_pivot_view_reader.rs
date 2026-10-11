@@ -2,8 +2,8 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
-    Writer,
+    Builder, PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig,
+    PivotTableConfig,
 };
 use litchi_xls::{
     PivotAxis, PivotAxisField, PivotCacheGrouping, PivotCacheItem, PivotCacheNumericGrouping,
@@ -11,7 +11,7 @@ use litchi_xls::{
 };
 
 fn generated_workbook() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Source").unwrap();
     writer
         .add_pivot_table(
@@ -98,7 +98,7 @@ fn generated_workbook() -> Vec<u8> {
         )
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

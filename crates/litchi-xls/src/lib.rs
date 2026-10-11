@@ -767,10 +767,13 @@ pub use workbook_view::{WorkbookView, WorkbookWindow};
 pub use worksheet::Worksheet;
 pub use worksheet::layout::Layout;
 pub use writer::{
-    ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite, Writer,
+    Builder, ShapeColor, ShapeFill, ShapeKind, ShapeLine, ShapeText, ShapeTextRun, ShapeWrite,
 };
 pub use xf_ext::{ExtProp, FullColorExt, FullColorType, XfExt};
 pub use xml_map::{
     DataBinding, LoadMode, Map, MapId, MapInfo, NamespaceDeclaration, OpaqueXml, Schema, SchemaId,
     XPath,
 };
+
+/// Fresh XLS workbook authoring.
+pub mod builder;

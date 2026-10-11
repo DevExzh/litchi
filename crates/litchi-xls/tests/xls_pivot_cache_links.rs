@@ -2,7 +2,7 @@ use std::io::Cursor;
 
 use litchi_xls::raw::Reader;
 use litchi_xls::writer::{
-    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotTableConfig, Writer,
+    Builder, PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotTableConfig,
 };
 
 const SXVIEW: u16 = 0x00B0;
@@ -59,7 +59,7 @@ fn pivot_config(
 }
 
 fn generated_bytes(pivots_per_sheet: &[usize]) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for (sheet_index, &pivot_count) in pivots_per_sheet.iter().enumerate() {
         let sheet_name = format!("Source{}", sheet_index + 1);
         let sheet = writer.add_worksheet(&sheet_name).unwrap();
@@ -79,7 +79,7 @@ fn generated_bytes(pivots_per_sheet: &[usize]) -> Vec<u8> {
         }
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

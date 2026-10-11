@@ -135,7 +135,7 @@ pub enum Error {
     /// A decoded worksheet cannot be edited through the create-only worksheet API.
     ///
     /// Use a source-checked transaction when one exists for the selected XLS
-    /// feature, or author a new worksheet through [`crate::writer::Writer`].
+    /// feature, or author a new worksheet through [`crate::writer::Builder`].
     SourceBoundWorksheetMutation {
         /// The attempted create-only operation.
         operation: &'static str,

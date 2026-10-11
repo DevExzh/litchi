@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
-use litchi_xls::{Scenario, ScenarioCell, ScenarioManager, ScenarioRange, Writer, raw::Reader};
+use litchi_xls::{Builder, Scenario, ScenarioCell, ScenarioManager, ScenarioRange, raw::Reader};
 
 fn poi_fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -32,11 +32,11 @@ fn scenario_manager_round_trip_keeps_values_inert() {
     manager.set_shown_scenario(Some(0));
     manager.set_result_ranges(vec![ScenarioRange::new(0, 2, 0, 1).unwrap()]);
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Scenarios").unwrap();
     writer.set_scenario_manager(sheet, manager).unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
 
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let manager = workbook
@@ -70,7 +70,7 @@ fn reads_poi_empty_scenario_manager_fixture() {
 
 #[test]
 fn writer_rejects_scenario_resource_bounds() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Scenarios").unwrap();
     let too_many = Scenario::new(
         "Too many",

@@ -2,8 +2,8 @@ use std::{fs::File, io::Cursor, path::PathBuf};
 
 use litchi_xls::{
     AutoFilter12Criterion, AutoFilter12Icon, AutoFilter12IconSet, AutoFilter12Operator,
-    AutoFilter12Value, ListColumnId, ListObject, ListObjectColumn, ListObjectId, ListObjectRange,
-    ListObjectStyleOptions, TableAutoFilter12, Writer, raw::Reader,
+    AutoFilter12Value, Builder, ListColumnId, ListObject, ListObjectColumn, ListObjectId,
+    ListObjectRange, ListObjectStyleOptions, TableAutoFilter12, raw::Reader,
 };
 
 #[test]
@@ -49,11 +49,11 @@ fn table_autofilter12_scalar_criteria_writer_reader_round_trip_inertly() {
     .with_autofilter12_criteria(filter.clone())
     .unwrap();
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Filters").unwrap();
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
 
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let parsed = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
@@ -84,11 +84,11 @@ fn apache_poi_icon_filter_table_round_trips_through_writer() {
     .with_autofilter12_criteria(TableAutoFilter12::try_new_icon(1, expected).unwrap())
     .unwrap();
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("POI icon filter").unwrap();
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert_eq!(
         workbook.xls_worksheet(0).unwrap().list_objects()[0]

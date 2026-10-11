@@ -1,5 +1,5 @@
 use super::super::super::formatting::{CellStyle, ExtendedFormat};
-use super::super::{CellPos, CellValue, Hyperlink, WritableCell, Writer};
+use super::super::{Builder, CellPos, CellValue, Hyperlink, WritableCell};
 use crate::error::{Error, Result};
 use crate::writer::formula::{FormulaTokenizer, encode_ptg_tokens};
 use crate::writer::string_limits::{SHARED_STRING_UNITS, ensure_utf16_len_within};
@@ -24,7 +24,7 @@ fn check_formula_cell(pos: CellPos, formula: &str, metadata: crate::FormulaMetad
     Ok(())
 }
 
-impl Writer {
+impl Builder {
     /// Write a string value to a cell
     ///
     /// # Arguments

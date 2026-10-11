@@ -1,7 +1,7 @@
-use super::super::{FileSharing, SheetProtection, Writer};
+use super::super::{Builder, FileSharing, SheetProtection};
 use crate::error::{Error, Result};
 
-impl Writer {
+impl Builder {
     fn hash_password(password: &str) -> u16 {
         let bytes = password.as_bytes();
         if bytes.is_empty() {

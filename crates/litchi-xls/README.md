@@ -24,12 +24,12 @@ workbook is source-bound because `litchi-xls` does not provide a whole-sheet
 BIFF8 re-save path; its public create-only mutators return a typed refusal
 instead of accepting an edit that could be dropped. Use an existing
 feature-specific transaction where one applies, or create a new worksheet with
-`Writer`.
+`Builder`.
 
-`Writer::set_password` permits the RC4 profiles. Legacy BIFF8 XOR obfuscation
+`Builder::set_password` permits the RC4 profiles. Legacy BIFF8 XOR obfuscation
 is intentionally decode-only by default and can only be authored with the
 explicit `WeakEncryptionPolicy::allow_xor_obfuscation()` capability and
-`Writer::set_xor_obfuscation_password`; it is not confidentiality protection.
+`Builder::set_xor_obfuscation_password`; it is not confidentiality protection.
 
 ```rust
 use litchi_xls::Package;
@@ -45,9 +45,11 @@ println!("sheets: {}", workbook.worksheet_count()?);
 It publishes exact bytes through `to_bytes`, `write_to`, and atomic `save`.
 Encrypted inputs require explicit source export; ordinary publication refuses
 them. The old generic eager reader is available only as `raw::Reader`.
-Primary changes use `Package::edit()` and `Package::apply(&patch)`. Builder
-creation remains under migration; focused feature engines and `Writer` remain
-available.
+Primary changes use `Package::edit()` and `Package::apply(&patch)`. Fresh authoring
+uses `Builder::build()` to produce a validated Package; publication belongs to
+that owner. Builders have no save, stream or byte-output methods. Encrypted
+builds retain the encrypted image and publish it explicitly through
+`Package::to_encrypted_bytes()`; ordinary publication refuses encrypted owners.
 
 ## Eager reader limits
 

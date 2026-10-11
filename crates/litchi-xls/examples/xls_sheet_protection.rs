@@ -1,4 +1,4 @@
-//! Sheet Protection — XLS Writer + Round-Trip Read Example
+//! Sheet Protection — XLS Builder + Round-Trip Read Example
 //!
 //! Demonstrates writing sheet protection (PROTECT, OBJECTPROTECT, SCENPROTECT,
 //! PASSWORD records) and then reading them back to verify the round-trip.
@@ -7,7 +7,7 @@
 //!
 //! The file is saved to `output/xls_sheet_protection.xls`.
 
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 use litchi_xls::writer::Column;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(output_dir)?;
     let output_path = output_dir.join("xls_sheet_protection.xls");
 
-    let mut w = Writer::new();
+    let mut w = Builder::new();
 
     // ================================================================
     // Sheet 1 — Protected with password + object/scenario protection
@@ -83,7 +83,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ================================================================
     // Save
     // ================================================================
-    w.save(&output_path)?;
+    w.build()?.save(&output_path)?;
     println!("\nSaved to: {}", output_path.display());
 
     // ================================================================

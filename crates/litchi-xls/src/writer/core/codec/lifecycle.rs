@@ -1,7 +1,7 @@
 use super::super::super::formatting::FormattingManager;
 use super::super::{
-    CalculationSettings, FunctionGroupOptions, WorkbookEnvironmentOptions, WorkbookWindowOptions,
-    WritableWorksheet, Writer,
+    Builder, CalculationSettings, FunctionGroupOptions, WorkbookEnvironmentOptions,
+    WorkbookWindowOptions, WritableWorksheet,
 };
 use crate::encryption::{WriterEncryption, validate_writer_encryption};
 use crate::error::{Error, Result};
@@ -10,7 +10,7 @@ use crate::writer::string_limits::WORKSHEET_NAME_UNITS;
 use crate::{EncryptionProfile, WeakEncryptionPolicy};
 use zeroize::Zeroizing;
 
-impl Writer {
+impl Builder {
     /// Create a new XLS writer
     #[must_use]
     pub fn new() -> Self {

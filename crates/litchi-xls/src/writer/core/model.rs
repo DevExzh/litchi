@@ -12,7 +12,7 @@ use crate::writer::string_limits::{
 };
 use crate::{DifferentialFormat, TableStyle, TableStyles, XfProperty};
 use std::collections::HashSet;
-/// Public configuration for adding a pivot table via [`Writer::add_pivot_table`].
+/// Public configuration for adding a pivot table via [`Builder::add_pivot_table`].
 #[derive(Debug, Clone)]
 pub struct PivotTableConfig {
     /// Pivot table name.
@@ -534,7 +534,7 @@ pub enum CellValue {
     Blank,
 }
 
-/// BIFF8 worksheet print/page setup written by `Writer::set_page_setup`.
+/// BIFF8 worksheet print/page setup written by `Builder::set_page_setup`.
 #[derive(Debug, Clone, PartialEq)]
 pub struct PageSetupOptions {
     pub print_headers: bool,
@@ -1345,7 +1345,7 @@ pub(super) fn prepare_data_validation(
 /// XLS file writer
 ///
 /// Provides methods to create and modify XLS (BIFF8) files.
-pub struct Writer {
+pub struct Builder {
     /// Worksheets to write
     pub(super) worksheets: Vec<WritableWorksheet>,
     /// Workbook-level defined names (named ranges).
@@ -1384,7 +1384,7 @@ pub struct Writer {
     pub(super) encryption: Option<WriterEncryption>,
 }
 
-impl Default for Writer {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

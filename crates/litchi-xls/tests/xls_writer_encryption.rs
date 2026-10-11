@@ -2,11 +2,11 @@ use std::io::Cursor;
 
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{Cell, CellValue, WorkbookTrait};
-use litchi_xls::writer::{EncryptionProfile, Writer};
+use litchi_xls::writer::{Builder, EncryptionProfile};
 use litchi_xls::{Error, OpenOptions, WeakEncryptionPolicy, raw::Reader};
 
 fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let first = writer.add_worksheet("Data").unwrap();
     let second = writer.add_worksheet("Second").unwrap();
     writer.write_string(first, 0, 0, "shared text").unwrap();
@@ -22,9 +22,7 @@ fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
             .unwrap(),
         _ => writer.set_password(password, profile).unwrap(),
     }
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
-    output.into_inner()
+    writer.build().unwrap().to_encrypted_bytes().unwrap()
 }
 
 fn open<'a>(bytes: &'a [u8], password: Option<&str>) -> Result<Reader<Cursor<&'a [u8]>>, Error> {
@@ -153,7 +151,7 @@ fn salts_are_nondeterministic_and_configuration_changes_are_atomic() {
         &filepass(&second_stream).1[6..22]
     );
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet").unwrap();
     writer
         .set_password("kept", EncryptionProfile::OfficeBinaryRc4)

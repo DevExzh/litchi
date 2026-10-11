@@ -480,7 +480,7 @@ fn invalid_data<T>(message: impl Into<String>) -> Result<T> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Writer, raw::Reader};
+    use crate::{Builder, raw::Reader};
     use litchi_cfb::{OleFile, OleWriter};
     use std::io::Cursor;
 
@@ -596,10 +596,14 @@ mod tests {
 
     #[test]
     fn parsed_xls_workbook_discovers_invalid_vba_payloads_as_inert_metadata() {
-        let mut source_writer = Writer::new();
+        let mut source_writer = Builder::new();
         source_writer.add_worksheet("Sheet1").unwrap();
         let mut source_bytes = Cursor::new(Vec::new());
-        source_writer.write_to(&mut source_bytes).unwrap();
+        source_writer
+            .build()
+            .unwrap()
+            .write_to(&mut source_bytes)
+            .unwrap();
         let mut source = OleFile::open(Cursor::new(source_bytes.into_inner())).unwrap();
         let workbook_stream = source.open_stream(&["Workbook"]).unwrap();
 

@@ -9,13 +9,13 @@
 //! cargo run --example minimal_xls --features ole --no-default-features
 //! ```
 
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("Creating minimal.xls via Writer...");
+    println!("Creating minimal.xls via Builder...");
 
     // Create a new XLS writer
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     // Single worksheet with a few basic cells
     let sheet = writer.add_worksheet("Sheet1")?;
@@ -39,7 +39,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Save workbook into an OLE compound file
     let output = "minimal.xls";
     println!("Saving to {output}...");
-    writer.save(output)?;
+    writer.build()?.save(output)?;
 
     println!("Done. Open '{output}' in Microsoft Excel to verify.");
 

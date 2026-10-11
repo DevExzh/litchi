@@ -3,7 +3,7 @@
 use std::io::Cursor;
 
 use litchi_cfb::{DirectoryEntry, OleFile, OleWriter};
-use litchi_xls::{UserNamesLimits, UserNamesPackageSnapshot, Writer, raw::Reader};
+use litchi_xls::{Builder, UserNamesLimits, UserNamesPackageSnapshot, raw::Reader};
 
 const USER_NAMES_STREAM_NAME: &str = "User Names";
 const REVISION_LOG_STREAM_NAME: &str = "Revision Log";
@@ -131,11 +131,15 @@ fn workbook_container(user_names: Vec<u8>, revision_log: Vec<u8>) -> Vec<u8> {
 }
 
 fn authored_workbook_stream() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_string(sheet, 0, 0, "shared").unwrap();
     let mut workbook_bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut workbook_bytes).unwrap();
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut workbook_bytes)
+        .unwrap();
     let mut source = OleFile::open(Cursor::new(workbook_bytes.into_inner())).unwrap();
     source.open_stream(&["Workbook"]).unwrap()
 }

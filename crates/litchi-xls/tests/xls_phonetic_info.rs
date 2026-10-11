@@ -1,18 +1,18 @@
 //! Round-trip tests for the BIFF8 `PhoneticInfo` record.
 
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 use litchi_xls::{
     PhoneticAlignment, PhoneticFormat, PhoneticInfo, PhoneticRange, PhoneticType, raw::Reader,
 };
 use std::io::Cursor;
 
 fn written_workbook(phonetic_info: Option<PhoneticInfo>) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Phonetic").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
     writer.set_phonetic_info(sheet, phonetic_info).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

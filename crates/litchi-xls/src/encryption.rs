@@ -35,7 +35,7 @@ pub enum EncryptionProfile {
 /// at the call site to make an intentional compatibility downgrade visible in
 /// code and diagnostics.
 #[derive(Debug, PartialEq, Eq)]
-#[must_use = "weak encryption must be explicitly passed to Writer::set_xor_obfuscation_password"]
+#[must_use = "weak encryption must be explicitly passed to Builder::set_xor_obfuscation_password"]
 pub struct WeakEncryptionPolicy {
     _private: (),
 }

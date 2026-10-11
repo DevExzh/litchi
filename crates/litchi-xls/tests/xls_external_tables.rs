@@ -1,6 +1,6 @@
 use std::io::Cursor;
 
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 use litchi_xls::{
     ExternalTableField, ExternalTableMetadata, ExternalTableVersion, ListColumnId, ListObject,
     ListObjectColumn, ListObjectFeatureVersion, ListObjectId, ListObjectRange,
@@ -63,11 +63,11 @@ fn external_table() -> ListObject {
 
 #[test]
 fn feature12_external_metadata_round_trips_inertly() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Query results").unwrap();
     writer.add_list_object(sheet, external_table()).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let first = output.into_inner();
     let workbook = Reader::new(Cursor::new(first.clone())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
@@ -178,11 +178,11 @@ fn feature11_web_source_round_trips_typed_inert_sync_metadata() {
     .unwrap()
     .with_web_source(metadata)
     .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Web").unwrap();
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.feature_version(), ListObjectFeatureVersion::Feature11);
@@ -232,7 +232,7 @@ fn feature11_xml_source_round_trips_typed_mapping() {
     .unwrap()
     .with_xml_source(metadata)
     .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("XML").unwrap();
     assert!(writer.add_list_object(sheet, table.clone()).is_err());
     assert!(writer.xml_map().is_none());
@@ -247,7 +247,7 @@ fn feature11_xml_source_round_trips_typed_mapping() {
     assert_eq!(writer.xml_map().unwrap().maps()[0].id().get(), 9);
     assert!(writer.remove_xml_map().is_err());
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     let mut package = litchi_cfb::OleFile::open(Cursor::new(bytes.clone())).unwrap();
     let xml_streams = package
@@ -307,11 +307,11 @@ fn feature12_web_source_round_trips_typed_with_loaded_total_formula() {
     .unwrap()
     .with_web_source(metadata)
     .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Web12").unwrap();
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.feature_version(), ListObjectFeatureVersion::Feature12);
@@ -357,14 +357,14 @@ fn feature12_xml_source_round_trips_typed_with_loaded_total_formula() {
     .unwrap()
     .with_xml_source(metadata)
     .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Xml12").unwrap();
     writer
         .put_xml_map(map_info(12, "Feature12", "root"))
         .unwrap();
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.feature_version(), ListObjectFeatureVersion::Feature12);

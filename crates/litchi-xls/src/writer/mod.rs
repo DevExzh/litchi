@@ -51,19 +51,19 @@ pub use crate::{DefinedNameFutureRecords, NameFnGrp12, NamePublish};
 pub use crate::{EncryptionProfile, WeakEncryptionPolicy};
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
-    AddInFunctionOptions, CalculationSettings, CellValue, CommentTextRunWrite, CommentWriteOptions,
-    ConditionalFormat, ConditionalFormat12Group, ConditionalFormat12Rule, ConditionalFormat12Type,
-    ConditionalFormatGroup, ConditionalFormatOperator, ConditionalFormatRange,
-    ConditionalFormatRule, ConditionalFormatType, ConditionalPattern, CustomTableStyles,
-    DataValidation, DataValidationErrorStyle, DataValidationFormulaKind, DataValidationImeMode,
-    DataValidationOperator, DataValidationOptions, DataValidationRange, DataValidationTableOptions,
-    DataValidationType, DdeOrOleItemOptions, DdeOrOleLinkOptions, DefinedName,
-    DefinedNameRecordOptions, ExternalCacheRowOptions, ExternalDefinedNameOptions,
+    AddInFunctionOptions, Builder, CalculationSettings, CellValue, CommentTextRunWrite,
+    CommentWriteOptions, ConditionalFormat, ConditionalFormat12Group, ConditionalFormat12Rule,
+    ConditionalFormat12Type, ConditionalFormatGroup, ConditionalFormatOperator,
+    ConditionalFormatRange, ConditionalFormatRule, ConditionalFormatType, ConditionalPattern,
+    CustomTableStyles, DataValidation, DataValidationErrorStyle, DataValidationFormulaKind,
+    DataValidationImeMode, DataValidationOperator, DataValidationOptions, DataValidationRange,
+    DataValidationTableOptions, DataValidationType, DdeOrOleItemOptions, DdeOrOleLinkOptions,
+    DefinedName, DefinedNameRecordOptions, ExternalCacheRowOptions, ExternalDefinedNameOptions,
     ExternalSheetOptions, ExternalWorkbookOptions, FunctionGroupOptions, PageSetupOptions,
     PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
     ShapeColor, ShapeFill, ShapeGroupChild, ShapeGroupWrite, ShapeKind, ShapeLine, ShapeText,
     ShapeTextRun, ShapeWrite, WorkbookEnvironmentOptions, WorkbookWindowOptions,
-    WorksheetLayoutOptions, Writer,
+    WorksheetLayoutOptions,
 };
 pub use formatting::{
     BorderStyle, Borders, CellStyle, ExtendedFormat, Fill, FillPattern, Font, FormattingManager,

@@ -1454,13 +1454,13 @@ mod tests {
     use std::io;
 
     fn package(sheet_count: usize) -> Vec<u8> {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         for index in 0..sheet_count {
             let sheet = writer.add_worksheet(&format!("Sheet{index}")).unwrap();
             writer.write_number(sheet, 0, 0, index as f64).unwrap();
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         let mut package =
             PackageEditor::open(output.into_inner(), Targets::default(), Limits::default())
                 .unwrap();

@@ -1,7 +1,7 @@
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("AutoFilter")?;
 
     writer.write_string(sheet, 0, 0, "Item")?;
@@ -26,6 +26,6 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     writer.set_auto_filter(sheet, 0, 4, 0, 2)?;
 
-    writer.save("xls_autofilter.xls")?;
+    writer.build()?.save("xls_autofilter.xls")?;
     Ok(())
 }

@@ -5,7 +5,7 @@
 use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_xls::{REVISION_LOG_STREAM_NAME, Revision, RevisionType, Writer, raw::Reader};
+use litchi_xls::{Builder, REVISION_LOG_STREAM_NAME, Revision, RevisionType, raw::Reader};
 
 // BIFF8 record types (MS-XLS 2.3 record enumeration values).
 const EOF_RECORD_TYPE: u16 = 0x000A;
@@ -126,15 +126,19 @@ fn revision_log_stream() -> Vec<u8> {
     stream
 }
 
-/// Write a minimal workbook with `Writer`, then move its `Workbook`
+/// Write a minimal workbook with `Builder`, then move its `Workbook`
 /// stream into a fresh container that also holds the supplied extra streams.
 fn workbook_container(extra_streams: &[(&str, Vec<u8>)]) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.add_worksheet("Sheet2").unwrap();
     writer.write_string(sheet, 0, 0, "shared").unwrap();
     let mut workbook_bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut workbook_bytes).unwrap();
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut workbook_bytes)
+        .unwrap();
 
     let mut ole = OleFile::open(Cursor::new(workbook_bytes.into_inner())).unwrap();
     let workbook_stream = ole.open_stream(&["Workbook"]).unwrap();

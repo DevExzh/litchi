@@ -3,8 +3,8 @@ use std::io::Cursor;
 use std::path::{Path, PathBuf};
 
 use litchi_xls::writer::{
-    AddInFunctionOptions, DdeOrOleItemOptions, DdeOrOleLinkOptions, ExternalDefinedNameOptions,
-    ExternalSheetOptions, ExternalWorkbookOptions, Writer,
+    AddInFunctionOptions, Builder, DdeOrOleItemOptions, DdeOrOleLinkOptions,
+    ExternalDefinedNameOptions, ExternalSheetOptions, ExternalWorkbookOptions,
 };
 use litchi_xls::{
     CachedValue, ClipboardFormat, ErrorValue, NameBody, SupportingBook, ValueMatrix, raw::Reader,
@@ -18,7 +18,7 @@ fn fixture(name: &str) -> PathBuf {
 
 #[test]
 fn generated_external_names_round_trip_as_inert_metadata() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Local").unwrap();
     let book = writer
         .add_external_workbook_link(ExternalWorkbookOptions {
@@ -95,7 +95,7 @@ fn generated_external_names_round_trip_as_inert_metadata() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let links = workbook.external_links();
     assert_eq!(links.supporting_books().len(), 3);

@@ -11,12 +11,13 @@ use litchi_xls::validation::{
     XlsValidationError, XlsValidationLimits, validate_source, validate_source_with_limits,
 };
 use litchi_xls::writer::{
-    AddInFunctionOptions, DdeOrOleItemOptions, DdeOrOleLinkOptions, ExternalDefinedNameOptions,
-    ExternalSheetOptions, ExternalWorkbookOptions, WeakEncryptionPolicy, Writer,
+    AddInFunctionOptions, Builder, DdeOrOleItemOptions, DdeOrOleLinkOptions,
+    ExternalDefinedNameOptions, ExternalSheetOptions, ExternalWorkbookOptions,
+    WeakEncryptionPolicy,
 };
 
 fn authored(protected: bool, encrypted: bool) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").expect("worksheet");
     writer.write_number(sheet, 0, 0, 42.0).expect("number");
     if protected {
@@ -30,13 +31,18 @@ fn authored(protected: bool, encrypted: bool) -> Vec<u8> {
             .set_xor_obfuscation_password("secret", WeakEncryptionPolicy::allow_xor_obfuscation())
             .expect("XOR protection");
     }
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("write XLS");
-    output.into_inner()
+    let package = writer.build().expect("build XLS");
+    if encrypted {
+        package.to_encrypted_bytes().expect("write encrypted XLS")
+    } else {
+        let mut output = Cursor::new(Vec::new());
+        package.write_to(&mut output).expect("write plaintext XLS");
+        output.into_inner()
+    }
 }
 
 fn authored_external() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Sheet1").expect("worksheet");
     let book = writer
         .add_external_workbook_link(ExternalWorkbookOptions {
@@ -81,12 +87,16 @@ fn authored_external() -> Vec<u8> {
         })
         .expect("DDE link");
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("write XLS");
+    writer
+        .build()
+        .expect("build XLS")
+        .write_to(&mut output)
+        .expect("write XLS");
     output.into_inner()
 }
 
 fn authored_encrypted_with_write_reservation() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").expect("worksheet");
     writer.write_number(sheet, 0, 0, 42.0).expect("number");
     writer
@@ -95,9 +105,11 @@ fn authored_encrypted_with_write_reservation() -> Vec<u8> {
     writer
         .set_xor_obfuscation_password("secret", WeakEncryptionPolicy::allow_xor_obfuscation())
         .expect("XOR protection");
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("write XLS");
-    output.into_inner()
+    writer
+        .build()
+        .expect("build XLS")
+        .to_encrypted_bytes()
+        .expect("write encrypted XLS")
 }
 
 fn source(bytes: Vec<u8>) -> Arc<dyn ReadAt> {

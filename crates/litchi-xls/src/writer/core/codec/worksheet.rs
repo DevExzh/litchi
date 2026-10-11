@@ -2,11 +2,11 @@ use super::super::super::biff::AutoFilterConditionWrite;
 use super::super::conditional_format::write_legacy_rule;
 use super::super::model::{a1_cell, prepare_data_validation};
 use super::super::{
-    AutoFilterColumnDef, AutoFilterRange, CellPos, CellValue, ConditionalFormat,
+    AutoFilterColumnDef, AutoFilterRange, Builder, CellPos, CellValue, ConditionalFormat,
     ConditionalFormat12Group, ConditionalFormat12Type, ConditionalFormatGroup,
     ConditionalFormatOperator, DataValidation, DataValidationOptions, DataValidationRange,
     DataValidationTableOptions, DefinedName, HorizontalPageBreak, MergedRange, PageSetupOptions,
-    SortConfig, VerticalPageBreak, WorksheetLayoutOptions, WritableCell, Writer,
+    SortConfig, VerticalPageBreak, WorksheetLayoutOptions, WritableCell,
 };
 use crate::error::{Error, Result};
 use std::collections::HashSet;
@@ -22,7 +22,7 @@ fn check_conditional_format_identifier(worksheet: &super::super::WritableWorkshe
     Ok(())
 }
 
-impl Writer {
+impl Builder {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.

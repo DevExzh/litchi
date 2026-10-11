@@ -5,12 +5,12 @@
 //!
 //! Run with: cargo run --example `comprehensive_xls_test`
 
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    println!("=== Comprehensive XLS Writer Test ===\n");
+    println!("=== Comprehensive XLS Builder Test ===\n");
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     // ============================================================
     // 1. SALES DATA SHEET - Numbers, Strings, and Formulas
@@ -383,7 +383,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // SAVE FILE
     // ============================================================
     println!("\nSaving to comprehensive_test.xls...");
-    writer.save("comprehensive_test.xls")?;
+    writer.build()?.save("comprehensive_test.xls")?;
 
     println!("\n✅ SUCCESS! XLS file created with:");
     println!("   ✓ 6 worksheets with different data");

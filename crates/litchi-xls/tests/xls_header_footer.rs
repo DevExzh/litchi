@@ -1,16 +1,16 @@
 //! Round-trip tests for the BIFF8 `HeaderFooter` record (even/first pages).
 
-use litchi_xls::writer::{PageSetupOptions, Writer};
+use litchi_xls::writer::{Builder, PageSetupOptions};
 use litchi_xls::{HeaderFooter, raw::Reader};
 use std::io::Cursor;
 
 fn written_workbook(options: PageSetupOptions) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("HF").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
     writer.set_page_setup(sheet, options).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

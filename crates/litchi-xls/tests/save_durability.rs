@@ -15,7 +15,7 @@ use litchi_core::Durability;
 use litchi_xls::cell_values::{Reference, Selector};
 use litchi_xls::comments::{Snapshot, Value};
 use litchi_xls::raw::Reader;
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
 
@@ -53,28 +53,29 @@ fn scratch_directory() -> ScratchDirectory {
     ScratchDirectory(directory)
 }
 
-fn writer() -> Writer {
-    let mut writer = Writer::new();
-    let sheet = writer.add_worksheet("Notes").unwrap();
-    writer
+fn builder() -> Builder {
+    let mut builder = Builder::new();
+    let sheet = builder.add_worksheet("Notes").unwrap();
+    builder
         .write_string(sheet, 0, 0, "save durability 0761")
         .unwrap();
-    writer.add_comment(sheet, 0, 1, "Author", "note").unwrap();
-    writer
+    builder.add_comment(sheet, 0, 1, "Author", "note").unwrap();
+    builder
 }
 
 #[test]
 fn every_writer_level_publishes_the_default_save_bytes() {
     let directory = scratch_directory();
-    let mut writer = writer();
+    let mut builder = builder();
+    let package = builder.build().unwrap();
     let reference = directory.join("reference.xls");
-    writer.save(&reference).unwrap();
+    package.save(&reference).unwrap();
     let expected = std::fs::read(&reference).unwrap();
 
     for durability in LEVELS {
         let destination = directory.join(format!("{}.xls", durability.as_str()));
         std::fs::write(&destination, b"old destination").unwrap();
-        writer
+        package
             .save_with_durability(&destination, durability)
             .unwrap();
         assert_eq!(
@@ -91,7 +92,7 @@ fn every_writer_level_publishes_the_default_save_bytes() {
 #[test]
 fn every_source_backed_overlay_level_publishes_the_default_save_bytes() {
     let mut source = Cursor::new(Vec::new());
-    writer().write_to(&mut source).unwrap();
+    builder().build().unwrap().write_to(&mut source).unwrap();
     let mut edit = Snapshot::from_bytes(source.into_inner()).unwrap().edit();
     edit.replace(
         Selector::Position(0),

@@ -4,7 +4,7 @@ use std::path::PathBuf;
 
 use litchi_core::sheet::WorkbookTrait;
 use litchi_xls::writer::sort::{Config, Key, On, Parent, Range};
-use litchi_xls::writer::{CustomTableStyles, Writer};
+use litchi_xls::writer::{Builder, CustomTableStyles};
 use litchi_xls::{
     ListColumnId, ListObject, ListObjectColumn, ListObjectFeatureVersion, ListObjectId,
     ListObjectRange, ListObjectStyleOptions, ListTotalAggregation, TableStyle, raw::Reader,
@@ -49,7 +49,7 @@ fn writer_custom_list_object_round_trips_through_reader() {
         vec![custom_style],
     )
     .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.set_custom_table_styles(styles).unwrap();
     let sheet = writer.add_worksheet("Data").unwrap();
     writer
@@ -58,7 +58,7 @@ fn writer_custom_list_object_round_trips_through_reader() {
     writer.write_string(sheet, 1, 0, "East").unwrap();
     writer.write_number(sheet, 1, 1, 42.0).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let table = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(table.id().value(), 7);
@@ -113,7 +113,7 @@ fn writer_rejects_table_collisions_ranges_and_style_references_atomically() {
         )
         .is_err()
     );
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let first = writer.add_worksheet("One").unwrap();
     let second = writer.add_worksheet("Two").unwrap();
     writer
@@ -139,7 +139,13 @@ fn writer_rejects_table_collisions_ranges_and_style_references_atomically() {
             .add_list_object(second, table(3, "Unknown", 0, 3, "NotConfigured"))
             .is_err()
     );
-    assert!(writer.write_to(&mut Cursor::new(Vec::new())).is_ok());
+    assert!(
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut Cursor::new(Vec::new()))
+            .is_ok()
+    );
 }
 
 #[test]
@@ -155,11 +161,11 @@ fn long_feature11_uses_strict_continue_frt11_chain_and_round_trips() {
         ListObjectStyleOptions::try_new("TableStyleMedium4").unwrap(),
     )
     .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Wide").unwrap();
     writer.add_list_object(sheet, table).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     let records = workbook_records(&bytes);
     let feature = records.iter().position(|v| v.0 == 0x0872).unwrap();
@@ -197,12 +203,12 @@ fn headerless_internal_feature12_and_table_sort_continuations_round_trip_in_orde
         .unwrap(),
     )
     .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Extended").unwrap();
     writer.add_list_object(sheet, value).unwrap();
     assert_eq!(writer.put_sort(sheet, sort.clone()).unwrap(), None);
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     let types = workbook_records(&bytes)
         .into_iter()
@@ -276,11 +282,11 @@ fn feature12_total_formula_string_and_aggregation_round_trip_inertly() {
     .unwrap()
     .with_totals_row(true)
     .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Totals").unwrap();
     writer.add_list_object(sheet, value).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let parsed = &workbook.xls_worksheet(0).unwrap().list_objects()[0];
     assert_eq!(

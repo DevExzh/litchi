@@ -2,7 +2,7 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig, Writer,
+    Builder, PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
 };
 use litchi_xls::{
     PivotCacheDateGroupUnit, PivotCacheDateGrouping, PivotCacheDateTime,
@@ -55,13 +55,13 @@ fn config(
 }
 
 fn write_configs(configs: Vec<(&str, PivotTableConfig)>) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for (sheet_name, config) in configs {
         let sheet = writer.add_worksheet(sheet_name).unwrap();
         writer.add_pivot_table(sheet, config).unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -264,7 +264,7 @@ fn reads_libreoffice_number_and_date_grouping_fixtures() {
 
 #[test]
 fn invalid_grouping_is_rejected_without_mutating_writer() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
     let mut invalid = numeric_config("Atomic");
     if let Some(PivotCacheGrouping::Numeric(grouping)) = &mut invalid.fields[0].grouping {
@@ -272,7 +272,7 @@ fn invalid_grouping_is_rejected_without_mutating_writer() {
     }
     assert!(writer.add_pivot_table(sheet, invalid).is_err());
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     assert!(
         Reader::new(Cursor::new(output.into_inner()))
             .unwrap()

@@ -7,7 +7,7 @@
 )]
 
 use litchi_cfb::{OleFile, OleWriter};
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 use litchi_xls::cell_values::{
     CellRange, Reference, Selector, Snapshot, Storage, StyleIndex, Value,
 };
@@ -39,13 +39,13 @@ fn workbook_bytes(numbers: &[(u32, u16, f64)], blanks: &[(u32, u16)]) -> Vec<u8>
 }
 
 fn raw_workbook_bytes(numbers: &[(u32, u16, f64)], _blanks: &[(u32, u16)]) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     for &(row, column, value) in numbers {
         writer.write_number(sheet, row, column, value).unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -339,14 +339,18 @@ fn same_width_existing_targets_are_supported_but_occupied_mismatches_are_atomic(
 
 #[test]
 fn strings_formulas_and_unrelated_owners_are_refused_before_staging() {
-    let mut string_writer = Writer::new();
+    let mut string_writer = Builder::new();
     let string_sheet = string_writer.add_worksheet("Sheet1").unwrap();
     string_writer.write_number(string_sheet, 0, 0, 1.0).unwrap();
     string_writer
         .write_string(string_sheet, 0, 1, "not scalar")
         .unwrap();
     let mut string_output = Cursor::new(Vec::new());
-    string_writer.write_to(&mut string_output).unwrap();
+    string_writer
+        .build()
+        .unwrap()
+        .write_to(&mut string_output)
+        .unwrap();
     let string_donor = Snapshot::from_bytes(string_output.into_inner()).unwrap();
     let target = Snapshot::from_bytes(workbook_bytes(&[], &[])).unwrap();
     let range =
@@ -365,13 +369,17 @@ fn strings_formulas_and_unrelated_owners_are_refused_before_staging() {
     );
     assert_eq!(edit.commit().unwrap().snapshot().bytes(), target.bytes());
 
-    let mut formula_writer = Writer::new();
+    let mut formula_writer = Builder::new();
     let formula_sheet = formula_writer.add_worksheet("Sheet1").unwrap();
     formula_writer
         .write_formula(formula_sheet, 0, 0, "1+1")
         .unwrap();
     let mut formula_output = Cursor::new(Vec::new());
-    formula_writer.write_to(&mut formula_output).unwrap();
+    formula_writer
+        .build()
+        .unwrap()
+        .write_to(&mut formula_output)
+        .unwrap();
     let formula_donor = Snapshot::from_bytes(formula_output.into_inner()).unwrap();
     let mut formula_edit = target.edit();
     assert!(

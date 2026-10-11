@@ -8,7 +8,7 @@
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_xls::cell_values::{FormulaCache, Reference, Selector, Snapshot, Value};
-use litchi_xls::{Error, SourceBackedWorkbook, Writer, raw::Reader};
+use litchi_xls::{Builder, Error, SourceBackedWorkbook, raw::Reader};
 use std::io::Cursor;
 use std::sync::Arc;
 
@@ -412,7 +412,7 @@ fn assert_non_workbook_streams_equal(before: &[u8], after: &[u8]) {
 }
 
 fn ancillary_formula_package() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Formula").expect("add worksheet");
     writer
         .write_formula(sheet, 0, 0, "A1")
@@ -421,7 +421,11 @@ fn ancillary_formula_package() -> Vec<u8> {
         .write_number(sheet, 1, 0, 42.0)
         .expect("write seed number");
     let mut base = Cursor::new(Vec::new());
-    writer.write_to(&mut base).expect("write seed package");
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut base)
+        .expect("write seed package");
     let base = base.into_inner();
     let stream = workbook_stream(&base);
     let native_tokens = hex_bytes(CENSUS[0].tokens);

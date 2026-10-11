@@ -51,13 +51,13 @@ fn selected_source_profile_survives_other_option_setters() {
 
 #[test]
 fn valid_workbook_opens_at_exact_physical_and_stream_boundaries() {
-    use litchi_xls::{SourceLimits, Writer, raw::Reader};
+    use litchi_xls::{Builder, SourceLimits, raw::Reader};
     use std::io::Cursor;
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Data").unwrap();
     writer.write_number(sheet, 0, 0, 42.0).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let bytes = output.into_inner();
     let ole = litchi_cfb::OleFile::open(Cursor::new(&bytes)).unwrap();
     let sizes: Vec<_> = (0..ole.directory_entry_count())

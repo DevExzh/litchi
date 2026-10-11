@@ -769,11 +769,11 @@ fn bof() -> Record {
 #[test]
 fn synthetic_worksheets_agree_on_duplicate_and_array_ownership() {
     let bytes = {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 1.0).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         output.into_inner()
     };
     let full = Reader::new(Cursor::new(bytes.as_slice())).unwrap();
@@ -1117,11 +1117,11 @@ const BASE_MULTI_DEFECT_MATRIX: &[(&str, &str)] = &[
 #[test]
 fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
     let bytes = {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 1.0).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         output.into_inner()
     };
     let full = Reader::new(Cursor::new(bytes.as_slice())).unwrap();
@@ -1208,14 +1208,14 @@ fn worksheet_first_error_matrix_matches_the_base_for_multi_defect_inputs() {
 #[test]
 fn kept_cell_refuses_a_position_kept_on_a_different_tab() {
     let bytes = {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let first = writer.add_worksheet("First").unwrap();
         writer.write_number(first, 1, 1, 10.0).unwrap();
         let second = writer.add_worksheet("Second").unwrap();
         writer.write_number(second, 1, 1, 20.0).unwrap();
         writer.write_number(second, 2, 2, 30.0).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
         output.into_inner()
     };
     let full = Reader::new(Cursor::new(bytes.as_slice())).unwrap();

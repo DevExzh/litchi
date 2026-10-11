@@ -3,13 +3,13 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions, Writer,
+    Builder, ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions,
 };
 use litchi_xls::{CachedValue, ErrorValue, raw::Reader};
 
 #[test]
 fn external_workbook_cache_round_trip_is_inert() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Local").unwrap();
     writer
         .add_external_workbook_link(ExternalWorkbookOptions {
@@ -31,7 +31,7 @@ fn external_workbook_cache_round_trip_is_inert() {
         })
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let external = workbook
         .external_links()
@@ -77,7 +77,7 @@ fn reads_poi_and_libreoffice_external_caches() {
 
 #[test]
 fn writer_rejects_external_cache_resource_errors() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert!(
         writer
             .add_external_workbook_link(ExternalWorkbookOptions {

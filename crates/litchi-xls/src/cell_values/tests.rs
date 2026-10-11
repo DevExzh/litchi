@@ -12,7 +12,7 @@ use std::io::Write;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 fn package() -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 3, 2, 4.5).unwrap();
     writer.write_number(sheet, 4, 0, 1.0).unwrap();
@@ -23,7 +23,7 @@ fn package() -> Vec<u8> {
     writer.write_boolean(sheet, 7, 0, true).unwrap();
     writer.write_formula(sheet, 8, 0, "1+1").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let mut package =
         PackageEditor::open(output.into_inner(), Targets::default(), Limits::default()).unwrap();
     package
@@ -33,7 +33,7 @@ fn package() -> Vec<u8> {
 }
 
 fn protected_package(worksheet: bool) -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 3, 2, 4.5).unwrap();
     if worksheet {
@@ -44,7 +44,7 @@ fn protected_package(worksheet: bool) -> Vec<u8> {
         writer.protect_workbook(Some("book"), true, false);
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -190,21 +190,21 @@ fn raw_rk_family_package(storage: Storage, raw_values: &[u32]) -> (Vec<u8>, Refe
 }
 
 fn formula_free_package() -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Plain").unwrap();
     writer.write_number(sheet, 1, 0, 1.0).unwrap();
     writer.write_number(sheet, 3, 1, 2.0).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
 fn formula_package(formula: &str) -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Formula").unwrap();
     writer.write_formula(sheet, 0, 0, formula).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -248,11 +248,11 @@ fn ancillary_formula_package() -> Vec<u8> {
 }
 
 fn positioned_formula_package(formula: &str, row: u32, column: u16) -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let sheet = writer.add_worksheet("Formula").unwrap();
     writer.write_formula(sheet, row, column, formula).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -1494,13 +1494,13 @@ fn sequential_number_commits_reuse_resources_and_reopen_publicly() {
 
 #[test]
 fn number_commit_shares_untouched_worksheet_inventories() {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let first = writer.add_worksheet("First").unwrap();
     writer.write_number(first, 0, 0, 1.0).unwrap();
     let second = writer.add_worksheet("Second").unwrap();
     writer.write_number(second, 0, 0, 2.0).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let source = Snapshot::from_bytes(output.into_inner()).unwrap();
 
     let mut edit = source.edit();
@@ -2762,7 +2762,7 @@ fn snapshot_retains_the_open_shared_string_property_table() {
 }
 
 fn two_sheet_matrix_package() -> Vec<u8> {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let first = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(first, 3, 2, 4.5).unwrap();
     writer.write_string(first, 6, 0, "alpha").unwrap();
@@ -2770,7 +2770,7 @@ fn two_sheet_matrix_package() -> Vec<u8> {
     writer.write_number(second, 1, 1, 8.5).unwrap();
     writer.write_string(second, 2, 0, "beta").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 

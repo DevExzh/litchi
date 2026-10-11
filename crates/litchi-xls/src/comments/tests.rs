@@ -288,7 +288,7 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
     use std::sync::Arc;
 
     for comments in [1_u32, 3, 12] {
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let sheet = writer.add_worksheet("Notes").unwrap();
         for index in 0..comments {
             writer
@@ -304,7 +304,7 @@ fn generic_commit_publishes_the_artifact_a_second_render_would_produce() {
         let other = writer.add_worksheet("Untouched").unwrap();
         writer.write_number(other, 20, 4, 42.0).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        writer.build().unwrap().write_to(&mut output).unwrap();
 
         let source = super::Snapshot::from_bytes(output.into_inner()).unwrap();
         let mut edit = source.edit();

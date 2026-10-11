@@ -2430,6 +2430,36 @@
           "name": "is_changed",
           "scope": "litchi_xls::package::edit::Commit",
           "replacement": "package/into_package and diagnostics().changed()"
+        },
+        {
+          "name": "Writer",
+          "scope": "litchi_xls",
+          "replacement": "use Builder::build returning Package"
+        },
+        {
+          "name": "Writer",
+          "scope": "litchi_xls::writer",
+          "replacement": "use Builder::build returning Package"
+        },
+        {
+          "name": "save",
+          "scope": "litchi_xls::Builder",
+          "replacement": "call build, then publish the returned Package"
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_xls::Builder",
+          "replacement": "call build, then publish the returned Package"
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_xls::Builder",
+          "replacement": "call build, then publish the returned Package"
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_xls::Builder",
+          "replacement": "call build, then publish the returned Package"
         }
       ],
       "families": [

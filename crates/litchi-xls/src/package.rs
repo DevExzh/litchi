@@ -4,7 +4,7 @@
 //! layer.  An eager package retains the parsed raw reader and its original
 //! cursor bytes.  A source-backed package retains the validated positional CFB
 //! view and the lazy semantic reader.  Neither path reserializes an opened
-//! package through [`crate::Writer`] merely to publish an unchanged artifact.
+//! package through [`crate::Builder`] merely to publish an unchanged artifact.
 //!
 //! The raw, generic reader lives under [`crate::raw`] and is intentionally
 //! available only through the explicit `reader_ref` escape on the canonical
@@ -246,11 +246,7 @@ impl Package {
     /// The authored image is admitted under the same strict default policies as
     /// an opened package. Publication and subsequent edits use this owner.
     pub fn new() -> Result<Self> {
-        let mut writer = crate::Writer::new();
-        writer.add_worksheet("Sheet1")?;
-        let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output)?;
-        Self::from_owned_bytes(output.into_inner(), OpenOptions::default())
+        crate::Builder::new().build()
     }
 
     /// Open an XLS package from a copied byte slice under default policies.
@@ -357,7 +353,7 @@ impl Package {
         })
     }
 
-    fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
+    pub(crate) fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
         let cfb_limits =
             litchi_cfb::OleFileLimits::new(options.get_source_limits().max_input_bytes() as u64)?;
         let mut ole_file = OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)?;

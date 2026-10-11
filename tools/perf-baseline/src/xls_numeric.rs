@@ -275,20 +275,20 @@ fn reserve_summary(
 
 /// Builds the deterministic native workbook used by the packed-RK selectors.
 ///
-/// The public writer emits the source Number records.  The narrow corpus
+/// The public builder emits the source Number records.  The narrow corpus
 /// conversion below changes one standalone Number to RK and one adjacent pair
-/// to MulRK using the same BIFF fields and RK encoding as the writer.  The
+/// to MulRK using the same BIFF fields and RK encoding as the builder.  The
 /// complete CFB is then rebuilt with two opaque sibling streams so publication
 /// checks can prove that untouched members and topology survive.
 pub(crate) fn build_rk_mulrk_corpus() -> Result<Corpus, Box<dyn std::error::Error>> {
-    let mut workbook_writer = litchi_xls::writer::Writer::new();
-    let packed = workbook_writer.add_worksheet("Packed")?;
-    workbook_writer.write_number(packed, 0, 0, 1.0)?;
-    workbook_writer.write_number(packed, 1, 0, 2.0)?;
-    workbook_writer.write_number(packed, 1, 1, 3.0)?;
-    workbook_writer.write_number(packed, 3, 2, 17.0)?;
+    let mut workbook_builder = litchi_xls::writer::Builder::new();
+    let packed = workbook_builder.add_worksheet("Packed")?;
+    workbook_builder.write_number(packed, 0, 0, 1.0)?;
+    workbook_builder.write_number(packed, 1, 0, 2.0)?;
+    workbook_builder.write_number(packed, 1, 1, 3.0)?;
+    workbook_builder.write_number(packed, 3, 2, 17.0)?;
     let mut package = Cursor::new(Vec::new());
-    workbook_writer.write_to(&mut package)?;
+    workbook_builder.build()?.write_to(&mut package)?;
 
     let mut source_ole = OleFile::open(Cursor::new(package.into_inner()))?;
     let source_workbook = source_ole.open_stream(&["Workbook"])?;
@@ -401,7 +401,7 @@ fn convert_numbers_to_rk_mulrk(workbook: &[u8]) -> Result<Vec<u8>, Box<dyn std::
     }
     let standalone = *number_indices
         .first()
-        .ok_or("XLS RK/MulRK source writer emitted no Number records")?;
+        .ok_or("XLS RK/MulRK source builder emitted no Number records")?;
     let pair = number_indices
         .windows(2)
         .find(|pair| {
@@ -423,7 +423,7 @@ fn convert_numbers_to_rk_mulrk(workbook: &[u8]) -> Result<Vec<u8>, Box<dyn std::
                 && pair[0] != standalone
         })
         .map(|pair| [pair[0], pair[1]])
-        .ok_or("XLS RK/MulRK source writer emitted no contiguous Number pair")?;
+        .ok_or("XLS RK/MulRK source builder emitted no contiguous Number pair")?;
 
     let mut transformed = Vec::new();
     reserve_exact(
@@ -1257,29 +1257,28 @@ fn require_encrypted_marker(bytes: &[u8]) -> Result<(), Box<dyn std::error::Erro
 }
 
 fn protected_fixture() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
-    let mut writer = litchi_xls::writer::Writer::new();
-    let sheet = writer.add_worksheet("Protected")?;
-    writer.write_number(sheet, 0, 0, 1.0)?;
-    writer.protect_sheet(sheet, Some("password"), true, false)?;
+    let mut builder = litchi_xls::writer::Builder::new();
+    let sheet = builder.add_worksheet("Protected")?;
+    builder.write_number(sheet, 0, 0, 1.0)?;
+    builder.protect_sheet(sheet, Some("password"), true, false)?;
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    builder.build()?.write_to(&mut output)?;
     Ok(output.into_inner())
 }
 
 fn encrypted_fixture() -> Result<Vec<u8>, Box<dyn std::error::Error>> {
     use litchi_xls::WeakEncryptionPolicy;
-    use litchi_xls::writer::{EncryptionProfile, Writer};
+    use litchi_xls::writer::{Builder, EncryptionProfile};
 
-    let mut writer = Writer::new();
-    let sheet = writer.add_worksheet("Encrypted")?;
-    writer.write_number(sheet, 0, 0, 1.0)?;
-    writer.set_xor_obfuscation_password("legacy", WeakEncryptionPolicy::allow_xor_obfuscation())?;
-    if writer.encryption_profile() != Some(EncryptionProfile::XorObfuscation) {
+    let mut builder = Builder::new();
+    let sheet = builder.add_worksheet("Encrypted")?;
+    builder.write_number(sheet, 0, 0, 1.0)?;
+    builder
+        .set_xor_obfuscation_password("legacy", WeakEncryptionPolicy::allow_xor_obfuscation())?;
+    if builder.encryption_profile() != Some(EncryptionProfile::XorObfuscation) {
         return Err("XLS encrypted guard fixture did not retain its encryption profile".into());
     }
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
-    Ok(output.into_inner())
+    Ok(builder.build()?.to_encrypted_bytes()?)
 }
 
 fn source_with_stream(

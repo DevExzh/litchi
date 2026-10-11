@@ -7,7 +7,7 @@
 use litchi_cfb::{OleFile, OleFileLimits, OleWriter, SharedOleFile, consts::STGTY_STREAM};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_xls::package::{Error as PackageError, Package};
-use litchi_xls::{OpenOptions, SourceBackedError, SourceBackedLimits, SourceLimits, Writer};
+use litchi_xls::{Builder, OpenOptions, SourceBackedError, SourceBackedLimits, SourceLimits};
 use std::io::{self, Cursor};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
@@ -23,12 +23,12 @@ fn fixture(relative: &str) -> Vec<u8> {
 }
 
 fn authored_package() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 3, 2, 4.5).unwrap();
     writer.write_number(sheet, 4, 0, 1.0).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -555,13 +555,13 @@ fn source_truncation_during_publication_preserves_typed_fence_error() {
 fn primary_operation_limit_is_typed_and_failed_staging_is_atomic() {
     use litchi_xls::cell_values::Reference;
     use litchi_xls::package::edit::{Error as EditError, LimitKind};
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     for row in 0..4097 {
         writer.write_number(sheet, row, 0, 1.0).unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let source = Package::from_bytes(&output.into_inner()).unwrap();
     let mut edit = source.edit().unwrap();
     for row in 0..4096 {
@@ -807,12 +807,12 @@ fn minimal_creation_supports_native_edits_and_exact_inverse() {
 #[test]
 fn first_cell_in_empty_sheet_repairs_later_sheet_offsets() {
     use litchi_xls::cell_values::{Reference, Value};
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Empty").unwrap();
     let second = writer.add_worksheet("Kept").unwrap();
     writer.write_number(second, 2, 3, 9.0).unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let package = Package::from_bytes(bytes.get_ref()).unwrap();
     let mut edit = package.edit().unwrap();
     edit.insert_cell(0_usize, Reference::new(0, 0).unwrap(), Value::Number(7.0))

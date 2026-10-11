@@ -1,11 +1,11 @@
 use std::io::Cursor;
 
 use litchi_xls::raw::Reader;
-use litchi_xls::writer::{Column, FrozenPanes, Row, Writer};
+use litchi_xls::writer::{Builder, Column, FrozenPanes, Row};
 
 #[test]
 fn row_and_column_property_apis_round_trip_checked_locations() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Locations").unwrap();
     let row = Row::new(40).unwrap();
     let column = Column::new(12).unwrap();
@@ -25,7 +25,7 @@ fn row_and_column_property_apis_round_trip_checked_locations() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     bytes.set_position(0);
     let workbook = Reader::new(bytes).unwrap();
     let worksheet = workbook.xls_worksheet(0).unwrap();

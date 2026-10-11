@@ -3,11 +3,11 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::raw::Reader;
-use litchi_xls::writer::{WorksheetLayoutOptions, Writer};
+use litchi_xls::writer::{Builder, WorksheetLayoutOptions};
 
 #[test]
 fn worksheet_layout_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Layout").unwrap();
     writer
         .set_worksheet_layout(
@@ -37,7 +37,7 @@ fn worksheet_layout_round_trip() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let layout = workbook.xls_worksheet(0).unwrap().layout();
     assert_eq!(layout.default_row_height_twips(), 360);
@@ -78,7 +78,7 @@ fn reads_poi_column_width_fixture_defaults() {
 
 #[test]
 fn writer_rejects_invalid_layout_bounds() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Layout").unwrap();
     assert!(
         writer

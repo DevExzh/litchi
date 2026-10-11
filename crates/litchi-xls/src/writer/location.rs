@@ -60,7 +60,7 @@ impl Column {
 ///
 /// `Row` and `Column` are reused here because the `Pane` record represents
 /// each frozen count in the same bounded BIFF8 domains. A zero/zero value is
-/// a semantic request to clear frozen panes; [`crate::writer::Writer::unfreeze_panes`]
+/// a semantic request to clear frozen panes; [`crate::writer::Builder::unfreeze_panes`]
 /// is the more direct spelling for that operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct FrozenPanes {

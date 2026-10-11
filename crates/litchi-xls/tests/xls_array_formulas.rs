@@ -4,7 +4,7 @@ use litchi_cfb::OleWriter;
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::formula_metadata::Range;
 use litchi_xls::raw::Reader;
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 
 const BOF: u16 = 0x0809;
 const BOUNDSHEET8: u16 = 0x0085;
@@ -279,13 +279,13 @@ fn malformed_array_links_are_rejected_through_the_public_reader() {
 
 #[test]
 fn public_writer_array_formula_roundtrips_through_the_reader() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("S").unwrap();
     let range = Range::try_new(6, 1, 7, 2).unwrap();
     writer.write_array_formula(sheet, range, "A1+7").unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     let sheet = workbook.xls_worksheet(0).unwrap();
 

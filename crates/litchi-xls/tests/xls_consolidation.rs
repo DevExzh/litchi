@@ -1,4 +1,4 @@
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 use litchi_xls::{
     Consolidation, ConsolidationBuiltInName, ConsolidationFile, ConsolidationFunction,
     ConsolidationRange, ConsolidationSource, raw::Reader,
@@ -60,11 +60,11 @@ fn consolidation_round_trip_preserves_order_and_inert_paths() {
             file: Some(ConsolidationFile::new("\u{1}remote.xls\u{3}SheetA").unwrap()),
         })
         .unwrap();
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Output").unwrap();
     writer.set_consolidation(sheet, value).unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let value = workbook.xls_worksheet(0).unwrap().consolidation().unwrap();
     assert_eq!(value.function(), ConsolidationFunction::Average);

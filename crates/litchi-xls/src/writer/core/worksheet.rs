@@ -12,7 +12,7 @@ use crate::writer::biff::AutoFilterConditionWrite;
 use crate::writer::formula::{FormulaTokenizer, compile_array_formula, encode_ptg_tokens};
 use crate::{Error, Result};
 
-use super::model::Writer;
+use super::model::Builder;
 
 use crate::formula_metadata::{Cell as FormulaCell, Owner, Range as FormulaRange, array};
 
@@ -545,7 +545,7 @@ impl WritableWorksheet {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Write one inert BIFF8 shared formula and its participating cells.
     ///
     /// `range` becomes the `ShrFmla` `RefU`. `participants` is the complete

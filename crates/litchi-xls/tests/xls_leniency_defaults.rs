@@ -15,9 +15,9 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::OwnedSource;
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::{
-    CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions,
+    Builder, CellFormatDefect, Defect, EncodingDefect, FormattingDefect, Leniency, OpenOptions,
     PaletteDefect, SharedStringDefect, SheetDefect, SheetNameDefect, SourceBackedOptions,
-    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, Writer, raw::Reader,
+    SourceBackedWorkbook, ToleranceReport, ToleratedDefect, raw::Reader,
 };
 
 const CODEPAGE: u16 = 0x0042;
@@ -57,11 +57,15 @@ struct Stream {
 
 impl Stream {
     /// The Workbook stream of a workbook the crate writer built.
-    fn from_writer(build: impl FnOnce(&mut Writer)) -> Self {
-        let mut writer = Writer::new();
+    fn from_writer(build: impl FnOnce(&mut Builder)) -> Self {
+        let mut writer = Builder::new();
         build(&mut writer);
         let mut bytes = Vec::new();
-        writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut Cursor::new(&mut bytes))
+            .unwrap();
         let stream = OleFile::open(Cursor::new(&bytes))
             .unwrap()
             .open_stream(&["Workbook"])

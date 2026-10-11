@@ -1,5 +1,5 @@
 use litchi_xls::writer::WorkbookEnvironmentOptions;
-use litchi_xls::{LinkUpdateMode, ObjectDisplayMode, Writer, raw::Reader};
+use litchi_xls::{Builder, LinkUpdateMode, ObjectDisplayMode, raw::Reader};
 use std::fs::File;
 use std::io::Cursor;
 use std::path::{Path, PathBuf};
@@ -32,7 +32,7 @@ fn reads_libreoffice_environment_fixture_without_refreshing_data() {
 
 #[test]
 fn workbook_environment_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Environment").unwrap();
     writer
         .set_workbook_environment(WorkbookEnvironmentOptions {
@@ -53,7 +53,7 @@ fn workbook_environment_round_trip() {
         })
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let environment = workbook.environment();
     assert!(environment.is_template());
@@ -78,7 +78,7 @@ fn reads_poi_dual_stream_dsf_value() {
 
 #[test]
 fn writer_rejects_cross_field_and_country_bounds() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let refresh = WorkbookEnvironmentOptions {
         refresh_external_data_on_load: true,
         ..WorkbookEnvironmentOptions::default()

@@ -15629,7 +15629,7 @@ fn write_fresh_doc(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
 }
 
 fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dyn Error>> {
-    let mut writer = litchi_xls::writer::Writer::new();
+    let mut builder = litchi_xls::writer::Builder::new();
     let mut content_bytes = 0;
     let mut cell_count = 0;
 
@@ -15639,14 +15639,14 @@ fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
                 .xls_dimensions()
                 .ok_or("non-numeric writer shape reached numeric XLS corpus")?;
             for sheet in 0..sheet_count {
-                let worksheet = writer.add_worksheet(&format!("Bench{sheet:02}"))?;
+                let worksheet = builder.add_worksheet(&format!("Bench{sheet:02}"))?;
                 for row in 0..row_count {
                     for column in 0..column_count {
                         let value =
                             (sheet * row_count * column_count + row * column_count + column) as f64;
                         content_bytes += std::mem::size_of_val(&value);
                         cell_count += 1;
-                        writer.write_number(worksheet, row as u32, column as u16, value)?;
+                        builder.write_number(worksheet, row as u32, column as u16, value)?;
                     }
                 }
             }
@@ -15658,16 +15658,16 @@ fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
             // That keeps exact output checks while placing ~4 MiB of legal,
             // distinct 32,700-byte strings in the shared-string table.
             for sheet in 0..128 {
-                let worksheet = writer.add_worksheet(&format!("Payload{sheet:03}"))?;
+                let worksheet = builder.add_worksheet(&format!("Payload{sheet:03}"))?;
                 let text = writer_payload_text("xls", sheet, 0, 0, 32_700);
                 content_bytes += text.len();
                 cell_count += 1;
-                writer.write_string(worksheet, 0, 0, &text)?;
+                builder.write_string(worksheet, 0, 0, &text)?;
             }
         },
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    builder.build()?.write_to(&mut output)?;
     Ok((output.into_inner(), cell_count, content_bytes))
 }
 
@@ -28352,11 +28352,11 @@ fn xls_comment_opaque_stream_name(index: usize) -> String {
 }
 
 fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
-    let mut workbook_writer = litchi_xls::writer::Writer::new();
-    let comments = workbook_writer.add_worksheet("Comments")?;
+    let mut workbook_builder = litchi_xls::writer::Builder::new();
+    let comments = workbook_builder.add_worksheet("Comments")?;
     for index in 0..XLS_COMMENTS_SOURCE_COUNT {
         let value = xls_comment_value(index, false)?;
-        workbook_writer.add_comment(
+        workbook_builder.add_comment(
             comments,
             u32::try_from(index)?,
             1,
@@ -28364,11 +28364,11 @@ fn build_xls_comments_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
             value.text(),
         )?;
     }
-    let untouched = workbook_writer.add_worksheet("Untouched")?;
-    workbook_writer.write_number(untouched, 20, 4, 42.0)?;
-    workbook_writer.add_comment(untouched, 4, 3, "Sentinel", "untouched sentinel")?;
+    let untouched = workbook_builder.add_worksheet("Untouched")?;
+    workbook_builder.write_number(untouched, 20, 4, 42.0)?;
+    workbook_builder.add_comment(untouched, 4, 3, "Sentinel", "untouched sentinel")?;
     let mut workbook_package = Cursor::new(Vec::new());
-    workbook_writer.write_to(&mut workbook_package)?;
+    workbook_builder.build()?.write_to(&mut workbook_package)?;
     let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
     let workbook_stream = parsed.open_stream(&["Workbook"])?;
 
@@ -29458,13 +29458,13 @@ fn xls_visibility_opaque_stream_name(index: usize) -> String {
 }
 
 fn build_xls_visibility_edit_corpus() -> Result<Corpus, Box<dyn Error>> {
-    let mut workbook_writer = litchi_xls::writer::Writer::new();
+    let mut workbook_builder = litchi_xls::writer::Builder::new();
     for index in 0..XLS_VISIBILITY_SHEET_COUNT {
-        let worksheet = workbook_writer.add_worksheet(&format!("Visibility{index:02}"))?;
-        workbook_writer.write_number(worksheet, 0, 0, index as f64)?;
+        let worksheet = workbook_builder.add_worksheet(&format!("Visibility{index:02}"))?;
+        workbook_builder.write_number(worksheet, 0, 0, index as f64)?;
     }
     let mut workbook_package = Cursor::new(Vec::new());
-    workbook_writer.write_to(&mut workbook_package)?;
+    workbook_builder.build()?.write_to(&mut workbook_package)?;
     let mut parsed = OleFile::open(Cursor::new(workbook_package.into_inner()))?;
     let workbook_stream = parsed.open_stream(&["Workbook"])?;
 
@@ -29857,12 +29857,12 @@ fn verify_xls_visibility_static_guards(source: &[u8]) -> Result<(), Box<dyn Erro
         return Err("XLS visibility cap-plus-one refusal mutated its source".into());
     }
 
-    let mut protected_writer = litchi_xls::writer::Writer::new();
-    let sheet = protected_writer.add_worksheet("Protected")?;
-    protected_writer.write_number(sheet, 0, 0, 1.0)?;
-    protected_writer.protect_sheet(sheet, Some("password"), true, false)?;
+    let mut protected_builder = litchi_xls::writer::Builder::new();
+    let sheet = protected_builder.add_worksheet("Protected")?;
+    protected_builder.write_number(sheet, 0, 0, 1.0)?;
+    protected_builder.protect_sheet(sheet, Some("password"), true, false)?;
     let mut protected_bytes = Cursor::new(Vec::new());
-    protected_writer.write_to(&mut protected_bytes)?;
+    protected_builder.build()?.write_to(&mut protected_bytes)?;
     if litchi_xls::sheet_visibility::Snapshot::from_bytes(protected_bytes.into_inner()).is_ok() {
         return Err("XLS visibility protected source was accepted".into());
     }
@@ -30400,12 +30400,12 @@ fn verify_xls_comments_static_guards(source: &[u8]) -> Result<(), Box<dyn Error>
         return Err("XLS eager fallback did not publish the explicit length change".into());
     }
 
-    let mut protected_writer = litchi_xls::writer::Writer::new();
-    let sheet = protected_writer.add_worksheet("Protected")?;
-    protected_writer.add_comment(sheet, 0, 0, "Source", "source")?;
-    protected_writer.protect_sheet(sheet, Some("password"), true, false)?;
+    let mut protected_builder = litchi_xls::writer::Builder::new();
+    let sheet = protected_builder.add_worksheet("Protected")?;
+    protected_builder.add_comment(sheet, 0, 0, "Source", "source")?;
+    protected_builder.protect_sheet(sheet, Some("password"), true, false)?;
     let mut protected_bytes = Cursor::new(Vec::new());
-    protected_writer.write_to(&mut protected_bytes)?;
+    protected_builder.build()?.write_to(&mut protected_bytes)?;
     let protected = litchi_xls::comments::Snapshot::from_bytes(protected_bytes.into_inner())?;
     let mut edit = protected.edit();
     if edit

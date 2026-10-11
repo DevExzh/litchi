@@ -1,12 +1,12 @@
 use litchi_xls::cell_values::{Reference, Selector};
 use litchi_xls::comments::{Snapshot, Update, Value};
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 use litchi_xls::{Visibility, raw::Reader};
 use std::collections::BTreeMap;
 use std::io::{self, Cursor, Write};
 
 fn authored(comments: usize) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Notes").unwrap();
     for index in 0..comments {
         writer
@@ -25,7 +25,7 @@ fn authored(comments: usize) -> Vec<u8> {
         .add_comment(other, 4, 3, "Other", "preserve me")
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -328,14 +328,14 @@ fn refuses_unsupported_lifecycle_and_enforces_batch_bound() {
 
 #[test]
 fn refuses_protected_signed_encrypted_and_invalid_values() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Protected").unwrap();
     writer.add_comment(sheet, 0, 0, "A", "text").unwrap();
     writer
         .protect_sheet(sheet, Some("password"), true, false)
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
     let mut edit = snapshot.edit();
     edit.replace(
@@ -369,11 +369,11 @@ fn refuses_protected_signed_encrypted_and_invalid_values() {
         Snapshot::from_bytes(replace_workbook_record_kind(authored(1), 0x0042, 0x002F)).is_err()
     );
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Empty").unwrap();
     writer.add_comment(sheet, 0, 0, "A", "").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let empty = Snapshot::from_bytes(output.into_inner()).unwrap();
     let mut edit = empty.edit();
     assert!(
@@ -524,12 +524,12 @@ fn source_backed_commit_handles_one_and_two_hundred_fifty_six_updates() {
 
 #[test]
 fn source_backed_commit_preserves_compressed_and_utf16_widths() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Widths").unwrap();
     writer.add_comment(sheet, 0, 0, "AB", "AB").unwrap();
     writer.add_comment(sheet, 1, 0, "作者", "😀😀").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
     let mut edit = snapshot.edit();
     edit.replace(
@@ -576,11 +576,11 @@ fn source_backed_commit_refuses_length_or_encoding_width_changes() {
     .unwrap();
     assert!(edit.commit_source_backed().is_err());
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Widths").unwrap();
     writer.add_comment(sheet, 0, 0, "AB", "AB").unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let snapshot = Snapshot::from_bytes(output.into_inner()).unwrap();
     let mut edit = snapshot.edit();
     // Both strings occupy two encoded bytes, but this changes compressed BIFF

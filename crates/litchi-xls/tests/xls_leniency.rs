@@ -143,7 +143,7 @@ use std::io::Cursor;
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::sheet::{Cell as SheetCell, CellValue};
-use litchi_xls::{CellFormatDefect, ExtendedFormat, Writer};
+use litchi_xls::{Builder, CellFormatDefect, ExtendedFormat};
 
 /// BIFF `Number` record type.
 const NUMBER_RECORD: u16 = 0x0203;
@@ -152,11 +152,15 @@ const NUMBER_RECORD: u16 = 0x0203;
 /// rewritten to `ixfe` — one of the most common non-Microsoft-producer
 /// defects in the wild.
 fn workbook_with_cell_ixfe(ixfe: u16) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 0, 0, 42.5).unwrap();
     let mut bytes = Vec::new();
-    writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut Cursor::new(&mut bytes))
+        .unwrap();
 
     let mut stream = OleFile::open(Cursor::new(&bytes))
         .unwrap()
@@ -200,11 +204,15 @@ fn assert_default_open_repairs_cell_xf(ixfe: u16) {
     // ...and the resolved format is the default cell XF — the very format the
     // writer gave this cell before the mutation, since it writes ixfe 15.
     let clean = Reader::new(Cursor::new({
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet("Sheet1").unwrap();
         writer.write_number(sheet, 0, 0, 42.5).unwrap();
         let mut bytes = Vec::new();
-        writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+        writer
+            .build()
+            .unwrap()
+            .write_to(&mut Cursor::new(&mut bytes))
+            .unwrap();
         bytes
     }))
     .unwrap();
@@ -244,11 +252,15 @@ fn a_default_open_repairs_a_reserved_style_slot_cell_xf_reference() {
 
 #[test]
 fn a_conforming_writer_workbook_reports_nothing() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Sheet1").unwrap();
     writer.write_number(sheet, 0, 0, 42.5).unwrap();
     let mut bytes = Vec::new();
-    writer.write_to(&mut Cursor::new(&mut bytes)).unwrap();
+    writer
+        .build()
+        .unwrap()
+        .write_to(&mut Cursor::new(&mut bytes))
+        .unwrap();
     let workbook = Reader::new(Cursor::new(bytes)).unwrap();
     assert!(workbook.tolerance_report().is_clean());
 }

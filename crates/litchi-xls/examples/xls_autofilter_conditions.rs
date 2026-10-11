@@ -1,6 +1,6 @@
-//! `AutoFilter` Conditions & Sort — XLS Writer Example
+//! `AutoFilter` Conditions & Sort — XLS Builder Example
 //!
-//! Demonstrates the new `add_filter_condition` and `set_sort` APIs on `Writer`.
+//! Demonstrates the new `add_filter_condition` and `set_sort` APIs on `Builder`.
 //! Generates an XLS file with:
 //!
 //! - A data table of products with prices and stock levels.
@@ -11,7 +11,7 @@
 //!
 //! The file is saved to `output/xls_autofilter_conditions.xls`.
 
-use litchi_xls::Writer;
+use litchi_xls::Builder;
 use litchi_xls::writer::{AutoFilterConditionWrite, Column};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -19,7 +19,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     std::fs::create_dir_all(output_dir)?;
     let output_path = output_dir.join("xls_autofilter_conditions.xls");
 
-    let mut w = Writer::new();
+    let mut w = Builder::new();
 
     // ================================================================
     // Sheet 1 — AutoFilter with numeric conditions
@@ -214,7 +214,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ================================================================
     // Save
     // ================================================================
-    w.save(&output_path)?;
+    w.build()?.save(&output_path)?;
     println!("\nSaved to: {}", output_path.display());
     println!("Open in Excel to verify filter dropdowns, conditions, and sort order.");
 

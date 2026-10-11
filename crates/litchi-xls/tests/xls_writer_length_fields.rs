@@ -16,9 +16,9 @@ use std::io::Cursor;
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_xls::autofilter::FilterValue;
 use litchi_xls::writer::{
-    AutoFilterConditionWrite, CellStyle, ConditionalFormat, ConditionalFormatType, ExtendedFormat,
-    ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions, Font, PivotCacheValue,
-    PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig, Writer,
+    AutoFilterConditionWrite, Builder, CellStyle, ConditionalFormat, ConditionalFormatType,
+    ExtendedFormat, ExternalCacheRowOptions, ExternalSheetOptions, ExternalWorkbookOptions, Font,
+    PivotCacheValue, PivotDataItemConfig, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
 };
 use litchi_xls::{
     CachedValue, Error, ExtProp, PivotCacheItem, StyleCategory, StyleExt, XfExt, XfProperties,
@@ -27,9 +27,9 @@ use litchi_xls::{
 
 type Reader = litchi_xls::raw::Reader<Cursor<Vec<u8>>>;
 
-fn written(writer: &mut Writer) -> Vec<u8> {
+fn written(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -91,8 +91,8 @@ fn straddling(limit: usize) -> String {
     format!("{}😀", "a".repeat(limit - 1))
 }
 
-fn one_sheet_writer(name: &str) -> (Writer, usize) {
-    let mut writer = Writer::new();
+fn one_sheet_writer(name: &str) -> (Builder, usize) {
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet(name).unwrap();
     writer.write_string(sheet, 0, 0, "kept").unwrap();
     (writer, sheet)
@@ -877,7 +877,7 @@ fn external_workbook_with_sheets(start: usize, count: usize) -> ExternalWorkbook
 
 #[test]
 fn external_sheet_reference_count_is_checked_at_registration() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Links").unwrap();
 
     // Five full SupBooks and one partial one produce N - 1 references.
@@ -1043,7 +1043,7 @@ fn worksheet_names_biff8_forbids_are_refused() {
     for name in [
         "a/b", "a\\b", "a?b", "a*b", "a[b", "a]b", "a:b", "a\0b", "a\u{3}b", "'lead", "trail'",
     ] {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         writer.add_worksheet("Kept").unwrap();
         let before = written(&mut writer);
         invalid_data(writer.add_worksheet(name));
@@ -1055,14 +1055,14 @@ fn worksheet_names_biff8_forbids_are_refused() {
         .chain(strings_of(30))
         .chain(strings_of(31))
     {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let sheet = writer.add_worksheet(&name).unwrap();
         writer.write_number(sheet, 0, 0, 1.0).unwrap();
         let workbook = read(written(&mut writer));
         assert_eq!(workbook.sheets()[0].name(), name);
     }
     for name in strings_of(32).into_iter().chain([straddling(31)]) {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         assert_eq!(
             too_long(writer.add_worksheet(&name)),
             ("worksheet name", 32, 31)
@@ -1167,8 +1167,8 @@ fn pivot_config(name: &str, data_field_name: &str) -> PivotTableConfig {
     }
 }
 
-fn pivot_writer() -> (Writer, usize) {
-    let mut writer = Writer::new();
+fn pivot_writer() -> (Builder, usize) {
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Source").unwrap();
     (writer, sheet)
 }

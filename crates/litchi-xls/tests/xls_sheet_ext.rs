@@ -1,16 +1,16 @@
 //! Round-trip tests for the BIFF8 `SheetExt` record (sheet tab color).
 
 use litchi_xls::raw::Reader;
-use litchi_xls::writer::Writer;
+use litchi_xls::writer::Builder;
 use std::io::Cursor;
 
-fn written_workbook(configure: impl FnOnce(&mut Writer)) -> Vec<u8> {
-    let mut writer = Writer::new();
+fn written_workbook(configure: impl FnOnce(&mut Builder)) -> Vec<u8> {
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Tab").unwrap();
     writer.write_string(sheet, 0, 0, "content").unwrap();
     configure(&mut writer);
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -38,7 +38,7 @@ fn workbook_without_tab_color_has_no_sheet_ext() {
 
 #[test]
 fn tab_color_validation_rejects_out_of_palette_indices() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Tab").unwrap();
     assert!(writer.set_worksheet_tab_color(0, Some(0x05)).is_err());
     assert!(writer.set_worksheet_tab_color(0, Some(0x40)).is_err());

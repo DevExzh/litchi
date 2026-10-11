@@ -2,7 +2,7 @@ use std::io::Cursor;
 use std::path::PathBuf;
 
 use litchi_xls::writer::{
-    PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig, Writer,
+    Builder, PivotCacheValue, PivotFieldConfig, PivotItemConfig, PivotTableConfig,
 };
 use litchi_xls::{PivotCacheDateTime, PivotCacheError, PivotCacheItem, raw::Reader};
 
@@ -68,7 +68,7 @@ fn typed_config(name: &str, sheet_name: &str) -> PivotTableConfig {
 }
 
 fn write_typed_workbook(sheet_count: usize) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for index in 0..sheet_count {
         let sheet_name = format!("Typed{}", index + 1);
         let sheet = writer.add_worksheet(&sheet_name).unwrap();
@@ -80,7 +80,7 @@ fn write_typed_workbook(sheet_count: usize) -> Vec<u8> {
             .unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -214,7 +214,7 @@ fn malformed_typed_records_are_rejected_and_invalid_add_is_atomic() {
     cache[boolean + 4..boolean + 6].copy_from_slice(&2u16.to_le_bytes());
     assert!(litchi_xls::pivot_table::parse_pivot_cache_stream(&cache).is_err());
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Atomic").unwrap();
     let mut invalid = typed_config("Invalid", "Atomic");
     invalid.fields[0]
@@ -222,7 +222,7 @@ fn malformed_typed_records_are_rejected_and_invalid_add_is_atomic() {
         .push(PivotCacheItem::Boolean(false));
     assert!(writer.add_pivot_table(sheet, invalid).is_err());
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     let workbook = Reader::new(Cursor::new(output.into_inner())).unwrap();
     assert!(workbook.pivot_caches().is_empty());
 }

@@ -116,17 +116,15 @@ fn atomic_save_refuses_overwrite_and_changed_sources() {
 #[cfg(feature = "encryption")]
 #[test]
 fn unlocked_encrypted_owner_refuses_plain_publication() {
-    use std::io::Cursor;
-    let mut writer = litchi_xls::Writer::new();
-    writer.add_worksheet("Sheet1").unwrap();
-    writer
+    let mut builder = litchi_xls::Builder::new();
+    builder.add_worksheet("Sheet1").unwrap();
+    builder
         .set_password("secret", litchi_xls::EncryptionProfile::OfficeBinaryRc4)
         .unwrap();
-    let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    let output = builder.build().unwrap().to_encrypted_bytes().unwrap();
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("protected.xls");
-    std::fs::write(&source, output.into_inner()).unwrap();
+    std::fs::write(&source, output).unwrap();
     let file = litchi_ops::open(&source).unwrap();
     let File::Locked(locked) = file else {
         panic!("locked owner")

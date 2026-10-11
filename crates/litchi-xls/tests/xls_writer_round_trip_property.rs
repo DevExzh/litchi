@@ -7,7 +7,7 @@
 //! A writer-to-reader round-trip property over random workbooks (change
 //! 0766).
 //!
-//! Each case drives one [`Writer`] through a random sequence of registration
+//! Each case drives one [`Builder`] through a random sequence of registration
 //! calls — worksheet and defined names, strings, numbers, formulas,
 //! hyperlinks, `AutoFilter` conditions, fonts, cell styles and number formats
 //! — with lengths drawn around every BIFF8 limit and text drawn from ASCII,
@@ -29,8 +29,8 @@ use litchi_core::sheet::{Cell as _, CellValue as ReadValue};
 use litchi_xls::autofilter::FilterValue;
 use litchi_xls::writer::formula::encode_ptg_tokens;
 use litchi_xls::writer::{
-    AutoFilterConditionWrite, CellStyle, Font, FormattingManager, FormulaTokenizer,
-    HorizontalAlignment, VerticalAlignment, Writer,
+    AutoFilterConditionWrite, Builder, CellStyle, Font, FormattingManager, FormulaTokenizer,
+    HorizontalAlignment, VerticalAlignment,
 };
 use litchi_xls::{DefinedNameKind, Error, FontUnderline, NameScope};
 
@@ -172,7 +172,7 @@ enum Accepted {
     Id(u16),
 }
 
-fn apply(writer: &mut Writer, call: &Call) -> Result<Accepted, Error> {
+fn apply(writer: &mut Builder, call: &Call) -> Result<Accepted, Error> {
     Ok(match call.clone() {
         Call::AddWorksheet(name) => Accepted::Index(writer.add_worksheet(&name)?),
         Call::String(sheet, row, col, value, style) => {
@@ -585,9 +585,9 @@ impl Generator<'_> {
     }
 }
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.build().unwrap().write_to(&mut output).unwrap();
     output.into_inner()
 }
 
@@ -612,8 +612,8 @@ const fn kind(call: &Call) -> &'static str {
 
 fn check_case(seed: u64, tally: &mut Tally) {
     let mut random = Random(seed | 1);
-    let mut writer = Writer::new();
-    let mut shadow = Writer::new();
+    let mut writer = Builder::new();
+    let mut shadow = Builder::new();
     let mut expected = Expected::default();
     let mut generator = Generator {
         random: &mut random,
@@ -894,7 +894,7 @@ fn random_workbooks_round_trip_through_the_reader() {
 fn surrogate_pairs_at_each_limit_round_trip_or_are_refused() {
     let at = |limit: usize| format!("{}\u{1F600}", "a".repeat(limit - 2));
     let past = |limit: usize| format!("{}\u{1F600}", "a".repeat(limit - 1));
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet(&at(31)).unwrap();
     assert!(matches!(
         writer.add_worksheet(&past(31)),

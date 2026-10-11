@@ -4622,9 +4622,10 @@ native-Office claim is made.
 - `doc_fresh_write_to`: construct a new `litchi_doc::builder::Builder`, add the
   selected fixed paragraphs through its public API, build a `Package`, and
   publish it with public `write_to`.
-- `xls_fresh_write_to`: construct a new `litchi_xls::writer::Writer`, add the
-  selected sheets and cells through its public API, and package it with public
-  `write_to`.
+- `xls_fresh_write_to`: construct a new `litchi_xls::Builder`, add the selected
+  sheets and cells, build a strictly admitted `Package`, and publish it with
+  public `write_to`. The timed authoring route now includes Package admission;
+  comparisons with pre-0200 revisions must account for that additional work.
 - `ppt_fresh_write_to`: construct a new `litchi_ppt::writer::Writer`, add the
   selected slides and text boxes through its public API, and package it with
   public `write_to`.

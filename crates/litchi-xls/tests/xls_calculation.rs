@@ -2,7 +2,7 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_xls::writer::{CalculationSettings, Writer};
+use litchi_xls::writer::{Builder, CalculationSettings};
 use litchi_xls::{CalculationMode, MultithreadedCalculation, ReferenceMode, raw::Reader};
 
 fn workbook_global_record_types(bytes: &[u8]) -> Vec<u16> {
@@ -31,7 +31,7 @@ fn workbook_global_record_types(bytes: &[u8]) -> Vec<u16> {
 
 #[test]
 fn calculation_settings_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let sheet = writer.add_worksheet("Calculation").unwrap();
     writer
         .set_calculation_settings(CalculationSettings {
@@ -53,7 +53,7 @@ fn calculation_settings_round_trip() {
     writer.write_string(sheet, 0, 0, "shared string").unwrap();
     writer.add_comment(sheet, 0, 0, "Author", "note").unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let bytes = bytes.into_inner();
     let relevant = workbook_global_record_types(&bytes)
         .into_iter()
@@ -101,7 +101,7 @@ fn reads_poi_calculation_fixture() {
 
 #[test]
 fn writer_rejects_invalid_calculation_bounds() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let invalid_count = CalculationSettings {
         maximum_iterations: 0,
         ..CalculationSettings::default()
@@ -118,7 +118,7 @@ fn writer_rejects_invalid_calculation_bounds() {
 
 #[test]
 fn automatic_multithreaded_calculation_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Automatic threading").unwrap();
     writer
         .set_calculation_settings(CalculationSettings {
@@ -127,7 +127,7 @@ fn automatic_multithreaded_calculation_round_trip() {
         })
         .unwrap();
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let threading = workbook.calculation().multithreaded_calculation().unwrap();
     assert!(threading.enabled());

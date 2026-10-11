@@ -2,12 +2,12 @@ use std::fs::File;
 use std::io::Cursor;
 use std::path::PathBuf;
 
-use litchi_xls::writer::{FunctionGroupOptions, Writer};
+use litchi_xls::writer::{Builder, FunctionGroupOptions};
 use litchi_xls::{BuiltInFunctionCategories, raw::Reader};
 
 #[test]
 fn custom_function_groups_round_trip_across_record_generations() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_worksheet("Functions").unwrap();
     let custom_categories = (0..20)
         .map(|index| {
@@ -26,7 +26,7 @@ fn custom_function_groups_round_trip_across_record_generations() {
         .unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
-    writer.write_to(&mut bytes).unwrap();
+    writer.build().unwrap().write_to(&mut bytes).unwrap();
     let workbook = Reader::new(Cursor::new(bytes.into_inner())).unwrap();
     let groups = workbook.function_groups().unwrap();
     assert_eq!(groups.built_in(), BuiltInFunctionCategories::Sixteen);
@@ -68,7 +68,7 @@ fn reads_established_producer_compatibility_count_seventeen() {
 
 #[test]
 fn writer_rejects_invalid_function_group_resources() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert!(
         writer
             .set_function_groups(FunctionGroupOptions {
