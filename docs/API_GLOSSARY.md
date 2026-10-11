@@ -1297,3 +1297,9 @@ returns the complete tab catalog, independent of parsed worksheet ordinals;
 source-backed cell projections retain `is_formula()`. The first read adapter
 still materializes sparse grids for traversal; early termination and measured
 facade overhead remain open acceptance work.
+
+Record [0204](unified-ops/0204-xls-eager-query-cursors.md) adds complete-catalog
+`Workbook::sheet_count()` and selector-based `Workbook::sheet()`, distinct from
+ordinary worksheet ordinals. Eager cell-only queries now consume the native
+iterator without a facade grid. Source-backed and axis projections still need
+bounded cursor work before full read-performance acceptance.
