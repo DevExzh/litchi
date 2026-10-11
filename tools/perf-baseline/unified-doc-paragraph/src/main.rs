@@ -14,13 +14,18 @@
 
 use litchi_core::Position;
 use litchi_doc::Builder;
-use litchi_doc::body_text::{Projection, Snapshot};
+use litchi_doc::body_text::{
+    OpenOptions as BodyOpenOptions, Projection, Snapshot,
+    TransactionLimits as BodyTransactionLimits,
+};
 use litchi_doc::tracked_revision::Limits;
+use litchi_ops::transaction::SemanticLimits;
 use litchi_ops::{File, OpenOptions, SourceMode};
 use serde_json::{Value, json};
 use sha2::{Digest, Sha256};
 use std::error::Error;
 use std::hint::black_box;
+use std::io::Cursor;
 use std::time::Instant;
 
 type Result<T> = std::result::Result<T, Box<dyn Error + Send + Sync>>;
@@ -31,6 +36,7 @@ const DEFAULT_ROUNDS: usize = 9;
 struct Config {
     counts: Vec<usize>,
     rounds: usize,
+    diagnostic: bool,
 }
 
 fn paragraph_text(position: usize) -> String {
@@ -67,6 +73,66 @@ fn native_once(bytes: &[u8], position: usize, replacement: &str) -> Result<Snaps
     edit.replace_paragraph(Position::new(position), replacement)?;
     let commit = edit.commit()?;
     Ok(commit.into_parts().0)
+}
+
+/// Run the native leaf with the same policy envelope the DOC facade supplies
+/// to its variable-width body snapshot. This is a diagnostic control only:
+/// the frozen paired routes continue to use [`native_once`] and
+/// [`unified_once`]. Comparing this leg with the default native leg isolates
+/// policy propagation and cross-crate option dispatch from path resolution
+/// and source-owner promotion.
+fn native_facade_policy_once(bytes: &[u8], position: usize, replacement: &str) -> Result<Snapshot> {
+    let snapshot = Snapshot::from_bytes_with_options(bytes.to_vec(), facade_body_open_options())?;
+    let mut edit = snapshot.edit_with_limits(facade_body_transaction_limits())?;
+    edit.replace_paragraph(Position::new(position), replacement)?;
+    let commit = edit.commit()?;
+    Ok(commit.into_parts().0)
+}
+
+/// Exercise the public explicit-options entry point while retaining the
+/// native default transaction policy. This separates the call/option shape
+/// from the broader facade semantic policy in the diagnostic output.
+fn native_explicit_default_once(
+    bytes: &[u8],
+    position: usize,
+    replacement: &str,
+) -> Result<Snapshot> {
+    let snapshot = Snapshot::from_bytes_with_options(bytes.to_vec(), BodyOpenOptions::default())?;
+    let mut edit = snapshot.edit()?;
+    edit.replace_paragraph(Position::new(position), replacement)?;
+    let commit = edit.commit()?;
+    Ok(commit.into_parts().0)
+}
+
+/// Keep the native package and public reader alive while a timed native edit
+/// runs. The facade's opened DOC retains both an indexed source and a reader;
+/// this control gives the native leg the same live-ingress footprint without
+/// putting the package/document construction in the edit clock.
+fn native_reader_context(
+    bytes: &[u8],
+) -> Result<(litchi_doc::Package<Cursor<Vec<u8>>>, litchi_doc::Document)> {
+    let mut package = litchi_doc::Package::from_reader(Cursor::new(bytes.to_vec()))?;
+    let document = package.document()?;
+    Ok((package, document))
+}
+
+fn facade_body_open_options() -> BodyOpenOptions {
+    BodyOpenOptions::default()
+        .with_package_limits(litchi_doc::package::Limits::default())
+        .with_transaction_limits(
+            BodyTransactionLimits::new(isize::MAX as usize, usize::MAX, usize::MAX)
+                .with_max_retained_render_bytes(usize::MAX),
+        )
+}
+
+fn facade_body_transaction_limits() -> BodyTransactionLimits {
+    let limits = SemanticLimits::default();
+    BodyTransactionLimits::new(
+        limits.max_operations().min(limits.max_expanded_targets()),
+        usize::MAX,
+        usize::MAX,
+    )
+    .with_max_retained_render_bytes(limits.max_snapshot_bytes())
 }
 
 /// The path is parsed once outside timing.  `&Path` is accepted by the
@@ -160,7 +226,7 @@ fn median(values: &[u128]) -> u128 {
     sorted[sorted.len() / 2]
 }
 
-fn measure(bytes: &[u8], count: usize, rounds: usize) -> Result<Value> {
+fn measure(bytes: &[u8], count: usize, rounds: usize, diagnostic: bool) -> Result<Value> {
     let position = count / 2;
     let replacement = replacement_text(position);
     let path_text = format!("/body/p[{}]", position + 1);
@@ -189,6 +255,16 @@ fn measure(bytes: &[u8], count: usize, rounds: usize) -> Result<Value> {
 
     let mut native_ns = Vec::with_capacity(rounds * 2);
     let mut unified_ns = Vec::with_capacity(rounds * 2);
+    let mut explicit_default_ns = Vec::new();
+    let mut facade_policy_ns = Vec::new();
+    let mut plain_reader_control_ns = Vec::new();
+    let mut retained_reader_ns = Vec::new();
+    if diagnostic {
+        explicit_default_ns.reserve(rounds);
+        facade_policy_ns.reserve(rounds);
+        plain_reader_control_ns.reserve(rounds * 2);
+        retained_reader_ns.reserve(rounds * 2);
+    }
     for _ in 0..rounds {
         // ABBA: native, unified, unified, native.
         for native_leg in [true, false, false, true] {
@@ -216,10 +292,75 @@ fn measure(bytes: &[u8], count: usize, rounds: usize) -> Result<Value> {
                 drop(output);
             }
         }
+        if diagnostic {
+            let start = Instant::now();
+            let output =
+                native_explicit_default_once(black_box(bytes), position, black_box(&replacement))?;
+            explicit_default_ns.push(start.elapsed().as_nanos());
+            black_box(&output);
+            drop(output);
+
+            let start = Instant::now();
+            let output =
+                native_facade_policy_once(black_box(bytes), position, black_box(&replacement))?;
+            facade_policy_ns.push(start.elapsed().as_nanos());
+            black_box(&output);
+            drop(output);
+
+            // Separate ABBA control: compare the ordinary native route with
+            // the same route while a freshly opened Package + Document remain
+            // live outside its clock. Neither control contributes to the
+            // frozen paired-route medians above.
+            for retained in [false, true, true, false] {
+                if retained {
+                    let (package, document) = native_reader_context(bytes)?;
+                    black_box((&package, &document));
+                    let start = Instant::now();
+                    let output = native_once(black_box(bytes), position, black_box(&replacement))?;
+                    let elapsed = start.elapsed().as_nanos();
+                    retained_reader_ns.push(elapsed);
+                    black_box(&output);
+                    black_box((&package, &document));
+                    drop(output);
+                    drop((package, document));
+                } else {
+                    let start = Instant::now();
+                    let output = native_once(black_box(bytes), position, black_box(&replacement))?;
+                    plain_reader_control_ns.push(start.elapsed().as_nanos());
+                    black_box(&output);
+                    drop(output);
+                }
+            }
+        }
     }
 
     let native_median_ns = median(&native_ns);
     let unified_median_ns = median(&unified_ns);
+    let diagnostic_result = diagnostic.then(|| {
+        let explicit_default_median_ns = median(&explicit_default_ns);
+        let facade_policy_median_ns = median(&facade_policy_ns);
+        let plain_reader_control_median_ns = median(&plain_reader_control_ns);
+        let retained_reader_median_ns = median(&retained_reader_ns);
+        json!({
+            "scope": "native-only policy controls; excluded from paired route medians",
+            "explicit_default_ns": explicit_default_ns,
+            "explicit_default_median_ns": explicit_default_median_ns,
+            "facade_policy_ns": facade_policy_ns,
+            "facade_policy_median_ns": facade_policy_median_ns,
+            "facade_policy_over_explicit_default": facade_policy_median_ns as f64
+                / explicit_default_median_ns as f64,
+            "retained_reader": {
+                "scope": "native Snapshot::open/edit/commit timed with a fresh Package + Document retained outside the clock",
+                "order": "ABBA",
+                "plain_native_ns": plain_reader_control_ns,
+                "plain_native_median_ns": plain_reader_control_median_ns,
+                "retained_reader_ns": retained_reader_ns,
+                "retained_reader_median_ns": retained_reader_median_ns,
+                "retained_over_plain": retained_reader_median_ns as f64
+                    / plain_reader_control_median_ns as f64,
+            },
+        })
+    });
     Ok(json!({
         "paragraphs": count,
         "operation": "paragraph_text_set",
@@ -238,6 +379,7 @@ fn measure(bytes: &[u8], count: usize, rounds: usize) -> Result<Value> {
         "native_median_ns": native_median_ns,
         "unified_median_ns": unified_median_ns,
         "unified_over_native": unified_median_ns as f64 / native_median_ns as f64,
+        "diagnostic": diagnostic_result,
         "input_cost": {
             "native": {
                 "source_bytes_prepared_outside_timing": true,
@@ -276,6 +418,7 @@ fn parse_counts(value: &str) -> Result<Vec<usize>> {
 fn parse_args() -> Result<Config> {
     let mut counts = DEFAULT_COUNTS.to_vec();
     let mut rounds = DEFAULT_ROUNDS;
+    let mut diagnostic = false;
     let mut args = std::env::args().skip(1);
     while let Some(argument) = args.next() {
         let (key, inline) = argument
@@ -283,9 +426,12 @@ fn parse_args() -> Result<Config> {
             .map_or((argument.as_str(), None), |(key, value)| (key, Some(value)));
         match key {
             "--help" | "-h" => {
-                println!("usage: unified-doc-paragraph-baseline [--counts N[,N...]] [--rounds N]");
+                println!(
+                    "usage: unified-doc-paragraph-baseline [--counts N[,N...]] [--rounds N] [--diagnostic]"
+                );
                 std::process::exit(0);
             },
+            "--diagnostic" => diagnostic = true,
             "--counts" => {
                 let value = inline
                     .map(str::to_owned)
@@ -306,7 +452,11 @@ fn parse_args() -> Result<Config> {
     if rounds < 3 {
         return Err("at least three ABBA rounds are required".into());
     }
-    Ok(Config { counts, rounds })
+    Ok(Config {
+        counts,
+        rounds,
+        diagnostic,
+    })
 }
 
 fn build_provenance() -> Value {
@@ -360,7 +510,7 @@ fn main() -> Result<()> {
             "bytes": bytes.len(),
             "sha256": sha256(&bytes),
         });
-        match measure(&bytes, count, config.rounds) {
+        match measure(&bytes, count, config.rounds, config.diagnostic) {
             Ok(mut result) => {
                 result["artifact"] = artifact;
                 eprintln!("measured DOC paragraph replacement: {count} paragraphs");
@@ -386,6 +536,7 @@ fn main() -> Result<()> {
             "workload": "one-variable-width-body-paragraph-set",
             "counts": config.counts,
             "rounds": config.rounds,
+            "diagnostic": config.diagnostic,
             "order": "ABBA",
             "samples_per_leg": config.rounds * 2,
             "routes": [

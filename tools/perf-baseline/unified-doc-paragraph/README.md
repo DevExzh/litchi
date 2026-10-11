@@ -51,3 +51,18 @@ lengths and SHA-256 values, exact warm-up equivalence, paragraph text digests,
 the timed boundaries, all raw samples, medians, and a failure matrix.  A
 receipt with a corpus or output validation failure is not a successful timing
 record.  Do not commit the benchmark binary or large raw captures.
+
+## Diagnostic controls
+
+Pass `--diagnostic` to add native-only controls after each paired ABBA round.
+The policy control compares explicit default options with the facade's body
+open/transaction policies. The retained-reader control runs a separate ABBA:
+plain native edit versus the same edit with a freshly opened native Package
+and Document kept alive outside the edit clock. It never preopens a body-text
+Snapshot outside timing. Neither control contributes samples to the primary
+route medians. Diagnostic runs can perturb allocator/cache state and are
+investigative evidence, not replacements for ordinary acceptance runs.
+
+Record 0189 contains repeated diagnostic receipts. Their source manifest
+includes the external resolved lockfile; reconstruct it from the root lockfile
+with the cached cc 1.6.0 resolution used for the offline build.
