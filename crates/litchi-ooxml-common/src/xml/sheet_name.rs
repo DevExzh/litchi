@@ -851,6 +851,1281 @@ where
     Ok(Some(output))
 }
 
+/// Insert one title into the leading catalog in an extended-properties part.
+///
+/// `original_titles` is the immutable catalog before the insertion and
+/// `position` is the destination slot in that catalog (`0..=len`).  The
+/// existing leading title text is checked with `equivalent`; entries after
+/// that prefix are treated as named-range metadata and remain byte-exact.
+/// Both the `TitlesOfParts` vector size and the matching `HeadingPairs`
+/// catalog count are updated.  The helper recognizes the aggregate `Sheet`
+/// category used by XLSB as well as the standard `Worksheets` category.
+///
+/// Optional metadata is left untouched when both recognized containers are
+/// absent.  A partially present or ambiguous layout is rejected so callers do
+/// not silently manufacture application metadata.
+///
+/// # Example
+///
+/// ```
+/// use litchi_ooxml_common::xml::sheet_name::insert_title;
+/// let xml = br#"<p:Properties xmlns:p="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:v="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><p:HeadingPairs><v:vector size="2" baseType="variant"><v:variant><v:lpstr>Worksheets</v:lpstr></v:variant><v:variant><v:i4>2</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="2" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#;
+/// let changed = insert_title(xml, &["One", "Two"], 1, "New", |left, right| left == right)?;
+/// let changed = std::str::from_utf8(changed.as_deref().expect("metadata present"))?;
+/// assert!(changed.contains("<v:i4>3</v:i4>"));
+/// assert!(changed.contains("<v:lpstr>One</v:lpstr><v:lpstr>New</v:lpstr><v:lpstr>Two</v:lpstr>"));
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn insert_title<F>(
+    content: &[u8],
+    original_titles: &[&str],
+    insertion_position: usize,
+    name: &str,
+    equivalent: F,
+) -> Result<Option<Vec<u8>>>
+where
+    F: Fn(&str, &str) -> bool,
+{
+    if insertion_position > original_titles.len() {
+        return Err(invalid(format!(
+            "extended-properties title insertion position {insertion_position} exceeds catalog length {}",
+            original_titles.len()
+        )));
+    }
+    if crate::mce::binds_namespace_by_reference(content) {
+        return Err(Error::Blocked(BlockReason::MarkupCompatibility));
+    }
+
+    let mut reader = NsReader::from_reader(content);
+    let origin = ReaderOrigin::of(content);
+    let mut stack = Vec::<InsertFrame>::new();
+    let mut titles = Vec::<InsertTitle>::new();
+    let mut heading_pairs = Vec::<InsertHeadingPair>::new();
+    let mut title_vector = None::<InsertVector>;
+    let mut heading_vector = None::<InsertVector>;
+    let mut saw_titles_container = false;
+    let mut saw_heading_container = false;
+    let mut pending_heading_label = None::<String>;
+    let mut heading_variant_count = 0usize;
+    let mut root_seen = false;
+    let mut captured_text_bytes = 0usize;
+    let mut title_index = 0usize;
+
+    loop {
+        let event_start = position(&reader, origin)?;
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|source| Error::Parse {
+                context: "extended-properties insertion XML scan",
+                source,
+            })?
+            .into_owned();
+        let event_end = position(&reader, origin)?;
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+
+        match event {
+            Event::Start(element) => {
+                if stack.len() >= MAX_REFERENCE_DEPTH {
+                    return Err(Error::Limit(Limit::NestingDepth {
+                        limit: MAX_REFERENCE_DEPTH,
+                    }));
+                }
+                if is_mce_namespace(&namespace) {
+                    return Err(Error::Blocked(BlockReason::MarkupCompatibility));
+                }
+                validate_title_attributes(&element, decoder, &resolver)?;
+                if stack.is_empty() {
+                    if root_seen {
+                        return Err(invalid(
+                            "extended-properties insertion XML contains multiple roots",
+                        ));
+                    }
+                    root_seen = true;
+                    if !is_extended_element(&namespace, &element, b"Properties") {
+                        return Err(invalid(
+                            "extended-properties insertion XML has no extended-properties root",
+                        ));
+                    }
+                }
+                if let Some(parent) = stack.last_mut() {
+                    if parent.kind == InsertKind::Title
+                        || matches!(
+                            parent.kind,
+                            InsertKind::HeadingLabel | InsertKind::HeadingCount
+                        )
+                    {
+                        parent.has_markup = true;
+                    }
+                }
+                let parent_kind = stack.last().map(|frame| frame.kind);
+                let kind = insert_kind(parent_kind, &namespace, &element, &mut title_index);
+                reject_insert_element(parent_kind, kind, element.name().local_name().as_ref())?;
+                if kind == InsertKind::Titles {
+                    if std::mem::replace(&mut saw_titles_container, true) {
+                        return Err(invalid(
+                            "duplicate extended-properties TitlesOfParts containers",
+                        ));
+                    }
+                }
+                if kind == InsertKind::HeadingPairs {
+                    if std::mem::replace(&mut saw_heading_container, true) {
+                        return Err(invalid(
+                            "duplicate extended-properties HeadingPairs containers",
+                        ));
+                    }
+                }
+                if kind == InsertKind::TitleVector {
+                    if title_vector.is_some() {
+                        return Err(invalid(
+                            "duplicate extended-properties TitlesOfParts vectors",
+                        ));
+                    }
+                }
+                if kind == InsertKind::HeadingVector {
+                    if heading_vector.is_some() {
+                        return Err(invalid(
+                            "duplicate extended-properties HeadingPairs vectors",
+                        ));
+                    }
+                }
+                let vector = matches!(kind, InsertKind::TitleVector | InsertKind::HeadingVector)
+                    .then(|| {
+                        parse_insert_vector(
+                            content,
+                            event_start,
+                            event_end,
+                            &element,
+                            &namespace,
+                            decoder,
+                        )
+                    })
+                    .transpose()?;
+                let title = if kind == InsertKind::Title {
+                    Some(insert_title_name(&element, &namespace, &resolver)?)
+                } else {
+                    None
+                };
+                stack.push(InsertFrame {
+                    kind,
+                    name: element.name().as_ref().to_vec().into_boxed_slice(),
+                    inner_start: event_end,
+                    start: event_start,
+                    text: String::new(),
+                    has_markup: false,
+                    vector,
+                    title,
+                    heading: (kind == InsertKind::HeadingVariant)
+                        .then(InsertHeadingBuilder::default),
+                });
+            },
+            Event::Empty(element) => {
+                if is_mce_namespace(&namespace) {
+                    return Err(Error::Blocked(BlockReason::MarkupCompatibility));
+                }
+                validate_title_attributes(&element, decoder, &resolver)?;
+                if stack.is_empty() {
+                    if root_seen {
+                        return Err(invalid(
+                            "extended-properties insertion XML contains multiple roots",
+                        ));
+                    }
+                    root_seen = true;
+                    if !is_extended_element(&namespace, &element, b"Properties") {
+                        return Err(invalid(
+                            "extended-properties insertion XML has no extended-properties root",
+                        ));
+                    }
+                }
+                if let Some(parent) = stack.last_mut() {
+                    if parent.kind == InsertKind::Title
+                        || matches!(
+                            parent.kind,
+                            InsertKind::HeadingLabel | InsertKind::HeadingCount
+                        )
+                    {
+                        parent.has_markup = true;
+                    }
+                }
+                let parent_kind = stack.last().map(|frame| frame.kind);
+                let kind = insert_kind(parent_kind, &namespace, &element, &mut title_index);
+                reject_insert_element(parent_kind, kind, element.name().local_name().as_ref())?;
+                if kind == InsertKind::Titles {
+                    if std::mem::replace(&mut saw_titles_container, true) {
+                        return Err(invalid(
+                            "duplicate extended-properties TitlesOfParts containers",
+                        ));
+                    }
+                }
+                if kind == InsertKind::HeadingPairs {
+                    if std::mem::replace(&mut saw_heading_container, true) {
+                        return Err(invalid(
+                            "duplicate extended-properties HeadingPairs containers",
+                        ));
+                    }
+                }
+                if matches!(kind, InsertKind::TitleVector | InsertKind::HeadingVector) {
+                    return Err(Error::Blocked(BlockReason::UnmodeledReference));
+                }
+                if kind == InsertKind::Title {
+                    let title = insert_title_name(&element, &namespace, &resolver)?;
+                    titles.push(InsertTitle {
+                        start: event_start,
+                        end: event_end,
+                        text: String::new(),
+                        has_markup: false,
+                        name: title.name,
+                        needs_binding: title.needs_binding,
+                        namespace: title.namespace,
+                    });
+                } else if matches!(kind, InsertKind::HeadingLabel | InsertKind::HeadingCount) {
+                    return Err(invalid(
+                        "extended-properties heading pair entries cannot be empty",
+                    ));
+                } else if parent_kind == Some(InsertKind::HeadingVector)
+                    || parent_kind == Some(InsertKind::HeadingPairs)
+                    || parent_kind == Some(InsertKind::Titles)
+                    || parent_kind == Some(InsertKind::TitleVector)
+                {
+                    return Err(invalid(
+                        "extended-properties metadata container has an unexpected empty child",
+                    ));
+                }
+            },
+            Event::Text(text) => {
+                if let Some(frame) = stack.last_mut()
+                    && matches!(
+                        frame.kind,
+                        InsertKind::Title | InsertKind::HeadingLabel | InsertKind::HeadingCount
+                    )
+                {
+                    let text = text.decode().map_err(|source| Error::Encoding {
+                        context: "extended-properties insertion text",
+                        source,
+                    })?;
+                    push_insert_text(&mut frame.text, &text, &mut captured_text_bytes)?;
+                } else if stack.is_empty() {
+                    let text = text.decode().map_err(|source| Error::Encoding {
+                        context: "extended-properties insertion text outside root",
+                        source,
+                    })?;
+                    if !is_xml_whitespace(&text) {
+                        return Err(invalid(
+                            "extended-properties insertion XML has non-whitespace text outside its root",
+                        ));
+                    }
+                }
+            },
+            Event::CData(text) => {
+                if let Some(frame) = stack.last_mut()
+                    && matches!(
+                        frame.kind,
+                        InsertKind::Title | InsertKind::HeadingLabel | InsertKind::HeadingCount
+                    )
+                {
+                    let text = text.decode().map_err(|source| Error::Encoding {
+                        context: "extended-properties insertion CDATA",
+                        source,
+                    })?;
+                    push_insert_text(&mut frame.text, &text, &mut captured_text_bytes)?;
+                } else if stack.is_empty() {
+                    return Err(invalid(
+                        "extended-properties insertion XML has CDATA outside its root",
+                    ));
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if let Some(frame) = stack.last_mut()
+                    && matches!(
+                        frame.kind,
+                        InsertKind::Title | InsertKind::HeadingLabel | InsertKind::HeadingCount
+                    )
+                {
+                    let text = decode_xml_reference(&reference)?;
+                    push_insert_text(&mut frame.text, &text, &mut captured_text_bytes)?;
+                } else if stack.is_empty() {
+                    return Err(invalid(
+                        "extended-properties insertion XML has an entity outside its root",
+                    ));
+                }
+            },
+            Event::End(end) => {
+                let frame = stack.pop().ok_or_else(|| {
+                    invalid("extended-properties insertion XML found an unmatched closing tag")
+                })?;
+                if frame.name.as_ref() != end.name().as_ref() {
+                    return Err(invalid(
+                        "extended-properties insertion XML closing tag does not match its start tag",
+                    ));
+                }
+                captured_text_bytes = captured_text_bytes
+                    .checked_sub(frame.text.len())
+                    .ok_or_else(|| {
+                        invalid("extended-properties insertion text budget underflow")
+                    })?;
+                match frame.kind {
+                    InsertKind::Title => {
+                        let title = frame.title.ok_or_else(|| {
+                            invalid("extended-properties title lost its namespace metadata")
+                        })?;
+                        titles.push(InsertTitle {
+                            start: frame.start,
+                            end: event_end,
+                            text: frame.text,
+                            has_markup: frame.has_markup,
+                            name: title.name,
+                            needs_binding: title.needs_binding,
+                            namespace: title.namespace,
+                        });
+                    },
+                    InsertKind::TitleVector => {
+                        let mut vector = frame.vector.ok_or_else(|| {
+                            invalid("extended-properties title vector lost its attributes")
+                        })?;
+                        vector.close_start = event_start;
+                        title_vector = Some(vector);
+                    },
+                    InsertKind::HeadingVector => {
+                        let mut vector = frame.vector.ok_or_else(|| {
+                            invalid("extended-properties heading vector lost its attributes")
+                        })?;
+                        vector.close_start = event_start;
+                        heading_vector = Some(vector);
+                    },
+                    InsertKind::HeadingLabel => {
+                        if frame.has_markup {
+                            return Err(invalid(
+                                "extended-properties heading label contains nested markup",
+                            ));
+                        }
+                        let parent = stack.last_mut().ok_or_else(|| {
+                            invalid("extended-properties heading label has no variant parent")
+                        })?;
+                        let heading = parent.heading.as_mut().ok_or_else(|| {
+                            invalid("extended-properties heading label has no variant parent")
+                        })?;
+                        if heading.label.replace(frame.text).is_some() {
+                            return Err(invalid(
+                                "extended-properties heading pair has duplicate labels",
+                            ));
+                        }
+                    },
+                    InsertKind::HeadingCount => {
+                        if frame.has_markup {
+                            return Err(invalid(
+                                "extended-properties heading count contains nested markup",
+                            ));
+                        }
+                        let span = decimal_text_span(content, frame.inner_start, event_start)?;
+                        let count = frame.text.trim().parse::<usize>().map_err(|_| {
+                            invalid("extended-properties heading count is not a decimal integer")
+                        })?;
+                        let parent = stack.last_mut().ok_or_else(|| {
+                            invalid("extended-properties heading count has no variant parent")
+                        })?;
+                        let heading = parent.heading.as_mut().ok_or_else(|| {
+                            invalid("extended-properties heading count has no variant parent")
+                        })?;
+                        if heading.count.replace((count, span)).is_some() {
+                            return Err(invalid(
+                                "extended-properties heading pair has duplicate counts",
+                            ));
+                        }
+                    },
+                    InsertKind::HeadingVariant => {
+                        let heading = frame.heading.ok_or_else(|| {
+                            invalid("extended-properties heading variant lost its state")
+                        })?;
+                        heading_variant_count =
+                            heading_variant_count.checked_add(1).ok_or_else(|| {
+                                invalid("extended-properties heading variant count overflow")
+                            })?;
+                        match (heading.label, heading.count) {
+                            (Some(label), Some((count, span))) => {
+                                heading_pairs.push(InsertHeadingPair { label, count, span });
+                            },
+                            (Some(label), None) => {
+                                if pending_heading_label.replace(label).is_some() {
+                                    return Err(invalid(
+                                        "extended-properties HeadingPairs has consecutive labels without counts",
+                                    ));
+                                }
+                            },
+                            (None, Some((count, span))) => {
+                                let label = pending_heading_label.take().ok_or_else(|| {
+                                    invalid("extended-properties HeadingPairs count has no label")
+                                })?;
+                                heading_pairs.push(InsertHeadingPair { label, count, span });
+                            },
+                            (None, None) => {
+                                return Err(invalid(
+                                    "extended-properties heading variant has neither label nor count",
+                                ));
+                            },
+                        }
+                    },
+                    _ => {},
+                }
+            },
+            Event::Comment(_) | Event::PI(_) | Event::DocType(_) | Event::Decl(_) => {
+                if let Some(parent) = stack.last_mut()
+                    && matches!(
+                        parent.kind,
+                        InsertKind::Title | InsertKind::HeadingLabel | InsertKind::HeadingCount
+                    )
+                {
+                    parent.has_markup = true;
+                }
+            },
+            Event::Eof => break,
+        }
+    }
+    if !root_seen || !stack.is_empty() {
+        return Err(invalid(
+            "extended-properties insertion XML ended before a complete root",
+        ));
+    }
+    if pending_heading_label.is_some() {
+        return Err(invalid(
+            "extended-properties HeadingPairs ends with a label without a count",
+        ));
+    }
+
+    let Some(title_vector) = title_vector else {
+        if !saw_titles_container && !saw_heading_container {
+            return Ok(None);
+        }
+        return Err(invalid(
+            "extended-properties HeadingPairs exists without TitlesOfParts",
+        ));
+    };
+    let Some(heading_vector) = heading_vector else {
+        return Err(invalid(
+            "extended-properties TitlesOfParts exists without HeadingPairs",
+        ));
+    };
+    validate_insert_layout(
+        &title_vector,
+        &heading_vector,
+        &titles,
+        &heading_pairs,
+        heading_variant_count,
+        original_titles,
+        &equivalent,
+    )?;
+
+    let title_name = titles.first().map_or_else(
+        || qualified_lpstr_name(&title_vector.name),
+        |title| title.name.clone(),
+    );
+    let title_namespace = titles.first().map_or_else(
+        || title_vector.namespace.clone(),
+        |title| title.namespace.clone(),
+    );
+    let needs_binding = titles.first().is_some_and(|title| title.needs_binding);
+    let new_title = write_insert_title(&title_name, &title_namespace, needs_binding, name)?;
+    let insert_at = titles.get(insertion_position).map_or_else(
+        || {
+            titles
+                .last()
+                .map_or(title_vector.close_start, |title| title.end)
+        },
+        |title| title.start,
+    );
+
+    let new_size = titles
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| invalid("extended-properties title vector size overflow"))?;
+    let size_span = title_vector.size.map(|(_, span)| span).ok_or_else(|| {
+        invalid("extended-properties TitlesOfParts vector has no checked size attribute")
+    })?;
+    let mut replacements = Vec::<Replacement>::new();
+    replacements
+        .try_reserve_exact(3)
+        .map_err(|source| Error::Allocation {
+            resource: "inserted extended-properties title replacements",
+            source,
+        })?;
+    replacements.push(Replacement {
+        span: size_span,
+        bytes: new_size.to_string().into_bytes(),
+    });
+    let catalog_pair = heading_pairs
+        .iter()
+        .find(|pair| matches!(pair.label.trim(), "Sheet" | "Worksheets"))
+        .ok_or_else(|| invalid("extended-properties heading pairs have no sheet catalog"))?;
+    let new_catalog_count = catalog_pair
+        .count
+        .checked_add(1)
+        .ok_or_else(|| invalid("extended-properties worksheet count overflow"))?;
+    replacements.push(Replacement {
+        span: catalog_pair.span,
+        bytes: new_catalog_count.to_string().into_bytes(),
+    });
+    replacements.push(Replacement {
+        span: Span {
+            start: insert_at,
+            end: insert_at,
+        },
+        bytes: new_title,
+    });
+    replacements.sort_unstable_by_key(|replacement| (replacement.span.start, replacement.span.end));
+    if replacements
+        .windows(2)
+        .any(|pair| pair[0].span.end > pair[1].span.start)
+    {
+        return Err(invalid("overlapping extended-properties title insertions"));
+    }
+    let output_len = replacements
+        .iter()
+        .try_fold(content.len(), |size, replacement| {
+            size.checked_sub(replacement.span.end - replacement.span.start)?
+                .checked_add(replacement.bytes.len())
+        })
+        .ok_or_else(|| invalid("extended-properties title insertion size overflow"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "inserted extended-properties titles",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for replacement in replacements {
+        output.extend_from_slice(&content[cursor..replacement.span.start]);
+        output.extend_from_slice(&replacement.bytes);
+        cursor = replacement.span.end;
+    }
+    output.extend_from_slice(&content[cursor..]);
+    Ok(Some(output))
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum InsertKind {
+    Properties,
+    Titles,
+    TitleVector,
+    Title,
+    HeadingPairs,
+    HeadingVector,
+    HeadingVariant,
+    HeadingLabel,
+    HeadingCount,
+    Other,
+}
+
+#[derive(Debug)]
+struct InsertFrame {
+    kind: InsertKind,
+    name: Box<[u8]>,
+    start: usize,
+    inner_start: usize,
+    text: String,
+    has_markup: bool,
+    vector: Option<InsertVector>,
+    title: Option<InsertTitleName>,
+    heading: Option<InsertHeadingBuilder>,
+}
+
+#[derive(Debug)]
+struct InsertVector {
+    name: Box<[u8]>,
+    namespace: Box<str>,
+    size: Option<(usize, Span)>,
+    base_type: Option<Box<str>>,
+    close_start: usize,
+}
+
+#[derive(Debug)]
+struct InsertTitle {
+    start: usize,
+    end: usize,
+    text: String,
+    has_markup: bool,
+    name: Box<[u8]>,
+    needs_binding: bool,
+    namespace: Box<str>,
+}
+
+#[derive(Debug)]
+struct InsertTitleName {
+    name: Box<[u8]>,
+    needs_binding: bool,
+    namespace: Box<str>,
+}
+
+#[derive(Debug, Default)]
+struct InsertHeadingBuilder {
+    label: Option<String>,
+    count: Option<(usize, Span)>,
+}
+
+#[derive(Debug)]
+struct InsertHeadingPair {
+    label: String,
+    count: usize,
+    span: Span,
+}
+
+#[derive(Debug)]
+struct InsertRawAttribute {
+    name: Vec<u8>,
+    span: Span,
+    value: String,
+}
+
+fn insert_kind(
+    parent: Option<InsertKind>,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    title_entries: &mut usize,
+) -> InsertKind {
+    let local = element.name().local_name();
+    let local = local.as_ref();
+    if parent.is_none() && is_extended_element(namespace, element, b"Properties") {
+        InsertKind::Properties
+    } else if parent == Some(InsertKind::Properties)
+        && is_extended_namespace(namespace)
+        && local == b"TitlesOfParts"
+    {
+        InsertKind::Titles
+    } else if parent == Some(InsertKind::Titles)
+        && is_property_types_namespace(namespace)
+        && local == b"vector"
+    {
+        InsertKind::TitleVector
+    } else if parent == Some(InsertKind::TitleVector)
+        && is_property_types_namespace(namespace)
+        && local == b"lpstr"
+    {
+        *title_entries = title_entries.saturating_add(1);
+        InsertKind::Title
+    } else if parent == Some(InsertKind::Properties)
+        && is_extended_namespace(namespace)
+        && local == b"HeadingPairs"
+    {
+        InsertKind::HeadingPairs
+    } else if parent == Some(InsertKind::HeadingPairs)
+        && is_property_types_namespace(namespace)
+        && local == b"vector"
+    {
+        InsertKind::HeadingVector
+    } else if parent == Some(InsertKind::HeadingVector)
+        && is_property_types_namespace(namespace)
+        && local == b"variant"
+    {
+        InsertKind::HeadingVariant
+    } else if parent == Some(InsertKind::HeadingVariant)
+        && is_property_types_namespace(namespace)
+        && local == b"lpstr"
+    {
+        InsertKind::HeadingLabel
+    } else if parent == Some(InsertKind::HeadingVariant)
+        && is_property_types_namespace(namespace)
+        && local == b"i4"
+    {
+        InsertKind::HeadingCount
+    } else {
+        InsertKind::Other
+    }
+}
+
+fn reject_insert_element(parent: Option<InsertKind>, kind: InsertKind, local: &[u8]) -> Result<()> {
+    if local == b"Properties" && kind != InsertKind::Properties {
+        return Err(invalid(
+            "extended-properties Properties element is outside the root context",
+        ));
+    }
+    if local == b"TitlesOfParts" && kind != InsertKind::Titles {
+        return Err(invalid(
+            "extended-properties TitlesOfParts is outside its recognized context",
+        ));
+    }
+    if local == b"HeadingPairs" && kind != InsertKind::HeadingPairs {
+        return Err(invalid(
+            "extended-properties HeadingPairs is outside its recognized context",
+        ));
+    }
+    if local == b"vector"
+        && matches!(parent, Some(InsertKind::Titles | InsertKind::HeadingPairs))
+        && kind == InsertKind::Other
+    {
+        return Err(invalid(
+            "extended-properties metadata container has a foreign vector child",
+        ));
+    }
+    if local == b"lpstr"
+        && matches!(
+            parent,
+            Some(InsertKind::TitleVector | InsertKind::HeadingVariant)
+        )
+        && kind == InsertKind::Other
+    {
+        return Err(invalid(
+            "extended-properties metadata container has a foreign lpstr child",
+        ));
+    }
+    if local == b"i4" && parent == Some(InsertKind::HeadingVariant) && kind == InsertKind::Other {
+        return Err(invalid(
+            "extended-properties heading pair has a foreign count child",
+        ));
+    }
+    if matches!(
+        parent,
+        Some(
+            InsertKind::Titles
+                | InsertKind::TitleVector
+                | InsertKind::HeadingPairs
+                | InsertKind::HeadingVector
+                | InsertKind::HeadingVariant
+                | InsertKind::Title
+                | InsertKind::HeadingLabel
+                | InsertKind::HeadingCount
+        )
+    ) && kind == InsertKind::Other
+    {
+        return Err(invalid(
+            "extended-properties metadata context has an unexpected child",
+        ));
+    }
+    Ok(())
+}
+
+fn parse_insert_vector(
+    content: &[u8],
+    start: usize,
+    end: usize,
+    element: &BytesStart<'_>,
+    namespace: &ResolveResult<'_>,
+    decoder: Decoder,
+) -> Result<InsertVector> {
+    let namespace = match namespace {
+        ResolveResult::Bound(Namespace(value)) => std::str::from_utf8(value)
+            .map_err(|source| Error::Utf8 {
+                context: "extended-properties metadata vector namespace",
+                source,
+            })?
+            .to_owned()
+            .into_boxed_str(),
+        _ => {
+            return Err(invalid(
+                "extended-properties metadata vector has no bound namespace",
+            ));
+        },
+    };
+    let attributes = insert_raw_attributes(content, start, end, element, decoder)?;
+    let mut size = None;
+    let mut base_type = None;
+    for attribute in attributes {
+        if attribute.name.as_slice() == b"size" {
+            if size.is_some() {
+                return Err(invalid(
+                    "extended-properties metadata vector has duplicate size attributes",
+                ));
+            }
+            let raw = content
+                .get(attribute.span.start..attribute.span.end)
+                .ok_or_else(|| {
+                    invalid("extended-properties size attribute span is out of bounds")
+                })?;
+            if raw.is_empty() || !raw.iter().all(u8::is_ascii_digit) {
+                return Err(invalid(
+                    "extended-properties metadata vector size is not a decimal integer",
+                ));
+            }
+            let value = std::str::from_utf8(raw)
+                .map_err(|source| Error::Utf8 {
+                    context: "extended-properties metadata vector size",
+                    source,
+                })?
+                .parse::<usize>()
+                .map_err(|_| invalid("extended-properties metadata vector size overflows usize"))?;
+            size = Some((value, attribute.span));
+        } else if attribute.name.as_slice() == b"baseType" {
+            if base_type.is_some() {
+                return Err(invalid(
+                    "extended-properties metadata vector has duplicate baseType attributes",
+                ));
+            }
+            base_type = Some(attribute.value.into_boxed_str());
+        }
+    }
+    Ok(InsertVector {
+        name: element.name().as_ref().to_vec().into_boxed_slice(),
+        namespace,
+        size,
+        base_type,
+        close_start: end,
+    })
+}
+
+fn insert_title_name(
+    element: &BytesStart<'_>,
+    namespace: &ResolveResult<'_>,
+    resolver: &NamespaceResolver,
+) -> Result<InsertTitleName> {
+    let namespace = match namespace {
+        ResolveResult::Bound(Namespace(value)) if is_property_types_uri(value) => {
+            std::str::from_utf8(value)
+                .map_err(|source| Error::Utf8 {
+                    context: "extended-properties catalog title namespace",
+                    source,
+                })?
+                .to_owned()
+                .into_boxed_str()
+        },
+        _ => {
+            return Err(invalid(
+                "extended-properties catalog title has no property-types namespace",
+            ));
+        },
+    };
+    let prefix = element.name().prefix();
+    let prefix_name = prefix.map(|value| value.into_inner());
+    let needs_binding = has_local_namespace_declaration(element, prefix_name)?;
+    if matches!(
+        resolver.resolve_prefix(prefix, true),
+        ResolveResult::Unknown(_)
+    ) {
+        return Err(invalid(
+            "extended-properties catalog title has an unbound namespace prefix",
+        ));
+    }
+    Ok(InsertTitleName {
+        name: element.name().as_ref().to_vec().into_boxed_slice(),
+        needs_binding,
+        namespace,
+    })
+}
+
+fn is_property_types_uri(value: &[u8]) -> bool {
+    value == PROPERTY_TYPES || value == STRICT_PROPERTY_TYPES
+}
+
+fn has_local_namespace_declaration(
+    element: &BytesStart<'_>,
+    prefix: Option<&[u8]>,
+) -> Result<bool> {
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|source| Error::Attribute {
+            context: "extended-properties title namespace declaration",
+            source,
+        })?;
+        let key = attribute.key.as_ref();
+        if prefix.is_none() {
+            if key == b"xmlns" {
+                return Ok(true);
+            }
+        } else if key
+            .strip_prefix(b"xmlns:")
+            .is_some_and(|value| Some(value) == prefix)
+        {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+fn insert_raw_attributes(
+    content: &[u8],
+    start: usize,
+    end: usize,
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+) -> Result<Vec<InsertRawAttribute>> {
+    let raw = raw_attribute_spans(content, start, end)?;
+    let mut decoded = Vec::new();
+    decoded
+        .try_reserve_exact(raw.len())
+        .map_err(|source| Error::Allocation {
+            resource: "extended-properties metadata attributes",
+            source,
+        })?;
+    for (index, attribute) in element.checked_attributes().enumerate() {
+        let attribute = attribute.map_err(|source| Error::Attribute {
+            context: "extended-properties metadata attribute",
+            source,
+        })?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|source| Error::Parse {
+                context: "extended-properties metadata attribute value",
+                source,
+            })?;
+        let raw_attribute = raw.get(index).ok_or_else(|| {
+            invalid("extended-properties metadata attribute count is inconsistent")
+        })?;
+        decoded.push(InsertRawAttribute {
+            name: attribute.key.as_ref().to_vec(),
+            span: raw_attribute.span,
+            value: value.into_owned(),
+        });
+    }
+    if decoded.len() != raw.len() {
+        return Err(invalid(
+            "extended-properties metadata attribute count is inconsistent",
+        ));
+    }
+    Ok(decoded)
+}
+
+fn raw_attribute_spans(
+    content: &[u8],
+    start: usize,
+    end: usize,
+) -> Result<Vec<InsertRawAttribute>> {
+    let bytes = content
+        .get(start..end)
+        .ok_or_else(|| invalid("extended-properties tag span is out of bounds"))?;
+    if bytes.first() != Some(&b'<') {
+        return Err(invalid("extended-properties tag does not start with '<'"));
+    }
+    let mut cursor = 1usize;
+    while cursor < bytes.len()
+        && !is_xml_space_byte(bytes[cursor])
+        && !matches!(bytes[cursor], b'>')
+    {
+        cursor += 1;
+    }
+    let mut output = Vec::new();
+    while cursor < bytes.len() {
+        while cursor < bytes.len() && is_xml_space_byte(bytes[cursor]) {
+            cursor += 1;
+        }
+        if cursor >= bytes.len() || bytes[cursor] == b'>' {
+            break;
+        }
+        if bytes[cursor] == b'/' {
+            if bytes.get(cursor + 1) == Some(&b'>') {
+                break;
+            }
+            return Err(invalid("extended-properties tag has an invalid '/'"));
+        }
+        let name_start = cursor;
+        while cursor < bytes.len()
+            && !is_xml_space_byte(bytes[cursor])
+            && !matches!(bytes[cursor], b'=' | b'>' | b'/')
+        {
+            cursor += 1;
+        }
+        if name_start == cursor {
+            return Err(invalid(
+                "extended-properties tag has an empty attribute name",
+            ));
+        }
+        let name = bytes[name_start..cursor].to_vec();
+        while cursor < bytes.len() && is_xml_space_byte(bytes[cursor]) {
+            cursor += 1;
+        }
+        if bytes.get(cursor) != Some(&b'=') {
+            return Err(invalid("extended-properties attribute is missing '='"));
+        }
+        cursor += 1;
+        while cursor < bytes.len() && is_xml_space_byte(bytes[cursor]) {
+            cursor += 1;
+        }
+        let quote = *bytes
+            .get(cursor)
+            .ok_or_else(|| invalid("extended-properties attribute is missing its quote"))?;
+        if !matches!(quote, b'"' | b'\'') {
+            return Err(invalid("extended-properties attribute is not quoted"));
+        }
+        cursor += 1;
+        let value_start = cursor;
+        while cursor < bytes.len() && bytes[cursor] != quote {
+            cursor += 1;
+        }
+        let value_end = cursor;
+        if cursor >= bytes.len() {
+            return Err(invalid("extended-properties attribute quote is not closed"));
+        }
+        output.push(InsertRawAttribute {
+            name,
+            span: Span {
+                start: start + value_start,
+                end: start + value_end,
+            },
+            value: String::new(),
+        });
+        cursor += 1;
+    }
+    Ok(output)
+}
+
+fn qualified_lpstr_name(vector_name: &[u8]) -> Box<[u8]> {
+    split_prefix(vector_name).map_or_else(
+        || b"lpstr".to_vec().into_boxed_slice(),
+        |(prefix, _)| {
+            let mut name = Vec::with_capacity(prefix.len() + 1 + 5);
+            name.extend_from_slice(prefix);
+            name.push(b':');
+            name.extend_from_slice(b"lpstr");
+            name.into_boxed_slice()
+        },
+    )
+}
+
+fn split_prefix(name: &[u8]) -> Option<(&[u8], &[u8])> {
+    let separator = name.iter().position(|byte| *byte == b':')?;
+    Some((&name[..separator], &name[separator + 1..]))
+}
+
+fn write_insert_title(
+    title_name: &[u8],
+    namespace: &str,
+    needs_binding: bool,
+    value: &str,
+) -> Result<Vec<u8>> {
+    if value.len() > MAX_CAPTURED_TEXT_BYTES {
+        return Err(Error::Limit(Limit::CapturedTextBytes {
+            limit: MAX_CAPTURED_TEXT_BYTES,
+        }));
+    }
+    if value.chars().any(|character| {
+        !matches!(character, '\u{9}' | '\u{a}' | '\u{d}'
+            | '\u{20}'..='\u{d7ff}' | '\u{e000}'..='\u{fffd}'
+            | '\u{10000}'..='\u{10ffff}')
+    }) {
+        return Err(invalid(
+            "inserted title contains a character forbidden by XML 1.0",
+        ));
+    }
+    // Literal CR is normalized to LF by XML readers; a reference preserves
+    // the semantic sheet name for subsequent metadata edits.
+    let escaped = escape_xml(value);
+    let escaped = if escaped.contains('\r') {
+        escaped.replace('\r', "&#13;")
+    } else {
+        escaped
+    };
+    let prefix = split_prefix(title_name).map(|(prefix, _)| prefix);
+    let binding_len = if needs_binding {
+        9usize.saturating_add(prefix.map_or(0, |value| value.len()))
+    } else {
+        0
+    };
+    let mut output = Vec::new();
+    let capacity = title_name
+        .len()
+        .checked_mul(2)
+        .and_then(|size| size.checked_add(escaped.len()))
+        .and_then(|size| size.checked_add(binding_len))
+        .and_then(|size| size.checked_add(namespace.len()))
+        .and_then(|size| size.checked_add(8))
+        .ok_or_else(|| invalid("extended-properties inserted title size overflow"))?;
+    output
+        .try_reserve_exact(capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "extended-properties inserted title",
+            source,
+        })?;
+    output.extend_from_slice(b"<");
+    output.extend_from_slice(title_name);
+    if needs_binding {
+        if let Some(prefix) = prefix {
+            output.extend_from_slice(b" xmlns:");
+            output.extend_from_slice(prefix);
+        } else {
+            output.extend_from_slice(b" xmlns");
+        }
+        output.extend_from_slice(b"=\"");
+        output.extend_from_slice(escape_xml(namespace).as_bytes());
+        output.extend_from_slice(b"\"");
+    }
+    output.extend_from_slice(b">");
+    output.extend_from_slice(escaped.as_bytes());
+    output.extend_from_slice(b"</");
+    output.extend_from_slice(title_name);
+    output.extend_from_slice(b">");
+    Ok(output)
+}
+
+fn push_insert_text(text: &mut String, value: &str, captured: &mut usize) -> Result<()> {
+    let next = captured
+        .checked_add(value.len())
+        .ok_or(Error::Limit(Limit::CapturedTextBytes {
+            limit: MAX_CAPTURED_TEXT_BYTES,
+        }))?;
+    if next > MAX_CAPTURED_TEXT_BYTES {
+        return Err(Error::Limit(Limit::CapturedTextBytes {
+            limit: MAX_CAPTURED_TEXT_BYTES,
+        }));
+    }
+    text.try_reserve(value.len())
+        .map_err(|source| Error::Allocation {
+            resource: "extended-properties insertion text",
+            source,
+        })?;
+    text.push_str(value);
+    *captured = next;
+    Ok(())
+}
+
+fn decimal_text_span(content: &[u8], start: usize, end: usize) -> Result<Span> {
+    let raw = content
+        .get(start..end)
+        .ok_or_else(|| invalid("extended-properties decimal text span is out of bounds"))?;
+    let mut left = 0usize;
+    let mut right = raw.len();
+    while left < right && is_xml_space_byte(raw[left]) {
+        left += 1;
+    }
+    while right > left && is_xml_space_byte(raw[right - 1]) {
+        right -= 1;
+    }
+    if left == right || !raw[left..right].iter().all(u8::is_ascii_digit) {
+        return Err(invalid(
+            "extended-properties heading count is not a plain decimal text value",
+        ));
+    }
+    Ok(Span {
+        start: start + left,
+        end: start + right,
+    })
+}
+
+fn is_xml_space_byte(byte: u8) -> bool {
+    matches!(byte, b' ' | b'\t' | b'\r' | b'\n')
+}
+
+fn validate_insert_layout<F>(
+    title_vector: &InsertVector,
+    heading_vector: &InsertVector,
+    titles: &[InsertTitle],
+    heading_pairs: &[InsertHeadingPair],
+    heading_variant_count: usize,
+    original_titles: &[&str],
+    equivalent: &F,
+) -> Result<()>
+where
+    F: Fn(&str, &str) -> bool,
+{
+    // Category names are extensible. A valid category outside the modeled
+    // catalog/named-range layout is unsupported, not evidence of corruption.
+    if heading_pairs.iter().any(|pair| {
+        !matches!(
+            pair.label.trim(),
+            "Sheet" | "Worksheets" | "Named Range" | "Named Ranges"
+        )
+    }) {
+        return Err(Error::Blocked(BlockReason::UnmodeledReference));
+    }
+    if title_vector
+        .base_type
+        .as_deref()
+        .is_some_and(|value| value != "lpstr")
+    {
+        return Err(invalid(
+            "extended-properties TitlesOfParts vector has a non-lpstr baseType",
+        ));
+    }
+    if heading_vector.base_type.as_deref() != Some("variant") {
+        return Err(invalid(
+            "extended-properties HeadingPairs vector is missing its variant baseType",
+        ));
+    }
+    if title_vector
+        .size
+        .is_none_or(|(size, _)| size != titles.len())
+    {
+        return Err(invalid(
+            "extended-properties TitlesOfParts vector size does not match its entries",
+        ));
+    }
+    if heading_vector
+        .size
+        .is_none_or(|(size, _)| size != heading_variant_count)
+    {
+        return Err(invalid(
+            "extended-properties HeadingPairs vector size does not match its entries",
+        ));
+    }
+    if titles.len() < original_titles.len() {
+        return Err(invalid(format!(
+            "extended-properties TitlesOfParts has {} titles but the catalog has {}",
+            titles.len(),
+            original_titles.len()
+        )));
+    }
+    for (index, (actual, expected)) in titles.iter().zip(original_titles).enumerate() {
+        if actual.has_markup || !equivalent(&actual.text, expected) {
+            return Err(invalid(format!(
+                "extended-properties catalog title {index} does not match the source catalog"
+            )));
+        }
+    }
+    if titles
+        .iter()
+        .skip(original_titles.len())
+        .any(|title| title.has_markup)
+    {
+        return Err(invalid(
+            "extended-properties trailing named-range title contains nested markup",
+        ));
+    }
+    let trailing = titles.len() - original_titles.len();
+    let mut catalog = None::<&InsertHeadingPair>;
+    let mut named_ranges = None::<&InsertHeadingPair>;
+    let mut group_stage = 0u8;
+    for pair in heading_pairs {
+        match pair.label.trim() {
+            "Sheet" | "Worksheets" => {
+                if group_stage != 0 || catalog.replace(pair).is_some() {
+                    return Err(invalid(
+                        "extended-properties HeadingPairs sheet category is out of order or duplicated",
+                    ));
+                }
+                group_stage = 1;
+                if pair.count != original_titles.len() {
+                    return Err(invalid(
+                        "extended-properties sheet category count does not match the catalog",
+                    ));
+                }
+            },
+            "Named Range" | "Named Ranges" => {
+                if group_stage != 1 || named_ranges.replace(pair).is_some() {
+                    return Err(invalid(
+                        "extended-properties HeadingPairs named-range category is out of order or duplicated",
+                    ));
+                }
+                group_stage = 2;
+                if pair.count != trailing {
+                    return Err(invalid(
+                        "extended-properties named-range category count does not match trailing titles",
+                    ));
+                }
+            },
+            _ => {
+                return Err(invalid(format!(
+                    "extended-properties HeadingPairs category {:?} is not a supported sheet group",
+                    pair.label
+                )));
+            },
+        }
+    }
+    let catalog = catalog.ok_or_else(|| {
+        invalid("extended-properties HeadingPairs has no Sheet or Worksheets category")
+    })?;
+    let named_range_count = named_ranges.map_or(0, |pair| pair.count);
+    if trailing != named_range_count {
+        return Err(invalid(
+            "extended-properties trailing titles have no matching named-range category",
+        ));
+    }
+    let total_group_count = catalog
+        .count
+        .checked_add(named_range_count)
+        .ok_or_else(|| invalid("extended-properties HeadingPairs group count overflows usize"))?;
+    if total_group_count != titles.len() {
+        return Err(invalid(
+            "extended-properties HeadingPairs group counts do not match TitlesOfParts",
+        ));
+    }
+    Ok(())
+}
+
 fn validate_title_order(catalog_len: usize, order: &[usize]) -> Result<bool> {
     if order.len() != catalog_len {
         return Err(invalid(format!(
@@ -1679,6 +2954,7 @@ mod tests {
         "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
     const PROPERTY_TYPES_NAMESPACE: &str =
         "http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes";
+    const MCE_STR: &str = "http://schemas.openxmlformats.org/markup-compatibility/2006";
 
     fn equivalent(left: &str, right: &str) -> bool {
         left.chars().nfd().default_case_fold().nfd().eq(right
@@ -2019,6 +3295,219 @@ mod tests {
         assert!(matches!(
             reorder_titles(unclosed.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
             Err(Error::Invalid(_)) | Err(Error::Parse { .. })
+        ));
+    }
+
+    fn insertion_source(label: &str) -> String {
+        format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}"><p:HeadingPairs><v:vector size="2" baseType="variant"><v:variant><v:lpstr>{label}</v:lpstr></v:variant><v:variant><v:i4>2</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="2" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr></v:vector></p:TitlesOfParts><Company data-keep="yes"/></p:Properties>"#
+        )
+    }
+
+    #[test]
+    fn inserts_catalog_title_at_start_middle_and_end() {
+        for (position, expected) in [
+            (0, "New &amp; Sheet,One,Two"),
+            (1, "One,New &amp; Sheet,Two"),
+            (2, "One,Two,New &amp; Sheet"),
+        ] {
+            let source = insertion_source("Worksheets");
+            let output = insert_title(
+                &source.into_bytes(),
+                &["One", "Two"],
+                position,
+                "New & Sheet",
+                equivalent,
+            )
+            .expect("insert")
+            .expect("metadata present");
+            let text = std::str::from_utf8(&output).expect("UTF-8");
+            let catalog = expected.replace(',', "</v:lpstr><v:lpstr>");
+            assert!(
+                text.contains(&format!("<v:lpstr>{catalog}</v:lpstr>")),
+                "{text}"
+            );
+            assert!(text.contains("<v:i4>3</v:i4>"), "{text}");
+            assert!(text.contains("size=\"3\""), "{text}");
+            assert!(text.contains("<Company data-keep=\"yes\"/>"), "{text}");
+        }
+    }
+
+    #[test]
+    fn inserts_before_trailing_named_range_and_supports_xlsb_sheet_group() {
+        let source = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}"><p:HeadingPairs><v:vector size="4" baseType="variant"><v:variant><v:lpstr>Sheet</v:lpstr></v:variant><v:variant><v:i4>2</v:i4></v:variant><v:variant><v:lpstr>Named Ranges</v:lpstr></v:variant><v:variant><v:i4>1</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="3" baseType="lpstr"><v:lpstr data-keep="one">One</v:lpstr><v:lpstr>Two</v:lpstr><v:lpstr data-range="exact">Two!Print_Area</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#
+        );
+        let output = insert_title(source.as_bytes(), &["One", "Two"], 1, "A&B", equivalent)
+            .expect("insert")
+            .expect("metadata present");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains("<v:i4>3</v:i4>"), "{text}");
+        assert!(text.contains("size=\"4\""), "{text}");
+        assert!(text.contains(
+            "<v:lpstr data-keep=\"one\">One</v:lpstr><v:lpstr>A&amp;B</v:lpstr><v:lpstr>Two</v:lpstr><v:lpstr data-range=\"exact\">Two!Print_Area</v:lpstr>"
+        ));
+    }
+
+    #[test]
+    fn accepts_padded_catalog_labels_consistently() {
+        let source = insertion_source(" Worksheets ");
+        let output = insert_title(source.as_bytes(), &["One", "Two"], 2, "Three", equivalent)
+            .expect("insert")
+            .expect("metadata present");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains("<v:i4>3</v:i4>"), "{text}");
+    }
+
+    #[test]
+    fn refuses_reversed_groups_undeclared_trailing_titles_and_missing_heading_metadata() {
+        let reversed = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}"><p:HeadingPairs><v:vector size="4" baseType="variant"><v:variant><v:lpstr>Named Ranges</v:lpstr></v:variant><v:variant><v:i4>1</v:i4></v:variant><v:variant><v:lpstr>Sheet</v:lpstr></v:variant><v:variant><v:i4>2</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="3" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr><v:lpstr>Two!Print_Area</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#
+        );
+        assert!(matches!(
+            insert_title(reversed.as_bytes(), &["One", "Two"], 0, "New", equivalent),
+            Err(Error::Invalid(_))
+        ));
+
+        let undeclared_trailing = insertion_source("Worksheets").replace(
+            r#"size="2" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr>"#,
+            r#"size="3" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr><v:lpstr>Two!Print_Area</v:lpstr>"#,
+        );
+        assert!(matches!(
+            insert_title(
+                undeclared_trailing.as_bytes(),
+                &["One", "Two"],
+                0,
+                "New",
+                equivalent
+            ),
+            Err(Error::Invalid(_))
+        ));
+
+        let missing_heading_size = insertion_source("Worksheets").replace(
+            r#"<v:vector size="2" baseType="variant">"#,
+            r#"<v:vector baseType="variant">"#,
+        );
+        assert!(matches!(
+            insert_title(
+                missing_heading_size.as_bytes(),
+                &["One", "Two"],
+                0,
+                "New",
+                equivalent
+            ),
+            Err(Error::Invalid(_))
+        ));
+
+        let missing_heading_base_type = insertion_source("Worksheets").replace(
+            r#"<v:vector size="2" baseType="variant">"#,
+            r#"<v:vector size="2">"#,
+        );
+        assert!(matches!(
+            insert_title(
+                missing_heading_base_type.as_bytes(),
+                &["One", "Two"],
+                0,
+                "New",
+                equivalent
+            ),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn absent_optional_metadata_is_an_exact_noop() {
+        let source = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}"><p:Application>Producer</p:Application></p:Properties>"#
+        );
+        assert_eq!(
+            insert_title(source.as_bytes(), &["One"], 0, "New", equivalent)
+                .expect("optional metadata"),
+            None
+        );
+        let partial = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}"><p:TitlesOfParts/></p:Properties>"#
+        );
+        assert!(matches!(
+            insert_title(partial.as_bytes(), &["One"], 0, "New", equivalent),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn validates_counts_prefix_and_namespace_scope_without_rewriting_other_bytes() {
+        let source = format!(
+            r#"<weird:Properties xmlns:weird="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:q="{PROPERTY_TYPES_NAMESPACE}"><weird:HeadingPairs><q:vector data-before="x" size="2" baseType="variant"><q:variant><q:lpstr>Worksheets</q:lpstr></q:variant><q:variant><q:i4>2</q:i4></q:variant></q:vector></weird:HeadingPairs><weird:TitlesOfParts><q:vector data-before="y" size="2" baseType="lpstr"><q:lpstr>One</q:lpstr><q:lpstr>Two</q:lpstr></q:vector></weird:TitlesOfParts><weird:Company data-keep="yes"/></weird:Properties>"#
+        );
+        let output = insert_title(source.as_bytes(), &["One", "Two"], 2, "Three", equivalent)
+            .expect("insert")
+            .expect("metadata present");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains("<q:vector data-before=\"x\" size=\"2\" baseType=\"variant\">"));
+        assert!(text.contains("<q:vector data-before=\"y\" size=\"3\" baseType=\"lpstr\">"));
+        assert!(text.contains("<weird:Company data-keep=\"yes\"/>"));
+        assert!(text.contains("<q:lpstr>Three</q:lpstr>"));
+    }
+
+    #[test]
+    fn inserts_into_an_empty_catalog_using_the_vector_prefix() {
+        let source = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}"><p:HeadingPairs><v:vector size="2" baseType="variant"><v:variant><v:lpstr>Sheet</v:lpstr></v:variant><v:variant><v:i4>0</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="0" baseType="lpstr"></v:vector></p:TitlesOfParts></p:Properties>"#
+        );
+        let output = insert_title(source.as_bytes(), &[], 0, "First", equivalent)
+            .expect("insert")
+            .expect("metadata present");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains("<v:i4>1</v:i4>"));
+        assert!(text.contains(
+            "<v:vector size=\"1\" baseType=\"lpstr\"><v:lpstr>First</v:lpstr></v:vector>"
+        ));
+    }
+
+    #[test]
+    fn inserted_title_preserves_carriage_returns_and_refuses_invalid_xml_characters() {
+        let source = insertion_source("Worksheets");
+        let name = "New\r\n\t&";
+        let output = insert_title(source.as_bytes(), &["One", "Two"], 1, name, equivalent)
+            .unwrap()
+            .unwrap();
+        assert!(
+            std::str::from_utf8(&output)
+                .unwrap()
+                .contains("New&#13;\n\t&amp;")
+        );
+        insert_title(&output, &["One", name, "Two"], 3, "Last", equivalent)
+            .expect("subsequent insert matches the original name");
+        assert!(matches!(
+            insert_title(
+                source.as_bytes(),
+                &["One", "Two"],
+                1,
+                "Bad\u{1}",
+                equivalent
+            ),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn refuses_malformed_stale_grouped_and_mce_metadata() {
+        let stale = insertion_source("Worksheets").replace(">One</v:lpstr>", ">Stale</v:lpstr>");
+        assert!(matches!(
+            insert_title(stale.as_bytes(), &["One", "Two"], 0, "New", equivalent),
+            Err(Error::Invalid(_))
+        ));
+        let grouped = insertion_source("Charts");
+        assert!(matches!(
+            insert_title(grouped.as_bytes(), &["One", "Two"], 0, "New", equivalent),
+            Err(Error::Blocked(BlockReason::UnmodeledReference))
+        ));
+        let mce = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}" xmlns:mc="{MCE_STR}"><p:HeadingPairs><v:vector size="2" baseType="variant"><v:variant><v:lpstr>Worksheets</v:lpstr></v:variant><v:variant><v:i4>2</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="2" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr></v:vector></p:TitlesOfParts><mc:AlternateContent/></p:Properties>"#
+        );
+        assert!(matches!(
+            insert_title(mce.as_bytes(), &["One", "Two"], 0, "New", equivalent),
+            Err(Error::Blocked(BlockReason::MarkupCompatibility))
         ));
     }
 }

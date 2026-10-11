@@ -1158,3 +1158,16 @@ the staged order changed. No mutable package escape or parallel transaction
 family is introduced. Ordering is a native structural barrier; the unified
 `move_to` and `swap` adapters publish through this family and flush pending edit
 families at transaction boundaries.
+
+## XLSB worksheet insertion (0186)
+
+The primary `Package::edit()` family gains
+`insert_sheet(Position, String, sheet::State) -> Result<()>`. The position is a
+zero-based slot in the staged complete catalog, including chart tabs. Repeated
+insertions use sequential positions; a supplied visibility state authors the
+new tab atomically. Other native edit families remain structural barriers.
+The unified `File::add` and transaction adapters resolve workbook placements,
+coerce name/hidden/visibility properties, and delegate publication to this
+native family. No mutable worksheet escape or alternate transaction API is
+introduced. Durable insertions use tag 9; existing patch tags retain their
+meaning.

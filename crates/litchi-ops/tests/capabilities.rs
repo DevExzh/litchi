@@ -882,8 +882,12 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
 #[test]
 fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
     let caps = Capabilities::of(FileFormat::Xlsb);
+    assert!(caps.element("sheet").unwrap().operations().add);
+    assert!(!caps.element("sheet").unwrap().operations().remove);
+    assert!(!caps.element("workbook").unwrap().operations().add);
     assert!(caps.verb(Verb::Get).is_supported());
     assert!(caps.verb(Verb::Set).is_supported());
+    assert!(caps.verb(Verb::Add).is_supported());
     assert!(caps.verb(Verb::Save).is_supported());
     assert!(caps.element("cell").is_some());
     let computed_value = caps
@@ -938,7 +942,15 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
                 element.name(),
                 property.name()
             );
-            assert!(!property.add(), "{}", property.name());
+            let sheet_add = element.name() == "sheet"
+                && matches!(property.name(), "name" | "hidden" | "visibility");
+            assert_eq!(
+                property.add(),
+                sheet_add,
+                "{}.{}",
+                element.name(),
+                property.name()
+            );
         }
     }
 }

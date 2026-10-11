@@ -117,6 +117,15 @@ enum Operation {
     ReorderSheets {
         order: Arc<[usize]>,
     },
+    /// Author one blank worksheet at a position in the currently staged
+    /// complete tab catalog.  The position is replayed sequentially, so a
+    /// patch containing several insertions remains deterministic even when
+    /// later insertions are staged after earlier ones.
+    InsertSheet {
+        catalog_position: usize,
+        name: String,
+        state: State,
+    },
     SetSheetState {
         catalog_position: usize,
         state: State,
@@ -204,6 +213,7 @@ enum Selection {
     SheetRename(usize),
     LegacyWorksheetRename(usize),
     SheetOrder,
+    SheetInsert(usize),
     SheetState(usize),
     Cell(usize, Reference),
     Drawing(usize),
@@ -217,6 +227,9 @@ impl Operation {
                 catalog_position, ..
             } => Selection::SheetRename(*catalog_position),
             Self::ReorderSheets { .. } => Selection::SheetOrder,
+            Self::InsertSheet {
+                catalog_position, ..
+            } => Selection::SheetInsert(*catalog_position),
             Self::SetSheetState {
                 catalog_position, ..
             } => Selection::SheetState(*catalog_position),
@@ -232,7 +245,10 @@ impl Operation {
 
     fn conflicts_with(&self, other: &Self) -> bool {
         match (self, other) {
-            (Self::ReorderSheets { .. }, _) | (_, Self::ReorderSheets { .. }) => true,
+            (Self::ReorderSheets { .. }, _)
+            | (_, Self::ReorderSheets { .. })
+            | (Self::InsertSheet { .. }, _)
+            | (_, Self::InsertSheet { .. }) => true,
             (Self::RenameSheet { .. }, Self::SetSheetState { .. })
             | (Self::SetSheetState { .. }, Self::RenameSheet { .. }) => false,
             (Self::SetSheetName { .. }, Self::SetSheetState { .. })
@@ -324,6 +340,7 @@ impl Edit {
                 Operation::RenameSheet { .. }
                 | Operation::SetSheetState { .. }
                 | Operation::ReorderSheets { .. }
+                | Operation::InsertSheet { .. }
                 | Operation::TransferCell { .. }
                 | Operation::AddImage { .. }
                 | Operation::TransferDrawing { .. } => {
@@ -453,6 +470,7 @@ impl Edit {
                         Operation::ReorderSheets { order } => Some(order),
                         Operation::RenameSheet { .. }
                         | Operation::SetSheetName { .. }
+                        | Operation::InsertSheet { .. }
                         | Operation::SetSheetState { .. }
                         | Operation::TransferCell { .. }
                         | Operation::AddImage { .. }
@@ -479,6 +497,143 @@ impl Edit {
             self.stage(operation)?;
         }
         Ok(changed)
+    }
+
+    /// Author one blank worksheet at a checked complete-catalog position.
+    ///
+    /// The position is interpreted against the catalog produced by earlier
+    /// insertions in this edit, so `Position::new(current_len)` appends and a
+    /// repeated insertion at the same position is well-defined.  A newly
+    /// authored worksheet has no cells, drawings, or formulas.  Its worksheet
+    /// part has the required binary-index relationship, and its explicit
+    /// visibility state is carried by the workbook's `BrtBundleSh` record.
+    /// Existing workbook operations cannot be mixed with insertion because
+    /// their sheet ordinals have no shared remapping contract.
+    ///
+    /// The durable operation is tag 9.  Its payload is the one-byte tag,
+    /// followed by an eight-byte little-endian catalog position, one state
+    /// byte, an eight-byte little-endian UTF-8 name length, and the name
+    /// bytes.  The operation is source-checked and replayed in order, so a
+    /// patch containing several insertions has the same staged-catalog
+    /// semantics as this method.
+    ///
+    /// ```
+    /// use litchi_core::sheet::traits::WorkbookTrait;
+    /// use litchi_core::Position;
+    /// use litchi_xlsb::{Builder, sheet::State, writer::MutableWorksheet};
+    ///
+    /// let mut builder = Builder::new();
+    /// builder.add_worksheet(MutableWorksheet::new("First"));
+    /// builder.add_worksheet(MutableWorksheet::new("Second"));
+    /// let source = builder.build()?;
+    /// let mut edit = source.edit()?;
+    /// edit.insert_sheet(Position::new(1), "Inserted".to_owned(), State::Visible)?;
+    /// let commit = edit.commit()?;
+    /// assert_eq!(
+    ///     commit.package().workbook()?.worksheet_names(),
+    ///     &["First", "Inserted", "Second"],
+    /// );
+    /// # Ok::<(), litchi_xlsb::package::PackageError>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range staged position, an invalid or
+    /// duplicate name, a structural dependency that cannot be remapped, or
+    /// a transaction that exceeds its finite change and patch policy.
+    pub fn insert_sheet(
+        &mut self,
+        position: litchi_core::Position,
+        name: String,
+        state: State,
+    ) -> Result<()> {
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::InsertSheet { .. }))
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet insertion cannot be combined with other workbook operations".to_string(),
+            ));
+        }
+        if self.operations.len() >= self.limits.changes() {
+            return Err(Error::LimitExceeded {
+                resource: "workbook structural operations",
+                actual: self.operations.len().saturating_add(1),
+                maximum: self.limits.changes(),
+            });
+        }
+        let catalog_position = position.get();
+        let staged_insertions = self
+            .operations
+            .iter()
+            .filter(|operation| matches!(operation, Operation::InsertSheet { .. }))
+            .count();
+        let staged_len = self
+            .sheet_catalog
+            .len()
+            .checked_add(staged_insertions)
+            .ok_or(Error::CapacityOverflow {
+                resource: "staged XLSB sheet catalog",
+            })?;
+        if catalog_position > staged_len {
+            return Err(Error::InvalidFormat(format!(
+                "sheet insertion position {catalog_position} exceeds staged catalog length {staged_len}"
+            )));
+        }
+        validate_sheet_name_value(&name)?;
+        validate_staged_insert_sheet_name(&self.sheet_catalog, &self.operations, &name)?;
+        let operation = Operation::InsertSheet {
+            catalog_position,
+            name,
+            state,
+        };
+        let mut operation_bytes = 0usize;
+        for staged in &self.operations {
+            operation_bytes = operation_bytes
+                .checked_add(encoded_operation_length(staged)?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "durable workbook patch operation bytes",
+                })?;
+        }
+        operation_bytes = operation_bytes
+            .checked_add(encoded_operation_length(&operation)?)
+            .ok_or(Error::CapacityOverflow {
+                resource: "durable workbook patch operation bytes",
+            })?;
+        let minimum_patch_bytes = MAGIC
+            .len()
+            .checked_add(24)
+            .and_then(|size| size.checked_add(self.before.len()))
+            .and_then(|size| size.checked_add(operation_bytes))
+            .ok_or(Error::CapacityOverflow {
+                resource: "durable workbook patch bytes",
+            })?;
+        if minimum_patch_bytes > self.limits.bytes() {
+            return Err(Error::LimitExceeded {
+                resource: "durable workbook patch bytes",
+                actual: minimum_patch_bytes,
+                maximum: self.limits.bytes(),
+            });
+        }
+        let candidate_len =
+            self.operations
+                .len()
+                .checked_add(1)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "staged workbook structural operations",
+                })?;
+        let mut candidate = Vec::new();
+        candidate
+            .try_reserve_exact(candidate_len)
+            .map_err(|source| Error::Allocation {
+                resource: "staged workbook structural operations",
+                source,
+            })?;
+        candidate.extend(self.operations.iter().cloned());
+        candidate.push(operation.clone());
+        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        self.stage(operation)
     }
 
     /// Plan a workbook-tab visibility change using the complete sheet
@@ -540,6 +695,7 @@ impl Edit {
             Operation::RenameSheet { .. }
             | Operation::SetSheetName { .. }
             | Operation::ReorderSheets { .. }
+            | Operation::InsertSheet { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
             | Operation::TransferDrawing { .. } => tab.state,
@@ -822,14 +978,19 @@ impl Edit {
     }
 
     fn stage(&mut self, operation: Operation) -> Result<()> {
-        let is_reorder = matches!(operation, Operation::ReorderSheets { .. });
-        if self
-            .operations
-            .iter()
-            .any(|existing| matches!(existing, Operation::ReorderSheets { .. }) != is_reorder)
-        {
+        let is_catalog_topology = matches!(
+            operation,
+            Operation::ReorderSheets { .. } | Operation::InsertSheet { .. }
+        );
+        if self.operations.iter().any(|existing| {
+            matches!(
+                existing,
+                Operation::ReorderSheets { .. } | Operation::InsertSheet { .. }
+            ) != is_catalog_topology
+        }) {
             return Err(Error::UnsupportedFeature(
-                "sheet reordering cannot be combined with other workbook operations".to_string(),
+                "sheet catalog topology operations cannot be combined with other workbook operations"
+                    .to_string(),
             ));
         }
         if self.operations.len() >= self.limits.changes() {
@@ -844,9 +1005,14 @@ impl Edit {
             .operation_indexes
             .get(&selection)
             .is_some_and(|indexes| {
-                indexes
-                    .iter()
-                    .any(|index| self.operations[*index].conflicts_with(&operation))
+                indexes.iter().any(|index| {
+                    // Multiple insertions are intentionally sequential;
+                    // all other topology/selection conflicts retain the
+                    // ordinary merge identity rule.
+                    !(matches!(self.operations[*index], Operation::InsertSheet { .. })
+                        && matches!(operation, Operation::InsertSheet { .. }))
+                        && self.operations[*index].conflicts_with(&operation)
+                })
             });
         if conflicts {
             return Err(Error::UnsupportedFeature(format!(
@@ -1319,6 +1485,7 @@ impl Patch {
                         },
                     )?)
                 },
+                Operation::InsertSheet { name, .. } => 18usize.checked_add(name.len()),
                 Operation::SetSheetState { .. } => Some(17),
                 Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
                 Operation::AddImage { image, .. } => {
@@ -1354,6 +1521,7 @@ impl MergeConflict {
         match self.selection {
             Selection::SheetRename(sheet)
             | Selection::LegacyWorksheetRename(sheet)
+            | Selection::SheetInsert(sheet)
             | Selection::SheetState(sheet)
             | Selection::Cell(sheet, _)
             | Selection::Drawing(sheet) => sheet,
@@ -1367,6 +1535,7 @@ impl MergeConflict {
         match self.selection {
             Selection::SheetRename(_)
             | Selection::LegacyWorksheetRename(_)
+            | Selection::SheetInsert(_)
             | Selection::SheetState(_)
             | Selection::SheetOrder
             | Selection::Drawing(_) => None,
@@ -1561,6 +1730,7 @@ fn canonicalize_legacy_operations(
             },
             operation @ (Operation::SetSheetName { .. }
             | Operation::ReorderSheets { .. }
+            | Operation::InsertSheet { .. }
             | Operation::SetSheetState { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
@@ -1581,6 +1751,16 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
             "durable workbook patches may contain at most one sheet-reorder operation".to_string(),
         ));
     }
+    let insert_count = operations
+        .iter()
+        .filter(|operation| matches!(operation, Operation::InsertSheet { .. }))
+        .count();
+    if reorder_count > 0 && insert_count > 0 {
+        return Err(Error::UnsupportedFeature(
+            "sheet insertion and sheet reordering cannot be combined in one durable patch"
+                .to_string(),
+        ));
+    }
     if reorder_count == 1
         && operations
             .iter()
@@ -1588,6 +1768,15 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
     {
         return Err(Error::UnsupportedFeature(
             "sheet reordering cannot be combined with other workbook operations".to_string(),
+        ));
+    }
+    if insert_count > 0
+        && operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::InsertSheet { .. }))
+    {
+        return Err(Error::UnsupportedFeature(
+            "sheet insertion cannot be combined with other workbook operations".to_string(),
         ));
     }
     Ok(())
@@ -1650,6 +1839,18 @@ fn replay_workbook(
             },
             Operation::ReorderSheets { order } => {
                 changed |= apply_sheet_order(&mut workbook, order)?;
+            },
+            Operation::InsertSheet {
+                catalog_position,
+                name,
+                state,
+            } => {
+                insert_sheet(&mut workbook, *catalog_position, name, *state)?;
+                changed = true;
+                // Insertion itself does not relocate the active view, but it
+                // still must leave the resulting catalog with a valid visible
+                // tab before publication.
+                state_changed = true;
             },
             Operation::AddImage { sheet, image } => {
                 add_image(&mut workbook, *sheet, image)?;
@@ -2112,6 +2313,747 @@ fn transfer_cell(
     Ok(())
 }
 
+/// Author one blank worksheet and insert its complete-catalog entry.
+///
+/// The package is edited on a clone and reparsed before the caller adopts it,
+/// so a refusal from any dependency leaves the source image untouched. Existing
+/// relationship identifiers, tab identifiers, worksheet payloads, and all
+/// unrelated package members remain byte-for-byte unchanged.
+fn insert_sheet(workbook: &mut Workbook, position: usize, name: &str, state: State) -> Result<()> {
+    let catalog_len = workbook.sheets().len();
+    if position > catalog_len {
+        return Err(Error::InvalidFormat(format!(
+            "sheet insertion position {position} exceeds catalog length {catalog_len}"
+        )));
+    }
+    validate_sheet_name_value(name)?;
+    if workbook.sheets().any(|tab| excel_name_eq(tab.name(), name)) {
+        return Err(Error::InvalidFormat(format!(
+            "duplicate sheet name {name:?}"
+        )));
+    }
+    reject_unmodeled_reorder_dependencies(&workbook.package)?;
+    reject_shared_workbook_headers(&workbook.package)?;
+    crate::signature_policy::ensure_unsigned(&workbook.package)?;
+
+    let workbook_uri = workbook.package.main_document_part()?.partname().clone();
+    let workbook_source = workbook.package.get_part(&workbook_uri)?.blob().to_vec();
+    let catalog = collect_bundle_records(&workbook_source, catalog_len, workbook.leniency())?;
+    let tab_id = allocate_tab_id(&catalog)?;
+    let (worksheet_uri, binary_index_uri) = allocate_worksheet_uris(&workbook.package)?;
+    let (worksheet_bytes, binary_index_bytes) = authored_blank_worksheet(name)?;
+
+    let (worksheet_relationship_type, worksheet_content_type) =
+        worksheet_relationship_flavor(&workbook.package)?;
+    let worksheet_target = worksheet_uri.relative_ref(workbook_uri.base_uri());
+    let binary_index_target = binary_index_uri.relative_ref(worksheet_uri.base_uri());
+
+    let mut worksheet_part = BlobPart::new(
+        worksheet_uri.clone(),
+        worksheet_content_type,
+        worksheet_bytes,
+    );
+    worksheet_part.rels_mut().get_or_add(
+        crate::binary_index::BINARY_INDEX_RELATIONSHIP,
+        &binary_index_target,
+    );
+    let binary_index_part = BlobPart::new(
+        binary_index_uri,
+        crate::binary_index::BINARY_INDEX_CONTENT_TYPE.to_string(),
+        binary_index_bytes,
+    );
+
+    let mut package = workbook.package.clone();
+    package.try_add_part(Box::new(worksheet_part))?;
+    package.try_add_part(Box::new(binary_index_part))?;
+    let new_rel_id = {
+        let workbook_part = package.get_part_mut(&workbook_uri)?;
+        workbook_part
+            .rels_mut()
+            .get_or_add(&worksheet_relationship_type, &worksheet_target)
+            .r_id()
+            .to_string()
+    };
+    let new_bundle = bundle_sheet_payload(state, tab_id, &new_rel_id, name)?;
+    let workbook_output = rewrite_workbook_insert(
+        &workbook_source,
+        position,
+        catalog_len,
+        &workbook.formula_context,
+        &new_bundle,
+    )?;
+
+    let tabs = workbook.sheets().collect::<Vec<_>>();
+    let old_titles = tabs
+        .iter()
+        .map(|tab| tab.name().to_owned())
+        .collect::<Vec<_>>();
+    let title_refs = old_titles.iter().map(String::as_str).collect::<Vec<_>>();
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve(package.part_count().saturating_add(2))
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet-insertion package replacements",
+            source,
+        })?;
+    replacements.push((workbook_uri, workbook_output));
+    for part in package.iter_parts() {
+        if part
+            .content_type()
+            .eq_ignore_ascii_case(litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES)
+        {
+            if let Some(output) = litchi_ooxml_common::xml::sheet_name::insert_title(
+                package.get_part(part.partname())?.blob(),
+                &title_refs,
+                position,
+                name,
+                excel_name_eq,
+            )? {
+                replacements.push((part.partname().clone(), output));
+            }
+        }
+    }
+    let volatile = crate::volatile_dependencies::reorder_owner(&package, catalog_len)?;
+    if let Some(uri) = volatile {
+        let source = package.get_part(&uri)?.blob();
+        if let Some(output) = rewrite_volatile_dependencies_insert(source, position, catalog_len)? {
+            replacements.push((uri, output));
+        }
+    }
+    package.replace_part_payloads(replacements)?;
+    let validated = workbook.reparse_candidate(package)?;
+    *workbook = validated;
+    Ok(())
+}
+
+fn authored_blank_worksheet(name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
+    let mut worksheet = crate::writer::MutableWorksheet::new(name.to_owned());
+    // `None` uses the legacy writer default, whose tab-selected flag is true.
+    // An inserted tab must not become the active/selected tab implicitly.
+    worksheet.set_view(litchi_sheet::view::View {
+        tab_selected: false,
+        ..Default::default()
+    });
+    let mut source = Vec::new();
+    worksheet.write_with_sparkline_block(
+        &mut Writer::new(&mut source),
+        &mut crate::writer::MutableSharedStringsWriter::new(),
+        None,
+    )?;
+    let index = crate::binary_index::encode_for_worksheet(
+        &source,
+        crate::binary_index::Limits::publication_default(),
+    )?;
+    Ok((source, index))
+}
+
+fn allocate_worksheet_uris(package: &litchi_opc::OpcPackage) -> Result<(PackURI, PackURI)> {
+    let attempts = package.part_count().saturating_add(2);
+    for ordinal in 1..=attempts {
+        let sheet_uri = PackURI::new(format!("/xl/worksheets/sheet{ordinal}.bin"))?;
+        let index_uri = PackURI::new(format!("/xl/worksheets/binaryIndex{ordinal}.bin"))?;
+        if package.contains_part(&sheet_uri) || package.contains_part(&index_uri) {
+            continue;
+        }
+        if package.validate_new_part_name(&sheet_uri).is_ok()
+            && package.validate_new_part_name(&index_uri).is_ok()
+        {
+            return Ok((sheet_uri, index_uri));
+        }
+    }
+    Err(Error::LimitExceeded {
+        resource: "XLSB worksheet URI allocation attempts",
+        actual: attempts,
+        maximum: attempts,
+    })
+}
+
+fn worksheet_relationship_flavor(package: &litchi_opc::OpcPackage) -> Result<(String, String)> {
+    let workbook = package.main_document_part()?;
+    let mut fallback = litchi_opc::constants::relationship_type::WORKSHEET.to_string();
+    for relationship in workbook.rels().iter() {
+        let is_worksheet = matches!(
+            relationship.reltype(),
+            litchi_opc::constants::relationship_type::WORKSHEET
+                | litchi_opc::constants::relationship_type::STRICT_WORKSHEET
+        );
+        if is_worksheet {
+            if relationship.is_external() {
+                continue;
+            }
+            let target = relationship.target_partname()?;
+            let part = package.get_part(&target)?;
+            return Ok((
+                relationship.reltype().to_string(),
+                part.content_type().to_string(),
+            ));
+        }
+        if relationship.reltype()
+            == "http://purl.oclc.org/ooxml/officeDocument/relationships/chartsheet"
+        {
+            fallback = litchi_opc::constants::relationship_type::STRICT_WORKSHEET.to_string();
+        }
+    }
+    Ok((fallback, WORKSHEET_CONTENT_TYPE.to_string()))
+}
+
+fn collect_bundle_records(
+    source: &[u8],
+    catalog_len: usize,
+    leniency: crate::leniency::Leniency,
+) -> Result<Vec<crate::package::records::BundleSheetRecord>> {
+    let mut records = Vec::new();
+    records
+        .try_reserve_exact(catalog_len)
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet insertion catalog records",
+            source,
+        })?;
+    let mut open = false;
+    let mut seen = false;
+    let mut closed = false;
+    for item in Records::new(source) {
+        let record = item?;
+        match record.kind() {
+            kind::BEGIN_BUNDLE_SHS => {
+                if open || seen || !record.payload().is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "Workbook has duplicate or malformed BrtBundleShs collections".to_string(),
+                    ));
+                }
+                open = true;
+                seen = true;
+            },
+            kind::BUNDLE_SH if open => {
+                let mut tolerance_report = crate::leniency::ToleranceReport::default();
+                let ordinal =
+                    u32::try_from(records.len()).map_err(|_error| Error::CapacityOverflow {
+                        resource: "XLSB sheet insertion catalog ordinal",
+                    })?;
+                let parsed = crate::package::records::BundleSheetRecord::parse_with(
+                    record.payload(),
+                    ordinal,
+                    crate::leniency::Tolerance::recording_with(&mut tolerance_report, leniency),
+                )?;
+                records.push(parsed);
+            },
+            kind::BUNDLE_SH => {
+                return Err(Error::InvalidFormat(
+                    "BrtBundleSh appears outside its BrtBeginBundleShs collection".to_string(),
+                ));
+            },
+            kind::END_BUNDLE_SHS => {
+                if !open || !record.payload().is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "Workbook has an unbalanced BrtEndBundleShs collection".to_string(),
+                    ));
+                }
+                open = false;
+                closed = true;
+            },
+            _ if open => {
+                return Err(Error::UnsupportedFeature(
+                    "sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records"
+                        .to_string(),
+                ));
+            },
+            _ => {},
+        }
+    }
+    if open || !closed || !seen || records.len() != catalog_len {
+        return Err(Error::InvalidFormat(format!(
+            "Workbook BrtBundleSh count {} differs from catalog size {catalog_len}",
+            records.len()
+        )));
+    }
+    Ok(records)
+}
+
+fn allocate_tab_id(records: &[crate::package::records::BundleSheetRecord]) -> Result<u32> {
+    let max_id = usize::from(u16::MAX);
+    let mut used = Vec::new();
+    used.try_reserve_exact(max_id.saturating_add(1))
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB stable sheet identifiers",
+            source,
+        })?;
+    used.resize(max_id.saturating_add(1), false);
+    for record in records {
+        let index = usize::try_from(record.id).map_err(|_error| {
+            Error::InvalidFormat("BrtBundleSh stable sheet identifier exceeds usize".to_string())
+        })?;
+        let slot = used.get_mut(index).ok_or_else(|| {
+            Error::InvalidFormat("BrtBundleSh stable sheet identifier exceeds u16".to_string())
+        })?;
+        if *slot {
+            return Err(Error::InvalidFormat(
+                "BrtBundleSh stable sheet identifiers are not unique".to_string(),
+            ));
+        }
+        *slot = true;
+    }
+    for candidate in 1..=u32::from(u16::MAX) {
+        let index = usize::try_from(candidate).map_err(|_error| {
+            Error::InvalidFormat("stable sheet identifier does not fit usize".to_string())
+        })?;
+        if !used[index] {
+            return Ok(candidate);
+        }
+    }
+    Err(Error::LimitExceeded {
+        resource: "XLSB stable sheet identifiers",
+        actual: records.len().saturating_add(1),
+        maximum: usize::from(u16::MAX),
+    })
+}
+
+fn bundle_sheet_payload(state: State, tab_id: u32, rel_id: &str, name: &str) -> Result<Vec<u8>> {
+    if !(1..=u32::from(u16::MAX)).contains(&tab_id) || rel_id.is_empty() {
+        return Err(Error::InvalidFormat(
+            "new BrtBundleSh has an invalid stable identifier or relationship".to_string(),
+        ));
+    }
+    let mut payload = Vec::new();
+    let mut writer = Writer::new(&mut payload);
+    writer.write_u32(u32::from(state_to_wire(state)))?;
+    writer.write_u32(tab_id)?;
+    writer.write_wide_string(rel_id)?;
+    writer.write_wide_string(name)?;
+    let _ = crate::package::records::BundleSheetRecord::parse(&payload)?;
+    Ok(payload)
+}
+
+fn rewrite_workbook_insert(
+    source: &[u8],
+    position: usize,
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+    new_bundle_payload: &[u8],
+) -> Result<Vec<u8>> {
+    if position > catalog_len {
+        return Err(Error::InvalidFormat(
+            "sheet insertion position exceeds the source catalog".to_string(),
+        ));
+    }
+    let new_bundle_record = make_record(kind::BUNDLE_SH, new_bundle_payload)?;
+    let output_capacity =
+        source
+            .len()
+            .checked_add(new_bundle_record.len())
+            .ok_or(Error::CapacityOverflow {
+                resource: "XLSB inserted workbook bytes",
+            })?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_capacity)
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB inserted workbook bytes",
+            source,
+        })?;
+    let mut bundle_count = 0usize;
+    let mut bundle_open = false;
+    let mut saw_bundle_collection = false;
+    let mut bundle_collection_closed = false;
+    let mut inserted = false;
+    for item in Records::new(source) {
+        let record = item?;
+        let raw = record_bytes(source, &record)?;
+        match record.kind() {
+            kind::BEGIN_BUNDLE_SHS => {
+                if bundle_open || saw_bundle_collection || !record.payload().is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "Workbook has duplicate or malformed BrtBundleShs collections".to_string(),
+                    ));
+                }
+                saw_bundle_collection = true;
+                bundle_open = true;
+                output.extend_from_slice(raw);
+            },
+            kind::BUNDLE_SH if bundle_open => {
+                if bundle_count == position {
+                    output.extend_from_slice(&new_bundle_record);
+                    inserted = true;
+                }
+                output.extend_from_slice(raw);
+                bundle_count = bundle_count.checked_add(1).ok_or(Error::CapacityOverflow {
+                    resource: "XLSB worksheet insertion catalog ordinal",
+                })?;
+            },
+            kind::BUNDLE_SH => {
+                return Err(Error::InvalidFormat(
+                    "BrtBundleSh appears outside its BrtBeginBundleShs collection".to_string(),
+                ));
+            },
+            kind::END_BUNDLE_SHS => {
+                if !bundle_open || !record.payload().is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "Workbook has an unbalanced BrtEndBundleShs collection".to_string(),
+                    ));
+                }
+                if bundle_count == position {
+                    output.extend_from_slice(&new_bundle_record);
+                    inserted = true;
+                }
+                bundle_open = false;
+                bundle_collection_closed = true;
+                output.extend_from_slice(raw);
+            },
+            _ if bundle_open => {
+                return Err(Error::UnsupportedFeature(
+                    "sheet insertion cannot detach an unknown record interspersed with BrtBundleSh records"
+                        .to_string(),
+                ));
+            },
+            kind::BEGIN_BOOK
+            | kind::END_BOOK
+            | kind::FILE_VERSION
+            | kind::WORKBOOK_PROP
+            | kind::BEGIN_BOOK_VIEWS
+            | kind::END_BOOK_VIEWS
+            | kind::BOOK_VIEW
+            | kind::BEGIN_PIVOT_CACHE_IDS
+            | kind::END_PIVOT_CACHE_IDS
+            | kind::BEGIN_PIVOT_CACHE_ID
+            | kind::END_PIVOT_CACHE_ID
+            | kind::BEGIN_EXTERNALS
+            | kind::END_EXTERNALS
+            | kind::SUP_SELF
+            | kind::SUP_SAME
+            | kind::SUP_ADDIN
+            | kind::SUP_BOOK_SRC
+            | kind::EXTERN_SHEET
+            | kind::NAME
+            | kind::CALC_PROP => {
+                let rewritten =
+                    rewrite_workbook_record_insert(raw, position, catalog_len, context)?;
+                output.extend_from_slice(&rewritten);
+            },
+            other => {
+                return Err(Error::UnsupportedFeature(format!(
+                    "sheet insertion cannot preserve unmodeled workbook record {other:?} at offset {} without a catalog dependency contract",
+                    record.offset()
+                )));
+            },
+        }
+    }
+    if bundle_open
+        || !bundle_collection_closed
+        || !saw_bundle_collection
+        || bundle_count != catalog_len
+    {
+        return Err(Error::InvalidFormat(format!(
+            "Workbook BrtBundleSh count {bundle_count} differs from catalog size {catalog_len}"
+        )));
+    }
+    if !inserted {
+        return Err(Error::InvalidFormat(
+            "Workbook sheet catalog insertion record was not emitted".to_string(),
+        ));
+    }
+    Ok(output)
+}
+
+fn make_record(record_kind: crate::raw::Kind, payload: &[u8]) -> Result<Vec<u8>> {
+    let mut output = Vec::new();
+    Writer::new(&mut output).write_record(record_kind, payload)?;
+    Ok(output)
+}
+
+fn rewrite_workbook_record_insert(
+    raw: &[u8],
+    position: usize,
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+) -> Result<Vec<u8>> {
+    let (header, header_len) = Header::parse(raw, RawLimits::DEFAULT)?;
+    let payload = raw.get(header_len..).ok_or(Error::InvalidLength {
+        expected: header_len,
+        found: raw.len(),
+    })?;
+    let payload = payload.get(..header.len()).ok_or(Error::InvalidLength {
+        expected: header_len.saturating_add(header.len()),
+        found: raw.len(),
+    })?;
+    let mut output = raw.to_vec();
+    match header.kind() {
+        kind::BOOK_VIEW => {
+            if payload.len() != 29 {
+                return Err(Error::InvalidLength {
+                    expected: 29,
+                    found: payload.len(),
+                });
+            }
+            for field_offset in [20usize, 24usize] {
+                let old = usize::try_from(u32::from_le_bytes(
+                    payload[field_offset..field_offset + 4]
+                        .try_into()
+                        .map_err(|_error| Error::InvalidLength {
+                            expected: field_offset.saturating_add(4),
+                            found: payload.len(),
+                        })?,
+                ))
+                .map_err(|_error| {
+                    Error::InvalidFormula("BrtBookView index overflow".to_string())
+                })?;
+                if old >= catalog_len {
+                    return Err(Error::InvalidFormat(
+                        "BrtBookView points outside the sheet catalog".to_string(),
+                    ));
+                }
+                let new = if old >= position {
+                    old.checked_add(1).ok_or(Error::CapacityOverflow {
+                        resource: "inserted workbook view index",
+                    })?
+                } else {
+                    old
+                };
+                output[header_len + field_offset..header_len + field_offset + 4].copy_from_slice(
+                    &u32::try_from(new)
+                        .map_err(|_error| Error::CapacityOverflow {
+                            resource: "inserted workbook view index",
+                        })?
+                        .to_le_bytes(),
+                );
+            }
+        },
+        kind::NAME => {
+            if payload.len() < 9 {
+                return Err(Error::InvalidLength {
+                    expected: 9,
+                    found: payload.len(),
+                });
+            }
+            let old = u32::from_le_bytes(payload[5..9].try_into().map_err(|_error| {
+                Error::InvalidLength {
+                    expected: 9,
+                    found: payload.len(),
+                }
+            })?);
+            if old != u32::MAX {
+                let old = usize::try_from(old).map_err(|_error| {
+                    Error::InvalidFormula("BrtName sheet scope does not fit usize".to_string())
+                })?;
+                if old >= catalog_len {
+                    return Err(Error::InvalidFormula(
+                        "BrtName sheet scope exceeds the sheet catalog".to_string(),
+                    ));
+                }
+                let new = if old >= position {
+                    old.checked_add(1).ok_or(Error::CapacityOverflow {
+                        resource: "inserted BrtName sheet scope",
+                    })?
+                } else {
+                    old
+                };
+                output[header_len + 5..header_len + 9].copy_from_slice(
+                    &u32::try_from(new)
+                        .map_err(|_error| Error::CapacityOverflow {
+                            resource: "inserted BrtName sheet scope",
+                        })?
+                        .to_le_bytes(),
+                );
+            }
+        },
+        kind::EXTERN_SHEET => {
+            let rewritten =
+                rewrite_extern_sheet_payload_insert(payload, position, catalog_len, context)?;
+            if rewritten != payload {
+                output = replace_record_payload(&output, header_len, header.len(), &rewritten)?;
+            }
+        },
+        _ => {},
+    }
+    Ok(output)
+}
+
+fn rewrite_extern_sheet_payload_insert(
+    payload: &[u8],
+    position: usize,
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+) -> Result<Vec<u8>> {
+    if payload.len() < 4 {
+        return Err(Error::InvalidLength {
+            expected: 4,
+            found: payload.len(),
+        });
+    }
+    let count = usize::try_from(u32::from_le_bytes(payload[..4].try_into().map_err(
+        |_error| Error::InvalidLength {
+            expected: 4,
+            found: payload.len(),
+        },
+    )?))
+    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow".to_string()))?;
+    let expected = 4usize
+        .checked_add(count.checked_mul(12).ok_or(Error::CapacityOverflow {
+            resource: "BrtExternSheet payload size",
+        })?)
+        .ok_or(Error::CapacityOverflow {
+            resource: "BrtExternSheet payload size",
+        })?;
+    if payload.len() != expected {
+        return Err(Error::InvalidLength {
+            expected,
+            found: payload.len(),
+        });
+    }
+    let mut output = payload.to_vec();
+    for entry in 0..count {
+        let offset = 4 + entry * 12;
+        let external_link =
+            u32::from_le_bytes(payload[offset..offset + 4].try_into().map_err(|_error| {
+                Error::InvalidLength {
+                    expected: offset + 4,
+                    found: payload.len(),
+                }
+            })?);
+        let first = i32::from_le_bytes(payload[offset + 4..offset + 8].try_into().map_err(
+            |_error| Error::InvalidLength {
+                expected: offset + 8,
+                found: payload.len(),
+            },
+        )?);
+        let last = i32::from_le_bytes(payload[offset + 8..offset + 12].try_into().map_err(
+            |_error| Error::InvalidLength {
+                expected: offset + 12,
+                found: payload.len(),
+            },
+        )?);
+        let link = context
+            .supporting_links
+            .get(usize::try_from(external_link).map_err(|_error| {
+                Error::InvalidFormula("BrtExternSheet supporting-link index overflow".to_string())
+            })?)
+            .ok_or_else(|| {
+                Error::InvalidFormula(
+                    "BrtExternSheet supporting-link index is unresolved".to_string(),
+                )
+            })?;
+        if matches!(link, crate::package::formula::SupportingLink::SameSheet)
+            && (first, last) != (-2, -2)
+        {
+            return Err(Error::InvalidFormula(
+                "same-sheet BrtExternSheet has invalid endpoints".to_string(),
+            ));
+        }
+        if !matches!(link, crate::package::formula::SupportingLink::SelfWorkbook) {
+            continue;
+        }
+        if (first, last) == (-2, -2) || (first, last) == (-1, -1) {
+            continue;
+        }
+        if first < 0 || last < first {
+            return Err(Error::InvalidFormula(
+                "internal BrtExternSheet range has invalid endpoints".to_string(),
+            ));
+        }
+        let first = usize::try_from(first).map_err(|_error| {
+            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow".to_string())
+        })?;
+        let last = usize::try_from(last).map_err(|_error| {
+            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow".to_string())
+        })?;
+        if last >= catalog_len {
+            return Err(Error::InvalidFormula(
+                "internal BrtExternSheet range exceeds the sheet catalog".to_string(),
+            ));
+        }
+        if first < position && position <= last {
+            return Err(Error::UnsupportedFeature(
+                "sheet insertion would broaden an internal BrtExternSheet 3-D range".to_string(),
+            ));
+        }
+        let first = if first >= position {
+            first.checked_add(1).ok_or(Error::CapacityOverflow {
+                resource: "inserted BrtExternSheet first endpoint",
+            })?
+        } else {
+            first
+        };
+        let last = if last >= position {
+            last.checked_add(1).ok_or(Error::CapacityOverflow {
+                resource: "inserted BrtExternSheet last endpoint",
+            })?
+        } else {
+            last
+        };
+        output[offset + 4..offset + 8].copy_from_slice(
+            &i32::try_from(first)
+                .map_err(|_error| Error::CapacityOverflow {
+                    resource: "inserted BrtExternSheet first endpoint",
+                })?
+                .to_le_bytes(),
+        );
+        output[offset + 8..offset + 12].copy_from_slice(
+            &i32::try_from(last)
+                .map_err(|_error| Error::CapacityOverflow {
+                    resource: "inserted BrtExternSheet last endpoint",
+                })?
+                .to_le_bytes(),
+        );
+    }
+    Ok(output)
+}
+
+fn rewrite_volatile_dependencies_insert(
+    source: &[u8],
+    position: usize,
+    catalog_len: usize,
+) -> Result<Option<Vec<u8>>> {
+    let mut output = source.to_vec();
+    let mut changed = false;
+    for item in Records::new(source) {
+        let record = item?;
+        if record.kind() != kind::VOL_REF {
+            continue;
+        }
+        if record.payload().len() != 12 {
+            return Err(Error::InvalidLength {
+                expected: 12,
+                found: record.payload().len(),
+            });
+        }
+        let old = usize::try_from(u32::from_le_bytes(
+            record.payload()[8..12]
+                .try_into()
+                .map_err(|_error| Error::InvalidLength {
+                    expected: 12,
+                    found: record.payload().len(),
+                })?,
+        ))
+        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow".to_string()))?;
+        if old >= catalog_len {
+            return Err(Error::InvalidFormat(
+                "BrtVolRef sheet index exceeds the sheet catalog".to_string(),
+            ));
+        }
+        let new = if old >= position {
+            old.checked_add(1).ok_or(Error::CapacityOverflow {
+                resource: "inserted BrtVolRef sheet index",
+            })?
+        } else {
+            old
+        };
+        let (_, header_len) = Header::parse(
+            source.get(record.offset()..).ok_or_else(|| {
+                Error::InvalidFormat("BrtVolRef offset is outside its part".to_string())
+            })?,
+            RawLimits::DEFAULT,
+        )?;
+        output[record.offset() + header_len + 8..record.offset() + header_len + 12]
+            .copy_from_slice(
+                &u32::try_from(new)
+                    .map_err(|_error| Error::CapacityOverflow {
+                        resource: "inserted BrtVolRef sheet index",
+                    })?
+                    .to_le_bytes(),
+            );
+        changed |= new != old;
+    }
+    Ok(changed.then_some(output))
+}
+
 /// Apply one complete-catalog permutation to the workbook and every modeled
 /// sheet-index dependency.  The package is edited through a replacement
 /// batch, so a refusal from any dependency leaves the source image untouched.
@@ -2272,6 +3214,19 @@ fn reject_unmodeled_reorder_dependencies(package: &litchi_opc::OpcPackage) -> Re
                     .to_string(),
             ));
         }
+    }
+    Ok(())
+}
+
+fn reject_shared_workbook_headers(package: &litchi_opc::OpcPackage) -> Result<()> {
+    if package.iter_parts().any(|part| {
+        part.content_type()
+            .eq_ignore_ascii_case(crate::shared_workbook::package::HEADERS_CONTENT_TYPE)
+    }) {
+        return Err(Error::UnsupportedFeature(
+            "sheet insertion is unsupported with shared-workbook revision headers because their historical display order is immutable"
+                .to_string(),
+        ));
     }
     Ok(())
 }
@@ -2820,6 +3775,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             },
             Operation::TransferCell { .. }
             | Operation::ReorderSheets { .. }
+            | Operation::InsertSheet { .. }
             | Operation::AddImage { .. }
             | Operation::TransferDrawing { .. } => {
                 return Err(Error::InvalidFormat(
@@ -3497,6 +4453,27 @@ fn validate_staged_sheet_name(
     Ok(())
 }
 
+fn validate_staged_insert_sheet_name(
+    catalog: &[SheetTarget],
+    operations: &[Operation],
+    name: &str,
+) -> Result<()> {
+    if catalog.iter().any(|tab| excel_name_eq(&tab.name, name)) {
+        return Err(Error::InvalidFormat(format!(
+            "duplicate sheet name {name:?}"
+        )));
+    }
+    if operations.iter().any(|operation| {
+        matches!(operation, Operation::InsertSheet { name: staged, .. }
+            if excel_name_eq(staged, name))
+    }) {
+        return Err(Error::InvalidFormat(format!(
+            "duplicate sheet name {name:?}"
+        )));
+    }
+    Ok(())
+}
+
 fn validate_final_sheet_name_changes(
     tabs: &[crate::sheet::Tab<'_>],
     changes: &BTreeMap<usize, &str>,
@@ -3623,6 +4600,7 @@ fn encoded_operation_length(operation: &Operation) -> Result<usize> {
                 },
             )?)
         },
+        Operation::InsertSheet { name, .. } => 18usize.checked_add(name.len()),
         Operation::SetSheetState { .. } => Some(10),
         Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
         Operation::AddImage { image, .. } => 74usize
@@ -3665,6 +4643,17 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             for position in order.iter().copied() {
                 push_usize(output, position)?;
             }
+        },
+        Operation::InsertSheet {
+            catalog_position,
+            name,
+            state,
+        } => {
+            output.push(9);
+            push_usize(output, *catalog_position)?;
+            output.push(state_to_wire(*state));
+            push_usize(output, name.len())?;
+            output.extend_from_slice(name.as_bytes());
         },
         Operation::SetSheetState {
             catalog_position,
@@ -3797,6 +4786,19 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             }
             Ok(Operation::ReorderSheets {
                 order: order.into(),
+            })
+        },
+        9 => {
+            let catalog_position = read_next_usize(data, offset)?;
+            let state = state_from_wire(read_slice(data, offset, 1)?[0])?;
+            let length = read_next_usize(data, offset)?;
+            let name = std::str::from_utf8(read_slice(data, offset, length)?)
+                .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
+                .to_string();
+            Ok(Operation::InsertSheet {
+                catalog_position,
+                name,
+                state,
             })
         },
         5 => {

@@ -63,6 +63,14 @@ impl File {
                     path,
                 })
             },
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Xlsb(commit.into_file()),
+                    path,
+                })
+            },
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]

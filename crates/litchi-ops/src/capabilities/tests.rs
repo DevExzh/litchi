@@ -144,6 +144,7 @@ fn every_format_has_one_answer_for_its_reads() {
                         && matches!(
                             verb,
                             Verb::Set
+                                | Verb::Add
                                 | Verb::Remove
                                 | Verb::Move
                                 | Verb::Swap

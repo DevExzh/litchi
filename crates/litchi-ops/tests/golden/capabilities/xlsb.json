@@ -18,10 +18,7 @@
       "supported": true
     },
     "add": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "remove": {
       "supported": true
@@ -201,7 +198,7 @@
       "element": "sheet",
       "parent": "workbook",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -297,13 +294,13 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
         "hidden": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         },
@@ -314,7 +311,7 @@
             "hidden",
             "veryHidden"
           ],
-          "add": false,
+          "add": true,
           "set": true,
           "get": true
         }
@@ -1890,6 +1887,51 @@
     },
     {
       "subject": "operation",
+      "verb": "add",
+      "element": "workbook",
+      "context": "non-sheet-elements",
+      "code": "unsupported_element",
+      "followUp": "M2 XLSB structural add handlers for non-sheet elements",
+      "reason": "XLSB structural addition creates complete workbook tabs; cells, ranges, rows, columns, tables and other nodes require their own native lifecycle owners"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "order-opaque-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet insertion",
+      "reason": "sheet insertion refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their dependencies have a native remapping contract"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "vba-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet insertion",
+      "reason": "sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "calculation-chain-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB calculation-chain-aware sheet insertion",
+      "reason": "sheet insertion refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "sheet",
+      "context": "noncontiguous-3d-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB 3-D dependency-aware sheet insertion",
+      "reason": "sheet insertion refuses a position inside an internal 3-D reference range because it would broaden the range"
+    },
+    {
+      "subject": "operation",
       "verb": "remove",
       "element": "workbook",
       "context": "non-cell-elements",
@@ -1967,7 +2009,7 @@
       "context": "order-opaque-dependencies",
       "code": "unsupported_capability",
       "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
-      "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
+      "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
     },
     {
       "subject": "operation",
@@ -1976,7 +2018,7 @@
       "context": "order-opaque-dependencies",
       "code": "unsupported_capability",
       "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
-      "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
+      "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
     },
     {
       "subject": "operation",

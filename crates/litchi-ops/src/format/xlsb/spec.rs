@@ -30,19 +30,19 @@ pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 3, 0> = Table::new(
     [
         Entry {
             spec: PropSpec::new("name", ValueType::Text),
-            access: Access::Set(SheetSetter::Name),
+            access: Access::SetAndAdd(SheetSetter::Name),
             constraint: Constraint::None,
             clear: false,
         },
         Entry {
             spec: PropSpec::new("hidden", ValueType::Bool),
-            access: Access::Set(SheetSetter::Hidden),
+            access: Access::SetAndAdd(SheetSetter::Hidden),
             constraint: Constraint::None,
             clear: false,
         },
         Entry {
             spec: PropSpec::new("visibility", ValueType::Token(&workbook::VISIBILITY)),
-            access: Access::Set(SheetSetter::Visibility),
+            access: Access::SetAndAdd(SheetSetter::Visibility),
             constraint: Constraint::None,
             clear: false,
         },

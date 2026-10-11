@@ -684,7 +684,13 @@ impl Capabilities {
             #[cfg(feature = "xlsb")]
             if matches!(
                 verb,
-                Verb::Set | Verb::Remove | Verb::Move | Verb::Swap | Verb::Edit | Verb::Batch
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
             ) && self.adapter() == Some(Adapter::Xlsb)
             {
                 if self.retains_source == Some(false) {
@@ -1091,10 +1097,60 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 
 /// XLSB writes keep a narrow element surface. A range is a selector accepted
 /// by the cell handler, while workbook, row, column and other nodes are not
-/// removable structural elements; complete-catalog sheet-order dependency
-/// refusals remain explicit operation gaps below.
+/// structural add/remove elements; complete-catalog sheet-order and insertion
+/// dependency refusals remain explicit operation gaps below.
 #[cfg(feature = "xlsb")]
-static XLSB_WRITE_GAPS: [GapSpec; 16] = [
+static XLSB_WRITE_GAPS: [GapSpec; 21] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "workbook",
+            context: "non-sheet-elements",
+        },
+        code: Code::UnsupportedElement,
+        follow_up: "M2 XLSB structural add handlers for non-sheet elements",
+        reason: "XLSB structural addition creates complete workbook tabs; cells, ranges, rows, columns, tables and other nodes require their own native lifecycle owners",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "sheet",
+            context: "order-opaque-dependencies",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware complete-catalog sheet insertion",
+        reason: "sheet insertion refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their dependencies have a native remapping contract",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "sheet",
+            context: "vba-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware complete-catalog sheet insertion",
+        reason: "sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "sheet",
+            context: "calculation-chain-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB calculation-chain-aware sheet insertion",
+        reason: "sheet insertion refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "sheet",
+            context: "noncontiguous-3d-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB 3-D dependency-aware sheet insertion",
+        reason: "sheet insertion refuses a position inside an internal 3-D reference range because it would broaden the range",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "remove",
@@ -1183,7 +1239,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 16] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
-        reason: "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract",
+        reason: "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -1193,7 +1249,7 @@ static XLSB_WRITE_GAPS: [GapSpec; 16] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
-        reason: "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract",
+        reason: "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies, unmodeled title layouts and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2045,6 +2101,12 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let add = structural;
+        #[cfg(feature = "xlsb")]
+        let add = add
+            || (self.adapter == Adapter::Xlsb
+                && self.retains_source != Some(false)
+                && self.data().canonical == "sheet"
+                && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx

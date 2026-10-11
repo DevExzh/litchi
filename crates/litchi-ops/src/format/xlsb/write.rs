@@ -8,10 +8,10 @@
 
 use std::collections::{BTreeMap, HashSet};
 use std::io::{self, Write};
-use std::path::Path;
+use std::path::Path as FilePath;
 
 use caseless::Caseless as _;
-use litchi_core::selector::CellRange;
+use litchi_core::selector::{CellRange, Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
 use litchi_xlsb::cell_values::structure::Edit as NativeStructureEdit;
 use litchi_xlsb::cell_values::{
@@ -25,6 +25,7 @@ use super::node::{Item, Node};
 use super::spec::{CELL_WRITE_TABLE, CellSetter, Kind, SHEET_WRITE_TABLE, SheetSetter};
 use super::{Nav, Xlsb, XlsbEditor, XlsbOwner};
 use crate::error::{Code, Error, Result};
+use crate::new_node::NewNode;
 use crate::path::PathArg;
 use crate::placement::Placement;
 use crate::props::{IntoProps, Props};
@@ -215,6 +216,7 @@ pub(crate) fn sheet_state_shape(target: &TargetArg<'_>, props: &Props<'_>) -> bo
     matches!(
         entry.access,
         crate::registry::Access::Set(SheetSetter::Hidden | SheetSetter::Visibility)
+            | crate::registry::Access::SetAndAdd(SheetSetter::Hidden | SheetSetter::Visibility)
     )
 }
 
@@ -238,6 +240,148 @@ pub(crate) fn set_with_limits<'p, 'v>(
         return Ok(commit);
     }
     set_sheet_with_limits(file, target, &props, limits)
+}
+
+/// Add one worksheet tab through the native workbook structure editor.
+///
+/// The facade resolves the parent and placement against the complete tab
+/// catalog, admits the shared sheet property registry, and then delegates the
+/// package rewrite to the XLSB leaf.  Keeping insertion in the native edit
+/// preserves workbook relationships, tab identity and active-view policy.
+pub(crate) fn add_with_limits<'p, 'n>(
+    file: &Xlsb,
+    parent: PathArg<'p>,
+    node: NewNode<'n>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    file.admit_edit()?;
+    let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
+    if parent.element() != Kind::Workbook {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "an XLSB sheet can only be added directly under the workbook",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    if !node.kind().eq_ignore_ascii_case("sheet") {
+        return Err(Error::new(
+            Code::UnsupportedElement,
+            "the XLSB structural verb supports worksheet sheets only",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+
+    let mut assignments = admit_sheet_properties(Operation::Add, node.props(), limits)?;
+    let count = file.tab_count()?;
+    let position = add_position(file, count, node.placement())?;
+    let name = match assignments.name.take() {
+        Some(name) => name,
+        None => default_sheet_name(file)?,
+    };
+    validate_sheet_name(file, &[], &name)?;
+    let state = assignments.state.unwrap_or(SheetState::Visible);
+    validate_new_sheet_state(file, state)?;
+    // The native operation is one semantic insertion. Include the generated
+    // default name in the staged-byte admission just like an authored name.
+    assignments.name = Some(name.clone());
+    check_limits(1, &assignments, limits)?;
+
+    let package = package_from_editor(file.editor()?);
+    let native_limits = TransferLimits::new(
+        limits.max_snapshot_bytes(),
+        limits.max_expanded_targets(),
+        1,
+        limits.max_snapshot_bytes(),
+    );
+    let mut edit = package
+        .edit_with_limits(native_limits)
+        .map_err(native_error)?;
+    edit.insert_sheet(Position::new(position), name, state)
+        .map_err(native_error)?;
+    let native = edit.commit().map_err(native_error)?;
+    let commit = Commit::from_native(file, native)?;
+    check_snapshot_limits(&commit.patch, limits)?;
+    Ok((commit, sheet_path(position)))
+}
+
+fn add_position(file: &Xlsb, count: usize, placement: Option<&Placement<'_>>) -> Result<usize> {
+    let position = match placement {
+        None | Some(Placement::End) => count,
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position)) => position.get(),
+        Some(Placement::Before(path)) => resolve_sheet_path(file, path)?,
+        Some(Placement::After(path)) => resolve_sheet_path(file, path)?.saturating_add(1),
+        Some(Placement::Into(path, position)) => {
+            let parent = crate::path::resolve::get(&Nav::new(file), path)?;
+            if parent.element() != Kind::Workbook {
+                return Err(Error::new(
+                    Code::UnsupportedType,
+                    "XLSB sheets can only be added within the workbook",
+                )
+                .with_format(FileFormat::Xlsb));
+            }
+            position.map_or(count, Position::get)
+        },
+    };
+    if position > count {
+        return Err(Error::new(
+            Code::OutOfRange,
+            "the XLSB sheet insertion position is outside the workbook",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    Ok(position)
+}
+
+fn default_sheet_name(file: &Xlsb) -> Result<String> {
+    let catalog = file.catalog()?;
+    let mut names = HashSet::new();
+    names
+        .try_reserve(catalog.len())
+        .map_err(|_| allocation("XLSB existing sheet-name keys"))?;
+    for position in 0..catalog.len() {
+        if let Some(tab) = catalog.get(position) {
+            names.insert(caseless_key(tab.name()));
+        }
+    }
+    let mut number = 1usize;
+    loop {
+        let name = format!("Sheet{number}");
+        let key = caseless_key(&name);
+        if !names.contains(&key) {
+            return Ok(name);
+        }
+        number = number.checked_add(1).ok_or_else(|| {
+            Error::new(
+                Code::OutOfRange,
+                "the XLSB default sheet name is outside its supported range",
+            )
+            .with_format(FileFormat::Xlsb)
+        })?;
+    }
+}
+
+fn validate_new_sheet_state(file: &Xlsb, state: SheetState) -> Result<()> {
+    if state.is_visible() {
+        return Ok(());
+    }
+    let catalog = file.catalog()?;
+    if (0..catalog.len()).any(|position| {
+        catalog
+            .get(position)
+            .is_some_and(|tab| tab.state().is_visible())
+    }) {
+        return Ok(());
+    }
+    Err(Error::new(
+        Code::InvalidArgument,
+        "a workbook must retain a visible sheet",
+    )
+    .with_format(FileFormat::Xlsb))
+}
+
+fn sheet_path(position: usize) -> Path<'static> {
+    Path::from_steps([Step::new("sheet").with(Predicate::Index(Position::new(position)))])
 }
 
 /// Remove stored cells selected by a direct cell path, range, or scoped
@@ -545,7 +689,7 @@ fn set_sheet_with_limits(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     let positions = resolve_sheet_targets(file, &target, limits)?;
-    let assignments = admit_sheet_properties(props, limits)?;
+    let assignments = admit_sheet_properties(Operation::Set, props, limits)?;
     check_limits(positions.len(), &assignments, limits)?;
 
     if assignments.name.is_some() && positions.len() > 1 {
@@ -1202,7 +1346,11 @@ fn append_sheet(
     Ok(())
 }
 
-fn admit_sheet_properties(props: &Props<'_>, limits: &SemanticLimits) -> Result<SheetAssignments> {
+fn admit_sheet_properties(
+    operation: Operation,
+    props: &Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<SheetAssignments> {
     let mut assignments = SheetAssignments::default();
     for (key, value) in props.iter() {
         let (_, entry) = SHEET_WRITE_TABLE
@@ -1210,7 +1358,7 @@ fn admit_sheet_properties(props: &Props<'_>, limits: &SemanticLimits) -> Result<
             .map_err(|error| error.with_property(key.as_str().to_owned()))?;
         let entry = *entry;
         entry
-            .prepare(Operation::Set, value, |setter, value| match setter {
+            .prepare(operation, value, |setter, value| match setter {
                 SheetSetter::Name => {
                     if assignments.name.is_some() {
                         return Err(duplicate_property());
@@ -1460,7 +1608,7 @@ pub(crate) fn write_to<W: Write>(file: &Xlsb, mut sink: W) -> Result<()> {
 /// Publish an XLSB snapshot using the shared guarded atomic writer. The
 /// source freshness fence runs before replacement; no post-replacement fence
 /// is run against a path-backed source whose file has just been replaced.
-pub(crate) fn save_to(file: &Xlsb, path: &Path, options: &SaveOptions) -> Result<u64> {
+pub(crate) fn save_to(file: &Xlsb, path: &FilePath, options: &SaveOptions) -> Result<u64> {
     #[cfg(feature = "encryption")]
     if options.reencrypt.is_some() {
         return Err(Error::new(
@@ -1520,6 +1668,7 @@ pub(crate) mod sheet_coalesce {
     };
     use crate::error::{Code, Error};
     use crate::props::Props;
+    use crate::registry::Operation;
     use crate::transaction::Error as TransactionError;
     use litchi_xlsb::cell_values::TransferLimits as NativeTransferLimits;
     use std::collections::HashSet;
@@ -1586,7 +1735,7 @@ pub(crate) mod sheet_coalesce {
         if !sheet_state_shape(target, props) {
             return Ok(None);
         }
-        let assignments = admit_sheet_properties(props, limits)?;
+        let assignments = admit_sheet_properties(Operation::Set, props, limits)?;
         let Some(state) = assignments.state else {
             return Ok(None);
         };

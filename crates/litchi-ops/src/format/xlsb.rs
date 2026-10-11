@@ -252,6 +252,28 @@ impl Xlsb {
         result
     }
 
+    /// Add one worksheet tab under the unified structural contract.
+    pub(crate) fn add<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::new_node::NewNode<'n>,
+    ) -> Result<(write::Commit, litchi_core::selector::Path<'static>)> {
+        self.add_with_limits(parent, node, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Add one worksheet tab under a caller-selected semantic budget.
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::new_node::NewNode<'n>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<(write::Commit, litchi_core::selector::Path<'static>)> {
+        self.check_source()?;
+        let result = write::add_with_limits(self, parent, node, limits);
+        self.check_source()?;
+        result
+    }
+
     /// Remove stored cells under the unified cell, range, and query target
     /// contract.  Missing coordinates are virtual cells and therefore exact
     /// no-ops; the native owner never shifts neighboring cells.

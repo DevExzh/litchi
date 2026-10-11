@@ -467,7 +467,7 @@ impl Edit {
         _parent: impl IntoPath<'p>,
         _node: impl IntoNode<'n>,
     ) -> Result<Path<'static>> {
-        #[cfg(feature = "pptx")]
+        #[cfg(any(feature = "pptx", feature = "xlsb"))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
@@ -486,6 +486,12 @@ impl Edit {
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_pptx(handle, commit, path)
             },
+            #[cfg(feature = "xlsb")]
+            File::Xlsb(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_xlsb(handle, commit, path)
+            },
             #[allow(unreachable_patterns)]
             _ => Err(pending()),
         })
@@ -495,7 +501,7 @@ impl Edit {
         _parent: impl IntoPath<'p>,
         _node: impl IntoNode<'n>,
     ) -> Result<Path<'static>> {
-        #[cfg(feature = "pptx")]
+        #[cfg(any(feature = "pptx", feature = "xlsb"))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
@@ -514,6 +520,12 @@ impl Edit {
                 let (commit, path) =
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_pptx(handle, commit, path)
+            },
+            #[cfg(feature = "xlsb")]
+            File::Xlsb(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_xlsb(handle, commit, path)
             },
             #[allow(unreachable_patterns)]
             _ => Err(pending()),
