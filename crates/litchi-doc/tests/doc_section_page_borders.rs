@@ -33,7 +33,7 @@
 )]
 
 use litchi_doc::{
-    ApplyTo, Art, Border, BorderError, Borders, Builder, Color, Depth, Offset, Package, Style,
+    ApplyTo, Art, Border, BorderError, Borders, Builder, Color, Depth, Offset, Style, raw::Package,
 };
 use std::io::Cursor;
 

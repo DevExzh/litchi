@@ -1,6 +1,8 @@
-use litchi_cfb::{OleError, OleFile};
+use crate::document::Document;
+use litchi_cfb::{OleError, OleFile, SharedOleFile};
 use std::fs::File;
 use std::io::{self, Read, Seek};
+use std::sync::Arc;
 use zeroize::Zeroizing;
 
 /// Finite resource limits for legacy Word package and stream ingestion.
@@ -316,7 +318,7 @@ impl From<ResourceLimit> for litchi_core::ResourceLimit {
             resource: litchi_core::Resource::InputBytes,
             observed: limit.actual,
             limit: limit.limit,
-            scope: std::sync::Arc::from(limit.scope()),
+            scope: Arc::from(limit.scope()),
         }
     }
 }
@@ -360,6 +362,7 @@ impl std::fmt::Debug for Password {
 #[derive(Debug, Default)]
 pub struct OpenOptions {
     password: Option<Password>,
+    limits: Limits,
     /// How opt-in stylesheet-defect repairs are treated.
     ///
     /// Defaults to [`crate::Leniency::Strict`], under which those defects
@@ -370,6 +373,19 @@ pub struct OpenOptions {
 }
 
 impl OpenOptions {
+    /// Replace the finite package and stream limits used by this open.
+    #[must_use]
+    pub const fn with_limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Return the finite limits selected for this open operation.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
     /// Provide a password-to-open credential through the non-cloneable
     /// [`Password`] boundary.
     #[must_use]
@@ -400,29 +416,6 @@ impl OpenOptions {
 
     pub(crate) fn password(&self) -> Option<&str> {
         self.password.as_ref().map(Password::as_str)
-    }
-}
-
-/// Options for opening a DOC CFB package before its document streams are read.
-/// [`Package::open`] remains the concise, bounded default. Use
-/// [`Package::open_with`] when the input contract needs an explicit limit set.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub struct PackageOpenOptions {
-    limits: Limits,
-}
-
-impl PackageOpenOptions {
-    /// Replace the finite limits used while opening the CFB package.
-    #[must_use]
-    pub const fn with_limits(mut self, limits: Limits) -> Self {
-        self.limits = limits;
-        self
-    }
-
-    /// Return the finite limits selected for this open operation.
-    #[must_use]
-    pub const fn limits(self) -> Limits {
-        self.limits
     }
 }
 
@@ -571,7 +564,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_doc::Package;
+/// use litchi_doc::raw::Package;
 ///
 /// // Open an existing document
 /// let mut pkg = Package::open("document.doc")?;
@@ -584,18 +577,68 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// println!("{}", text);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct Package<R: Read + Seek = File> {
+pub struct RawPackage<R: Read + Seek = File> {
     /// The underlying OLE file
     pub(super) ole: OleFile<R>,
     /// Limits inherited by [`Package::document`](super::Package::document).
     pub(super) limits: Limits,
 }
 
-impl<R: Read + Seek> std::fmt::Debug for Package<R> {
+impl<R: Read + Seek> std::fmt::Debug for RawPackage<R> {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter
+            .debug_struct("RawPackage")
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
+
+/// An immutable, owned DOC package snapshot.
+///
+/// The raw seek-cursor owner remains available under [`crate::package::raw`]
+/// for format-specific stream and property-set work. This owner is the
+/// canonical semantic package: its CFB index and parsed document projection
+/// are shared by clones and are never mutated in place.
+///
+/// ```
+/// use litchi_doc::{Builder, Package};
+/// let mut builder = Builder::new();
+/// builder.add_paragraph("Shared document")?;
+/// let package = builder.build()?;
+/// let document = package.document();
+/// let bytes = package.to_bytes()?;
+/// drop(package);
+/// assert!(document.text()?.contains("Shared document"));
+/// let reopened = Package::from_bytes(&bytes)?;
+/// assert_eq!(reopened.to_bytes()?, bytes);
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub struct Package {
+    pub(super) shared: Arc<SharedOleFile>,
+    pub(super) document: Document,
+    pub(super) metadata: Arc<litchi_core::Metadata>,
+    pub(super) limits: Limits,
+    pub(super) leniency: crate::leniency::Leniency,
+}
+
+impl Clone for Package {
+    fn clone(&self) -> Self {
+        Self {
+            shared: Arc::clone(&self.shared),
+            document: self.document.clone(),
+            metadata: Arc::clone(&self.metadata),
+            limits: self.limits,
+            leniency: self.leniency,
+        }
+    }
+}
+
+impl std::fmt::Debug for Package {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         formatter
             .debug_struct("Package")
             .field("limits", &self.limits)
+            .field("leniency", &self.leniency)
             .finish_non_exhaustive()
     }
 }

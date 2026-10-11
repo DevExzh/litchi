@@ -7,10 +7,10 @@ impl Document {
     /// positions return `Ok(None)`.
     pub fn paragraph_at(&self, position: Position) -> Result<Option<Paragraph>> {
         let mut remaining = position.get();
-        let text = self.text_extractor.text_shared();
-        let text_ranges = self.text_extractor.cp_to_byte_shared();
+        let text = self.0.text_extractor.text_shared();
+        let text_ranges = self.0.text_extractor.cp_to_byte_shared();
 
-        for (_, start_cp, end_cp) in self.fib.get_all_subdoc_ranges() {
+        for (_, start_cp, end_cp) in self.0.fib.get_all_subdoc_ranges() {
             if start_cp >= end_cp {
                 continue;
             }
@@ -19,10 +19,10 @@ impl Document {
                 ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
                     Arc::clone(&text),
                     Arc::clone(&text_ranges),
-                    self.pap_bin_table.as_ref(),
-                    self.chp_bin_table.as_ref(),
+                    self.0.pap_bin_table.as_ref(),
+                    self.0.chp_bin_table.as_ref(),
                     (start_cp, end_cp),
-                    self.stylesheet.as_ref(),
+                    self.0.stylesheet.as_ref(),
                 )?;
             let (extracted, available) = para_extractor.extract_paragraph_at(remaining)?;
             if let Some(extracted) = extracted {
@@ -46,8 +46,8 @@ impl Document {
     /// ```rust,no_run
     /// use litchi_doc::Package;
     ///
-    /// let mut pkg = Package::open("document.doc")?;
-    /// let doc = pkg.document()?;
+    /// let pkg = Package::open("document.doc")?;
+    /// let doc = pkg.document();
     ///
     /// for para in doc.paragraphs()? {
     ///     println!("Paragraph: {}", para.text()?);
@@ -58,11 +58,11 @@ impl Document {
         let mut all_paragraphs = Vec::new();
 
         // Reuse the decoded text and CP boundary map across all subdocument extractors.
-        let text = self.text_extractor.text_shared();
-        let text_ranges = self.text_extractor.cp_to_byte_shared();
+        let text = self.0.text_extractor.text_shared();
+        let text_ranges = self.0.text_extractor.cp_to_byte_shared();
 
         // Get all subdocument ranges from FIB
-        let subdoc_ranges = self.fib.get_all_subdoc_ranges();
+        let subdoc_ranges = self.0.fib.get_all_subdoc_ranges();
 
         // Pre-allocate if we know the approximate size
         if let Some((_, _, last_end)) = subdoc_ranges.last() {
@@ -83,10 +83,10 @@ impl Document {
                 ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
                     Arc::clone(&text),
                     Arc::clone(&text_ranges),
-                    self.pap_bin_table.as_ref(),
-                    self.chp_bin_table.as_ref(),
+                    self.0.pap_bin_table.as_ref(),
+                    self.0.chp_bin_table.as_ref(),
                     (start_cp, end_cp),
-                    self.stylesheet.as_ref(),
+                    self.0.stylesheet.as_ref(),
                 )?;
 
             let extracted_paras = para_extractor.extract_paragraphs()?;
@@ -129,7 +129,8 @@ impl Document {
                         object_name_buffer.push('_');
                         object_name_buffer.push_str(&pic_offset.to_string());
 
-                        if let Some(mtef_ast) = self.parsed_mtef.get(object_name_buffer.as_str()) {
+                        if let Some(mtef_ast) = self.0.parsed_mtef.get(object_name_buffer.as_str())
+                        {
                             // Found matching formula - create run with MTEF AST (Arc::clone is cheap)
                             run_objects.push(Run::with_mtef_formula(
                                 text,
@@ -165,7 +166,7 @@ impl Document {
             }
 
             for run in &mut run_objects {
-                run.resolve_revisions(&self.revision_authors)?;
+                run.resolve_revisions(&self.0.revision_authors)?;
             }
 
             // Create paragraph with runs and properties
@@ -174,7 +175,7 @@ impl Document {
             let mut para = Paragraph::new(String::new());
             para.set_runs(run_objects);
             para.set_properties(para_props);
-            para.resolve_revision(&self.revision_authors)?;
+            para.resolve_revision(&self.0.revision_authors)?;
             output.push(para);
         }
         Ok(())
@@ -193,8 +194,8 @@ impl Document {
     /// ```rust,no_run
     /// use litchi_doc::Package;
     ///
-    /// let mut pkg = Package::open("document.doc")?;
-    /// let doc = pkg.document()?;
+    /// let pkg = Package::open("document.doc")?;
+    /// let doc = pkg.document();
     ///
     /// for table in doc.tables()? {
     ///     println!("Table with {} rows", table.row_count()?);
@@ -218,8 +219,8 @@ impl Document {
     /// use litchi_doc::Package;
     /// use litchi_doc::Element as DocumentElement;
     ///
-    /// let mut pkg = Package::open("document.doc")?;
-    /// let doc = pkg.document()?;
+    /// let pkg = Package::open("document.doc")?;
+    /// let doc = pkg.document();
     ///
     /// for element in doc.elements()? {
     ///     match element {

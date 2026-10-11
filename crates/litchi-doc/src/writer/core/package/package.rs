@@ -1152,12 +1152,19 @@ impl Builder {
     /// The returned package owns a cursor-backed copy of the complete CFB
     /// artifact.  Byte and filesystem publication are methods on that package
     /// so every output path shares one validated owner boundary.
-    pub fn build(&mut self) -> Result<crate::Package<Cursor<Vec<u8>>>, WriteError> {
+    pub fn build(&mut self) -> Result<crate::Package, WriteError> {
         let mut output = Cursor::new(Vec::new());
         self.build_ole_writer()
             .and_then(|mut writer| writer.write_to(&mut output).map_err(WriteError::from))?;
-        crate::Package::from_owned_bytes(output.into_inner(), crate::package::Limits::default())
-            .map_err(WriteError::Package)
+        let options =
+            self.encryption
+                .as_ref()
+                .map_or_else(crate::OpenOptions::default, |encryption| {
+                    crate::OpenOptions::default().with_password(crate::Password::new(
+                        encryption.password.as_str().to_owned(),
+                    ))
+                });
+        crate::Package::from_owned_bytes(output.into_inner(), options).map_err(WriteError::Package)
     }
 
     // Helper methods for DOC writer:

@@ -75,7 +75,7 @@ fn documents_without_the_table_report_none() {
 
 #[test]
 fn exposes_embedded_fonts_through_the_document_api() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Package::from_reader(
         File::open(fixture(
             "test-data/poi/test-data/hpsf/TestNon4ByteBoundary.doc",
         ))

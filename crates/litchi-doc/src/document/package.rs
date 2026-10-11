@@ -1,11 +1,9 @@
 //! OLE package orchestration for the typed Word document model.
 
-use super::model::Document;
+use super::model::{Document, DocumentState};
 use crate::encryption::decrypt_document_streams;
 use crate::leniency::{AuxiliaryTableDefect, ToleranceReport};
-use crate::package::{
-    Error as PackageError, Limits, OpenOptions, ResourceKind, ResourceLimit, Result,
-};
+use crate::package::{Error as PackageError, OpenOptions, ResourceKind, ResourceLimit, Result};
 use crate::parts::associated_strings::DocumentAssociatedStrings;
 use crate::parts::auto_summary::DocumentAutoSummary;
 use crate::parts::bookmarks::BookmarksTable;
@@ -56,23 +54,15 @@ impl Document {
     ///
     /// This is typically called internally by `Package::document()`.
     pub(crate) fn from_ole<R: Read + Seek>(ole: &mut OleFile<R>) -> Result<Self> {
-        Self::from_ole_with_limits(ole, Limits::default())
+        Self::from_ole_with_options(ole, OpenOptions::default())
     }
 
-    /// Create a new Document from an OLE file with explicit finite limits.
-    pub(crate) fn from_ole_with_limits<R: Read + Seek>(
-        ole: &mut OleFile<R>,
-        limits: Limits,
-    ) -> Result<Self> {
-        Self::from_ole_with_options(ole, OpenOptions::default(), limits)
-    }
-
-    /// Create a new Document from an OLE file with password-to-open options.
+    /// Create a new Document from an OLE file under one merged options envelope.
     pub(crate) fn from_ole_with_options<R: Read + Seek>(
         ole: &mut OleFile<R>,
         options: OpenOptions,
-        limits: Limits,
     ) -> Result<Self> {
+        let limits = options.limits();
         // Resolve hostile lengths before materializing the corresponding payload.
         let word_document_size = locate_stream(
             ole,
@@ -471,7 +461,7 @@ impl Document {
             "StwUser",
         );
 
-        Ok(Self {
+        Ok(Document::from_state(DocumentState {
             fib,
             word_document,
             data_stream,
@@ -539,7 +529,7 @@ impl Document {
             tolerance,
             mtef_data,
             parsed_mtef,
-        })
+        }))
     }
 }
 

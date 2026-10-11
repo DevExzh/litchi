@@ -33,7 +33,8 @@
 )]
 
 use litchi_doc::{
-    Builder, Package, TextFlow,
+    Builder, TextFlow,
+    raw::Package,
     section::columns::{Column, Error, Layout},
 };
 use std::io::Cursor;

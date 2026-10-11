@@ -148,8 +148,8 @@ impl Document {
 
     /// Locate and parse the `FFData` of one legacy form-code field.
     fn parse_form_field_data(&self, field: &Field) -> Option<FormFieldData> {
-        let data_stream = self.data_stream.as_deref()?;
-        let chp_table = self.chp_bin_table.as_ref()?;
+        let data_stream = self.0.data_stream.as_deref()?;
+        let chp_table = self.0.chp_bin_table.as_ref()?;
         let (story_start, _story_end) = self.field_story_range_if_present(field.story)?;
         let (code_start, code_end) = field.code_range();
         let instruction = self

@@ -18,7 +18,7 @@ impl Document {
     /// }
     /// ```
     pub fn footnotes(&self) -> Result<Vec<Footnote>> {
-        let table = match &self.footnotes_table {
+        let table = match &self.0.footnotes_table {
             Some(t) => t,
             None => return Ok(Vec::new()),
         };
@@ -26,6 +26,7 @@ impl Document {
         let mut result = Vec::with_capacity(table.count());
         for reference in table.references() {
             let text = self
+                .0
                 .text_extractor
                 .text_at_range(reference.text_start_cp, reference.text_end_cp)
                 .to_string();
@@ -54,7 +55,7 @@ impl Document {
     /// }
     /// ```
     pub fn endnotes(&self) -> Result<Vec<Footnote>> {
-        let table = match &self.endnotes_table {
+        let table = match &self.0.endnotes_table {
             Some(t) => t,
             None => return Ok(Vec::new()),
         };
@@ -62,6 +63,7 @@ impl Document {
         let mut result = Vec::with_capacity(table.count());
         for reference in table.references() {
             let text = self
+                .0
                 .text_extractor
                 .text_at_range(reference.text_start_cp, reference.text_end_cp)
                 .to_string();

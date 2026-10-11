@@ -97,8 +97,8 @@
 //! ```rust,no_run
 //! use litchi_doc::Package;
 //!
-//! let mut package = Package::open("document.doc")?;
-//! let document = package.document()?;
+//! let package = Package::open("document.doc")?;
+//! let document = package.document();
 //!
 //! for paragraph in document.paragraphs()? {
 //!     println!("{}", paragraph.text()?);
@@ -152,6 +152,10 @@ pub mod hyperlink;
 pub mod image;
 pub mod leniency;
 pub mod package;
+/// Low-level cursor-backed CFB access for format-specific callers.
+pub mod raw {
+    pub use crate::package::raw::Package;
+}
 pub mod paragraph;
 pub mod parts;
 mod plcf;
@@ -168,14 +172,14 @@ pub mod vba;
 
 /// Typed, inert MS-OFFCRYPTO `DataSpaces` and legacy-binary IRM metadata.
 ///
-/// The package facade exposes [`Package::data_spaces`] for structural
+/// The package facade exposes [`raw::Package::data_spaces`] for structural
 /// inspection. Rights evaluation, decryption, and external policy services
 /// remain outside this crate.
 pub use litchi_crypto::spaces;
 
 /// Inert `[MS-OSHARED]` VBA digital-signature blob storage.
 ///
-/// The package facade exposes this owner through [`Package::vba_signature`].
+/// The package facade exposes this owner through [`raw::Package::vba_signature`].
 /// PKCS#7 `SignedData`, `contentInfo` form (`SpcIndirectDataContent` versus
 /// `SpcIndirectDataContentV2`), and certificate-store trust remain opaque:
 /// parsing and editing never establish trust or execute a VBA project.
@@ -204,8 +208,8 @@ pub use leniency::{
     StylesheetDefect, TableDefinitionDefect, ToleranceReport, ToleratedDefect,
 };
 pub use package::{
-    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, PackageOpenOptions, Password,
-    ResourceKind, ResourceLimit, Result,
+    EncryptionKind, Error, Limits, LimitsError, OpenOptions, Package, Password, ResourceKind,
+    ResourceLimit, Result,
 };
 pub use paragraph::{Paragraph, Run};
 pub use parts::associated_strings::{AssociatedStringSlot, DocumentAssociatedStrings};

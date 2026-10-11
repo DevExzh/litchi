@@ -55,7 +55,7 @@ fn corpus(count: usize) -> Result<Vec<u8>> {
     for position in 0..count {
         builder.add_paragraph(&paragraph_text(position))?;
     }
-    let mut package = builder.build()?;
+    let package = builder.build()?;
     Ok(package.to_bytes()?)
 }
 
@@ -110,8 +110,11 @@ fn native_explicit_default_once(
 /// putting the package/document construction in the edit clock.
 fn native_reader_context(
     bytes: &[u8],
-) -> Result<(litchi_doc::Package<Cursor<Vec<u8>>>, litchi_doc::Document)> {
-    let mut package = litchi_doc::Package::from_reader(Cursor::new(bytes.to_vec()))?;
+) -> Result<(
+    litchi_doc::raw::Package<Cursor<Vec<u8>>>,
+    litchi_doc::Document,
+)> {
+    let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(bytes.to_vec()))?;
     let document = package.document()?;
     Ok((package, document))
 }

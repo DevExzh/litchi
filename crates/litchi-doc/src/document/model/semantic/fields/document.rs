@@ -194,7 +194,7 @@ impl Document {
             let Some((start, end)) = self.field_story_range_if_present(story) else {
                 continue;
             };
-            let text = self.text_extractor.text_at_range(start, end);
+            let text = self.0.text_extractor.text_at_range(start, end);
             references.extend(
                 non_plcf_field_texts(story, text)
                     .iter()
@@ -223,7 +223,7 @@ impl Document {
             let Some((start, end)) = self.field_story_range_if_present(story) else {
                 continue;
             };
-            let text = self.text_extractor.text_at_range(start, end);
+            let text = self.0.text_extractor.text_at_range(start, end);
             private_fields.extend(
                 non_plcf_field_texts(story, text)
                     .iter()

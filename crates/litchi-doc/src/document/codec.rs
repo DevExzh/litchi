@@ -179,7 +179,7 @@ impl Document {
         // In a more sophisticated implementation, we'd match specific text patterns
         // to specific MTEF streams
 
-        for parsed_ast in self.parsed_mtef.values() {
+        for parsed_ast in self.0.parsed_mtef.values() {
             if !parsed_ast.is_empty() {
                 return Some(Arc::clone(parsed_ast));
             }

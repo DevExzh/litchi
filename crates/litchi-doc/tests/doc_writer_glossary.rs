@@ -38,7 +38,8 @@ use litchi_doc::writer::{
     ParagraphFormatting, Picture, Shape as DrawingShape,
 };
 use litchi_doc::{
-    Builder, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, OpenOptions, Package,
+    Builder, GlossaryItem, GlossaryItemKind, GlossaryMetadata, GlossaryStyle, OpenOptions,
+    raw::Package,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};

@@ -34,7 +34,7 @@
 
 use litchi_cfb::OleFile;
 use litchi_doc::parts::fib::FileInformationBlock;
-use litchi_doc::{DocumentAssociatedStrings, Package};
+use litchi_doc::{DocumentAssociatedStrings, raw::Package};
 use std::fs::File;
 use std::path::Path;
 

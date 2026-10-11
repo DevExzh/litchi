@@ -21,8 +21,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     println!("Opening DOC: {}", path);
 
-    let mut package = Package::open(&path)?;
-    let doc = package.document()?;
+    let package = Package::open(&path)?;
+    let doc = package.document();
 
     // ---- Basic stats ----
     let paragraph_count = doc.paragraph_count()?;

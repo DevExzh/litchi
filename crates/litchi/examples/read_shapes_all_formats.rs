@@ -6,7 +6,7 @@
 //! Run with: cargo run --example read_shapes_all_formats --features doc,ppt,xls -- <file.doc|file.ppt|file.xls>
 
 use litchi::ppt::Package as PptPackage;
-use litchi_doc::Package as DocPackage;
+use litchi_doc::raw::Package as DocPackage;
 use std::env;
 use std::error::Error;
 use std::path::Path;

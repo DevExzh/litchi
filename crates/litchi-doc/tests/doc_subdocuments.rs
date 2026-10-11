@@ -80,7 +80,7 @@ fn word97_era_document_without_master_document_tables_reports_none() {
 
 #[test]
 fn exposes_subdocuments_through_the_document_api() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Package::from_reader(
         File::open(fixture("test-data/poi/test-data/document/47950_normal.doc")).unwrap(),
     )
     .unwrap();

@@ -497,9 +497,11 @@ fn row_resource_limits_are_limit_exceeded() {
         let limits = litchi_doc::Limits::default()
             .with_max_package_bytes(1)
             .expect("a one-byte package limit is valid");
-        let error =
-            litchi_doc::Package::from_reader_with_limits(io::Cursor::new(vec![0_u8; 64]), limits)
-                .expect_err("a 64-byte package exceeds a one-byte limit");
+        let error = litchi_doc::Package::from_reader_with_options(
+            io::Cursor::new(vec![0_u8; 64]),
+            litchi_doc::OpenOptions::default().with_limits(limits),
+        )
+        .expect_err("a 64-byte package exceeds a one-byte limit");
         assert!(
             matches!(error, litchi_doc::Error::ResourceLimit(_)),
             "{error:?}"

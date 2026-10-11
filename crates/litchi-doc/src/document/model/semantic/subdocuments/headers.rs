@@ -19,7 +19,7 @@ impl Document {
     /// }
     /// ```
     pub fn headers_footers(&self) -> Result<Vec<HeaderFooter>> {
-        let table = match &self.headers_table {
+        let table = match &self.0.headers_table {
             Some(t) => t,
             None => return Ok(Vec::new()),
         };
@@ -31,6 +31,7 @@ impl Document {
             }
 
             let text = self
+                .0
                 .text_extractor
                 .text_at_range(story.start_cp, story.end_cp)
                 .to_string();

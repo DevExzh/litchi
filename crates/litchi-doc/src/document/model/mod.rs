@@ -11,3 +11,5 @@ mod validation;
 
 pub use semantic::BodyParagraphs;
 pub use state::Document;
+
+pub(in crate::document) use state::DocumentState;

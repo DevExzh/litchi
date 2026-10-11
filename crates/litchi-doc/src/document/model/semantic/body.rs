@@ -21,10 +21,10 @@ pub struct BodyParagraphs<'a> {
 
 impl<'a> BodyParagraphs<'a> {
     fn new(document: &'a Document) -> Self {
-        let (_, story_end) = document.fib.get_main_doc_range();
+        let (_, story_end) = document.0.fib.get_main_doc_range();
         Self {
-            text: document.text_extractor.text(),
-            pap_bin_table: document.pap_bin_table.as_ref(),
+            text: document.0.text_extractor.text(),
+            pap_bin_table: document.0.pap_bin_table.as_ref(),
             story_end,
             current_cp: 0,
             cursor_byte: 0,

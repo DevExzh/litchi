@@ -267,7 +267,7 @@ fn tables_round_trip_through_both_output_paths() {
 
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = crate::raw::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     assert_document(package.document().unwrap());
 
     let path = std::env::temp_dir().join(format!(
@@ -279,7 +279,7 @@ fn tables_round_trip_through_both_output_paths() {
             .as_nanos()
     ));
     writer.build().unwrap().save(&path).unwrap();
-    let mut package = crate::Package::open(&path).unwrap();
+    let mut package = crate::raw::Package::open(&path).unwrap();
     assert_document(package.document().unwrap());
     std::fs::remove_file(path).unwrap();
 }

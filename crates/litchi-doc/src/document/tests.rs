@@ -3,8 +3,8 @@
 #[cfg(test)]
 mod lazy_auxiliary_tests {
     use crate::builder::Builder;
-    use crate::package::Package;
     use crate::parts::fib::FileInformationBlock;
+    use crate::raw::Package;
     use crate::tracked_revision::Limits;
     use litchi_ole_common::object::{Editor as PackageEditor, Targets};
     use std::io::Cursor;
@@ -49,8 +49,8 @@ mod lazy_auxiliary_tests {
         let document = package
             .document()
             .expect("unrelated document open must not parse optional tables");
-        assert!(document.paragraph_groups_source.is_err());
-        assert!(document.dofr_records_source.is_err());
+        assert!(document.0.paragraph_groups_source.is_err());
+        assert!(document.0.dofr_records_source.is_err());
         assert!(document.saved_selection().is_err());
         let paragraph_error = document
             .paragraph_groups()
@@ -138,6 +138,7 @@ mod lazy_auxiliary_tests {
         let mut package = Package::from_reader(Cursor::new(bytes)).expect("package open");
         let document = package.document().expect("document open");
         let source = document
+            .0
             .paragraph_groups_source
             .as_ref()
             .expect("PGP range capture")
@@ -152,7 +153,7 @@ mod lazy_auxiliary_tests {
                 .expect("PGP metadata")
                 .is_empty()
         );
-        assert!(matches!(&document.dofr_records_source, Ok(None)));
+        assert!(matches!(&document.0.dofr_records_source, Ok(None)));
     }
 }
 
@@ -185,8 +186,9 @@ mod owned_mtef_tests {
     }
 }
 
-use crate::package::{Error as PackageError, Package};
+use crate::package::Error as PackageError;
 use crate::parts::fib::WORD_97_NFIB;
+use crate::raw::Package;
 use crate::{Builder, Image, ImageError};
 use std::io::Cursor;
 use std::path::Path;
@@ -209,11 +211,12 @@ fn test_extract_png_image_from_doc() {
     const PNG_SIGNATURE: [u8; 8] = [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A];
 
     let mut found_signature = doc
+        .0
         .word_document
         .windows(PNG_SIGNATURE.len())
         .any(|window| window == PNG_SIGNATURE);
 
-    if let Some(data_stream) = doc.data_stream.as_ref() {
+    if let Some(data_stream) = doc.0.data_stream.as_ref() {
         found_signature |= data_stream
             .windows(PNG_SIGNATURE.len())
             .any(|window| window == PNG_SIGNATURE);

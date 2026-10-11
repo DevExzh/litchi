@@ -1,8 +1,8 @@
 //! Regression coverage for ordinal semantic paragraph queries.
 
 use litchi_core::Position;
-use litchi_doc::Package;
 use litchi_doc::builder::Builder;
+use litchi_doc::raw::Package;
 use litchi_doc::writer::CharacterFormatting;
 use std::io::Cursor;
 

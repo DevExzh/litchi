@@ -38,8 +38,8 @@ use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{BookmarkEntry, CommentEntry};
 use litchi_doc::{
     AuxiliaryTableDefect, BookmarkDefect, Builder, CommentDefect, Defect, Leniency, OpenOptions,
-    Package, PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
-    StylesheetDefect, TableDefinitionDefect,
+    PapxDefect, PieceDefect, SectionDefect, SprmDefect, StshifDefect, StyleDefect,
+    StylesheetDefect, TableDefinitionDefect, raw::Package,
 };
 use litchi_ole_common::object::{Editor as PackageEditor, Targets};
 use std::io::Cursor;

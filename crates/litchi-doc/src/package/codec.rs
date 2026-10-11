@@ -1,16 +1,18 @@
 use super::model::{
-    Error, Limits, OpenOptions, Package, PackageOpenOptions, ResourceKind, ResourceLimit, Result,
+    Error, Limits, OpenOptions, Package, RawPackage, ResourceKind, ResourceLimit, Result,
 };
 use crate::document::Document;
-use litchi_cfb::{OleError, OleFile};
+use litchi_cfb::{OleError, OleFile, SharedOleFile, SharedOleFileLimits};
+use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_ole_common::property_set::{
-    PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
+    PropertySetReader, Section, SharedPropertySetReader, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
 use std::fs::File;
 use std::io::{Cursor, Read, Seek, SeekFrom, Write};
 use std::path::Path;
+use std::sync::Arc;
 
-impl Package<File> {
+impl RawPackage<File> {
     /// Open a .doc package from a file path.
     ///
     /// # Arguments
@@ -20,36 +22,26 @@ impl Package<File> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_doc::Package;
+    /// use litchi_doc::raw::Package;
     ///
     /// let pkg = Package::open("document.doc")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with(path, PackageOpenOptions::default())
-    }
-
-    /// Open a `.doc` package using explicit package-open options.
-    ///
-    /// This is the ergonomic bounded alternative to [`Self::open`]. It keeps
-    /// the simple default API intact while making the selected limits visible
-    /// at the call site.
-    pub fn open_with<P: AsRef<Path>>(path: P, options: PackageOpenOptions) -> Result<Self> {
-        let path = path.as_ref();
-        let limits = options.limits();
-        let file = File::open(path)?;
-        let source_len = file.metadata()?.len();
-        validate_package_size(source_len, limits)?;
-        Package::from_reader_with_limits(file, limits)
+        Self::open_with_limits(path, Limits::default())
     }
 
     /// Open a `.doc` package with explicit finite read limits.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: Limits) -> Result<Self> {
-        Self::open_with(path, PackageOpenOptions::default().with_limits(limits))
+        let path = path.as_ref();
+        let file = File::open(path)?;
+        let source_len = file.metadata()?.len();
+        validate_package_size(source_len, limits)?;
+        RawPackage::from_reader_with_limits(file, limits)
     }
 }
 
-impl<R: Read + Seek> Package<R> {
+impl<R: Read + Seek> RawPackage<R> {
     /// Create a Package from any reader that implements Read + Seek.
     ///
     /// # Arguments
@@ -60,7 +52,7 @@ impl<R: Read + Seek> Package<R> {
     ///
     /// ```rust,no_run
     /// use std::fs::File;
-    /// use litchi_doc::Package;
+    /// use litchi_doc::raw::Package;
     ///
     /// let file = File::open("document.doc")?;
     /// let pkg = Package::from_reader(file)?;
@@ -98,7 +90,7 @@ impl<R: Read + Seek> Package<R> {
     /// owners that need to run first on the same physical validation context.
     pub(crate) fn validate_ole_file(ole: &mut OleFile<R>, limits: Limits) -> Result<()> {
         Self::validate_package_ole_file(ole, limits)?;
-        Document::from_ole_with_limits(ole, limits).map(|_| ())
+        Document::from_ole_with_options(ole, OpenOptions::default().with_limits(limits)).map(|_| ())
     }
 
     fn validate_package_ole_file(ole: &OleFile<R>, limits: Limits) -> Result<()> {
@@ -127,7 +119,7 @@ impl<R: Read + Seek> Package<R> {
     ///
     /// ```rust,no_run
     /// use litchi_cfb::OleFile;
-    /// use litchi_doc::Package;
+    /// use litchi_doc::raw::Package;
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("document.doc")?;
@@ -153,27 +145,30 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_doc::Package;
+    /// use litchi_doc::raw::Package;
     ///
     /// let mut pkg = Package::open("document.doc")?;
     /// let doc = pkg.document()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn document(&mut self) -> Result<Document> {
-        Document::from_ole_with_limits(&mut self.ole, self.limits)
+        Document::from_ole_with_options(
+            &mut self.ole,
+            OpenOptions::default().with_limits(self.limits),
+        )
     }
 
     /// Get the main document using explicit password-to-open options.
     pub fn document_with_options(&mut self, options: OpenOptions) -> Result<Document> {
-        Document::from_ole_with_options(&mut self.ole, options, self.limits)
+        let limits = options.limits().constrained_by(self.limits);
+        Document::from_ole_with_options(&mut self.ole, options.with_limits(limits))
     }
 
     /// Open the document with explicit limits and no password.
     pub fn document_with_limits(&mut self, limits: Limits) -> Result<Document> {
         Document::from_ole_with_options(
             &mut self.ole,
-            OpenOptions::default(),
-            limits.constrained_by(self.limits),
+            OpenOptions::default().with_limits(limits.constrained_by(self.limits)),
         )
     }
 
@@ -183,7 +178,11 @@ impl<R: Read + Seek> Package<R> {
         options: OpenOptions,
         limits: Limits,
     ) -> Result<Document> {
-        Document::from_ole_with_options(&mut self.ole, options, limits.constrained_by(self.limits))
+        let limits = options
+            .limits()
+            .constrained_by(limits)
+            .constrained_by(self.limits);
+        Document::from_ole_with_options(&mut self.ole, options.with_limits(limits))
     }
 
     /// Limits inherited by [`Self::document`].
@@ -261,7 +260,8 @@ impl<R: Read + Seek> Package<R> {
     ///
     /// All logical OLE streams and storages are copied, while only the patch's
     /// `DataSpaces` stream replacements are applied. The output must be a fresh
-    /// seekable destination; the generic `Package<R>` reader remains intact.
+    /// seekable destination; the generic `raw::Package<R>` reader remains
+    /// intact.
     pub fn write_data_spaces_patch<W: Write + Seek>(
         &mut self,
         patch: &litchi_crypto::spaces::Patch,
@@ -441,38 +441,314 @@ impl<R: Read + Seek> Package<R> {
     }
 }
 
-impl Package<Cursor<Vec<u8>>> {
+impl RawPackage<Cursor<Vec<u8>>> {
     /// Parse a complete in-memory DOC artifact for exact no-op publication.
-    pub fn from_bytes(bytes: &[u8]) -> Result<Package<Cursor<Vec<u8>>>> {
+    pub fn from_bytes(bytes: &[u8]) -> Result<RawPackage<Cursor<Vec<u8>>>> {
         let limits = Limits::default();
-        Self::validate_source_len(bytes.len(), limits)?;
-        Self::from_owned_bytes(bytes.to_vec(), limits)
-    }
-
-    /// Parse a complete in-memory DOC artifact with explicit finite limits.
-    pub fn from_bytes_with_options(
-        bytes: &[u8],
-        options: PackageOpenOptions,
-    ) -> Result<Package<Cursor<Vec<u8>>>> {
-        let limits = options.limits();
-        Self::validate_source_len(bytes.len(), limits)?;
-        Self::from_owned_bytes(bytes.to_vec(), limits)
+        Self::from_owned_bytes(clone_bounded_source(bytes, limits)?, limits)
     }
 
     pub(crate) fn from_owned_bytes(
         bytes: Vec<u8>,
         limits: Limits,
-    ) -> Result<Package<Cursor<Vec<u8>>>> {
+    ) -> Result<RawPackage<Cursor<Vec<u8>>>> {
         Self::validate_source_len(bytes.len(), limits)?;
         let ole =
             OleFile::open_with_limits(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
-        Package::from_ole_file_with_limits(ole, limits)
+        RawPackage::from_ole_file_with_limits(ole, limits)
+    }
+}
+
+impl Package {
+    /// Open an immutable DOC package from a path under the default policy.
+    ///
+    /// Ingress seals an owned snapshot. Later changes to the original path do
+    /// not change this package or its document projection; source identities
+    /// identify the sealed bytes, not the original filesystem object.
+    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
+        Self::open_with_options(path, OpenOptions::default())
     }
 
-    /// Create the minimal valid DOC package through the canonical builder.
+    /// Open an immutable DOC package under one merged options envelope.
+    pub fn open_with_options(path: impl AsRef<Path>, options: OpenOptions) -> Result<Self> {
+        let mut file = File::open(path)?;
+        Self::from_reader_with_options(&mut file, options)
+    }
+
+    /// Read and validate an immutable DOC package from a reader.
+    pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
+        Self::from_reader_with_options(reader, OpenOptions::default())
+    }
+
+    /// Read and validate an immutable DOC package under one options envelope.
+    pub fn from_reader_with_options<R: Read>(mut reader: R, options: OpenOptions) -> Result<Self> {
+        let bytes = read_bounded_source(&mut reader, options.limits())?;
+        Self::from_owned_bytes(bytes, options)
+    }
+
+    /// Parse an immutable DOC package from borrowed bytes.
+    pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
+        Self::from_bytes_with_options(bytes, OpenOptions::default())
+    }
+
+    /// Parse an immutable DOC package under one options envelope.
+    pub fn from_bytes_with_options(bytes: &[u8], options: OpenOptions) -> Result<Self> {
+        let owned = clone_bounded_source(bytes, options.limits())?;
+        Self::from_owned_bytes(owned, options)
+    }
+
+    /// Adopt an already validated, owned CFB parse without re-indexing it.
+    pub fn from_ole_file(ole: OleFile<Cursor<Vec<u8>>>) -> Result<Self> {
+        Self::from_ole_file_with_options(ole, OpenOptions::default())
+    }
+
+    /// Adopt an already validated, owned CFB parse under one options envelope.
+    pub fn from_ole_file_with_options(
+        ole: OleFile<Cursor<Vec<u8>>>,
+        options: OpenOptions,
+    ) -> Result<Self> {
+        let limits = options.limits();
+        let raw = RawPackage::from_ole_file_with_limits(ole, limits)?;
+        Self::from_raw(raw, options)
+    }
+
+    /// Construct the minimal valid DOC package through the canonical builder.
     pub fn new() -> std::result::Result<Self, crate::writer::WriteError> {
         crate::builder::Builder::new().build()
     }
+
+    /// Return the retained immutable CFB source used by this package.
+    #[must_use]
+    pub fn shared_source(&self) -> Arc<SharedOleFile> {
+        Arc::clone(&self.shared)
+    }
+
+    /// Consume this package and return its retained immutable CFB source.
+    #[must_use]
+    pub fn into_shared_source(self) -> Arc<SharedOleFile> {
+        self.shared
+    }
+
+    /// Return the retained immutable parsed document projection.
+    #[must_use]
+    pub fn document(&self) -> Document {
+        self.document.clone()
+    }
+
+    /// Return the typed package metadata projected at open.
+    #[must_use]
+    pub fn metadata(&self) -> &litchi_core::Metadata {
+        self.metadata.as_ref()
+    }
+
+    /// Limits retained by this immutable package.
+    #[must_use]
+    pub const fn limits(&self) -> Limits {
+        self.limits
+    }
+
+    /// Leniency policy retained by this immutable package.
+    #[must_use]
+    pub const fn leniency(&self) -> crate::leniency::Leniency {
+        self.leniency
+    }
+
+    /// Check and return the current source identity.
+    pub fn source_version(&self) -> Result<SourceVersion> {
+        Ok(self.shared.source_version()?)
+    }
+
+    /// Copy the exact retained package bytes.
+    pub fn to_bytes(&self) -> Result<Vec<u8>> {
+        let length = self.shared.file_size();
+        let capacity = usize::try_from(length)
+            .map_err(|_| Error::InvalidFormat("DOC package size does not fit in memory".into()))?;
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(capacity)
+            .map_err(|source| Error::Allocation {
+                resource: "DOC package output",
+                source,
+            })?;
+        bytes.resize(capacity, 0);
+        self.read_source_into(&mut bytes)?;
+        Ok(bytes)
+    }
+
+    /// Stream the exact retained package bytes to a sequential sink.
+    pub fn write_to(&self, mut writer: impl Write) -> Result<()> {
+        let source = self.shared.source_arc();
+        let expected = self.shared.captured_source_version();
+        let before = source.version()?;
+        if before != expected {
+            return Err(Error::Ole(OleError::SourceChanged {
+                expected,
+                observed: before,
+            }));
+        }
+        stream_source(&*source, &mut writer)?;
+        let after = source.version()?;
+        if after != expected {
+            return Err(Error::Ole(OleError::SourceChanged {
+                expected,
+                observed: after,
+            }));
+        }
+        Ok(())
+    }
+
+    /// Atomically replace a destination with the exact retained package.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace a destination with explicit durability.
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<()> {
+        let source = self.shared.source_arc();
+        let expected = self.shared.captured_source_version();
+        litchi_cfb::atomic::save(
+            path,
+            durability,
+            litchi_cfb::atomic::Overwrite::Replace,
+            |writer| {
+                let before = source.version()?;
+                if before != expected {
+                    return Err(Error::Ole(OleError::SourceChanged {
+                        expected,
+                        observed: before,
+                    }));
+                }
+                stream_source(&*source, writer)?;
+                Ok(())
+            },
+            || {
+                let after = source.version()?;
+                if after != expected {
+                    return Err(Error::Ole(OleError::SourceChanged {
+                        expected,
+                        observed: after,
+                    }));
+                }
+                Ok(())
+            },
+        )
+    }
+
+    pub(crate) fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits();
+        RawPackage::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), limits)?;
+        let ole =
+            OleFile::open_with_limits(Cursor::new(bytes), litchi_cfb::OleFileLimits::default())?;
+        let raw = RawPackage::from_ole_file_with_limits(ole, limits)?;
+        Self::from_raw(raw, options)
+    }
+
+    fn from_raw(mut raw: RawPackage<Cursor<Vec<u8>>>, options: OpenOptions) -> Result<Self> {
+        let limits = options.limits();
+        let leniency = options.leniency;
+        let document = Document::from_ole_with_options(&mut raw.ole, options)?;
+        let version = OwnedSource::new(Vec::new()).version()?;
+        let shared = Arc::new(SharedOleFile::from_owned_ole_file(
+            raw.ole,
+            version,
+            SharedOleFileLimits::new(
+                u64::try_from(limits.max_package_bytes()).unwrap_or(u64::MAX),
+            )?,
+        )?);
+        let metadata = shared.get_metadata().map(Into::into).map_err(Error::from)?;
+        Ok(Self {
+            shared,
+            document,
+            metadata: Arc::new(metadata),
+            limits,
+            leniency,
+        })
+    }
+
+    fn read_source_into(&self, output: &mut [u8]) -> Result<()> {
+        let source = self.shared.source_arc();
+        let expected = self.shared.captured_source_version();
+        let before = source.version()?;
+        if before != expected {
+            return Err(Error::Ole(OleError::SourceChanged {
+                expected,
+                observed: before,
+            }));
+        }
+        source.read_exact_at(0, output)?;
+        let after = source.version()?;
+        if after != expected {
+            return Err(Error::Ole(OleError::SourceChanged {
+                expected,
+                observed: after,
+            }));
+        }
+        Ok(())
+    }
+}
+
+fn read_bounded_source<R: Read>(reader: &mut R, limits: Limits) -> Result<Vec<u8>> {
+    let maximum = limits.max_package_bytes();
+    let mut bytes = Vec::new();
+    let mut buffer = [0_u8; 64 * 1024];
+    loop {
+        let count = reader.read(&mut buffer)?;
+        if count == 0 {
+            break;
+        }
+        let next = bytes
+            .len()
+            .checked_add(count)
+            .ok_or_else(|| Error::InvalidFormat("DOC package input length overflow".to_string()))?;
+        if next > maximum {
+            return Err(Error::ResourceLimit(ResourceLimit::new(
+                ResourceKind::Package,
+                u64::try_from(next).unwrap_or(u64::MAX),
+                u64::try_from(maximum).unwrap_or(u64::MAX),
+                None,
+            )));
+        }
+        bytes
+            .try_reserve(count)
+            .map_err(|source| Error::Allocation {
+                resource: "DOC package input",
+                source,
+            })?;
+        bytes.extend_from_slice(&buffer[..count]);
+    }
+    Ok(bytes)
+}
+
+fn clone_bounded_source(bytes: &[u8], limits: Limits) -> Result<Vec<u8>> {
+    RawPackage::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), limits)?;
+    let mut owned = Vec::new();
+    owned
+        .try_reserve_exact(bytes.len())
+        .map_err(|source| Error::Allocation {
+            resource: "DOC package input",
+            source,
+        })?;
+    owned.extend_from_slice(bytes);
+    Ok(owned)
+}
+
+fn stream_source(source: &dyn ReadAt, writer: &mut impl Write) -> Result<()> {
+    let length = source.len()?;
+    let mut offset = 0_u64;
+    let mut buffer = [0_u8; 64 * 1024];
+    while offset < length {
+        let count = usize::try_from(length - offset)
+            .unwrap_or(buffer.len())
+            .min(buffer.len());
+        source.read_exact_at(offset, &mut buffer[..count])?;
+        writer.write_all(&buffer[..count])?;
+        offset = offset.saturating_add(u64::try_from(count).unwrap_or(u64::MAX));
+    }
+    Ok(())
 }
 
 fn preflight_source_len<R: Read + Seek>(reader: &mut R, limits: Limits) -> Result<()> {

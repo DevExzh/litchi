@@ -33,8 +33,8 @@
 )]
 
 use litchi_doc::{
-    Builder, Package, ProofingEntry, ProofingFeature, ProofingState, ProofingStateTable,
-    ProofingStatus, ProofingTables,
+    Builder, ProofingEntry, ProofingFeature, ProofingState, ProofingStateTable, ProofingStatus,
+    ProofingTables, raw::Package,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};

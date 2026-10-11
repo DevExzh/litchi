@@ -40,7 +40,7 @@
 use litchi_doc::builder::Builder;
 use litchi_doc::image::PictureFields;
 use litchi_doc::writer::{FloatingPosition, Picture, PictureKind};
-use litchi_doc::{Package, Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
+use litchi_doc::{Run, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, raw::Package};
 use litchi_odraw::image::Kind as BlipKind;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;

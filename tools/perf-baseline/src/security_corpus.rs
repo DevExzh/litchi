@@ -37,7 +37,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionError, ExecutionLimits, Limits,
     OwnedSource, ReadAt, Resource,
 };
-use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, Package as DocPackage};
+use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, raw::Package as DocPackage};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_ole_common::object::Limits as ObjectLimits;
 use litchi_opc::{

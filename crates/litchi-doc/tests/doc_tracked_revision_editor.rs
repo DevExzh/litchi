@@ -33,8 +33,8 @@
 )]
 
 use litchi_cfb::OleFile;
-use litchi_doc::Package;
 use litchi_doc::builder::Builder;
+use litchi_doc::raw::Package;
 use litchi_doc::tracked_revision::{Limits, RevisionEditor, RevisionKind, RevisionMetadata};
 use litchi_doc::writer::{CharacterFormatting, ParagraphFormatting, TextRevision};
 use std::io::Cursor;

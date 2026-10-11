@@ -41,7 +41,7 @@ use litchi_doc::builder::Builder;
 use litchi_doc::shape::extract_drawing_shapes;
 use litchi_doc::writer::{FloatingPosition, Picture};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
-use litchi_doc::{Package, ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin};
+use litchi_doc::{ShapeHorizontalOrigin, ShapeTextWrap, ShapeVerticalOrigin, raw::Package};
 use litchi_odraw::shape::Kind;
 use std::io::{Cursor, Write};
 use std::path::PathBuf;

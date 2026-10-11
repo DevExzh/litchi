@@ -65,6 +65,6 @@ fn test_empty_document_write() {
     assert!(result.is_ok());
     let data = cursor.into_inner();
     assert!(!data.is_empty());
-    let mut package = crate::Package::from_reader(Cursor::new(data)).unwrap();
+    let mut package = crate::raw::Package::from_reader(Cursor::new(data)).unwrap();
     assert_eq!(package.document().unwrap().text().unwrap(), "\r");
 }

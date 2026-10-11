@@ -1,4 +1,5 @@
-use super::*;
+use super::{Error, OpenOptions};
+use crate::raw::Package;
 use std::path::Path;
 
 #[test]

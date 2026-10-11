@@ -39,7 +39,7 @@
 
 use litchi_doc::header_footer::HeaderFooter;
 use litchi_doc::parts::headers::HeaderFooterType;
-use litchi_doc::{Document, Package};
+use litchi_doc::{Document, raw::Package};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {

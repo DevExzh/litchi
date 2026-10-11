@@ -24,7 +24,7 @@ impl Write for FailingSink {
 
 #[test]
 fn package_new_and_builder_round_trip_through_exact_publication() {
-    let mut empty = Package::new().expect("minimal package");
+    let empty = Package::new().expect("minimal package");
     let empty_bytes = empty.to_bytes().expect("minimal package bytes");
     assert!(!empty_bytes.is_empty());
 
@@ -38,7 +38,7 @@ fn package_new_and_builder_round_trip_through_exact_publication() {
     builder
         .add_paragraph("canonical publication")
         .expect("paragraph");
-    let mut package = builder.build().expect("created package");
+    let package = builder.build().expect("created package");
     let bytes = package.to_bytes().expect("created package bytes");
 
     let mut streamed = Vec::new();
@@ -47,12 +47,11 @@ fn package_new_and_builder_round_trip_through_exact_publication() {
         .expect("created package stream");
     assert_eq!(streamed, bytes);
 
-    let mut reopened = Package::from_bytes(&bytes).expect("round-trip package");
+    let reopened = Package::from_bytes(&bytes).expect("round-trip package");
     assert_eq!(reopened.to_bytes().expect("round-trip bytes"), bytes);
     assert!(
         reopened
             .document()
-            .expect("round-trip document")
             .text()
             .expect("round-trip text")
             .contains("canonical publication")
@@ -61,9 +60,9 @@ fn package_new_and_builder_round_trip_through_exact_publication() {
 
 #[test]
 fn package_publication_keeps_sink_failures_typed() {
-    let mut package = Package::new().expect("minimal package");
+    let package = Package::new().expect("minimal package");
     let error = package
         .write_to(FailingSink)
         .expect_err("failing publication sink");
-    assert!(matches!(error, Error::Ole(_)));
+    assert!(matches!(error, Error::Io(_)));
 }

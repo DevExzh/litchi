@@ -18,16 +18,16 @@ impl Document {
             return Ok(Vec::new());
         }
 
-        let text = self.text_extractor.text_shared();
-        let text_ranges = self.text_extractor.cp_to_byte_shared();
+        let text = self.0.text_extractor.text_shared();
+        let text_ranges = self.0.text_extractor.cp_to_byte_shared();
 
         let para_extractor = ParagraphExtractor::new_with_range_and_stylesheet_and_shared_ranges(
             Arc::clone(&text),
             Arc::clone(&text_ranges),
-            self.pap_bin_table.as_ref(),
-            self.chp_bin_table.as_ref(),
+            self.0.pap_bin_table.as_ref(),
+            self.0.chp_bin_table.as_ref(),
             (start_cp, end_cp),
-            self.stylesheet.as_ref(),
+            self.0.stylesheet.as_ref(),
         )?;
 
         let extracted = para_extractor.extract_paragraphs()?;

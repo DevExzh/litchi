@@ -27,7 +27,7 @@ use std::{
 use litchi_cfb::{OleFile, OleFileLimits};
 use litchi_crypto::ooxml::{self, IntegrityStatus, Kind, Limits as CryptoLimits, Mode};
 use litchi_crypto::spaces;
-use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, Package as DocPackage};
+use litchi_doc::{Error as DocError, Limits as DocLimits, OpenOptions, raw::Package as DocPackage};
 use litchi_docx::source_backed::Package as DocxSourcePackage;
 use litchi_opc::{OpcError, OpcPackage, SourceBackedPackage, SourceLimits};
 use litchi_sign::{Policy, Status};

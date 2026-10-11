@@ -37,7 +37,7 @@ fn comments_round_trip_with_other_subdocuments() {
 
     let mut cursor = Cursor::new(Vec::new());
     writer.build().unwrap().write_to(&mut cursor).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
+    let mut package = crate::raw::Package::from_reader(Cursor::new(cursor.into_inner())).unwrap();
     let document = package.document().unwrap();
 
     assert_eq!(document.footnotes().unwrap().len(), 1);
@@ -87,7 +87,7 @@ fn comments_round_trip_with_other_subdocuments() {
             .as_nanos()
     ));
     writer.build().unwrap().save(&path).unwrap();
-    let mut package = crate::Package::open(&path).unwrap();
+    let mut package = crate::raw::Package::open(&path).unwrap();
     let comments = package.document().unwrap().comments().unwrap();
     assert_eq!(comments.len(), 2);
     assert_eq!(
@@ -142,7 +142,7 @@ fn writes_maximum_annotation_bookmark_count() {
         .unwrap()
         .write_to(&mut output)
         .expect("maximum annotation bookmark count is writable");
-    let mut package = crate::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = crate::raw::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
     let document = package.document().unwrap();
     assert_eq!(
         document.annotation_bookmarks().unwrap().unwrap().len(),

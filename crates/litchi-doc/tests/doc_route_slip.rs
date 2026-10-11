@@ -40,7 +40,7 @@ use litchi_doc::route_slip::{
     DeliveryOption, EditKind, Editor, Metadata, NarrowString, Protection, Recipient,
     RecipientSelectionError, RecipientSelector, Snapshot, TransactionError, parse, to_bytes,
 };
-use litchi_doc::{Builder, Package};
+use litchi_doc::{Builder, raw::Package};
 use std::io::Cursor;
 
 fn base_doc() -> Vec<u8> {

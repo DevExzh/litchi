@@ -125,10 +125,18 @@ impl Doc {
         let mut builder = litchi_doc::Builder::new();
         builder.add_paragraph("")?;
         let package = builder.build()?;
-        match Self::from_ole_file(package.into_ole_file(), &OpenOptions::default(), None)? {
-            LegacyOpen::Opened(doc) => Ok(doc),
-            LegacyOpen::PasswordRequired(_) => Err(litchi_doc::Error::PasswordRequired.into()),
-        }
+        let reader = OnceLock::new();
+        let _ = reader.set(Ok(package.document()));
+        Ok(Self(Opened::new(DocState {
+            reader,
+            metadata: package.metadata().clone(),
+            package_limits: package.limits(),
+            doc_leniency: package.leniency(),
+            source: DocSource::Retained {
+                shared: package.into_shared_source(),
+                snapshot: OnceLock::new(),
+            },
+        })))
     }
 
     pub(crate) fn with_origin(&self, origin: Option<Arc<std::path::Path>>) -> Self {
@@ -189,7 +197,7 @@ impl Doc {
         options: &OpenOptions,
         password: Option<&str>,
     ) -> Result<LegacyOpen<Self>> {
-        let mut package = litchi_doc::Package::from_ole_file_with_limits(
+        let mut package = litchi_doc::raw::Package::from_ole_file_with_limits(
             ole,
             options.doc.and_then(|doc| doc.limits).unwrap_or_default(),
         )?;
@@ -558,12 +566,13 @@ impl Doc {
                 .with_format(FileFormat::Doc));
             },
         };
-        let mut package = litchi_doc::Package::from_bytes_with_options(
+        let package = litchi_doc::Package::from_bytes_with_options(
             &bytes,
-            litchi_doc::package::PackageOpenOptions::default().with_limits(self.0.package_limits),
+            litchi_doc::OpenOptions::default()
+                .with_limits(self.0.package_limits)
+                .with_leniency(self.0.doc_leniency),
         )?;
-        let options = litchi_doc::OpenOptions::default().with_leniency(self.0.doc_leniency);
-        Ok(package.document_with_options(options)?)
+        Ok(package.document())
     }
 
     /// The length of the retained input, or `None` when it was released.
@@ -818,7 +827,7 @@ mod tests {
     use super::*;
     use crate::detect::{DetectedFormat, detect_format_smart};
     use crate::{Code, DocOptions};
-    use litchi_doc::{Leniency, Package};
+    use litchi_doc::{Leniency, raw::Package};
     use std::path::PathBuf;
 
     fn fixture_path(name: &str) -> PathBuf {

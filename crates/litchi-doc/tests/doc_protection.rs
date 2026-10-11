@@ -78,7 +78,7 @@ fn word_97_document_predating_the_tables_reports_none() {
 
 #[test]
 fn exposes_no_protected_ranges_through_the_document_api() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Package::from_reader(
         File::open(fixture("test-data/poi/test-data/document/47950_normal.doc")).unwrap(),
     )
     .unwrap();

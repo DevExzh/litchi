@@ -35,7 +35,7 @@
 use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
 use litchi_doc::writer::Picture;
-use litchi_doc::{Error, Limits, OpenOptions, Package, PackageOpenOptions, Password, ResourceKind};
+use litchi_doc::{Error, Limits, OpenOptions, Password, ResourceKind, raw::Package};
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -183,7 +183,7 @@ fn package_limit_accepts_exact_size_and_rejects_one_less() {
 }
 
 #[test]
-fn default_limits_are_bounded_and_package_open_options_apply_them() {
+fn default_limits_are_bounded_and_open_options_apply_them() {
     let defaults = Limits::default();
     assert!(defaults.max_package_bytes() < Limits::MAX_PACKAGE_BYTES);
     assert!(defaults.max_input_bytes() < Limits::MAX_INPUT_BYTES);
@@ -194,7 +194,8 @@ fn default_limits_are_bounded_and_package_open_options_apply_them() {
     let path = temporary_path();
     std::fs::write(&path, &bytes).unwrap();
     let package =
-        Package::open_with(&path, PackageOpenOptions::default().with_limits(exact)).unwrap();
+        litchi_doc::Package::open_with_options(&path, OpenOptions::default().with_limits(exact))
+            .unwrap();
     std::fs::remove_file(path).unwrap();
     assert_eq!(package.limits(), exact);
 }

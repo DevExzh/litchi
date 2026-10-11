@@ -35,9 +35,10 @@
 //! Public DOC transaction coverage for inert `_PID_HLINKS` metadata.
 
 use litchi_doc::{
-    FieldType, FieldsTable, HyperlinkAssociation, Package, UserDefinedHyperlinks,
+    FieldType, FieldsTable, HyperlinkAssociation, UserDefinedHyperlinks,
     package::Snapshot,
     parts::protection::{ProtectionAuthorization, ProtectionPolicy},
+    raw::Package,
     user_defined_hyperlinks::{Hyperlink, Hyperlinks, Limits},
 };
 use litchi_ole_common::property_set::user_defined::{Edit, LinkBase, Properties};

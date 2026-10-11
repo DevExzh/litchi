@@ -89,7 +89,7 @@ fn reads_multi_author_threading_from_a_word_produced_document() {
 
 #[test]
 fn exposes_threading_through_the_document_api() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Package::from_reader(
         File::open(fixture("test-data/ole/doc/ThreeColHeadFoot.doc")).unwrap(),
     )
     .unwrap();

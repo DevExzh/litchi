@@ -609,7 +609,7 @@ mod transaction_tests;
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Package;
     use std::path::PathBuf;
 
     #[test]

@@ -69,7 +69,7 @@ fn documents_without_asumy_report_none() {
 
 #[test]
 fn document_api_reports_none_without_asumy() {
-    let mut package = litchi_doc::Package::from_reader(
+    let mut package = litchi_doc::raw::Package::from_reader(
         File::open(fixture("test-data/ole/doc/ThreeColHeadFoot.doc")).unwrap(),
     )
     .unwrap();

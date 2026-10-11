@@ -36,7 +36,7 @@ use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
 use litchi_doc::embedded_object::{Info, Limits};
 use litchi_doc::writer::Picture;
-use litchi_doc::{EQUATION_3_CLSID, Editor, MtefEquation, MtefEquationWriteOptions, Package};
+use litchi_doc::{EQUATION_3_CLSID, Editor, MtefEquation, MtefEquationWriteOptions, raw::Package};
 use litchi_ole_common::object::{Editor as ObjectEditor, Limits as ObjectLimits, Target, Targets};
 use std::io::Cursor;
 

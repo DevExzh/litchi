@@ -3,7 +3,7 @@
 //! The OLE property-set grammar and typed PID owners live in
 //! `litchi-ole-common`. This module only supplies the DOC package boundary:
 //! host validation, owned source bytes, and source-checked whole-package
-//! commits. A generic `Package<R>` cannot safely mutate in place because its
+//! commits. A generic `raw::Package<R>` cannot safely mutate in place because its
 //! reader is owned by the parsed CFB file and the original artifact bytes are
 //! not recoverable from that API.
 

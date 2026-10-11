@@ -42,8 +42,8 @@ use litchi_doc::shape::extract_drawing_shapes;
 use litchi_doc::writer::{FloatingPosition, Picture};
 use litchi_doc::writer::{Kind as DrawingKind, Shape as DrawingShape};
 use litchi_doc::{
-    HeaderFooterParagraph, HeaderFooterType, HeaderKind, Package, ShapeHorizontalOrigin,
-    ShapeTextWrap, ShapeVerticalOrigin,
+    HeaderFooterParagraph, HeaderFooterType, HeaderKind, ShapeHorizontalOrigin, ShapeTextWrap,
+    ShapeVerticalOrigin, raw::Package,
 };
 use litchi_odraw::shape::Kind;
 use std::io::{Cursor, Write};

@@ -10,7 +10,7 @@ use crate::section::{
     PageGrid, PageGridMode, PageOrientation, Protection, TextFlow, VerticalJustification,
     VerticalMargin,
 };
-use crate::{OpenOptions, Package};
+use crate::{OpenOptions, raw::Package};
 use std::path::{Path, PathBuf};
 
 fn fixed_sprm(opcode: u16, operand: &[u8]) -> Vec<u8> {

@@ -7,8 +7,8 @@ impl Document {
 
     /// Get all comments in main-document reference order.
     pub fn comments(&self) -> Result<Vec<Comment>> {
-        let mut result = Vec::with_capacity(self.comments_table.count());
-        for reference in self.comments_table.references() {
+        let mut result = Vec::with_capacity(self.0.comments_table.count());
+        for reference in self.0.comments_table.references() {
             let reference_end = reference.reference_cp.checked_add(1).ok_or_else(|| {
                 PackageError::Corrupted("comment reference CP overflows".to_string())
             })?;
@@ -16,10 +16,12 @@ impl Document {
                 PackageError::Corrupted("comment marker CP overflows".to_string())
             })?;
             if self
+                .0
                 .text_extractor
                 .text_at_range(reference.reference_cp, reference_end)
                 != "\u{5}"
                 || self
+                    .0
                     .text_extractor
                     .text_at_range(reference.marker_cp, marker_end)
                     != "\u{5}"
@@ -28,7 +30,7 @@ impl Document {
                     "comment reference or story does not begin with U+0005".to_string(),
                 ));
             }
-            if let Some(chp_table) = &self.chp_bin_table
+            if let Some(chp_table) = &self.0.chp_bin_table
                 && (!chp_table
                     .runs_in_range(reference.reference_cp, reference_end)
                     .any(|run| run.properties.is_spec)
@@ -48,6 +50,7 @@ impl Document {
                 PackageError::Corrupted("comment story range is empty".to_string())
             })?;
             if self
+                .0
                 .text_extractor
                 .text_at_range(paragraph_mark_cp, reference.text_end_cp)
                 != "\r"
@@ -57,6 +60,7 @@ impl Document {
                 ));
             }
             let text = self
+                .0
                 .text_extractor
                 .text_at_range(body_start, reference.text_end_cp)
                 .to_string();

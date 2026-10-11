@@ -1994,6 +1994,26 @@
           "name": "write_to_stream",
           "scope": "litchi_doc::Builder",
           "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "PackageOpenOptions",
+          "scope": "litchi_doc",
+          "replacement": "use the merged OpenOptions envelope"
+        },
+        {
+          "name": "open_with",
+          "scope": "litchi_doc::Package",
+          "replacement": "use open_with_options"
+        },
+        {
+          "name": "document_with_options",
+          "scope": "litchi_doc::Package",
+          "replacement": "supply OpenOptions at package ingress; document() returns a retained projection"
+        },
+        {
+          "name": "ole_file",
+          "scope": "litchi_doc::Package",
+          "replacement": "use explicit raw boundary for physical container access"
         }
       ],
       "families": []
@@ -2041,6 +2061,26 @@
           "name": "write_to_stream",
           "scope": "litchi_doc::Builder",
           "replacement": "publish the Package returned by build()"
+        },
+        {
+          "name": "PackageOpenOptions",
+          "scope": "litchi_doc",
+          "replacement": "use the merged OpenOptions envelope"
+        },
+        {
+          "name": "open_with",
+          "scope": "litchi_doc::Package",
+          "replacement": "use open_with_options"
+        },
+        {
+          "name": "document_with_options",
+          "scope": "litchi_doc::Package",
+          "replacement": "supply OpenOptions at package ingress; document() returns a retained projection"
+        },
+        {
+          "name": "ole_file",
+          "scope": "litchi_doc::Package",
+          "replacement": "use explicit raw boundary for physical container access"
         }
       ],
       "families": []

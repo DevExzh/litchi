@@ -18,8 +18,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use litchi_core::Position;
-use litchi_doc::Package;
 use litchi_doc::body_text::{Error as BodyError, Projection, Refusal, Snapshot, TransactionLimits};
+use litchi_doc::raw::Package;
 use litchi_doc::tracked_revision::Limits;
 use serde::Serialize;
 use sha2::{Digest, Sha256};

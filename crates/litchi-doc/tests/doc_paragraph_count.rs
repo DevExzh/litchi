@@ -1,7 +1,7 @@
 //! Regression coverage for the structural-only native-DOC paragraph count.
 
-use litchi_doc::Package;
 use litchi_doc::builder::Builder;
+use litchi_doc::raw::Package;
 use std::io::Cursor;
 
 #[test]

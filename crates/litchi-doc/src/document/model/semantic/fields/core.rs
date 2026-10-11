@@ -8,7 +8,7 @@ impl Document {
     #[inline]
     #[must_use]
     pub fn fields_table(&self) -> Option<&FieldsTable> {
-        self.fields_table.as_ref()
+        self.0.fields_table.as_ref()
     }
 
     /// Get stored instruction and cached-result text for every field story.
@@ -19,7 +19,7 @@ impl Document {
     /// external paths are never opened, OLE objects are never activated, and
     /// macro instructions are never resolved, loaded, or executed.
     pub fn fields(&self) -> Result<Vec<FieldText>> {
-        let Some(fields) = &self.fields_table else {
+        let Some(fields) = &self.0.fields_table else {
             return Ok(Vec::new());
         };
 

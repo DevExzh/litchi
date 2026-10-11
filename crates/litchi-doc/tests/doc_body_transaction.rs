@@ -13,7 +13,7 @@ use litchi_doc::builder::Builder;
 use litchi_doc::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
 use litchi_doc::tracked_revision::Limits;
 use litchi_doc::writer::{FloatingPosition, Kind, Picture, Shape};
-use litchi_doc::{HeaderKind, Package};
+use litchi_doc::{HeaderKind, raw::Package};
 use std::io::Cursor;
 use std::path::PathBuf;
 

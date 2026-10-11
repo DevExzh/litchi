@@ -738,15 +738,18 @@ impl Snapshot {
 
     fn open_with_options(input: impl Into<Vec<u8>>, options: OpenOptions) -> Result<Self> {
         let bytes = input.into();
-        crate::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), options.package_limits)
-            .map_err(Error::Invalid)?;
+        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
+            bytes.len(),
+            options.package_limits,
+        )
+        .map_err(Error::Invalid)?;
         let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
             bytes.clone(),
             options.revision_limits,
             options.protection_policy.clone(),
         )
         .map_err(Error::Invalid)?;
-        crate::Package::validate_ole_file(&mut ole, options.package_limits)
+        crate::raw::Package::validate_ole_file(&mut ole, options.package_limits)
             .map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
@@ -837,7 +840,7 @@ impl Snapshot {
         mut cfb_observer: impl FnMut(CfbParseEvent),
     ) -> Result<Self> {
         let bytes = input.into();
-        crate::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), package_limits)
+        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), package_limits)
             .map_err(Error::Invalid)?;
         let mut ole = observe_phase(
             &mut observer,
@@ -854,7 +857,10 @@ impl Snapshot {
         observe_phase(
             &mut observer,
             DiagnosticPhase::PublicReaderValidation,
-            || crate::Package::validate_ole_file(&mut ole, package_limits).map_err(Error::Invalid),
+            || {
+                crate::raw::Package::validate_ole_file(&mut ole, package_limits)
+                    .map_err(Error::Invalid)
+            },
         )?;
         let source = observe_phase(&mut observer, DiagnosticPhase::SourceRetention, || {
             Ok(Arc::from(bytes.into_boxed_slice()))
@@ -5943,7 +5949,7 @@ mod tests {
         edit.replace_paragraph(Position::new(0), "formatted")
             .expect("formatted empty paragraph accepts insertion");
         let commit = edit.commit().expect("formatted empty commit");
-        let mut package = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("formatted candidate opens");
         let document = package.document().expect("formatted candidate document");
         let paragraph = document
@@ -6019,7 +6025,7 @@ mod tests {
         edit.replace_paragraph(Position::new(0), "inside")
             .expect("bookmark-protected empty insertion");
         let commit = edit.commit().expect("bookmark commit");
-        let mut package = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("bookmark candidate opens");
         let bookmark = package
             .document()
@@ -6107,12 +6113,12 @@ mod tests {
         let (_strict_editor, mut ole) =
             RevisionEditor::open_with_ole_file(source.clone(), Limits::default())
                 .expect("physical DOC context should open");
-        crate::Package::<Cursor<Vec<u8>>>::validate_source_len(
+        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
             source.len(),
             crate::package::Limits::default(),
         )
         .expect("public package preflight should pass");
-        crate::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
+        crate::raw::Package::validate_ole_file(&mut ole, crate::package::Limits::default())
             .expect("public reader should validate the shared context");
 
         let source = Snapshot::from_bytes(source).expect("source should open");
@@ -6124,7 +6130,7 @@ mod tests {
             commit.snapshot().paragraphs(Projection::All).unwrap()[0].text(),
             "alpha expanded"
         );
-        let mut public = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut public = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("changed candidate should pass the public package gate");
         assert_eq!(
             public
@@ -6234,7 +6240,7 @@ mod tests {
             .collect::<Vec<_>>();
         assert_eq!(texts, ["alpha expanded", "bravo", "c"]);
 
-        let mut package = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("CFB reopens");
         let document = package.document().expect("DOC reopens");
         let paragraphs = document.paragraphs().expect("paragraphs read back");
@@ -6309,7 +6315,7 @@ mod tests {
             ["alpha", "bravo"]
         );
         let mut inverse_package =
-            crate::Package::from_reader(Cursor::new(semantic_inverse.finish()))
+            crate::raw::Package::from_reader(Cursor::new(semantic_inverse.finish()))
                 .expect("durable inverse CFB reopens");
         let inverse_document = inverse_package
             .document()
@@ -6520,7 +6526,7 @@ mod tests {
         edit.set_embedded_display_as_icon(77, !before)
             .expect("resource metadata edit");
         let commit = edit.commit().expect("resource root commit");
-        let mut package = crate::Package::from_reader(Cursor::new(commit.snapshot().finish()))
+        let mut package = crate::raw::Package::from_reader(Cursor::new(commit.snapshot().finish()))
             .expect("resource CFB reopens");
         package.document().expect("resource DOC reopens");
         let changed =
@@ -6928,7 +6934,7 @@ mod tests {
                 "placeholder"
             );
             let mut restored_package =
-                crate::Package::from_reader(Cursor::new(durable_restored.finish()))
+                crate::raw::Package::from_reader(Cursor::new(durable_restored.finish()))
                     .expect("durable inverse CFB");
             assert_eq!(
                 restored_package

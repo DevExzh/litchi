@@ -11,7 +11,7 @@ impl Document {
     /// only stored instruction and cached-result text; it never evaluates or
     /// refreshes a field.
     pub fn field_text_at_position(&self, story: FieldStory, cp: u32) -> Result<Option<FieldText>> {
-        let Some(fields_table) = &self.fields_table else {
+        let Some(fields_table) = &self.0.fields_table else {
             return Ok(None);
         };
         let Some(field) = fields_table
@@ -76,7 +76,7 @@ fn without_nested_fields(
 mod tests {
     use super::*;
     use crate::builder::Builder;
-    use crate::package::Package;
+    use crate::raw::Package;
     use std::io::Cursor;
 
     #[test]

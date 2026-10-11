@@ -206,7 +206,7 @@ fn sort_case_insensitively(names: &mut [String]) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Package;
     use litchi_cfb::OleWriter;
     use std::io::Cursor;
 

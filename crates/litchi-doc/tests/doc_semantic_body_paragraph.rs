@@ -1,8 +1,8 @@
 //! Regression coverage for borrowed ordinary-body paragraph queries.
 
 use litchi_core::Position;
-use litchi_doc::Package;
 use litchi_doc::body_text::{Projection, Snapshot};
+use litchi_doc::raw::Package;
 use litchi_doc::writer::{Builder, FootnoteEntry};
 use std::io::Cursor;
 

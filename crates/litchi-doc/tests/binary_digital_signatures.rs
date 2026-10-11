@@ -68,7 +68,8 @@ fn property_blob() -> Vec<u8> {
 fn doc_facade_discovers_unsigned_signature_state() {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let mut doc =
-        litchi_doc::Package::open(root.join("test-data/ole/doc/documentProperties.doc")).unwrap();
+        litchi_doc::raw::Package::open(root.join("test-data/ole/doc/documentProperties.doc"))
+            .unwrap();
     assert!(doc.signatures().unwrap().is_empty());
 }
 
@@ -121,7 +122,7 @@ fn public_property_set_facade_reads_and_edits_vba_signature_payloads() {
     writer.write_to(&mut output).unwrap();
 
     let bytes = common::with_valid_word97_dop(output.into_inner());
-    let mut package = litchi_doc::Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut package = litchi_doc::raw::Package::from_reader(Cursor::new(bytes.clone())).unwrap();
     let package_signature = package.vba_signature().unwrap().unwrap();
     assert_eq!(package_signature.info().signature(), [1, 2, 3]);
 

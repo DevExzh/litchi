@@ -36,7 +36,7 @@ use litchi_doc::parts::fib::FileInformationBlock;
 use litchi_doc::parts::headers::HeaderFooterType;
 use litchi_doc::writer::FootnoteEntry;
 use litchi_doc::{
-    Builder, CharacterFormatting, HeaderFooterParagraph, Package, ParagraphFormatting,
+    Builder, CharacterFormatting, HeaderFooterParagraph, ParagraphFormatting, raw::Package,
 };
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};

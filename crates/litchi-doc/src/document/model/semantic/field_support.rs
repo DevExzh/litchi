@@ -26,11 +26,11 @@ impl Document {
             ));
         }
 
-        Ok(self.text_extractor.text_at_range(start, end).to_string())
+        Ok(self.0.text_extractor.text_at_range(start, end).to_string())
     }
 
     pub(super) fn field_story_range_if_present(&self, story: FieldStory) -> Option<(u32, u32)> {
-        story.range(&self.fib)
+        story.range(&self.0.fib)
     }
 
     pub(super) fn field_story_range(&self, story: FieldStory) -> Result<(u32, u32)> {

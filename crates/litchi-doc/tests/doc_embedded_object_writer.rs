@@ -36,7 +36,7 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_doc::builder::Builder;
 use litchi_doc::embedded_object::Limits;
 use litchi_doc::parts::protection::{ProtectionAuthorization, ProtectionPolicy};
-use litchi_doc::{Editor, Package, WriteOptions};
+use litchi_doc::{Editor, WriteOptions, raw::Package};
 use std::fs;
 use std::io::Cursor;
 use std::path::PathBuf;

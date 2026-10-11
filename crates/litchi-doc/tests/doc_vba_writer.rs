@@ -32,7 +32,7 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
-use litchi_doc::{Builder, EncryptionProfile, OpenOptions, Package};
+use litchi_doc::{Builder, EncryptionProfile, OpenOptions, raw::Package};
 use litchi_vba::{
     Limits,
     build::{Module, Project},

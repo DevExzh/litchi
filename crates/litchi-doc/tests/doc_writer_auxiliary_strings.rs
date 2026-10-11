@@ -32,7 +32,7 @@
     reason = "integration-test fixtures favor explicit wire values and concise panic-driven assertions over production-style ergonomics"
 )]
 
-use litchi_doc::{AssociatedStringSlot, Builder, Package, SavedByEntry, SavedByTable};
+use litchi_doc::{AssociatedStringSlot, Builder, SavedByEntry, SavedByTable, raw::Package};
 use std::io::Cursor;
 use std::sync::atomic::{AtomicUsize, Ordering};
 

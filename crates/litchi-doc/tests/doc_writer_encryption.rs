@@ -35,7 +35,7 @@
 use litchi_cfb::OleFile;
 use litchi_doc::builder::Builder;
 use litchi_doc::writer::{EncryptionProfile, FootnoteEntry};
-use litchi_doc::{Error, OpenOptions, Package};
+use litchi_doc::{Error, OpenOptions, raw::Package};
 use std::io::Cursor;
 
 fn encrypted_document(profile: EncryptionProfile, password: &str) -> Vec<u8> {

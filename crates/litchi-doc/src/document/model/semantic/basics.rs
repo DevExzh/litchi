@@ -21,14 +21,14 @@ impl Document {
     /// ```rust,no_run
     /// use litchi_doc::Package;
     ///
-    /// let mut pkg = Package::open("document.doc")?;
-    /// let doc = pkg.document()?;
+    /// let pkg = Package::open("document.doc")?;
+    /// let doc = pkg.document();
     /// let text = doc.text()?;
     /// println!("{}", text);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn text(&self) -> Result<String> {
-        self.text_extractor.extract_all_text()
+        self.0.text_extractor.extract_all_text()
     }
 
     /// Get the number of paragraphs in the document.
@@ -40,17 +40,18 @@ impl Document {
     /// ```rust,no_run
     /// use litchi_doc::Package;
     ///
-    /// let mut pkg = Package::open("document.doc")?;
-    /// let doc = pkg.document()?;
+    /// let pkg = Package::open("document.doc")?;
+    /// let doc = pkg.document();
     /// let count = doc.paragraph_count()?;
     /// println!("Paragraphs: {}", count);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn paragraph_count(&self) -> Result<usize> {
-        let text = self.text_extractor.text();
+        let text = self.0.text_extractor.text();
         count_paragraphs_in_ranges(
             text,
-            self.fib
+            self.0
+                .fib
                 .get_all_subdoc_ranges()
                 .into_iter()
                 .map(|(_, start_cp, end_cp)| (start_cp, end_cp)),
@@ -67,8 +68,8 @@ impl Document {
     /// ```rust,no_run
     /// use litchi_doc::Package;
     ///
-    /// let mut pkg = Package::open("document.doc")?;
-    /// let doc = pkg.document()?;
+    /// let pkg = Package::open("document.doc")?;
+    /// let doc = pkg.document();
     /// let count = doc.table_count()?;
     /// println!("Tables: {}", count);
     /// # Ok::<(), Box<dyn std::error::Error>>(())
@@ -106,7 +107,7 @@ impl Document {
     #[inline]
     #[must_use]
     pub fn fib(&self) -> &FileInformationBlock {
-        &self.fib
+        &self.0.fib
     }
 
     /// Get the parsed Word 97+ stylesheet.
@@ -115,7 +116,7 @@ impl Document {
     /// exact UPX property payloads for subsequent inheritance and formatting.
     #[must_use]
     pub fn stylesheet(&self) -> Option<&StyleSheet> {
-        self.stylesheet.as_ref()
+        self.0.stylesheet.as_ref()
     }
 
     /// Every non-structural defect the reader repaired while opening this
@@ -128,7 +129,7 @@ impl Document {
     /// [`crate::ToleranceReport`].
     #[must_use]
     pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
-        &self.tolerance
+        &self.0.tolerance
     }
 
     /// Get the document's fixed associated-string metadata table.
@@ -136,19 +137,19 @@ impl Document {
     /// Template and mail-merge paths are inert strings and are never opened.
     #[must_use]
     pub fn associated_strings(&self) -> Option<&DocumentAssociatedStrings> {
-        self.associated_strings.as_ref()
+        self.0.associated_strings.as_ref()
     }
 
     /// Get the ordered `LISTNUM` list-name metadata table.
     #[must_use]
     pub fn list_names(&self) -> Option<&ListNamesTable> {
-        self.list_names.as_ref()
+        self.0.list_names.as_ref()
     }
 
     /// Get list-level template codes parallel to the document's list definitions.
     #[must_use]
     pub fn list_templates(&self) -> Option<&ListTemplateTable> {
-        self.list_templates.as_ref()
+        self.0.list_templates.as_ref()
     }
 
     /// Strictly access spelling and grammar proofing-state ranges.
@@ -156,7 +157,8 @@ impl Document {
     /// Parsing is deferred so nonconforming producer caches do not prevent the document's
     /// primary text from opening. Any malformed PLCF is reported when this metadata is requested.
     pub fn proofing_tables(&self) -> Result<&ProofingTables> {
-        self.proofing_tables
+        self.0
+            .proofing_tables
             .as_ref()
             .map_err(|error| PackageError::Corrupted(format!("invalid proofing metadata: {error}")))
     }
@@ -166,7 +168,7 @@ impl Document {
     /// Parsing is deferred so nonconforming producer caches do not prevent the document's
     /// primary text from opening. Cookie payloads remain opaque and are never interpreted.
     pub fn grammar_cookie_tables(&self) -> Result<&GrammarCookieTables> {
-        self.grammar_cookies.as_ref().map_err(|error| {
+        self.0.grammar_cookies.as_ref().map_err(|error| {
             PackageError::Corrupted(format!("invalid grammar cookie metadata: {error}"))
         })
     }
@@ -177,7 +179,8 @@ impl Document {
     /// producer cache. The cache is exposed as metadata only and is never
     /// acted upon.
     pub fn table_character_cache(&self) -> Result<Option<&TableCharacterCache>> {
-        self.table_char_cache
+        self.0
+            .table_char_cache
             .as_ref()
             .map(Option::as_ref)
             .map_err(|error| {
@@ -191,7 +194,7 @@ impl Document {
     /// document's primary text from opening. The version-specific `Tbkd` flag
     /// bits are producer caches and are never interpreted.
     pub fn textbox_break_tables(&self) -> Result<&TextBoxBreakTables> {
-        self.textbox_breaks.as_ref().map_err(|error| {
+        self.0.textbox_breaks.as_ref().map_err(|error| {
             PackageError::Corrupted(format!("invalid textbox break metadata: {error}"))
         })
     }
@@ -202,7 +205,7 @@ impl Document {
     /// document's primary text from opening. Service-provided payloads remain
     /// opaque and are never interpreted.
     pub fn text_services_tables(&self) -> Result<&TextServicesTables> {
-        self.text_services.as_ref().map_err(|error| {
+        self.0.text_services.as_ref().map_err(|error| {
             PackageError::Corrupted(format!("invalid text services metadata: {error}"))
         })
     }
@@ -212,7 +215,8 @@ impl Document {
     /// Parsing is deferred because modern Word versions are instructed to ignore
     /// this legacy cache. Saved paths remain inert and are never opened or resolved.
     pub fn saved_by_table(&self) -> Result<&SavedByTable> {
-        self.saved_by_table
+        self.0
+            .saved_by_table
             .as_ref()
             .map_err(|error| PackageError::Corrupted(format!("invalid saved-by metadata: {error}")))
     }
@@ -223,9 +227,9 @@ impl Document {
     /// never applied to document navigation or host selection state, and its
     /// optional malformed bytes are reported only when this accessor is used.
     pub fn saved_selection(&self) -> Result<Option<&SavedSelection>> {
-        match self.saved_selection.get_or_init(|| {
-            let ccp_text = self.fib.get_main_doc_range().1;
-            parse_deferred_source(&self.saved_selection_source, |source| {
+        match self.0.saved_selection.get_or_init(|| {
+            let ccp_text = self.0.fib.get_main_doc_range().1;
+            parse_deferred_source(&self.0.saved_selection_source, |source| {
                 let selection = SavedSelection::parse_bytes(source)?;
                 if selection.cp_first() > ccp_text {
                     return Err(PackageError::Corrupted(format!(
@@ -255,8 +259,8 @@ impl Document {
     /// block types. They are returned as metadata and are never applied to
     /// document paragraphs.
     pub fn paragraph_groups(&self) -> Result<Option<&PgpArray>> {
-        match self.paragraph_groups.get_or_init(|| {
-            parse_deferred_source(&self.paragraph_groups_source, PgpArray::parse_bytes)
+        match self.0.paragraph_groups.get_or_init(|| {
+            parse_deferred_source(&self.0.paragraph_groups_source, PgpArray::parse_bytes)
         }) {
             Ok(value) => Ok(value.as_ref()),
             Err(error) => Err(PackageError::Corrupted(format!(
@@ -271,8 +275,8 @@ impl Document {
     /// opened, frame layout is not rendered, and list styles are not applied
     /// to document paragraphs.
     pub fn dofr_records(&self) -> Result<Option<&DofrArray>> {
-        match self.dofr_records.get_or_init(|| {
-            parse_deferred_source(&self.dofr_records_source, DofrArray::parse_bytes)
+        match self.0.dofr_records.get_or_init(|| {
+            parse_deferred_source(&self.0.dofr_records_source, DofrArray::parse_bytes)
         }) {
             Ok(value) => Ok(value.as_ref()),
             Err(error) => Err(PackageError::Corrupted(format!(
@@ -286,15 +290,15 @@ impl Document {
     /// Printer environment blocks are retained as bounded bytes; no printer is
     /// contacted and no print settings are applied.
     pub fn print_environment(&self) -> Result<Option<&DocumentPrintEnvironment>> {
-        match self.print_environment.get_or_init(|| {
+        match self.0.print_environment.get_or_init(|| {
             let driver =
-                parse_deferred_source(&self.print_driver_source, PrintDriver::parse_bytes)?;
+                parse_deferred_source(&self.0.print_driver_source, PrintDriver::parse_bytes)?;
             let portrait = parse_deferred_source(
-                &self.print_environment_portrait_source,
+                &self.0.print_environment_portrait_source,
                 PrintEnvironment::parse_bytes,
             )?;
             let landscape = parse_deferred_source(
-                &self.print_environment_landscape_source,
+                &self.0.print_environment_landscape_source,
                 PrintEnvironment::parse_bytes,
             )?;
             Ok(DocumentPrintEnvironment::from_parts(
@@ -315,9 +319,9 @@ impl Document {
     /// certificate trust is established and no VBA project is opened or
     /// executed.
     pub fn vba_signatures(&self) -> Result<Option<&DocumentVbaSignatures>> {
-        match self.vba_signatures.get_or_init(|| {
+        match self.0.vba_signatures.get_or_init(|| {
             parse_deferred_source(
-                &self.vba_signatures_source,
+                &self.0.vba_signatures_source,
                 DocumentVbaSignatures::parse_bytes,
             )
         }) {
@@ -334,7 +338,8 @@ impl Document {
     /// document's primary text from opening. Caption labels remain inert text
     /// and referenced OLE objects are never activated.
     pub fn caption_tables(&self) -> Result<&CaptionTables> {
-        self.caption_tables
+        self.0
+            .caption_tables
             .as_ref()
             .map_err(|error| PackageError::Corrupted(format!("invalid caption metadata: {error}")))
     }
@@ -346,7 +351,8 @@ impl Document {
     /// document's primary text from opening. Repair descriptions remain inert
     /// text; no repair is ever applied or reverted.
     pub fn repair_bookmarks(&self) -> Result<Option<&DocumentRepairBookmarks>> {
-        self.repair_bookmarks
+        self.0
+            .repair_bookmarks
             .as_ref()
             .map(Option::as_ref)
             .map_err(|error| {
@@ -359,7 +365,8 @@ impl Document {
     /// Ordinary documents return `None`. Parsing is deferred so malformed
     /// optional metadata does not prevent primary text access.
     pub fn glossary_metadata(&self) -> Result<Option<&GlossaryMetadata>> {
-        self.glossary_metadata
+        self.0
+            .glossary_metadata
             .as_ref()
             .map(Option::as_ref)
             .map_err(|error| PackageError::Corrupted(format!("invalid glossary metadata: {error}")))
@@ -377,7 +384,7 @@ impl Document {
         let Some(item) = metadata.items().get(index) else {
             return Ok(None);
         };
-        Ok(Some(self.text_extractor.text_at_range(
+        Ok(Some(self.0.text_extractor.text_at_range(
             item.start_cp(),
             item.end_cp().saturating_sub(1),
         )))
@@ -388,7 +395,8 @@ impl Document {
     /// The returned content is passive and never evaluates fields, follows
     /// links, activates embedded objects, or resolves or executes macros.
     pub fn attached_glossary(&self) -> Result<Option<&AttachedGlossary>> {
-        self.attached_glossary
+        self.0
+            .attached_glossary
             .as_ref()
             .map(Option::as_ref)
             .map_err(|error| PackageError::Corrupted(format!("invalid attached glossary: {error}")))

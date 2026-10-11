@@ -14,11 +14,11 @@
 
 use litchi_core::Position;
 use litchi_core::patch::CompositionLimits;
-use litchi_doc::Package;
 use litchi_doc::body_text::{
     Edit, Error, Projection, Refusal, Snapshot, SubEditJoinFailure, TransactionLimits,
 };
 use litchi_doc::builder::Builder;
+use litchi_doc::raw::Package;
 use litchi_doc::tracked_revision::Limits;
 use std::io::Cursor;
 use std::path::PathBuf;

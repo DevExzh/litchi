@@ -1872,7 +1872,7 @@ fn optional_text_outcome<E: std::fmt::Display>(text: Result<Option<String>, E>) 
 fn leaf_doc_open(path: &Path) -> Result<litchi_doc::Document, Box<dyn Error>> {
     let bytes = crate::ole2_range_source::read_bounded(path)?;
     let ole = litchi_cfb::OleFile::open(Cursor::new(bytes))?;
-    let mut package = litchi_doc::Package::from_ole_file(ole)?;
+    let mut package = litchi_doc::raw::Package::from_ole_file(ole)?;
     let document = package.document()?;
     std::hint::black_box(package.ole_file().get_metadata().map(Metadata::from).ok());
     Ok(document)
@@ -2217,7 +2217,7 @@ fn run_ole2(
             "fresh litchi::open(Path) + File::presentation()?.slide(target) + compat Slide::text()"
         },
         (Leg::Leaf, Ole2Query::DocOpen) => {
-            "fs::read + litchi_cfb::OleFile::open + litchi_doc::Package::from_ole_file + Package::document() + OLE property-set metadata"
+            "fs::read + litchi_cfb::OleFile::open + litchi_doc::raw::Package::from_ole_file + Package::document() + OLE property-set metadata"
         },
         (Leg::Leaf, Ole2Query::DocFullText) => {
             "fresh leaf DOC open (as for open) + Document::text()"

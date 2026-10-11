@@ -33,7 +33,9 @@
 )]
 
 use litchi_doc::builder::Builder;
-use litchi_doc::{FieldStory, FieldType, IndexEntryOption, Package, TableOfAuthoritiesEntryOption};
+use litchi_doc::{
+    FieldStory, FieldType, IndexEntryOption, TableOfAuthoritiesEntryOption, raw::Package,
+};
 use std::io::Cursor;
 use std::path::PathBuf;
 

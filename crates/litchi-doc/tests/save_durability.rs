@@ -11,8 +11,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::Durability;
-use litchi_doc::Package;
 use litchi_doc::builder::Builder;
+use litchi_doc::raw::Package;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
 
@@ -55,7 +55,7 @@ fn every_level_publishes_the_default_save_bytes() {
     let directory = scratch_directory();
     let mut writer = Builder::new();
     writer.add_paragraph("save durability 0761").unwrap();
-    let mut package = writer.build().unwrap();
+    let package = writer.build().unwrap();
     let reference = directory.join("reference.doc");
     package.save(&reference).unwrap();
     let expected = std::fs::read(&reference).unwrap();
