@@ -350,7 +350,13 @@ pub(super) fn open_path(
         let bytes = super::read_whole_source(source.as_ref(), version, ceiling)?;
         return open_bytes(bytes, options, ooxml_hint);
     }
-    let shared = match SharedOleFile::open(Arc::clone(&source)) {
+    let shared_limits = litchi_cfb::SharedOleFileLimits::new(
+        options
+            .max_input_bytes
+            .unwrap_or(litchi_cfb::SharedOleFileLimits::DEFAULT_MAX_INPUT_BYTES)
+            .min(litchi_cfb::SharedOleFileLimits::MAX_INPUT_BYTES),
+    )?;
+    let shared = match SharedOleFile::open_with_limits(Arc::clone(&source), shared_limits) {
         Ok(shared) => shared,
         Err(error) if soft(&error) => {
             ensure_path_source_current(source.as_ref(), version)?;

@@ -1,0 +1,851 @@
+//! The primary immutable XLS package transaction.
+//!
+//! `Package::edit` is the one package-owned write entry point for legacy XLS.
+//! It delegates cell, resource, and worksheet-structure changes to the
+//! checked [`crate::cell_values`] owner and adapts that owner to the canonical
+//! `Edit`/`Commit`/`Patch` triad.  The package passed to an edit is never
+//! mutated; dropping the edit is rollback.
+//!
+//! A small end-to-end example is enough to show the ownership boundary:
+//!
+//! ```
+//! use litchi_xls::cell_values::{Reference, Value};
+//! use litchi_xls::package::edit::Result;
+//! use litchi_xls::Package;
+//!
+//! fn change_first_cell(bytes: &[u8]) -> Result<Vec<u8>> {
+//!     let source = Package::from_bytes(bytes).map_err(Error::Package)?;
+//!     let mut edit = source.edit()?;
+//!     edit.set_value(0usize, Reference::new(0, 0).map_err(Error::CellValues)?,
+//!         Value::Number(2.0))?;
+//!     let commit = edit.commit()?;
+//!     commit.into_package().to_bytes().map_err(Error::Package)
+//! }
+//! # use litchi_xls::package::edit::Error;
+//! ```
+
+use super::{Error as PackageError, Package, PackageState};
+use crate::cell_values;
+use crate::{OpenOptions, SourceBackedError};
+use litchi_cfb::{OleFileLimits, SharedOleFile};
+use litchi_core::SourceVersion;
+use litchi_ole_common::object::Limits as ObjectLimits;
+use std::fmt;
+use std::sync::Arc;
+
+/// A canonical primary-edit limit dimension.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Number of staged cell, resource, or worksheet operations.
+    Operations,
+}
+
+/// Explicit bounds for one primary XLS edit.
+///
+/// The default profile is the leaf editor's checked default.  `Package`
+/// intersects these bounds with the profile it retained at ingress, so an
+/// edit cannot widen the source's admission policy by passing a larger value.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct EditOptions {
+    object_limits: ObjectLimits,
+    cfb_limits: OleFileLimits,
+}
+
+impl Default for EditOptions {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl EditOptions {
+    /// Construct the checked default edit profile.
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            object_limits: ObjectLimits::default(),
+            cfb_limits: OleFileLimits::default(),
+        }
+    }
+
+    /// Select the editable object-capture bounds.
+    #[must_use]
+    pub const fn object_limits(mut self, limits: ObjectLimits) -> Self {
+        self.object_limits = limits;
+        self
+    }
+
+    /// Select the low-level CFB admission bounds.
+    #[must_use]
+    pub const fn cfb_limits(mut self, limits: OleFileLimits) -> Self {
+        self.cfb_limits = limits;
+        self
+    }
+
+    /// Return the requested object-capture bounds.
+    #[must_use]
+    pub const fn get_object_limits(&self) -> ObjectLimits {
+        self.object_limits
+    }
+
+    /// Return the requested CFB admission bounds.
+    #[must_use]
+    pub const fn get_cfb_limits(&self) -> OleFileLimits {
+        self.cfb_limits
+    }
+}
+
+/// Typed errors for the primary XLS package transaction.
+#[derive(Debug)]
+#[non_exhaustive]
+pub enum Error {
+    /// The immutable package owner rejected ingress, publication, or a source
+    /// freshness check.
+    Package(PackageError),
+    /// The checked cell-values owner rejected a semantic operation.
+    CellValues(crate::Error),
+    /// A finite transaction or leaf admission bound was exceeded.
+    Limit {
+        /// Dimension whose bound was exceeded.
+        kind: LimitKind,
+        /// Observed amount.
+        observed: usize,
+        /// Configured maximum.
+        maximum: usize,
+    },
+    /// A patch's exact source image does not match the package receiving it.
+    PatchConflict,
+}
+
+impl From<PackageError> for Error {
+    fn from(error: PackageError) -> Self {
+        Self::Package(error)
+    }
+}
+
+impl From<crate::Error> for Error {
+    fn from(error: crate::Error) -> Self {
+        // The leaf exposes this variant as a typed bound.  Keep the mapping
+        // here so the package family has the canonical Limit shape while all
+        // other leaf refusals remain available as typed sources.
+        match error {
+            crate::Error::StagedChangeLimit { observed, maximum } => Self::Limit {
+                kind: LimitKind::Operations,
+                observed,
+                maximum,
+            },
+            other => Self::CellValues(other),
+        }
+    }
+}
+
+impl fmt::Display for Error {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            Self::Package(error) => error.fmt(formatter),
+            Self::CellValues(error) => error.fmt(formatter),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                formatter,
+                "XLS edit limit {kind:?}: {observed} exceeds {maximum}"
+            ),
+            Self::PatchConflict => formatter.write_str(
+                "XLS package patch source does not match the exact package receiving it",
+            ),
+        }
+    }
+}
+
+impl std::error::Error for Error {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::Package(error) => Some(error),
+            Self::CellValues(error) => Some(error),
+            Self::Limit { .. } | Self::PatchConflict => None,
+        }
+    }
+}
+
+impl Error {
+    /// Return the exceeded limit dimension, if this is a limit failure.
+    #[must_use]
+    pub const fn limit_kind(&self) -> Option<LimitKind> {
+        match self {
+            Self::Limit { kind, .. } => Some(*kind),
+            Self::Package(_) | Self::CellValues(_) | Self::PatchConflict => None,
+        }
+    }
+
+    /// Return the observed and maximum values, if this is a limit failure.
+    #[must_use]
+    pub const fn limit_values(&self) -> Option<(usize, usize)> {
+        match self {
+            Self::Limit {
+                observed, maximum, ..
+            } => Some((*observed, *maximum)),
+            Self::Package(_) | Self::CellValues(_) | Self::PatchConflict => None,
+        }
+    }
+}
+
+/// Result type for the canonical XLS primary transaction.
+pub type Result<T> = std::result::Result<T, Error>;
+
+/// Content-free facts about one primary XLS publication.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+    operation_count: usize,
+    changed_cells: usize,
+    changed_number_fields: usize,
+    touched_streams: usize,
+}
+
+impl Diagnostics {
+    fn from_leaf(value: cell_values::Diagnostics, operation_count: usize) -> Self {
+        Self {
+            changed: value.changed(),
+            operation_count,
+            changed_cells: value.changed_cells(),
+            changed_number_fields: value.changed_number_fields(),
+            touched_streams: value.touched_streams(),
+        }
+    }
+
+    /// Whether exact package bytes changed.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+
+    /// Number of semantic operations retained by the patch.
+    #[must_use]
+    pub const fn operation_count(self) -> usize {
+        self.operation_count
+    }
+
+    /// Number of semantically changed cells.
+    #[must_use]
+    pub const fn changed_cells(self) -> usize {
+        self.changed_cells
+    }
+
+    /// Number of standalone `Number` fields changed.
+    #[must_use]
+    pub const fn changed_number_fields(self) -> usize {
+        self.changed_number_fields
+    }
+
+    /// Number of CFB streams in the mutation closure.
+    #[must_use]
+    pub const fn touched_streams(self) -> usize {
+        self.touched_streams
+    }
+}
+
+/// Exact, reversible package patch produced by a primary edit.
+#[derive(Clone)]
+pub struct Patch {
+    inner: cell_values::Patch,
+}
+
+impl fmt::Debug for Patch {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Patch")
+            .field("before_bytes", &self.before().len())
+            .field("after_bytes", &self.after().len())
+            .field("operation_count", &self.operation_count())
+            .field("is_noop", &self.is_noop())
+            .finish()
+    }
+}
+
+impl Patch {
+    fn from_leaf(inner: cell_values::Patch) -> Self {
+        Self { inner }
+    }
+
+    /// Whether exact package bytes are identical.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.inner.is_noop()
+    }
+
+    /// Exact source image required before applying this patch.
+    #[must_use]
+    pub fn before(&self) -> &[u8] {
+        self.inner.before()
+    }
+
+    /// Exact target image produced by this patch.
+    #[must_use]
+    pub fn after(&self) -> &[u8] {
+        self.inner.after()
+    }
+
+    /// Number of semantic operations retained by this patch.
+    #[must_use]
+    pub fn operation_count(&self) -> usize {
+        self.inner.semantic().len()
+    }
+
+    /// Return the exact inverse patch.
+    #[must_use]
+    pub fn inverse(&self) -> Self {
+        Self::from_leaf(self.inner.inverse())
+    }
+
+    pub(crate) fn leaf(&self) -> &cell_values::Patch {
+        &self.inner
+    }
+}
+
+/// Successful immutable primary XLS publication.
+#[derive(Clone)]
+pub struct Commit {
+    package: Package,
+    patch: Patch,
+    diagnostics: Diagnostics,
+}
+
+impl fmt::Debug for Commit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Commit")
+            .field("package", &self.package)
+            .field("patch", &self.patch)
+            .field("diagnostics", &self.diagnostics)
+            .finish()
+    }
+}
+
+impl Commit {
+    /// Published immutable package.
+    #[must_use]
+    pub const fn package(&self) -> &Package {
+        &self.package
+    }
+
+    /// Reversible exact-source patch.
+    #[must_use]
+    pub const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
+    /// Content-free publication diagnostics.
+    #[must_use]
+    pub const fn diagnostics(&self) -> Diagnostics {
+        self.diagnostics
+    }
+
+    /// Consume the commit into its package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.package
+    }
+
+    /// Consume the commit into its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.package, self.patch)
+    }
+}
+
+/// Detached primary XLS edit backed by the checked cell-values snapshot.
+pub struct Edit {
+    package: Package,
+    inner: cell_values::Edit,
+    options: EditOptions,
+    source_guard: Option<SourceGuard>,
+}
+
+impl fmt::Debug for Edit {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Edit")
+            .field("package", &self.package)
+            .field("options", &self.options)
+            .field("source_backed", &self.source_guard.is_some())
+            .finish_non_exhaustive()
+    }
+}
+
+#[derive(Clone)]
+struct SourceGuard {
+    source: Arc<SharedOleFile>,
+    expected: SourceVersion,
+}
+
+impl Edit {
+    pub(crate) fn from_package_with_options(
+        package: Package,
+        options: EditOptions,
+    ) -> Result<Self> {
+        super::ensure_publication_allowed(&package.inner).map_err(Error::Package)?;
+        let source_guard = capture_source_guard(&package)?;
+        let snapshot = package
+            .edit_snapshot_with_limits(options.object_limits, options.cfb_limits)
+            .map_err(Error::Package)?;
+        check_source_guard(source_guard.as_ref())?;
+        let inner = snapshot.edit();
+        Ok(Self {
+            package,
+            inner,
+            options,
+            source_guard,
+        })
+    }
+
+    /// Immutable package that authorized this edit.
+    #[must_use]
+    pub const fn source(&self) -> &Package {
+        &self.package
+    }
+
+    /// Requested edit profile. The package owner intersects it with the
+    /// retained ingress profile before constructing the leaf snapshot.
+    #[must_use]
+    pub const fn options(&self) -> EditOptions {
+        self.options
+    }
+
+    /// Set one existing numeric cell while preserving its storage family.
+    pub fn set_numeric<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        value: f64,
+    ) -> Result<()> {
+        self.inner
+            .set_numeric(selector.into(), reference, value)
+            .map_err(Error::from)
+    }
+
+    /// Set one existing standalone BIFF8 `Number` cell.
+    pub fn set_number<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        value: f64,
+    ) -> Result<()> {
+        self.inner
+            .set_number(selector.into(), reference, value)
+            .map_err(Error::from)
+    }
+
+    /// Copy a bounded scalar rectangle from another immutable XLS package.
+    pub fn copy_scalar_cells_from<'source, 'target>(
+        &mut self,
+        donor: &Package,
+        source_selector: impl Into<cell_values::Selector<'source>>,
+        source_range: cell_values::CellRange,
+        target_selector: impl Into<cell_values::Selector<'target>>,
+        target_anchor: cell_values::Reference,
+    ) -> Result<Option<&mut Self>> {
+        let guard = capture_source_guard(donor)?;
+        let options = donor.retained_edit_options()?;
+        let donor = donor.edit_snapshot_with_limits(options.object_limits, options.cfb_limits)?;
+        let mut candidate = self.inner.clone();
+        let copied = candidate
+            .copy_scalar_cells_from(
+                &donor,
+                source_selector,
+                source_range,
+                target_selector,
+                target_anchor,
+            )
+            .map_err(Error::from)?
+            .is_some();
+        check_source_guard(guard.as_ref())?;
+        if copied {
+            self.inner = candidate;
+        }
+        Ok(copied.then_some(self))
+    }
+
+    /// Copy one scalar cell from another immutable XLS package.
+    pub fn copy_scalar_cell_from<'source, 'target>(
+        &mut self,
+        donor: &Package,
+        source_selector: impl Into<cell_values::Selector<'source>>,
+        source_reference: cell_values::Reference,
+        target_selector: impl Into<cell_values::Selector<'target>>,
+        target_reference: cell_values::Reference,
+    ) -> Result<Option<&mut Self>> {
+        let guard = capture_source_guard(donor)?;
+        let options = donor.retained_edit_options()?;
+        let donor = donor.edit_snapshot_with_limits(options.object_limits, options.cfb_limits)?;
+        let mut candidate = self.inner.clone();
+        let copied = candidate
+            .copy_scalar_cell_from(
+                &donor,
+                source_selector,
+                source_reference,
+                target_selector,
+                target_reference,
+            )
+            .map_err(Error::from)?
+            .is_some();
+        check_source_guard(guard.as_ref())?;
+        if copied {
+            self.inner = candidate;
+        }
+        Ok(copied.then_some(self))
+    }
+
+    /// Set a typed value on an existing cell.
+    pub fn set_value<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        value: cell_values::Value,
+    ) -> Result<()> {
+        self.inner
+            .set_value(selector.into(), reference, value)
+            .map_err(Error::from)
+    }
+
+    /// Clear an existing formatting-only blank cell.
+    pub fn clear_cell<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+    ) -> Result<()> {
+        self.inner
+            .clear_cell(selector.into(), reference)
+            .map_err(Error::from)
+    }
+
+    /// Insert one scalar cell with the workbook's canonical default style.
+    pub fn insert_cell<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        value: cell_values::Value,
+    ) -> Result<()> {
+        self.inner
+            .insert_cell(selector.into(), reference, value)
+            .map_err(Error::from)
+    }
+
+    /// Insert one scalar cell with an existing workbook style resource.
+    pub fn insert_cell_with_style<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        value: cell_values::Value,
+        style: cell_values::StyleIndex,
+    ) -> Result<()> {
+        self.inner
+            .insert_cell_with_style(selector.into(), reference, value, style)
+            .map_err(Error::from)
+    }
+
+    /// Insert one rich shared-string cell.
+    pub fn insert_rich_text_cell<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        text: String,
+        formatting_runs: Vec<crate::records::SharedStringFormatRun>,
+    ) -> Result<()> {
+        self.inner
+            .insert_rich_text_cell(selector.into(), reference, text, formatting_runs)
+            .map_err(Error::from)
+    }
+
+    /// Insert one formula cell using the workbook's default style.
+    pub fn insert_formula<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        expression: &str,
+    ) -> Result<()> {
+        self.inner
+            .insert_formula(selector.into(), reference, expression)
+            .map_err(Error::from)
+    }
+
+    /// Insert one formula cell using an existing workbook style resource.
+    pub fn insert_formula_with_style<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        expression: &str,
+        style: cell_values::StyleIndex,
+    ) -> Result<()> {
+        self.inner
+            .insert_formula_with_style(selector.into(), reference, expression, style)
+            .map_err(Error::from)
+    }
+
+    /// Remove one supported cell record.
+    pub fn remove_cell<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+    ) -> Result<()> {
+        self.inner
+            .remove_cell(selector.into(), reference)
+            .map_err(Error::from)
+    }
+
+    /// Set an existing cell's workbook XF style.
+    pub fn set_style<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        style: cell_values::StyleIndex,
+    ) -> Result<()> {
+        self.inner
+            .set_style(selector.into(), reference, style)
+            .map_err(Error::from)
+    }
+
+    /// Duplicate an existing XF resource for later style operations.
+    pub fn duplicate_style(
+        &mut self,
+        source: cell_values::StyleIndex,
+    ) -> Result<cell_values::StyleIndex> {
+        self.inner.duplicate_style(source).map_err(Error::from)
+    }
+
+    /// Author one validated workbook XF resource for later style operations.
+    pub fn author_style(&mut self, payload: &[u8]) -> Result<cell_values::StyleIndex> {
+        self.inner.author_style(payload).map_err(Error::from)
+    }
+
+    /// Insert rows and shift the checked worksheet closure.
+    pub fn insert_rows<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        start: u16,
+        count: u16,
+    ) -> Result<()> {
+        self.inner
+            .insert_rows(selector.into(), start, count)
+            .map_err(Error::from)
+    }
+
+    /// Delete rows and shift the checked worksheet closure.
+    pub fn delete_rows<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        start: u16,
+        count: u16,
+    ) -> Result<()> {
+        self.inner
+            .delete_rows(selector.into(), start, count)
+            .map_err(Error::from)
+    }
+
+    /// Insert columns and shift the checked worksheet closure.
+    pub fn insert_columns<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        start: u8,
+        count: u8,
+    ) -> Result<()> {
+        self.inner
+            .insert_columns(selector.into(), start, count)
+            .map_err(Error::from)
+    }
+
+    /// Delete columns and shift the checked worksheet closure.
+    pub fn delete_columns<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        start: u8,
+        count: u8,
+    ) -> Result<()> {
+        self.inner
+            .delete_columns(selector.into(), start, count)
+            .map_err(Error::from)
+    }
+
+    /// Rename one worksheet using the workbook's case-insensitive identity.
+    pub fn rename_sheet<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        name: &str,
+    ) -> Result<()> {
+        self.inner
+            .rename_sheet(selector.into(), name)
+            .map_err(Error::from)
+    }
+
+    /// Publish the canonical immutable package commit.
+    pub fn commit(self) -> Result<Commit> {
+        check_source_guard(self.source_guard.as_ref())?;
+        let source = self.package.clone();
+        let leaf_commit = self.inner.commit().map_err(Error::from)?;
+        check_source_guard(self.source_guard.as_ref())?;
+        let leaf_snapshot = leaf_commit.snapshot().clone();
+        let leaf_patch = leaf_commit.patch().clone();
+        let diagnostics =
+            Diagnostics::from_leaf(leaf_commit.diagnostics(), leaf_patch.semantic().len());
+        let package = if leaf_patch.is_noop() {
+            let mut package = source;
+            Arc::make_mut(&mut package.inner).edit_snapshot = Some(leaf_snapshot);
+            package
+        } else {
+            package_from_snapshot(&source, leaf_snapshot)?
+        };
+        check_source_guard(self.source_guard.as_ref())?;
+        Ok(Commit {
+            package,
+            patch: Patch::from_leaf(leaf_patch),
+            diagnostics,
+        })
+    }
+}
+
+impl Package {
+    fn retained_edit_options(&self) -> Result<EditOptions> {
+        if let Some(snapshot) = &self.inner.edit_snapshot {
+            return Ok(EditOptions::new()
+                .object_limits(snapshot.object_limits())
+                .cfb_limits(snapshot.cfb_limits()));
+        }
+        if let Some(cfb) = self.source() {
+            let selected = cfb.limits();
+            let limits = OleFileLimits::new(selected.max_input_bytes())
+                .and_then(|limits| limits.with_max_directory_bytes(selected.max_directory_bytes()))
+                .and_then(|limits| {
+                    limits.with_max_allocation_table_bytes(selected.max_allocation_table_bytes())
+                })
+                .map_err(PackageError::Cfb)?;
+            return Ok(EditOptions::new().cfb_limits(limits));
+        }
+        Ok(EditOptions::default())
+    }
+
+    /// Start the primary XLS transaction under the retained default profile.
+    pub fn edit(&self) -> Result<Edit> {
+        Edit::from_package_with_options(self.clone(), self.retained_edit_options()?)
+    }
+
+    /// Start the primary XLS transaction under an explicitly requested profile.
+    pub fn edit_with_options(&self, options: EditOptions) -> Result<Edit> {
+        Edit::from_package_with_options(self.clone(), options)
+    }
+
+    /// Apply a primary exact-source patch without mutating this package.
+    pub fn apply(&self, patch: &Patch) -> Result<Self> {
+        super::ensure_publication_allowed(&self.inner).map_err(Error::Package)?;
+        let guard = capture_source_guard(self)?;
+        let matches = if let Some(snapshot) = &self.inner.edit_snapshot {
+            snapshot.bytes() == patch.before()
+        } else {
+            self.source_bytes().map_err(Error::Package)? == patch.before()
+        };
+        check_source_guard(guard.as_ref())?;
+        if !matches {
+            return Err(Error::PatchConflict);
+        }
+        if patch.is_noop() {
+            check_source_guard(guard.as_ref())?;
+            return Ok(self.clone());
+        }
+        let options = self.retained_edit_options()?;
+        let snapshot = self
+            .edit_snapshot_with_limits(options.object_limits, options.cfb_limits)
+            .map_err(Error::Package)?;
+        let target = patch.leaf().apply(&snapshot).map_err(Error::from)?;
+        check_source_guard(guard.as_ref())?;
+        let package = package_from_snapshot(self, target)?;
+        check_source_guard(guard.as_ref())?;
+        Ok(package)
+    }
+}
+
+fn capture_source_guard(package: &Package) -> Result<Option<SourceGuard>> {
+    match &package.inner.state {
+        PackageState::Source { cfb, .. } => {
+            let expected = cfb.source_version().map_err(|error| {
+                Error::Package(PackageError::Source(SourceBackedError::from(error)))
+            })?;
+            Ok(Some(SourceGuard {
+                source: Arc::clone(cfb),
+                expected,
+            }))
+        },
+        PackageState::Eager { .. } => Ok(None),
+    }
+}
+
+fn check_source_guard(guard: Option<&SourceGuard>) -> Result<()> {
+    let Some(guard) = guard else {
+        return Ok(());
+    };
+    let observed = guard
+        .source
+        .source_version()
+        .map_err(|error| Error::Package(PackageError::Source(SourceBackedError::from(error))))?;
+    if observed != guard.expected {
+        return Err(Error::Package(PackageError::Source(
+            SourceBackedError::SourceChanged {
+                expected: guard.expected,
+                observed,
+            },
+        )));
+    }
+    Ok(())
+}
+
+fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> Result<Package> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(snapshot.bytes().len())
+        .map_err(|_| Error::CellValues(crate::Error::Allocation("XLS primary read projection")))?;
+    bytes.extend_from_slice(snapshot.bytes());
+    if let super::RetainedPolicy::Source { limits, leniency } = source.inner.policy {
+        let selected = snapshot.cfb_limits();
+        let cfb_limits = litchi_cfb::SharedOleFileLimits::new(selected.max_input_bytes())
+            .and_then(|limits| limits.with_max_directory_bytes(selected.max_directory_bytes()))
+            .and_then(|limits| {
+                limits.with_max_allocation_table_bytes(selected.max_allocation_table_bytes())
+            })
+            .map_err(PackageError::Cfb)?;
+        let cfb = Arc::new(
+            SharedOleFile::open_with_limits(
+                Arc::new(litchi_core::OwnedSource::new(bytes)),
+                cfb_limits,
+            )
+            .map_err(PackageError::Cfb)?,
+        );
+        let workbook = crate::SourceBackedWorkbook::from_shared_ole_file_with_options(
+            cfb,
+            crate::SourceBackedOptions::default()
+                .with_limits(limits)
+                .with_leniency(leniency),
+        )
+        .map_err(PackageError::Source)?;
+        let mut package = Package::from_source(workbook)?;
+        Arc::make_mut(&mut package.inner).edit_snapshot = Some(snapshot);
+        return Ok(package);
+    }
+    let mut ole =
+        litchi_cfb::OleFile::open_with_limits(std::io::Cursor::new(bytes), snapshot.cfb_limits())
+            .map_err(PackageError::Cfb)?;
+    let metadata = super::eager_metadata(&mut ole);
+    let options = OpenOptions::default()
+        .leniency(source.leniency())
+        .compatibility_profile(source.compatibility_profile().unwrap_or_default());
+    let reader = crate::raw::Reader::from_admitted_ole_file(ole, options)?;
+    Ok(Package {
+        inner: Arc::new(super::PackageInner {
+            state: PackageState::Eager {
+                reader: Arc::new(reader),
+                encrypted: false,
+            },
+            policy: source.inner.policy,
+            metadata: std::sync::OnceLock::from(metadata),
+            edit_snapshot: Some(snapshot),
+        }),
+    })
+}

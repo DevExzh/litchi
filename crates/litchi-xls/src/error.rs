@@ -73,6 +73,13 @@ pub enum Error {
     InvalidData(String),
     /// A requested edit cannot preserve unsupported source records safely.
     UnsafeEdit(String),
+    /// The finite primary cell-edit staging bound was exceeded.
+    StagedChangeLimit {
+        /// Changes that would be retained after this operation.
+        observed: usize,
+        /// Maximum changes one transaction can retain.
+        maximum: usize,
+    },
     /// A caller supplied an invalid physical source limit.
     InvalidLimit {
         /// Source dimension whose configured value is invalid.
@@ -204,6 +211,10 @@ impl fmt::Display for Error {
                 write!(f, "Invalid data: {msg}")
             },
             Error::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
+            Error::StagedChangeLimit { observed, maximum } => write!(
+                f,
+                "XLS staged change limit exceeded: {observed} > {maximum}"
+            ),
             Error::InvalidLimit {
                 kind,
                 value,

@@ -1170,9 +1170,18 @@ impl SourceBackedWorkbook {
         // This owner was admitted under SourceBackedLimits. Preserve that
         // policy during materialization instead of introducing the eager
         // reader's separate default SourceLimits after copying the input.
-        let parsed = litchi_cfb::OleFile::open(Cursor::new(bytes))
+        let selected = self.inner.cfb.limits();
+        let cfb_limits = litchi_cfb::OleFileLimits::new(selected.max_input_bytes())?
+            .with_max_directory_bytes(selected.max_directory_bytes())?
+            .with_max_allocation_table_bytes(selected.max_allocation_table_bytes())?;
+        let parsed = litchi_cfb::OleFile::open_with_limits(Cursor::new(bytes), cfb_limits)
             .map_err(Error::from)
-            .and_then(|ole| Reader::from_admitted_ole_file(ole, crate::OpenOptions::default()));
+            .and_then(|ole| {
+                Reader::from_admitted_ole_file(
+                    ole,
+                    crate::OpenOptions::default().leniency(self.inner.leniency),
+                )
+            });
         let workbook = match parsed {
             Ok(workbook) => workbook,
             Err(error) => {

@@ -1464,3 +1464,38 @@ fn xls_package_errors_preserve_classification() {
         Code::LimitExceeded,
     );
 }
+
+#[cfg(feature = "xls")]
+#[test]
+fn xls_staged_changes_classify_as_a_limit() {
+    assert_code(
+        litchi_xls::Error::StagedChangeLimit {
+            observed: 4097,
+            maximum: 4096,
+        },
+        Code::LimitExceeded,
+    );
+}
+
+#[cfg(feature = "xls")]
+#[test]
+fn xls_primary_edit_errors_keep_typed_sources_and_codes() {
+    use litchi_xls::package::edit::{Error as EditError, LimitKind};
+    assert_code(
+        EditError::Limit {
+            kind: LimitKind::Operations,
+            observed: 4097,
+            maximum: 4096,
+        },
+        Code::LimitExceeded,
+    );
+    assert_code(EditError::PatchConflict, Code::InvalidInput);
+    let error: Error = EditError::Package(litchi_xls::package::Error::EncryptionPolicy).into();
+    assert_eq!(error.code(), Code::DocumentProtected);
+    assert!(matches!(
+        error.leaf(),
+        Source::XlsEdit(EditError::Package(
+            litchi_xls::package::Error::EncryptionPolicy
+        ))
+    ));
+}

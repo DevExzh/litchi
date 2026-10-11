@@ -3470,6 +3470,17 @@ fn an_open_with_options_threads_leniency_into_the_source_backed_open() {
         Defect::Formatting(FormattingDefect::ExtendedFormatCountMismatch)
     );
 
+    let eager = owner
+        .materialize_eager()
+        .expect("materialization retains leniency");
+    assert!(!eager.tolerance_report().is_clean());
+    assert!(
+        eager
+            .tolerance_report()
+            .count(FormattingDefect::ExtendedFormatCountMismatch)
+            > 0
+    );
+
     // Default options agree with the default constructors on a conforming
     // workbook, and the report is reachable and clean.
     let owner = SourceBackedWorkbook::from_read_at_with_options(

@@ -356,6 +356,9 @@ pub enum Source {
     /// A canonical legacy Excel package or projection error.
     #[cfg(feature = "xls")]
     XlsPackage(litchi_xls::package::Error),
+    /// A canonical primary XLS edit or patch error.
+    #[cfg(feature = "xls")]
+    XlsEdit(litchi_xls::package::edit::Error),
     /// A source-backed legacy Excel error.
     #[cfg(feature = "xls")]
     XlsSource(litchi_xls::SourceBackedError),
@@ -435,6 +438,8 @@ impl Source {
             Self::Xls(error) => Some(error),
             #[cfg(feature = "xls")]
             Self::XlsPackage(error) => Some(error),
+            #[cfg(feature = "xls")]
+            Self::XlsEdit(error) => Some(error),
             #[cfg(feature = "xls")]
             Self::XlsSource(error) => Some(error),
             #[cfg(feature = "ppt")]
@@ -1341,7 +1346,7 @@ impl Classify for litchi_xls::Error {
     fn classify(&self) -> Class {
         match self {
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
-            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::Limit { .. } | Self::StagedChangeLimit { .. } => Class::of(Code::LimitExceeded),
             Self::Io(error) => error.classify(),
             Self::Cfb(error) => error.classify(),
             Self::PasswordProtected | Self::PasswordRequired => {
@@ -1378,6 +1383,33 @@ impl Classify for litchi_xls::Error {
             | Self::UnexpectedRecordType { .. }
             | Self::Eof(_) => Class::of(Code::CorruptFile),
         }
+    }
+}
+
+#[cfg(feature = "xls")]
+impl Classify for litchi_xls::package::edit::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Package(error) => error.classify(),
+            Self::CellValues(error) => error.classify(),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
+#[cfg(feature = "xls")]
+impl From<litchi_xls::package::edit::Error> for Error {
+    fn from(error: litchi_xls::package::edit::Error) -> Self {
+        let class = error.classify();
+        let message = class.code.summary();
+        Self::from_class(
+            class,
+            message,
+            Some(FileFormat::Xls),
+            Source::XlsEdit(error),
+        )
     }
 }
 

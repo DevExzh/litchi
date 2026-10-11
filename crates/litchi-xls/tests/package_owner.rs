@@ -78,6 +78,7 @@ struct CountingReadAt {
     reads: AtomicUsize,
     revision: AtomicU64,
     change_on_next_read: AtomicBool,
+    truncate_on_next_read: AtomicBool,
 }
 
 impl CountingReadAt {
@@ -87,6 +88,7 @@ impl CountingReadAt {
             reads: AtomicUsize::new(0),
             revision: AtomicU64::new(0),
             change_on_next_read: AtomicBool::new(false),
+            truncate_on_next_read: AtomicBool::new(false),
         }
     }
 
@@ -110,6 +112,10 @@ impl ReadAt for CountingReadAt {
     }
 
     fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        if self.truncate_on_next_read.swap(false, Ordering::SeqCst) {
+            self.bump();
+            return Ok(0);
+        }
         let start = usize::try_from(offset)
             .map_err(|_| io::Error::new(io::ErrorKind::InvalidInput, "offset overflow"))?;
         if start >= self.bytes.len() || output.is_empty() {
@@ -325,4 +331,440 @@ fn transformed_source_handoff_retains_original_entry_limits() {
     let mut edit = snapshot.edit();
     edit.rename_sheet(0_usize.into(), "Renamed").unwrap();
     assert!(edit.commit().is_err());
+}
+
+#[test]
+fn primary_commit_updates_projection_and_supports_exact_inverse_and_replay() {
+    use litchi_core::sheet::CellValue;
+    use litchi_xls::cell_values::Reference;
+    let bytes = authored_package();
+    let source = Package::from_bytes(&bytes).unwrap();
+    let reference = Reference::new(3, 2).unwrap();
+    let mut edit = source.edit().unwrap();
+    edit.set_number("Sheet1", reference, 8.5).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    assert!(!commit.patch().is_noop());
+    assert_eq!(source.to_bytes().unwrap(), bytes);
+    assert_eq!(
+        commit
+            .package()
+            .workbook()
+            .worksheet("Sheet1")
+            .unwrap()
+            .unwrap()
+            .cell_value(reference)
+            .unwrap(),
+        Some(CellValue::Float(8.5))
+    );
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), bytes);
+    let reopened = Package::from_bytes(&bytes).unwrap();
+    let applied = reopened.apply(commit.patch()).unwrap();
+    assert_eq!(
+        applied.to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    assert!(applied.apply(commit.patch()).is_err());
+    let destination = ScratchFile::new("primary-commit");
+    applied.save(destination.path()).unwrap();
+    assert_eq!(
+        Package::open(destination.path())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        applied.to_bytes().unwrap()
+    );
+    let (package, patch) = commit.into_parts();
+    assert_eq!(
+        package.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        bytes
+    );
+}
+
+#[test]
+fn primary_noop_and_dropped_edits_leave_exact_source_unchanged() {
+    use litchi_xls::cell_values::Reference;
+    let bytes = authored_package();
+    let source = Package::from_bytes(&bytes).unwrap();
+    let mut dropped = source.edit().unwrap();
+    dropped
+        .set_number(0_usize, Reference::new(3, 2).unwrap(), 99.0)
+        .unwrap();
+    drop(dropped);
+    let mut noop = source.edit().unwrap();
+    noop.set_number(0_usize, Reference::new(3, 2).unwrap(), 4.5)
+        .unwrap();
+    let commit = noop.commit().unwrap();
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
+    assert_eq!(commit.into_package().to_bytes().unwrap(), bytes);
+    assert_eq!(source.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn primary_detached_commits_recheck_source_even_for_noop() {
+    for change in [false, true] {
+        let source = Arc::new(CountingReadAt::new(authored_package()));
+        let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+        let package = Package::from_source(workbook).unwrap();
+        let mut edit = package.edit().unwrap();
+        if change {
+            edit.set_number(
+                0_usize,
+                litchi_xls::cell_values::Reference::new(3, 2).unwrap(),
+                8.5,
+            )
+            .unwrap();
+        }
+        source.bump();
+        assert!(
+            edit.commit().is_err(),
+            "detached publication must reject source replacement"
+        );
+    }
+}
+
+#[test]
+fn primary_retains_narrow_object_profile_through_commit_inverse_and_explicit_widening() {
+    use litchi_xls::cell_values::Reference;
+    use litchi_xls::package::edit::EditOptions;
+    let bytes = authored_package();
+    let source = Package::from_bytes(&bytes).unwrap();
+    let mut ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let maximum = ole.open_stream(&["Workbook"]).unwrap().len() as u64;
+    let limits = litchi_ole_common::object::Limits {
+        max_stream_size: maximum,
+        ..Default::default()
+    };
+    let mut edit = source
+        .edit_with_options(EditOptions::new().object_limits(limits))
+        .unwrap();
+    edit.set_number(0_usize, Reference::new(3, 2).unwrap(), 8.5)
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), bytes);
+    let mut grow = restored.edit_with_options(EditOptions::default()).unwrap();
+    grow.rename_sheet(0_usize, "LongerSheetName").unwrap();
+    assert!(grow.commit().is_err());
+
+    let mut wide = source.edit().unwrap();
+    wide.rename_sheet(0_usize, "LongerSheetName").unwrap();
+    let wide = wide.commit().unwrap();
+    let narrow = source
+        .edit_with_options(EditOptions::new().object_limits(limits))
+        .unwrap()
+        .commit()
+        .unwrap()
+        .into_package();
+    assert!(
+        narrow.apply(wide.patch()).is_err(),
+        "recipient limits govern patch replay"
+    );
+    assert_eq!(narrow.to_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn primary_structural_edits_preserve_leaf_dependency_checks() {
+    use litchi_core::sheet::CellValue;
+    use litchi_xls::cell_values::{Reference, Value};
+    let bytes = authored_package();
+    let source = Package::from_bytes(&bytes).unwrap();
+    let mut edit = source.edit().unwrap();
+    edit.insert_cell(0_usize, Reference::new(9, 1).unwrap(), Value::Number(12.0))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit
+            .package()
+            .workbook()
+            .worksheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .cell_value(Reference::new(9, 1).unwrap())
+            .unwrap(),
+        Some(CellValue::Float(12.0))
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        bytes
+    );
+    let mut remove = commit.package().edit().unwrap();
+    remove
+        .remove_cell(0_usize, Reference::new(9, 1).unwrap())
+        .unwrap();
+    let removed = remove.commit().unwrap().into_package();
+    assert_eq!(
+        removed
+            .workbook()
+            .worksheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .cell_value(Reference::new(9, 1).unwrap())
+            .unwrap(),
+        None
+    );
+}
+
+#[test]
+fn primary_signed_and_encrypted_sources_are_refused() {
+    let signed = Package::from_bytes(&signed_package()).unwrap();
+    assert!(signed.edit().is_err());
+    let bytes = fixture("poi/test-data/spreadsheet/xor-encryption-abc.xls");
+    let encrypted =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().password("abc")).unwrap();
+    assert!(encrypted.edit().is_err());
+    assert_eq!(encrypted.source_bytes().unwrap(), bytes);
+}
+
+#[test]
+fn source_truncation_during_publication_preserves_typed_fence_error() {
+    for route in 0..3 {
+        let source = Arc::new(CountingReadAt::new(authored_package()));
+        let workbook = litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap();
+        let package = Package::from_source(workbook).unwrap();
+        let destination = ScratchFile::new("truncation");
+        std::fs::write(destination.path(), b"unchanged destination").unwrap();
+        source.truncate_on_next_read.store(true, Ordering::SeqCst);
+        let error = match route {
+            0 => package.to_bytes().unwrap_err(),
+            1 => package.write_to(&mut Vec::new()).unwrap_err(),
+            _ => package.save(destination.path()).unwrap_err(),
+        };
+        assert!(
+            matches!(
+                error,
+                PackageError::Source(SourceBackedError::SourceChanged { .. })
+            ),
+            "route {route}: {error}"
+        );
+        assert_eq!(
+            std::fs::read(destination.path()).unwrap(),
+            b"unchanged destination"
+        );
+    }
+}
+
+#[test]
+fn primary_operation_limit_is_typed_and_failed_staging_is_atomic() {
+    use litchi_xls::cell_values::Reference;
+    use litchi_xls::package::edit::{Error as EditError, LimitKind};
+    let mut writer = Writer::new();
+    let sheet = writer.add_worksheet("Sheet1").unwrap();
+    for row in 0..4097 {
+        writer.write_number(sheet, row, 0, 1.0).unwrap();
+    }
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    let source = Package::from_bytes(&output.into_inner()).unwrap();
+    let mut edit = source.edit().unwrap();
+    for row in 0..4096 {
+        edit.set_number(0_usize, Reference::new(row, 0).unwrap(), 2.0)
+            .unwrap();
+    }
+    let error = edit
+        .set_number(0_usize, Reference::new(4096, 0).unwrap(), 2.0)
+        .unwrap_err();
+    assert!(matches!(
+        error,
+        EditError::Limit {
+            kind: LimitKind::Operations,
+            observed: 4097,
+            maximum: 4096
+        }
+    ));
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit
+            .package()
+            .workbook()
+            .worksheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .cell_value(Reference::new(4096, 0).unwrap())
+            .unwrap(),
+        Some(litchi_core::sheet::CellValue::Float(1.0))
+    );
+}
+
+#[test]
+fn primary_default_followup_retains_explicit_wider_profile() {
+    use litchi_xls::cell_values::Reference;
+    use litchi_xls::package::edit::EditOptions;
+    let bytes = authored_package();
+    let source = Package::from_bytes(&bytes).unwrap();
+    let limits = litchi_ole_common::object::Limits {
+        max_stream_size: 256 * 1024 * 1024,
+        ..Default::default()
+    };
+    let committed = source
+        .edit_with_options(EditOptions::new().object_limits(limits))
+        .unwrap()
+        .commit()
+        .unwrap()
+        .into_package();
+    assert_eq!(
+        committed
+            .edit()
+            .unwrap()
+            .options()
+            .get_object_limits()
+            .max_stream_size,
+        limits.max_stream_size
+    );
+
+    let maximum = 3 * 1024 * 1024 * 1024;
+    let cfb = Arc::new(
+        SharedOleFile::open_with_limits(
+            Arc::new(litchi_core::OwnedSource::new(bytes)),
+            litchi_cfb::SharedOleFileLimits::new(maximum).unwrap(),
+        )
+        .unwrap(),
+    );
+    let workbook = litchi_xls::raw::source_backed_workbook_from_shared_ole_file(
+        cfb,
+        SourceBackedLimits::new(maximum).unwrap(),
+    )
+    .unwrap();
+    let source = Package::from_source(workbook).unwrap();
+    assert_eq!(
+        source
+            .edit()
+            .unwrap()
+            .options()
+            .get_cfb_limits()
+            .max_input_bytes(),
+        maximum
+    );
+    let mut edit = source
+        .edit_with_options(EditOptions::new().cfb_limits(OleFileLimits::new(maximum).unwrap()))
+        .unwrap();
+    edit.set_number(0_usize, Reference::new(3, 2).unwrap(), 8.5)
+        .unwrap();
+    let committed = edit.commit().unwrap().into_package();
+    assert_eq!(
+        committed.source_backed_limits().unwrap().max_input_bytes,
+        maximum
+    );
+    assert_eq!(
+        committed
+            .edit()
+            .unwrap()
+            .options()
+            .get_cfb_limits()
+            .max_input_bytes(),
+        maximum
+    );
+}
+
+#[test]
+fn primary_transfer_uses_package_donor_and_is_reversible() {
+    use litchi_xls::cell_values::Reference;
+    let bytes = scalar_transfer_package();
+    let source = Package::from_bytes(&bytes).unwrap();
+    let mut edit = source.edit().unwrap();
+    assert!(
+        edit.copy_scalar_cell_from(
+            &source,
+            0_usize,
+            Reference::new(3, 2).unwrap(),
+            0_usize,
+            Reference::new(9, 0).unwrap()
+        )
+        .unwrap()
+        .is_some()
+    );
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        commit
+            .package()
+            .workbook()
+            .worksheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .cell_value(Reference::new(9, 0).unwrap())
+            .unwrap(),
+        Some(litchi_core::sheet::CellValue::Float(4.5))
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        source.to_bytes().unwrap()
+    );
+}
+
+// The narrow native transfer closure refuses REFRESHALL even when false.
+// Build the same dependency-free fixture used by xls_cross_workbook_scalar.
+fn scalar_transfer_package() -> Vec<u8> {
+    let mut ole = OleFile::open(Cursor::new(authored_package())).unwrap();
+    let mut workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut offset = 0;
+    let removed = loop {
+        let kind = u16::from_le_bytes(workbook[offset..offset + 2].try_into().unwrap());
+        let length = usize::from(u16::from_le_bytes(
+            workbook[offset + 2..offset + 4].try_into().unwrap(),
+        )) + 4;
+        if kind == 0x01B7 {
+            workbook.drain(offset..offset + length);
+            break u32::try_from(length).unwrap();
+        }
+        assert_ne!(kind, 0x000A);
+        offset += length;
+    };
+    offset = 0;
+    loop {
+        let kind = u16::from_le_bytes(workbook[offset..offset + 2].try_into().unwrap());
+        let length = usize::from(u16::from_le_bytes(
+            workbook[offset + 2..offset + 4].try_into().unwrap(),
+        )) + 4;
+        if kind == 0x0085 {
+            let start = u32::from_le_bytes(workbook[offset + 4..offset + 8].try_into().unwrap());
+            workbook[offset + 4..offset + 8].copy_from_slice(&(start - removed).to_le_bytes());
+        }
+        if kind == 0x000A {
+            break;
+        }
+        offset += length;
+    }
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &workbook).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    output.into_inner()
+}
+
+#[test]
+fn primary_source_commit_retains_query_limits_and_positional_projection() {
+    let workbook = litchi_xls::SourceBackedWorkbook::from_read_at_with_limits(
+        Arc::new(litchi_core::OwnedSource::new(authored_package())),
+        SourceBackedLimits::default().with_max_text_cells(1),
+    )
+    .unwrap();
+    let source = Package::from_source(workbook).unwrap();
+    assert!(source.workbook().text().is_err());
+    let mut edit = source.edit().unwrap();
+    edit.set_number(
+        0_usize,
+        litchi_xls::cell_values::Reference::new(3, 2).unwrap(),
+        8.5,
+    )
+    .unwrap();
+    let committed = edit.commit().unwrap().into_package();
+    assert!(committed.is_source_backed());
+    assert!(matches!(
+        committed.workbook().text(),
+        Err(PackageError::Source(
+            SourceBackedError::ResourceLimit { .. }
+        ))
+    ));
 }

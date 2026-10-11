@@ -65,6 +65,8 @@
 
 /// Immutable XLS package ownership and read-only projections.
 pub mod package;
+pub use package::edit::Error as EditError;
+pub use package::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
 pub use package::{Package, Workbook};
 
 /// Error types for XLS parsing

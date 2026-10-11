@@ -832,6 +832,90 @@ impl Snapshot {
         &self.inner.bytes
     }
 
+    /// Effective complete-package capture profile retained by this snapshot.
+    pub(crate) fn object_limits(&self) -> Limits {
+        self.inner.limits
+    }
+
+    /// Effective CFB admission profile retained by this snapshot.
+    pub(crate) fn cfb_limits(&self) -> OleFileLimits {
+        self.inner.cfb_limits
+    }
+
+    /// Retain the narrower profile; reuse the validated owner when unchanged.
+    pub(crate) fn constrain_limits(
+        &self,
+        requested: Limits,
+        requested_cfb: OleFileLimits,
+    ) -> Result<Self> {
+        let (limits, cfb_limits) = self.effective_limits(requested, requested_cfb)?;
+        let retained = self.inner.limits;
+        let retained_cfb = self.inner.cfb_limits;
+        if limits == retained && cfb_limits == retained_cfb {
+            return Ok(self.clone());
+        }
+        Self::from_slice_with_limits_and_cfb(self.bytes(), limits, cfb_limits)
+    }
+
+    /// Copy an immutable image only after the selected physical input bound.
+    pub(crate) fn from_slice_with_limits_and_cfb(
+        bytes: &[u8],
+        limits: Limits,
+        cfb_limits: OleFileLimits,
+    ) -> Result<Self> {
+        let observed = u64::try_from(bytes.len()).unwrap_or(u64::MAX);
+        if observed > cfb_limits.max_input_bytes() {
+            return Err(Error::Cfb(litchi_cfb::OleError::LimitExceeded {
+                resource: "input bytes",
+                observed,
+                maximum: cfb_limits.max_input_bytes(),
+            }));
+        }
+        let mut owned = Vec::new();
+        owned
+            .try_reserve_exact(bytes.len())
+            .map_err(|_| Error::Allocation("XLS primary edit source"))?;
+        owned.extend_from_slice(bytes);
+        Self::from_bytes_with_limits_and_cfb(owned, limits, cfb_limits)
+    }
+
+    /// Intersect selected profiles without reparsing the immutable image.
+    pub(crate) fn effective_limits(
+        &self,
+        requested: Limits,
+        requested_cfb: OleFileLimits,
+    ) -> Result<(Limits, OleFileLimits)> {
+        let retained = self.inner.limits;
+        let limits = Limits {
+            max_objects: retained.max_objects.min(requested.max_objects),
+            max_storage_depth: retained.max_storage_depth.min(requested.max_storage_depth),
+            max_streams_per_object: retained
+                .max_streams_per_object
+                .min(requested.max_streams_per_object),
+            max_streams: retained.max_streams.min(requested.max_streams),
+            max_stream_size: retained.max_stream_size.min(requested.max_stream_size),
+            max_object_size: retained.max_object_size.min(requested.max_object_size),
+            max_total_size: retained.max_total_size.min(requested.max_total_size),
+        };
+        let retained_cfb = self.inner.cfb_limits;
+        let cfb_limits = OleFileLimits::new(
+            retained_cfb
+                .max_input_bytes()
+                .min(requested_cfb.max_input_bytes()),
+        )?
+        .with_max_directory_bytes(
+            retained_cfb
+                .max_directory_bytes()
+                .min(requested_cfb.max_directory_bytes()),
+        )?
+        .with_max_allocation_table_bytes(
+            retained_cfb
+                .max_allocation_table_bytes()
+                .min(requested_cfb.max_allocation_table_bytes()),
+        )?;
+        Ok((limits, cfb_limits))
+    }
+
     /// Opaque source version captured for this immutable snapshot lineage.
     ///
     /// `Snapshot::from_bytes` mints this process-local token over its owned,
@@ -2404,9 +2488,10 @@ impl Edit {
             .and_then(|value| value.checked_add(self.resource_changes.len()))
             .ok_or_else(|| Error::InvalidData("transaction resource size overflow".into()))?;
         if observed >= MAX_STAGED_CHANGES {
-            return Err(Error::UnsafeEdit(format!(
-                "cell transaction exceeds its {MAX_STAGED_CHANGES}-change limit"
-            )));
+            return Err(Error::StagedChangeLimit {
+                observed: observed.saturating_add(1),
+                maximum: MAX_STAGED_CHANGES,
+            });
         }
         self.resource_changes
             .try_reserve(1)
@@ -2601,9 +2686,10 @@ impl Edit {
             .and_then(|value| value.checked_add(self.resource_changes.len()))
             .ok_or_else(|| Error::InvalidData("cell transaction size overflow".into()))?;
         if observed >= MAX_STAGED_CHANGES {
-            return Err(Error::UnsafeEdit(format!(
-                "cell transaction exceeds its {MAX_STAGED_CHANGES}-change limit"
-            )));
+            return Err(Error::StagedChangeLimit {
+                observed: observed.saturating_add(1),
+                maximum: MAX_STAGED_CHANGES,
+            });
         }
         self.structural_changes
             .try_reserve(1)
@@ -2647,16 +2733,16 @@ impl Edit {
             change.storage = storage;
             change.value = value;
         } else {
-            if self
+            let observed = self
                 .changes
                 .len()
                 .saturating_add(self.structural_changes.len())
-                .saturating_add(self.resource_changes.len())
-                >= MAX_STAGED_CHANGES
-            {
-                return Err(Error::UnsafeEdit(format!(
-                    "cell transaction exceeds its {MAX_STAGED_CHANGES}-change limit"
-                )));
+                .saturating_add(self.resource_changes.len());
+            if observed >= MAX_STAGED_CHANGES {
+                return Err(Error::StagedChangeLimit {
+                    observed: observed.saturating_add(1),
+                    maximum: MAX_STAGED_CHANGES,
+                });
             }
             self.changes
                 .try_reserve(1)
@@ -5299,8 +5385,8 @@ impl Patch {
         if self.is_noop() {
             return Ok(source.clone());
         }
-        Snapshot::from_bytes_with_limits_and_cfb(
-            self.after.to_vec(),
+        Snapshot::from_slice_with_limits_and_cfb(
+            &self.after,
             source.inner.limits,
             source.inner.cfb_limits,
         )

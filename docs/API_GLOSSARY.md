@@ -1270,3 +1270,13 @@ preserves exact source bytes and applies source/encryption fences. Facade reads
 delegate to this owner. Package primary edits, Builder creation and positional
 option-envelope migration remain open; no complete transaction family is
 registered by this wave. See [0197](unified-ops/0197-xls-immutable-owner.md).
+
+## XLS primary transactions (record 0198)
+
+The primary `package::edit` family exports Edit, Commit, Patch, Diagnostics,
+Error and LimitKind. Package owns edit/apply; Commit exposes the canonical
+triad and pair split, while Workbook remains read-only. No-op and inverse
+operations retain the recipient's effective profiles. The operation bound is
+an inline typed error; physical admission errors keep their typed source.
+Builder and full option-envelope unification remain open. See
+[0198](unified-ops/0198-xls-primary-transactions.md).

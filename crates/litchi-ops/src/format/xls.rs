@@ -45,7 +45,7 @@ impl Xls {
     ) -> Result<LegacyOpen<Self>> {
         let mut leaf_options = litchi_xls::OpenOptions::new().password(password);
         if let Some(maximum) = options.max_input_bytes {
-            let maximum = maximum.min(litchi_xls::SourceLimits::DEFAULT_MAX_INPUT_BYTES as u64);
+            let maximum = maximum.min(litchi_xls::SourceLimits::MAX_INPUT_BYTES as u64);
             let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
             let limits = litchi_xls::SourceLimits::builder()
                 .max_input_bytes(maximum)?
@@ -231,6 +231,42 @@ mod tests {
     use litchi_xls::SourceBackedError;
     use std::io::Write;
     use std::path::{Path, PathBuf};
+
+    #[test]
+    fn explicit_eager_input_profile_can_exceed_default_within_hard_cap() {
+        let maximum = 768 * 1024 * 1024;
+        let options = OpenOptions {
+            max_input_bytes: Some(maximum),
+            ..OpenOptions::default()
+        };
+        let ole = OleFile::open(Cursor::new(fixture("Simple.xls"))).unwrap();
+        let LegacyOpen::Opened(xls) = Xls::from_ole_file(ole, &options, None).unwrap() else {
+            panic!("unencrypted fixture");
+        };
+        assert_eq!(
+            xls.owner().source_limits().unwrap().max_input_bytes() as u64,
+            maximum
+        );
+    }
+
+    #[test]
+    #[cfg(any(unix, windows))]
+    fn explicit_positional_input_profile_is_retained_by_cfb_and_workbook() {
+        let maximum = 3 * 1024 * 1024 * 1024;
+        let options = OpenOptions::new().max_input_bytes(maximum);
+        let crate::File::Xls(xls) = crate::open_with(fixture_path("Simple.xls"), &options).unwrap()
+        else {
+            panic!("unencrypted XLS fixture");
+        };
+        assert_eq!(
+            xls.owner().source().unwrap().limits().max_input_bytes(),
+            maximum
+        );
+        assert_eq!(
+            xls.owner().source_backed_limits().unwrap().max_input_bytes,
+            maximum
+        );
+    }
 
     fn append_cell_text(out: &mut String, cell: &CellValue) {
         match cell {

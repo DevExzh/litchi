@@ -45,8 +45,9 @@ println!("sheets: {}", workbook.worksheet_count()?);
 It publishes exact bytes through `to_bytes`, `write_to`, and atomic `save`.
 Encrypted inputs require explicit source export; ordinary publication refuses
 them. The old generic eager reader is available only as `raw::Reader`.
-Canonical package edits and Builder creation remain under migration; focused
-feature edit engines and `Writer` remain available.
+Primary changes use `Package::edit()` and `Package::apply(&patch)`. Builder
+creation remains under migration; focused feature engines and `Writer` remain
+available.
 
 ## Eager reader limits
 
@@ -76,6 +77,27 @@ The positional reader continues to use `SourceBackedLimits`; its explicit
 materialization adapter preserves that existing admission policy. Focused
 edit snapshots retain their separate object/CFB profiles. These limits are
 not a total-memory budget.
+
+## Primary edits
+
+The source remains immutable. Commit exposes `package()`, `patch()` and
+`diagnostics()`, or `into_parts()` for the `(Package, Patch)` pair. The package
+retains the effective source and edit limits through no-op commits, further
+edits and inverse application. Signed or encrypted inputs are refused by this
+edit path. Unsupported BIFF dependency closures remain typed refusals.
+
+```rust
+use litchi_xls::{Package, cell_values::Reference};
+
+let source = Package::open("example.xls")?;
+let mut edit = source.edit()?;
+edit.set_numeric("Sheet1", Reference::new(0, 0)?, 42.0)?;
+let commit = edit.commit()?;
+commit.package().save("edited.xls")?;
+let restored = commit.package().apply(&commit.patch().inverse())?;
+assert_eq!(restored.to_bytes()?, source.to_bytes()?);
+# Ok::<(), Box<dyn std::error::Error>>(())
+```
 
 ## License
 

@@ -2400,9 +2400,41 @@
           "name": "is_empty",
           "scope": "litchi_xls::cell_values::SemanticPatch",
           "replacement": "use is_noop()"
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_xls::Workbook",
+          "replacement": "state changes belong to immutable Package"
+        },
+        {
+          "name": "edit_with_options",
+          "scope": "litchi_xls::Workbook",
+          "replacement": "state changes belong to immutable Package"
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_xls::Workbook",
+          "replacement": "state changes belong to immutable Package"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_xls::package::edit::Commit",
+          "replacement": "package/into_package and diagnostics().changed()"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_xls::package::edit::Commit",
+          "replacement": "package/into_package and diagnostics().changed()"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_xls::package::edit::Commit",
+          "replacement": "package/into_package and diagnostics().changed()"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_xls::package::edit"
+      ]
     }
   ]
 }

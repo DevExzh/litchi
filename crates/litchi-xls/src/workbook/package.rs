@@ -121,7 +121,7 @@ impl<R: Read + Seek> Reader<R> {
     /// Decode a CFB owner whose physical admission is already complete.
     /// The positional materializer uses its existing source/materialization
     /// bounds, while public eager entry points use `SourceLimits` above.
-    pub(super) fn from_admitted_ole_file(
+    pub(crate) fn from_admitted_ole_file(
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {

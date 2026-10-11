@@ -30,6 +30,11 @@ use std::sync::{Arc, OnceLock};
 /// alias local makes the owner independent of the public root re-exports.
 type RawReader = crate::raw::Reader<Cursor<Vec<u8>>>;
 
+/// The canonical primary transaction for an immutable XLS package.
+#[path = "package/edit.rs"]
+pub mod edit;
+pub use edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
+
 /// Errors returned by the canonical XLS package and projection APIs.
 #[non_exhaustive]
 pub enum Error {
@@ -135,6 +140,7 @@ impl std::error::Error for Error {
 }
 
 /// The immutable state held by one package.
+#[derive(Clone)]
 enum PackageState {
     /// A fully parsed reader retaining the exact source cursor bytes.
     Eager {
@@ -199,10 +205,12 @@ pub struct Package {
     inner: Arc<PackageInner>,
 }
 
+#[derive(Clone)]
 struct PackageInner {
     state: PackageState,
     policy: RetainedPolicy,
     metadata: OnceLock<Metadata>,
+    edit_snapshot: Option<crate::cell_values::Snapshot>,
 }
 
 impl fmt::Debug for PackageInner {
@@ -332,6 +340,7 @@ impl Package {
                     leniency,
                 },
                 metadata: OnceLock::new(),
+                edit_snapshot: None,
             }),
         })
     }
@@ -366,6 +375,7 @@ impl Package {
                     compatibility_profile: options.get_compatibility_profile(),
                 },
                 metadata: metadata_cache,
+                edit_snapshot: None,
             }),
         })
     }
@@ -571,7 +581,7 @@ impl Package {
                                 observed: before,
                             }));
                         }
-                        stream_source(&*source, cfb.file_size(), writer)
+                        stream_source(cfb, &*source, cfb.file_size(), writer)
                     },
                     || {
                         let after = source.version()?;
@@ -590,18 +600,29 @@ impl Package {
 
     /// Begin the editable cell-values adapter on demand.
     ///
-    /// No snapshot is constructed while a package is opened.  This method is
-    /// the low-level seam used by the next canonical edit wave.
+    /// No snapshot is constructed while a package is opened. Primary edits
+    /// retain their validated snapshot for subsequent operations; this explicit
+    /// low-level adapter also retains and intersects that selected profile.
     pub fn edit_snapshot_with_limits(
         &self,
         limits: litchi_ole_common::object::Limits,
         cfb_limits: litchi_cfb::OleFileLimits,
     ) -> Result<crate::cell_values::Snapshot> {
         let (limits, cfb_limits) = self.edit_profile(limits, cfb_limits)?;
+        if let Some(cfb) = self.source() {
+            cfb.source_version().map_err(SourceBackedError::from)?;
+        }
+        if let Some(snapshot) = &self.inner.edit_snapshot {
+            let result = snapshot.constrain_limits(limits, cfb_limits);
+            if let Some(cfb) = self.source() {
+                cfb.source_version().map_err(SourceBackedError::from)?;
+            }
+            return result.map_err(Error::Reader);
+        }
         match &self.inner.state {
             PackageState::Eager { reader, .. } => {
-                crate::cell_values::Snapshot::from_bytes_with_limits_and_cfb(
-                    reader.get_ref().get_ref().clone(),
+                crate::cell_values::Snapshot::from_slice_with_limits_and_cfb(
+                    reader.get_ref().get_ref(),
                     limits,
                     cfb_limits,
                 )
@@ -626,7 +647,10 @@ impl Package {
             PackageState::Eager { .. } => None,
         };
         let cfb_limits = if source_cfb_limits.is_none() {
-            let admitted = litchi_cfb::OleFileLimits::default();
+            let admitted = self.inner.edit_snapshot.as_ref().map_or_else(
+                litchi_cfb::OleFileLimits::default,
+                crate::cell_values::Snapshot::cfb_limits,
+            );
             cfb_limits
                 .with_max_directory_bytes(
                     cfb_limits
@@ -642,6 +666,11 @@ impl Package {
             cfb_limits
         };
         let cfb_limits = intersect_cfb_limits(cfb_limits, retained_input, source_cfb_limits)?;
+        if let Some(snapshot) = &self.inner.edit_snapshot {
+            return snapshot
+                .effective_limits(limits, cfb_limits)
+                .map_err(Error::Reader);
+        }
         Ok((limits, cfb_limits))
     }
 
@@ -940,7 +969,9 @@ fn exact_bytes(inner: &Arc<PackageInner>) -> Result<Vec<u8>> {
             let expected = cfb
                 .source_version()
                 .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-            source.read_exact_at(0, &mut bytes).map_err(Error::Io)?;
+            if let Err(error) = source.read_exact_at(0, &mut bytes) {
+                return Err(source_read_error(cfb, expected, error));
+            }
             let observed = cfb
                 .source_version()
                 .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
@@ -965,7 +996,7 @@ fn stream_exact<W: Write>(inner: &Arc<PackageInner>, writer: &mut W) -> Result<(
             let expected = cfb
                 .source_version()
                 .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
-            stream_source(&*source, cfb.file_size(), writer)?;
+            stream_source(cfb, &*source, cfb.file_size(), writer)?;
             let observed = cfb
                 .source_version()
                 .map_err(|error| Error::Source(SourceBackedError::from(error)))?;
@@ -981,6 +1012,7 @@ fn stream_exact<W: Write>(inner: &Arc<PackageInner>, writer: &mut W) -> Result<(
 }
 
 fn stream_source<W: Write + ?Sized>(
+    cfb: &SharedOleFile,
     source: &dyn ReadAt,
     length: u64,
     writer: &mut W,
@@ -990,15 +1022,30 @@ fn stream_source<W: Write + ?Sized>(
     while offset < length {
         let count = usize::try_from((length - offset).min(buffer.len() as u64))
             .map_err(|_| Error::InvalidData("XLS source range does not fit usize"))?;
-        source
-            .read_exact_at(offset, &mut buffer[..count])
-            .map_err(Error::Io)?;
+        if let Err(error) = source.read_exact_at(offset, &mut buffer[..count]) {
+            let expected = cfb.captured_source_version();
+            return Err(source_read_error(cfb, expected, error));
+        }
         writer.write_all(&buffer[..count]).map_err(Error::Io)?;
         offset = offset
             .checked_add(count as u64)
             .ok_or(Error::InvalidData("XLS source offset overflow"))?;
     }
     Ok(())
+}
+
+fn source_read_error(
+    cfb: &SharedOleFile,
+    expected: litchi_core::SourceVersion,
+    error: io::Error,
+) -> Error {
+    match cfb.source_version() {
+        Ok(observed) if observed != expected => {
+            Error::Source(SourceBackedError::SourceChanged { expected, observed })
+        },
+        Ok(_) => Error::Io(error),
+        Err(version_error) => Error::Source(SourceBackedError::from(version_error)),
+    }
 }
 
 fn ensure_publication_allowed(inner: &Arc<PackageInner>) -> Result<()> {
