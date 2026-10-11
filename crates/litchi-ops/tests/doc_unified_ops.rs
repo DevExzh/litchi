@@ -281,6 +281,64 @@ fn doc_source_limits_preserve_dimension_and_values_through_facade_ingress() {
 }
 
 #[test]
+fn doc_changed_candidate_retains_stream_limits_and_original_bytes() {
+    use litchi_doc::{SourceLimitKind, SourceLimits};
+
+    let bytes = multi_paragraph_doc();
+    let ole = litchi_cfb::OleFile::open(Cursor::new(bytes.clone())).unwrap();
+    let sizes = ole
+        .list_streams()
+        .iter()
+        .map(|path| {
+            let path = path.iter().map(String::as_str).collect::<Vec<_>>();
+            usize::try_from(ole.stream_len(&path).unwrap()).unwrap()
+        })
+        .collect::<Vec<_>>();
+    let entry = *sizes.iter().max().unwrap();
+    let aggregate = sizes.iter().sum::<usize>();
+    for (limits, expected, maximum) in [
+        (
+            SourceLimits::builder()
+                .max_entry_bytes(entry)
+                .unwrap()
+                .build()
+                .unwrap(),
+            SourceLimitKind::EntryBytes,
+            entry,
+        ),
+        (
+            SourceLimits::builder()
+                .max_aggregate_bytes(aggregate)
+                .unwrap()
+                .build()
+                .unwrap(),
+            SourceLimitKind::AggregateBytes,
+            aggregate,
+        ),
+    ] {
+        let file = open_bytes_with(
+            bytes.clone(),
+            &OpenOptions::new().doc(DocOptions::new().source_limits(limits)),
+        )
+        .expect("exact source limits admit original");
+        let replacement = "x".repeat(100_000);
+        let error = file
+            .set("/body/p[1]", props! { "text" => replacement })
+            .expect_err("changed candidate exceeds retained source limits");
+        assert_eq!(error.code(), Code::LimitExceeded);
+        assert!(matches!(error.leaf(),
+            litchi_ops::error::Source::DocTransaction(
+                litchi_doc::package::edit::Error::Body(litchi_doc::body_text::Error::Invalid(
+                    litchi_doc::Error::Limit { kind, observed, maximum: actual }
+                ))
+            ) if *kind == expected && *actual == maximum as u64 && *observed > *actual
+        ));
+        assert_eq!(file.to_bytes().unwrap(), bytes);
+        assert_eq!(paragraph_text(&file, "/body/p[1]"), "first");
+    }
+}
+
+#[test]
 fn doc_capabilities_and_source_retention_are_narrow_and_explicit() {
     let capabilities = Capabilities::of(FileFormat::Doc);
     for verb in [

@@ -92,7 +92,7 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 | Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036) and DOC (0192) kind/observed/maximum; broader taxonomy pending |
 | Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC/OOXML (0036) and DOC (0192) `SourceLimitKind`; semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
-| Coverage policy | caller-selected limits on **every** public ingress path | — | 🔴 gaps: DOC focused strict-owner allocation ordering (0192), ppt/xls (W4), ODF (W3) |
+| Coverage policy | caller-selected limits on **every** public ingress path | — | 🔴 gaps: ppt/xls (W4), ODF (W3) |
 
 ### OPC source dimensions
 
@@ -1217,7 +1217,8 @@ ingress errors carry the canonical inline fields. `OpenOptions` consumes
 Defaults are 512 MiB input, 512 MiB per stream, and 2 GiB aggregate. Canonical
 and raw reader admission checks all declared logical streams before payload
 reads, including metadata and opaque streams. Already-parsed adoption cannot
-retroactively constrain CFB parsing allocations. The focused body Snapshot's
-strict owner still needs this preflight before its own payload reads; complete
-allocation-budget coverage and full DOC acceptance remain open. See
-[0192](unified-ops/0192-doc-source-limits.md).
+retroactively constrain CFB parsing allocations. Record 0193 extends this preflight to the focused body Snapshot's strict
+owner before payload capture, including candidate and profiled reopens.
+Complete allocation-budget coverage for raw escape paths and full DOC
+acceptance remain open. See [0192](unified-ops/0192-doc-source-limits.md) and
+[0193](unified-ops/0193-doc-strict-owner-admission.md).

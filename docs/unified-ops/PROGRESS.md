@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0193 | [DOC strict-owner admission](0193-doc-strict-owner-admission.md) | Typed preflight before strict payload capture across body opens/reopens; one parsed CFB retained; 5,276 combined + 1,913 final DOC/facade tests/doctests, lint/docs/glossary/boundaries pass; full goal remains open |
 | 0192 | [DOC source limits](0192-doc-source-limits.md) | Canonical checked SourceLimits, inline typed errors, shared defaults and all-stream reader preflight; 2,713 tests/doctests, lint/docs/glossary/boundaries pass; focused strict-owner allocation ordering and full goal remain open |
 | 0191 | [DOC primary transactions](0191-doc-primary-transactions.md) | Native Package Edit/Commit/Patch/Diagnostics, retained policies and validated owner handoff; facade adopts canonical package; 2,707 tests/doctests, lint/docs/glossary/boundaries pass; scoped ratios under 10%, absolute large-case slowdown and full goal remain open |
 | 0190 | [Immutable DOC owner](0190-doc-immutable-owner.md) | Concrete immutable Package, cheap detached Document, merged OpenOptions and explicit raw reader; encrypted/exact publication checks; 2,696 combined tests/doctests, lint/docs/glossary/boundaries pass; repeated 100-paragraph overhead 13.6%, primary transactions and full goal remain open |

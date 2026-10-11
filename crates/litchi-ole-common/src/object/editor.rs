@@ -143,9 +143,63 @@ impl Editor {
         targets: Targets,
         limits: Limits,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), OleError> {
+        Self::open_with_ole_file_with_admission(bytes, targets, limits, |_| Ok(()))
+    }
+
+    /// Opens a package with one caller-owned admission callback between the
+    /// top-level CFB parse and any selected-stream capture.
+    ///
+    /// The callback receives immutable parsed directory and allocation-table
+    /// metadata. It runs before common package admission can read payloads,
+    /// so a format owner can reject declared content with its own typed error
+    /// without parsing the CFB a second time. Existing callers that do not
+    /// need this format-specific gate should use [`Self::open_with_ole_file`].
+    ///
+    /// ```
+    /// use std::io::Cursor;
+    /// use litchi_cfb::{OleError, OleWriter};
+    /// use litchi_ole_common::object::{Editor, Limits, Targets};
+    ///
+    /// let mut writer = OleWriter::new();
+    /// writer.create_stream(&["payload"], b"example")?;
+    /// let mut bytes = Cursor::new(Vec::new());
+    /// writer.write_to(&mut bytes)?;
+    /// let result = Editor::open_with_ole_file_with_admission::<OleError, _>(
+    ///     bytes.into_inner(), Targets::default(), Limits::default(),
+    ///     |ole| {
+    ///         if ole.stream_len(&["payload"])? > 4 {
+    ///             return Err(OleError::InvalidFormat("caller payload limit".into()));
+    ///         }
+    ///         Ok(())
+    ///     },
+    /// );
+    /// assert!(matches!(result, Err(OleError::InvalidFormat(_))));
+    /// # Ok::<(), OleError>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a caller error for a rejected admission or a converted
+    /// low-level CFB error for parsing and common object admission failures.
+    ///
+    /// # Panics
+    ///
+    /// A panic from the caller-owned admission callback propagates to the
+    /// caller.
+    pub fn open_with_ole_file_with_admission<E, F>(
+        bytes: Vec<u8>,
+        targets: Targets,
+        limits: Limits,
+        admission: F,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), E>
+    where
+        E: From<OleError>,
+        F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<(), E>,
+    {
         Self::validate_open_inputs(&targets, limits)?;
-        let mut ole = OleFile::open(Cursor::new(bytes))?;
-        let admitted = Self::admit_open(&mut ole, targets, limits)?;
+        let mut ole = OleFile::open(Cursor::new(bytes)).map_err(E::from)?;
+        admission(&ole)?;
+        let admitted = Self::admit_open(&mut ole, targets, limits).map_err(E::from)?;
         let original = Arc::new(ole.get_ref().get_ref().clone());
         let editor = Self::from_admitted(original, limits, admitted);
         Ok((editor, ole))
@@ -173,11 +227,63 @@ impl Editor {
         bytes: Vec<u8>,
         targets: Targets,
         limits: Limits,
-        mut observer: impl FnMut(CfbParseEvent),
+        observer: impl FnMut(CfbParseEvent),
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), OleError> {
+        Self::open_with_ole_file_profiled_with_admission(bytes, targets, limits, observer, |_| {
+            Ok(())
+        })
+    }
+
+    /// Feature-gated profiled equivalent of
+    /// [`Self::open_with_ole_file_with_admission`].
+    ///
+    /// The parse observer still surrounds exactly one top-level CFB parse;
+    /// the caller-owned admission callback runs after its `Finished` event and
+    /// before common stream capture.
+    ///
+    /// ```no_run
+    /// # #[cfg(feature = "performance-diagnostics")]
+    /// # {
+    /// use litchi_cfb::OleError;
+    /// use litchi_ole_common::object::{Editor, Limits, Targets};
+    ///
+    /// let _result = Editor::open_with_ole_file_profiled_with_admission::<OleError, _>(
+    ///     Vec::new(),
+    ///     Targets::default(),
+    ///     Limits::default(),
+    ///     |_| {},
+    ///     |_| Ok::<(), OleError>(()),
+    /// );
+    /// # }
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a caller error for a rejected admission or a converted
+    /// low-level CFB error for parsing and common object admission failures.
+    ///
+    /// # Panics
+    ///
+    /// A panic from the parse observer or caller-owned admission callback
+    /// propagates to the caller. Event balancing is guaranteed only when both
+    /// callbacks return normally.
+    #[cfg(feature = "performance-diagnostics")]
+    pub fn open_with_ole_file_profiled_with_admission<E, F>(
+        bytes: Vec<u8>,
+        targets: Targets,
+        limits: Limits,
+        mut observer: impl FnMut(CfbParseEvent),
+        admission: F,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>), E>
+    where
+        E: From<OleError>,
+        F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<(), E>,
+    {
         Self::validate_open_inputs(&targets, limits)?;
-        let mut ole = observe_cfb_parse(&mut observer, || OleFile::open(Cursor::new(bytes)))?;
-        let admitted = Self::admit_open(&mut ole, targets, limits)?;
+        let mut ole = observe_cfb_parse(&mut observer, || OleFile::open(Cursor::new(bytes)))
+            .map_err(E::from)?;
+        admission(&ole)?;
+        let admitted = Self::admit_open(&mut ole, targets, limits).map_err(E::from)?;
         let original = Arc::new(ole.get_ref().get_ref().clone());
         let editor = Self::from_admitted(original, limits, admitted);
         Ok((editor, ole))

@@ -758,14 +758,16 @@ impl Snapshot {
             options.source_limits,
         )
         .map_err(Error::Invalid)?;
-        let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
-            bytes.clone(),
-            options.revision_limits,
-            options.protection_policy.clone(),
-        )
-        .map_err(Error::Invalid)?;
-        crate::raw::Package::validate_ole_file(&mut ole, options.source_limits)
+        let source_limits = options.source_limits;
+        let (_strict_editor, mut ole) =
+            RevisionEditor::open_with_ole_file_with_policy_and_admission(
+                bytes.clone(),
+                options.revision_limits,
+                options.protection_policy.clone(),
+                |ole| crate::package::preflight_declared_streams(ole, source_limits).map(|_| ()),
+            )
             .map_err(Error::Invalid)?;
+        crate::raw::Package::validate_ole_file(&mut ole, source_limits).map_err(Error::Invalid)?;
         Ok(Self {
             source: Arc::from(bytes.into_boxed_slice()),
             fingerprint_cache: OnceLock::new(),
@@ -862,9 +864,17 @@ impl Snapshot {
             DiagnosticPhase::StrictOwnerValidation,
             || {
                 let (_strict_editor, ole) =
-                    RevisionEditor::open_with_ole_file_profiled(bytes.clone(), limits, |event| {
-                        cfb_observer(event);
-                    })
+                    RevisionEditor::open_with_ole_file_profiled_with_admission(
+                        bytes.clone(),
+                        limits,
+                        |event| {
+                            cfb_observer(event);
+                        },
+                        |ole| {
+                            crate::package::preflight_declared_streams(ole, source_limits)
+                                .map(|_| ())
+                        },
+                    )
                     .map_err(Error::Invalid)?;
                 Ok(ole)
             },
@@ -1450,10 +1460,17 @@ impl Snapshot {
     }
 
     fn editor(&self) -> Result<RevisionEditor> {
-        let mut editor = RevisionEditor::open_with_policy(
+        let source_limits = self.source_limits;
+        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(
+            self.source.len(),
+            source_limits,
+        )
+        .map_err(Error::Invalid)?;
+        let (mut editor, _ole) = RevisionEditor::open_with_ole_file_with_policy_and_admission(
             self.source.as_ref().to_vec(),
             self.limits,
             self.protection_policy.clone(),
+            |ole| crate::package::preflight_declared_streams(ole, source_limits).map(|_| ()),
         )
         .map_err(Error::Invalid)?;
         editor.set_retained_render_limit(self.transaction_limits.max_retained_render_bytes());
@@ -1554,10 +1571,14 @@ impl Edit {
     /// Reopens a complete candidate rendered by a resource owner under this
     /// transaction's protection policy and retained-render ceiling.
     fn reopen_editor(&self, bytes: Vec<u8>) -> Result<RevisionEditor> {
-        let mut editor = RevisionEditor::open_with_policy(
+        let source_limits = self.source.source_limits;
+        crate::raw::Package::<Cursor<Vec<u8>>>::validate_source_len(bytes.len(), source_limits)
+            .map_err(Error::Invalid)?;
+        let (mut editor, _ole) = RevisionEditor::open_with_ole_file_with_policy_and_admission(
             bytes,
             self.source.limits,
             self.source.protection_policy.clone(),
+            |ole| crate::package::preflight_declared_streams(ole, source_limits).map(|_| ()),
         )
         .map_err(Error::Invalid)?;
         editor
@@ -2329,12 +2350,17 @@ impl Edit {
                 self.source.source_limits,
             )
             .map_err(Error::Invalid)?;
-            let (_strict_editor, mut ole) = RevisionEditor::open_with_ole_file_with_policy(
-                bytes.clone(),
-                self.source.limits,
-                self.source.protection_policy.clone(),
-            )
-            .map_err(Error::Invalid)?;
+            let source_limits = self.source.source_limits;
+            let (_strict_editor, mut ole) =
+                RevisionEditor::open_with_ole_file_with_policy_and_admission(
+                    bytes.clone(),
+                    self.source.limits,
+                    self.source.protection_policy.clone(),
+                    |ole| {
+                        crate::package::preflight_declared_streams(ole, source_limits).map(|_| ())
+                    },
+                )
+                .map_err(Error::Invalid)?;
             let document = crate::Document::from_ole_with_options(
                 &mut ole,
                 PackageOpenOptions::default().source_limits(self.source.source_limits),
@@ -5390,6 +5416,149 @@ mod tests {
         assert!(cfb_events.is_empty());
         assert!(matches!(result, Err(Error::Invalid(_))));
         assert!(events.is_empty());
+    }
+
+    #[test]
+    fn editor_reopens_preflight_outer_input_before_container_parsing() {
+        let mut source =
+            Snapshot::open(doc_with_opaque_stream(&["alpha"]), Limits::default()).unwrap();
+        let mut edit = source.edit().unwrap();
+        let limits = crate::SourceLimits::builder()
+            .max_input_bytes(1)
+            .unwrap()
+            .build()
+            .unwrap();
+        source.source_limits = limits;
+        assert!(matches!(
+            source.editor(),
+            Err(Error::Invalid(crate::Error::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                maximum: 1,
+                ..
+            }))
+        ));
+        edit.source.source_limits = limits;
+        // Invalid CFB bytes distinguish the input gate from container parsing.
+        assert!(matches!(
+            edit.reopen_editor(vec![0; 2]),
+            Err(Error::Invalid(crate::Error::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: 2,
+                maximum: 1
+            }))
+        ));
+    }
+
+    #[test]
+    fn source_stream_preflight_precedes_strict_owner_capture() {
+        let source_limits = crate::package::SourceLimits::builder()
+            .max_entry_bytes(1)
+            .expect("one-byte entry limit is within the safety ceiling")
+            .build()
+            .expect("source limits");
+        let strict_limits = Limits {
+            max_stream_size: 1,
+            ..Limits::default()
+        };
+        let result = Snapshot::from_bytes_with_options(
+            doc_with_opaque_stream(&["alpha"]),
+            OpenOptions::default()
+                .source_limits(source_limits)
+                .with_revision_limits(strict_limits),
+        );
+
+        assert!(matches!(
+            result,
+            Err(Error::Invalid(crate::package::Error::Limit {
+                kind: crate::package::SourceLimitKind::EntryBytes,
+                observed,
+                maximum: 1,
+            })) if observed > 1
+        ));
+    }
+
+    #[test]
+    fn source_aggregate_preflight_precedes_strict_owner_capture() {
+        let source_limits = crate::package::SourceLimits::builder()
+            .max_aggregate_bytes(1)
+            .expect("one-byte aggregate limit is within the safety ceiling")
+            .build()
+            .expect("source limits");
+        let strict_limits = Limits {
+            max_total_size: 1,
+            ..Limits::default()
+        };
+        let result = Snapshot::from_bytes_with_options(
+            doc_with_opaque_stream(&["alpha"]),
+            OpenOptions::default()
+                .source_limits(source_limits)
+                .with_revision_limits(strict_limits),
+        );
+
+        assert!(matches!(
+            result,
+            Err(Error::Invalid(crate::package::Error::Limit {
+                kind: crate::package::SourceLimitKind::AggregateBytes,
+                observed,
+                maximum: 1,
+            })) if observed > 1
+        ));
+    }
+
+    #[cfg(feature = "performance-diagnostics")]
+    #[test]
+    fn profiled_source_stream_preflight_matches_ordinary_error_before_capture() {
+        let source_limits = crate::package::SourceLimits::builder()
+            .max_entry_bytes(1)
+            .expect("one-byte entry limit is within the safety ceiling")
+            .build()
+            .expect("source limits");
+        let strict_limits = Limits {
+            max_stream_size: 1,
+            ..Limits::default()
+        };
+        let ordinary = Snapshot::from_bytes_with_options(
+            doc_with_opaque_stream(&["alpha"]),
+            OpenOptions::default()
+                .source_limits(source_limits)
+                .with_revision_limits(strict_limits),
+        )
+        .map_err(|error| error.to_string());
+
+        let mut events = Vec::new();
+        let mut cfb_events = Vec::new();
+        let profiled = Snapshot::open_bounded_profiled_with_source_limits(
+            doc_with_opaque_stream(&["alpha"]),
+            strict_limits,
+            TransactionLimits::default(),
+            source_limits,
+            |event| events.push(event),
+            |event| cfb_events.push(event),
+        )
+        .map_err(|error| error.to_string());
+
+        assert_eq!(profiled, ordinary);
+        assert_eq!(
+            cfb_events,
+            vec![
+                CfbParseEvent::Started,
+                CfbParseEvent::Finished {
+                    outcome: CfbParseOutcome::Success,
+                },
+            ]
+        );
+        assert_eq!(
+            events,
+            vec![
+                DiagnosticEvent::Started {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                },
+                DiagnosticEvent::Finished {
+                    phase: DiagnosticPhase::StrictOwnerValidation,
+                    outcome: DiagnosticOutcome::Error,
+                },
+            ]
+        );
     }
 
     #[cfg(feature = "performance-diagnostics")]

@@ -72,7 +72,7 @@ The focused body-text Snapshot path still opens its strict ObjectEditor
 before the public-reader stream preflight. Its outer input gate runs first,
 and its existing revision-owner limits remain active, but applying the DOC
 entry/aggregate preflight before that strict owner's payload allocations is a
-remaining follow-up. The primary Package ingress is preflighted before edits
+follow-up closed in [0193](0193-doc-strict-owner-admission.md). The primary Package ingress is preflighted before edits
 can start. No complete allocation-budget guarantee for focused/raw escape
 paths is claimed.
 

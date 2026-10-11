@@ -970,22 +970,45 @@ impl RevisionEditor {
         limits: Limits,
         policy: ProtectionPolicy,
     ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
-        let (package, mut ole) =
-            ObjectEditor::open_with_ole_file(bytes, Targets::default(), limits)
-                .map_err(PackageError::from)?;
+        Self::open_with_ole_file_with_policy_and_admission(bytes, limits, policy, |_| Ok(()))
+    }
+
+    pub(crate) fn open_with_ole_file_with_policy_and_admission<F>(
+        bytes: Vec<u8>,
+        limits: Limits,
+        policy: ProtectionPolicy,
+        admission: F,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)>
+    where
+        F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<()>,
+    {
+        let (package, mut ole) = ObjectEditor::open_with_ole_file_with_admission(
+            bytes,
+            Targets::default(),
+            limits,
+            admission,
+        )?;
         let editor = Self::open_from_package(package, &mut ole, policy)?;
         Ok((editor, ole))
     }
 
     #[cfg(feature = "performance-diagnostics")]
-    pub(crate) fn open_with_ole_file_profiled(
+    pub(crate) fn open_with_ole_file_profiled_with_admission<F>(
         bytes: Vec<u8>,
         limits: Limits,
         observer: impl FnMut(CfbParseEvent),
-    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)> {
-        let (package, mut ole) =
-            ObjectEditor::open_with_ole_file_profiled(bytes, Targets::default(), limits, observer)
-                .map_err(PackageError::from)?;
+        admission: F,
+    ) -> Result<(Self, OleFile<Cursor<Vec<u8>>>)>
+    where
+        F: FnOnce(&OleFile<Cursor<Vec<u8>>>) -> Result<()>,
+    {
+        let (package, mut ole) = ObjectEditor::open_with_ole_file_profiled_with_admission(
+            bytes,
+            Targets::default(),
+            limits,
+            observer,
+            admission,
+        )?;
         let editor = Self::open_from_package(package, &mut ole, ProtectionPolicy::default())?;
         Ok((editor, ole))
     }
