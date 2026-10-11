@@ -1056,6 +1056,18 @@ impl Classify for litchi_pptx::Error {
 impl Classify for litchi_xlsx::Error {
     fn classify(&self) -> Class {
         match self {
+            Self::SheetNameDependency(error) => match error {
+                litchi_ooxml_common::xml::sheet_name::Error::Blocked(_) => {
+                    Class::of(Code::UnsupportedCapability)
+                },
+                litchi_ooxml_common::xml::sheet_name::Error::Limit(_) => {
+                    Class::of(Code::LimitExceeded)
+                },
+                litchi_ooxml_common::xml::sheet_name::Error::Allocation { .. } => {
+                    Class::of(Code::InternalError)
+                },
+                _ => Class::of(Code::CorruptFile),
+            },
             Self::Package(error) => error.classify(),
             #[cfg(feature = "encryption")]
             Self::Encryption(error) => error.classify(),
@@ -1137,6 +1149,18 @@ impl Classify for litchi_xlsx::Error {
 impl Classify for litchi_xlsb::package::PackageError {
     fn classify(&self) -> Class {
         match self {
+            Self::SheetNameDependency(error) => match error {
+                litchi_ooxml_common::xml::sheet_name::Error::Blocked(_) => {
+                    Class::of(Code::UnsupportedCapability)
+                },
+                litchi_ooxml_common::xml::sheet_name::Error::Limit(_) => {
+                    Class::of(Code::LimitExceeded)
+                },
+                litchi_ooxml_common::xml::sheet_name::Error::Allocation { .. } => {
+                    Class::of(Code::InternalError)
+                },
+                _ => Class::of(Code::CorruptFile),
+            },
             Self::Io(error) => error.classify(),
             Self::Opc(error) => error.classify(),
             Self::Wire(error) => error.classify(),

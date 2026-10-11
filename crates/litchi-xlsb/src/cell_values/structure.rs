@@ -103,6 +103,10 @@ enum Operation {
     SetSheetName {
         catalog_position: usize,
         name: String,
+        /// Whether replay must update XML dependency carriers owned by the
+        /// workbook package.  Tag 6 deliberately retains the historical
+        /// metadata-only behavior; newly staged edits use tag 7.
+        dependencies: bool,
     },
     SetSheetState {
         catalog_position: usize,
@@ -328,6 +332,7 @@ impl Edit {
         let operation = Operation::SetSheetName {
             catalog_position,
             name,
+            dependencies: true,
         };
         if let Some(index) = name_index {
             self.operations[index] = operation;
@@ -1385,6 +1390,7 @@ fn canonicalize_legacy_operations(
                 Operation::SetSheetName {
                     catalog_position,
                     name,
+                    dependencies: false,
                 }
             },
             operation @ (Operation::SetSheetName { .. }
@@ -1915,6 +1921,7 @@ fn transfer_cell(
 
 fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Result<(bool, bool)> {
     let mut names = BTreeMap::<usize, &str>::new();
+    let mut dependency_positions = std::collections::BTreeSet::<usize>::new();
     let mut states = BTreeMap::<usize, State>::new();
     let mut changed = false;
     let mut state_changed = false;
@@ -1941,6 +1948,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             Operation::SetSheetName {
                 catalog_position,
                 name,
+                dependencies,
             } => {
                 let tab = tabs.get(*catalog_position).ok_or_else(|| {
                     Error::WorksheetNotFound(format!("sheet index {catalog_position}"))
@@ -1952,6 +1960,9 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                 if tab.name() != name {
                     validate_sheet_name_value(name)?;
                     names.insert(*catalog_position, name.as_str());
+                    if *dependencies {
+                        dependency_positions.insert(*catalog_position);
+                    }
                     changed = true;
                 }
             },
@@ -1987,6 +1998,24 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
         return Ok((false, false));
     }
     let kinds = tabs.iter().map(|tab| tab.kind()).collect::<Vec<_>>();
+    let old_sheet_titles = if dependency_positions.is_empty() {
+        Vec::new()
+    } else {
+        tabs.iter()
+            .map(|tab| tab.name().to_owned())
+            .collect::<Vec<_>>()
+    };
+    let dependency_renames = dependency_positions
+        .iter()
+        .filter_map(|catalog_position| {
+            names.get(catalog_position).map(|name| {
+                (
+                    old_sheet_titles[*catalog_position].clone(),
+                    (*name).to_owned(),
+                )
+            })
+        })
+        .collect::<Vec<_>>();
     let mut final_states = tabs.iter().map(|tab| tab.state()).collect::<Vec<_>>();
     for (catalog_position, state) in &states {
         let final_state = final_states
@@ -2080,12 +2109,108 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             "sheet metadata record was not found".to_string(),
         ));
     }
+    // Parse every dependent XML part and stage all successful replacements
+    // before changing the candidate package.  A dependency refusal therefore
+    // cannot leave a partially edited workbook image behind.
     let mut package = workbook.package.clone();
-    package.get_part_mut(&uri)?.set_blob(output);
+    let dependency_replacements = if dependency_renames.is_empty() {
+        Vec::new()
+    } else {
+        collect_sheet_name_dependency_replacements(
+            &package,
+            &dependency_renames,
+            &old_sheet_titles,
+        )?
+    };
+    let mut replacements = dependency_replacements;
+    replacements.push((uri, output));
+    package.replace_part_payloads(replacements)?;
     apply_sheet_view_dependencies(workbook, &mut package, &kinds, &final_states, &states)?;
     let validated = workbook.reparse_candidate(package)?;
     *workbook = validated;
     Ok((true, state_changed))
+}
+
+/// Stage rewrites for every package part whose declared content type is XML.
+///
+/// XLSB workbooks commonly carry chart, custom-XML, and extended-property
+/// members beside their binary workbook part.  The content type is the only
+/// authoritative discriminator here: a URI ending in `.xml` is not enough,
+/// and an XML part is not required to use that suffix.  The helper performs a
+/// namespace-aware lexical rewrite and returns typed refusals for formula-like
+/// carriers it cannot prove safe to edit.
+fn collect_sheet_name_dependency_replacements(
+    package: &litchi_opc::OpcPackage,
+    dependency_renames: &[(String, String)],
+    old_sheet_titles: &[String],
+) -> Result<Vec<(PackURI, Vec<u8>)>> {
+    if dependency_renames.is_empty() {
+        return Ok(Vec::new());
+    }
+    let renames = dependency_renames
+        .iter()
+        .map(|(before, after)| litchi_ooxml_common::xml::sheet_name::Rename { before, after })
+        .collect::<Vec<_>>();
+    let sheet_titles = old_sheet_titles
+        .iter()
+        .map(String::as_str)
+        .collect::<Vec<_>>();
+    let mut xml_parts = Vec::new();
+    xml_parts
+        .try_reserve(package.part_count())
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet-name XML part inventory",
+            source,
+        })?;
+    for part in package.iter_parts() {
+        if (is_xml_content_type(part.content_type())
+            || part
+                .content_type()
+                .eq_ignore_ascii_case(litchi_opc::constants::content_type::OFC_VML_DRAWING))
+            && !part
+                .content_type()
+                .eq_ignore_ascii_case(litchi_opc::constants::content_type::SML_EXTERNAL_LINK)
+            && !part.partname().as_str().starts_with("/xl/externalLinks/")
+        {
+            xml_parts.push(part.partname().clone());
+        }
+    }
+    xml_parts.sort_unstable_by(|left, right| left.as_str().cmp(right.as_str()));
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve(xml_parts.len().saturating_add(1))
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet-name XML replacements",
+            source,
+        })?;
+    for partname in xml_parts {
+        let part = package.get_part(&partname)?;
+        let Some(payload) = litchi_ooxml_common::xml::sheet_name::rewrite(
+            part.blob(),
+            &renames,
+            if part
+                .content_type()
+                .eq_ignore_ascii_case(litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES)
+            {
+                &sheet_titles
+            } else {
+                &[]
+            },
+            excel_name_eq,
+        )?
+        else {
+            continue;
+        };
+        replacements.push((partname, payload));
+    }
+    Ok(replacements)
+}
+
+fn is_xml_content_type(content_type: &str) -> bool {
+    let bytes = content_type.as_bytes();
+    content_type.eq_ignore_ascii_case("application/xml")
+        || content_type.eq_ignore_ascii_case("text/xml")
+        || (bytes.len() > 4 && bytes[bytes.len() - 4..].eq_ignore_ascii_case(b"+xml"))
 }
 
 fn apply_sheet_view_dependencies(
@@ -2657,7 +2782,9 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             // Tag 1 is retained for wire compatibility with patches
             // written before complete-catalog selectors.  Current edits do
             // not construct this variant; decoded instances are canonicalized
-            // to tag 6 before they can be replayed or re-encoded.
+            // to tag 6 before they can be replayed or re-encoded.  Tag 6 is
+            // metadata-only; tag 7 is the dependency-aware form emitted by
+            // current edits.
             output.push(1);
             push_usize(output, *sheet)?;
             push_usize(output, name.len())?;
@@ -2666,8 +2793,9 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
         Operation::SetSheetName {
             catalog_position,
             name,
+            dependencies,
         } => {
-            output.push(6);
+            output.push(if *dependencies { 7 } else { 6 });
             push_usize(output, *catalog_position)?;
             push_usize(output, name.len())?;
             output.extend_from_slice(name.as_bytes());
@@ -2756,6 +2884,19 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
             Ok(Operation::SetSheetName {
                 catalog_position,
                 name,
+                dependencies: false,
+            })
+        },
+        7 => {
+            let catalog_position = read_next_usize(data, offset)?;
+            let length = read_next_usize(data, offset)?;
+            let name = std::str::from_utf8(read_slice(data, offset, length)?)
+                .map_err(|error| Error::InvalidFormat(format!("sheet name is not UTF-8: {error}")))?
+                .to_string();
+            Ok(Operation::SetSheetName {
+                catalog_position,
+                name,
+                dependencies: true,
             })
         },
         5 => {

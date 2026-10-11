@@ -1091,7 +1091,7 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// a selector accepted by the cell handler, while workbook, sheet, row,
 /// column and other nodes are not removable structural elements.
 #[cfg(feature = "xlsb")]
-static XLSB_WRITE_GAPS: [GapSpec; 6] = [
+static XLSB_WRITE_GAPS: [GapSpec; 8] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "remove",
@@ -1151,6 +1151,26 @@ static XLSB_WRITE_GAPS: [GapSpec; 6] = [
         code: Code::UnsupportedCapability,
         follow_up: "M2 XLSB multi-window and additional tab-kind view mutation",
         reason: "visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "sheet",
+            context: "sheet-name-markup-compatibility",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB markup-compatibility-aware sheet-name dependency rewrites",
+        reason: "sheet-name edits refuse a recognized dependency inside an OOXML markup-compatibility alternative instead of selecting or discarding a branch",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "sheet",
+            context: "sheet-name-unmodeled-reference",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB additional sheet-name reference carriers",
+        reason: "sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale",
     },
 ];
 

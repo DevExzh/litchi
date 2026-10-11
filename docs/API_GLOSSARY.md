@@ -1136,3 +1136,14 @@ Nonempty batches require built-in parts; custom-part packages receive typed
 provide atomic failure. One revocation records signature policy before the
 built-in setters invalidate replaced XML source provenance. XLSB uses this seam
 for workbook and worksheet view payloads staged by its structural edit.
+
+
+## Shared sheet-name dependencies (0184)
+
+The focused `litchi_ooxml_common::xml::sheet_name` helper owns lexical XML and
+formula-prefix surgery shared by XLSX and XLSB. Its caller supplies semantic
+name equivalence and the original catalog titles; it exposes typed parse,
+allocation, scan-limit and unsupported-carrier errors. Format owners retain
+transaction, package, selector and publication policy. New XLSB name patches
+use tag 7 for dependency-aware replay; historical tags 1/6 retain their earlier
+metadata-only behavior.

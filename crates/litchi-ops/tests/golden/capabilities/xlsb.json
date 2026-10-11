@@ -1949,6 +1949,24 @@
       "reason": "visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs"
     },
     {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "sheet-name-markup-compatibility",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB markup-compatibility-aware sheet-name dependency rewrites",
+      "reason": "sheet-name edits refuse a recognized dependency inside an OOXML markup-compatibility alternative instead of selecting or discarding a branch"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "sheet-name-unmodeled-reference",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB additional sheet-name reference carriers",
+      "reason": "sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale"
+    },
+    {
       "subject": "view",
       "mode": "issues",
       "code": "unsupported_capability",

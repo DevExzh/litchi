@@ -26,6 +26,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 #[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// A textual sheet-name dependency could not be rewritten safely.
+    SheetNameDependency(litchi_ooxml_common::xml::sheet_name::Error),
     /// I/O error
     Io(std::io::Error),
     /// XML parsing error
@@ -165,6 +167,7 @@ pub enum Error {
 impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Error::SheetNameDependency(error) => fmt::Display::fmt(error, f),
             Error::Io(e) => write!(f, "I/O error: {}", e),
             Error::Xml(e) => write!(f, "XML error: {}", e),
             Error::Wire(e) => write!(f, "BIFF12 wire error: {e}"),
@@ -269,6 +272,7 @@ impl fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Error::SheetNameDependency(error) => Some(error),
             Error::Io(e) => Some(e),
             Error::Xml(e) => Some(e),
             Error::Wire(e) => Some(e),
@@ -498,5 +502,11 @@ impl From<litchi_sheet::CoordinateError> for Error {
 impl From<litchi_sheet::RangeError> for Error {
     fn from(error: litchi_sheet::RangeError) -> Self {
         Self::Range(error)
+    }
+}
+
+impl From<litchi_ooxml_common::xml::sheet_name::Error> for Error {
+    fn from(error: litchi_ooxml_common::xml::sheet_name::Error) -> Self {
+        Self::SheetNameDependency(error)
     }
 }

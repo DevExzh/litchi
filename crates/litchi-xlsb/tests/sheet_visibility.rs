@@ -224,6 +224,34 @@ fn durable_state_wire_round_trips_and_rejects_unknown_tags_and_states() {
     assert!(Patch::from_bytes(&invalid_state, TransferLimits::DEFAULT).is_err());
 }
 
+// Reconstruct the historical BundleSh-only after image. New operations also
+// update XML dependencies, so simply changing their tag would forge an invalid
+// old patch rather than test backward compatibility.
+fn metadata_only_name_wire(package: &Package, patch: &Patch) -> Vec<u8> {
+    let mut legacy = package.opc_package().clone();
+    let renamed = package.apply(patch).expect("new rename package");
+    let uri = legacy.main_document_part().unwrap().partname().clone();
+    let workbook = renamed
+        .opc_package()
+        .get_part(&uri)
+        .unwrap()
+        .blob()
+        .to_vec();
+    legacy.get_part_mut(&uri).unwrap().set_blob(workbook);
+    let after = Package::from_opc(legacy).unwrap().to_bytes().unwrap();
+    let original = patch.to_bytes(TransferLimits::DEFAULT).unwrap();
+    let before_len =
+        usize::try_from(u64::from_le_bytes(original[8..16].try_into().unwrap())).unwrap();
+    let mut wire = original[..32 + before_len].to_vec();
+    wire[16..24].copy_from_slice(&(after.len() as u64).to_le_bytes());
+    wire.extend_from_slice(&after);
+    wire.extend_from_slice(&original[operation_offset(&original)..]);
+    let offset = operation_offset(&wire);
+    assert_eq!(wire[offset], 7, "dependency-aware name operation");
+    wire[offset] = 6;
+    wire
+}
+
 #[test]
 fn old_rename_wire_tag_and_worksheet_ordinal_remain_compatible() {
     // The new operation addresses the complete catalog, so the first
@@ -237,12 +265,12 @@ fn old_rename_wire_tag_and_worksheet_ordinal_remain_compatible() {
         .expect("rename")
         .expect("resolved worksheet selector");
     let commit = edit.commit().expect("rename commit");
-    let mut wire = commit
-        .patch()
-        .to_bytes(TransferLimits::DEFAULT)
-        .expect("durable rename patch");
+    let mut wire = metadata_only_name_wire(&package, commit.patch());
     let offset = operation_offset(&wire);
-    assert_eq!(wire[offset], 6, "catalog-position rename tag is emitted");
+    assert_eq!(
+        wire[offset], 6,
+        "historical catalog-position name operation"
+    );
     wire[offset] = 1;
     wire[offset + 1..offset + 9].copy_from_slice(&0_u64.to_le_bytes());
     assert_eq!(
@@ -1029,7 +1057,7 @@ fn legacy_and_canonical_name_patches_share_merge_identity() {
     let mut left = package.edit().unwrap();
     left.set_sheet_name(1, "Left".into()).unwrap();
     let left = left.commit().unwrap();
-    let mut wire = left.patch().to_bytes(TransferLimits::DEFAULT).unwrap();
+    let mut wire = metadata_only_name_wire(&package, left.patch());
     let offset = operation_offset(&wire);
     wire[offset] = 1;
     wire[offset + 1..offset + 9].copy_from_slice(&0_u64.to_le_bytes());
@@ -1042,4 +1070,78 @@ fn legacy_and_canonical_name_patches_share_merge_identity() {
     let merge = legacy.merge_three_way(right.patch()).unwrap();
     assert_eq!(merge.conflicts().len(), 1);
     assert_eq!(merge.conflicts()[0].sheet_index(), 1);
+}
+
+#[test]
+fn historical_catalog_name_patch_retains_metadata_only_after_image() {
+    let package = chart_first_package();
+    let mut edit = package.edit().unwrap();
+    edit.set_sheet_name(1, "Renamed".into()).unwrap();
+    let commit = edit.commit().unwrap();
+    let wire = metadata_only_name_wire(&package, commit.patch());
+    let decoded = Patch::from_bytes(&wire, TransferLimits::DEFAULT).unwrap();
+    let replay = package.apply(&decoded).unwrap();
+    assert_eq!(replay.workbook().unwrap().worksheet_names()[0], "Renamed");
+    let app = PackURI::new("/docProps/app.xml").unwrap();
+    assert_eq!(
+        replay.opc_package().get_part(&app).unwrap().blob(),
+        package.opc_package().get_part(&app).unwrap().blob()
+    );
+    assert_ne!(
+        commit
+            .package()
+            .opc_package()
+            .get_part(&app)
+            .unwrap()
+            .blob(),
+        package.opc_package().get_part(&app).unwrap().blob()
+    );
+    assert_eq!(
+        replay
+            .apply(&decoded.inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        package.to_bytes().unwrap()
+    );
+}
+
+#[test]
+fn dependency_name_patch_quotes_formulas_and_preserves_unrelated_payloads() {
+    let package = chart_first_package();
+    let before = package.to_bytes().unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.set_sheet_name("Data", "O'Brien & Co".into()).unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = Patch::from_bytes(
+        &commit.patch().to_bytes(TransferLimits::DEFAULT).unwrap(),
+        TransferLimits::DEFAULT,
+    )
+    .unwrap();
+    let replay = package.apply(&patch).unwrap();
+    for metadata in package.opc_package().iter_parts() {
+        let part = package.opc_package().get_part(metadata.partname()).unwrap();
+        let changed = replay.opc_package().get_part(part.partname()).unwrap();
+        if part.content_type()
+            == "application/vnd.openxmlformats-officedocument.drawingml.chart+xml"
+        {
+            let source = std::str::from_utf8(part.blob()).unwrap();
+            let expected = source.replace("Data!", "&apos;O&apos;&apos;Brien &amp; Co&apos;!");
+            assert_eq!(changed.blob(), expected.as_bytes());
+        } else if part.partname().as_str() == "/docProps/app.xml" {
+            let source = std::str::from_utf8(part.blob()).unwrap();
+            assert_eq!(
+                changed.blob(),
+                source
+                    .replace(">Data<", ">O&apos;Brien &amp; Co<")
+                    .as_bytes()
+            );
+        } else if part.partname().as_str() != "/xl/workbook.bin" {
+            assert_eq!(part.blob(), changed.blob(), "{}", part.partname());
+        }
+    }
+    assert_eq!(
+        replay.apply(&patch.inverse()).unwrap().to_bytes().unwrap(),
+        before
+    );
 }
