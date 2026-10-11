@@ -99,6 +99,10 @@ assert_eq!(restored.to_bytes()?, source.to_bytes()?);
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
 
+
+Minimal fresh workbooks use `Package::new()?`, which creates one empty `Sheet1`.
+The returned owner supports primary transactions and atomic publication.
+
 ## License
 
 Licensed under the Apache License, Version 2.0. Part of the

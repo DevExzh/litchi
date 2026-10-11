@@ -8,7 +8,7 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-#[cfg(feature = "doc")]
+#[cfg(any(feature = "doc", feature = "xls"))]
 use litchi_cfb::atomic::{self, Overwrite as CfbOverwrite};
 
 use litchi_core::{Durability, FileFormat};
@@ -236,6 +236,7 @@ impl File {
             feature = "docx",
             feature = "xlsx",
             feature = "pptx",
+            feature = "xls",
             feature = "xlsb"
         )))]
         {
@@ -251,6 +252,7 @@ impl File {
             feature = "docx",
             feature = "xlsx",
             feature = "pptx",
+            feature = "xls",
             feature = "xlsb"
         ))]
         {
@@ -261,6 +263,8 @@ impl File {
                 Self::Locked(locked) => return Err(locked.read_error()),
                 #[cfg(feature = "doc")]
                 Self::Doc(_) => {},
+                #[cfg(feature = "xls")]
+                Self::Xls(_) => {},
                 #[cfg(feature = "docx")]
                 Self::Docx(_) => {},
                 #[cfg(feature = "xlsx")]
@@ -287,6 +291,8 @@ impl File {
             let bytes = match self {
                 #[cfg(feature = "doc")]
                 Self::Doc(handle) => save_doc(handle, &destination, options)?,
+                #[cfg(feature = "xls")]
+                Self::Xls(handle) => save_xls(handle, &destination, options)?,
                 #[cfg(feature = "docx")]
                 Self::Docx(handle) => handle.save_to(&destination, options)?,
                 #[cfg(feature = "xlsx")]
@@ -312,9 +318,18 @@ impl File {
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "xls",
     feature = "xlsb"
 ))]
 fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
+    #[cfg(feature = "xls")]
+    if let File::Xls(handle) = file {
+        return handle
+            .origin()
+            .map(|origin| origin.as_ref().to_path_buf())
+            .ok_or_else(|| file_required(format));
+    }
+
     #[cfg(feature = "doc")]
     if let File::Doc(handle) = file {
         return handle
@@ -358,6 +373,7 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "xls",
     feature = "xlsb"
 ))]
 fn file_required(format: Option<FileFormat>) -> Error {
@@ -429,6 +445,59 @@ fn validate_doc_destination(destination: &Path) -> Result<()> {
     }
 }
 
+#[cfg(feature = "xls")]
+fn save_xls(
+    handle: &crate::format::xls::Xls,
+    destination: &Path,
+    options: &SaveOptions,
+) -> Result<u64> {
+    handle.check_source()?;
+    validate_xls_destination(destination)?;
+    let overwrite = match options.overwrite {
+        Overwrite::Replace => CfbOverwrite::Replace,
+        Overwrite::Refuse => CfbOverwrite::Refuse,
+    };
+    atomic::save(
+        destination,
+        options.durability,
+        overwrite,
+        |staging| {
+            let mut counted = crate::write::Counted {
+                sink: staging,
+                bytes: 0,
+            };
+            handle.write_to(&mut counted)?;
+            Ok(counted.bytes)
+        },
+        || handle.check_source(),
+    )
+}
+
+#[cfg(feature = "xls")]
+fn validate_xls_destination(destination: &Path) -> Result<()> {
+    if destination.file_name().is_none() {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "the XLS save destination must name a file",
+        )
+        .with_format(FileFormat::Xls));
+    }
+    match std::fs::symlink_metadata(destination) {
+        Ok(metadata) => {
+            if metadata.file_type().is_symlink() || !metadata.is_file() {
+                return Err(Error::new(
+                    Code::InvalidArgument,
+                    "the XLS save destination must be a regular file",
+                )
+                .with_format(FileFormat::Xls));
+            }
+            Ok(())
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(Error::from(error)),
+    }
+}
+
 /// Refuse a destination whose extension names a different format.  Flavour
 /// extensions of the same format, unknown extensions and no extension are
 /// accepted because content, rather than a filename, chooses the format.
@@ -437,6 +506,7 @@ fn validate_doc_destination(destination: &Path) -> Result<()> {
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "xls",
     feature = "xlsb"
 ))]
 fn same_format(path: &Path, format: FileFormat) -> Result<()> {
@@ -461,6 +531,7 @@ fn same_format(path: &Path, format: FileFormat) -> Result<()> {
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "xls",
     feature = "xlsb"
 ))]
 fn format_of_extension(extension: &str) -> Option<FileFormat> {

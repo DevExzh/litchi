@@ -768,3 +768,74 @@ fn primary_source_commit_retains_query_limits_and_positional_projection() {
         ))
     ));
 }
+
+#[test]
+fn minimal_creation_supports_native_edits_and_exact_inverse() {
+    use litchi_xls::cell_values::{Reference, Value};
+    let package = Package::new().unwrap();
+    assert_eq!(package.workbook().worksheet_names().unwrap(), ["Sheet1"]);
+    assert!(package.workbook().text().unwrap().trim().is_empty());
+    let original = package.to_bytes().unwrap();
+    let reference = Reference::new(0, 0).unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.insert_cell(0_usize, reference, Value::Number(42.0))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .workbook()
+            .worksheet(0_usize)
+            .unwrap()
+            .unwrap()
+            .cell_value(reference)
+            .unwrap(),
+        Some(litchi_core::sheet::CellValue::Float(42.0))
+    );
+    assert_eq!(package.to_bytes().unwrap(), original);
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        original
+    );
+}
+
+#[test]
+fn first_cell_in_empty_sheet_repairs_later_sheet_offsets() {
+    use litchi_xls::cell_values::{Reference, Value};
+    let mut writer = Writer::new();
+    writer.add_worksheet("Empty").unwrap();
+    let second = writer.add_worksheet("Kept").unwrap();
+    writer.write_number(second, 2, 3, 9.0).unwrap();
+    let mut bytes = Cursor::new(Vec::new());
+    writer.write_to(&mut bytes).unwrap();
+    let package = Package::from_bytes(bytes.get_ref()).unwrap();
+    let mut edit = package.edit().unwrap();
+    edit.insert_cell(0_usize, Reference::new(0, 0).unwrap(), Value::Number(7.0))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+    assert_eq!(
+        reopened
+            .workbook()
+            .worksheet(1_usize)
+            .unwrap()
+            .unwrap()
+            .cell_value(Reference::new(2, 3).unwrap())
+            .unwrap(),
+        Some(litchi_core::sheet::CellValue::Float(9.0))
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        *bytes.get_ref()
+    );
+}

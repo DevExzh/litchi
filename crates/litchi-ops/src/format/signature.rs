@@ -89,7 +89,8 @@ impl<S> Opened<S> {
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
-        feature = "xlsb"
+        feature = "xlsb",
+        feature = "xls"
     ))]
     pub(crate) fn with_origin(&self, origin: Option<Arc<Path>>) -> Arc<Self> {
         Self::from_parts_with_origin(self.signature, Arc::clone(&self.state), origin)
@@ -101,7 +102,8 @@ impl<S> Opened<S> {
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
-        feature = "xlsb"
+        feature = "xlsb",
+        feature = "xls"
     ))]
     pub(crate) fn origin(&self) -> Option<Arc<Path>> {
         self.origin.clone()

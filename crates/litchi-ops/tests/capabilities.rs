@@ -12,6 +12,7 @@ use litchi_ops::capabilities::Verb;
 fn capability_goldens_follow_enabled_formats() {
     for (format, name, enabled) in [
         (FileFormat::Doc, "doc", cfg!(feature = "doc")),
+        (FileFormat::Xls, "xls", cfg!(feature = "xls")),
         (FileFormat::Docx, "docx", cfg!(feature = "docx")),
         (FileFormat::Xlsx, "xlsx", cfg!(feature = "xlsx")),
         (FileFormat::Xlsb, "xlsb", cfg!(feature = "xlsb")),

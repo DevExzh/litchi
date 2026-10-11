@@ -30,6 +30,74 @@ const _: () = {
 };
 
 impl Xls {
+    pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
+        use crate::create::{Conformance, Flavor};
+        use crate::error::{Code, Error};
+        let refusal = if options.flavor_value() != Flavor::Document {
+            Some((
+                "the XLS creator does not author templates",
+                "use Flavor::Document",
+            ))
+        } else if options.conformance_value() == Conformance::Strict {
+            Some((
+                "legacy XLS does not support OOXML Strict conformance",
+                "use Conformance::Transitional",
+            ))
+        } else if options.metadata_value().is_some() {
+            Some((
+                "initial XLS metadata authoring is not integrated",
+                "omit initial metadata",
+            ))
+        } else {
+            None
+        };
+        if let Some((message, suggestion)) = refusal {
+            return Err(Error::new(Code::UnsupportedCapability, message)
+                .with_format(FileFormat::Xls)
+                .with_suggestion(suggestion));
+        }
+        Ok(Self(Opened::new(Package::new()?)))
+    }
+
+    pub(crate) fn with_origin(&self, origin: Option<Arc<std::path::Path>>) -> Self {
+        Self(self.0.with_origin(origin))
+    }
+
+    pub(crate) fn origin(&self) -> Option<Arc<std::path::Path>> {
+        self.0.origin()
+    }
+
+    pub(crate) fn is_encrypted(&self) -> bool {
+        self.owner().is_encrypted()
+    }
+
+    pub(crate) fn check_source(&self) -> Result<()> {
+        if let Some(source) = self.owner().source() {
+            let expected = source.captured_source_version();
+            let observed = source.source_arc().version()?;
+            if observed != expected {
+                return Err(
+                    litchi_xls::SourceBackedError::SourceChanged { expected, observed }.into(),
+                );
+            }
+        }
+        Ok(())
+    }
+
+    pub(crate) fn write_to<W: std::io::Write>(&self, sink: &mut W) -> Result<()> {
+        if self.signature() == Signature::RemovalAuthorized {
+            let bytes = signature::unsign_compound_file(
+                self.owner().to_bytes()?,
+                litchi_sign::cfb::Format::Xls,
+            )?;
+            sink.write_all(&bytes)?;
+            self.check_source()?;
+        } else {
+            self.owner().write_to(sink)?;
+        }
+        Ok(())
+    }
+
     pub(crate) fn retains_source(&self) -> bool {
         true
     }

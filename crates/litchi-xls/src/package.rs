@@ -241,6 +241,18 @@ impl fmt::Debug for Package {
 }
 
 impl Package {
+    /// Create a minimal BIFF8 workbook containing one empty `Sheet1` worksheet.
+    ///
+    /// The authored image is admitted under the same strict default policies as
+    /// an opened package. Publication and subsequent edits use this owner.
+    pub fn new() -> Result<Self> {
+        let mut writer = crate::Writer::new();
+        writer.add_worksheet("Sheet1")?;
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output)?;
+        Self::from_owned_bytes(output.into_inner(), OpenOptions::default())
+    }
+
     /// Open an XLS package from a copied byte slice under default policies.
     pub fn from_bytes(bytes: &[u8]) -> Result<Self> {
         Self::from_bytes_with_options(bytes, OpenOptions::default())
@@ -532,6 +544,17 @@ impl Package {
     /// until a supported decrypt/re-encrypt owner is available.
     pub fn to_plain_bytes(&self) -> Result<Vec<u8>> {
         self.to_bytes()
+    }
+
+    /// Whether the retained input uses password-to-open encryption.
+    /// Ordinary publication refuses these inputs to avoid emitting plaintext.
+    #[must_use]
+    pub fn is_encrypted(&self) -> bool {
+        match &self.inner.state {
+            PackageState::Eager { encrypted, .. } | PackageState::Source { encrypted, .. } => {
+                *encrypted
+            },
+        }
     }
 
     /// Stream the exact package bytes to a sequential sink.

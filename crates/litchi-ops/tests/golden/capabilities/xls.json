@@ -1,0 +1,170 @@
+{
+  "format": "xls",
+  "state": "open",
+  "verbs": {
+    "get": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "find": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "query": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "view": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "set": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "add": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "remove": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "move": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "swap": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "edit": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "batch": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "save": {
+      "supported": true
+    },
+    "create": {
+      "supported": true
+    }
+  },
+  "views": {
+    "text": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "annotated": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "outline": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "stats": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "issues": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "forms": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "html": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "svg": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "screenshot": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    },
+    "pdf": {
+      "supported": false,
+      "code": "unsupported_capability",
+      "followUp": "M1 R6b",
+      "reason": "the XLS adapter of record 0010 §4.8 has not landed"
+    }
+  },
+  "elements": [],
+  "gaps": [
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "template",
+      "code": "unsupported_capability",
+      "followUp": "use Flavor::Document; M2 XLS template creation",
+      "reason": "the XLS creator currently authors ordinary workbooks and refuses template requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "strict-conformance",
+      "code": "unsupported_capability",
+      "followUp": "CreateOptions::conformance(Conformance::Transitional)",
+      "reason": "the XLS creator emits binary BIFF8 workbooks and refuses Strict requests"
+    },
+    {
+      "subject": "operation",
+      "verb": "create",
+      "element": "workbook",
+      "context": "initial-metadata",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS metadata creation",
+      "reason": "the XLS creator refuses initial metadata until typed metadata authoring is integrated"
+    }
+  ]
+}

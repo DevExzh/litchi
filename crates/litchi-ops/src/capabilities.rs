@@ -499,6 +499,16 @@ impl Capabilities {
             coverage: coverage(format),
             ordinary_output_protected: {
                 let mut protected = false;
+                #[cfg(feature = "xls")]
+                {
+                    let file = match file {
+                        File::Signed(signed) => signed.file(),
+                        file => file,
+                    };
+                    if let File::Xls(handle) = file {
+                        protected = handle.is_encrypted();
+                    }
+                }
                 #[cfg(feature = "encryption")]
                 {
                     let file = match file {
@@ -608,10 +618,14 @@ impl Capabilities {
         if (verb.is_edit() || verb == Verb::Create) && self.state == State::Signed {
             return SIGNED.support();
         }
-        if let Some(refusal) = self.read_refusal() {
-            return refusal.support();
-        }
         if self.ordinary_output_protected && (verb.is_edit() || verb == Verb::Save) {
+            if self.format == Some(FileFormat::Xls) {
+                return Refusal {
+                    code: Code::DocumentProtected,
+                    follow_up: "M2 XLS encryption-preserving publication",
+                    reason: "the unlocked XLS owner refuses ordinary publication to prevent plaintext output",
+                }.support();
+            }
             #[cfg(feature = "pptx")]
             if self.adapter() == Some(Adapter::Pptx) {
                 return Refusal { code: Code::DocumentProtected, follow_up: "use SaveOptions::reencrypt for encrypted publication; native encrypted edits remain pending", reason: "the unlocked encrypted presentation refuses ordinary plaintext publication and native editing" }.support();
@@ -621,6 +635,15 @@ impl Capabilities {
                 follow_up: "SaveOptions::reencrypt; M2 encryption-profile-preserving native edits",
                 reason: "the unlocked encrypted workbook requires re-encryption for publication and refuses native editing",
             }.support();
+        }
+        if verb == Verb::Create {
+            return self.creation_support();
+        }
+        if verb == Verb::Save {
+            return self.publication_support();
+        }
+        if let Some(refusal) = self.read_refusal() {
+            return refusal.support();
         }
         if verb.is_edit() {
             #[cfg(feature = "doc")]
@@ -747,6 +770,10 @@ impl Capabilities {
 
     /// Whether this report's format has an integrated publisher.
     fn publication_support(&self) -> Support {
+        if self.format == Some(FileFormat::Xls) && cfg!(feature = "xls") {
+            return Support::Supported;
+        }
+
         if matches!(
             self.format,
             Some(
@@ -768,6 +795,10 @@ impl Capabilities {
 
     /// Whether this report's format has an integrated creator.
     fn creation_support(&self) -> Support {
+        if self.format == Some(FileFormat::Xls) && cfg!(feature = "xls") {
+            return Support::Supported;
+        }
+
         if matches!(
             self.format,
             Some(
@@ -832,7 +863,15 @@ impl Capabilities {
     /// with a gap first, then the format's axis and property gaps, then the
     /// view modes the adapter does not render.
     pub fn gaps(&self) -> Gaps {
+        let independent: &'static [GapSpec] = &[];
+        #[cfg(feature = "xls")]
+        let independent = if self.format == Some(FileFormat::Xls) {
+            &XLS_CREATION_OPTION_GAPS[..]
+        } else {
+            independent
+        };
         Gaps {
+            independent: independent.iter(),
             adapter: self.adapter(),
             phase: GapPhase::Elements,
             next: 0,
@@ -1202,6 +1241,26 @@ static XLSX_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ),
 ];
 
+/// XLS creation options not represented by its native minimal creator.
+#[cfg(feature = "xls")]
+static XLS_CREATION_OPTION_GAPS: [GapSpec; 3] = [
+    xls_creation_gap(
+        "template",
+        "use Flavor::Document; M2 XLS template creation",
+        "the XLS creator currently authors ordinary workbooks and refuses template requests",
+    ),
+    xls_creation_gap(
+        "strict-conformance",
+        "CreateOptions::conformance(Conformance::Transitional)",
+        "the XLS creator emits binary BIFF8 workbooks and refuses Strict requests",
+    ),
+    xls_creation_gap(
+        "initial-metadata",
+        "M2 XLS metadata creation",
+        "the XLS creator refuses initial metadata until typed metadata authoring is integrated",
+    ),
+];
+
 /// XLSB creation options not represented by its native minimal creator.
 #[cfg(feature = "xlsb")]
 static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
@@ -1515,6 +1574,24 @@ const fn encrypted_xlsx_edit_gap(verb: &'static str) -> GapSpec {
 
 #[cfg(feature = "xlsx")]
 const fn xlsx_creation_gap(
+    context: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "workbook",
+            context,
+        },
+        code: Code::UnsupportedCapability,
+        follow_up,
+        reason,
+    }
+}
+
+#[cfg(feature = "xls")]
+const fn xls_creation_gap(
     context: &'static str,
     follow_up: &'static str,
     reason: &'static str,
@@ -2871,6 +2948,7 @@ impl Gap {
 /// option gaps, and view gaps.
 #[derive(Debug, Clone)]
 pub struct Gaps {
+    independent: std::slice::Iter<'static, GapSpec>,
     adapter: Option<Adapter>,
     phase: GapPhase,
     next: usize,
@@ -2888,6 +2966,9 @@ impl Iterator for Gaps {
     type Item = Gap;
 
     fn next(&mut self) -> Option<Gap> {
+        if let Some(spec) = self.independent.next() {
+            return Some(Gap { spec });
+        }
         let adapter = self.adapter?;
         loop {
             let index = self.next;

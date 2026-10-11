@@ -161,6 +161,7 @@ impl Locked {
     /// the path route after content classification.
     #[cfg(any(
         feature = "doc",
+        feature = "xls",
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
@@ -233,6 +234,7 @@ impl LockedState {
     /// needs an independent locked handle.
     #[cfg(any(
         feature = "doc",
+        feature = "xls",
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",

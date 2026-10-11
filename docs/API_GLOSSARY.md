@@ -1280,3 +1280,7 @@ operations retain the recipient's effective profiles. The operation bound is
 an inline typed error; physical admission errors keep their typed source.
 Builder and full option-envelope unification remain open. See
 [0198](unified-ops/0198-xls-primary-transactions.md).
+
+Record 0199 adds XLS `Package::new()` for one empty worksheet and connects the
+unified creator and publisher to that owner. Option-bearing XLS authoring still
+uses `Writer` pending its complete Builder and encrypted-publication migration.

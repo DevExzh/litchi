@@ -115,12 +115,14 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "docx",
             feature = "xlsx",
             feature = "pptx",
+            feature = "xls",
             feature = "xlsb"
         ))]
         let file = if matches!(
             file.format(),
             Some(
-                litchi_core::FileFormat::Doc
+                litchi_core::FileFormat::Xls
+                    | litchi_core::FileFormat::Doc
                     | litchi_core::FileFormat::Docx
                     | litchi_core::FileFormat::Xlsx
                     | litchi_core::FileFormat::Pptx
@@ -144,8 +146,11 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         ))]
         {
             let file = super::cfb::open_path(path, source, version, options)?;
-            #[cfg(feature = "doc")]
-            let file = if file.format() == Some(litchi_core::FileFormat::Doc) {
+            #[cfg(any(feature = "doc", feature = "xls"))]
+            let file = if matches!(
+                file.format(),
+                Some(litchi_core::FileFormat::Doc | litchi_core::FileFormat::Xls)
+            ) {
                 super::attach_origin(file, stable_origin(path)?)
             } else {
                 file
@@ -205,12 +210,14 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
+        feature = "xls",
         feature = "xlsb"
     ))]
     let opened = if matches!(
         opened.format(),
         Some(
-            litchi_core::FileFormat::Doc
+            litchi_core::FileFormat::Xls
+                | litchi_core::FileFormat::Doc
                 | litchi_core::FileFormat::Docx
                 | litchi_core::FileFormat::Xlsx
                 | litchi_core::FileFormat::Pptx

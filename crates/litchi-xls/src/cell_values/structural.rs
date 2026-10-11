@@ -808,21 +808,52 @@ fn rebuild_sheet(
     let index = unique_kind(&records, INDEX, "INDEX")?;
     let dimensions = unique_kind(&records, DIMENSIONS, "DIMENSIONS")?;
     let def_col = unique_kind(&records, DEF_COL_WIDTH, "DEFCOLWIDTH")?;
-    let first_row = records
-        .iter()
-        .position(|record| record.kind == ROW)
-        .ok_or_else(|| {
-            Error::UnsafeEdit("structural edit requires an existing BIFF8 row table".into())
-        })?;
-    let last_dbcell = records
-        .iter()
-        .rposition(|record| record.kind == DBCELL)
-        .ok_or_else(|| Error::UnsafeEdit("structural edit requires an existing DBCELL".into()))?;
-    if first_row <= index || last_dbcell < first_row {
-        return Err(Error::InvalidData(
-            "worksheet row-block order is invalid".into(),
-        ));
-    }
+    let first_row = records.iter().position(|record| record.kind == ROW);
+    let last_dbcell = records.iter().rposition(|record| record.kind == DBCELL);
+    let (row_records, row_table_start, row_table_end) = match (first_row, last_dbcell) {
+        (Some(first), Some(last)) if first > index && last >= first => (
+            &records[first..=last],
+            records[first].start,
+            records[last].end,
+        ),
+        (None, None) => {
+            // An empty indexed sheet has no row blocks. Require empty extents,
+            // no INDEX block pointers and no orphaned cells before creating its
+            // first row block directly after DIMENSIONS.
+            let index_payload = &worksheet[records[index].start + 4..records[index].end];
+            let dimensions_payload =
+                &worksheet[records[dimensions].start + 4..records[dimensions].end];
+            if index_payload.len() != 16
+                || index_payload[..12].iter().any(|byte| *byte != 0)
+                || dimensions_payload.len() != 14
+                || dimensions_payload.iter().any(|byte| *byte != 0)
+                || dimensions <= index
+                || def_col <= index
+                || def_col >= dimensions
+                || records.iter().any(|record| {
+                    is_cell_record(record.kind)
+                        || matches!(
+                            record.kind,
+                            STRING | TABLE | ARRAY | SHARED_FORMULA | CONTINUE | 0x0091
+                        )
+                })
+            {
+                return Err(Error::UnsafeEdit(
+                    "empty worksheet row-table metadata is inconsistent".into(),
+                ));
+            }
+            (
+                &records[0..0],
+                records[dimensions].end,
+                records[dimensions].end,
+            )
+        },
+        _ => {
+            return Err(Error::InvalidData(
+                "worksheet row-block order is invalid".into(),
+            ));
+        },
+    };
     let shifting = operations.iter().any(|operation| {
         matches!(
             operation,
@@ -837,7 +868,7 @@ fn rebuild_sheet(
         }
     }
 
-    let mut rows = collect_rows(worksheet, &records[first_row..=last_dbcell])?;
+    let mut rows = collect_rows(worksheet, row_records)?;
     for operation in operations {
         match operation {
             StructuralChange::Cell {
@@ -896,8 +927,6 @@ fn rebuild_sheet(
     }
     patch_row_extents(&mut rows)?;
 
-    let row_table_start = records[first_row].start;
-    let row_table_end = records[last_dbcell].end;
     let index_record = &records[index];
     let between = worksheet
         .get(index_record.end..row_table_start)
