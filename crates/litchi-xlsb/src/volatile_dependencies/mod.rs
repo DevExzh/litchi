@@ -33,3 +33,26 @@ pub use transaction::Transaction;
 pub type Limits = ReadLimits;
 
 pub use crate::package::error::{Error, Result};
+
+/// Validate graph ownership and the modeled stream before catalog remapping.
+pub(crate) fn reorder_owner(
+    package: &litchi_opc::OpcPackage,
+    sheet_count: usize,
+) -> Result<Option<litchi_opc::PackURI>> {
+    let workbook_name = package.main_document_part()?.partname();
+    let graph = package::discover_graph(package, workbook_name, Limits::DEFAULT)?;
+    let Some(graph) = graph else {
+        return Ok(None);
+    };
+    let parsed = codec::read(
+        package.get_part(&graph.part_name)?.blob(),
+        Limits::DEFAULT,
+        sheet_count,
+    )?;
+    if !parsed.rewrite_safe {
+        return Err(Error::UnsupportedFeature(
+            "sheet reordering cannot remap unmodeled volatile dependencies".to_string(),
+        ));
+    }
+    Ok(Some(graph.part_name))
+}

@@ -4,7 +4,7 @@
 //! formula-like carriers and markup-compatibility alternatives are rejected
 //! before publication instead of being guessed at.
 
-use std::collections::TryReserveError;
+use std::collections::{BTreeSet, TryReserveError};
 use std::str::Utf8Error;
 
 use litchi_core::xml::ReaderOrigin;
@@ -31,8 +31,11 @@ const EXCEL_FORMULA: &[u8] = b"http://schemas.microsoft.com/office/excel/2006/ma
 const X14: &[u8] = b"http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
 const EXTENDED_PROPERTIES: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/extended-properties";
+const STRICT_EXTENDED_PROPERTIES: &[u8] =
+    b"http://purl.oclc.org/ooxml/officeDocument/extended-properties";
 const PROPERTY_TYPES: &[u8] =
     b"http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes";
+const STRICT_PROPERTY_TYPES: &[u8] = b"http://purl.oclc.org/ooxml/officeDocument/docPropsVTypes";
 const MAX_REFERENCE_DEPTH: usize = 256;
 const MAX_CAPTURED_TEXT_BYTES: usize = 8 * 1024 * 1024;
 
@@ -181,6 +184,24 @@ struct Attribute {
 struct Tag {
     name: Box<str>,
     attributes: Box<[Attribute]>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum TitleReorderKind {
+    Properties,
+    TitlesOfParts,
+    TitleVector,
+    Title(usize),
+    Other,
+}
+
+#[derive(Debug)]
+struct TitleReorderFrame {
+    kind: TitleReorderKind,
+    name: Box<[u8]>,
+    inner_start: usize,
+    text: String,
+    has_markup: bool,
 }
 
 /// Rewrite one XML part, returning `None` without allocating an output buffer
@@ -459,6 +480,585 @@ where
     }
     output.extend_from_slice(&content[cursor..]);
     Ok(Some(output))
+}
+
+/// Reorder the leading catalog titles in an extended-properties part.
+///
+/// `original_titles` is the complete catalog in its source order, while each
+/// entry in `order` names the source catalog slot that should occupy the final
+/// position. Only the first `original_titles.len()` `vt:lpstr` entries in the
+/// one recognized `TitlesOfParts` vector are changed. Following entries are
+/// named-range metadata and remain byte-exact, including formula-like text.
+/// The XML namespace URIs are matched rather than their prefixes, so producer
+/// chosen prefixes remain intact.
+///
+/// # Example
+///
+/// ```
+/// use litchi_ooxml_common::xml::sheet_name::reorder_titles;
+/// let xml = br#"<p:Properties xmlns:p="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:v="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><p:TitlesOfParts><v:vector><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#;
+/// let changed = reorder_titles(xml, &["One", "Two"], &[1, 0], |left, right| {
+///     left.eq_ignore_ascii_case(right)
+/// })?;
+/// let bytes = changed.expect("changed titles");
+/// let changed = std::str::from_utf8(&bytes)?;
+/// assert!(changed.contains("<v:lpstr>Two</v:lpstr><v:lpstr>One</v:lpstr>"));
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+///
+/// # Errors
+///
+/// Returns a typed [`enum@Error`] when `order` is not a full permutation, the
+/// catalog titles do not match the immutable source catalog, the title context
+/// is ambiguous, or the XML contains markup-compatibility content.
+pub fn reorder_titles<F>(
+    content: &[u8],
+    original_titles: &[&str],
+    order: &[usize],
+    equivalent: F,
+) -> Result<Option<Vec<u8>>>
+where
+    F: Fn(&str, &str) -> bool,
+{
+    let identity = validate_title_order(original_titles.len(), order)?;
+    // Preserve the exact no-op contract before looking at the source bytes.
+    // This also lets callers keep malformed optional metadata untouched when
+    // the workbook order did not change.
+    if identity {
+        return Ok(None);
+    }
+
+    if crate::mce::binds_namespace_by_reference(content) {
+        return Err(Error::Blocked(BlockReason::MarkupCompatibility));
+    }
+
+    let mut reader = NsReader::from_reader(content);
+    let origin = ReaderOrigin::of(content);
+    let mut stack = Vec::<TitleReorderFrame>::new();
+    let mut replacements = Vec::<Replacement>::new();
+    replacements
+        .try_reserve_exact(original_titles.len())
+        .map_err(|source| Error::Allocation {
+            resource: "sheet-title replacements",
+            source,
+        })?;
+    let mut root_seen = false;
+    let mut saw_titles = false;
+    let mut saw_vector = false;
+    let mut title_entries = 0usize;
+    let mut captured_text_bytes = 0usize;
+
+    loop {
+        let event_start = position(&reader, origin)?;
+        let decoder = reader.decoder();
+        let event = reader
+            .read_event()
+            .map_err(|source| Error::Parse {
+                context: "sheet-title permutation XML scan",
+                source,
+            })?
+            .into_owned();
+        let event_end = position(&reader, origin)?;
+        let resolver = reader.resolver().clone();
+        let (namespace, event) = resolver.resolve_event(event);
+
+        match event {
+            Event::Start(element) => {
+                if stack.len() >= MAX_REFERENCE_DEPTH {
+                    return Err(Error::Limit(Limit::NestingDepth {
+                        limit: MAX_REFERENCE_DEPTH,
+                    }));
+                }
+                if is_mce_namespace(&namespace) {
+                    return Err(Error::Blocked(BlockReason::MarkupCompatibility));
+                }
+                validate_title_attributes(&element, decoder, &resolver)?;
+                if stack.is_empty() {
+                    if root_seen {
+                        return Err(invalid(
+                            "sheet-title permutation XML contains multiple roots",
+                        ));
+                    }
+                    root_seen = true;
+                    if !is_extended_element(&namespace, &element, b"Properties") {
+                        return Err(invalid(
+                            "sheet-title permutation XML has no extended-properties root",
+                        ));
+                    }
+                }
+
+                if let Some(parent) = stack.last_mut() {
+                    parent.has_markup = true;
+                }
+                let parent_kind = stack.last().map(|frame| frame.kind);
+                let local_name = element.name().local_name();
+                let local = local_name.as_ref();
+                let kind = reorder_kind(parent_kind, &namespace, &element, &mut title_entries);
+                reject_ambiguous_title_element(local, parent_kind, kind)?;
+                if kind == TitleReorderKind::TitlesOfParts {
+                    if std::mem::replace(&mut saw_titles, true) {
+                        return Err(invalid("duplicate extended-properties TitlesOfParts"));
+                    }
+                }
+                if kind == TitleReorderKind::TitleVector {
+                    if std::mem::replace(&mut saw_vector, true) {
+                        return Err(invalid(
+                            "duplicate extended-properties TitlesOfParts vector",
+                        ));
+                    }
+                }
+                stack.push(TitleReorderFrame {
+                    kind,
+                    name: element.name().as_ref().to_vec().into_boxed_slice(),
+                    inner_start: event_end,
+                    text: String::new(),
+                    has_markup: false,
+                });
+            },
+            Event::Empty(element) => {
+                if is_mce_namespace(&namespace) {
+                    return Err(Error::Blocked(BlockReason::MarkupCompatibility));
+                }
+                validate_title_attributes(&element, decoder, &resolver)?;
+                if stack.is_empty() {
+                    if root_seen {
+                        return Err(invalid(
+                            "sheet-title permutation XML contains multiple roots",
+                        ));
+                    }
+                    root_seen = true;
+                    if !is_extended_element(&namespace, &element, b"Properties") {
+                        return Err(invalid(
+                            "sheet-title permutation XML has no extended-properties root",
+                        ));
+                    }
+                }
+                if let Some(parent) = stack.last_mut() {
+                    parent.has_markup = true;
+                }
+                let parent_kind = stack.last().map(|frame| frame.kind);
+                let local_name = element.name().local_name();
+                let local = local_name.as_ref();
+                let kind = reorder_kind(parent_kind, &namespace, &element, &mut title_entries);
+                reject_ambiguous_title_element(local, parent_kind, kind)?;
+                if kind == TitleReorderKind::TitlesOfParts {
+                    if std::mem::replace(&mut saw_titles, true) {
+                        return Err(invalid("duplicate extended-properties TitlesOfParts"));
+                    }
+                }
+                if kind == TitleReorderKind::TitleVector {
+                    if std::mem::replace(&mut saw_vector, true) {
+                        return Err(invalid(
+                            "duplicate extended-properties TitlesOfParts vector",
+                        ));
+                    }
+                }
+                if let TitleReorderKind::Title(index) = kind {
+                    let replacement = finish_reordered_title(
+                        index,
+                        "",
+                        true,
+                        Span {
+                            start: event_end,
+                            end: event_end,
+                        },
+                        content,
+                        original_titles,
+                        order,
+                        &equivalent,
+                    )?;
+                    if let Some(replacement) = replacement {
+                        replacements.push(replacement);
+                    }
+                }
+            },
+            Event::Text(text) => {
+                if let Some(frame) = stack.last_mut()
+                    && matches!(frame.kind, TitleReorderKind::Title(_))
+                {
+                    let text = text.decode().map_err(|source| Error::Encoding {
+                        context: "extended-properties title text",
+                        source,
+                    })?;
+                    captured_text_bytes =
+                        captured_text_bytes
+                            .checked_add(text.len())
+                            .ok_or(Error::Limit(Limit::CapturedTextBytes {
+                                limit: MAX_CAPTURED_TEXT_BYTES,
+                            }))?;
+                    if captured_text_bytes > MAX_CAPTURED_TEXT_BYTES {
+                        return Err(Error::Limit(Limit::CapturedTextBytes {
+                            limit: MAX_CAPTURED_TEXT_BYTES,
+                        }));
+                    }
+                    frame.text.push_str(&text);
+                } else if stack.is_empty() {
+                    let text = text.decode().map_err(|source| Error::Encoding {
+                        context: "sheet-title XML text outside root",
+                        source,
+                    })?;
+                    if !is_xml_whitespace(&text) {
+                        return Err(invalid(
+                            "sheet-title permutation XML has non-whitespace text outside its root",
+                        ));
+                    }
+                }
+            },
+            Event::CData(text) => {
+                if let Some(frame) = stack.last_mut()
+                    && matches!(frame.kind, TitleReorderKind::Title(_))
+                {
+                    let text = text.decode().map_err(|source| Error::Encoding {
+                        context: "extended-properties title CDATA",
+                        source,
+                    })?;
+                    captured_text_bytes =
+                        captured_text_bytes
+                            .checked_add(text.len())
+                            .ok_or(Error::Limit(Limit::CapturedTextBytes {
+                                limit: MAX_CAPTURED_TEXT_BYTES,
+                            }))?;
+                    if captured_text_bytes > MAX_CAPTURED_TEXT_BYTES {
+                        return Err(Error::Limit(Limit::CapturedTextBytes {
+                            limit: MAX_CAPTURED_TEXT_BYTES,
+                        }));
+                    }
+                    frame.text.push_str(&text);
+                } else if stack.is_empty() {
+                    return Err(invalid(
+                        "sheet-title permutation XML has CDATA outside its root",
+                    ));
+                }
+            },
+            Event::GeneralRef(reference) => {
+                if let Some(frame) = stack.last_mut()
+                    && matches!(frame.kind, TitleReorderKind::Title(_))
+                {
+                    let text = decode_xml_reference(&reference)?;
+                    captured_text_bytes =
+                        captured_text_bytes
+                            .checked_add(text.len())
+                            .ok_or(Error::Limit(Limit::CapturedTextBytes {
+                                limit: MAX_CAPTURED_TEXT_BYTES,
+                            }))?;
+                    if captured_text_bytes > MAX_CAPTURED_TEXT_BYTES {
+                        return Err(Error::Limit(Limit::CapturedTextBytes {
+                            limit: MAX_CAPTURED_TEXT_BYTES,
+                        }));
+                    }
+                    frame.text.push_str(&text);
+                } else if stack.is_empty() {
+                    return Err(invalid(
+                        "sheet-title permutation XML has an entity outside its root",
+                    ));
+                }
+            },
+            Event::End(end) => {
+                let frame = stack.pop().ok_or_else(|| {
+                    invalid("sheet-title permutation XML found an unmatched closing tag")
+                })?;
+                if frame.name.as_ref() != end.name().as_ref() {
+                    return Err(invalid(
+                        "sheet-title permutation XML closing tag does not match its start tag",
+                    ));
+                }
+                captured_text_bytes = captured_text_bytes
+                    .checked_sub(frame.text.len())
+                    .ok_or_else(|| invalid("sheet-title text budget underflow"))?;
+                if let TitleReorderKind::Title(index) = frame.kind {
+                    let replacement = finish_reordered_title(
+                        index,
+                        &frame.text,
+                        frame.has_markup,
+                        Span {
+                            start: frame.inner_start,
+                            end: event_start,
+                        },
+                        content,
+                        original_titles,
+                        order,
+                        &equivalent,
+                    )?;
+                    if let Some(replacement) = replacement {
+                        replacements.push(replacement);
+                    }
+                }
+            },
+            Event::Comment(_) | Event::PI(_) | Event::DocType(_) | Event::Decl(_) => {
+                if let Some(parent) = stack.last_mut()
+                    && matches!(parent.kind, TitleReorderKind::Title(_))
+                {
+                    parent.has_markup = true;
+                }
+            },
+            Event::Eof => break,
+        }
+    }
+
+    if !root_seen || !stack.is_empty() {
+        return Err(invalid(
+            "sheet-title permutation XML ended before a complete root",
+        ));
+    }
+    // TitlesOfParts is optional extended-property metadata. Absence means
+    // there is no cached catalog order to update; a present but malformed
+    // container still refuses the rewrite below.
+    if !saw_titles {
+        return Ok(None);
+    }
+    if !saw_vector {
+        return Err(invalid(
+            "extended-properties TitlesOfParts title vector is missing",
+        ));
+    }
+    if title_entries < original_titles.len() {
+        return Err(invalid(format!(
+            "extended-properties TitlesOfParts has {title_entries} titles but the catalog has {}",
+            original_titles.len()
+        )));
+    }
+    if replacements.is_empty() {
+        return Ok(None);
+    }
+    replacements.sort_unstable_by_key(|replacement| replacement.span.start);
+    if replacements
+        .windows(2)
+        .any(|pair| pair[0].span.end > pair[1].span.start)
+    {
+        return Err(invalid("overlapping sheet-title replacements"));
+    }
+    let output_len = replacements
+        .iter()
+        .try_fold(content.len(), |size, replacement| {
+            size.checked_sub(replacement.span.end - replacement.span.start)?
+                .checked_add(replacement.bytes.len())
+        })
+        .ok_or_else(|| invalid("sheet-title permutation output size overflow"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation {
+            resource: "reordered extended-properties titles",
+            source,
+        })?;
+    let mut cursor = 0usize;
+    for replacement in replacements {
+        output.extend_from_slice(&content[cursor..replacement.span.start]);
+        output.extend_from_slice(&replacement.bytes);
+        cursor = replacement.span.end;
+    }
+    output.extend_from_slice(&content[cursor..]);
+    Ok(Some(output))
+}
+
+fn validate_title_order(catalog_len: usize, order: &[usize]) -> Result<bool> {
+    if order.len() != catalog_len {
+        return Err(invalid(format!(
+            "sheet-title order has {} entries but the catalog has {catalog_len}",
+            order.len()
+        )));
+    }
+    let mut seen = Vec::new();
+    seen.try_reserve_exact(catalog_len)
+        .map_err(|source| Error::Allocation {
+            resource: "sheet-title permutation validation",
+            source,
+        })?;
+    seen.resize(catalog_len, false);
+    let mut identity = true;
+    for (position, &source) in order.iter().enumerate() {
+        identity &= position == source;
+        let slot = seen
+            .get_mut(source)
+            .ok_or_else(|| invalid("sheet-title order contains an out-of-range index"))?;
+        if std::mem::replace(slot, true) {
+            return Err(invalid("sheet-title order contains a duplicate index"));
+        }
+    }
+    if seen.iter().any(|used| !used) {
+        return Err(invalid("sheet-title order omits a catalog index"));
+    }
+    Ok(identity)
+}
+
+fn reorder_kind(
+    parent: Option<TitleReorderKind>,
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    title_entries: &mut usize,
+) -> TitleReorderKind {
+    let local = element.name().local_name();
+    let local = local.as_ref();
+    if parent.is_none() && is_extended_element(namespace, element, b"Properties") {
+        TitleReorderKind::Properties
+    } else if parent == Some(TitleReorderKind::Properties)
+        && is_extended_namespace(namespace)
+        && local == b"TitlesOfParts"
+    {
+        TitleReorderKind::TitlesOfParts
+    } else if parent == Some(TitleReorderKind::TitlesOfParts)
+        && is_property_types_namespace(namespace)
+        && local == b"vector"
+    {
+        TitleReorderKind::TitleVector
+    } else if parent == Some(TitleReorderKind::TitleVector)
+        && is_property_types_namespace(namespace)
+        && local == b"lpstr"
+    {
+        let index = *title_entries;
+        *title_entries = (*title_entries).saturating_add(1);
+        TitleReorderKind::Title(index)
+    } else {
+        TitleReorderKind::Other
+    }
+}
+
+fn reject_ambiguous_title_element(
+    local: &[u8],
+    parent: Option<TitleReorderKind>,
+    kind: TitleReorderKind,
+) -> Result<()> {
+    if local == b"TitlesOfParts" && kind != TitleReorderKind::TitlesOfParts {
+        return Err(invalid(
+            "extended-properties TitlesOfParts is outside its recognized context",
+        ));
+    }
+    if local == b"vector"
+        && parent == Some(TitleReorderKind::TitlesOfParts)
+        && kind != TitleReorderKind::TitleVector
+    {
+        return Err(invalid(
+            "extended-properties TitlesOfParts has a foreign vector child",
+        ));
+    }
+    if local == b"lpstr"
+        && parent == Some(TitleReorderKind::TitleVector)
+        && kind == TitleReorderKind::Other
+    {
+        return Err(invalid(
+            "extended-properties title vector has a foreign lpstr child",
+        ));
+    }
+    if matches!(
+        parent,
+        Some(TitleReorderKind::TitlesOfParts | TitleReorderKind::TitleVector)
+    ) && kind == TitleReorderKind::Other
+    {
+        return Err(invalid(
+            "extended-properties title context has an unexpected child",
+        ));
+    }
+    Ok(())
+}
+
+fn validate_title_attributes(
+    element: &BytesStart<'_>,
+    decoder: Decoder,
+    resolver: &NamespaceResolver,
+) -> Result<()> {
+    let mut expanded = BTreeSet::<(Vec<u8>, Vec<u8>)>::new();
+    for attribute in element.checked_attributes() {
+        let attribute = attribute.map_err(|source| Error::Attribute {
+            context: "sheet-title XML attribute",
+            source,
+        })?;
+        let value = attribute
+            .decoded_and_normalized_value(XmlVersion::Explicit1_0, decoder)
+            .map_err(|source| Error::Parse {
+                context: "sheet-title XML attribute value",
+                source,
+            })?;
+        let key = attribute.key;
+        if is_namespace_declaration(key.as_ref()) {
+            if value.as_bytes() == MCE {
+                return Err(Error::Blocked(BlockReason::MarkupCompatibility));
+            }
+            continue;
+        }
+        let (namespace, local) = resolver.resolve_attribute(key);
+        let namespace = match namespace {
+            ResolveResult::Bound(Namespace(value)) => value.to_vec(),
+            ResolveResult::Unbound => Vec::new(),
+            ResolveResult::Unknown(prefix) => {
+                return Err(invalid(format!(
+                    "sheet-title XML attribute has an unbound namespace prefix '{}'",
+                    String::from_utf8_lossy(prefix.as_ref())
+                )));
+            },
+        };
+        if namespace.as_slice() == MCE {
+            return Err(Error::Blocked(BlockReason::MarkupCompatibility));
+        }
+        let expanded_name = (namespace, local.as_ref().to_vec());
+        if !expanded.insert(expanded_name) {
+            return Err(invalid(format!(
+                "duplicate expanded sheet-title XML attribute '{}'",
+                String::from_utf8_lossy(key.as_ref())
+            )));
+        }
+    }
+    Ok(())
+}
+
+fn is_namespace_declaration(key: &[u8]) -> bool {
+    key == b"xmlns" || key.starts_with(b"xmlns:")
+}
+
+fn is_xml_whitespace(text: &str) -> bool {
+    text.bytes()
+        .all(|byte| matches!(byte, b' ' | b'\t' | b'\r' | b'\n'))
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "arguments carry the complete source and span context for one title edit"
+)]
+fn finish_reordered_title<F>(
+    index: usize,
+    actual: &str,
+    has_markup: bool,
+    span: Span,
+    content: &[u8],
+    original_titles: &[&str],
+    order: &[usize],
+    equivalent: &F,
+) -> Result<Option<Replacement>>
+where
+    F: Fn(&str, &str) -> bool,
+{
+    let Some(expected) = original_titles.get(index) else {
+        return Ok(None);
+    };
+    if has_markup {
+        return Err(invalid(format!(
+            "extended-properties catalog title {index} contains nested markup"
+        )));
+    }
+    if !equivalent(actual, expected) {
+        return Err(invalid(format!(
+            "extended-properties catalog title {index} does not match the source catalog"
+        )));
+    }
+    if order[index] == index {
+        return Ok(None);
+    }
+    let target = original_titles[order[index]];
+    let escaped = escape_xml(target);
+    if span.start == span.end && !escaped.is_empty() {
+        return Err(invalid(format!(
+            "extended-properties catalog title {index} is empty but its reordered value is not"
+        )));
+    }
+    if content
+        .get(span.start..span.end)
+        .is_some_and(|bytes| bytes == escaped.as_bytes())
+    {
+        return Ok(None);
+    }
+    Ok(Some(Replacement {
+        span,
+        bytes: escaped.into_bytes(),
+    }))
 }
 
 #[allow(
@@ -928,6 +1528,29 @@ fn is_namespace(namespace: &ResolveResult<'_>, expected: &[&[u8]]) -> bool {
     )
 }
 
+fn is_extended_namespace(namespace: &ResolveResult<'_>) -> bool {
+    is_namespace(
+        namespace,
+        &[EXTENDED_PROPERTIES, STRICT_EXTENDED_PROPERTIES],
+    )
+}
+
+fn is_property_types_namespace(namespace: &ResolveResult<'_>) -> bool {
+    is_namespace(namespace, &[PROPERTY_TYPES, STRICT_PROPERTY_TYPES])
+}
+
+fn is_mce_namespace(namespace: &ResolveResult<'_>) -> bool {
+    is_namespace(namespace, &[MCE])
+}
+
+fn is_extended_element(
+    namespace: &ResolveResult<'_>,
+    element: &BytesStart<'_>,
+    local: &[u8],
+) -> bool {
+    element.name().local_name().as_ref() == local && is_extended_namespace(namespace)
+}
+
 fn ensure_direct(alternate: bool) -> Result<()> {
     if alternate {
         Err(Error::Blocked(BlockReason::MarkupCompatibility))
@@ -1196,5 +1819,206 @@ mod tests {
             .expect("scan")
             .is_none()
         );
+    }
+
+    #[test]
+    fn reorders_titles_by_expanded_namespace_and_preserves_foreign_markup() {
+        let source = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}" xmlns:foreign="urn:foreign"><foreign:note>keep</foreign:note><p:TitlesOfParts><v:vector baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#
+        );
+        let changed = reorder_titles(source.as_bytes(), &["One", "Two"], &[1, 0], equivalent)
+            .expect("reorder")
+            .expect("changed output");
+        let changed = std::str::from_utf8(&changed).expect("UTF-8");
+        assert!(changed.contains("<v:lpstr>Two</v:lpstr><v:lpstr>One</v:lpstr>"));
+        assert!(changed.contains("<foreign:note>keep</foreign:note>"));
+        assert!(changed.contains("baseType=\"lpstr\""));
+    }
+
+    #[test]
+    fn reorders_only_catalog_prefix_and_keeps_named_range_title_exact() {
+        let source = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}"><TitlesOfParts><vt:vector size="3" baseType="lpstr"><vt:lpstr data-keep="one">One</vt:lpstr><vt:lpstr>Two</vt:lpstr><vt:lpstr data-range="exact">Two!Print_Area</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#
+        );
+        let changed = reorder_titles(source.as_bytes(), &["One", "Two"], &[1, 0], equivalent)
+            .expect("reorder")
+            .expect("changed output");
+        let changed = std::str::from_utf8(&changed).expect("UTF-8");
+        assert!(changed.contains(concat!(
+            "<vt:lpstr data-keep=\"one\">Two</vt:lpstr>",
+            "<vt:lpstr>One</vt:lpstr>",
+            "<vt:lpstr data-range=\"exact\">Two!Print_Area</vt:lpstr>"
+        )));
+    }
+
+    #[test]
+    fn unchanged_catalog_slot_preserves_its_lexical_text() {
+        let source = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}"><TitlesOfParts><vt:vector><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr><vt:lpstr><![CDATA[Three]]></vt:lpstr></vt:vector></TitlesOfParts></Properties>"#
+        );
+        let changed = reorder_titles(
+            source.as_bytes(),
+            &["One", "Two", "Three"],
+            &[1, 0, 2],
+            equivalent,
+        )
+        .expect("reorder")
+        .expect("changed output");
+        assert!(
+            std::str::from_utf8(&changed)
+                .expect("UTF-8")
+                .contains("<vt:lpstr><![CDATA[Three]]></vt:lpstr>")
+        );
+    }
+
+    #[test]
+    fn absent_optional_titles_need_no_rewrite() {
+        let source = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}"><Application>Producer</Application></Properties>"#
+        );
+        assert!(
+            reorder_titles(source.as_bytes(), &["One", "Two"], &[1, 0], equivalent)
+                .expect("optional metadata")
+                .is_none()
+        );
+    }
+
+    #[test]
+    fn rejects_non_permutations_before_scanning_source() {
+        let malformed = b"<not-xml";
+        assert!(matches!(
+            reorder_titles(malformed, &["One", "Two"], &[0], equivalent),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            reorder_titles(malformed, &["One", "Two"], &[0, 0], equivalent),
+            Err(Error::Invalid(_))
+        ));
+        assert!(matches!(
+            reorder_titles(malformed, &["One", "Two"], &[0, 2], equivalent),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn identity_order_is_an_exact_noop_even_for_malformed_xml() {
+        assert_eq!(
+            reorder_titles(b"<not-xml", &["One", "Two"], &[0, 1], equivalent)
+                .expect("identity no-op"),
+            None
+        );
+    }
+
+    #[test]
+    fn rejects_stale_nested_and_markup_compatibility_title_contexts() {
+        let stale = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}"><TitlesOfParts><vt:vector><vt:lpstr>Stale</vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#
+        );
+        assert!(matches!(
+            reorder_titles(stale.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
+            Err(Error::Invalid(_))
+        ));
+
+        let nested = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}"><TitlesOfParts><vt:vector><vt:lpstr><vt:rich>One</vt:rich></vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#
+        );
+        assert!(matches!(
+            reorder_titles(nested.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
+            Err(Error::Invalid(_))
+        ));
+
+        let mce = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"><mc:AlternateContent><mc:Choice Requires="x"><TitlesOfParts><vt:vector><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts></mc:Choice></mc:AlternateContent></Properties>"#
+        );
+        assert!(matches!(
+            reorder_titles(mce.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
+            Err(Error::Blocked(BlockReason::MarkupCompatibility))
+        ));
+    }
+
+    #[test]
+    fn rejects_excessive_nesting_before_materializing_a_reordered_part() {
+        let mut source = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}"><Application>"#
+        );
+        source.push_str(&"<x>".repeat(MAX_REFERENCE_DEPTH));
+        source.push_str(&"</x>".repeat(MAX_REFERENCE_DEPTH));
+        source.push_str(
+            r#"</Application><TitlesOfParts><vt:vector><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#,
+        );
+        assert!(matches!(
+            reorder_titles(source.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
+            Err(Error::Limit(Limit::NestingDepth { .. }))
+        ));
+    }
+
+    #[test]
+    fn rejects_duplicate_raw_and_expanded_title_attributes() {
+        let raw_duplicate = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}"><TitlesOfParts><vt:vector a="1" a="2"><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#
+        );
+        assert!(matches!(
+            reorder_titles(
+                raw_duplicate.as_bytes(),
+                &["One", "Two"],
+                &[1, 0],
+                equivalent
+            ),
+            Err(Error::Attribute { .. })
+        ));
+
+        let expanded_duplicate = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}" xmlns:a="urn:duplicate" xmlns:b="urn:duplicate"><TitlesOfParts><vt:vector a:keep="1" b:keep="2"><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#
+        );
+        assert!(matches!(
+            reorder_titles(
+                expanded_duplicate.as_bytes(),
+                &["One", "Two"],
+                &[1, 0],
+                equivalent
+            ),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_markup_compatibility_attributes_even_without_an_alternate_branch() {
+        let source = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006" mc:Ignorable="future"><TitlesOfParts><vt:vector><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#
+        );
+        assert!(matches!(
+            reorder_titles(source.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
+            Err(Error::Blocked(BlockReason::MarkupCompatibility))
+        ));
+    }
+
+    #[test]
+    fn rejects_foreign_children_that_make_the_title_prefix_ambiguous() {
+        let source = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}" xmlns:foreign="urn:foreign"><TitlesOfParts><foreign:vector><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr></foreign:vector></TitlesOfParts></Properties>"#
+        );
+        assert!(matches!(
+            reorder_titles(source.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
+            Err(Error::Invalid(_))
+        ));
+    }
+
+    #[test]
+    fn rejects_non_whitespace_text_outside_root_and_unclosed_markup() {
+        let source = format!(
+            r#"junk<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}"><TitlesOfParts><vt:vector><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts></Properties>"#
+        );
+        assert!(matches!(
+            reorder_titles(source.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
+            Err(Error::Invalid(_))
+        ));
+
+        let unclosed = format!(
+            r#"<Properties xmlns="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:vt="{PROPERTY_TYPES_NAMESPACE}"><TitlesOfParts><vt:vector><vt:lpstr>One</vt:lpstr><vt:lpstr>Two</vt:lpstr></vt:vector></TitlesOfParts>"#
+        );
+        assert!(matches!(
+            reorder_titles(unclosed.as_bytes(), &["One", "Two"], &[1, 0], equivalent),
+            Err(Error::Invalid(_)) | Err(Error::Parse { .. })
+        ));
     }
 }

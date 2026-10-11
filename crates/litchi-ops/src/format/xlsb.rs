@@ -271,6 +271,54 @@ impl Xlsb {
         result
     }
 
+    /// Move one complete-catalog tab using the unified placement contract.
+    pub(crate) fn move_to<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::placement::Placement<'q>,
+    ) -> Result<write::Commit> {
+        self.move_to_with_limits(
+            path,
+            placement,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Move one complete-catalog tab under an explicit semantic budget.
+    pub(crate) fn move_to_with_limits<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::placement::Placement<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        self.check_source()?;
+        let result = write::move_to_with_limits(self, path, placement, limits);
+        self.check_source()?;
+        result
+    }
+
+    /// Swap two complete-catalog tabs in one native structural edit.
+    pub(crate) fn swap<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+    ) -> Result<write::Commit> {
+        self.swap_with_limits(left, right, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Swap two complete-catalog tabs under an explicit semantic budget.
+    pub(crate) fn swap_with_limits<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        self.check_source()?;
+        let result = write::swap_with_limits(self, left, right, limits);
+        self.check_source()?;
+        result
+    }
+
     /// Stream this immutable snapshot to a sequential sink.
     pub(crate) fn write_to<W: std::io::Write>(&self, sink: W) -> Result<()> {
         write::write_to(self, sink)

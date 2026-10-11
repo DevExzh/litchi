@@ -1147,3 +1147,14 @@ allocation, scan-limit and unsupported-carrier errors. Format owners retain
 transaction, package, selector and publication policy. New XLSB name patches
 use tag 7 for dependency-aware replay; historical tags 1/6 retain their earlier
 metadata-only behavior.
+
+## XLSB complete tab ordering (0185)
+
+The primary `Package::edit()` family gains `reorder_sheets(&[sheet::Selector])`.
+The slice names every tab exactly once using semantic names or checked positions
+in the immutable source catalog. Repeated calls replace the staged permutation;
+an identity permutation restores the original order. The result reports whether
+the staged order changed. No mutable package escape or parallel transaction
+family is introduced. Ordering is a native structural barrier; the unified
+`move_to` and `swap` adapters publish through this family and flush pending edit
+families at transaction boundaries.

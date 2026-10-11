@@ -21,7 +21,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `2346df7c5afcf5597a4a3caf4cf1ca5467f80d948e93e7f87b8fdf13461921e2` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `e908881add128c2d68b3cf9756478be0c347201ad045e687ae8f43ef9ef8d3ef` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `e9281f010ce5097658342f7fe5a78b27f45cce72f46241535c03bcea8dc06cde` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -2750,6 +2750,14 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `sheet` | `unmodeled-tab-views` | visibility changes refuse active-tab relocation across multiple workbook windows and selected-view changes on unmodeled dialog or macro tabs | M2 XLSB multi-window and additional tab-kind view mutation |
 | `set` | `sheet` | `sheet-name-markup-compatibility` | sheet-name edits refuse a recognized dependency inside an OOXML markup-compatibility alternative instead of selecting or discarding a branch | M2 XLSB markup-compatibility-aware sheet-name dependency rewrites |
 | `set` | `sheet` | `sheet-name-unmodeled-reference` | sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale | M2 XLSB additional sheet-name reference carriers |
+| `move` | `sheet` | `order-opaque-dependencies` | sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet ordering |
+| `swap` | `sheet` | `order-opaque-dependencies` | sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract | M2 XLSB dependency-aware complete-catalog sheet ordering |
+| `move` | `sheet` | `vba-dependency` | sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet ordering |
+| `swap` | `sheet` | `vba-dependency` | sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet ordering |
+| `move` | `sheet` | `calculation-chain-dependency` | sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet ordering |
+| `swap` | `sheet` | `calculation-chain-dependency` | sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet ordering |
+| `move` | `sheet` | `noncontiguous-3d-dependency` | sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous | M2 XLSB 3-D dependency-aware sheet ordering |
+| `swap` | `sheet` | `noncontiguous-3d-dependency` | sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous | M2 XLSB 3-D dependency-aware sheet ordering |
 
 ## pptx
 

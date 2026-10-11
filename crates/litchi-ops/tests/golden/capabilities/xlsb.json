@@ -27,16 +27,10 @@
       "supported": true
     },
     "move": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "swap": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "edit": {
       "supported": true
@@ -1965,6 +1959,78 @@
       "code": "unsupported_capability",
       "followUp": "M2 XLSB additional sheet-name reference carriers",
       "reason": "sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "order-opaque-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "sheet",
+      "context": "order-opaque-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "reason": "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "vba-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "reason": "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "sheet",
+      "context": "vba-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet ordering",
+      "reason": "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "calculation-chain-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB calculation-chain-aware sheet ordering",
+      "reason": "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "sheet",
+      "context": "calculation-chain-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB calculation-chain-aware sheet ordering",
+      "reason": "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "sheet",
+      "context": "noncontiguous-3d-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB 3-D dependency-aware sheet ordering",
+      "reason": "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "sheet",
+      "context": "noncontiguous-3d-dependency",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB 3-D dependency-aware sheet ordering",
+      "reason": "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous"
     },
     {
       "subject": "view",

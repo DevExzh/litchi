@@ -682,8 +682,10 @@ impl Capabilities {
                 return Support::Supported;
             }
             #[cfg(feature = "xlsb")]
-            if matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch)
-                && self.adapter() == Some(Adapter::Xlsb)
+            if matches!(
+                verb,
+                Verb::Set | Verb::Remove | Verb::Move | Verb::Swap | Verb::Edit | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Xlsb)
             {
                 if self.retains_source == Some(false) {
                     return RETAINED_SOURCE.support();
@@ -1087,11 +1089,12 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ),
 ];
 
-/// XLSB cell removal deliberately has a narrow element surface.  A range is
-/// a selector accepted by the cell handler, while workbook, sheet, row,
-/// column and other nodes are not removable structural elements.
+/// XLSB writes keep a narrow element surface. A range is a selector accepted
+/// by the cell handler, while workbook, row, column and other nodes are not
+/// removable structural elements; complete-catalog sheet-order dependency
+/// refusals remain explicit operation gaps below.
 #[cfg(feature = "xlsb")]
-static XLSB_WRITE_GAPS: [GapSpec; 8] = [
+static XLSB_WRITE_GAPS: [GapSpec; 16] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "remove",
@@ -1171,6 +1174,86 @@ static XLSB_WRITE_GAPS: [GapSpec; 8] = [
         code: Code::UnsupportedCapability,
         follow_up: "M2 XLSB additional sheet-name reference carriers",
         reason: "sheet-name edits refuse formula-like or name-like reference carriers outside the proven rewrite vocabulary so dependent names cannot be left stale",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "sheet",
+            context: "order-opaque-dependencies",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
+        reason: "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "sheet",
+            context: "order-opaque-dependencies",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
+        reason: "sheet ordering refuses shared-workbook revisions, data-model parts, connections, slicers, timelines, unmodeled workbook records, opaque volatile dependencies and markup-compatibility title metadata until their historical or ordinal dependencies have a native remapping contract",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "sheet",
+            context: "vba-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
+        reason: "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "sheet",
+            context: "vba-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware complete-catalog sheet ordering",
+        reason: "sheet ordering refuses workbooks with a VBA project dependency until native catalog identity remapping is available",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "sheet",
+            context: "calculation-chain-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB calculation-chain-aware sheet ordering",
+        reason: "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "sheet",
+            context: "calculation-chain-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB calculation-chain-aware sheet ordering",
+        reason: "sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "sheet",
+            context: "noncontiguous-3d-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB 3-D dependency-aware sheet ordering",
+        reason: "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "sheet",
+            context: "noncontiguous-3d-dependency",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB 3-D dependency-aware sheet ordering",
+        reason: "sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous",
     },
 ];
 

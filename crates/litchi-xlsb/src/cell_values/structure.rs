@@ -108,6 +108,15 @@ enum Operation {
         /// metadata-only behavior; newly staged edits use tag 7.
         dependencies: bool,
     },
+    /// Replace the complete workbook-tab order by source-catalog positions.
+    ///
+    /// The vector is a permutation in final-position order.  Keeping source
+    /// positions rather than names makes the operation stable when names are
+    /// duplicated in a lenient source image and keeps chart/dialog/macro tabs
+    /// in the same complete catalog as worksheets.
+    ReorderSheets {
+        order: Arc<[usize]>,
+    },
     SetSheetState {
         catalog_position: usize,
         state: State,
@@ -194,6 +203,7 @@ impl ImagePlan {
 enum Selection {
     SheetRename(usize),
     LegacyWorksheetRename(usize),
+    SheetOrder,
     SheetState(usize),
     Cell(usize, Reference),
     Drawing(usize),
@@ -206,6 +216,7 @@ impl Operation {
             Self::SetSheetName {
                 catalog_position, ..
             } => Selection::SheetRename(*catalog_position),
+            Self::ReorderSheets { .. } => Selection::SheetOrder,
             Self::SetSheetState {
                 catalog_position, ..
             } => Selection::SheetState(*catalog_position),
@@ -221,6 +232,7 @@ impl Operation {
 
     fn conflicts_with(&self, other: &Self) -> bool {
         match (self, other) {
+            (Self::ReorderSheets { .. }, _) | (_, Self::ReorderSheets { .. }) => true,
             (Self::RenameSheet { .. }, Self::SetSheetState { .. })
             | (Self::SetSheetState { .. }, Self::RenameSheet { .. }) => false,
             (Self::SetSheetName { .. }, Self::SetSheetState { .. })
@@ -311,6 +323,7 @@ impl Edit {
                 Operation::SetSheetName { name, .. } => name.as_str(),
                 Operation::RenameSheet { .. }
                 | Operation::SetSheetState { .. }
+                | Operation::ReorderSheets { .. }
                 | Operation::TransferCell { .. }
                 | Operation::AddImage { .. }
                 | Operation::TransferDrawing { .. } => {
@@ -340,6 +353,132 @@ impl Edit {
             self.stage(operation)?;
         }
         Ok(Some(changed))
+    }
+
+    /// Replace the complete workbook-tab order by semantic selectors.
+    ///
+    /// Every selector is resolved against this edit's immutable source
+    /// catalog, and the slice must name every tab exactly once.  The order
+    /// includes chart, dialog, macro, and unbound tabs as well as worksheets.
+    /// Repeating the operation replaces the earlier staged permutation, so a
+    /// later identity order cancels the change without retaining stale
+    /// intermediate positions.
+    ///
+    /// Reordering is a workbook-structure barrier.  It cannot be composed in
+    /// one transaction with metadata, cell, or drawing operations until those
+    /// operations have a shared catalog-identity remapping contract.
+    ///
+    /// ```
+    /// use litchi_core::sheet::traits::WorkbookTrait;
+    /// use litchi_xlsb::{Builder, sheet::Selector, writer::MutableWorksheet};
+    ///
+    /// let mut builder = Builder::new();
+    /// builder.add_worksheet(MutableWorksheet::new("First"));
+    /// builder.add_worksheet(MutableWorksheet::new("Second"));
+    /// let source = builder.build()?;
+    /// let mut edit = source.edit()?;
+    /// assert!(edit.reorder_sheets(&[
+    ///     Selector::from("Second"),
+    ///     Selector::from("First"),
+    /// ])?);
+    /// let commit = edit.commit()?;
+    /// assert_eq!(
+    ///     commit.package().workbook()?.worksheet_names(),
+    ///     &["Second", "First"],
+    /// );
+    /// # Ok::<(), litchi_xlsb::package::PackageError>(())
+    /// ```
+    pub fn reorder_sheets(&mut self, selectors: &[Selector<'_>]) -> Result<bool> {
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::ReorderSheets { .. }))
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet reordering cannot be combined with other workbook operations".to_string(),
+            ));
+        }
+        if selectors.len() != self.sheet_catalog.len() {
+            return Err(Error::InvalidFormat(format!(
+                "sheet order must select every catalog tab exactly once (expected {}, found {})",
+                self.sheet_catalog.len(),
+                selectors.len()
+            )));
+        }
+        let mut order = Vec::new();
+        order
+            .try_reserve_exact(selectors.len())
+            .map_err(|source| Error::Allocation {
+                resource: "XLSB sheet order selectors",
+                source,
+            })?;
+        let mut seen = Vec::new();
+        seen.try_reserve_exact(self.sheet_catalog.len())
+            .map_err(|source| Error::Allocation {
+                resource: "XLSB sheet order selector set",
+                source,
+            })?;
+        seen.resize(self.sheet_catalog.len(), false);
+        for selector in selectors {
+            let catalog_position = resolve_catalog_position(&self.sheet_catalog, selector)?
+                .ok_or_else(|| {
+                    Error::WorksheetNotFound(
+                        "sheet order selector does not resolve in the source catalog".to_string(),
+                    )
+                })?;
+            let used = seen.get_mut(catalog_position).ok_or_else(|| {
+                Error::InvalidFormat("sheet order position is out of bounds".to_string())
+            })?;
+            if std::mem::replace(used, true) {
+                return Err(Error::InvalidFormat(
+                    "sheet order selectors must be unique".to_string(),
+                ));
+            }
+            order.push(catalog_position);
+        }
+        if seen.iter().any(|used| !used) {
+            return Err(Error::InvalidFormat(
+                "sheet order selectors must cover the complete catalog".to_string(),
+            ));
+        }
+        let order: Arc<[usize]> = order.into();
+        let existing = self
+            .operation_indexes
+            .get(&Selection::SheetOrder)
+            .and_then(|indexes| {
+                indexes
+                    .iter()
+                    .rev()
+                    .find_map(|index| match &self.operations[*index] {
+                        Operation::ReorderSheets { order } => Some(order),
+                        Operation::RenameSheet { .. }
+                        | Operation::SetSheetName { .. }
+                        | Operation::SetSheetState { .. }
+                        | Operation::TransferCell { .. }
+                        | Operation::AddImage { .. }
+                        | Operation::TransferDrawing { .. } => None,
+                    })
+            });
+        let identity = order
+            .iter()
+            .enumerate()
+            .all(|(position, source)| position == *source);
+        let changed = existing.map_or(!identity, |current| current.as_ref() != order.as_ref());
+        let operation = Operation::ReorderSheets { order };
+        if let Some(index) =
+            self.operation_indexes
+                .get(&Selection::SheetOrder)
+                .and_then(|indexes| {
+                    indexes.iter().rev().copied().find(|index| {
+                        matches!(self.operations[*index], Operation::ReorderSheets { .. })
+                    })
+                })
+        {
+            self.operations[index] = operation;
+        } else {
+            self.stage(operation)?;
+        }
+        Ok(changed)
     }
 
     /// Plan a workbook-tab visibility change using the complete sheet
@@ -400,6 +539,7 @@ impl Edit {
             Operation::SetSheetState { state, .. } => *state,
             Operation::RenameSheet { .. }
             | Operation::SetSheetName { .. }
+            | Operation::ReorderSheets { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
             | Operation::TransferDrawing { .. } => tab.state,
@@ -682,6 +822,16 @@ impl Edit {
     }
 
     fn stage(&mut self, operation: Operation) -> Result<()> {
+        let is_reorder = matches!(operation, Operation::ReorderSheets { .. });
+        if self
+            .operations
+            .iter()
+            .any(|existing| matches!(existing, Operation::ReorderSheets { .. }) != is_reorder)
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet reordering cannot be combined with other workbook operations".to_string(),
+            ));
+        }
         if self.operations.len() >= self.limits.changes() {
             return Err(Error::LimitExceeded {
                 resource: "workbook structural operations",
@@ -939,16 +1089,20 @@ impl Patch {
                 maximum: limits.changes(),
             });
         }
-        let mut encoded_operations = Vec::new();
+        let mut encoded_length = 0usize;
         for operation in &self.operations {
-            encode_operation(operation, &mut encoded_operations)?;
+            encoded_length = encoded_length
+                .checked_add(encoded_operation_length(operation)?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "durable workbook patch operation bytes",
+                })?;
         }
         let total = MAGIC
             .len()
             .checked_add(24)
             .and_then(|size| size.checked_add(self.before.len()))
             .and_then(|size| size.checked_add(self.after.len()))
-            .and_then(|size| size.checked_add(encoded_operations.len()))
+            .and_then(|size| size.checked_add(encoded_length))
             .ok_or(Error::CapacityOverflow {
                 resource: "durable workbook patch bytes",
             })?;
@@ -972,7 +1126,9 @@ impl Patch {
         push_usize(&mut output, self.operations.len())?;
         output.extend_from_slice(&self.before);
         output.extend_from_slice(&self.after);
-        output.extend_from_slice(&encoded_operations);
+        for operation in &self.operations {
+            encode_operation(operation, &mut output)?;
+        }
         Ok(output)
     }
 
@@ -1114,6 +1270,7 @@ impl Patch {
         // makes old and new encodings select the same merge key.  Re-encoding
         // the decoded patch uses the canonical tag 6 form.
         operations = canonicalize_legacy_operations(&validated_before, operations)?;
+        validate_reorder_operations(&operations)?;
         let _validated_after = validated_workbook_with_external_link_limits_and_drawing_policy(
             &after,
             external_link_limits,
@@ -1155,6 +1312,13 @@ impl Patch {
                 Operation::RenameSheet { name, .. } | Operation::SetSheetName { name, .. } => {
                     17usize.checked_add(name.len())
                 },
+                Operation::ReorderSheets { order } => {
+                    9usize.checked_add(order.len().checked_mul(size_of::<u64>()).ok_or(
+                        Error::CapacityOverflow {
+                            resource: "workbook history reorder operation bytes",
+                        },
+                    )?)
+                },
                 Operation::SetSheetState { .. } => Some(17),
                 Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
                 Operation::AddImage { image, .. } => {
@@ -1193,6 +1357,7 @@ impl MergeConflict {
             | Selection::SheetState(sheet)
             | Selection::Cell(sheet, _)
             | Selection::Drawing(sheet) => sheet,
+            Selection::SheetOrder => usize::MAX,
         }
     }
 
@@ -1203,6 +1368,7 @@ impl MergeConflict {
             Selection::SheetRename(_)
             | Selection::LegacyWorksheetRename(_)
             | Selection::SheetState(_)
+            | Selection::SheetOrder
             | Selection::Drawing(_) => None,
             Selection::Cell(_, reference) => Some(reference),
         }
@@ -1394,6 +1560,7 @@ fn canonicalize_legacy_operations(
                 }
             },
             operation @ (Operation::SetSheetName { .. }
+            | Operation::ReorderSheets { .. }
             | Operation::SetSheetState { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
@@ -1404,6 +1571,28 @@ fn canonicalize_legacy_operations(
     Ok(canonical)
 }
 
+fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
+    let reorder_count = operations
+        .iter()
+        .filter(|operation| matches!(operation, Operation::ReorderSheets { .. }))
+        .count();
+    if reorder_count > 1 {
+        return Err(Error::UnsupportedFeature(
+            "durable workbook patches may contain at most one sheet-reorder operation".to_string(),
+        ));
+    }
+    if reorder_count == 1
+        && operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::ReorderSheets { .. }))
+    {
+        return Err(Error::UnsupportedFeature(
+            "sheet reordering cannot be combined with other workbook operations".to_string(),
+        ));
+    }
+    Ok(())
+}
+
 fn replay_workbook(
     mut workbook: Workbook,
     before: &[u8],
@@ -1412,6 +1601,7 @@ fn replay_workbook(
     if operations.is_empty() {
         return Ok((before.to_vec(), workbook));
     }
+    validate_reorder_operations(operations)?;
     let mut changed = false;
     let mut state_changed = false;
     let mut index = 0usize;
@@ -1457,6 +1647,9 @@ fn replay_workbook(
                     *target_reference,
                 )?;
                 changed = true;
+            },
+            Operation::ReorderSheets { order } => {
+                changed |= apply_sheet_order(&mut workbook, order)?;
             },
             Operation::AddImage { sheet, image } => {
                 add_image(&mut workbook, *sheet, image)?;
@@ -1919,6 +2112,647 @@ fn transfer_cell(
     Ok(())
 }
 
+/// Apply one complete-catalog permutation to the workbook and every modeled
+/// sheet-index dependency.  The package is edited through a replacement
+/// batch, so a refusal from any dependency leaves the source image untouched.
+fn apply_sheet_order(workbook: &mut Workbook, order: &[usize]) -> Result<bool> {
+    let catalog_len = workbook.sheets().len();
+    let inverse = validate_sheet_order(order, catalog_len)?;
+    if order
+        .iter()
+        .enumerate()
+        .all(|(position, source)| position == *source)
+    {
+        return Ok(false);
+    }
+    reject_unmodeled_reorder_dependencies(&workbook.package)?;
+    crate::signature_policy::ensure_unsigned(&workbook.package)?;
+
+    let workbook_uri = workbook.package.main_document_part()?.partname().clone();
+    let volatile = crate::volatile_dependencies::reorder_owner(&workbook.package, catalog_len)?;
+    let workbook_source = workbook.package.get_part(&workbook_uri)?.blob().to_vec();
+    let workbook_output = rewrite_workbook_order(
+        &workbook_source,
+        order,
+        &inverse,
+        catalog_len,
+        &workbook.formula_context,
+    )?;
+
+    let tabs = workbook.sheets().collect::<Vec<_>>();
+    let titles = tabs
+        .iter()
+        .map(|tab| tab.name().to_owned())
+        .collect::<Vec<_>>();
+    let title_refs = titles.iter().map(String::as_str).collect::<Vec<_>>();
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve(workbook.package.part_count().saturating_add(2))
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet-order package replacements",
+            source,
+        })?;
+    replacements.push((workbook_uri, workbook_output));
+
+    for part in workbook.package.iter_parts() {
+        if part
+            .content_type()
+            .eq_ignore_ascii_case(litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES)
+        {
+            if let Some(output) = litchi_ooxml_common::xml::sheet_name::reorder_titles(
+                workbook.package.get_part(part.partname())?.blob(),
+                &title_refs,
+                order,
+                excel_name_eq,
+            )? {
+                replacements.push((part.partname().clone(), output));
+            }
+        }
+        if volatile.as_ref().is_some_and(|uri| uri == part.partname()) {
+            if let Some(output) = rewrite_volatile_dependencies(
+                workbook.package.get_part(part.partname())?.blob(),
+                &inverse,
+                catalog_len,
+            )? {
+                replacements.push((part.partname().clone(), output));
+            }
+        }
+        if part
+            .content_type()
+            .eq_ignore_ascii_case(crate::shared_workbook::package::HEADERS_CONTENT_TYPE)
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet reordering is unsupported with shared-workbook revision headers because their historical display order is immutable"
+                    .to_string(),
+            ));
+        }
+    }
+
+    let mut package = workbook.package.clone();
+    package.replace_part_payloads(replacements)?;
+    let validated = workbook.reparse_candidate(package)?;
+    *workbook = validated;
+    Ok(true)
+}
+
+fn validate_sheet_order(order: &[usize], catalog_len: usize) -> Result<Vec<usize>> {
+    if order.len() != catalog_len {
+        return Err(Error::InvalidFormat(format!(
+            "sheet order has {} entries but the catalog has {catalog_len}",
+            order.len()
+        )));
+    }
+    let mut inverse = Vec::new();
+    inverse
+        .try_reserve_exact(catalog_len)
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet-order inverse permutation",
+            source,
+        })?;
+    inverse.resize(catalog_len, usize::MAX);
+    for (new_position, &old_position) in order.iter().enumerate() {
+        let slot = inverse.get_mut(old_position).ok_or_else(|| {
+            Error::InvalidFormat("sheet order contains an out-of-range position".to_string())
+        })?;
+        if *slot != usize::MAX {
+            return Err(Error::InvalidFormat(
+                "sheet order contains a duplicate position".to_string(),
+            ));
+        }
+        *slot = new_position;
+    }
+    if inverse.iter().any(|position| *position == usize::MAX) {
+        return Err(Error::InvalidFormat(
+            "sheet order omits a catalog position".to_string(),
+        ));
+    }
+    Ok(inverse)
+}
+
+fn reject_unmodeled_reorder_dependencies(package: &litchi_opc::OpcPackage) -> Result<()> {
+    for part in package.iter_parts() {
+        let content_type = part.content_type().to_ascii_lowercase();
+        let part_name = part.partname().as_str().to_ascii_lowercase();
+        if content_type.eq_ignore_ascii_case(litchi_opc::constants::content_type::OFC_VBA_PROJECT)
+            || content_type.eq_ignore_ascii_case(
+                litchi_opc::constants::content_type::OFC_VBA_PROJECT_SIGNATURE,
+            )
+            || content_type.eq_ignore_ascii_case(
+                litchi_opc::constants::content_type::OFC_VBA_PROJECT_SIGNATURE_AGILE,
+            )
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet reordering is unsupported while a VBA project dependency is present"
+                    .to_string(),
+            ));
+        }
+        if content_type.contains("calcchain") || part_name.contains("calcchain") {
+            return Err(Error::UnsupportedFeature(
+                "sheet reordering is unsupported while a calculation-chain dependency is present"
+                    .to_string(),
+            ));
+        }
+        if content_type.eq_ignore_ascii_case(crate::slicer::package::CACHE_CONTENT_TYPE)
+            || content_type.eq_ignore_ascii_case(crate::slicer::package::VIEWS_CONTENT_TYPE)
+            || content_type == "application/vnd.ms-excel.timelinecache+xml"
+            || content_type == "application/vnd.ms-excel.timeline+xml"
+            || content_type.eq_ignore_ascii_case(crate::shared_workbook::package::LOG_CONTENT_TYPE)
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet reordering is unsupported with unmodeled slicer, timeline or revision-log dependencies".to_string(),
+            ));
+        }
+        if content_type.eq_ignore_ascii_case(crate::data_model::DATA_MODEL_CONTENT_TYPE)
+            || content_type.eq_ignore_ascii_case(
+                crate::package::connections::package::CONNECTIONS_CONTENT_TYPE,
+            )
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet reordering is unsupported with unmodeled data-model or connections dependencies"
+                    .to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn rewrite_workbook_order(
+    source: &[u8],
+    order: &[usize],
+    inverse: &[usize],
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+) -> Result<Vec<u8>> {
+    let mut bundle_records = Vec::new();
+    bundle_records
+        .try_reserve_exact(catalog_len)
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB reordered catalog records",
+            source,
+        })?;
+    let mut saw_bundle_collection = false;
+    let mut bundle_open = false;
+    let mut bundle_collection_closed = false;
+    let mut records = Vec::new();
+    for item in Records::new(source) {
+        let record = item?;
+        let raw = record_bytes(source, &record)?;
+        match record.kind() {
+            kind::BEGIN_BUNDLE_SHS => {
+                if bundle_open || saw_bundle_collection {
+                    return Err(Error::InvalidFormat(
+                        "Workbook has duplicate or nested BrtBundleShs collections".to_string(),
+                    ));
+                }
+                if !record.payload().is_empty() {
+                    return Err(Error::InvalidLength {
+                        expected: 0,
+                        found: record.payload().len(),
+                    });
+                }
+                saw_bundle_collection = true;
+                bundle_open = true;
+            },
+            kind::BUNDLE_SH if bundle_open => {
+                bundle_records.push(raw);
+            },
+            kind::BUNDLE_SH => {
+                return Err(Error::InvalidFormat(
+                    "BrtBundleSh appears outside its BrtBeginBundleShs collection".to_string(),
+                ));
+            },
+            kind::END_BUNDLE_SHS => {
+                if !bundle_open {
+                    return Err(Error::InvalidFormat(
+                        "BrtEndBundleShs has no matching collection".to_string(),
+                    ));
+                }
+                if !record.payload().is_empty() {
+                    return Err(Error::InvalidLength {
+                        expected: 0,
+                        found: record.payload().len(),
+                    });
+                }
+                bundle_open = false;
+                bundle_collection_closed = true;
+            },
+            _ if bundle_open => {
+                return Err(Error::UnsupportedFeature(
+                    "sheet reordering cannot detach an unknown record interspersed with BrtBundleSh records"
+                        .to_string(),
+                ));
+            },
+            kind::BEGIN_BOOK
+            | kind::END_BOOK
+            | kind::FILE_VERSION
+            | kind::WORKBOOK_PROP
+            | kind::BEGIN_BOOK_VIEWS
+            | kind::END_BOOK_VIEWS
+            | kind::BOOK_VIEW
+            | kind::BEGIN_PIVOT_CACHE_IDS
+            | kind::END_PIVOT_CACHE_IDS
+            | kind::BEGIN_PIVOT_CACHE_ID
+            | kind::END_PIVOT_CACHE_ID
+            | kind::BEGIN_EXTERNALS
+            | kind::END_EXTERNALS
+            | kind::SUP_SELF
+            | kind::SUP_SAME
+            | kind::SUP_ADDIN
+            | kind::SUP_BOOK_SRC
+            | kind::EXTERN_SHEET
+            | kind::NAME
+            | kind::CALC_PROP => {},
+            other => {
+                return Err(Error::UnsupportedFeature(format!(
+                    "sheet reordering cannot preserve unmodeled workbook record {other:?} at offset {} without a catalog dependency contract",
+                    record.offset()
+                )));
+            },
+        }
+        records.try_reserve(1).map_err(|source| Error::Allocation {
+            resource: "XLSB workbook record spans",
+            source,
+        })?;
+        records.push((record.kind(), raw));
+    }
+    if bundle_open || !bundle_collection_closed || !saw_bundle_collection {
+        return Err(Error::InvalidFormat(
+            "Workbook sheet catalog has no complete BrtBundleSh collection".to_string(),
+        ));
+    }
+    if bundle_records.len() != catalog_len {
+        return Err(Error::InvalidFormat(format!(
+            "Workbook BrtBundleSh count {} differs from catalog size {catalog_len}",
+            bundle_records.len()
+        )));
+    }
+
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|source| Error::Allocation {
+            resource: "reordered workbook.bin",
+            source,
+        })?;
+    let mut inserted_bundles = false;
+    for (record_kind, raw) in records {
+        if record_kind == kind::BUNDLE_SH {
+            if !inserted_bundles {
+                for &old_position in order {
+                    output.extend_from_slice(bundle_records.get(old_position).ok_or_else(
+                        || {
+                            Error::InvalidFormat(
+                                "sheet order references an absent BrtBundleSh record".to_string(),
+                            )
+                        },
+                    )?);
+                }
+                inserted_bundles = true;
+            }
+            continue;
+        }
+        let raw = rewrite_workbook_record(raw, inverse, catalog_len, context)?;
+        output.extend_from_slice(&raw);
+    }
+    if !inserted_bundles {
+        return Err(Error::InvalidFormat(
+            "Workbook sheet catalog records were not emitted".to_string(),
+        ));
+    }
+    Ok(output)
+}
+
+fn rewrite_workbook_record(
+    raw: &[u8],
+    inverse: &[usize],
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+) -> Result<Vec<u8>> {
+    let (header, header_len) = Header::parse(raw, RawLimits::DEFAULT)?;
+    let payload = raw.get(header_len..).ok_or(Error::InvalidLength {
+        expected: header_len,
+        found: raw.len(),
+    })?;
+    let payload = payload.get(..header.len()).ok_or(Error::InvalidLength {
+        expected: header_len.saturating_add(header.len()),
+        found: raw.len(),
+    })?;
+    let mut output = raw.to_vec();
+    match header.kind() {
+        kind::BOOK_VIEW => {
+            if payload.len() != 29 {
+                return Err(Error::InvalidLength {
+                    expected: 29,
+                    found: payload.len(),
+                });
+            }
+            for field_offset in [20usize, 24usize] {
+                let old = usize::try_from(u32::from_le_bytes(
+                    payload[field_offset..field_offset + 4]
+                        .try_into()
+                        .map_err(|_error| Error::InvalidLength {
+                            expected: field_offset.saturating_add(4),
+                            found: payload.len(),
+                        })?,
+                ))
+                .map_err(|_error| {
+                    Error::InvalidFormula("BrtBookView index overflow".to_string())
+                })?;
+                let new = *inverse.get(old).ok_or_else(|| {
+                    Error::InvalidFormat("BrtBookView points outside the sheet catalog".to_string())
+                })?;
+                let output_len = output.len();
+                let target = output
+                    .get_mut(header_len + field_offset..header_len + field_offset + 4)
+                    .ok_or(Error::InvalidLength {
+                        expected: header_len + field_offset + 4,
+                        found: output_len,
+                    })?;
+                target.copy_from_slice(
+                    &u32::try_from(new)
+                        .map_err(|_error| Error::CapacityOverflow {
+                            resource: "reordered workbook view index",
+                        })?
+                        .to_le_bytes(),
+                );
+            }
+        },
+        kind::NAME => {
+            if payload.len() < 9 {
+                return Err(Error::InvalidLength {
+                    expected: 9,
+                    found: payload.len(),
+                });
+            }
+            let old = u32::from_le_bytes(payload[5..9].try_into().map_err(|_error| {
+                Error::InvalidLength {
+                    expected: 9,
+                    found: payload.len(),
+                }
+            })?);
+            if old != u32::MAX {
+                let old = usize::try_from(old).map_err(|_error| {
+                    Error::InvalidFormula("BrtName sheet scope does not fit usize".to_string())
+                })?;
+                let new = *inverse.get(old).ok_or_else(|| {
+                    Error::InvalidFormula(
+                        "BrtName sheet scope exceeds the sheet catalog".to_string(),
+                    )
+                })?;
+                output[header_len + 5..header_len + 9].copy_from_slice(
+                    &u32::try_from(new)
+                        .map_err(|_error| Error::CapacityOverflow {
+                            resource: "reordered BrtName sheet scope",
+                        })?
+                        .to_le_bytes(),
+                );
+            }
+        },
+        kind::EXTERN_SHEET => {
+            let rewritten = rewrite_extern_sheet_payload(payload, inverse, catalog_len, context)?;
+            if rewritten != payload {
+                output = replace_record_payload(&output, header_len, header.len(), &rewritten)?;
+            }
+        },
+        _ => {},
+    }
+    Ok(output)
+}
+
+fn rewrite_extern_sheet_payload(
+    payload: &[u8],
+    inverse: &[usize],
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+) -> Result<Vec<u8>> {
+    if payload.len() < 4 {
+        return Err(Error::InvalidLength {
+            expected: 4,
+            found: payload.len(),
+        });
+    }
+    let count = usize::try_from(u32::from_le_bytes(payload[..4].try_into().map_err(
+        |_error| Error::InvalidLength {
+            expected: 4,
+            found: payload.len(),
+        },
+    )?))
+    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow".to_string()))?;
+    let expected = 4usize
+        .checked_add(count.checked_mul(12).ok_or(Error::CapacityOverflow {
+            resource: "BrtExternSheet payload size",
+        })?)
+        .ok_or(Error::CapacityOverflow {
+            resource: "BrtExternSheet payload size",
+        })?;
+    if payload.len() != expected {
+        return Err(Error::InvalidLength {
+            expected,
+            found: payload.len(),
+        });
+    }
+    let mut output = payload.to_vec();
+    for entry in 0..count {
+        let offset = 4 + entry * 12;
+        let external_link =
+            u32::from_le_bytes(payload[offset..offset + 4].try_into().map_err(|_error| {
+                Error::InvalidLength {
+                    expected: offset + 4,
+                    found: payload.len(),
+                }
+            })?);
+        let first = i32::from_le_bytes(payload[offset + 4..offset + 8].try_into().map_err(
+            |_error| Error::InvalidLength {
+                expected: offset + 8,
+                found: payload.len(),
+            },
+        )?);
+        let last = i32::from_le_bytes(payload[offset + 8..offset + 12].try_into().map_err(
+            |_error| Error::InvalidLength {
+                expected: offset + 12,
+                found: payload.len(),
+            },
+        )?);
+        let link = context
+            .supporting_links
+            .get(usize::try_from(external_link).map_err(|_error| {
+                Error::InvalidFormula("BrtExternSheet supporting-link index overflow".to_string())
+            })?)
+            .ok_or_else(|| {
+                Error::InvalidFormula(
+                    "BrtExternSheet supporting-link index is unresolved".to_string(),
+                )
+            })?;
+        match link {
+            crate::package::formula::SupportingLink::SelfWorkbook => {},
+            crate::package::formula::SupportingLink::SameSheet => {
+                if (first, last) != (-2, -2) {
+                    return Err(Error::InvalidFormula(
+                        "same-sheet BrtExternSheet has invalid endpoints".to_string(),
+                    ));
+                }
+                continue;
+            },
+            crate::package::formula::SupportingLink::ExternalWorkbook(_)
+            | crate::package::formula::SupportingLink::AddIn => continue,
+        }
+        if (first, last) == (-2, -2) || (first, last) == (-1, -1) {
+            continue;
+        }
+        if first < 0 || last < first {
+            return Err(Error::InvalidFormula(
+                "internal BrtExternSheet range has invalid endpoints".to_string(),
+            ));
+        }
+        let first = usize::try_from(first).map_err(|_error| {
+            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow".to_string())
+        })?;
+        let last = usize::try_from(last).map_err(|_error| {
+            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow".to_string())
+        })?;
+        if last >= catalog_len {
+            return Err(Error::InvalidFormula(
+                "internal BrtExternSheet range exceeds the sheet catalog".to_string(),
+            ));
+        }
+        let span = last
+            .checked_sub(first)
+            .and_then(|value| value.checked_add(1))
+            .ok_or(Error::CapacityOverflow {
+                resource: "internal BrtExternSheet range",
+            })?;
+        let mut minimum = usize::MAX;
+        let mut maximum = 0usize;
+        for old_position in first..=last {
+            let new_position = *inverse.get(old_position).ok_or_else(|| {
+                Error::InvalidFormula("internal BrtExternSheet endpoint is unmapped".to_string())
+            })?;
+            minimum = minimum.min(new_position);
+            maximum = maximum.max(new_position);
+        }
+        if maximum.saturating_sub(minimum).saturating_add(1) != span {
+            return Err(Error::UnsupportedFeature(
+                "sheet reorder would make an internal BrtExternSheet 3-D range non-contiguous"
+                    .to_string(),
+            ));
+        }
+        output[offset + 4..offset + 8].copy_from_slice(
+            &i32::try_from(minimum)
+                .map_err(|_error| Error::CapacityOverflow {
+                    resource: "reordered BrtExternSheet first endpoint",
+                })?
+                .to_le_bytes(),
+        );
+        output[offset + 8..offset + 12].copy_from_slice(
+            &i32::try_from(maximum)
+                .map_err(|_error| Error::CapacityOverflow {
+                    resource: "reordered BrtExternSheet last endpoint",
+                })?
+                .to_le_bytes(),
+        );
+    }
+    Ok(output)
+}
+
+fn rewrite_volatile_dependencies(
+    source: &[u8],
+    inverse: &[usize],
+    catalog_len: usize,
+) -> Result<Option<Vec<u8>>> {
+    let mut output = source.to_vec();
+    let mut changed = false;
+    for item in Records::new(source) {
+        let record = item?;
+        if record.kind() != kind::VOL_REF {
+            continue;
+        }
+        if record.payload().len() != 12 {
+            return Err(Error::InvalidLength {
+                expected: 12,
+                found: record.payload().len(),
+            });
+        }
+        let old = usize::try_from(u32::from_le_bytes(
+            record.payload()[8..12]
+                .try_into()
+                .map_err(|_error| Error::InvalidLength {
+                    expected: 12,
+                    found: record.payload().len(),
+                })?,
+        ))
+        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow".to_string()))?;
+        if old >= catalog_len {
+            return Err(Error::InvalidFormat(
+                "BrtVolRef sheet index exceeds the sheet catalog".to_string(),
+            ));
+        }
+        let new = *inverse
+            .get(old)
+            .ok_or_else(|| Error::InvalidFormat("BrtVolRef sheet index is unmapped".to_string()))?;
+        let (_, header_len) = Header::parse(
+            source.get(record.offset()..).ok_or_else(|| {
+                Error::InvalidFormat("BrtVolRef offset is outside its part".to_string())
+            })?,
+            RawLimits::DEFAULT,
+        )?;
+        output[record.offset() + header_len + 8..record.offset() + header_len + 12]
+            .copy_from_slice(
+                &u32::try_from(new)
+                    .map_err(|_error| Error::CapacityOverflow {
+                        resource: "reordered BrtVolRef sheet index",
+                    })?
+                    .to_le_bytes(),
+            );
+        changed |= new != old;
+    }
+    Ok(changed.then_some(output))
+}
+
+fn replace_record_payload(
+    raw: &[u8],
+    header_len: usize,
+    payload_len: usize,
+    payload: &[u8],
+) -> Result<Vec<u8>> {
+    if payload.len() != payload_len {
+        return Err(Error::InvalidLength {
+            expected: payload_len,
+            found: payload.len(),
+        });
+    }
+    let end = header_len
+        .checked_add(payload_len)
+        .ok_or(Error::CapacityOverflow {
+            resource: "BIFF12 record payload range",
+        })?;
+    if raw.len() < end {
+        return Err(Error::InvalidLength {
+            expected: end,
+            found: raw.len(),
+        });
+    }
+    let mut output = raw.to_vec();
+    output[header_len..end].copy_from_slice(payload);
+    Ok(output)
+}
+
+fn record_bytes<'a>(source: &'a [u8], record: &crate::raw::Record<'_>) -> Result<&'a [u8]> {
+    let record_source = source
+        .get(record.offset()..)
+        .ok_or_else(|| Error::InvalidFormat("record offset is outside its part".to_string()))?;
+    let (_, header_len) = Header::parse(record_source, RawLimits::DEFAULT)?;
+    let end = record
+        .offset()
+        .checked_add(header_len)
+        .and_then(|offset| offset.checked_add(record.len()))
+        .ok_or(Error::CapacityOverflow {
+            resource: "workbook record range",
+        })?;
+    source
+        .get(record.offset()..end)
+        .ok_or_else(|| Error::InvalidFormat("record range is outside its part".to_string()))
+}
+
 fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Result<(bool, bool)> {
     let mut names = BTreeMap::<usize, &str>::new();
     let mut dependency_positions = std::collections::BTreeSet::<usize>::new();
@@ -1985,6 +2819,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                 }
             },
             Operation::TransferCell { .. }
+            | Operation::ReorderSheets { .. }
             | Operation::AddImage { .. }
             | Operation::TransferDrawing { .. } => {
                 return Err(Error::InvalidFormat(
@@ -2776,6 +3611,30 @@ fn copy_arc(bytes: &[u8], resource: &'static str) -> Result<Arc<[u8]>> {
     Ok(Arc::from(copied))
 }
 
+fn encoded_operation_length(operation: &Operation) -> Result<usize> {
+    let length = match operation {
+        Operation::RenameSheet { name, .. } | Operation::SetSheetName { name, .. } => {
+            17usize.checked_add(name.len())
+        },
+        Operation::ReorderSheets { order } => {
+            9usize.checked_add(order.len().checked_mul(size_of::<u64>()).ok_or(
+                Error::CapacityOverflow {
+                    resource: "durable workbook patch sheet order bytes",
+                },
+            )?)
+        },
+        Operation::SetSheetState { .. } => Some(10),
+        Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
+        Operation::AddImage { image, .. } => 74usize
+            .checked_add(image.data.len())
+            .and_then(|size| size.checked_add(image.description.as_ref().map_or(0, String::len))),
+        Operation::TransferDrawing { source, .. } => 33usize.checked_add(source.len()),
+    };
+    length.ok_or(Error::CapacityOverflow {
+        resource: "durable workbook patch operation bytes",
+    })
+}
+
 fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
     match operation {
         Operation::RenameSheet { sheet, name } => {
@@ -2799,6 +3658,13 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             push_usize(output, *catalog_position)?;
             push_usize(output, name.len())?;
             output.extend_from_slice(name.as_bytes());
+        },
+        Operation::ReorderSheets { order } => {
+            output.push(8);
+            push_usize(output, order.len())?;
+            for position in order.iter().copied() {
+                push_usize(output, position)?;
+            }
         },
         Operation::SetSheetState {
             catalog_position,
@@ -2897,6 +3763,40 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                 catalog_position,
                 name,
                 dependencies: true,
+            })
+        },
+        8 => {
+            let count = read_next_usize(data, offset)?;
+            let available = data
+                .len()
+                .checked_sub(*offset)
+                .ok_or(Error::InvalidLength {
+                    expected: *offset,
+                    found: data.len(),
+                })?;
+            let required = count
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::CapacityOverflow {
+                    resource: "workbook patch sheet order",
+                })?;
+            if required > available {
+                return Err(Error::InvalidLength {
+                    expected: offset.saturating_add(required),
+                    found: data.len(),
+                });
+            }
+            let mut order = Vec::new();
+            order
+                .try_reserve_exact(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "workbook patch sheet order",
+                    source,
+                })?;
+            for _ in 0..count {
+                order.push(read_next_usize(data, offset)?);
+            }
+            Ok(Operation::ReorderSheets {
+                order: order.into(),
             })
         },
         5 => {

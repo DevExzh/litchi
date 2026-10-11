@@ -101,6 +101,10 @@ impl File {
             Self::Xlsx(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Xlsx(commit.into_file())),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Xlsb(commit.into_file())),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
@@ -160,6 +164,8 @@ impl File {
     /// Exchange two elements while preserving their content and formatting.
     ///
     /// PPTX supports slides in created or eagerly opened presentations.
+    /// XLSB supports complete-catalog tab ordering, including chart tabs, in
+    /// retained source and eager owners.
     ///
     /// Both paths resolve against this snapshot. The returned handle owns the
     /// complete change; a failure leaves the original unchanged.
@@ -185,6 +191,10 @@ impl File {
             Self::Xlsx(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Xlsx(commit.into_file())),
+            #[cfg(feature = "xlsb")]
+            Self::Xlsb(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Xlsb(commit.into_file())),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)

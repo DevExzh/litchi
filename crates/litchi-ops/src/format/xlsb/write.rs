@@ -11,8 +11,8 @@ use std::io::{self, Write};
 use std::path::Path;
 
 use caseless::Caseless as _;
-use litchi_core::FileFormat;
 use litchi_core::selector::CellRange;
+use litchi_core::{FileFormat, Position};
 use litchi_xlsb::cell_values::structure::Edit as NativeStructureEdit;
 use litchi_xlsb::cell_values::{
     Edit as NativeCellEdit, Patch as NativeCellPatch, Reference, Scalar as NativeScalar,
@@ -25,6 +25,8 @@ use super::node::{Item, Node};
 use super::spec::{CELL_WRITE_TABLE, CellSetter, Kind, SHEET_WRITE_TABLE, SheetSetter};
 use super::{Nav, Xlsb, XlsbEditor, XlsbOwner};
 use crate::error::{Code, Error, Result};
+use crate::path::PathArg;
+use crate::placement::Placement;
 use crate::props::{IntoProps, Props};
 use crate::registry::Operation;
 use crate::save::{Overwrite, SaveOptions};
@@ -343,6 +345,197 @@ pub(crate) fn remove_with_limits(
     let commit = Commit::from_cell_parts(file, package, patches)?;
     check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
+}
+
+/// Reorder one complete-catalog XLSB tab with the shared placement vocabulary.
+///
+/// The public resolver addresses every tab kind in workbook order.  A native
+/// edit receives the resulting permutation in one operation, so relationship
+/// identity, active-view state, and opaque tab payloads remain owned by the
+/// binary leaf rather than being reconstructed by the facade.
+pub(crate) fn move_to_with_limits<'p, 'q>(
+    file: &Xlsb,
+    path: PathArg<'p>,
+    placement: Placement<'q>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    file.admit_edit()?;
+    let source = resolve_sheet_path(file, &path)?;
+    let count = file.tab_count()?;
+    let destination = move_destination(file, source, count, &placement)?;
+    admit_order_targets(1, count, limits)?;
+    let order = move_permutation(count, source, destination)?;
+    reorder_with_limits(file, order, limits)
+}
+
+/// Exchange two complete-catalog XLSB tabs in one native structural edit.
+pub(crate) fn swap_with_limits<'p, 'q>(
+    file: &Xlsb,
+    left: PathArg<'p>,
+    right: PathArg<'q>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    file.admit_edit()?;
+    let left = resolve_sheet_path(file, &left)?;
+    let right = resolve_sheet_path(file, &right)?;
+    let count = file.tab_count()?;
+    if left >= count || right >= count {
+        return Err(
+            Error::new(Code::PathNotFound, "the selected XLSB tab is absent")
+                .with_format(FileFormat::Xlsb),
+        );
+    }
+    admit_order_targets(usize::from(left != right).saturating_add(1), count, limits)?;
+    let mut order = identity_permutation(count)?;
+    order.swap(left, right);
+    reorder_with_limits(file, order, limits)
+}
+
+fn reorder_with_limits(file: &Xlsb, order: Vec<usize>, limits: &SemanticLimits) -> Result<Commit> {
+    let editor = file.editor()?;
+    let package = package_from_editor(editor);
+    let native_limits = TransferLimits::new(
+        limits.max_snapshot_bytes(),
+        limits.max_expanded_targets(),
+        1,
+        limits.max_snapshot_bytes(),
+    );
+    let mut edit = package
+        .edit_with_limits(native_limits)
+        .map_err(native_error)?;
+    // `reorder_sheets` borrows semantic selectors for the complete
+    // permutation. The native owner validates them against its immutable base
+    // catalog before staging, and retains exact no-op patches when the
+    // permutation is the identity.
+    let mut selectors = Vec::new();
+    selectors
+        .try_reserve_exact(order.len())
+        .map_err(|_| allocation("XLSB sheet-order selectors"))?;
+    selectors.extend(
+        order
+            .into_iter()
+            .map(|position| NativeSelector::Position(Position::new(position))),
+    );
+    edit.reorder_sheets(&selectors).map_err(native_error)?;
+    let native = edit.commit().map_err(native_error)?;
+    let commit = Commit::from_native(file, native)?;
+    check_snapshot_limits(&commit.patch, limits)?;
+    Ok(commit)
+}
+
+fn resolve_sheet_path(file: &Xlsb, path: &PathArg<'_>) -> Result<usize> {
+    let node = crate::path::resolve::get(&Nav::new(file), path)?;
+    if node.element() != Kind::Sheet {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "the XLSB structural verb requires a sheet tab",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    Ok(node.sheet_position())
+}
+
+fn move_destination(
+    file: &Xlsb,
+    source: usize,
+    count: usize,
+    placement: &Placement<'_>,
+) -> Result<usize> {
+    let last = count.checked_sub(1).ok_or_else(|| {
+        Error::new(Code::PathNotFound, "the XLSB workbook has no sheet tabs")
+            .with_format(FileFormat::Xlsb)
+    })?;
+    let position = match placement {
+        Placement::Start => 0,
+        Placement::End => last,
+        Placement::Position(position) => position.get(),
+        Placement::Before(path) => {
+            let anchor = resolve_sheet_path(file, path)?;
+            if source == anchor {
+                source
+            } else if source < anchor {
+                anchor.saturating_sub(1)
+            } else {
+                anchor
+            }
+        },
+        Placement::After(path) => {
+            let anchor = resolve_sheet_path(file, path)?;
+            if source <= anchor {
+                anchor
+            } else {
+                anchor.saturating_add(1)
+            }
+        },
+        Placement::Into(path, position) => {
+            let parent = crate::path::resolve::get(&Nav::new(file), path)?;
+            if parent.element() != Kind::Workbook {
+                return Err(Error::new(
+                    Code::UnsupportedType,
+                    "XLSB sheets can only be reordered within the workbook",
+                )
+                .with_format(FileFormat::Xlsb));
+            }
+            position.map_or(last, Position::get)
+        },
+    };
+    if position >= count {
+        return Err(Error::new(
+            Code::OutOfRange,
+            "the XLSB sheet move position is outside the workbook",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    Ok(position)
+}
+
+fn move_permutation(count: usize, source: usize, destination: usize) -> Result<Vec<usize>> {
+    if source >= count || destination >= count {
+        return Err(Error::new(
+            Code::OutOfRange,
+            "the XLSB sheet move position is outside the workbook",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    let mut order = identity_permutation(count)?;
+    if source != destination {
+        let tab = order.remove(source);
+        order.insert(destination, tab);
+    }
+    Ok(order)
+}
+
+fn identity_permutation(count: usize) -> Result<Vec<usize>> {
+    let mut order = Vec::new();
+    order
+        .try_reserve_exact(count)
+        .map_err(|_| allocation("XLSB sheet-order permutation"))?;
+    order.extend(0..count);
+    Ok(order)
+}
+
+fn admit_order_targets(targets: usize, catalog_tabs: usize, limits: &SemanticLimits) -> Result<()> {
+    if targets > limits.max_expanded_targets() {
+        return Err(expanded_limit(targets, limits.max_expanded_targets()));
+    }
+    // The semantic charge is the selected tab count (one for a move and one
+    // or two for a swap), while the native permutation itself is catalog-wide.
+    // Account for the complete facade permutation and selector vectors before
+    // allocating either vector. Native transfer limits independently bound its
+    // encoded patch history.
+    let permutation_bytes = catalog_tabs
+        .checked_mul(size_of::<usize>())
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    let selector_bytes = catalog_tabs
+        .checked_mul(size_of::<NativeSelector<'_>>())
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    let staged = permutation_bytes
+        .checked_add(selector_bytes)
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    if staged > limits.max_staged_bytes() {
+        return Err(staged_limit(staged, limits.max_staged_bytes()));
+    }
+    Ok(())
 }
 
 fn set_sheet_with_limits(

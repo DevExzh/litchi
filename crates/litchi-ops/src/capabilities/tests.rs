@@ -141,7 +141,15 @@ fn every_format_has_one_answer_for_its_reads() {
                     || pptx_edit
                     || (format == FileFormat::Xlsb
                         && cfg!(feature = "xlsb")
-                        && matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch))
+                        && matches!(
+                            verb,
+                            Verb::Set
+                                | Verb::Remove
+                                | Verb::Move
+                                | Verb::Swap
+                                | Verb::Edit
+                                | Verb::Batch
+                        ))
                 {
                     Support::Supported
                 } else if get.is_supported() {
