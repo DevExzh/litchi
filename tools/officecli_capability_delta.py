@@ -6,8 +6,8 @@ with their ``extends`` bases merged the way OfficeCLI's ``SchemaHelpLoader``
 merges them) with Litchi's golden capability reports
 (``crates/litchi-ops/tests/golden/capabilities/<format>.json``, the JSON of
 ``Capabilities::of(format)``) for the three formats OfficeCLI describes:
-DOCX, XLSX and PPTX, plus XLSB against the XLSX vocabulary as a parity
-target (not a claim of OfficeCLI XLSB file support). DOCX's optional
+DOCX, XLSX and PPTX, plus XLS and XLSB against the XLSX vocabulary as a parity
+target (not a claim of OfficeCLI XLS/XLSB file support). DOCX's optional
 ``docx-encryption.json`` baseline contributes feature-gated operation gaps
 that are absent from the default report. It writes
 ``docs/unified-ops/officecli-capability-delta.md``.
@@ -42,12 +42,12 @@ from pathlib import Path
 REPO = Path(__file__).resolve().parent.parent
 GOLDEN_DIR = Path("crates/litchi-ops/tests/golden/capabilities")
 OUTPUT = Path("docs/unified-ops/officecli-capability-delta.md")
-FORMATS = ("docx", "xlsx", "xlsb", "pptx")
+FORMATS = ("docx", "xlsx", "xlsb", "xls", "pptx")
 
 
 def reference_format(fmt: str) -> str:
-    """BIFF12 uses the SpreadsheetML vocabulary as a comparison target."""
-    return "xlsx" if fmt == "xlsb" else fmt
+    """Binary Excel formats use SpreadsheetML vocabulary as a comparison target."""
+    return "xlsx" if fmt in ("xls", "xlsb") else fmt
 
 
 # OfficeCLI elements Litchi models inside another element: their properties
@@ -485,8 +485,8 @@ def render(
         "reports (`Capabilities::of(format)`, record 0010 §7), for the formats",
         "OfficeCLI describes. M1 is read-only, so a property counts as supported",
         "when Litchi reads it; OfficeCLI's add/set/get flags are shown as `asg`.",
-        "XLSB is compared against the XLSX help vocabulary as Litchi's parity",
-        "target; this does not claim OfficeCLI itself supports XLSB files.",
+        "XLS and XLSB are compared against the XLSX help vocabulary as Litchi's parity",
+        "target; this does not claim OfficeCLI itself supports XLS or XLSB files.",
         "DOCX operation gaps also include the feature-specific encryption baseline",
         "when that golden is present.",
         "",

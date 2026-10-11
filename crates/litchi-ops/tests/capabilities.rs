@@ -985,10 +985,10 @@ fn available_and_pending_reads_have_distinct_reports() {
             .verb(Verb::Get)
             .is_supported()
     );
-    // XLSB now has a unified read adapter. Keep this check on a legacy format
-    // whose adapter remains pending; its feature may be disabled in a focused
-    // build, so the report's declared refusal is authoritative.
-    let pending = Capabilities::of(FileFormat::Xls);
+    // Keep this check on a legacy format whose adapter remains pending; its
+    // feature may be disabled in a focused build, so the report's declared
+    // refusal is authoritative.
+    let pending = Capabilities::of(FileFormat::Ppt);
     assert!(!pending.verb(Verb::Get).is_supported());
     #[cfg(feature = "pptx")]
     {

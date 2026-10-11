@@ -35,7 +35,7 @@
 //!    well formed, and a property is never both readable and a gap;
 //! 2. exhaustive `match`es on the adapter list, [`Verb`] and [`Mode`], so an
 //!    adapter, verb or mode without its arm does not compile;
-//! 3. DOCX, XLSX, XLSB and PPTX fixture tests checking reported path
+//! 3. DOCX, XLSX, XLSB, XLS and PPTX fixture tests checking reported path
 //!    templates, queryable kinds, emitted property membership and view modes,
 //!    plus tests of protected and pending-format refusals. Complete property liveness
 //!    and OfficeCLI parity remain follow-up work;
@@ -93,7 +93,8 @@
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
-        feature = "xlsb"
+        feature = "xlsb",
+        feature = "xls"
     )),
     allow(
         dead_code,
@@ -864,12 +865,6 @@ impl Capabilities {
     /// view modes the adapter does not render.
     pub fn gaps(&self) -> Gaps {
         let independent: &'static [GapSpec] = &[];
-        #[cfg(feature = "xls")]
-        let independent = if self.format == Some(FileFormat::Xls) {
-            &XLS_CREATION_OPTION_GAPS[..]
-        } else {
-            independent
-        };
         Gaps {
             independent: independent.iter(),
             adapter: self.adapter(),
@@ -922,10 +917,6 @@ fn refused(format: FileFormat) -> Refusal {
         FileFormat::Doc if cfg!(feature = "doc") => pending(
             "M1 R6a",
             "the DOC adapter of record 0010 §4.8 has not landed",
-        ),
-        FileFormat::Xls if cfg!(feature = "xls") => pending(
-            "M1 R6b",
-            "the XLS adapter of record 0010 §4.8 has not landed",
         ),
         FileFormat::Ppt if cfg!(feature = "ppt") => pending(
             "M1 R6c",
@@ -1948,6 +1939,8 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Xlsx => m1_view_gap(mode),
         #[cfg(feature = "xlsb")]
         Adapter::Xlsb => m1_view_gap(mode),
+        #[cfg(feature = "xls")]
+        Adapter::Xls => m1_view_gap(mode),
         #[cfg(feature = "pptx")]
         Adapter::Pptx => m1_view_gap(mode),
     }
@@ -2073,6 +2066,9 @@ check_capabilities!(crate::format::xlsx::SPEC);
 
 #[cfg(feature = "xlsb")]
 check_capabilities!(crate::format::xlsb::SPEC);
+
+#[cfg(feature = "xls")]
+check_capabilities!(crate::format::xls::SPEC);
 
 #[cfg(feature = "pptx")]
 check_capabilities!(crate::format::pptx::SPEC);
@@ -2422,6 +2418,10 @@ impl Element {
     /// Whether a selector's keys that are not properties name table header
     /// columns (`row[Sales>5000]`, record 0010 §5.4): workbook rows.
     fn header_columns(&self) -> bool {
+        #[cfg(feature = "xls")]
+        if self.adapter == Adapter::Xls {
+            return false;
+        }
         self.adapter.family() == Family::Workbook && self.data().canonical == "row"
     }
 }
@@ -2727,6 +2727,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
         return XLSB_WRITE_GAPS
             .get(index.saturating_sub(XLSB_CREATION_OPTION_GAPS.len()))
             .map(Some);
+    }
+    #[cfg(feature = "xls")]
+    if adapter == Adapter::Xls {
+        return XLS_CREATION_OPTION_GAPS.get(index).map(Some);
     }
     let _ = (adapter, index);
     None

@@ -39,7 +39,7 @@ pub mod rtf;
     feature = "xlsb"
 ))]
 pub(crate) mod signature;
-#[cfg(any(feature = "xlsx", feature = "xlsb"))]
+#[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb"))]
 pub(crate) mod workbook;
 #[cfg(feature = "xls")]
 pub mod xls;

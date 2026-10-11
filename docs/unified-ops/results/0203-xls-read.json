@@ -1,0 +1,155 @@
+{
+  "schema": "litchi.xls_read_bench.v1",
+  "samples": 5,
+  "warmup_passes": 1,
+  "generation_included": false,
+  "opening_included": false,
+  "path_construction_included": false,
+  "query_compilation_included": false,
+  "cases": [
+    {
+      "cells": 1,
+      "xls_bytes": 4096,
+      "native_checksum": 10417878499401512927,
+      "unified_checksum": 10417878499401512927,
+      "native_query_checksum": 10417878499401512927,
+      "unified_query_checksum": 10417878499401512927,
+      "native_ns": [
+        100,
+        30,
+        20,
+        30,
+        30
+      ],
+      "unified_get_ns": [
+        1250,
+        590,
+        420,
+        410,
+        410
+      ],
+      "native_query_ns": [
+        130,
+        50,
+        50,
+        50,
+        50
+      ],
+      "unified_query_ns": [
+        1720,
+        1020,
+        730,
+        710,
+        690
+      ]
+    },
+    {
+      "cells": 100,
+      "xls_bytes": 7168,
+      "native_checksum": 4054751163340653429,
+      "unified_checksum": 4054751163340653429,
+      "native_query_checksum": 4054751163340653429,
+      "unified_query_checksum": 4054751163340653429,
+      "native_ns": [
+        2750,
+        1850,
+        1420,
+        1290,
+        1210
+      ],
+      "unified_get_ns": [
+        41350,
+        40950,
+        40781,
+        40770,
+        40490
+      ],
+      "native_query_ns": [
+        810,
+        730,
+        670,
+        650,
+        650
+      ],
+      "unified_query_ns": [
+        23870,
+        22030,
+        22130,
+        21300,
+        21441
+      ]
+    },
+    {
+      "cells": 1000,
+      "xls_bytes": 43520,
+      "native_checksum": 11251833652265854789,
+      "unified_checksum": 11251833652265854789,
+      "native_query_checksum": 11251833652265854789,
+      "unified_query_checksum": 11251833652265854789,
+      "native_ns": [
+        27140,
+        21290,
+        17980,
+        16300,
+        15950
+      ],
+      "unified_get_ns": [
+        408342,
+        424022,
+        412892,
+        419202,
+        410672
+      ],
+      "native_query_ns": [
+        7280,
+        6350,
+        6310,
+        6300,
+        6280
+      ],
+      "unified_query_ns": [
+        237931,
+        235131,
+        222901,
+        220441,
+        226701
+      ]
+    },
+    {
+      "cells": 10000,
+      "xls_bytes": 410112,
+      "native_checksum": 13863300601406287973,
+      "unified_checksum": 13863300601406287973,
+      "native_query_checksum": 13863300601406287973,
+      "unified_query_checksum": 13863300601406287973,
+      "native_ns": [
+        373181,
+        330872,
+        325201,
+        307882,
+        303651
+      ],
+      "unified_get_ns": [
+        4339590,
+        4281329,
+        4302450,
+        4243709,
+        4271819
+      ],
+      "native_query_ns": [
+        79301,
+        75570,
+        74860,
+        74431,
+        74370
+      ],
+      "unified_query_ns": [
+        2403841,
+        2412091,
+        2392101,
+        2410451,
+        2410111
+      ]
+    }
+  ]
+}

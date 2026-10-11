@@ -9,7 +9,8 @@
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
-        feature = "xlsb"
+        feature = "xlsb",
+        feature = "xls"
     )),
     allow(
         dead_code,
@@ -58,6 +59,8 @@ enum Inner<'f> {
     Pptx(crate::format::pptx::ViewJson),
     #[cfg(feature = "xlsb")]
     Xlsb(crate::format::xlsb::ViewJson),
+    #[cfg(feature = "xls")]
+    Xls(crate::format::xls::ViewJson),
     /// Keeps `'f` in use; uninhabited.
     #[allow(dead_code, reason = "uninhabited: only keeps the lifetime in use")]
     Never(Infallible, PhantomData<&'f ()>),
@@ -99,6 +102,12 @@ impl Json<'_> {
             inner: Inner::Xlsb(json),
         }
     }
+    #[cfg(feature = "xls")]
+    pub(crate) fn xls(json: crate::format::xls::ViewJson) -> Self {
+        Self {
+            inner: Inner::Xls(json),
+        }
+    }
 }
 
 impl Serialize for Json<'_> {
@@ -114,6 +123,8 @@ impl Serialize for Json<'_> {
             Inner::Pptx(json) => json.serialize(serializer),
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(json) => json.serialize(serializer),
+            #[cfg(feature = "xls")]
+            Inner::Xls(json) => json.serialize(serializer),
             Inner::Never(never, _) => match *never {},
         }
     }

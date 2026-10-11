@@ -5,8 +5,8 @@ It compares OfficeCLI's help schemas with Litchi's golden capability
 reports (`Capabilities::of(format)`, record 0010 §7), for the formats
 OfficeCLI describes. M1 is read-only, so a property counts as supported
 when Litchi reads it; OfficeCLI's add/set/get flags are shown as `asg`.
-XLSB is compared against the XLSX help vocabulary as Litchi's parity
-target; this does not claim OfficeCLI itself supports XLSB files.
+XLS and XLSB are compared against the XLSX help vocabulary as Litchi's parity
+target; this does not claim OfficeCLI itself supports XLS or XLSB files.
 DOCX operation gaps also include the feature-specific encryption baseline
 when that golden is present.
 
@@ -22,6 +22,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `7ab2e2c43210ed0f7f01df58c9833a5c0507efef18e037ee273de0fb1c704183` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -50,6 +51,7 @@ Elements:
 | docx | 11 | 24 | 0 | 0 | 9 | 2 | 5 |
 | xlsx | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
+| xls | 6 | 32 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 23 | 10 | 0 | 0 | 0 | 1 | 8 |
 
 Properties:
@@ -59,6 +61,7 @@ Properties:
 | docx | 164 | 4 | 428 | 0 | 68 | 2 | 295 | 27 |
 | xlsx | 89 | 16 | 489 | 0 | 18 | 1 | 78 | 62 |
 | xlsb | 56 | 45 | 489 | 0 | 22 | 1 | 78 | 2 |
+| xls | 17 | 17 | 509 | 0 | 23 | 1 | 124 | 0 |
 | pptx | 153 | 31 | 113 | 0 | 110 | 0 | 280 | 156 |
 
 ## docx
@@ -2766,6 +2769,764 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `swap` | `sheet` | `calculation-chain-dependency` | sheet ordering refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet ordering |
 | `move` | `sheet` | `noncontiguous-3d-dependency` | sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous | M2 XLSB 3-D dependency-aware sheet ordering |
 | `swap` | `sheet` | `noncontiguous-3d-dependency` | sheet ordering refuses a permutation that would make an internal 3-D reference noncontiguous | M2 XLSB 3-D dependency-aware sheet ordering |
+
+## xls
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+| aboveaverage | conditionalFormatting | gap | M1-extended (R6b) |
+| autofilter | autofilter | gap | M1-extended (R6b) |
+| cell | cell | supported |  |
+| cellis | conditionalFormatting | gap | M1-extended (R6b) |
+| cfextended | conditionalFormatting | gap | M1-extended (R6b) |
+| chart-axis | axis | gap | M1-extended (R6b) |
+| chart-series | series | gap | M1-extended (R6b) |
+| chart | chart | gap | M1-extended (R6b) |
+| colbreak | colbreak | gap | M1-extended (R6b) |
+| colorscale | conditionalFormatting | gap | M1-extended (R6b) |
+| column | column | supported |  |
+| comment | comment | gap | M1-extended (R6b) |
+| conditionalformatting | conditionalFormatting | gap | M1-extended (R6b) |
+| containstext | conditionalFormatting | gap | M1-extended (R6b) |
+| databar | conditionalFormatting | gap | M1-extended (R6b) |
+| dateoccurring | conditionalFormatting | gap | M1-extended (R6b) |
+| detectedtable |  | missing |  |
+| duplicatevalues | conditionalFormatting | gap | M1-extended (R6b) |
+| formulacf | conditionalFormatting | gap | M1-extended (R6b) |
+| hyperlink | hyperlink | gap | M1-extended (R6b) |
+| iconset | conditionalFormatting | gap | M1-extended (R6b) |
+| namedrange | namedrange | gap | M1-extended (R6b) |
+| ole | ole | gap | M1-extended (R6b) |
+| pagebreak | colbreak | gap | M1-extended (R6b) |
+| picture | picture | gap | M1-extended (R6b) |
+| pivottable | pivottable | gap | M1-extended (R6b) |
+| range | range | supported |  |
+| raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| row | row | supported |  |
+| rowbreak | rowbreak | gap | M1-extended (R6b) |
+| run | run | gap | M1-extended (R6b) |
+| shape | shape | gap | M1-extended (R6b) |
+| sheet | sheet | supported |  |
+| slicer | slicer | gap | M1-extended (R6b) |
+| sort |  | out of scope | a set-only action that reorders rows; M2 write surface |
+| sparkline | sparkline | gap | M1-extended (R6b) |
+| table | table | gap | M1-extended (R6b) |
+| topn | conditionalFormatting | gap | M1-extended (R6b) |
+| uniquevalues | conditionalFormatting | gap | M1-extended (R6b) |
+| validation | dataValidation | gap | M1-extended (R6b) |
+| workbook | workbook | supported |  |
+|  | mergeCell | litchi-only | M1-extended (R6b) |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Status | Follow-up |
+|---|---|---|---|---|---|
+| aboveaverage | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| aboveaverage | `aboveAverage` | bool | a-g | element gap | M1-extended (R6b) |
+| aboveaverage | `stdDev` | number | a-- | element gap | M1-extended (R6b) |
+| aboveaverage | `equalAverage` | bool | a-- | element gap | M1-extended (R6b) |
+| aboveaverage | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| aboveaverage | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| aboveaverage | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| aboveaverage | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| aboveaverage | `type` | string | --g | element gap | M1-extended (R6b) |
+| aboveaverage | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| autofilter | `range` | string | asg | element gap | M1-extended (R6b) |
+| autofilter | `criteria0` | string | a-- | element gap | M1-extended (R6b) |
+| cell | `value` | string | asg | supported | the node's text |
+| cell | `formula` | string | asg | gap | M1-extended (R6b) |
+| cell | `numberformat` | string | asg | missing |  |
+| cell | `font.bold` | bool | asg | missing |  |
+| cell | `font.italic` | bool | asg | missing |  |
+| cell | `font.name` | string | asg | missing |  |
+| cell | `font.size` | font-size | asg | missing |  |
+| cell | `font.color` | color | asg | missing |  |
+| cell | `fill` | color | asg | missing |  |
+| cell | `fillPattern` | enum | asg | missing |  |
+| cell | `fillBg` | color | asg | missing |  |
+| cell | `strike` | bool | asg | missing |  |
+| cell | `underline` | enum | asg | missing |  |
+| cell | `locked` | bool | as- | write-only | M2 |
+| cell | `protection.locked` | bool | --g | missing |  |
+| cell | `protection.hidden` | bool | --g | missing |  |
+| cell | `numFmtId` | number | --g | raw-only | ADR 0034: native selection requires explicit raw admission |
+| cell | `phonetic` | string | asg | missing |  |
+| cell | `quotePrefix` | bool | --g | missing |  |
+| cell | `alignment.horizontal` | enum | asg | missing |  |
+| cell | `alignment.vertical` | enum | asg | missing |  |
+| cell | `alignment.wrapText` | bool | asg | missing |  |
+| cell | `alignment.readingOrder` | enum | asg | missing |  |
+| cell | `merge` | string | as- | write-only | M2 |
+| cell | `ref` | string | a-- | write-only | M2 |
+| cell | `link` | string | asg | missing |  |
+| cell | `tooltip` | string | as- | write-only | M2 |
+| cell | `display` | string | asg | missing |  |
+| cell | `type` | enum | asg | supported |  |
+| cell | `runs` | string | a-- | write-only | M2 |
+| cell | `clear` | bool | as- | write-only | M2 |
+| cell | `shift` | string | a-- | write-only | M2 |
+| cell | `arrayformula` | string | as- | gap | M1-extended (R6b) |
+| cell | `cachedValue` | string | --g | gap | M1-extended (R6b) |
+| cell | `computedValue` | string | --g | missing |  |
+| cell | `evaluated` | bool | --g | gap | M1-extended (R6b) |
+| cell | `alignment.indent` | number | asg | missing |  |
+| cell | `alignment.shrinkToFit` | bool | asg | missing |  |
+| cell | `alignment.textRotation` | number | asg | missing |  |
+| cell | `border.diagonal` | string | asg | missing |  |
+| cell | `border.diagonal.color` | color | asg | missing |  |
+| cell | `border.diagonalDown` | bool | asg | missing |  |
+| cell | `border.diagonalUp` | bool | asg | missing |  |
+| cell | `border` | string | as- | write-only | M2 |
+| cell | `border.all` | string | as- | write-only | M2 |
+| cell | `border.top` | string | asg | missing |  |
+| cell | `border.bottom` | string | asg | missing |  |
+| cell | `border.left` | string | asg | missing |  |
+| cell | `border.right` | string | asg | missing |  |
+| cell | `border.color` | color | as- | write-only | M2 |
+| cell | `arrayref` | string | --g | gap | M1-extended (R6b) |
+| cell | `mergeAnchor` | bool | --g | missing |  |
+| cell | `empty` | bool | --g | supported |  |
+| cell | `richtext` | bool | --g | missing |  |
+| cell | `subscript` | bool | asg | missing |  |
+| cell | `superscript` | bool | asg | missing |  |
+| cell | `image` | string | as- | write-only | M2 |
+| cell | `alt` | string | asg | missing |  |
+| cell | `image.contentType` | string | --g | missing |  |
+| cell | `image.fileSize` | int | --g | missing |  |
+| cellis | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| cellis | `operator` | enum | a-g | element gap | M1-extended (R6b) |
+| cellis | `value` | string | a-g | element gap | M1-extended (R6b) |
+| cellis | `value2` | string | a-g | element gap | M1-extended (R6b) |
+| cellis | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| cellis | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| cellis | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| cellis | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| cellis | `type` | string | --g | element gap | M1-extended (R6b) |
+| cellis | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| cfextended | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| cfextended | `type` | string | --g | element gap | M1-extended (R6b) |
+| cfextended | `text` | string | a-g | element gap | M1-extended (R6b) |
+| cfextended | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| cfextended | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| cfextended | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| cfextended | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| cfextended | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| chart-axis | `role` | string | --g | element gap | M1-extended (R6b) |
+| chart-axis | `dispUnits` | enum | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `majorUnit` | number | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `minorUnit` | number | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `axisFont` | string | --g | element gap | M1-extended (R6b) |
+| chart-axis | `axisMax` | number | --g | element gap | M1-extended (R6b) |
+| chart-axis | `axisMin` | number | --g | element gap | M1-extended (R6b) |
+| chart-axis | `axisNumFmt` | string | --g | element gap | M1-extended (R6b) |
+| chart-axis | `axisOrientation` | string | --g | element gap | M1-extended (R6b) |
+| chart-axis | `axisTitle` | string | --g | element gap | M1-extended (R6b) |
+| chart-axis | `format` | string | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `labelOffset` | number | --g | element gap | M1-extended (R6b) |
+| chart-axis | `labelRotation` | number | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `logBase` | number | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `majorGridlines` | bool | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `max` | number | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `min` | number | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `minorGridlines` | bool | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `tickLabelSkip` | number | --g | element gap | M1-extended (R6b) |
+| chart-axis | `title` | string | -sg | element gap | M1-extended (R6b) |
+| chart-axis | `visible` | bool | -sg | element gap | M1-extended (R6b) |
+| chart-series | `valuesRef` | string | --g | element gap | M1-extended (R6b) |
+| chart-series | `trendline.dispEq` | bool | --g | element gap | M1-extended (R6b) |
+| chart-series | `trendline.dispRSqr` | bool | --g | element gap | M1-extended (R6b) |
+| chart-series | `alpha` | number | --g | element gap | M1-extended (R6b) |
+| chart-series | `outlineColor` | color | --g | element gap | M1-extended (R6b) |
+| chart-series | `categories` | string | asg | element gap | M1-extended (R6b) |
+| chart-series | `categoriesRef` | string | --g | element gap | M1-extended (R6b) |
+| chart-series | `color` | color | asg | element gap | M1-extended (R6b) |
+| chart-series | `dataLabels.numFmt` | string | --g | element gap | M1-extended (R6b) |
+| chart-series | `dataLabels.separator` | string | --g | element gap | M1-extended (R6b) |
+| chart-series | `errBars` | string | -sg | element gap | M1-extended (R6b) |
+| chart-series | `invertIfNeg` | string | -sg | element gap | M1-extended (R6b) |
+| chart-series | `lineDash` | enum | -sg | element gap | M1-extended (R6b) |
+| chart-series | `lineWidth` | number | -sg | element gap | M1-extended (R6b) |
+| chart-series | `marker` | string | -sg | element gap | M1-extended (R6b) |
+| chart-series | `markerSize` | number | -sg | element gap | M1-extended (R6b) |
+| chart-series | `markerColor` | string | -sg | element gap | M1-extended (R6b) |
+| chart-series | `name` | string | asg | element gap | M1-extended (R6b) |
+| chart-series | `nameRef` | string | --g | element gap | M1-extended (R6b) |
+| chart-series | `scatterStyle` | string | --g | element gap | M1-extended (R6b) |
+| chart-series | `secondaryAxis` | bool | --g | element gap | M1-extended (R6b) |
+| chart-series | `smooth` | string | -sg | element gap | M1-extended (R6b) |
+| chart-series | `values` | string | asg | element gap | M1-extended (R6b) |
+| chart-series | `bubbleSize` | string | a-g | element gap | M1-extended (R6b) |
+| chart-series | `bubbleSizeRef` | string | a-g | element gap | M1-extended (R6b) |
+| chart | `dataRange` | string | a-- | element gap | M1-extended (R6b) |
+| chart | `radarStyle` | string | asg | element gap | M1-extended (R6b) |
+| chart | `roundedCorners` | string | asg | element gap | M1-extended (R6b) |
+| chart | `valAxisVisible` | bool | asg | element gap | M1-extended (R6b) |
+| chart | `view3d.perspective` | number | --g | element gap | M1-extended (R6b) |
+| chart | `view3d.rotateX` | number | --g | element gap | M1-extended (R6b) |
+| chart | `view3d.rotateY` | number | --g | element gap | M1-extended (R6b) |
+| chart | `anchor` | string | as- | element gap | M1-extended (R6b) |
+| chart | `dispunits` | string | as- | element gap | M1-extended (R6b) |
+| chart | `x` | length | asg | element gap | M1-extended (R6b) |
+| chart | `y` | length | asg | element gap | M1-extended (R6b) |
+| chart | `seriesCount` | number | --g | element gap | M1-extended (R6b) |
+| chart | `areafill` | string | as- | element gap | M1-extended (R6b) |
+| chart | `autotitledeleted` | bool | as- | element gap | M1-extended (R6b) |
+| chart | `axisfont` | string | as- | element gap | M1-extended (R6b) |
+| chart | `axisline` | string | as- | element gap | M1-extended (R6b) |
+| chart | `axismax` | number | as- | element gap | M1-extended (R6b) |
+| chart | `axismin` | number | as- | element gap | M1-extended (R6b) |
+| chart | `axisnumfmt` | string | as- | element gap | M1-extended (R6b) |
+| chart | `axisorientation` | string | as- | element gap | M1-extended (R6b) |
+| chart | `axisposition` | string | as- | element gap | M1-extended (R6b) |
+| chart | `axistitle` | string | as- | element gap | M1-extended (R6b) |
+| chart | `axisvisible` | bool | as- | element gap | M1-extended (R6b) |
+| chart | `bubbleScale` | number | asg | element gap | M1-extended (R6b) |
+| chart | `catAxisVisible` | bool | asg | element gap | M1-extended (R6b) |
+| chart | `catTitle` | string | asg | element gap | M1-extended (R6b) |
+| chart | `cataxisline` | string | as- | element gap | M1-extended (R6b) |
+| chart | `categories` | string | asg | element gap | M1-extended (R6b) |
+| chart | `chartFill` | color | asg | element gap | M1-extended (R6b) |
+| chart | `chartType` | enum | a-g | element gap | M1-extended (R6b) |
+| chart | `chartareafill` | string | as- | element gap | M1-extended (R6b) |
+| chart | `chartborder` | string | as- | element gap | M1-extended (R6b) |
+| chart | `colorrule` | string | as- | element gap | M1-extended (R6b) |
+| chart | `colors` | string | a-- | element gap | M1-extended (R6b) |
+| chart | `combosplit` | number | a-- | element gap | M1-extended (R6b) |
+| chart | `combotypes` | string | as- | element gap | M1-extended (R6b) |
+| chart | `crossBetween` | string | asg | element gap | M1-extended (R6b) |
+| chart | `crosses` | string | asg | element gap | M1-extended (R6b) |
+| chart | `crossesAt` | number | asg | element gap | M1-extended (R6b) |
+| chart | `data` | string | a-- | element gap | M1-extended (R6b) |
+| chart | `dataLabels` | string | asg | element gap | M1-extended (R6b) |
+| chart | `dataTable` | bool | asg | element gap | M1-extended (R6b) |
+| chart | `decreaseColor` | color | a-- | element gap | M1-extended (R6b) |
+| chart | `dispBlanksAs` | enum | asg | element gap | M1-extended (R6b) |
+| chart | `droplines` | string | asg | element gap | M1-extended (R6b) |
+| chart | `errbars` | string | as- | element gap | M1-extended (R6b) |
+| chart | `explosion` | number | asg | element gap | M1-extended (R6b) |
+| chart | `firstSliceAngle` | number | asg | element gap | M1-extended (R6b) |
+| chart | `gapdepth` | number | as- | element gap | M1-extended (R6b) |
+| chart | `gapwidth` | number | asg | element gap | M1-extended (R6b) |
+| chart | `gradient` | string | asg | element gap | M1-extended (R6b) |
+| chart | `gradients` | string | as- | element gap | M1-extended (R6b) |
+| chart | `gridlines` | bool | asg | element gap | M1-extended (R6b) |
+| chart | `height` | length | asg | element gap | M1-extended (R6b) |
+| chart | `hilowlines` | string | asg | element gap | M1-extended (R6b) |
+| chart | `holeSize` | number | asg | element gap | M1-extended (R6b) |
+| chart | `increaseColor` | color | a-- | element gap | M1-extended (R6b) |
+| chart | `invertifneg` | bool | as- | element gap | M1-extended (R6b) |
+| chart | `labelPos` | string | asg | element gap | M1-extended (R6b) |
+| chart | `labelfont` | string | as- | element gap | M1-extended (R6b) |
+| chart | `labelFont.size` | number | --g | element gap | M1-extended (R6b) |
+| chart | `labelFont.color` | string | --g | element gap | M1-extended (R6b) |
+| chart | `labelFont.bold` | bool | --g | element gap | M1-extended (R6b) |
+| chart | `labelFont.name` | string | --g | element gap | M1-extended (R6b) |
+| chart | `labeloffset` | number | as- | element gap | M1-extended (R6b) |
+| chart | `labelrotation` | number | as- | element gap | M1-extended (R6b) |
+| chart | `leaderlines` | bool | as- | element gap | M1-extended (R6b) |
+| chart | `legend` | enum | asg | element gap | M1-extended (R6b) |
+| chart | `legend.overlay` | bool | asg | element gap | M1-extended (R6b) |
+| chart | `legendFont` | string | asg | element gap | M1-extended (R6b) |
+| chart | `linedash` | string | as- | element gap | M1-extended (R6b) |
+| chart | `linewidth` | number | as- | element gap | M1-extended (R6b) |
+| chart | `logbase` | number | as- | element gap | M1-extended (R6b) |
+| chart | `majorTickMark` | string | asg | element gap | M1-extended (R6b) |
+| chart | `majorunit` | number | as- | element gap | M1-extended (R6b) |
+| chart | `marker` | string | as- | element gap | M1-extended (R6b) |
+| chart | `markersize` | number | as- | element gap | M1-extended (R6b) |
+| chart | `markercolor` | string | -sg | element gap | M1-extended (R6b) |
+| chart | `minorGridlines` | bool | asg | element gap | M1-extended (R6b) |
+| chart | `minorTickMark` | string | asg | element gap | M1-extended (R6b) |
+| chart | `minorunit` | number | as- | element gap | M1-extended (R6b) |
+| chart | `overlap` | number | asg | element gap | M1-extended (R6b) |
+| chart | `plotFill` | color | asg | element gap | M1-extended (R6b) |
+| chart | `plotborder` | string | as- | element gap | M1-extended (R6b) |
+| chart | `plotvisonly` | bool | as- | element gap | M1-extended (R6b) |
+| chart | `preset` | string | as- | element gap | M1-extended (R6b) |
+| chart | `referenceline` | string | as- | element gap | M1-extended (R6b) |
+| chart | `scatterstyle` | string | as- | element gap | M1-extended (R6b) |
+| chart | `secondaryaxis` | string | as- | element gap | M1-extended (R6b) |
+| chart | `series{N}` | string | -s- | element gap | M1-extended (R6b) |
+| chart | `seriesoutline` | string | as- | element gap | M1-extended (R6b) |
+| chart | `seriesshadow` | string | as- | element gap | M1-extended (R6b) |
+| chart | `serlines` | string | as- | element gap | M1-extended (R6b) |
+| chart | `shape` | string | as- | element gap | M1-extended (R6b) |
+| chart | `showMarker` | string | -sg | element gap | M1-extended (R6b) |
+| chart | `shownegbubbles` | bool | as- | element gap | M1-extended (R6b) |
+| chart | `sizerepresents` | string | as- | element gap | M1-extended (R6b) |
+| chart | `smooth` | string | asg | element gap | M1-extended (R6b) |
+| chart | `style` | number | asg | element gap | M1-extended (R6b) |
+| chart | `tickLabelPos` | string | asg | element gap | M1-extended (R6b) |
+| chart | `ticklabelskip` | number | as- | element gap | M1-extended (R6b) |
+| chart | `title` | string | asg | element gap | M1-extended (R6b) |
+| chart | `title.bold` | string | asg | element gap | M1-extended (R6b) |
+| chart | `title.color` | color | asg | element gap | M1-extended (R6b) |
+| chart | `title.font` | string | asg | element gap | M1-extended (R6b) |
+| chart | `title.overlay` | bool | asg | element gap | M1-extended (R6b) |
+| chart | `title.size` | font-size | asg | element gap | M1-extended (R6b) |
+| chart | `totalColor` | color | a-- | element gap | M1-extended (R6b) |
+| chart | `transparency` | number | as- | element gap | M1-extended (R6b) |
+| chart | `trendline` | string | asg | element gap | M1-extended (R6b) |
+| chart | `updownbars` | string | asg | element gap | M1-extended (R6b) |
+| chart | `valaxisline` | string | as- | element gap | M1-extended (R6b) |
+| chart | `varyColors` | string | asg | element gap | M1-extended (R6b) |
+| chart | `view3d` | string | asg | element gap | M1-extended (R6b) |
+| chart | `width` | length | asg | element gap | M1-extended (R6b) |
+| colbreak | `col` | string | as- | element gap | M1-extended (R6b) |
+| colbreak | `manual` | bool | -s- | element gap | M1-extended (R6b) |
+| colbreak | `min` | int | -s- | element gap | M1-extended (R6b) |
+| colbreak | `max` | int | -s- | element gap | M1-extended (R6b) |
+| colorscale | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| colorscale | `minColor` | color | a-g | element gap | M1-extended (R6b) |
+| colorscale | `maxColor` | color | a-g | element gap | M1-extended (R6b) |
+| colorscale | `midColor` | color | a-g | element gap | M1-extended (R6b) |
+| colorscale | `midpoint` | number | a-- | element gap | M1-extended (R6b) |
+| colorscale | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| colorscale | `type` | string | --g | element gap | M1-extended (R6b) |
+| colorscale | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| column | `name` | string | a-- | write-only | M2 |
+| column | `width` | length | asg | gap | M1-extended (R6b) |
+| column | `hidden` | bool | asg | gap | M1-extended (R6b) |
+| column | `outline` | int | -s- | gap | M1-extended (R6b) |
+| column | `collapsed` | bool | -sg | gap | M1-extended (R6b) |
+| column | `numberformat` | string | -sg | missing |  |
+| column | `customWidth` | bool | --g | gap | M1-extended (R6b) |
+| column | `autofit` | bool | -s- | write-only | M2 |
+| comment | `ref` | string | asg | element gap | M1-extended (R6b) |
+| comment | `author` | string | asg | element gap | M1-extended (R6b) |
+| comment | `text` | string | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `type` | enum | --g | element gap | M1-extended (R6b) |
+| conditionalformatting | `ref` | string | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `fill` | color | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `operator` | string | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `value` | string | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `color` | color | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `value2` | string | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `text` | string | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `rank` | number | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `percent` | bool | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `bottom` | bool | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `aboveAverage` | bool | a-g | element gap | M1-extended (R6b) |
+| conditionalformatting | `stdDev` | number | a-- | element gap | M1-extended (R6b) |
+| conditionalformatting | `equalAverage` | bool | a-- | element gap | M1-extended (R6b) |
+| conditionalformatting | `period` | string | a-g | element gap | M1-extended (R6b) |
+| conditionalformatting | `min` | string | a-g | element gap | M1-extended (R6b) |
+| conditionalformatting | `max` | string | a-g | element gap | M1-extended (R6b) |
+| conditionalformatting | `showValue` | bool | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `negativeColor` | color | a-g | element gap | M1-extended (R6b) |
+| conditionalformatting | `axisColor` | color | a-g | element gap | M1-extended (R6b) |
+| conditionalformatting | `axisPosition` | enum | a-- | element gap | M1-extended (R6b) |
+| conditionalformatting | `minColor` | color | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `maxColor` | color | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `midColor` | color | a-g | element gap | M1-extended (R6b) |
+| conditionalformatting | `midPoint` | string | a-- | element gap | M1-extended (R6b) |
+| conditionalformatting | `iconset` | string | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `reverse` | bool | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `formula` | string | asg | element gap | M1-extended (R6b) |
+| conditionalformatting | `dxfId` | int | --g | element gap | M1-extended (R6b) |
+| containstext | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| containstext | `text` | string | a-g | element gap | M1-extended (R6b) |
+| containstext | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| containstext | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| containstext | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| containstext | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| containstext | `type` | string | --g | element gap | M1-extended (R6b) |
+| containstext | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| databar | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| databar | `min` | string | a-- | element gap | M1-extended (R6b) |
+| databar | `max` | string | a-- | element gap | M1-extended (R6b) |
+| databar | `color` | color | a-g | element gap | M1-extended (R6b) |
+| databar | `showValue` | bool | a-g | element gap | M1-extended (R6b) |
+| databar | `negativeColor` | color | a-g | element gap | M1-extended (R6b) |
+| databar | `axisColor` | color | a-g | element gap | M1-extended (R6b) |
+| databar | `axisPosition` | enum | a-- | element gap | M1-extended (R6b) |
+| databar | `minLength` | number | a-g | element gap | M1-extended (R6b) |
+| databar | `maxLength` | number | a-g | element gap | M1-extended (R6b) |
+| databar | `direction` | enum | a-g | element gap | M1-extended (R6b) |
+| databar | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| databar | `type` | string | --g | element gap | M1-extended (R6b) |
+| databar | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| dateoccurring | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| dateoccurring | `period` | enum | a-g | element gap | M1-extended (R6b) |
+| dateoccurring | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| dateoccurring | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| dateoccurring | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| dateoccurring | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| dateoccurring | `type` | string | --g | element gap | M1-extended (R6b) |
+| dateoccurring | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| detectedtable | `source` | string | --g | missing |  |
+| detectedtable | `stable` | bool | --g | missing |  |
+| detectedtable | `ref` | string | --g | missing |  |
+| detectedtable | `columns` | string | --g | missing |  |
+| detectedtable | `dataRange` | string | --g | missing |  |
+| duplicatevalues | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| duplicatevalues | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| duplicatevalues | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| duplicatevalues | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| duplicatevalues | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| duplicatevalues | `type` | string | --g | element gap | M1-extended (R6b) |
+| duplicatevalues | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| formulacf | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| formulacf | `formula` | string | a-g | element gap | M1-extended (R6b) |
+| formulacf | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| formulacf | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| formulacf | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| formulacf | `font.italic` | bool | a-- | element gap | M1-extended (R6b) |
+| formulacf | `font.underline` | bool | a-- | element gap | M1-extended (R6b) |
+| formulacf | `font.strike` | bool | a-- | element gap | M1-extended (R6b) |
+| formulacf | `font.size` | font-size | a-- | element gap | M1-extended (R6b) |
+| formulacf | `font.name` | string | a-- | element gap | M1-extended (R6b) |
+| formulacf | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| formulacf | `type` | string | --g | element gap | M1-extended (R6b) |
+| formulacf | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| hyperlink | `url` | string | --g | element gap | M1-extended (R6b) |
+| hyperlink | `ref` | string | --g | element gap | M1-extended (R6b) |
+| hyperlink | `location` | string | --g | element gap | M1-extended (R6b) |
+| hyperlink | `display` | string | --g | element gap | M1-extended (R6b) |
+| hyperlink | `tooltip` | string | --g | element gap | M1-extended (R6b) |
+| iconset | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| iconset | `iconset` | enum | a-g | element gap | M1-extended (R6b) |
+| iconset | `reverse` | bool | a-- | element gap | M1-extended (R6b) |
+| iconset | `showValue` | bool | a-- | element gap | M1-extended (R6b) |
+| iconset | `type` | string | --g | element gap | M1-extended (R6b) |
+| iconset | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| namedrange | `name` | string | asg | element gap | M1-extended (R6b) |
+| namedrange | `ref` | string | asg | element gap | M1-extended (R6b) |
+| namedrange | `scope` | string | asg | element gap | M1-extended (R6b) |
+| namedrange | `comment` | string | asg | element gap | M1-extended (R6b) |
+| namedrange | `volatile` | bool | asg | element gap | M1-extended (R6b) |
+| ole | `anchor` | string | asg | element gap | M1-extended (R6b) |
+| ole | `shapeId` | number | --g | element gap | M1-extended (R6b) |
+| ole | `contentType` | string | --g | element gap | M1-extended (R6b) |
+| ole | `fileSize` | number | --g | element gap | M1-extended (R6b) |
+| ole | `objectType` | string | --g | element gap | M1-extended (R6b) |
+| ole | `preview` | string | a-- | element gap | M1-extended (R6b) |
+| ole | `progId` | string | asg | element gap | M1-extended (R6b) |
+| ole | `src` | string | as- | element gap | M1-extended (R6b) |
+| ole | `oleKind` | enum | a-- | element gap | M1-extended (R6b) |
+| ole | `embedExt` | string | a-- | element gap | M1-extended (R6b) |
+| pagebreak | `row` | int | a-- | element gap | M1-extended (R6b) |
+| pagebreak | `col` | string | a-- | element gap | M1-extended (R6b) |
+| picture | `crop` | string | --g | element gap | M1-extended (R6b) |
+| picture | `title` | string | a-- | element gap | M1-extended (R6b) |
+| picture | `decorative` | bool | a-g | element gap | M1-extended (R6b) |
+| picture | `rotation` | string | asg | element gap | M1-extended (R6b) |
+| picture | `flip` | string | asg | element gap | M1-extended (R6b) |
+| picture | `flipH` | bool | as- | element gap | M1-extended (R6b) |
+| picture | `flipV` | bool | as- | element gap | M1-extended (R6b) |
+| picture | `flipBoth` | bool | a-- | element gap | M1-extended (R6b) |
+| picture | `opacity` | string | a-g | element gap | M1-extended (R6b) |
+| picture | `hyperlink` | string | a-- | element gap | M1-extended (R6b) |
+| picture | `anchor` | string | a-- | element gap | M1-extended (R6b) |
+| picture | `anchorMode` | string | a-- | element gap | M1-extended (R6b) |
+| picture | `shadow` | string | -s- | element gap | M1-extended (R6b) |
+| picture | `glow` | string | -s- | element gap | M1-extended (R6b) |
+| picture | `reflection` | string | -s- | element gap | M1-extended (R6b) |
+| picture | `softEdge` | string | -s- | element gap | M1-extended (R6b) |
+| picture | `crop.l` | string | as- | element gap | M1-extended (R6b) |
+| picture | `crop.r` | string | as- | element gap | M1-extended (R6b) |
+| picture | `crop.t` | string | as- | element gap | M1-extended (R6b) |
+| picture | `crop.b` | string | as- | element gap | M1-extended (R6b) |
+| picture | `srcRect` | string | as- | element gap | M1-extended (R6b) |
+| picture | `anchoredTo` | string | --g | element gap | M1-extended (R6b) |
+| picture | `mergeAnchor` | bool | --g | element gap | M1-extended (R6b) |
+| picture | `x` | length | asg | element gap | M1-extended (R6b) |
+| picture | `y` | length | asg | element gap | M1-extended (R6b) |
+| picture | `width` | integer | asg | element gap | M1-extended (R6b) |
+| picture | `height` | integer | asg | element gap | M1-extended (R6b) |
+| picture | `cropBottom` | string | as- | element gap | M1-extended (R6b) |
+| picture | `cropLeft` | string | as- | element gap | M1-extended (R6b) |
+| picture | `cropRight` | string | as- | element gap | M1-extended (R6b) |
+| picture | `cropTop` | string | as- | element gap | M1-extended (R6b) |
+| picture | `name` | string | a-g | element gap | M1-extended (R6b) |
+| picture | `fallback` | string | a-- | element gap | M1-extended (R6b) |
+| picture | `alt` | string | asg | element gap | M1-extended (R6b) |
+| picture | `contentType` | string | --g | element gap | M1-extended (R6b) |
+| picture | `fileSize` | number | --g | element gap | M1-extended (R6b) |
+| picture | `relId` | string | --g | element gap | M1-extended (R6b) |
+| picture | `src` | string | as- | element gap | M1-extended (R6b) |
+| pivottable | `source` | string | asg | element gap | M1-extended (R6b) |
+| pivottable | `position` | string | a-- | element gap | M1-extended (R6b) |
+| pivottable | `name` | string | asg | element gap | M1-extended (R6b) |
+| pivottable | `style` | string | asg | element gap | M1-extended (R6b) |
+| pivottable | `rows` | string | asg | element gap | M1-extended (R6b) |
+| pivottable | `cols` | string | asg | element gap | M1-extended (R6b) |
+| pivottable | `filters` | string | asg | element gap | M1-extended (R6b) |
+| pivottable | `values` | string | asg | element gap | M1-extended (R6b) |
+| pivottable | `aggregate` | string | as- | element gap | M1-extended (R6b) |
+| pivottable | `showDataAs` | string | as- | element gap | M1-extended (R6b) |
+| pivottable | `topN` | string | a-- | element gap | M1-extended (R6b) |
+| pivottable | `sort` | enum | as- | element gap | M1-extended (R6b) |
+| pivottable | `layout` | enum | asg | element gap | M1-extended (R6b) |
+| pivottable | `labelFilter` | string | a-- | element gap | M1-extended (R6b) |
+| pivottable | `calculatedField` | string | a-- | element gap | M1-extended (R6b) |
+| pivottable | `repeatLabels` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `blankRows` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `grandTotals` | enum | as- | element gap | M1-extended (R6b) |
+| pivottable | `rowGrandTotals` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `colGrandTotals` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `grandTotalCaption` | string | asg | element gap | M1-extended (R6b) |
+| pivottable | `subtotals` | enum | asg | element gap | M1-extended (R6b) |
+| pivottable | `defaultSubtotal` | bool | as- | element gap | M1-extended (R6b) |
+| pivottable | `showRowStripes` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `showColStripes` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `showRowHeaders` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `showColHeaders` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `showLastColumn` | bool | asg | element gap | M1-extended (R6b) |
+| pivottable | `showDrill` | bool | a-- | element gap | M1-extended (R6b) |
+| pivottable | `mergeLabels` | bool | a-- | element gap | M1-extended (R6b) |
+| pivottable | `cacheId` | number | --g | element gap | M1-extended (R6b) |
+| pivottable | `fieldCount` | number | --g | element gap | M1-extended (R6b) |
+| pivottable | `dataFieldCount` | number | --g | element gap | M1-extended (R6b) |
+| pivottable | `dataField{N}` | string | --g | element gap | M1-extended (R6b) |
+| pivottable | `dataField{N}.showAs` | enum | --g | element gap | M1-extended (R6b) |
+| pivottable | `location` | string | --g | element gap | M1-extended (R6b) |
+| pivottable | `collapsedFields` | string | --g | element gap | M1-extended (R6b) |
+| pivottable | `axisAsDataField` | bool | --g | element gap | M1-extended (R6b) |
+| pivottable | `sortByField` | string | --g | element gap | M1-extended (R6b) |
+| range | `merge` | bool | -sg | missing |  |
+| range | `font.bold` | bool | -s- | write-only | M2 |
+| range | `fill` | color | -s- | write-only | M2 |
+| range | `numberformat` | string | -s- | write-only | M2 |
+| range | `alignment.horizontal` | enum | -s- | write-only | M2 |
+| row | `matchedTable` | string | --g | missing |  |
+| row | `tableSource` | string | --g | missing |  |
+| row | `cols` | int | a-- | write-only | M2 |
+| row | `height` | length | asg | gap | M1-extended (R6b) |
+| row | `hidden` | bool | asg | gap | M1-extended (R6b) |
+| row | `outline` | int | -s- | gap | M1-extended (R6b) |
+| row | `outlineLevel` | number | --g | gap | M1-extended (R6b) |
+| row | `collapsed` | bool | -sg | gap | M1-extended (R6b) |
+| row | `customHeight` | bool | --g | gap | M1-extended (R6b) |
+| rowbreak | `row` | int | as- | element gap | M1-extended (R6b) |
+| rowbreak | `manual` | bool | -s- | element gap | M1-extended (R6b) |
+| rowbreak | `min` | int | -s- | element gap | M1-extended (R6b) |
+| rowbreak | `max` | int | -s- | element gap | M1-extended (R6b) |
+| run | `subscript` | bool | asg | element gap | M1-extended (R6b) |
+| run | `superscript` | bool | asg | element gap | M1-extended (R6b) |
+| run | `bold` | bool | asg | element gap | M1-extended (R6b) |
+| run | `color` | color | asg | element gap | M1-extended (R6b) |
+| run | `font` | string | as- | element gap | M1-extended (R6b) |
+| run | `italic` | bool | asg | element gap | M1-extended (R6b) |
+| run | `size` | font-size | asg | element gap | M1-extended (R6b) |
+| run | `text` | string | asg | element gap | M1-extended (R6b) |
+| shape | `hyperlink` | string | a-g | element gap | M1-extended (R6b) |
+| shape | `reflection` | string | asg | element gap | M1-extended (R6b) |
+| shape | `anchor` | string | a-- | element gap | M1-extended (R6b) |
+| shape | `gradientFill` | string | a-- | element gap | M1-extended (R6b) |
+| shape | `geometry` | string | asg | element gap | M1-extended (R6b) |
+| shape | `flip` | string | as- | element gap | M1-extended (R6b) |
+| shape | `flipBoth` | bool | as- | element gap | M1-extended (R6b) |
+| shape | `x` | length | asg | element gap | M1-extended (R6b) |
+| shape | `y` | string | asg | element gap | M1-extended (R6b) |
+| shape | `width` | string | asg | element gap | M1-extended (R6b) |
+| shape | `height` | string | asg | element gap | M1-extended (R6b) |
+| shape | `align` | string | asg | element gap | M1-extended (R6b) |
+| shape | `bold` | bool | asg | element gap | M1-extended (R6b) |
+| shape | `color` | color | asg | element gap | M1-extended (R6b) |
+| shape | `fill` | color | asg | element gap | M1-extended (R6b) |
+| shape | `flipH` | bool | as- | element gap | M1-extended (R6b) |
+| shape | `flipV` | bool | as- | element gap | M1-extended (R6b) |
+| shape | `font` | string | asg | element gap | M1-extended (R6b) |
+| shape | `glow` | string | asg | element gap | M1-extended (R6b) |
+| shape | `italic` | bool | asg | element gap | M1-extended (R6b) |
+| shape | `line` | string | asg | element gap | M1-extended (R6b) |
+| shape | `margin` | length | asg | element gap | M1-extended (R6b) |
+| shape | `name` | string | asg | element gap | M1-extended (R6b) |
+| shape | `rotation` | string | asg | element gap | M1-extended (R6b) |
+| shape | `shadow` | string | asg | element gap | M1-extended (R6b) |
+| shape | `size` | font-size | asg | element gap | M1-extended (R6b) |
+| shape | `softEdge` | string | asg | element gap | M1-extended (R6b) |
+| shape | `text` | string | asg | element gap | M1-extended (R6b) |
+| shape | `underline` | string | asg | element gap | M1-extended (R6b) |
+| shape | `valign` | string | asg | element gap | M1-extended (R6b) |
+| sheet | `name` | string | asg | supported |  |
+| sheet | `autoFilter` | string | asg | missing |  |
+| sheet | `tabColor` | color | asg | missing |  |
+| sheet | `hidden` | bool | asg | supported |  |
+| sheet | `freeze` | string | -sg | missing |  |
+| sheet | `direction` | enum | -sg | missing |  |
+| sheet | `zoom` | number | -sg | missing |  |
+| sheet | `gridlines` | bool | --g | missing |  |
+| sheet | `headings` | bool | --g | missing |  |
+| sheet | `visibility` | enum | --g | supported |  |
+| sheet | `protect` | bool | -sg | missing |  |
+| sheet | `password` | string | -s- | write-only | M2 |
+| sheet | `passwordHash` | string | --g | missing |  |
+| sheet | `protection.algorithm` | string | --g | missing |  |
+| sheet | `protection.hash` | string | --g | missing |  |
+| sheet | `protection.salt` | string | --g | missing |  |
+| sheet | `protection.spinCount` | number | --g | missing |  |
+| sheet | `printTitleRows` | string | -s- | write-only | M2 |
+| sheet | `printTitleCols` | string | -s- | write-only | M2 |
+| sheet | `orientation` | string | --g | missing |  |
+| sheet | `paperSize` | number | --g | missing |  |
+| sheet | `fitToPage` | string | --g | missing |  |
+| sheet | `printArea` | string | -sg | missing |  |
+| sheet | `margin.top` | string | --g | missing |  |
+| sheet | `margin.bottom` | string | --g | missing |  |
+| sheet | `margin.left` | string | --g | missing |  |
+| sheet | `margin.right` | string | --g | missing |  |
+| sheet | `margin.header` | string | --g | missing |  |
+| sheet | `margin.footer` | string | --g | missing |  |
+| sheet | `header` | string | -sg | missing |  |
+| sheet | `footer` | string | -sg | missing |  |
+| sheet | `sort` | string | -sg | missing |  |
+| sheet | `rowBreaks` | string | --g | missing |  |
+| sheet | `colBreaks` | string | --g | missing |  |
+| slicer | `pivotTable` | string | asg | element gap | M1-extended (R6b) |
+| slicer | `field` | string | a-g | element gap | M1-extended (R6b) |
+| slicer | `caption` | string | asg | element gap | M1-extended (R6b) |
+| slicer | `name` | string | asg | element gap | M1-extended (R6b) |
+| slicer | `rowHeight` | number | asg | element gap | M1-extended (R6b) |
+| slicer | `columnCount` | number | asg | element gap | M1-extended (R6b) |
+| slicer | `pivotCacheId` | number | --g | element gap | M1-extended (R6b) |
+| slicer | `itemCount` | number | --g | element gap | M1-extended (R6b) |
+| slicer | `cache` | string | --g | element gap | M1-extended (R6b) |
+| sparkline | `type` | enum | asg | element gap | M1-extended (R6b) |
+| sparkline | `dataRange` | string | asg | element gap | M1-extended (R6b) |
+| sparkline | `location` | string | asg | element gap | M1-extended (R6b) |
+| sparkline | `color` | color | asg | element gap | M1-extended (R6b) |
+| sparkline | `negativeColor` | color | asg | element gap | M1-extended (R6b) |
+| sparkline | `markers` | bool | asg | element gap | M1-extended (R6b) |
+| sparkline | `highPoint` | bool | asg | element gap | M1-extended (R6b) |
+| sparkline | `lowPoint` | bool | asg | element gap | M1-extended (R6b) |
+| sparkline | `firstPoint` | bool | asg | element gap | M1-extended (R6b) |
+| sparkline | `lastPoint` | bool | asg | element gap | M1-extended (R6b) |
+| sparkline | `negative` | bool | asg | element gap | M1-extended (R6b) |
+| sparkline | `highMarkerColor` | color | a-- | element gap | M1-extended (R6b) |
+| sparkline | `lowMarkerColor` | color | a-- | element gap | M1-extended (R6b) |
+| sparkline | `firstMarkerColor` | color | a-- | element gap | M1-extended (R6b) |
+| sparkline | `lastMarkerColor` | color | a-- | element gap | M1-extended (R6b) |
+| sparkline | `markersColor` | color | a-- | element gap | M1-extended (R6b) |
+| sparkline | `lineWeight` | number | asg | element gap | M1-extended (R6b) |
+| sparkline | `displayEmptyCellsAs` | enum | asg | element gap | M1-extended (R6b) |
+| sparkline | `displayXAxis` | bool | asg | element gap | M1-extended (R6b) |
+| sparkline | `rightToLeft` | bool | asg | element gap | M1-extended (R6b) |
+| sparkline | `dateAxis` | bool | asg | element gap | M1-extended (R6b) |
+| table | `ref` | string | asg | element gap | M1-extended (R6b) |
+| table | `displayName` | string | asg | element gap | M1-extended (R6b) |
+| table | `headerRow` | bool | asg | element gap | M1-extended (R6b) |
+| table | `totalRow` | bool | asg | element gap | M1-extended (R6b) |
+| table | `autoExpand` | bool | a-- | element gap | M1-extended (R6b) |
+| table | `showFirstColumn` | bool | asg | element gap | M1-extended (R6b) |
+| table | `showLastColumn` | bool | asg | element gap | M1-extended (R6b) |
+| table | `showRowStripes` | bool | asg | element gap | M1-extended (R6b) |
+| table | `showColumnStripes` | bool | asg | element gap | M1-extended (R6b) |
+| table | `columns` | string | a-g | element gap | M1-extended (R6b) |
+| table | `totalsRowFunction` | string | a-- | element gap | M1-extended (R6b) |
+| table | `totalFunction` | string | --g | element gap | M1-extended (R6b) |
+| table | `totalLabel` | string | --g | element gap | M1-extended (R6b) |
+| table | `name` | string | asg | element gap | M1-extended (R6b) |
+| table | `style` | string | asg | element gap | M1-extended (R6b) |
+| topn | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| topn | `rank` | number | a-g | element gap | M1-extended (R6b) |
+| topn | `percent` | bool | a-g | element gap | M1-extended (R6b) |
+| topn | `bottom` | bool | a-g | element gap | M1-extended (R6b) |
+| topn | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| topn | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| topn | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| topn | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| topn | `type` | string | --g | element gap | M1-extended (R6b) |
+| topn | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| uniquevalues | `ref` | string | a-g | element gap | M1-extended (R6b) |
+| uniquevalues | `fill` | color | a-- | element gap | M1-extended (R6b) |
+| uniquevalues | `font.color` | color | a-- | element gap | M1-extended (R6b) |
+| uniquevalues | `font.bold` | bool | a-- | element gap | M1-extended (R6b) |
+| uniquevalues | `stopIfTrue` | bool | a-- | element gap | M1-extended (R6b) |
+| uniquevalues | `type` | string | --g | element gap | M1-extended (R6b) |
+| uniquevalues | `dxfId` | number | --g | element gap | M1-extended (R6b) |
+| validation | `type` | enum | asg | element gap | M1-extended (R6b) |
+| validation | `ref` | string | asg | element gap | M1-extended (R6b) |
+| validation | `allowBlank` | bool | asg | element gap | M1-extended (R6b) |
+| validation | `showError` | bool | asg | element gap | M1-extended (R6b) |
+| validation | `showInput` | bool | asg | element gap | M1-extended (R6b) |
+| validation | `errorTitle` | string | asg | element gap | M1-extended (R6b) |
+| validation | `promptTitle` | string | asg | element gap | M1-extended (R6b) |
+| validation | `errorStyle` | enum | asg | element gap | M1-extended (R6b) |
+| validation | `inCellDropdown` | bool | asg | element gap | M1-extended (R6b) |
+| validation | `showDropDown` | bool | as- | element gap | M1-extended (R6b) |
+| validation | `operator` | enum | asg | element gap | M1-extended (R6b) |
+| validation | `formula1` | string | asg | element gap | M1-extended (R6b) |
+| validation | `formula2` | string | asg | element gap | M1-extended (R6b) |
+| validation | `prompt` | string | asg | element gap | M1-extended (R6b) |
+| validation | `error` | string | asg | element gap | M1-extended (R6b) |
+| workbook | `defaultFont` | string | --- | write-only | M2 |
+| workbook | `defaultFontSize` | length | --- | write-only | M2 |
+| workbook | `author` | string | -sg | supported |  |
+| workbook | `title` | string | -sg | supported |  |
+| workbook | `calc.mode` | enum | -sg | missing |  |
+| workbook | `calc.iterate` | bool | -sg | missing |  |
+| workbook | `calc.iterateCount` | number | -sg | missing |  |
+| workbook | `calc.iterateDelta` | number | -sg | missing |  |
+| workbook | `calc.fullPrecision` | bool | -sg | missing |  |
+| workbook | `lastModifiedBy` | string | -sg | supported |  |
+| workbook | `created` | string | --g | supported |  |
+| workbook | `modified` | string | --g | supported |  |
+| workbook | `extended.application` | string | --g | missing |  |
+| workbook | `category` | string | -sg | supported |  |
+| workbook | `description` | string | -sg | supported |  |
+| workbook | `keywords` | string | -sg | supported |  |
+| workbook | `revisionNumber` | string | -sg | supported |  |
+| workbook | `activeTab` | number | --g | gap | M1-extended (R6b) |
+| workbook | `firstSheet` | number | --g | missing |  |
+| workbook | `calc.fullCalcOnLoad` | bool | --g | missing |  |
+| workbook | `calc.refMode` | string | --g | missing |  |
+| workbook | `workbook.backupFile` | bool | --g | missing |  |
+| workbook | `workbook.codeName` | string | --g | missing |  |
+| workbook | `workbook.date1904` | bool | -sg | supported |  |
+| workbook | `workbook.dateCompatibility` | bool | -sg | missing |  |
+| workbook | `workbook.filterPrivacy` | bool | -sg | missing |  |
+| workbook | `workbook.showObjects` | enum | -sg | missing |  |
+| workbook | `workbook.lockStructure` | bool | -sg | missing |  |
+| workbook | `workbook.lockWindows` | bool | -sg | missing |  |
+| workbook | `workbook.password` | string | -sg | missing |  |
+| workbook | `extended.applicationVersion` | string | --g | missing |  |
+| workbook | `extended.characters` | number | --g | missing |  |
+| workbook | `extended.company` | string | -sg | missing |  |
+| workbook | `extended.lines` | number | --g | missing |  |
+| workbook | `extended.manager` | string | -sg | missing |  |
+| workbook | `extended.pages` | number | --g | missing |  |
+| workbook | `extended.paragraphs` | number | --g | missing |  |
+| workbook | `extended.template` | string | -sg | missing |  |
+| workbook | `extended.totalTime` | number | --g | missing |  |
+| workbook | `extended.words` | number | --g | missing |  |
+| workbook | `subject` | string | -sg | supported |  |
+| workbook | `theme.color.accent1` | color | -sg | missing |  |
+| workbook | `theme.color.accent2` | color | -sg | missing |  |
+| workbook | `theme.color.accent3` | color | -sg | missing |  |
+| workbook | `theme.color.accent4` | color | -sg | missing |  |
+| workbook | `theme.color.accent5` | color | -sg | missing |  |
+| workbook | `theme.color.accent6` | color | -sg | missing |  |
+| workbook | `theme.color.dk1` | color | -sg | missing |  |
+| workbook | `theme.color.dk2` | color | -sg | missing |  |
+| workbook | `theme.color.folHlink` | color | -sg | missing |  |
+| workbook | `theme.color.hlink` | color | -sg | missing |  |
+| workbook | `theme.color.lt1` | color | -sg | missing |  |
+| workbook | `theme.color.lt2` | color | -sg | missing |  |
+| workbook | `theme.colorScheme` | string | --g | missing |  |
+| workbook | `theme.font.major.eastAsia` | string | -sg | missing |  |
+| workbook | `theme.font.major.latin` | string | -sg | missing |  |
+| workbook | `theme.font.minor.eastAsia` | string | -sg | missing |  |
+| workbook | `theme.font.minor.latin` | string | -sg | missing |  |
+| workbook | `theme.fontScheme` | string | --g | missing |  |
+| workbook | `theme.formatScheme` | string | --g | missing |  |
+| workbook | `theme.name` | string | --g | missing |  |
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `query` | `row` | `header-column-predicates` | legacy XLS does not yet bind row predicate names to header columns | M1-extended (R6b) |
+| `get` | `cell` | `non-worksheet-tab` | chart and macro tabs retain catalog positions but do not expose ordinary worksheet cells | M1-extended (R6b) |
+| `view` | `workbook` | `non-worksheet-content` | text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected | M1-extended (R6b) |
+| `create` | `workbook` | `template` | the XLS creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLS template creation |
+| `create` | `workbook` | `strict-conformance` | the XLS creator emits binary BIFF8 workbooks and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
+| `create` | `workbook` | `initial-metadata` | the XLS creator refuses initial metadata until typed metadata authoring is integrated | M2 XLS metadata creation |
 
 ## pptx
 

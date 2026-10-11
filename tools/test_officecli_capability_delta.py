@@ -61,6 +61,11 @@ class SchemaLoading(unittest.TestCase):
         self.assertEqual(delta.officecli_elements(self.help, "xlsb"), delta.officecli_elements(self.help, "xlsx"))
         self.assertEqual(delta.reference_format("xlsb"), "xlsx")
 
+    def test_xls_uses_xlsx_schema_reference(self) -> None:
+        write(self.help / "xlsx" / "cell.json", {"element": "cell", "properties": {"value": READ}})
+        self.assertEqual(delta.officecli_elements(self.help, "xls"), delta.officecli_elements(self.help, "xlsx"))
+        self.assertEqual(delta.reference_format("xls"), "xlsx")
+
     def test_path_forms_name_their_element(self) -> None:
         names = delta.path_names(
             {

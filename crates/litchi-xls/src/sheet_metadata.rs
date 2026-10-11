@@ -31,6 +31,22 @@ pub struct SheetMetadata {
 }
 
 impl SheetMetadata {
+    pub(crate) fn from_parts(
+        workbook_index: usize,
+        name: String,
+        visibility: SheetVisibility,
+        kind: SheetKind,
+        parsed_worksheet_index: Option<usize>,
+    ) -> Self {
+        Self {
+            workbook_index,
+            name,
+            visibility,
+            kind,
+            parsed_worksheet_index,
+        }
+    }
+
     #[must_use]
     pub fn workbook_index(&self) -> usize {
         self.workbook_index

@@ -117,6 +117,8 @@ impl<'q> Plan<'q> {
             FileFormat::Xlsx => super::compile::compile::<crate::format::xlsx::Nav<'static>>(query),
             #[cfg(feature = "xlsb")]
             FileFormat::Xlsb => super::compile::compile::<crate::format::xlsb::Nav<'static>>(query),
+            #[cfg(feature = "xls")]
+            FileFormat::Xls => super::compile::compile::<crate::format::xls::Nav<'static>>(query),
             #[cfg(feature = "pptx")]
             FileFormat::Pptx => super::compile::compile::<crate::format::pptx::Nav<'static>>(query),
             _ => {

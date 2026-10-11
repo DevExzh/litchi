@@ -13,7 +13,8 @@ use litchi_core::FileFormat;
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
-        feature = "xlsb"
+        feature = "xlsb",
+        feature = "xls"
     )),
     allow(
         clippy::only_used_in_recursion,
@@ -94,6 +95,12 @@ impl File {
                 crate::path::resolve::get(&crate::format::xlsb::Nav::new(handle), &path)
                     .map(Node::Xlsb)
             },
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::get(&crate::format::xls::Nav::new(handle), &path)
+                    .map(Node::Xls)
+            },
             Self::Signed(signed) => signed.file().get(path),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -136,6 +143,12 @@ impl File {
                 let path = path.into_path()?;
                 crate::path::resolve::find(&crate::format::xlsb::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Xlsb))
+            },
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::find(&crate::format::xls::Nav::new(handle), &path)
+                    .map(|node| node.map(Node::Xls))
             },
             Self::Signed(signed) => signed.file().find(path),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -185,6 +198,10 @@ impl File {
             Self::Xlsb(handle) => {
                 crate::query::run(crate::format::xlsb::Nav::new(handle), selector)
                     .map(Matches::xlsb)
+            },
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => {
+                crate::query::run(crate::format::xls::Nav::new(handle), selector).map(Matches::xls)
             },
             Self::Signed(signed) => signed.file().query(selector),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -236,6 +253,11 @@ impl File {
                 crate::format::xlsb::view_json(handle, mode, &crate::view::mode::Options::default())
                     .map(crate::view::Json::xlsb)
             },
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => {
+                crate::format::xls::view_json(handle, mode, &crate::view::mode::Options::default())
+                    .map(crate::view::Json::xls)
+            },
             Self::Signed(signed) => signed.file().view_json(mode),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -279,6 +301,13 @@ impl File {
                 &crate::view::mode::Options::default(),
                 output,
             ),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => crate::format::xls::view_to(
+                handle,
+                mode,
+                &crate::view::mode::Options::default(),
+                output,
+            ),
             Self::Signed(signed) => signed.file().view_to(mode, output),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -310,6 +339,8 @@ pub(crate) enum Adapter {
     Pptx,
     #[cfg(feature = "xlsb")]
     Xlsb,
+    #[cfg(feature = "xls")]
+    Xls,
 }
 
 impl Adapter {
@@ -327,6 +358,8 @@ impl Adapter {
             FileFormat::Pptx => Some(Self::Pptx),
             #[cfg(feature = "xlsb")]
             FileFormat::Xlsb => Some(Self::Xlsb),
+            #[cfg(feature = "xls")]
+            FileFormat::Xls => Some(Self::Xls),
             _ => None,
         }
     }
@@ -344,6 +377,8 @@ impl Adapter {
             Self::Pptx => FileFormat::Pptx,
             #[cfg(feature = "xlsb")]
             Self::Xlsb => FileFormat::Xlsb,
+            #[cfg(feature = "xls")]
+            Self::Xls => FileFormat::Xls,
         }
     }
 
@@ -383,6 +418,11 @@ macro_rules! with_spec {
             #[cfg(feature = "xlsb")]
             $crate::read::Adapter::Xlsb => {
                 let $spec = &$crate::format::xlsb::SPEC;
+                $body
+            },
+            #[cfg(feature = "xls")]
+            $crate::read::Adapter::Xls => {
+                let $spec = &$crate::format::xls::SPEC;
                 $body
             },
         }

@@ -605,12 +605,19 @@ impl SourceBackedWorksheetDescriptor {
 /// An owned result of one selected-cell lookup.
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceBackedCell {
+    formula: bool,
     row: u32,
     column: u32,
     value: litchi_core::sheet::CellValue,
 }
 
 impl SourceBackedCell {
+    /// Whether this stored cell is a formula with a cached result.
+    #[must_use]
+    pub const fn is_formula(&self) -> bool {
+        self.formula
+    }
+
     /// Zero-based row.
     #[must_use]
     pub const fn row(&self) -> u32 {
@@ -1292,6 +1299,29 @@ impl SourceBackedWorkbook {
     /// Number of all workbook tabs, including chart and macro sheets.
     pub fn sheet_count(&self) -> Result<usize> {
         self.metadata(|inner| inner.sheets.len())
+    }
+
+    /// Complete workbook-tab metadata, including non-worksheet tabs.
+    ///
+    /// Metadata access retains the source-version fence without parsing any
+    /// worksheet payload. Parsed worksheet indices use the same ordinal as
+    /// `worksheet_by_index`; tab indices remain in complete workbook order.
+    pub fn sheet_metadata(&self) -> Result<Vec<crate::SheetMetadata>> {
+        self.metadata(|inner| {
+            inner
+                .sheets
+                .iter()
+                .map(|sheet| {
+                    crate::SheetMetadata::from_parts(
+                        sheet.workbook_index,
+                        sheet.name.clone(),
+                        sheet.visibility,
+                        sheet.kind,
+                        sheet.worksheet_index,
+                    )
+                })
+                .collect()
+        })
     }
 
     /// Number of ordinary worksheet tabs.
@@ -3223,6 +3253,7 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
                 index.set_sst_chain_checkpoint(&strings.chain);
             }
             self.found = Some(SourceBackedCell {
+                formula: matches!(record, CellRecord::Formula { .. }),
                 row: u32::from(self.row),
                 column: u32::from(self.column),
                 value,
@@ -3311,6 +3342,7 @@ where
             cell.value().clone()
         };
         (self.visitor)(SourceBackedCell {
+            formula: matches!(record, CellRecord::Formula { .. }),
             row: u32::from(record.row()),
             column: u32::from(record.col()),
             value,
@@ -3748,6 +3780,7 @@ fn replay_indexed_cell(
             replay_indexed_slot(owner, sheet.end, slot, &mut cursor, execution, &mut strings)?
         {
             found = Some(SourceBackedCell {
+                formula: slot.kind == 0x0006,
                 row: u32::from(row),
                 column: u32::from(column),
                 value,

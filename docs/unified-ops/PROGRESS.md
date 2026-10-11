@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0203 | [Unified XLS reads](0203-xls-unified-reads.md) | Native-backed navigation/query/views, complete tab catalog, source fences and explicit gaps; tests/lint/docs/glossary pass; eager paired reads miss performance target and traversal early termination remains open; unified XLS mutations and full goal remain open |
 | 0202 | [Explicit XLS encryption entropy](0202-xls-explicit-encryption-entropy.md) | Single-use explicit entropy removes ambient RNG from Builder build; 2,242 tests/doctests, lint/docs/glossary/boundaries pass; Package security publication, unified XLS CRUD and full goal remain open |
 | 0201 | [XLS encryption profile](0201-xls-encryption-profile.md) | Retained exact encryption mode/key length and canonical password opening; 2,323 tests/doctests, lint/docs/glossary/boundaries pass; security publication verbs, Builder entropy, unified XLS CRUD and full goal remain open |
 | 0200 | [Canonical XLS Builder](0200-xls-canonical-builder.md) | Concrete Builder and Package-returning build replace Writer publication; encrypted owners retain explicit output; 2,234 tests/doctests plus focused Builder checks, lint/docs/glossary/boundaries and harness compilation pass; encrypted-build determinism, unified XLS CRUD and full goal remain open |

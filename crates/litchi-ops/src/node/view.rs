@@ -376,6 +376,9 @@ pub(crate) enum Source<'a> {
     Pptx(crate::format::pptx::Props<'a>),
     #[cfg(feature = "xlsb")]
     Xlsb(crate::format::xlsb::Props<'a>),
+    /// An XLS node's leaf values.
+    #[cfg(feature = "xls")]
+    Xls(crate::format::xls::Props<'a>),
 }
 
 impl<'a> Source<'a> {
@@ -399,6 +402,8 @@ impl<'a> Source<'a> {
             Self::Pptx(ref props) => props.get(index),
             #[cfg(feature = "xlsb")]
             Self::Xlsb(ref props) => props.get(index),
+            #[cfg(feature = "xls")]
+            Self::Xls(ref props) => props.get(index),
         }
     }
 }
@@ -588,6 +593,8 @@ enum Inner<'n, 'f> {
     Pptx(crate::format::pptx::Children<'f>),
     #[cfg(feature = "xlsb")]
     Xlsb(crate::format::xlsb::Children<'f>),
+    #[cfg(feature = "xls")]
+    Xls(crate::format::xls::Children<'f>),
 }
 
 impl<'n, 'f> Children<'n, 'f> {
@@ -652,6 +659,12 @@ impl<'n, 'f> Children<'n, 'f> {
             inner: Inner::Xlsb(children),
         }
     }
+    #[cfg(feature = "xls")]
+    pub(crate) const fn xls(children: crate::format::xls::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Xls(children),
+        }
+    }
 }
 
 impl<'f> Iterator for Children<'_, 'f> {
@@ -673,6 +686,8 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Pptx(children) => children.next().map(|child| child.map(Node::Pptx)),
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(children) => children.next().map(|child| child.map(Node::Xlsb)),
+            #[cfg(feature = "xls")]
+            Inner::Xls(children) => children.next().map(|child| child.map(Node::Xls)),
         };
         if matches!(item, Some(Err(_)) | None) {
             self.inner = Inner::Empty(PhantomData);

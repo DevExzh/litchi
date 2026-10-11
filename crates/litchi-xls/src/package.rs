@@ -763,6 +763,19 @@ impl Workbook {
         }
     }
 
+    /// Return complete workbook-tab metadata in original tab order.
+    ///
+    /// This includes chart and macro tabs. Each descriptor distinguishes the
+    /// tab position from its optional ordinary worksheet ordinal.
+    pub fn sheets(&self) -> Result<Vec<crate::SheetMetadata>> {
+        match &self.package.state {
+            PackageState::Source { workbook, .. } => {
+                workbook.sheet_metadata().map_err(Error::Source)
+            },
+            PackageState::Eager { reader, .. } => Ok(reader.sheets().to_vec()),
+        }
+    }
+
     /// Return ordinary worksheet names.
     pub fn worksheet_names(&self) -> Result<Vec<String>> {
         match &self.package.state {

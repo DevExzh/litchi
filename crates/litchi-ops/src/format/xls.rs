@@ -17,6 +17,20 @@ use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
+mod children;
+mod nav;
+mod node;
+pub(crate) mod owner;
+mod spec;
+pub(crate) mod views;
+
+pub(crate) use children::Children;
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub(crate) use node::Props;
+pub(crate) use spec::SPEC;
+pub(crate) use views::{Json as ViewJson, view_json, view_to};
+
 /// An immutable legacy Excel workbook. Cloning shares its native package.
 #[derive(Clone)]
 pub struct Xls(Arc<Opened<Package>>);
@@ -84,6 +98,17 @@ impl Xls {
         Ok(())
     }
 
+    pub(crate) fn date_1904(&self) -> Result<bool> {
+        let workbook = self.owner().workbook();
+        if let Some(source) = workbook.source_backed_ref() {
+            return Ok(matches!(
+                source.date_system()?,
+                litchi_xls::DateSystem::Excel1904
+            ));
+        }
+        Ok(WorkbookTrait::is_1904_date_system(workbook.reader_ref()?))
+    }
+
     pub(crate) fn write_to<W: std::io::Write>(&self, sink: &mut W) -> Result<()> {
         if self.signature() == Signature::RemovalAuthorized {
             let bytes = signature::unsign_compound_file(
@@ -134,8 +159,22 @@ impl Xls {
         self.0.signature()
     }
 
-    fn owner(&self) -> &Package {
+    pub(super) fn owner(&self) -> &Package {
         &self.0
+    }
+
+    /// Run one read against the retained native owner, fencing both the
+    /// source-backed and eager routes.  The native source owner itself keeps
+    /// the payload scan lazy; this wrapper only checks the captured source
+    /// version before and after the operation.
+    pub(crate) fn finish<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+        self.check_source()?;
+        let value = operation();
+        let freshness = self.check_source();
+        match freshness {
+            Err(error) => Err(error),
+            Ok(()) => value,
+        }
     }
 
     #[cfg(test)]

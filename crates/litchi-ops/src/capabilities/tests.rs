@@ -78,12 +78,7 @@ fn every_format_has_one_answer_for_its_reads() {
             },
             Support::Unsupported { code, .. } => {
                 assert_eq!(capabilities.elements().count(), 0, "{format:?}");
-                let expected_gaps = if format == FileFormat::Xls && cfg!(feature = "xls") {
-                    3
-                } else {
-                    0
-                };
-                assert_eq!(capabilities.gaps().count(), expected_gaps, "{format:?}");
+                assert_eq!(capabilities.gaps().count(), 0, "{format:?}");
                 for mode in Mode::ALL {
                     assert_eq!(capabilities.view(*mode), get, "{format:?} {mode:?}");
                 }
@@ -204,6 +199,68 @@ fn publication_and_creation_are_not_existing_document_edits() {
     assert!(!Verb::Create.is_edit());
 }
 
+#[cfg(feature = "xls")]
+#[test]
+fn xls_read_adapter_advertises_m1_reads_and_keeps_mutations_pending() {
+    let capabilities = Capabilities::of(FileFormat::Xls);
+    assert!(capabilities.verb(Verb::Get).is_supported());
+    assert!(capabilities.verb(Verb::Find).is_supported());
+    assert!(capabilities.verb(Verb::Query).is_supported());
+    assert!(capabilities.verb(Verb::View).is_supported());
+    assert!(capabilities.verb(Verb::Save).is_supported());
+    assert!(capabilities.verb(Verb::Create).is_supported());
+    assert!(capabilities.elements().next().is_some());
+
+    for verb in Verb::ALL.into_iter().filter(|verb| verb.is_edit()) {
+        assert_eq!(
+            capabilities.verb(verb).code(),
+            Some(Code::UnsupportedCapability),
+            "XLS {verb:?} remains a pending mutation"
+        );
+    }
+
+    for mode in [Mode::Text, Mode::Annotated, Mode::Outline, Mode::Stats] {
+        assert!(capabilities.view(mode).is_supported(), "XLS {mode:?}");
+    }
+    for mode in [
+        Mode::Issues,
+        Mode::Forms,
+        Mode::Html,
+        Mode::Svg,
+        Mode::Screenshot,
+        Mode::Pdf,
+    ] {
+        assert_eq!(
+            capabilities.view(mode).code(),
+            Some(Code::UnsupportedCapability),
+            "XLS {mode:?} remains an M1 view gap"
+        );
+    }
+
+    assert!(
+        !capabilities
+            .elements()
+            .find(|element| element.data().canonical == "row")
+            .unwrap()
+            .header_columns()
+    );
+
+    let creation_gaps = capabilities
+        .gaps()
+        .filter(|gap| {
+            matches!(
+                gap.subject(),
+                crate::node::spec::Subject::Operation {
+                    verb: "create",
+                    element: "workbook",
+                    ..
+                }
+            )
+        })
+        .count();
+    assert_eq!(creation_gaps, 3);
+}
+
 #[test]
 fn formats_without_a_variant_point_at_m6() {
     for format in [
@@ -228,7 +285,13 @@ fn formats_without_a_variant_point_at_m6() {
 /// reads: each element's identity keys are the ones a path step may use,
 /// each alias normalizes to the element's kind, and the report's element
 /// lookup finds the element by every name.
-#[cfg(any(feature = "doc", feature = "docx", feature = "xlsx", feature = "xlsb"))]
+#[cfg(any(
+    feature = "doc",
+    feature = "docx",
+    feature = "xlsx",
+    feature = "xlsb",
+    feature = "xls"
+))]
 #[test]
 fn spec_tables_agree_with_their_vocabularies() {
     use crate::node::spec::FormatSpec;
@@ -280,6 +343,8 @@ fn spec_tables_agree_with_their_vocabularies() {
     check(&crate::format::xlsx::SPEC, FileFormat::Xlsx);
     #[cfg(feature = "xlsb")]
     check(&crate::format::xlsb::SPEC, FileFormat::Xlsb);
+    #[cfg(feature = "xls")]
+    check(&crate::format::xls::SPEC, FileFormat::Xls);
     #[cfg(feature = "pptx")]
     check(&crate::format::pptx::SPEC, FileFormat::Pptx);
 }

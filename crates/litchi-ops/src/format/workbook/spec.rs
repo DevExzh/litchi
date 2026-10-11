@@ -425,6 +425,7 @@ props! {
 
 props! {
     /// A table, in `TableToNode` order.
+    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
     TableKey in TABLE_PROPS {
         Name => "name": ValueType::Text,
         DisplayName => "displayName": ValueType::Text,

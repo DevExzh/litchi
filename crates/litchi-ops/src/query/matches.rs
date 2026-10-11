@@ -10,7 +10,8 @@
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
-        feature = "xlsb"
+        feature = "xlsb",
+        feature = "xls"
     )),
     allow(
         dead_code,
@@ -33,7 +34,8 @@ use super::plan::{Diagnostic, Plan};
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
-    feature = "xlsb"
+    feature = "xlsb",
+    feature = "xls"
 ))]
 use super::walk::Walk;
 use crate::Result;
@@ -85,6 +87,8 @@ enum Inner<'f, 'q> {
     Pptx(Walk<'q, 'f, crate::format::pptx::Nav<'f>>),
     #[cfg(feature = "xlsb")]
     Xlsb(Walk<'q, 'f, crate::format::xlsb::Nav<'f>>),
+    #[cfg(feature = "xls")]
+    Xls(Walk<'q, 'f, crate::format::xls::Nav<'f>>),
     /// Keeps the lifetimes in use in builds without an adapter; uninhabited.
     #[allow(dead_code, reason = "uninhabited: only keeps the lifetimes in use")]
     Never(Infallible, PhantomData<(&'f (), &'q ())>),
@@ -126,6 +130,12 @@ impl<'f, 'q> Matches<'f, 'q> {
             inner: Inner::Xlsb(walk),
         }
     }
+    #[cfg(feature = "xls")]
+    pub(crate) fn xls(walk: Walk<'q, 'f, crate::format::xls::Nav<'f>>) -> Self {
+        Self {
+            inner: Inner::Xls(walk),
+        }
+    }
 
     /// The same matches, stopping after `n` in all: the walk ends there,
     /// reading nothing more.
@@ -152,6 +162,10 @@ impl<'f, 'q> Matches<'f, 'q> {
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(walk) => Self {
                 inner: Inner::Xlsb(walk.limit(n)),
+            },
+            #[cfg(feature = "xls")]
+            Inner::Xls(walk) => Self {
+                inner: Inner::Xls(walk.limit(n)),
             },
             Inner::Never(never, _) => match never {},
         }
@@ -181,6 +195,8 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Pptx(walk) => walk.plan(),
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(walk) => walk.plan(),
+            #[cfg(feature = "xls")]
+            Inner::Xls(walk) => walk.plan(),
             Inner::Never(never, _) => match *never {},
         }
     }
@@ -208,6 +224,8 @@ impl<'f> Iterator for Matches<'f, '_> {
             Inner::Pptx(walk) => walk.next().map(|node| node.map(Node::Pptx)),
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(walk) => walk.next().map(|node| node.map(Node::Xlsb)),
+            #[cfg(feature = "xls")]
+            Inner::Xls(walk) => walk.next().map(|node| node.map(Node::Xls)),
             Inner::Never(never, _) => match *never {},
         }
     }

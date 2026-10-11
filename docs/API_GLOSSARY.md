@@ -1289,3 +1289,11 @@ Record 0200 replaces XLS `Writer` with concrete `Builder`. `Builder::build()`
 returns a validated Package, and all publication belongs to that owner,
 including explicit encrypted image export. The old builder output methods are
 removed and covered by the glossary audit.
+
+
+Record [0203](unified-ops/0203-xls-unified-reads.md) connects unified XLS
+`get`/`find`/`query`/`view` to canonical `Package` reads. Native `Workbook::sheets()`
+returns the complete tab catalog, independent of parsed worksheet ordinals;
+source-backed cell projections retain `is_formula()`. The first read adapter
+still materializes sparse grids for traversal; early termination and measured
+facade overhead remain open acceptance work.

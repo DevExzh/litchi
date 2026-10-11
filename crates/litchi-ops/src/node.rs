@@ -25,7 +25,7 @@
 //!
 //! # Status
 //!
-//! DOCX, XLSX, XLSB and PPTX carry concrete leaf-backed nodes. Other formats retain the
+//! DOCX, XLSX, XLSB, XLS and PPTX carry concrete leaf-backed nodes. Other formats retain the
 //! uninhabited [`Pending`] placeholder until their adapters land. These nodes
 //! are available through File navigation and lazy queries.
 
@@ -135,7 +135,8 @@ pub(crate) use view::Project;
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
-    feature = "xlsb"
+    feature = "xlsb",
+    feature = "xls"
 ))]
 pub(crate) use view::Source;
 pub use view::{
@@ -183,7 +184,7 @@ pub enum Node<'f> {
     Doc(crate::format::doc::Node<'f>),
     /// A legacy Excel node (XLS adapter, step R6b).
     #[cfg(feature = "xls")]
-    Xls(Pending<'f, crate::format::xls::Xls>),
+    Xls(crate::format::xls::Node<'f>),
     /// A legacy PowerPoint node (PPT adapter, step R6c).
     #[cfg(feature = "ppt")]
     Ppt(Pending<'f, crate::format::ppt::Ppt>),
@@ -332,6 +333,18 @@ impl<'f> Node<'f> {
             _ => None,
         }
     }
+
+    /// Borrow the format-specific legacy Excel node.
+    #[cfg(feature = "xls")]
+    #[must_use]
+    pub fn as_xls(&self) -> Option<&crate::format::xls::Node<'f>> {
+        match self {
+            Self::Xls(node) => Some(node),
+            #[allow(unreachable_patterns, reason = "format variants depend on features")]
+            _ => None,
+        }
+    }
+
     /// Borrow the format-specific presentation node.
     #[cfg(feature = "pptx")]
     #[must_use]
