@@ -21,7 +21,7 @@ fn libreoffice_fixture(name: &str) -> PathBuf {
 }
 
 fn lenient_options() -> OpenOptions<'static> {
-    OpenOptions::new().with_leniency(Leniency::TolerateFormattingDefects)
+    OpenOptions::new().leniency(Leniency::TolerateFormattingDefects)
 }
 
 fn open_lenient(path: PathBuf) -> Workbook<std::fs::File> {

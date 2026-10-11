@@ -106,6 +106,8 @@ mod cell;
 pub mod cell_values;
 /// Lossless, source-backed BIFF8 worksheet visibility transactions.
 pub mod sheet_visibility;
+/// Finite physical source limits shared by the eager XLS owners.
+pub mod source_limits;
 
 /// BIFF8 worksheet data-validation records.
 #[allow(
@@ -732,6 +734,7 @@ pub use shapes::Shape;
 pub use shared_string_index::{SharedStringBucket, SharedStringIndex};
 pub use sheet_ext::{SheetExt, SheetExtOptional};
 pub use sheet_metadata::{SheetKind, SheetMetadata, SheetVisibility};
+pub use source_limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilder};
 pub use style_ext::{StyleCategory, StyleExt};
 pub use sxview_link::SXViewLink;
 pub use table_styles::{

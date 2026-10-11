@@ -1146,7 +1146,13 @@ impl SourceBackedWorkbook {
             execution.check()?;
         }
         self.inner.ensure_current()?;
-        let workbook = match Workbook::new(Cursor::new(bytes)) {
+        // This owner was admitted under SourceBackedLimits. Preserve that
+        // policy during materialization instead of introducing the eager
+        // reader's separate default SourceLimits after copying the input.
+        let parsed = litchi_cfb::OleFile::open(Cursor::new(bytes))
+            .map_err(Error::from)
+            .and_then(|ole| Workbook::from_admitted_ole_file(ole, crate::OpenOptions::default()));
+        let workbook = match parsed {
             Ok(workbook) => workbook,
             Err(error) => {
                 self.inner.ensure_current()?;

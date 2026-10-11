@@ -953,7 +953,7 @@ mod tests {
         let open = |password| {
             Workbook::new_with_options(
                 std::fs::File::open(&path).unwrap(),
-                OpenOptions::new().with_password(password),
+                OpenOptions::new().password(password),
             )
         };
         assert!(matches!(open(None), Err(Error::PasswordRequired)));
@@ -1042,7 +1042,7 @@ mod tests {
             .join("../../test-data/poi/test-data/spreadsheet/xor-encryption-abc.xls");
         let file = std::fs::File::open(path).unwrap();
         let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().with_password("abc")).unwrap();
+            Workbook::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
         let cell = workbook.xls_worksheet(0).unwrap().get_cell(0, 0).unwrap();
         assert!(matches!(cell.value(), CellValue::Float(value) if *value == 1.0));
     }
@@ -1053,15 +1053,12 @@ mod tests {
             .join("../../test-data/ole/xls/password.xls");
         let wrong_password_file = std::fs::File::open(&path).unwrap();
         assert!(matches!(
-            Workbook::new_with_options(
-                wrong_password_file,
-                OpenOptions::new().with_password("wrong"),
-            ),
+            Workbook::new_with_options(wrong_password_file, OpenOptions::new().password("wrong"),),
             Err(Error::InvalidPassword)
         ));
         let file = std::fs::File::open(path).unwrap();
         let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().with_password("password")).unwrap();
+            Workbook::new_with_options(file, OpenOptions::new().password("password")).unwrap();
         let worksheet = workbook.xls_worksheet(0).unwrap();
         let found = (0..128).any(|row| {
             (0..32).any(|column| {

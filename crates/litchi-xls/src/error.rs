@@ -73,6 +73,24 @@ pub enum Error {
     InvalidData(String),
     /// A requested edit cannot preserve unsupported source records safely.
     UnsafeEdit(String),
+    /// A caller supplied an invalid physical source limit.
+    InvalidLimit {
+        /// Source dimension whose configured value is invalid.
+        kind: crate::SourceLimitKind,
+        /// Requested value.
+        value: usize,
+        /// Hard safety ceiling.
+        maximum: usize,
+    },
+    /// A caller-selected finite source limit was exceeded during ingress.
+    Limit {
+        /// Source dimension that exceeded its selected limit.
+        kind: crate::SourceLimitKind,
+        /// Observed value.
+        observed: u64,
+        /// Configured maximum.
+        maximum: u64,
+    },
     /// A string is longer than the BIFF8 field that would store it.
     ///
     /// The writer returns this before it produces any output; it never
@@ -186,6 +204,23 @@ impl fmt::Display for Error {
                 write!(f, "Invalid data: {msg}")
             },
             Error::UnsafeEdit(msg) => write!(f, "Unsafe edit refused: {msg}"),
+            Error::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid XLS source limit for {kind}: {value} (maximum {maximum})"
+            ),
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "XLS source limit exceeded for {}: {observed} > {maximum}",
+                kind.description()
+            ),
             Error::StringTooLong {
                 field,
                 utf16_units,

@@ -1244,3 +1244,19 @@ and OLE ownership retains the selected bounds through candidate validation,
 copy-through and layout changes. This policy fix precedes the canonical XLS
 SourceLimits/OpenOptions and Package migration; it does not mark that API
 family complete. See [0195](unified-ops/0195-xls-retained-limits.md).
+
+## XLS eager source policies (record 0196)
+
+The eager reader now exposes `SourceLimits` / `SourceLimitsBuilder` with
+`max_input_bytes`, `max_entry_bytes`, `max_aggregate_bytes`, and checked
+`build`. `SourceLimitKind` identifies the dimension in the inline
+`Error::InvalidLimit` and `Error::Limit` variants. `OpenOptions::source_limits`
+sets the profile; `get_source_limits` reads it. The canonical consuming
+`password`, `leniency`, and `compatibility_profile` setters replace the
+`with_*` spellings; getters use `get_*`. Credentials are redacted in Debug.
+The XLS glossary gate bans all three replaced setters.
+
+This applies to eager reader ingress and raw CFB adoption. Positional-reader
+options, focused edit profile convergence, and the immutable Package/Workbook
+split remain open; this is not a complete canonical owner registration.
+See [0196](unified-ops/0196-xls-source-limits.md).

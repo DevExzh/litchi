@@ -2342,6 +2342,21 @@
       "features": [],
       "banned_names": [
         {
+          "name": "with_password",
+          "scope": "litchi_xls::OpenOptions",
+          "replacement": "use OpenOptions::password()"
+        },
+        {
+          "name": "with_leniency",
+          "scope": "litchi_xls::OpenOptions",
+          "replacement": "use OpenOptions::leniency()"
+        },
+        {
+          "name": "with_compatibility_profile",
+          "scope": "litchi_xls::OpenOptions",
+          "replacement": "use OpenOptions::compatibility_profile()"
+        },
+        {
           "name": "Transaction",
           "scope": "litchi_xls::cell_values",
           "replacement": "use cell_values::Edit"

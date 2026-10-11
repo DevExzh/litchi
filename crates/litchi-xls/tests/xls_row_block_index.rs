@@ -70,7 +70,7 @@ fn parses_real_sparse_and_rowless_dbcell_blocks() {
     let compatibility_profile = CompatibilityProfile::SharedFormulaFlagWithoutPtgExpV1;
     let workbook = Workbook::new_with_options(
         File::open(sparse_path).unwrap(),
-        OpenOptions::new().with_compatibility_profile(compatibility_profile),
+        OpenOptions::new().compatibility_profile(compatibility_profile),
     )
     .unwrap();
     let worksheet_index = workbook

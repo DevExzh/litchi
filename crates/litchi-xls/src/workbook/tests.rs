@@ -108,7 +108,7 @@ mod defined_name_tests {
     fn parses_names_after_xor_decryption() {
         let file = File::open(poi_fixture("xor-encryption-abc.xls")).unwrap();
         let workbook =
-            Workbook::new_with_options(file, OpenOptions::new().with_password("abc")).unwrap();
+            Workbook::new_with_options(file, OpenOptions::new().password("abc")).unwrap();
         assert!(workbook.defined_names().len() <= usize::from(u16::MAX));
     }
 
@@ -122,12 +122,10 @@ mod defined_name_tests {
             Ok(Ok(_)) => panic!("an encrypted workbook opened without a password"),
             Err(error) => panic!("expected the container back, got {error}"),
         };
-        let workbook = Workbook::from_ole_file_or_password_required(
-            ole,
-            OpenOptions::new().with_password("abc"),
-        )
-        .unwrap()
-        .unwrap_or_else(|_| panic!("the returned container opens with its password"));
+        let workbook =
+            Workbook::from_ole_file_or_password_required(ole, OpenOptions::new().password("abc"))
+                .unwrap()
+                .unwrap_or_else(|_| panic!("the returned container opens with its password"));
         assert!(litchi_core::sheet::WorkbookTrait::worksheet_count(&workbook) > 0);
     }
 }

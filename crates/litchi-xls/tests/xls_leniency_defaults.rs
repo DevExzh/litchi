@@ -180,7 +180,7 @@ fn try_open_both(
 ) {
     let workbook = Workbook::new_with_options(
         Cursor::new(package.to_vec()),
-        OpenOptions::new().with_leniency(leniency),
+        OpenOptions::new().leniency(leniency),
     )
     .map_err(|error| error.to_string());
     let owner = SourceBackedWorkbook::from_read_at_with_options(
@@ -547,7 +547,7 @@ fn with_font_fields(nth: usize, weight: u16, charset: u8) -> Vec<u8> {
 fn open_eager(package: &[u8], leniency: Leniency) -> Result<Workbook<Cursor<Vec<u8>>>, String> {
     Workbook::new_with_options(
         Cursor::new(package.to_vec()),
-        OpenOptions::new().with_leniency(leniency),
+        OpenOptions::new().leniency(leniency),
     )
     .map_err(|error| error.to_string())
 }

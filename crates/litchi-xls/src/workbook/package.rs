@@ -19,12 +19,13 @@ use crate::number_format::Formatting;
 use crate::pivot_table;
 use crate::records::{BiffVersion, Encoding};
 use crate::sheet_metadata::SheetMetadata;
+use crate::source_limits::{SourceLimitKind, SourceLimits};
 use litchi_biff::Records;
-use litchi_cfb::OleFile;
+use litchi_cfb::{OleFile, OleFileLimits};
 use litchi_ole_common::property_set::{
     PropertySetReader, Section, Stream, USER_DEFINED_PROPERTIES_FMTID,
 };
-use std::io::{Read, Seek};
+use std::io::{Read, Seek, SeekFrom};
 use std::sync::Arc;
 
 impl<R: Read + Seek> Workbook<R> {
@@ -82,11 +83,10 @@ impl<R: Read + Seek> Workbook<R> {
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
     pub fn new_with_options(reader: R, options: OpenOptions<'_>) -> Result<Self> {
-        let mut workbook = Self::empty(OleFile::open(reader)?);
-
-        workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
-        workbook.parse_workbook(&options, CellDecoding::Every)?;
-        Ok(workbook)
+        let source_limits = options.get_source_limits();
+        let ole_file = Self::open_ole_file_with_limits(reader, source_limits)?;
+        preflight_declared_streams(&ole_file, source_limits)?;
+        Self::from_admitted_ole_file(ole_file, options)
     }
 
     /// Create an XLS workbook from an already-parsed OLE file.
@@ -112,8 +112,19 @@ impl<R: Read + Seek> Workbook<R> {
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
     ) -> Result<Self> {
-        let mut workbook = Self::empty(ole_file);
+        let source_limits = options.get_source_limits();
+        Self::validate_ole_file(&ole_file, source_limits)?;
+        Self::from_admitted_ole_file(ole_file, options)
+    }
 
+    /// Decode a CFB owner whose physical admission is already complete.
+    /// The positional materializer uses its existing source/materialization
+    /// bounds, while public eager entry points use `SourceLimits` above.
+    pub(super) fn from_admitted_ole_file(
+        ole_file: OleFile<R>,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        let mut workbook = Self::empty(ole_file);
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
         workbook.parse_workbook(&options, CellDecoding::Every)?;
         Ok(workbook)
@@ -136,6 +147,8 @@ impl<R: Read + Seek> Workbook<R> {
         ole_file: OleFile<R>,
         options: OpenOptions<'_>,
     ) -> Result<std::result::Result<Self, OleFile<R>>> {
+        let source_limits = options.get_source_limits();
+        Self::validate_ole_file(&ole_file, source_limits)?;
         let mut workbook = Self::empty(ole_file);
 
         workbook.xml_map = crate::xml_map::parse_stream_if_present(&mut workbook.ole_file)?;
@@ -144,6 +157,32 @@ impl<R: Read + Seek> Workbook<R> {
             Err(Error::PasswordRequired) => Ok(Err(workbook.ole_file)),
             Err(error) => Err(error),
         }
+    }
+
+    /// Open a CFB source after checking the complete physical input size and
+    /// applying the corresponding low-level CFB input ceiling.
+    pub(super) fn open_ole_file_with_limits(
+        mut reader: R,
+        source_limits: SourceLimits,
+    ) -> Result<OleFile<R>> {
+        preflight_source_len(&mut reader, source_limits)?;
+        let cfb_limit = u64::try_from(source_limits.max_input_bytes()).unwrap_or(u64::MAX);
+        Ok(OleFile::open_with_limits(
+            reader,
+            OleFileLimits::new(cfb_limit)?,
+        )?)
+    }
+
+    /// Validate a parsed CFB source under the XLS physical ingress policy.
+    ///
+    /// Adoption cannot constrain allocations that occurred while the caller
+    /// parsed the OLE file. It does ensure that no XML, Workbook, or other
+    /// declared stream payload is read before the selected policy is checked.
+    pub(super) fn validate_ole_file(
+        ole_file: &OleFile<R>,
+        source_limits: SourceLimits,
+    ) -> Result<()> {
+        preflight_ole_file(ole_file, source_limits)
     }
 
     /// Parse the workbook stream.
@@ -160,8 +199,8 @@ impl<R: Read + Seek> Workbook<R> {
             .ole_file
             .open_stream(&["Workbook"])
             .or_else(|_| self.ole_file.open_stream(&["Book"]))?;
-        let workbook_data = prepare_workbook_stream(workbook_data, options.password())?;
-        let mut tolerance = ToleranceLog::new(options.leniency());
+        let workbook_data = prepare_workbook_stream(workbook_data, options.get_password())?;
+        let mut tolerance = ToleranceLog::new(options.get_leniency());
         // Container repairs come first: the compound-file reader applied them
         // while the OLE file was opened, before any BIFF record was read.
         tolerance
@@ -235,7 +274,7 @@ impl<R: Read + Seek> Workbook<R> {
                 sheet_index,
                 bound_sheet,
                 &encoding,
-                options.compatibility_profile(),
+                options.get_compatibility_profile(),
                 cells,
                 tolerance.report_mut(),
             ) {
@@ -591,5 +630,354 @@ impl<R: Read + Seek> Workbook<R> {
             limits,
         )
         .map(Some)
+    }
+}
+
+/// Validate the physical size and declared stream lengths of an already
+/// parsed CFB container before any format payload is materialized.
+pub(crate) fn preflight_ole_file<R: Read + Seek>(
+    ole_file: &OleFile<R>,
+    source_limits: SourceLimits,
+) -> Result<()> {
+    validate_source_len(ole_file.file_size(), source_limits)?;
+    preflight_declared_streams(ole_file, source_limits)?;
+    Ok(())
+}
+
+/// Check the complete source length without allocating or entering the CFB
+/// parser. A `Read + Seek` source normally reports its length directly; the
+/// bounded probe is retained for readers whose seek-to-end operation fails.
+fn preflight_source_len<R: Read + Seek>(reader: &mut R, source_limits: SourceLimits) -> Result<()> {
+    let original_position = reader.stream_position()?;
+    match reader.seek(SeekFrom::End(0)) {
+        Ok(source_len) => {
+            reader.seek(SeekFrom::Start(original_position))?;
+            validate_source_len(source_len, source_limits)
+        },
+        Err(_seek_error) => {
+            reader.seek(SeekFrom::Start(0))?;
+            let maximum = u64::try_from(source_limits.max_input_bytes()).unwrap_or(u64::MAX);
+            let probe_len = maximum.saturating_add(1);
+            let mut observed = 0_u64;
+            let mut buffer = [0_u8; 8192];
+            let count_result = (|| -> std::io::Result<()> {
+                while observed < probe_len {
+                    let remaining = probe_len - observed;
+                    let request = usize::try_from(remaining)
+                        .unwrap_or(usize::MAX)
+                        .min(buffer.len());
+                    let read = reader.read(&mut buffer[..request])?;
+                    if read == 0 {
+                        break;
+                    }
+                    observed = observed.saturating_add(u64::try_from(read).unwrap_or(u64::MAX));
+                }
+                Ok(())
+            })();
+            let restore_result = reader.seek(SeekFrom::Start(original_position));
+            count_result?;
+            restore_result?;
+            validate_source_len(observed, source_limits)
+        },
+    }
+}
+
+fn validate_source_len(actual: u64, source_limits: SourceLimits) -> Result<()> {
+    let maximum = u64::try_from(source_limits.max_input_bytes()).unwrap_or(u64::MAX);
+    if actual > maximum {
+        return Err(Error::Limit {
+            kind: SourceLimitKind::InputBytes,
+            observed: actual,
+            maximum,
+        });
+    }
+    Ok(())
+}
+
+/// Check all declared CFB stream lengths without reading any stream payload.
+///
+/// The aggregate includes opaque, metadata, and embedded-object streams. The
+/// root mini-stream backing is excluded because charging it in addition to
+/// its stream entries would count mini-stream payloads twice.
+fn preflight_declared_streams<R: Read + Seek>(
+    ole_file: &OleFile<R>,
+    source_limits: SourceLimits,
+) -> Result<u64> {
+    let entry_maximum = u64::try_from(source_limits.max_entry_bytes()).unwrap_or(u64::MAX);
+    let aggregate_maximum = u64::try_from(source_limits.max_aggregate_bytes()).unwrap_or(u64::MAX);
+    let mut aggregate = 0_u64;
+    for index in 0..ole_file.directory_entry_count() {
+        let sid = u32::try_from(index).map_err(|_error| {
+            Error::InvalidData("XLS CFB directory entry index exceeds u32".to_string())
+        })?;
+        let Some(entry) = ole_file.directory_entry_by_sid(sid) else {
+            continue;
+        };
+        if entry.entry_type != litchi_cfb::consts::STGTY_STREAM {
+            continue;
+        }
+        if entry.size > entry_maximum {
+            return Err(Error::Limit {
+                kind: SourceLimitKind::EntryBytes,
+                observed: entry.size,
+                maximum: entry_maximum,
+            });
+        }
+        aggregate = aggregate.checked_add(entry.size).ok_or(Error::Limit {
+            kind: SourceLimitKind::AggregateBytes,
+            observed: u64::MAX,
+            maximum: aggregate_maximum,
+        })?;
+    }
+    if aggregate > aggregate_maximum {
+        return Err(Error::Limit {
+            kind: SourceLimitKind::AggregateBytes,
+            observed: aggregate,
+            maximum: aggregate_maximum,
+        });
+    }
+    Ok(aggregate)
+}
+
+#[cfg(test)]
+mod source_limit_tests {
+    use super::{preflight_declared_streams, preflight_ole_file, preflight_source_len};
+    use crate::{Error, OpenOptions, SourceLimitKind, SourceLimits, Workbook};
+    use litchi_cfb::{OleFile, OleWriter};
+    use std::io::{Cursor, Read, Seek, SeekFrom};
+    use std::sync::{Arc, atomic::AtomicUsize, atomic::Ordering};
+
+    fn limits(input: usize, entry: usize, aggregate: usize) -> SourceLimits {
+        SourceLimits::builder()
+            .max_input_bytes(input)
+            .unwrap()
+            .max_entry_bytes(entry)
+            .unwrap()
+            .max_aggregate_bytes(aggregate)
+            .unwrap()
+            .build()
+            .unwrap()
+    }
+
+    fn cfb_with_streams() -> Vec<u8> {
+        let mut writer = OleWriter::new();
+        writer.create_stream(&["Workbook"], b"abc").unwrap();
+        writer.create_stream(&["OpaqueMetadata"], b"12345").unwrap();
+        writer.create_stream(&["Nested", "Payload"], b"xy").unwrap();
+        let mut bytes = Cursor::new(Vec::new());
+        writer.write_to(&mut bytes).unwrap();
+        bytes.into_inner()
+    }
+
+    #[test]
+    fn exact_entry_and_aggregate_boundaries_include_opaque_streams() {
+        let bytes = cfb_with_streams();
+        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let source_limits = limits(bytes.len(), 5, 10);
+        assert_eq!(preflight_declared_streams(&ole, source_limits).unwrap(), 10);
+        preflight_ole_file(&ole, source_limits).unwrap();
+    }
+
+    #[test]
+    fn entry_limit_precedes_aggregate_limit() {
+        let bytes = cfb_with_streams();
+        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let error = preflight_declared_streams(&ole, limits(bytes.len(), 4, 1)).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: SourceLimitKind::EntryBytes,
+                observed: 5,
+                maximum: 4,
+            }
+        ));
+    }
+
+    #[test]
+    fn aggregate_limit_accounts_for_opaque_and_nested_streams() {
+        let bytes = cfb_with_streams();
+        let ole = OleFile::open(Cursor::new(bytes.clone())).unwrap();
+        let error = preflight_declared_streams(&ole, limits(bytes.len(), 5, 9)).unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: SourceLimitKind::AggregateBytes,
+                observed: 10,
+                maximum: 9,
+            }
+        ));
+    }
+
+    #[test]
+    fn input_limit_is_checked_before_cfb_payload_or_structure() {
+        let bytes = cfb_with_streams();
+        let error = preflight_source_len(
+            &mut Cursor::new(bytes.clone()),
+            limits(
+                bytes.len() - 1,
+                SourceLimits::MAX_ENTRY_BYTES,
+                SourceLimits::MAX_AGGREGATE_BYTES,
+            ),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: SourceLimitKind::InputBytes,
+                observed,
+                maximum,
+            } if observed == bytes.len() as u64 && maximum == (bytes.len() - 1) as u64
+        ));
+    }
+
+    #[derive(Debug)]
+    struct CountingReader {
+        cursor: Cursor<Vec<u8>>,
+        reads: Arc<AtomicUsize>,
+    }
+
+    impl Read for CountingReader {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            let count = self.cursor.read(output)?;
+            self.reads.fetch_add(count, Ordering::Relaxed);
+            Ok(count)
+        }
+    }
+
+    impl Seek for CountingReader {
+        fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+            self.cursor.seek(position)
+        }
+    }
+
+    #[test]
+    fn eager_input_rejection_happens_before_container_reads() {
+        let bytes = cfb_with_streams();
+        let reads = Arc::new(AtomicUsize::new(0));
+        let reader = CountingReader {
+            cursor: Cursor::new(bytes.clone()),
+            reads: Arc::clone(&reads),
+        };
+        let source_limits = limits(
+            bytes.len() - 1,
+            SourceLimits::MAX_ENTRY_BYTES,
+            SourceLimits::MAX_AGGREGATE_BYTES,
+        );
+        let error =
+            Workbook::new_with_options(reader, OpenOptions::new().source_limits(source_limits))
+                .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: SourceLimitKind::InputBytes,
+                ..
+            }
+        ));
+        assert_eq!(reads.load(Ordering::Relaxed), 0);
+    }
+
+    #[test]
+    fn adopted_container_rejects_stream_lengths_before_payload_reads() {
+        let bytes = cfb_with_streams();
+        let reads = Arc::new(AtomicUsize::new(0));
+        let reader = CountingReader {
+            cursor: Cursor::new(bytes.clone()),
+            reads: Arc::clone(&reads),
+        };
+        let ole = OleFile::open(reader).unwrap();
+        let reads_after_cfb = reads.load(Ordering::Relaxed);
+        let source_limits = limits(bytes.len(), 4, SourceLimits::MAX_AGGREGATE_BYTES);
+        let error = Workbook::from_ole_file_with_options(
+            ole,
+            OpenOptions::new().source_limits(source_limits),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: SourceLimitKind::EntryBytes,
+                observed: 5,
+                maximum: 4,
+            }
+        ));
+        assert_eq!(reads.load(Ordering::Relaxed), reads_after_cfb);
+    }
+
+    #[test]
+    fn password_returning_adoption_applies_the_same_preflight_gate() {
+        let bytes = cfb_with_streams();
+        let reads = Arc::new(AtomicUsize::new(0));
+        let reader = CountingReader {
+            cursor: Cursor::new(bytes.clone()),
+            reads: Arc::clone(&reads),
+        };
+        let ole = OleFile::open(reader).unwrap();
+        let reads_after_cfb = reads.load(Ordering::Relaxed);
+        let source_limits = limits(bytes.len(), 4, SourceLimits::MAX_AGGREGATE_BYTES);
+        let error = Workbook::from_ole_file_or_password_required(
+            ole,
+            OpenOptions::new().source_limits(source_limits),
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: SourceLimitKind::EntryBytes,
+                observed: 5,
+                maximum: 4,
+            }
+        ));
+        assert_eq!(reads.load(Ordering::Relaxed), reads_after_cfb);
+    }
+    struct NoEndReader {
+        cursor: Cursor<Vec<u8>>,
+        fail_read: bool,
+    }
+
+    impl Read for NoEndReader {
+        fn read(&mut self, output: &mut [u8]) -> std::io::Result<usize> {
+            if self.fail_read {
+                self.cursor.set_position(1);
+                return Err(std::io::Error::other("injected read failure"));
+            }
+            self.cursor.read(output)
+        }
+    }
+
+    impl Seek for NoEndReader {
+        fn seek(&mut self, position: SeekFrom) -> std::io::Result<u64> {
+            if matches!(position, SeekFrom::End(_)) {
+                return Err(std::io::Error::new(
+                    std::io::ErrorKind::Unsupported,
+                    "end seeking unavailable",
+                ));
+            }
+            self.cursor.seek(position)
+        }
+    }
+
+    #[test]
+    fn bounded_length_probe_restores_position_on_success_limit_and_read_error() {
+        for (maximum, fail_read) in [(10, false), (9, false), (10, true)] {
+            let mut reader = NoEndReader {
+                cursor: Cursor::new(vec![0; 10]),
+                fail_read,
+            };
+            reader.cursor.set_position(3);
+            let result = preflight_source_len(&mut reader, limits(maximum, 10, 10));
+            assert_eq!(reader.cursor.position(), 3);
+            match (maximum, fail_read) {
+                (_, true) => assert!(matches!(result, Err(Error::Io(_)))),
+                (9, false) => assert!(matches!(
+                    result,
+                    Err(Error::Limit {
+                        kind: SourceLimitKind::InputBytes,
+                        observed: 10,
+                        maximum: 9,
+                    })
+                )),
+                _ => result.unwrap(),
+            }
+        }
     }
 }

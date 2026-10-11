@@ -17,6 +17,7 @@ mod tests;
 #[cfg(test)]
 mod validation_only_tests;
 
+pub use crate::source_limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilder};
 pub use model::{OpenOptions, Workbook};
 pub use source::{
     SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,

@@ -14,6 +14,7 @@ use crate::pivot_table;
 use crate::protection;
 use crate::records::{BiffVersion, SharedStringProperties};
 use crate::sheet_metadata::SheetMetadata;
+use crate::source_limits::SourceLimits;
 use crate::worksheet::Worksheet;
 use litchi_cfb::OleFile;
 use litchi_core::sheet::{
@@ -76,9 +77,23 @@ pub struct Workbook<R: Read + Seek> {
 }
 
 /// Options for opening a legacy XLS workbook.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+///
+/// Setters consume the options value and preserve the other selected policies.
+/// Passwords are never included in its debug representation.
+///
+/// ```
+/// use litchi_xls::{Leniency, OpenOptions};
+/// let options = OpenOptions::new()
+///     .password("example-password")
+///     .leniency(Leniency::Strict);
+/// assert_eq!(options.get_leniency(), Leniency::Strict);
+/// assert!(!format!("{options:?}").contains("example-password"));
+/// ```
+#[derive(Clone, Copy, PartialEq, Eq)]
 #[non_exhaustive]
 pub struct OpenOptions<'a> {
+    /// Checked physical input and declared-stream policy.
+    source_limits: SourceLimits,
     /// Password used for BIFF8 password-to-open encryption.
     password: Option<&'a str>,
     /// How non-structural formatting defects are treated.
@@ -110,51 +125,76 @@ impl<'a> OpenOptions<'a> {
     #[must_use]
     pub const fn new() -> Self {
         Self {
+            source_limits: SourceLimits::DEFAULT,
             password: None,
             leniency: Leniency::Strict,
             compatibility_profile: crate::CompatibilityProfile::Strict,
         }
     }
 
+    /// Select checked physical input and declared-stream limits.
+    #[must_use]
+    pub const fn source_limits(mut self, limits: SourceLimits) -> Self {
+        self.source_limits = limits;
+        self
+    }
+
+    /// Return the selected physical source policy.
+    #[must_use]
+    pub const fn get_source_limits(&self) -> SourceLimits {
+        self.source_limits
+    }
+
     /// Password used for BIFF8 password-to-open encryption.
     #[must_use]
-    pub const fn password(&self) -> Option<&'a str> {
+    pub const fn get_password(&self) -> Option<&'a str> {
         self.password
     }
 
     /// Set the optional BIFF8 password-to-open password.
-    pub fn with_password(mut self, password: impl Into<Option<&'a str>>) -> Self {
+    pub fn password(mut self, password: impl Into<Option<&'a str>>) -> Self {
         self.password = password.into();
         self
     }
 
     /// Current formatting-defect policy.
     #[must_use]
-    pub const fn leniency(&self) -> Leniency {
+    pub const fn get_leniency(&self) -> Leniency {
         self.leniency
     }
 
     /// Set the formatting-defect policy.
     #[must_use]
-    pub const fn with_leniency(mut self, leniency: Leniency) -> Self {
+    pub const fn leniency(mut self, leniency: Leniency) -> Self {
         self.leniency = leniency;
         self
     }
 
     /// Current explicit workbook compatibility profile.
     #[must_use]
-    pub const fn compatibility_profile(&self) -> crate::CompatibilityProfile {
+    pub const fn get_compatibility_profile(&self) -> crate::CompatibilityProfile {
         self.compatibility_profile
     }
 
     /// Select an explicit, versioned workbook compatibility profile.
     #[must_use]
-    pub const fn with_compatibility_profile(
+    pub const fn compatibility_profile(
         mut self,
         compatibility_profile: crate::CompatibilityProfile,
     ) -> Self {
         self.compatibility_profile = compatibility_profile;
         self
+    }
+}
+
+impl std::fmt::Debug for OpenOptions<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("OpenOptions")
+            .field("source_limits", &self.source_limits)
+            .field("password", &self.password.map(|_| "[REDACTED]"))
+            .field("leniency", &self.leniency)
+            .field("compatibility_profile", &self.compatibility_profile)
+            .finish()
     }
 }
 

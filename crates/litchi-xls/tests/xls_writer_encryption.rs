@@ -28,10 +28,7 @@ fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
 }
 
 fn open<'a>(bytes: &'a [u8], password: Option<&str>) -> Result<Workbook<Cursor<&'a [u8]>>, Error> {
-    Workbook::new_with_options(
-        Cursor::new(bytes),
-        OpenOptions::new().with_password(password),
-    )
+    Workbook::new_with_options(Cursor::new(bytes), OpenOptions::new().password(password))
 }
 
 fn workbook_stream(bytes: &[u8]) -> Vec<u8> {

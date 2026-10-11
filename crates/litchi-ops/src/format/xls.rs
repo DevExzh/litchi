@@ -124,8 +124,9 @@ impl Xls {
         password: Option<&str>,
     ) -> Result<LegacyOpen<Self>> {
         let _ = options;
+        litchi_xls::raw::preflight_ole_file(&ole, litchi_xls::SourceLimits::default())?;
         let metadata = ole.get_metadata().map(Metadata::from).unwrap_or_default();
-        let leaf_options = litchi_xls::OpenOptions::new().with_password(password);
+        let leaf_options = litchi_xls::OpenOptions::new().password(password);
         match litchi_xls::Workbook::from_ole_file_or_password_required(ole, leaf_options)? {
             Ok(workbook) => Ok(LegacyOpen::Opened(Self(Opened::new(XlsOwner::Eager(
                 Box::new(EagerXls { workbook, metadata }),

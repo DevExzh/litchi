@@ -1426,3 +1426,24 @@ fn doc_source_limit_configuration_preserves_dimension_and_values() {
         Source::Doc(litchi_doc::Error::InvalidLimit { .. })
     ));
 }
+
+#[cfg(feature = "xls")]
+#[test]
+fn xls_source_limits_preserve_error_codes() {
+    assert_code(
+        litchi_xls::Error::InvalidLimit {
+            kind: litchi_xls::SourceLimitKind::InputBytes,
+            value: 0,
+            maximum: litchi_xls::SourceLimits::MAX_INPUT_BYTES,
+        },
+        Code::InvalidArgument,
+    );
+    assert_code(
+        litchi_xls::Error::Limit {
+            kind: litchi_xls::SourceLimitKind::EntryBytes,
+            observed: 101,
+            maximum: 100,
+        },
+        Code::LimitExceeded,
+    );
+}

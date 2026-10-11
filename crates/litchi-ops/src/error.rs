@@ -1335,6 +1335,8 @@ impl Classify for litchi_doc::writer::WriteError {
 impl Classify for litchi_xls::Error {
     fn classify(&self) -> Class {
         match self {
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
             Self::Io(error) => error.classify(),
             Self::Cfb(error) => error.classify(),
             Self::PasswordProtected | Self::PasswordRequired => {
