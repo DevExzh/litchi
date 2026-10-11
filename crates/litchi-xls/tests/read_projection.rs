@@ -32,7 +32,23 @@ fn complete_catalog_matches_eager_visibility_and_chart_tab_identity() {
             source.workbook().sheets().unwrap(),
             eager.workbook().sheets().unwrap()
         );
-        assert_eq!(source.workbook().sheets().unwrap().len(), 3);
+        for package in [&eager, &source] {
+            let workbook = package.workbook();
+            let catalog = workbook.sheets().unwrap();
+            assert_eq!(workbook.sheet_count().unwrap(), 3);
+            for (position, metadata) in catalog.iter().enumerate() {
+                assert_eq!(workbook.sheet(position).unwrap().as_ref(), Some(metadata));
+                assert_eq!(
+                    workbook
+                        .sheet(metadata.name().to_ascii_lowercase().as_str())
+                        .unwrap()
+                        .as_ref(),
+                    Some(metadata)
+                );
+            }
+            assert!(workbook.sheet(3).unwrap().is_none());
+            assert!(workbook.sheet("no such tab").unwrap().is_none());
+        }
         if name == "44010-TwoCharts.xls" {
             let sheets = source.workbook().sheets().unwrap();
             assert_eq!(sheets[1].kind(), litchi_xls::SheetKind::ChartSheet);

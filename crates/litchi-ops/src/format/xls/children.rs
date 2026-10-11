@@ -2,20 +2,25 @@
 
 use super::Xls;
 use super::node::{CellSource, Item, Node, Sheet};
-use super::owner::{Grid, SheetHandle};
+use super::owner::{CellData, EagerCells, Grid, SheetHandle};
 use super::spec::Kind;
 use crate::error::{Code, Error, Result};
 use crate::node::ViewOptions;
 use crate::path::navigate::KindSet;
+use litchi_core::sheet::Cell as _;
 
 /// Children are cursor-backed. The grid itself is shared by `Arc`; only the
 /// selected coordinate list is retained by a row/range cursor.
 pub(crate) struct Children<'f> {
     file: &'f Xls,
-    state: State,
+    state: State<'f>,
 }
 
-enum State {
+enum State<'f> {
+    EagerCells {
+        sheet: usize,
+        cells: EagerCells<'f>,
+    },
     Done,
     Sheets {
         next: usize,
@@ -170,7 +175,7 @@ impl SheetItems {
 }
 
 impl<'f> Children<'f> {
-    fn new(file: &'f Xls, state: State) -> Self {
+    fn new(file: &'f Xls, state: State<'f>) -> Self {
         Self { file, state }
     }
 
@@ -242,6 +247,17 @@ impl<'f> Children<'f> {
                 if !sheet.handle.is_grid() || !want.any() {
                     return Ok(Self::new(file, State::Done));
                 }
+                if want.cells && !want.rows && !want.columns {
+                    if let Some(cells) = sheet.handle.eager_cells(file)? {
+                        return Ok(Self::new(
+                            file,
+                            State::EagerCells {
+                                sheet: node.sheet_position(),
+                                cells,
+                            },
+                        ));
+                    }
+                }
                 let grid = sheet.grid()?.clone();
                 State::SheetItems(SheetItems::new(node.sheet_position(), grid, want))
             },
@@ -276,6 +292,22 @@ impl<'f> Children<'f> {
 
     fn step(&mut self) -> Result<Option<Node<'f>>> {
         match &mut self.state {
+            State::EagerCells { sheet, cells } => {
+                let Some(cell) = cells.next() else {
+                    return Ok(None);
+                };
+                let at = (cell.row(), cell.column());
+                let data = CellData {
+                    value: cell.value().clone(),
+                    formula: cell.is_formula(),
+                };
+                Ok(Some(Node::new_cell(
+                    self.file,
+                    *sheet,
+                    at,
+                    CellSource::Direct(Some(data)),
+                )))
+            },
             State::Done => Ok(None),
             State::Sheets { next, count } => {
                 if *next >= *count {
@@ -391,3 +423,8 @@ fn dense_too_large(cells: u64, budget: u32) -> Error {
     .with_format(litchi_core::FileFormat::Xls)
     .with_suggestion("raise the `dense` budget, use a smaller range, or list stored cells only")
 }
+
+const _: () = {
+    fn assert_send_sync<T: Send + Sync>() {}
+    let _ = assert_send_sync::<Children<'static>>;
+};

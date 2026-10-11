@@ -138,7 +138,7 @@ impl<'f> Nav<'f> {
 }
 
 pub(super) fn tab_count(file: &Xls) -> Result<usize> {
-    Ok(file.owner().workbook().sheets()?.len())
+    file.owner().workbook().sheet_count().map_err(Into::into)
 }
 
 pub(super) fn finish<T>(file: &Xls, operation: impl FnOnce() -> Result<T>) -> Result<T> {

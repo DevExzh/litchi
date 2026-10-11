@@ -317,6 +317,13 @@ impl Worksheet {
         self.cells.get(&(row, col))
     }
 
+    /// Borrow stored cells in row-major order without collecting their references.
+    ///
+    /// Missing coordinates are omitted; formatting-only stored cells remain.
+    pub fn stored_cells(&self) -> impl Iterator<Item = &Cell> + Send + Sync {
+        self.cells.values()
+    }
+
     pub(crate) fn get_cell_mut(&mut self, row: u32, col: u32) -> Option<&mut Cell> {
         self.cells.get_mut(&(row, col))
     }
@@ -885,8 +892,7 @@ impl WorksheetTrait for Worksheet {
 
     fn cells(&self) -> Box<dyn CellIteratorTrait<'_> + '_> {
         Box::new(CellIterator {
-            cells: self.cells.values().collect(),
-            index: 0,
+            cells: self.cells.values(),
         })
     }
 
@@ -965,20 +971,15 @@ impl WorksheetTrait for &Worksheet {
 
 /// Cell iterator for XLS worksheets
 struct CellIterator<'a> {
-    cells: Vec<&'a Cell>,
-    index: usize,
+    cells: std::collections::btree_map::Values<'a, (u32, u32), Cell>,
 }
 
 impl<'a> CellIteratorTrait<'a> for CellIterator<'a> {
     fn next(&mut self) -> Option<SheetResult<Box<dyn SheetCell + 'a>>> {
-        if self.index >= self.cells.len() {
-            None
-        } else {
-            let cell = self.cells[self.index];
-            self.index += 1;
-            // Return reference instead of clone - zero-copy!
-            Some(Ok(Box::new(cell)))
-        }
+        self.cells.next().map(|cell| {
+            let cell: Box<dyn SheetCell> = Box::new(cell);
+            Ok(cell)
+        })
     }
 }
 

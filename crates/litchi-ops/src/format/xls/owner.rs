@@ -10,7 +10,7 @@ use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use litchi_core::sheet::{Cell, CellValue, WorkbookTrait};
-use litchi_xls::{Package, SheetKind, SheetVisibility};
+use litchi_xls::{Package, SheetKind, SheetMetadata, SheetVisibility};
 
 use super::Xls;
 use crate::error::{Code, Error, Result};
@@ -22,33 +22,24 @@ pub(super) struct SheetHandle {
     package: Package,
     /// Position in the complete BoundSheet8 catalog.
     position: usize,
-    /// Position in the parsed worksheet vector, when this tab is a grid.
-    worksheet_index: Option<usize>,
-    name: String,
-    visibility: SheetVisibility,
-    kind: SheetKind,
+    metadata: SheetMetadata,
 }
+
+pub(super) type EagerCells<'a> = Box<dyn Iterator<Item = &'a litchi_xls::Cell> + Send + Sync + 'a>;
 
 impl SheetHandle {
     pub(super) fn at(file: &Xls, position: usize) -> Result<Option<Self>> {
         let workbook = file.owner().workbook();
-        let Some(entry) = workbook.sheets()?.into_iter().nth(position) else {
+        let Some(entry) = workbook.sheet(position)? else {
             return Ok(None);
         };
-        Ok(Some(Self {
-            package: file.owner().clone(),
-            position,
-            worksheet_index: entry.parsed_worksheet_index(),
-            name: entry.name().to_owned(),
-            visibility: entry.visibility(),
-            kind: entry.kind(),
-        }))
+        Ok(Some(Self::from_metadata(file, position, entry)))
     }
 
     pub(super) fn named(file: &Xls, name: &str, case: Case) -> Result<Option<Self>> {
         let names = file.owner().workbook().sheets()?;
-        let mut found = None;
-        for (position, candidate) in names.iter().enumerate() {
+        let mut found: Option<(usize, SheetMetadata)> = None;
+        for (position, candidate) in names.into_iter().enumerate() {
             if case.matches(candidate.name(), name) {
                 if found.is_some() {
                     return Err(Error::new(
@@ -57,13 +48,18 @@ impl SheetHandle {
                     )
                     .with_format(litchi_core::FileFormat::Xls));
                 }
-                found = Some(position);
+                found = Some((position, candidate));
             }
         }
-        Ok(found
-            .map(|position| Self::at(file, position))
-            .transpose()?
-            .flatten())
+        Ok(found.map(|(position, entry)| Self::from_metadata(file, position, entry)))
+    }
+
+    fn from_metadata(file: &Xls, position: usize, entry: SheetMetadata) -> Self {
+        Self {
+            package: file.owner().clone(),
+            position,
+            metadata: entry,
+        }
     }
 
     pub(super) const fn position(&self) -> usize {
@@ -71,19 +67,20 @@ impl SheetHandle {
     }
 
     pub(super) fn name(&self) -> &str {
-        &self.name
+        self.metadata.name()
     }
 
-    pub(super) const fn visibility(&self) -> SheetVisibility {
-        self.visibility
+    pub(super) fn visibility(&self) -> SheetVisibility {
+        self.metadata.visibility()
     }
 
-    pub(super) const fn is_grid(&self) -> bool {
-        self.worksheet_index.is_some() && matches!(self.kind, SheetKind::WorksheetOrDialog)
+    pub(super) fn is_grid(&self) -> bool {
+        self.metadata.parsed_worksheet_index().is_some()
+            && matches!(self.metadata.kind(), SheetKind::WorksheetOrDialog)
     }
 
     pub(super) fn grid(&self) -> Result<Grid> {
-        let worksheet_index = self.worksheet_index.ok_or_else(|| {
+        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the selected XLS tab has no worksheet grid",
@@ -99,7 +96,7 @@ impl SheetHandle {
     /// answering this lookup, but it returns only the selected cell. Eager
     /// readers use their indexed worksheet map directly.
     pub(super) fn cell(&self, at: (u32, u32)) -> Result<Option<CellData>> {
-        let worksheet_index = self.worksheet_index.ok_or_else(|| {
+        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
                 "the selected XLS tab has no worksheet grid",
@@ -122,6 +119,27 @@ impl SheetHandle {
             value: cell.value().clone(),
             formula: cell.is_formula(),
         }))
+    }
+
+    /// Borrow the eager worksheet's native cell iterator when the owner has
+    /// already parsed its cells. Returning `None` preserves the source-backed
+    /// fallback until a resumable positional cell cursor is available.
+    pub(super) fn eager_cells<'f>(&self, file: &'f Xls) -> Result<Option<EagerCells<'f>>> {
+        if self.package.source_workbook().is_some() {
+            return Ok(None);
+        }
+        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
+            Error::new(
+                Code::UnsupportedCapability,
+                "the selected XLS tab has no worksheet grid",
+            )
+            .with_format(litchi_core::FileFormat::Xls)
+        })?;
+        let reader = file.owner().reader_ref()?;
+        let worksheet = reader
+            .xls_worksheet(worksheet_index)
+            .map_err(|error| worksheet_error(error.to_string()))?;
+        Ok(Some(Box::new(worksheet.stored_cells())))
     }
 }
 

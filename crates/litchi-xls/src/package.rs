@@ -763,6 +763,47 @@ impl Workbook {
         }
     }
 
+    /// Return the number of workbook tabs in original tab order.
+    ///
+    /// This includes chart and macro tabs as well as ordinary worksheets.
+    pub fn sheet_count(&self) -> Result<usize> {
+        match &self.package.state {
+            PackageState::Source { workbook, .. } => workbook.sheet_count().map_err(Error::Source),
+            PackageState::Eager { reader, .. } => Ok(reader.sheets().len()),
+        }
+    }
+
+    /// Select one workbook tab by its semantic name or checked zero-based
+    /// position and return its owned catalog metadata.
+    ///
+    /// The position is in the complete workbook-tab catalog. In particular,
+    /// it is not the ordinal accepted by `xls_worksheet` when chart or macro
+    /// tabs precede an ordinary worksheet.
+    pub fn sheet<'a>(
+        &self,
+        selector: impl Into<litchi_core::selector::Selector<'a, std::convert::Infallible>>,
+    ) -> Result<Option<crate::SheetMetadata>> {
+        let selector = selector.into();
+        match &self.package.state {
+            PackageState::Source { workbook, .. } => {
+                workbook.sheet(selector).map_err(Error::Source)
+            },
+            PackageState::Eager { reader, .. } => {
+                let sheet = match selector {
+                    litchi_core::selector::Selector::Name(name) => {
+                        reader.sheet_by_name(name.as_ref())
+                    },
+                    litchi_core::selector::Selector::Position(position) => {
+                        reader.sheet(position.get())
+                    },
+                    litchi_core::selector::Selector::Id(id) => match id {},
+                    _ => return Err(Error::InvalidData("unsupported sheet selector")),
+                };
+                Ok(sheet.cloned())
+            },
+        }
+    }
+
     /// Return complete workbook-tab metadata in original tab order.
     ///
     /// This includes chart and macro tabs. Each descriptor distinguishes the

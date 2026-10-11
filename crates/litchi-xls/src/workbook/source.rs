@@ -1301,6 +1301,45 @@ impl SourceBackedWorkbook {
         self.metadata(|inner| inner.sheets.len())
     }
 
+    /// Select one workbook tab by its semantic name or checked zero-based
+    /// position and return its owned catalog metadata.
+    ///
+    /// The position is in the complete `BoundSheet8` tab catalog, while the
+    /// metadata's optional worksheet index remains the ordinal used by the
+    /// worksheet payload APIs.
+    pub fn sheet<'a>(
+        &self,
+        selector: impl Into<litchi_core::selector::Selector<'a, std::convert::Infallible>>,
+    ) -> Result<Option<crate::SheetMetadata>> {
+        let selector = selector.into();
+        self.metadata(|inner| {
+            let sheet = match selector {
+                litchi_core::selector::Selector::Name(name) => inner
+                    .sheets
+                    .iter()
+                    .find(|sheet| sheet.name.eq_ignore_ascii_case(name.as_ref())),
+                litchi_core::selector::Selector::Position(position) => {
+                    inner.sheets.get(position.get())
+                },
+                litchi_core::selector::Selector::Id(id) => match id {},
+                _ => {
+                    return Err(SourceBackedError::InvalidData(
+                        "unsupported sheet selector".into(),
+                    ));
+                },
+            };
+            Ok(sheet.map(|sheet| {
+                crate::SheetMetadata::from_parts(
+                    sheet.workbook_index,
+                    sheet.name.clone(),
+                    sheet.visibility,
+                    sheet.kind,
+                    sheet.worksheet_index,
+                )
+            }))
+        })?
+    }
+
     /// Complete workbook-tab metadata, including non-worksheet tabs.
     ///
     /// Metadata access retains the source-version fence without parsing any
