@@ -78,6 +78,7 @@ fn encrypted_build_retains_the_ciphertext_and_requires_explicit_output() {
     builder
         .set_password("secret", EncryptionProfile::OfficeBinaryRc4)
         .unwrap();
+    builder.set_encryption_entropy(litchi_xls::EncryptionEntropy::generate().unwrap());
     let package = builder.build().unwrap();
     assert!(package.is_encrypted());
     assert!(matches!(
@@ -132,6 +133,10 @@ fn build_refuses_pivot_page_entries_without_declared_fields() {
             },
         )
         .unwrap();
+    builder
+        .set_password("secret", EncryptionProfile::OfficeBinaryRc4)
+        .unwrap();
+    builder.set_encryption_entropy(litchi_xls::EncryptionEntropy::generate().unwrap());
     assert!(matches!(
         builder.build(),
         Err(litchi_xls::package::Error::Reader(
@@ -139,6 +144,13 @@ fn build_refuses_pivot_page_entries_without_declared_fields() {
                 record_type: 0x00b6,
                 ..
             }
+        ))
+    ));
+    // Strict admission failed after encryption; the attempted build still consumed entropy.
+    assert!(matches!(
+        builder.build(),
+        Err(litchi_xls::package::Error::Reader(
+            litchi_xls::Error::EncryptionEntropyRequired
         ))
     ));
 }

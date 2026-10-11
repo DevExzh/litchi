@@ -55,6 +55,26 @@ default limits. `Package::encryption()` reports its retained `EncryptionProfile`
 including the CryptoAPI RC4 key length, after successful password verification.
 Plain owners report `None`; this metadata does not authorize a security downgrade.
 
+RC4 authoring requires explicit entropy for each build:
+
+```rust
+# fn main() -> Result<(), Box<dyn std::error::Error>> {
+use litchi_xls::{Builder, EncryptionEntropy, EncryptionProfile};
+let mut builder = Builder::new();
+builder.set_password("secret", EncryptionProfile::OfficeBinaryRc4)?;
+builder.set_encryption_entropy(EncryptionEntropy::generate()?);
+let encrypted = builder.build()?.to_encrypted_bytes()?;
+# Ok(())
+# }
+```
+
+`build()` never obtains randomness. Each RC4 build attempt consumes its entropy,
+even if later validation fails. Supply fresh entropy for the next attempt.
+`EncryptionEntropy::from_bytes` supports reproducible pipelines; never reuse a
+salt with the same password for different plaintexts. XOR obfuscation and plain
+builds do not require entropy.
+
+
 ## Eager reader limits
 
 `OpenOptions::source_limits` selects checked physical input, per-stream and

@@ -121,6 +121,7 @@ fn unlocked_encrypted_owner_refuses_plain_publication() {
     builder
         .set_password("secret", litchi_xls::EncryptionProfile::OfficeBinaryRc4)
         .unwrap();
+    builder.set_encryption_entropy(litchi_xls::EncryptionEntropy::generate().unwrap());
     let output = builder.build().unwrap().to_encrypted_bytes().unwrap();
     let directory = tempfile::tempdir().unwrap();
     let source = directory.path().join("protected.xls");

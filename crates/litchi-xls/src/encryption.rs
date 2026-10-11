@@ -29,6 +29,60 @@ pub enum EncryptionProfile {
     CryptoApiRc4 { key_bits: u16 },
 }
 
+/// Caller-owned entropy for one BIFF8 RC4 authoring attempt.
+///
+/// RC4 headers contain a salt and a verifier.  A [`Builder`](crate::Builder)
+/// never obtains those bytes from ambient randomness: pass one entropy token
+/// with [`Builder::set_encryption_entropy`](crate::Builder::set_encryption_entropy)
+/// before building an Office Binary RC4 or CryptoAPI RC4 workbook.  The token
+/// is move-only and is consumed by that attempt, including when the attempt
+/// later fails.  Supplying a fresh token for every distinct plaintext and
+/// password is required; do not reuse a salt with the same password across
+/// different plaintexts.
+///
+/// [`generate`](Self::generate) is the explicit convenience constructor for a
+/// cryptographically random token.  [`from_bytes`](Self::from_bytes) is useful
+/// for deterministic tests and reproducible pipelines, where the caller owns
+/// the risk of selecting unique secret material.
+///
+/// The token intentionally has no `Clone` or `Debug` implementation:
+///
+/// ```compile_fail
+/// use litchi_xls::EncryptionEntropy;
+/// let entropy = EncryptionEntropy::from_bytes([0; 16], [1; 16]);
+/// let _copy = entropy.clone();
+/// ```
+pub struct EncryptionEntropy {
+    salt: Zeroizing<[u8; 16]>,
+    verifier: Zeroizing<[u8; 16]>,
+}
+
+impl EncryptionEntropy {
+    /// Generate fresh salt and verifier bytes using the operating system RNG.
+    ///
+    /// Randomness is obtained only by this explicit constructor; workbook
+    /// building itself never consults an ambient random source.
+    pub fn generate() -> Result<Self> {
+        Ok(Self {
+            salt: random_16("binary RC4 salt")?,
+            verifier: random_16("binary RC4 verifier")?,
+        })
+    }
+
+    /// Construct deterministic entropy from caller-provided bytes.
+    ///
+    /// The token is still consumed after one RC4 build attempt.  Never reuse
+    /// the same salt and password for distinct plaintexts: doing so reuses an
+    /// RC4 keystream and can disclose information about both workbooks.
+    #[must_use]
+    pub fn from_bytes(salt: [u8; 16], verifier: [u8; 16]) -> Self {
+        Self {
+            salt: Zeroizing::new(salt),
+            verifier: Zeroizing::new(verifier),
+        }
+    }
+}
+
 /// Explicit capability required to author legacy BIFF8 XOR obfuscation.
 ///
 /// XOR obfuscation is retained for interoperability with legacy documents, not
@@ -231,7 +285,10 @@ fn random_16(field: &str) -> Result<Zeroizing<[u8; 16]>> {
     Ok(value)
 }
 
-fn prepare_writer_material(encryption: &WriterEncryption) -> Result<WriterEncryptionMaterial> {
+fn prepare_writer_material(
+    encryption: &WriterEncryption,
+    entropy: Option<&EncryptionEntropy>,
+) -> Result<WriterEncryptionMaterial> {
     validate_writer_encryption(&encryption.password, encryption.profile)?;
     match encryption.profile {
         EncryptionProfile::XorObfuscation => {
@@ -245,10 +302,9 @@ fn prepare_writer_material(encryption: &WriterEncryption) -> Result<WriterEncryp
             })
         },
         EncryptionProfile::OfficeBinaryRc4 => {
-            let salt = random_16("binary RC4 salt")?;
-            let verifier = random_16("binary RC4 verifier")?;
+            let entropy = entropy.ok_or(Error::EncryptionEntropyRequired)?;
             let (header, context) =
-                legacy_rc4::build_header(&encryption.password, &salt, &verifier)
+                legacy_rc4::build_header(&encryption.password, &entropy.salt, &entropy.verifier)
                     .map_err(map_legacy_runtime_error)?;
 
             let mut filepass = Vec::with_capacity(BINARY_RC4_FILEPASS_LEN);
@@ -260,15 +316,14 @@ fn prepare_writer_material(encryption: &WriterEncryption) -> Result<WriterEncryp
             })
         },
         EncryptionProfile::CryptoApiRc4 { key_bits } => {
-            let salt = random_16("CryptoAPI salt")?;
-            let verifier = random_16("CryptoAPI verifier")?;
+            let entropy = entropy.ok_or(Error::EncryptionEntropyRequired)?;
             let (header, context) = office_rc4::build_header(
                 &encryption.password,
                 usize::from(key_bits),
                 Flags::CRYPTO_API,
                 CRYPTOAPI_RC4_PROVIDER,
-                &salt,
-                &verifier,
+                &entropy.salt,
+                &entropy.verifier,
             )
             .map_err(map_cryptoapi_runtime_error)?;
             let mut filepass = Vec::with_capacity(2 + header.len());
@@ -417,9 +472,10 @@ fn inspect_clear_workbook(workbook: &[u8]) -> Result<ClearWorkbookPlan> {
 pub(crate) fn encrypt_workbook_for_write(
     mut workbook: Vec<u8>,
     encryption: &WriterEncryption,
+    entropy: Option<&EncryptionEntropy>,
 ) -> Result<Vec<u8>> {
     let plan = inspect_clear_workbook(&workbook)?;
-    let mut material = prepare_writer_material(encryption)?;
+    let mut material = prepare_writer_material(encryption, entropy)?;
     let filepass_len = u16::try_from(material.filepass.len()).map_err(|_error| {
         Error::InvalidData("FILEPASS payload exceeds the BIFF8 record limit".to_string())
     })?;

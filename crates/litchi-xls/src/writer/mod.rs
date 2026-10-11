@@ -48,7 +48,7 @@ pub use crate::{
     ConsolidationRange, ConsolidationSource,
 };
 pub use crate::{DefinedNameFutureRecords, NameFnGrp12, NamePublish};
-pub use crate::{EncryptionProfile, WeakEncryptionPolicy};
+pub use crate::{EncryptionEntropy, EncryptionProfile, WeakEncryptionPolicy};
 pub use biff::{AutoFilterConditionWrite, write_cfex12_marker, write_cfheader};
 pub use core::{
     AddInFunctionOptions, Builder, CalculationSettings, CellValue, CommentTextRunWrite,

@@ -1,7 +1,7 @@
 use super::model::Builder;
 use super::stream;
-use crate::encryption::encrypt_workbook_for_write;
-use crate::error::Result;
+use crate::encryption::{EncryptionEntropy, encrypt_workbook_for_write};
+use crate::error::{Error, Result};
 use litchi_cfb::writer::OleWriter;
 
 impl Builder {
@@ -11,15 +11,36 @@ impl Builder {
     /// the staged content and can be published independently. Encrypted builds
     /// retain their encrypted image; publish that image explicitly with
     /// [`crate::Package::to_encrypted_bytes`]. Ordinary package publication
-    /// refuses encrypted owners.
+    /// refuses encrypted owners. Office Binary RC4 and CryptoAPI RC4 builds
+    /// also require a one-use [`crate::EncryptionEntropy`] supplied through
+    /// [`Builder::set_encryption_entropy`](crate::Builder::set_encryption_entropy);
+    /// the entropy is consumed even when this method later fails.
     ///
     /// # Errors
     /// Returns typed authoring, container or strict package-admission failures.
     pub fn build(&mut self) -> crate::package::Result<crate::Package> {
+        // Take caller-owned RC4 entropy before any default-sheet staging.  A
+        // missing token is therefore a typed preflight error and cannot leave
+        // a visible mutation behind.  Taking it also ensures that all RC4
+        // attempts consume the token, including attempts that fail later in
+        // generation or strict package admission.
+        let encryption_entropy = match self
+            .encryption
+            .as_ref()
+            .map(|encryption| encryption.profile)
+        {
+            Some(crate::EncryptionProfile::OfficeBinaryRc4)
+            | Some(crate::EncryptionProfile::CryptoApiRc4 { .. }) => Some(
+                self.encryption_entropy
+                    .take()
+                    .ok_or(Error::EncryptionEntropyRequired)?,
+            ),
+            _ => None,
+        };
         if self.worksheets.is_empty() {
             self.add_worksheet("Sheet1")?;
         }
-        let streams = self.generate_workbook_streams()?;
+        let streams = self.generate_workbook_streams(encryption_entropy.as_ref())?;
         let mut ole_writer = OleWriter::new();
         self.populate_compound_document(&mut ole_writer, streams)?;
         let mut output = std::io::Cursor::new(Vec::new());
@@ -83,7 +104,10 @@ impl Builder {
 
     /// Generate the complete Workbook stream (plus pivot cache streams) with
     /// all BIFF records.
-    fn generate_workbook_streams(&self) -> Result<stream::WorkbookStreams> {
+    fn generate_workbook_streams(
+        &self,
+        encryption_entropy: Option<&EncryptionEntropy>,
+    ) -> Result<stream::WorkbookStreams> {
         if let Some(map_info) = self.xml_map.as_ref() {
             crate::xml_map::validate_info(map_info)?;
         }
@@ -126,7 +150,8 @@ impl Builder {
             .map(crate::toolbar::to_bytes)
             .transpose()?;
         if let Some(encryption) = &self.encryption {
-            streams.workbook = encrypt_workbook_for_write(streams.workbook, encryption)?;
+            streams.workbook =
+                encrypt_workbook_for_write(streams.workbook, encryption, encryption_entropy)?;
         }
         Ok(streams)
     }

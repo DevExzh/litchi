@@ -19,6 +19,9 @@ fn encrypted(profile: EncryptionProfile) -> Package {
             .unwrap(),
         _ => builder.set_password("secret", profile).unwrap(),
     }
+    if profile != EncryptionProfile::XorObfuscation {
+        builder.set_encryption_entropy(litchi_xls::EncryptionEntropy::generate().unwrap());
+    }
     builder.build().unwrap()
 }
 

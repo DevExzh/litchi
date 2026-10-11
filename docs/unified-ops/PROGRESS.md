@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0202 | [Explicit XLS encryption entropy](0202-xls-explicit-encryption-entropy.md) | Single-use explicit entropy removes ambient RNG from Builder build; 2,242 tests/doctests, lint/docs/glossary/boundaries pass; Package security publication, unified XLS CRUD and full goal remain open |
 | 0201 | [XLS encryption profile](0201-xls-encryption-profile.md) | Retained exact encryption mode/key length and canonical password opening; 2,323 tests/doctests, lint/docs/glossary/boundaries pass; security publication verbs, Builder entropy, unified XLS CRUD and full goal remain open |
 | 0200 | [Canonical XLS Builder](0200-xls-canonical-builder.md) | Concrete Builder and Package-returning build replace Writer publication; encrypted owners retain explicit output; 2,234 tests/doctests plus focused Builder checks, lint/docs/glossary/boundaries and harness compilation pass; encrypted-build determinism, unified XLS CRUD and full goal remain open |
 | 0199 | [XLS creation and publication](0199-xls-creation-publication.md) | Native minimal Package, unified creation and atomic publication, origin retention, first-cell row-table creation and explicit option gaps; 2,229 combined tests/doctests plus final owner/publication checks pass; Builder, unified XLS CRUD and full goal remain open |

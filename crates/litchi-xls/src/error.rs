@@ -142,6 +142,8 @@ pub enum Error {
     },
     /// Weak legacy encryption authoring requires an explicit opt-in policy.
     WeakEncryptionRequiresExplicitPolicy,
+    /// RC4 authoring requires caller-supplied one-use salt and verifier bytes.
+    EncryptionEntropyRequired,
     /// Unexpected record type
     UnexpectedRecordType {
         /// Expected record type
@@ -259,6 +261,9 @@ impl fmt::Display for Error {
                 f,
                 "BIFF8 XOR obfuscation requires an explicit weak-encryption policy"
             ),
+            Error::EncryptionEntropyRequired => {
+                write!(f, "BIFF8 RC4 authoring requires one-use EncryptionEntropy")
+            },
             Error::UnexpectedRecordType { expected, found } => {
                 write!(
                     f,

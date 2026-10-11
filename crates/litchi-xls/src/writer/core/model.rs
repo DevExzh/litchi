@@ -2,7 +2,7 @@ use super::super::formatting::FormattingManager;
 use super::data_validation::{DataValidation, DataValidationBiffPayload};
 use super::named_range::DefinedNameRecordOptions;
 use super::worksheet::WritableWorksheet;
-use crate::encryption::WriterEncryption;
+use crate::encryption::{EncryptionEntropy, WriterEncryption};
 use crate::error::{Error, Result};
 use crate::page_setup::{PrintComments, PrintErrors, PrintOrder, PrintOrientation};
 use crate::writer::string_limits::{
@@ -1382,6 +1382,8 @@ pub struct Builder {
     /// Optional inert Office Toolbars (`XCB`) stream.
     pub(super) toolbar: Option<crate::Wrapper<'static>>,
     pub(super) encryption: Option<WriterEncryption>,
+    /// One-use caller-supplied salt and verifier for RC4 authoring.
+    pub(super) encryption_entropy: Option<EncryptionEntropy>,
 }
 
 impl Default for Builder {

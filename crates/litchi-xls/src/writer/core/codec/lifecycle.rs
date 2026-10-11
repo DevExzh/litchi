@@ -3,7 +3,7 @@ use super::super::{
     Builder, CalculationSettings, FunctionGroupOptions, WorkbookEnvironmentOptions,
     WorkbookWindowOptions, WritableWorksheet,
 };
-use crate::encryption::{WriterEncryption, validate_writer_encryption};
+use crate::encryption::{EncryptionEntropy, WriterEncryption, validate_writer_encryption};
 use crate::error::{Error, Result};
 use crate::records::{SheetNameFault, sheet_name_fault};
 use crate::writer::string_limits::WORKSHEET_NAME_UNITS;
@@ -42,6 +42,7 @@ impl Builder {
             style_extensions: Vec::new(),
             toolbar: None,
             encryption: None,
+            encryption_entropy: None,
         }
     }
 
@@ -86,6 +87,19 @@ impl Builder {
             return Err(Error::WeakEncryptionRequiresExplicitPolicy);
         }
         self.configure_password(password.into(), profile)
+    }
+
+    /// Supply one-use salt and verifier bytes for a subsequent RC4 build.
+    ///
+    /// RC4 authoring requires this explicit entropy input because builders do
+    /// not consult ambient randomness.  A token is consumed by the next RC4
+    /// build attempt, even if generation or strict package admission fails.
+    /// Plain and explicitly permitted XOR builds leave a pending token
+    /// untouched.  Supply a fresh token for every distinct plaintext and
+    /// password; reusing a salt with a password across distinct plaintexts
+    /// reuses an RC4 keystream.
+    pub fn set_encryption_entropy(&mut self, entropy: EncryptionEntropy) {
+        self.encryption_entropy = Some(entropy);
     }
 
     /// Configure legacy BIFF8 XOR obfuscation for subsequent writes.

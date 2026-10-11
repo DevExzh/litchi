@@ -22,6 +22,9 @@ fn encrypted_workbook(profile: EncryptionProfile, password: &str) -> Vec<u8> {
             .unwrap(),
         _ => writer.set_password(password, profile).unwrap(),
     }
+    if profile != EncryptionProfile::XorObfuscation {
+        writer.set_encryption_entropy(litchi_xls::EncryptionEntropy::generate().unwrap());
+    }
     writer.build().unwrap().to_encrypted_bytes().unwrap()
 }
 
