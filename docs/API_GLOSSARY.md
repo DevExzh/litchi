@@ -1171,3 +1171,15 @@ coerce name/hidden/visibility properties, and delegate publication to this
 native family. No mutable worksheet escape or alternate transaction API is
 introduced. Durable insertions use tag 9; existing patch tags retain their
 meaning.
+
+## XLSB sheet removal (0187)
+
+The primary `Package::edit()` family gains
+`remove_sheet(impl Into<sheet::Selector>) -> Result<Option<bool>>`. Selectors
+resolve the immutable source catalog, including chart tabs. Missing selectors
+return `None`; repeated removals return `Some(false)`. Distinct removals extend
+one sorted source-position set, encoded with durable tag 10. Other edit
+families remain structural barriers. The unified sheet-path and homogeneous
+sheet-query adapters delegate to one native edit and commit. Additional
+internal content dependencies require explicit disposition and currently
+receive typed refusal; removal does not implicitly run garbage collection.

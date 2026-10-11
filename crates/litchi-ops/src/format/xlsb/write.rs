@@ -43,14 +43,17 @@ use crate::value::Scalar;
 /// a structural worksheet patch.
 #[derive(Debug, Clone)]
 pub(crate) enum Patch {
-    Structure(NativeStructurePatch),
+    Structure {
+        patch: NativeStructurePatch,
+        retained_bytes: usize,
+    },
     Cells(Vec<NativeCellPatch>),
 }
 
 impl Patch {
     pub(crate) fn before(&self) -> &[u8] {
         match self {
-            Self::Structure(patch) => patch.before(),
+            Self::Structure { patch, .. } => patch.before(),
             Self::Cells(patches) => patches
                 .first()
                 .expect("cell patch invariant: at least one worksheet")
@@ -60,7 +63,7 @@ impl Patch {
 
     pub(crate) fn after(&self) -> &[u8] {
         match self {
-            Self::Structure(patch) => patch.after(),
+            Self::Structure { patch, .. } => patch.after(),
             Self::Cells(patches) => patches
                 .last()
                 .expect("cell patch invariant: at least one worksheet")
@@ -73,7 +76,9 @@ impl Patch {
     /// endpoint images alone would undercharge transaction history.
     pub(crate) fn snapshot_bytes(&self) -> usize {
         match self {
-            Self::Structure(patch) => patch.before().len().saturating_add(patch.after().len()),
+            Self::Structure { patch, .. } => {
+                patch.before().len().saturating_add(patch.after().len())
+            },
             Self::Cells(patches) => patches
                 .iter()
                 .fold(size_of::<Vec<NativeCellPatch>>(), |bytes, patch| {
@@ -82,9 +87,18 @@ impl Patch {
         }
     }
 
+    /// Exact native history charge. Structural patches cache the checked
+    /// native calculation at commit construction so transaction diagnostics
+    /// remain infallible; cell patches retain their native semantic payloads.
     pub(crate) fn retained_bytes(&self) -> usize {
-        self.snapshot_bytes()
-            .saturating_add(self.operation_count().saturating_mul(124))
+        match self {
+            Self::Structure { retained_bytes, .. } => *retained_bytes,
+            Self::Cells(patches) => patches
+                .iter()
+                .fold(size_of::<Vec<NativeCellPatch>>(), |bytes, patch| {
+                    bytes.saturating_add(patch.retained_bytes())
+                }),
+        }
     }
 
     pub(crate) fn is_noop(&self) -> bool {
@@ -93,7 +107,7 @@ impl Patch {
 
     pub(crate) fn operation_count(&self) -> usize {
         match self {
-            Self::Structure(patch) => patch.operation_count(),
+            Self::Structure { patch, .. } => patch.operation_count(),
             Self::Cells(patches) => patches.iter().fold(0usize, |count, patch| {
                 count.saturating_add(patch.changes().len())
             }),
@@ -125,6 +139,7 @@ impl Commit {
         base.check_source()?;
         let result = (|| {
             let (package, patch) = native.into_parts();
+            let retained_bytes = patch.retained_bytes().map_err(native_error)?;
             // A native edit may retain a semantic operation whose replay is
             // an exact image no-op. Preserve the original immutable handle in
             // that case so source-backed publication never canonicalizes a
@@ -136,7 +151,10 @@ impl Commit {
             };
             Ok(Self {
                 after,
-                patch: Patch::Structure(patch),
+                patch: Patch::Structure {
+                    patch,
+                    retained_bytes,
+                },
             })
         })();
         base.check_source()?;
@@ -384,17 +402,21 @@ fn sheet_path(position: usize) -> Path<'static> {
     Path::from_steps([Step::new("sheet").with(Predicate::Index(Position::new(position)))])
 }
 
-/// Remove stored cells selected by a direct cell path, range, or scoped
-/// query.  The target expansion and worksheet grouping are shared with cell
-/// setters, while the native cell-values owner supplies the deletion
-/// semantics: a virtual (unstored) cell is an exact no-op and no row or
-/// column shifting is attempted.
+/// Remove a complete-catalog sheet selected by a direct sheet path or
+/// homogeneous sheet query, or stored cells selected by a direct cell path,
+/// range, or scoped query. The target expansion and worksheet grouping are
+/// shared with cell setters, while the native cell-values owner supplies the
+/// deletion semantics: a virtual (unstored) cell is an exact no-op and no row
+/// or column shifting is attempted.
 pub(crate) fn remove_with_limits(
     file: &Xlsb,
     target: TargetArg<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     file.admit_edit()?;
+    if let Some(targets) = resolve_sheet_removal_targets(file, &target, limits)? {
+        return remove_sheets_with_limits(file, targets, limits);
+    }
     if let Some(range) = target
         .path()
         .and_then(|path| path.path().steps().last())
@@ -487,6 +509,79 @@ pub(crate) fn remove_with_limits(
         patches.push(patch);
     }
     let commit = Commit::from_cell_parts(file, package, patches)?;
+    check_snapshot_limits(&commit.patch, limits)?;
+    Ok(commit)
+}
+
+/// Remove complete-catalog tabs in one native structural edit.
+///
+/// The facade resolves every target against the immutable source catalog before
+/// creating an editor.  Native selectors therefore keep their source ordinal
+/// even when more than one tab is staged, and a failed later selector cannot
+/// expose a partially published package.  The complete catalog includes chart,
+/// dialog, macro, and unbound tabs; the leaf owns their dependency and view
+/// remapping.
+fn remove_sheets_with_limits(
+    file: &Xlsb,
+    targets: Vec<SheetTarget>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    check_remove_limits(targets.len(), limits)?;
+    let catalog = file.catalog()?;
+    let count = catalog.len();
+    if targets.is_empty() {
+        return Err(
+            Error::new(Code::ZeroMatches, "the mutation selector matched no sheet")
+                .with_format(FileFormat::Xlsb),
+        );
+    }
+    if targets.len() >= count {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "an XLSB workbook must retain at least one sheet",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+
+    let mut selected = HashSet::new();
+    selected
+        .try_reserve(targets.len())
+        .map_err(|_| allocation("XLSB sheet removal targets"))?;
+    selected.extend(targets.iter().map(|target| target.tab));
+    let visible = (0..count).any(|position| {
+        !selected.contains(&position)
+            && catalog
+                .get(position)
+                .is_some_and(|tab| tab.state().is_visible())
+    });
+    if !visible {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "an XLSB workbook must retain a visible sheet",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+
+    let editor = file.editor()?;
+    let package = package_from_editor(editor);
+    let native_limits = TransferLimits::new(
+        limits.max_snapshot_bytes(),
+        targets.len(),
+        1,
+        limits.max_snapshot_bytes(),
+    );
+    let mut edit = package
+        .edit_with_limits(native_limits)
+        .map_err(native_error)?;
+    for target in targets {
+        // The native edit resolves every selector against its immutable source
+        // catalog.  Do not translate a later target through an earlier removal.
+        let _ = edit
+            .remove_sheet(NativeSelector::Position(Position::new(target.tab)))
+            .map_err(native_error)?;
+    }
+    let native = edit.commit().map_err(native_error)?;
+    let commit = Commit::from_native(file, native)?;
     check_snapshot_limits(&commit.patch, limits)?;
     Ok(commit)
 }
@@ -1266,6 +1361,87 @@ fn range_area(range: CellRange) -> usize {
         .and_then(|value| value.checked_add(1))
         .unwrap_or(usize::MAX);
     rows.saturating_mul(columns)
+}
+
+/// Classify a removal target before the cell resolver expands it.  A direct
+/// sheet path and a homogeneous sheet query use the complete catalog removal
+/// route.  Queries that mix a sheet with any other node are rejected so a
+/// caller cannot accidentally delete only one branch of a heterogeneous
+/// selection; all-cell and all-non-cell queries remain with the existing cell
+/// resolver, which supplies their established precise refusal.
+fn resolve_sheet_removal_targets(
+    file: &Xlsb,
+    target: &TargetArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<Vec<SheetTarget>>> {
+    if let Some(path) = target.path() {
+        // Preserve the cell remover's deferred-grid route.  In particular, a
+        // cached-only source can still remove a checked cell coordinate even
+        // though its full worksheet metadata is intentionally unavailable.
+        if path.path().steps().len() > 1
+            && path
+                .path()
+                .steps()
+                .last()
+                .is_some_and(|step| step.cell_ref().is_some() || step.cell_range().is_some())
+        {
+            return Ok(None);
+        }
+        let node = crate::path::resolve::get(&Nav::new(file), path)?;
+        if node.element() != Kind::Sheet {
+            return Ok(None);
+        }
+        let mut positions = Vec::new();
+        let mut seen = HashSet::new();
+        append_sheet(&mut positions, &mut seen, node, limits)?;
+        file.check_source()?;
+        return Ok(Some(positions));
+    }
+
+    let Some(query) = target.query() else {
+        return Ok(None);
+    };
+    let walk = crate::query::run(Nav::new(file), query.clone())?;
+    if !walk.plan().diagnostics().is_empty() {
+        return Err(Error::new(
+            Code::InvalidSelector,
+            "the mutation selector contains an unsupported predicate",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    let mut positions = Vec::new();
+    let mut seen = HashSet::new();
+    let mut matched = false;
+    let mut other = false;
+    for node in walk {
+        matched = true;
+        let node = node?;
+        if node.element() == Kind::Sheet {
+            append_sheet(&mut positions, &mut seen, node, limits)?;
+        } else {
+            other = true;
+        }
+    }
+    file.check_source()?;
+    if !matched {
+        return Err(Error::new(
+            Code::ZeroMatches,
+            "the mutation selector matched no element",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    if other && !positions.is_empty() {
+        return Err(Error::new(
+            Code::UnsupportedElement,
+            "an XLSB sheet removal selector cannot mix sheets with other elements",
+        )
+        .with_format(FileFormat::Xlsb));
+    }
+    if positions.is_empty() {
+        Ok(None)
+    } else {
+        Ok(Some(positions))
+    }
 }
 
 /// Resolve only workbook sheet nodes. A cell, range, table, or any other

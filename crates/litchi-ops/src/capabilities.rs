@@ -1097,10 +1097,10 @@ static XLSB_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 
 /// XLSB writes keep a narrow element surface. A range is a selector accepted
 /// by the cell handler, while workbook, row, column and other nodes are not
-/// structural add/remove elements; complete-catalog sheet-order and insertion
-/// dependency refusals remain explicit operation gaps below.
+/// structural add/remove elements. Complete-catalog sheet insertion, removal,
+/// and ordering dependency refusals remain explicit operation gaps below.
 #[cfg(feature = "xlsb")]
-static XLSB_WRITE_GAPS: [GapSpec; 21] = [
+static XLSB_WRITE_GAPS: [GapSpec; 24] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -1155,11 +1155,41 @@ static XLSB_WRITE_GAPS: [GapSpec; 21] = [
         subject: Subject::Operation {
             verb: "remove",
             element: "workbook",
-            context: "non-cell-elements",
+            context: "non-sheet-elements",
         },
         code: Code::UnsupportedElement,
         follow_up: "M2 XLSB non-cell removal handlers",
-        reason: "XLSB removal deletes stored cell records; ranges select cells, while sheet, row, column, table and other structural elements are refused",
+        reason: "XLSB removal deletes complete-catalog sheet tabs and stored cell records; workbook, row, column, table and other non-sheet structural elements require their own native lifecycle owners",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "sheet",
+            context: "order-opaque-dependencies",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware complete-catalog sheet removal",
+        reason: "sheet removal admits only the selected sheet root and exclusively owned binaryIndex parts; any other outgoing internal relationship, including chart, drawing, comments, tables or adjunct parts, is refused as unsupported until it has a typed dependency disposition, along with shared-workbook revisions, data-model parts, connections, slicers, timelines, pivot-cache and table formula dependencies, unmodeled workbook records, surviving worksheet FRT/AC records and formula groups, opaque volatile dependencies and markup-compatibility title metadata",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "sheet",
+            context: "removed-scoped-names",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware scoped-name removal",
+        reason: "sheet removal refuses workbook or sheet-scoped names that resolve into a removed tab until native name pruning and reference remapping are available",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "sheet",
+            context: "textual-references",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLSB dependency-aware textual-reference removal",
+        reason: "sheet removal refuses formula-like and textual dependency carriers that still reference a removed tab instead of leaving stale names or links",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2131,7 +2161,7 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Xlsb
                 && self.retains_source != Some(false)
-                && self.data().canonical == "cell"
+                && matches!(self.data().canonical, "cell" | "sheet")
                 && readable);
         Operations {
             add,

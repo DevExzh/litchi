@@ -130,8 +130,10 @@ impl File {
     /// checks refuse removals that the format cannot preserve safely.
     /// PPTX supports dependency-free slides in created or eagerly opened
     /// presentations and requires at least one slide to remain.
-    /// XLSB removes stored cell records from cells, ranges, and cell queries;
-    /// virtual cells are exact no-ops and neighboring cells never shift.
+    /// XLSB removes complete-catalog sheet tabs, or stored cell records from
+    /// cells, ranges, and cell queries; virtual cells are exact no-ops and
+    /// neighboring cells never shift.  A sheet query must be homogeneous, and
+    /// complete-tab removal retains at least one visible tab.
     ///
     /// # Errors
     /// Returns target, protection, source, dependency or capability errors.

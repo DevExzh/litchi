@@ -883,11 +883,12 @@ fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
 fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
     let caps = Capabilities::of(FileFormat::Xlsb);
     assert!(caps.element("sheet").unwrap().operations().add);
-    assert!(!caps.element("sheet").unwrap().operations().remove);
+    assert!(caps.element("sheet").unwrap().operations().remove);
     assert!(!caps.element("workbook").unwrap().operations().add);
     assert!(caps.verb(Verb::Get).is_supported());
     assert!(caps.verb(Verb::Set).is_supported());
     assert!(caps.verb(Verb::Add).is_supported());
+    assert!(caps.verb(Verb::Remove).is_supported());
     assert!(caps.verb(Verb::Save).is_supported());
     assert!(caps.element("cell").is_some());
     let computed_value = caps
@@ -903,6 +904,25 @@ fn xlsb_reports_keep_selection_semantic_and_declare_sheet_and_cell_writes() {
         })
         .expect("formula evaluation remains an explicit XLSB capability gap");
     assert_eq!(computed_value.follow_up(), "M4 (formula evaluation)");
+    for context in [
+        "order-opaque-dependencies",
+        "removed-scoped-names",
+        "textual-references",
+    ] {
+        assert!(
+            caps.gaps().any(|gap| {
+                matches!(
+                    gap.subject(),
+                    litchi_ops::capabilities::Subject::Operation {
+                        verb: "remove",
+                        element: "sheet",
+                        context: actual,
+                    } if actual == context
+                )
+            }),
+            "missing XLSB sheet-removal gap: {context}"
+        );
+    }
     let named_range = caps.element("namedrange").unwrap();
     assert_eq!(
         named_range

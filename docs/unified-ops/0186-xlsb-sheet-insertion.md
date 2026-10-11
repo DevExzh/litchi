@@ -97,7 +97,6 @@ visibility, the returned canonical path and preserved active-tab identity.
 
 | Owner / existing tabs | After native / facade µs | Repeat native / facade µs |
 |---|---:|---:|
-
 | eager / 1 | 783.704 / 803.333 | 788.613 / 801.434 |
 | source / 1 | 931.095 / 947.885 | 931.634 / 951.954 |
 | eager / 10 | 2074.720 / 2118.320 | 2083.419 / 2128.289 |

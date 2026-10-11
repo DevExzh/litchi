@@ -174,6 +174,42 @@ struct Replacement {
     bytes: Vec<u8>,
 }
 
+fn apply_replacements(
+    content: &[u8],
+    mut replacements: Vec<Replacement>,
+    resource: &'static str,
+) -> Result<Option<Vec<u8>>> {
+    if replacements.is_empty() {
+        return Ok(None);
+    }
+    replacements.sort_unstable_by_key(|replacement| (replacement.span.start, replacement.span.end));
+    if replacements
+        .windows(2)
+        .any(|pair| pair[0].span.end > pair[1].span.start)
+    {
+        return Err(invalid("overlapping extended-properties replacements"));
+    }
+    let output_len = replacements
+        .iter()
+        .try_fold(content.len(), |size, replacement| {
+            size.checked_sub(replacement.span.end - replacement.span.start)?
+                .checked_add(replacement.bytes.len())
+        })
+        .ok_or_else(|| invalid("extended-properties replacement output size overflow"))?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(output_len)
+        .map_err(|source| Error::Allocation { resource, source })?;
+    let mut cursor = 0usize;
+    for replacement in replacements {
+        output.extend_from_slice(&content[cursor..replacement.span.start]);
+        output.extend_from_slice(&replacement.bytes);
+        cursor = replacement.span.end;
+    }
+    output.extend_from_slice(&content[cursor..]);
+    Ok(Some(output))
+}
+
 #[derive(Debug)]
 struct Attribute {
     name: Box<str>,
@@ -851,47 +887,7 @@ where
     Ok(Some(output))
 }
 
-/// Insert one title into the leading catalog in an extended-properties part.
-///
-/// `original_titles` is the immutable catalog before the insertion and
-/// `position` is the destination slot in that catalog (`0..=len`).  The
-/// existing leading title text is checked with `equivalent`; entries after
-/// that prefix are treated as named-range metadata and remain byte-exact.
-/// Both the `TitlesOfParts` vector size and the matching `HeadingPairs`
-/// catalog count are updated.  The helper recognizes the aggregate `Sheet`
-/// category used by XLSB as well as the standard `Worksheets` category.
-///
-/// Optional metadata is left untouched when both recognized containers are
-/// absent.  A partially present or ambiguous layout is rejected so callers do
-/// not silently manufacture application metadata.
-///
-/// # Example
-///
-/// ```
-/// use litchi_ooxml_common::xml::sheet_name::insert_title;
-/// let xml = br#"<p:Properties xmlns:p="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:v="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><p:HeadingPairs><v:vector size="2" baseType="variant"><v:variant><v:lpstr>Worksheets</v:lpstr></v:variant><v:variant><v:i4>2</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="2" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#;
-/// let changed = insert_title(xml, &["One", "Two"], 1, "New", |left, right| left == right)?;
-/// let changed = std::str::from_utf8(changed.as_deref().expect("metadata present"))?;
-/// assert!(changed.contains("<v:i4>3</v:i4>"));
-/// assert!(changed.contains("<v:lpstr>One</v:lpstr><v:lpstr>New</v:lpstr><v:lpstr>Two</v:lpstr>"));
-/// # Ok::<(), Box<dyn std::error::Error>>(())
-/// ```
-pub fn insert_title<F>(
-    content: &[u8],
-    original_titles: &[&str],
-    insertion_position: usize,
-    name: &str,
-    equivalent: F,
-) -> Result<Option<Vec<u8>>>
-where
-    F: Fn(&str, &str) -> bool,
-{
-    if insertion_position > original_titles.len() {
-        return Err(invalid(format!(
-            "extended-properties title insertion position {insertion_position} exceeds catalog length {}",
-            original_titles.len()
-        )));
-    }
+fn scan_insert_metadata(content: &[u8]) -> Result<Option<InsertMetadata>> {
     if crate::mce::binds_namespace_by_reference(content) {
         return Err(Error::Blocked(BlockReason::MarkupCompatibility));
     }
@@ -1305,6 +1301,65 @@ where
             "extended-properties TitlesOfParts exists without HeadingPairs",
         ));
     };
+    Ok(Some(InsertMetadata {
+        titles,
+        heading_pairs,
+        title_vector,
+        heading_vector,
+        heading_variant_count,
+    }))
+}
+
+/// Insert one title into the leading catalog in an extended-properties part.
+///
+/// `original_titles` is the immutable catalog before the insertion and
+/// `position` is the destination slot in that catalog (`0..=len`). The
+/// existing leading title text is checked with `equivalent`; entries after
+/// that prefix are treated as named-range metadata and remain byte-exact.
+/// Both the `TitlesOfParts` vector size and the matching `HeadingPairs`
+/// catalog count are updated. The helper recognizes the aggregate `Sheet`
+/// category used by XLSB as well as the standard `Worksheets` category.
+///
+/// Optional metadata is left untouched when both recognized containers are
+/// absent. A partially present or ambiguous layout is rejected so callers do
+/// not silently manufacture application metadata.
+/// # Example
+///
+/// ```
+/// use litchi_ooxml_common::xml::sheet_name::insert_title;
+/// let xml = br#"<p:Properties xmlns:p="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:v="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><p:HeadingPairs><v:vector size="2" baseType="variant"><v:variant><v:lpstr>Worksheets</v:lpstr></v:variant><v:variant><v:i4>2</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="2" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#;
+/// let changed = insert_title(xml, &["One", "Two"], 1, "New", |left, right| left == right)?;
+/// let changed = std::str::from_utf8(changed.as_deref().expect("metadata present"))?;
+/// assert!(changed.contains("<v:i4>3</v:i4>"));
+/// assert!(changed.contains("<v:lpstr>One</v:lpstr><v:lpstr>New</v:lpstr><v:lpstr>Two</v:lpstr>"));
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn insert_title<F>(
+    content: &[u8],
+    original_titles: &[&str],
+    insertion_position: usize,
+    name: &str,
+    equivalent: F,
+) -> Result<Option<Vec<u8>>>
+where
+    F: Fn(&str, &str) -> bool,
+{
+    if insertion_position > original_titles.len() {
+        return Err(invalid(format!(
+            "extended-properties title insertion position {insertion_position} exceeds catalog length {}",
+            original_titles.len()
+        )));
+    }
+    let Some(metadata) = scan_insert_metadata(content)? else {
+        return Ok(None);
+    };
+    let InsertMetadata {
+        titles,
+        heading_pairs,
+        title_vector,
+        heading_vector,
+        heading_variant_count,
+    } = metadata;
     validate_insert_layout(
         &title_vector,
         &heading_vector,
@@ -1371,35 +1426,130 @@ where
         },
         bytes: new_title,
     });
-    replacements.sort_unstable_by_key(|replacement| (replacement.span.start, replacement.span.end));
-    if replacements
-        .windows(2)
-        .any(|pair| pair[0].span.end > pair[1].span.start)
-    {
-        return Err(invalid("overlapping extended-properties title insertions"));
+    apply_replacements(content, replacements, "inserted extended-properties titles")
+}
+
+/// Remove catalog titles from an extended-properties part.
+///
+/// `original_titles` is the immutable source catalog and `positions` contains
+/// its sorted, unique zero-based slots to remove. The `TitlesOfParts` vector
+/// and the matching `Sheet` or `Worksheets` heading count are decremented;
+/// trailing named-range entries and all surviving title elements retain their
+/// original bytes. If the optional metadata is absent, the part is left
+/// untouched.
+///
+/// # Example
+///
+/// ```
+/// use litchi_ooxml_common::xml::sheet_name::remove_titles;
+/// let xml = br#"<p:Properties xmlns:p="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:v="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><p:HeadingPairs><v:vector size="2" baseType="variant"><v:variant><v:lpstr>Worksheets</v:lpstr></v:variant><v:variant><v:i4>3</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="3" baseType="lpstr"><v:lpstr>One</v:lpstr><v:lpstr>Two</v:lpstr><v:lpstr>Three</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#;
+/// let changed = remove_titles(xml, &["One", "Two", "Three"], &[1], |left, right| left == right)?;
+/// let changed = std::str::from_utf8(changed.as_deref().expect("metadata present"))?;
+/// assert!(changed.contains("<v:i4>2</v:i4>"));
+/// assert!(!changed.contains(">Two</v:lpstr>"));
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub fn remove_titles<F>(
+    content: &[u8],
+    original_titles: &[&str],
+    positions: &[usize],
+    equivalent: F,
+) -> Result<Option<Vec<u8>>>
+where
+    F: Fn(&str, &str) -> bool,
+{
+    validate_remove_positions(original_titles.len(), positions)?;
+    if positions.is_empty() {
+        return Ok(None);
     }
-    let output_len = replacements
+    let Some(metadata) = scan_insert_metadata(content)? else {
+        return Ok(None);
+    };
+    let InsertMetadata {
+        titles,
+        heading_pairs,
+        title_vector,
+        heading_vector,
+        heading_variant_count,
+    } = metadata;
+    validate_insert_layout(
+        &title_vector,
+        &heading_vector,
+        &titles,
+        &heading_pairs,
+        heading_variant_count,
+        original_titles,
+        &equivalent,
+    )?;
+
+    let size_span = title_vector.size.map(|(_, span)| span).ok_or_else(|| {
+        invalid("extended-properties TitlesOfParts vector has no checked size attribute")
+    })?;
+    let new_size = titles
+        .len()
+        .checked_sub(positions.len())
+        .ok_or_else(|| invalid("extended-properties title vector removal underflow"))?;
+    let catalog_pair = heading_pairs
         .iter()
-        .try_fold(content.len(), |size, replacement| {
-            size.checked_sub(replacement.span.end - replacement.span.start)?
-                .checked_add(replacement.bytes.len())
-        })
-        .ok_or_else(|| invalid("extended-properties title insertion size overflow"))?;
-    let mut output = Vec::new();
-    output
-        .try_reserve_exact(output_len)
+        .find(|pair| matches!(pair.label.trim(), "Sheet" | "Worksheets"))
+        .ok_or_else(|| invalid("extended-properties heading pairs have no sheet catalog"))?;
+    let new_catalog_count = catalog_pair
+        .count
+        .checked_sub(positions.len())
+        .ok_or_else(|| invalid("extended-properties worksheet count removal underflow"))?;
+
+    let replacement_count = positions
+        .len()
+        .checked_add(2)
+        .ok_or_else(|| invalid("extended-properties title replacement count overflow"))?;
+    let mut replacements = Vec::<Replacement>::new();
+    replacements
+        .try_reserve_exact(replacement_count)
         .map_err(|source| Error::Allocation {
-            resource: "inserted extended-properties titles",
+            resource: "removed extended-properties title replacements",
             source,
         })?;
-    let mut cursor = 0usize;
-    for replacement in replacements {
-        output.extend_from_slice(&content[cursor..replacement.span.start]);
-        output.extend_from_slice(&replacement.bytes);
-        cursor = replacement.span.end;
+    replacements.push(Replacement {
+        span: size_span,
+        bytes: new_size.to_string().into_bytes(),
+    });
+    replacements.push(Replacement {
+        span: catalog_pair.span,
+        bytes: new_catalog_count.to_string().into_bytes(),
+    });
+    for &position in positions {
+        let title = titles.get(position).ok_or_else(|| {
+            invalid(format!(
+                "extended-properties title removal position {position} exceeds the source catalog"
+            ))
+        })?;
+        replacements.push(Replacement {
+            span: Span {
+                start: title.start,
+                end: title.end,
+            },
+            bytes: Vec::new(),
+        });
     }
-    output.extend_from_slice(&content[cursor..]);
-    Ok(Some(output))
+    apply_replacements(content, replacements, "removed extended-properties titles")
+}
+
+fn validate_remove_positions(catalog_len: usize, positions: &[usize]) -> Result<()> {
+    let mut previous = None;
+    for &position in positions {
+        if position >= catalog_len {
+            return Err(invalid(format!(
+                "extended-properties title removal position {position} exceeds catalog length {catalog_len}"
+            )));
+        }
+        if previous.is_some_and(|value| position <= value) {
+            return Err(invalid(
+                "extended-properties title removal positions must be sorted and unique",
+            ));
+        }
+        previous = Some(position);
+    }
+    Ok(())
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1414,6 +1564,15 @@ enum InsertKind {
     HeadingLabel,
     HeadingCount,
     Other,
+}
+
+#[derive(Debug)]
+struct InsertMetadata {
+    titles: Vec<InsertTitle>,
+    heading_pairs: Vec<InsertHeadingPair>,
+    title_vector: InsertVector,
+    heading_vector: InsertVector,
+    heading_variant_count: usize,
 }
 
 #[derive(Debug)]
@@ -3487,6 +3646,159 @@ mod tests {
                 equivalent
             ),
             Err(Error::Invalid(_))
+        ));
+    }
+
+    fn removal_source(label: &str) -> String {
+        format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}"><p:HeadingPairs><v:vector size="4" baseType="variant"><v:variant><v:lpstr>{label}</v:lpstr></v:variant><v:variant><v:i4>4</v:i4></v:variant><v:variant><v:lpstr>Named Ranges</v:lpstr></v:variant><v:variant><v:i4>1</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="5" baseType="lpstr"><v:lpstr data-one="1">One</v:lpstr><v:lpstr>Two</v:lpstr><v:lpstr><![CDATA[Three]]></v:lpstr><v:lpstr>Four</v:lpstr><v:lpstr data-range="exact">Four!Print_Area</v:lpstr></v:vector></p:TitlesOfParts></p:Properties>"#
+        )
+    }
+
+    #[test]
+    fn removes_catalog_title_at_start_middle_and_end() {
+        for (positions, expected, size, count) in [
+            (&[0usize][..], "Two,Three,Four", 4, 3),
+            (&[1usize, 2][..], "One,Four", 3, 2),
+            (&[3usize][..], "One,Two,Three", 4, 3),
+        ] {
+            let source = removal_source("Worksheets");
+            let output = remove_titles(
+                source.as_bytes(),
+                &["One", "Two", "Three", "Four"],
+                positions,
+                equivalent,
+            )
+            .expect("remove")
+            .expect("metadata present");
+            let text = std::str::from_utf8(&output).expect("UTF-8");
+            let catalog = expected.replace(',', "</v:lpstr><v:lpstr>");
+            if expected == "Two,Three,Four" {
+                assert!(
+                    text.contains("<v:lpstr>Two</v:lpstr><v:lpstr><![CDATA[Three]]></v:lpstr><v:lpstr>Four</v:lpstr>"),
+                    "{text}"
+                );
+            } else if expected == "One,Four" {
+                assert!(
+                    text.contains(r#"<v:lpstr data-one="1">One</v:lpstr><v:lpstr>Four</v:lpstr>"#),
+                    "{text}"
+                );
+            } else if expected == "One,Two,Three" {
+                assert!(
+                    text.contains(
+                        r#"<v:lpstr data-one="1">One</v:lpstr><v:lpstr>Two</v:lpstr><v:lpstr><![CDATA[Three]]></v:lpstr>"#
+                    ),
+                    "{text}"
+                );
+            } else {
+                assert!(
+                    text.contains(&format!("<v:lpstr>{catalog}</v:lpstr>")),
+                    "{text}"
+                );
+            }
+            assert!(
+                text.contains(&format!("<v:vector size=\"{size}\"")),
+                "{text}"
+            );
+            assert!(text.contains(&format!("<v:i4>{count}</v:i4>")), "{text}");
+            assert!(
+                text.contains(r#"<v:lpstr data-range="exact">Four!Print_Area</v:lpstr>"#),
+                "{text}"
+            );
+            if expected != "One,Four" {
+                assert!(text.contains("<![CDATA[Three]]>"), "{text}");
+            }
+        }
+    }
+
+    #[test]
+    fn removes_multiple_titles_only_when_positions_are_sorted_and_unique() {
+        let source = removal_source("Sheet");
+        let output = remove_titles(
+            source.as_bytes(),
+            &["One", "Two", "Three", "Four"],
+            &[0, 2],
+            equivalent,
+        )
+        .expect("remove")
+        .expect("metadata present");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains("<v:lpstr>Two</v:lpstr><v:lpstr>Four</v:lpstr>"));
+        assert!(text.contains("<v:vector size=\"3\""));
+        assert!(text.contains("<v:i4>2</v:i4>"));
+
+        for positions in [[2, 0], [1, 1], [4, 0]] {
+            assert!(matches!(
+                remove_titles(
+                    source.as_bytes(),
+                    &["One", "Two", "Three", "Four"],
+                    &positions,
+                    equivalent,
+                ),
+                Err(Error::Invalid(_))
+            ));
+        }
+    }
+
+    #[test]
+    fn removes_titles_with_local_namespace_bindings_and_preserves_lexical_survivors() {
+        let source = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}"><p:HeadingPairs><v:vector xmlns:v="{PROPERTY_TYPES_NAMESPACE}" size="4" baseType="variant"><v:variant><v:lpstr>Worksheets</v:lpstr></v:variant><v:variant><v:i4>2</v:i4></v:variant><v:variant><v:lpstr>Named Ranges</v:lpstr></v:variant><v:variant><v:i4>1</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector xmlns:v="{PROPERTY_TYPES_NAMESPACE}" data-before="keep" size="3" baseType="lpstr"><v:lpstr data-one="1">One</v:lpstr><v:lpstr data-two="2">Two</v:lpstr><v:lpstr data-range="exact">Two!Print_Area</v:lpstr></v:vector></p:TitlesOfParts><p:Company data-keep="yes"/></p:Properties>"#
+        );
+        let output = remove_titles(source.as_bytes(), &["One", "Two"], &[0], equivalent)
+            .expect("remove")
+            .expect("metadata present");
+        let text = std::str::from_utf8(&output).expect("UTF-8");
+        assert!(text.contains(
+            r#"<v:vector xmlns:v="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes" data-before="keep" size="2" baseType="lpstr"><v:lpstr data-two="2">Two</v:lpstr><v:lpstr data-range="exact">Two!Print_Area</v:lpstr></v:vector>"#
+        ));
+        assert!(text.contains(r#"<p:Company data-keep="yes"/>"#));
+        assert!(text.contains("<v:i4>1</v:i4>"));
+    }
+
+    #[test]
+    fn removal_empty_positions_and_absent_metadata_are_exact_noops() {
+        assert_eq!(
+            remove_titles(b"<not-xml", &["One"], &[], equivalent).expect("empty no-op"),
+            None
+        );
+        let absent = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}"><p:Application>Producer</p:Application></p:Properties>"#
+        );
+        assert_eq!(
+            remove_titles(absent.as_bytes(), &["One"], &[0], equivalent).expect("absent metadata"),
+            None
+        );
+    }
+
+    #[test]
+    fn removal_refuses_stale_unknown_and_markup_compatibility_metadata() {
+        let stale = removal_source("Worksheets").replace(">One</v:lpstr>", ">Stale</v:lpstr>");
+        assert!(matches!(
+            remove_titles(
+                stale.as_bytes(),
+                &["One", "Two", "Three", "Four"],
+                &[0],
+                equivalent
+            ),
+            Err(Error::Invalid(_))
+        ));
+        let unknown = removal_source("Charts");
+        assert!(matches!(
+            remove_titles(
+                unknown.as_bytes(),
+                &["One", "Two", "Three", "Four"],
+                &[0],
+                equivalent
+            ),
+            Err(Error::Blocked(BlockReason::UnmodeledReference))
+        ));
+        let mce = format!(
+            r#"<p:Properties xmlns:p="{EXTENDED_PROPERTIES_NAMESPACE}" xmlns:v="{PROPERTY_TYPES_NAMESPACE}" xmlns:mc="{MCE_STR}"><p:HeadingPairs><v:vector size="2" baseType="variant"><v:variant><v:lpstr>Worksheets</v:lpstr></v:variant><v:variant><v:i4>1</v:i4></v:variant></v:vector></p:HeadingPairs><p:TitlesOfParts><v:vector size="1" baseType="lpstr"><v:lpstr>One</v:lpstr></v:vector></p:TitlesOfParts><mc:AlternateContent/></p:Properties>"#
+        );
+        assert!(matches!(
+            remove_titles(mce.as_bytes(), &["One"], &[0], equivalent),
+            Err(Error::Blocked(BlockReason::MarkupCompatibility))
         ));
     }
 

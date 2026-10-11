@@ -202,7 +202,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -1934,10 +1934,37 @@
       "subject": "operation",
       "verb": "remove",
       "element": "workbook",
-      "context": "non-cell-elements",
+      "context": "non-sheet-elements",
       "code": "unsupported_element",
       "followUp": "M2 XLSB non-cell removal handlers",
-      "reason": "XLSB removal deletes stored cell records; ranges select cells, while sheet, row, column, table and other structural elements are refused"
+      "reason": "XLSB removal deletes complete-catalog sheet tabs and stored cell records; workbook, row, column, table and other non-sheet structural elements require their own native lifecycle owners"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "order-opaque-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware complete-catalog sheet removal",
+      "reason": "sheet removal admits only the selected sheet root and exclusively owned binaryIndex parts; any other outgoing internal relationship, including chart, drawing, comments, tables or adjunct parts, is refused as unsupported until it has a typed dependency disposition, along with shared-workbook revisions, data-model parts, connections, slicers, timelines, pivot-cache and table formula dependencies, unmodeled workbook records, surviving worksheet FRT/AC records and formula groups, opaque volatile dependencies and markup-compatibility title metadata"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "removed-scoped-names",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware scoped-name removal",
+      "reason": "sheet removal refuses workbook or sheet-scoped names that resolve into a removed tab until native name pruning and reference remapping are available"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "sheet",
+      "context": "textual-references",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLSB dependency-aware textual-reference removal",
+      "reason": "sheet removal refuses formula-like and textual dependency carriers that still reference a removed tab instead of leaving stale names or links"
     },
     {
       "subject": "operation",

@@ -535,8 +535,10 @@ impl Edit {
     /// Remove selected elements from the current candidate.
     ///
     /// Consecutive direct XLSB cell removals on one worksheet share one
-    /// native cell-values edit.  Ranges, queries, and non-cell targets use
-    /// the format handler after the pending direct-cell run is flushed.
+    /// native cell-values edit.  Complete-catalog sheet paths and homogeneous
+    /// sheet queries use one native structural edit after any pending direct
+    /// cell run is flushed; ranges, heterogeneous queries, and other targets
+    /// retain the format handler's precise admission rules.
     ///
     /// # Errors
     /// As [`File::remove`], with the mutation's item index and transaction limits.
@@ -1361,7 +1363,7 @@ fn wrap_xlsb<T>(
     let leaf_operations = patch.operation_count();
     // Structural and cell-value patches both retain exact package images.
     // Cell selectors spanning worksheets retain every per-worksheet image;
-    // charge those images plus a conservative semantic operation allowance.
+    // structural patches carry the checked native operation charge.
     let snapshot_bytes = patch.retained_bytes();
     Ok((
         Step {

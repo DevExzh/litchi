@@ -274,9 +274,11 @@ impl Xlsb {
         result
     }
 
-    /// Remove stored cells under the unified cell, range, and query target
-    /// contract.  Missing coordinates are virtual cells and therefore exact
-    /// no-ops; the native owner never shifts neighboring cells.
+    /// Remove a complete-catalog sheet, or stored cells under the unified
+    /// cell, range, and query target contract.  Sheet selectors resolve once
+    /// against the immutable catalog and are staged together in one native
+    /// structural edit.  Missing coordinates are virtual cells and therefore
+    /// exact no-ops; the native cell owner never shifts neighboring cells.
     pub(crate) fn remove(&self, target: crate::target::TargetArg<'_>) -> Result<write::Commit> {
         self.remove_with_limits(target, &crate::transaction::SemanticLimits::default())
     }

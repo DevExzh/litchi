@@ -581,7 +581,7 @@ fn signed_xlsb_removal_requires_explicit_signature_consumption() {
 }
 
 #[test]
-fn xlsb_capabilities_advertise_removal_only_for_cells() {
+fn xlsb_capabilities_advertise_removal_for_cells_and_sheets() {
     let report = Capabilities::of(FileFormat::Xlsb);
     assert!(report.verb(Verb::Remove).is_supported());
     assert!(
@@ -591,14 +591,21 @@ fn xlsb_capabilities_advertise_removal_only_for_cells() {
             .operations()
             .remove
     );
-    for element in ["range", "sheet", "row", "col", "table", "workbook"] {
+    assert!(
+        report
+            .element("sheet")
+            .expect("sheet capability")
+            .operations()
+            .remove
+    );
+    for element in ["range", "row", "col", "table", "workbook"] {
         assert!(
             !report
                 .element(element)
                 .expect("declared XLSB element")
                 .operations()
                 .remove,
-            "XLSB removal must remain cell-only for {element}"
+            "XLSB removal must remain limited to cells and sheets for {element}"
         );
     }
     let removable = report
@@ -606,5 +613,5 @@ fn xlsb_capabilities_advertise_removal_only_for_cells() {
         .filter(|element| element.operations().remove)
         .map(|element| element.name())
         .collect::<Vec<_>>();
-    assert_eq!(removable, ["cell"]);
+    assert_eq!(removable, ["sheet", "cell"]);
 }

@@ -21,7 +21,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `2346df7c5afcf5597a4a3caf4cf1ca5467f80d948e93e7f87b8fdf13461921e2` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `3bed7530f2eb083d7fe425b5ffa7a9eb99e66ccc5c9b72d1b4b64f5714df2276` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -2747,7 +2747,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `add` | `sheet` | `vba-dependency` | sheet insertion refuses workbooks with a VBA project dependency until native catalog identity remapping is available | M2 XLSB dependency-aware complete-catalog sheet insertion |
 | `add` | `sheet` | `calculation-chain-dependency` | sheet insertion refuses workbooks with a calculation-chain dependency until native sheet positions can be remapped safely | M2 XLSB calculation-chain-aware sheet insertion |
 | `add` | `sheet` | `noncontiguous-3d-dependency` | sheet insertion refuses a position inside an internal 3-D reference range because it would broaden the range | M2 XLSB 3-D dependency-aware sheet insertion |
-| `remove` | `workbook` | `non-cell-elements` | XLSB removal deletes stored cell records; ranges select cells, while sheet, row, column, table and other structural elements are refused | M2 XLSB non-cell removal handlers |
+| `remove` | `workbook` | `non-sheet-elements` | XLSB removal deletes complete-catalog sheet tabs and stored cell records; workbook, row, column, table and other non-sheet structural elements require their own native lifecycle owners | M2 XLSB non-cell removal handlers |
+| `remove` | `sheet` | `order-opaque-dependencies` | sheet removal admits only the selected sheet root and exclusively owned binaryIndex parts; any other outgoing internal relationship, including chart, drawing, comments, tables or adjunct parts, is refused as unsupported until it has a typed dependency disposition, along with shared-workbook revisions, data-model parts, connections, slicers, timelines, pivot-cache and table formula dependencies, unmodeled workbook records, surviving worksheet FRT/AC records and formula groups, opaque volatile dependencies and markup-compatibility title metadata | M2 XLSB dependency-aware complete-catalog sheet removal |
+| `remove` | `sheet` | `removed-scoped-names` | sheet removal refuses workbook or sheet-scoped names that resolve into a removed tab until native name pruning and reference remapping are available | M2 XLSB dependency-aware scoped-name removal |
+| `remove` | `sheet` | `textual-references` | sheet removal refuses formula-like and textual dependency carriers that still reference a removed tab instead of leaving stale names or links | M2 XLSB dependency-aware textual-reference removal |
 | `remove` | `cell` | `formula-groups` | array, shared and data-table formula-group members require native group lifecycle support before removal | M2 XLSB dependency-aware formula-group removal |
 | `remove` | `cell` | `calculation-chain` | stored formulas cannot be removed while an opaque calculation chain is present | M2 XLSB calculation-chain-aware formula removal |
 | `remove` | `cell` | `unmodeled-cell-records` | semantic removal refuses worksheets containing reserved cell-record families whose coordinate layout is not modeled | M2 XLSB additional native cell-record families |

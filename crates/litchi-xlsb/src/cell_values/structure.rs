@@ -48,6 +48,7 @@
 use super::{CellFormula, Reference, TransferLimits, Value};
 use crate::Workbook;
 use crate::external_link::ExternalLinkLimits;
+use crate::formula::{Parser, Token};
 use crate::package::error::{Error, Result};
 use crate::package::formula::excel_name_eq;
 use crate::raw::{Header, Limits as RawLimits, Records, Writer, kind};
@@ -55,7 +56,8 @@ use crate::sheet::{Kind, Selector, State};
 use crate::workbook::DrawingLoadPolicy;
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{BlobPart, PackURI, Part};
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, HashSet};
+use std::mem::size_of;
 use std::sync::Arc;
 
 const MAGIC: &[u8; 8] = b"LCXBWRP1";
@@ -125,6 +127,12 @@ enum Operation {
         catalog_position: usize,
         name: String,
         state: State,
+    },
+    /// Remove one or more complete-catalog tabs by their immutable source
+    /// positions.  The positions stay source-relative so a durable patch is
+    /// independent of the order in which selectors were staged.
+    RemoveSheets {
+        positions: Arc<[usize]>,
     },
     SetSheetState {
         catalog_position: usize,
@@ -214,6 +222,7 @@ enum Selection {
     LegacyWorksheetRename(usize),
     SheetOrder,
     SheetInsert(usize),
+    SheetRemoval,
     SheetState(usize),
     Cell(usize, Reference),
     Drawing(usize),
@@ -230,6 +239,7 @@ impl Operation {
             Self::InsertSheet {
                 catalog_position, ..
             } => Selection::SheetInsert(*catalog_position),
+            Self::RemoveSheets { .. } => Selection::SheetRemoval,
             Self::SetSheetState {
                 catalog_position, ..
             } => Selection::SheetState(*catalog_position),
@@ -248,7 +258,9 @@ impl Operation {
             (Self::ReorderSheets { .. }, _)
             | (_, Self::ReorderSheets { .. })
             | (Self::InsertSheet { .. }, _)
-            | (_, Self::InsertSheet { .. }) => true,
+            | (_, Self::InsertSheet { .. })
+            | (Self::RemoveSheets { .. }, _)
+            | (_, Self::RemoveSheets { .. }) => true,
             (Self::RenameSheet { .. }, Self::SetSheetState { .. })
             | (Self::SetSheetState { .. }, Self::RenameSheet { .. }) => false,
             (Self::SetSheetName { .. }, Self::SetSheetState { .. })
@@ -341,6 +353,7 @@ impl Edit {
                 | Operation::SetSheetState { .. }
                 | Operation::ReorderSheets { .. }
                 | Operation::InsertSheet { .. }
+                | Operation::RemoveSheets { .. }
                 | Operation::TransferCell { .. }
                 | Operation::AddImage { .. }
                 | Operation::TransferDrawing { .. } => {
@@ -471,6 +484,7 @@ impl Edit {
                         Operation::RenameSheet { .. }
                         | Operation::SetSheetName { .. }
                         | Operation::InsertSheet { .. }
+                        | Operation::RemoveSheets { .. }
                         | Operation::SetSheetState { .. }
                         | Operation::TransferCell { .. }
                         | Operation::AddImage { .. }
@@ -636,6 +650,169 @@ impl Edit {
         self.stage(operation)
     }
 
+    /// Plan removal of one complete-catalog tab.
+    ///
+    /// The selector is resolved against the immutable source catalog. Repeating
+    /// a selector in one edit is an exact resolved no-op; selecting another tab
+    /// extends the one durable removal operation, keeping all positions in
+    /// source-catalog coordinates. Worksheet, chart, dialog, macro, and
+    /// very-hidden unbound tabs are all addressable.
+    ///
+    /// Removal is a workbook-topology barrier. The candidate is fully replayed
+    /// before this edit adopts it, so relationship closure, catalog-index
+    /// dependencies, and the final visible-tab invariant fail atomically.
+    ///
+    /// ```
+    /// use litchi_core::sheet::WorkbookTrait as _;
+    /// use litchi_xlsb::{Builder, writer::MutableWorksheet};
+    ///
+    /// let mut builder = Builder::new();
+    /// builder.add_worksheet(MutableWorksheet::new("First"));
+    /// builder.add_worksheet(MutableWorksheet::new("Second"));
+    /// let source = builder.build()?;
+    /// let mut edit = source.edit()?;
+    /// assert_eq!(edit.remove_sheet(0_usize)?, Some(true));
+    /// let commit = edit.commit()?;
+    /// assert_eq!(
+    ///     commit.package().workbook()?.worksheet_names(),
+    ///     &["Second".to_owned()],
+    /// );
+    /// # Ok::<(), litchi_xlsb::package::PackageError>(())
+    /// ```
+    ///
+    /// Repeating a resolved selector returns `Some(false)` without changing
+    /// the staged operation. A selector that is absent from the immutable
+    /// source catalog returns `None`.
+    pub fn remove_sheet<'a>(&mut self, selector: impl Into<Selector<'a>>) -> Result<Option<bool>> {
+        let selector = selector.into();
+        let Some(position) = resolve_catalog_position(&self.sheet_catalog, &selector)? else {
+            return Ok(None);
+        };
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::RemoveSheets { .. }))
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet removal cannot be combined with other workbook operations".to_string(),
+            ));
+        }
+        let existing_index =
+            self.operation_indexes
+                .get(&Selection::SheetRemoval)
+                .and_then(|indexes| {
+                    indexes.iter().rev().copied().find(|index| {
+                        matches!(self.operations[*index], Operation::RemoveSheets { .. })
+                    })
+                });
+        let existing_positions = existing_index.and_then(|index| match &self.operations[index] {
+            Operation::RemoveSheets { positions } => Some(positions.as_ref()),
+            Operation::RenameSheet { .. }
+            | Operation::SetSheetName { .. }
+            | Operation::ReorderSheets { .. }
+            | Operation::InsertSheet { .. }
+            | Operation::SetSheetState { .. }
+            | Operation::TransferCell { .. }
+            | Operation::AddImage { .. }
+            | Operation::TransferDrawing { .. } => None,
+        });
+        let positions_len = existing_positions.map_or(Ok(1usize), |positions| {
+            positions
+                .len()
+                .checked_add(1)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "staged sheet-removal positions",
+                })
+        })?;
+        let mut positions = Vec::new();
+        positions
+            .try_reserve_exact(positions_len)
+            .map_err(|source| Error::Allocation {
+                resource: "staged sheet-removal positions",
+                source,
+            })?;
+        if let Some(existing_positions) = existing_positions {
+            positions.extend_from_slice(existing_positions);
+        }
+        if positions.binary_search(&position).is_ok() {
+            return Ok(Some(false));
+        }
+        positions.push(position);
+        positions.sort_unstable();
+        let positions: Arc<[usize]> = positions.into();
+        let operation = Operation::RemoveSheets { positions };
+        if existing_index.is_none() && self.operations.len() >= self.limits.changes() {
+            return Err(Error::LimitExceeded {
+                resource: "workbook structural operations",
+                actual: self.operations.len().saturating_add(1),
+                maximum: self.limits.changes(),
+            });
+        }
+        let mut operation_bytes = 0usize;
+        for staged in &self.operations {
+            operation_bytes = operation_bytes
+                .checked_add(encoded_operation_length(staged)?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "durable workbook patch operation bytes",
+                })?;
+        }
+        if let Some(index) = existing_index {
+            operation_bytes = operation_bytes
+                .checked_sub(encoded_operation_length(&self.operations[index])?)
+                .ok_or(Error::CapacityOverflow {
+                    resource: "durable workbook patch operation bytes",
+                })?;
+        }
+        operation_bytes = operation_bytes
+            .checked_add(encoded_operation_length(&operation)?)
+            .ok_or(Error::CapacityOverflow {
+                resource: "durable workbook patch operation bytes",
+            })?;
+        let minimum_patch_bytes = MAGIC
+            .len()
+            .checked_add(24)
+            .and_then(|size| size.checked_add(self.before.len()))
+            .and_then(|size| size.checked_add(operation_bytes))
+            .ok_or(Error::CapacityOverflow {
+                resource: "durable workbook patch bytes",
+            })?;
+        if minimum_patch_bytes > self.limits.bytes() {
+            return Err(Error::LimitExceeded {
+                resource: "durable workbook patch bytes",
+                actual: minimum_patch_bytes,
+                maximum: self.limits.bytes(),
+            });
+        }
+        let candidate_len = self
+            .operations
+            .len()
+            .checked_add(usize::from(existing_index.is_none()))
+            .ok_or(Error::CapacityOverflow {
+                resource: "staged workbook structural operations",
+            })?;
+        let mut candidate = Vec::new();
+        candidate
+            .try_reserve_exact(candidate_len)
+            .map_err(|source| Error::Allocation {
+                resource: "staged workbook structural operations",
+                source,
+            })?;
+        candidate.extend(self.operations.iter().cloned());
+        if let Some(index) = existing_index {
+            candidate[index] = operation.clone();
+        } else {
+            candidate.push(operation.clone());
+        }
+        let _validated_candidate = replay_package(&self.base, &self.before, &candidate)?;
+        if let Some(index) = existing_index {
+            self.operations[index] = operation;
+            Ok(Some(true))
+        } else {
+            self.stage(operation)?;
+            Ok(Some(true))
+        }
+    }
+
     /// Plan a workbook-tab visibility change using the complete sheet
     /// catalog.  Positions are zero-based [`litchi_core::Position`] values
     /// wrapped by [`Selector`], so chart, dialog, macro, and unbound tabs are
@@ -696,6 +873,7 @@ impl Edit {
             | Operation::SetSheetName { .. }
             | Operation::ReorderSheets { .. }
             | Operation::InsertSheet { .. }
+            | Operation::RemoveSheets { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
             | Operation::TransferDrawing { .. } => tab.state,
@@ -980,12 +1158,16 @@ impl Edit {
     fn stage(&mut self, operation: Operation) -> Result<()> {
         let is_catalog_topology = matches!(
             operation,
-            Operation::ReorderSheets { .. } | Operation::InsertSheet { .. }
+            Operation::ReorderSheets { .. }
+                | Operation::InsertSheet { .. }
+                | Operation::RemoveSheets { .. }
         );
         if self.operations.iter().any(|existing| {
             matches!(
                 existing,
-                Operation::ReorderSheets { .. } | Operation::InsertSheet { .. }
+                Operation::ReorderSheets { .. }
+                    | Operation::InsertSheet { .. }
+                    | Operation::RemoveSheets { .. }
             ) != is_catalog_topology
         }) {
             return Err(Error::UnsupportedFeature(
@@ -1011,6 +1193,8 @@ impl Edit {
                     // ordinary merge identity rule.
                     !(matches!(self.operations[*index], Operation::InsertSheet { .. })
                         && matches!(operation, Operation::InsertSheet { .. }))
+                        && !(matches!(self.operations[*index], Operation::RemoveSheets { .. })
+                            && matches!(operation, Operation::RemoveSheets { .. }))
                         && self.operations[*index].conflicts_with(&operation)
                 })
             });
@@ -1465,14 +1649,27 @@ impl Patch {
         })
     }
 
-    fn retained_bytes(&self) -> Result<usize> {
-        let mut bytes =
-            self.before
-                .len()
-                .checked_add(self.after.len())
-                .ok_or(Error::CapacityOverflow {
-                    resource: "workbook history bytes",
-                })?;
+    /// Return the checked history byte charge of this patch.
+    ///
+    /// The result includes both canonical package images and the encoded
+    /// semantic operations and durable envelope, with checked arithmetic matching [`History`]'s
+    /// eviction accounting. It does not serialize or reparse the package.
+    ///
+    /// ```
+    /// let package = litchi_xlsb::Package::new()?;
+    /// let commit = package.edit()?.commit()?;
+    /// assert!(commit.patch().retained_bytes()? >= commit.patch().before().len());
+    /// # Ok::<(), litchi_xlsb::package::PackageError>(())
+    /// ```
+    pub fn retained_bytes(&self) -> Result<usize> {
+        let mut bytes = self
+            .before
+            .len()
+            .checked_add(self.after.len())
+            .and_then(|bytes| bytes.checked_add(MAGIC.len() + 24))
+            .ok_or(Error::CapacityOverflow {
+                resource: "workbook history bytes",
+            })?;
         for operation in &self.operations {
             let operation_bytes = match operation {
                 Operation::RenameSheet { name, .. } | Operation::SetSheetName { name, .. } => {
@@ -1486,6 +1683,13 @@ impl Patch {
                     )?)
                 },
                 Operation::InsertSheet { name, .. } => 18usize.checked_add(name.len()),
+                Operation::RemoveSheets { positions } => {
+                    9usize.checked_add(positions.len().checked_mul(size_of::<u64>()).ok_or(
+                        Error::CapacityOverflow {
+                            resource: "workbook history sheet-removal operation bytes",
+                        },
+                    )?)
+                },
                 Operation::SetSheetState { .. } => Some(17),
                 Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
                 Operation::AddImage { image, .. } => {
@@ -1525,7 +1729,7 @@ impl MergeConflict {
             | Selection::SheetState(sheet)
             | Selection::Cell(sheet, _)
             | Selection::Drawing(sheet) => sheet,
-            Selection::SheetOrder => usize::MAX,
+            Selection::SheetOrder | Selection::SheetRemoval => usize::MAX,
         }
     }
 
@@ -1538,6 +1742,7 @@ impl MergeConflict {
             | Selection::SheetInsert(_)
             | Selection::SheetState(_)
             | Selection::SheetOrder
+            | Selection::SheetRemoval
             | Selection::Drawing(_) => None,
             Selection::Cell(_, reference) => Some(reference),
         }
@@ -1731,6 +1936,7 @@ fn canonicalize_legacy_operations(
             operation @ (Operation::SetSheetName { .. }
             | Operation::ReorderSheets { .. }
             | Operation::InsertSheet { .. }
+            | Operation::RemoveSheets { .. }
             | Operation::SetSheetState { .. }
             | Operation::TransferCell { .. }
             | Operation::AddImage { .. }
@@ -1755,10 +1961,16 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
         .iter()
         .filter(|operation| matches!(operation, Operation::InsertSheet { .. }))
         .count();
-    if reorder_count > 0 && insert_count > 0 {
+    let remove_count = operations
+        .iter()
+        .filter(|operation| matches!(operation, Operation::RemoveSheets { .. }))
+        .count();
+    let topology_family_count = usize::from(reorder_count > 0)
+        .saturating_add(usize::from(insert_count > 0))
+        .saturating_add(usize::from(remove_count > 0));
+    if topology_family_count > 1 {
         return Err(Error::UnsupportedFeature(
-            "sheet insertion and sheet reordering cannot be combined in one durable patch"
-                .to_string(),
+            "sheet topology operations cannot be combined in one durable patch".to_string(),
         ));
     }
     if reorder_count == 1
@@ -1777,6 +1989,20 @@ fn validate_reorder_operations(operations: &[Operation]) -> Result<()> {
     {
         return Err(Error::UnsupportedFeature(
             "sheet insertion cannot be combined with other workbook operations".to_string(),
+        ));
+    }
+    if remove_count > 0
+        && operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::RemoveSheets { .. }))
+    {
+        return Err(Error::UnsupportedFeature(
+            "sheet removal cannot be combined with other workbook operations".to_string(),
+        ));
+    }
+    if remove_count > 1 {
+        return Err(Error::UnsupportedFeature(
+            "durable workbook patches may contain at most one sheet-removal operation".to_string(),
         ));
     }
     Ok(())
@@ -1850,6 +2076,10 @@ fn replay_workbook(
                 // Insertion itself does not relocate the active view, but it
                 // still must leave the resulting catalog with a valid visible
                 // tab before publication.
+                state_changed = true;
+            },
+            Operation::RemoveSheets { positions } => {
+                changed |= apply_sheet_removal(&mut workbook, positions)?;
                 state_changed = true;
             },
             Operation::AddImage { sheet, image } => {
@@ -3054,6 +3284,1432 @@ fn rewrite_volatile_dependencies_insert(
     Ok(changed.then_some(output))
 }
 
+/// Apply one source-catalog sheet removal. All physical graph work is done on
+/// a package clone and adopted only after a strict workbook reparse succeeds.
+fn apply_sheet_removal(workbook: &mut Workbook, positions: &[usize]) -> Result<bool> {
+    let catalog_len = workbook.sheets().len();
+    let (remaining, removed) = validate_sheet_removal_positions(positions, catalog_len)?;
+    if removed.iter().all(|value| !*value) {
+        return Ok(false);
+    }
+    reject_unmodeled_reorder_dependencies(&workbook.package)?;
+    reject_shared_workbook_headers(&workbook.package)?;
+    crate::signature_policy::ensure_unsigned(&workbook.package)?;
+
+    let workbook_uri = workbook.package.main_document_part()?.partname().clone();
+    let workbook_source = workbook.package.get_part(&workbook_uri)?.blob().to_vec();
+    let bundle_records =
+        collect_bundle_records(&workbook_source, catalog_len, workbook.leniency())?;
+    let selected_rel_ids = bundle_records
+        .iter()
+        .enumerate()
+        .filter(|(position, _)| removed[*position])
+        .filter_map(|(_, record)| record.rel_id.clone())
+        .collect::<Vec<_>>();
+    let (roots, modeled_parts) =
+        modeled_sheet_removal_parts(&workbook.package, &workbook_uri, &selected_rel_ids)?;
+    reject_unmodeled_binary_sheet_name_dependencies(&workbook.package)?;
+    reject_surviving_binary_sheet_dependencies(
+        &workbook.package,
+        &modeled_parts,
+        &bundle_records,
+        &removed,
+    )?;
+    reject_sheet_xml_dependencies(&workbook.package, &modeled_parts, &bundle_records, &removed)?;
+
+    for (position, tab) in workbook.sheets().enumerate() {
+        if removed[position] {
+            continue;
+        }
+        let Some(ordinal) = tab.worksheet_position() else {
+            continue;
+        };
+        let snapshot = workbook.cell_values(ordinal.get())?;
+        for cell in snapshot.cells() {
+            if let Some(formula) = cell.formula() {
+                let tokens = Parser::with_extra(formula.tokens(), formula.ancillary())
+                    .parse()
+                    .map_err(map_formula_error)?;
+                reject_removed_formula_targets(
+                    tokens,
+                    &removed,
+                    &workbook.formula_context,
+                    Some(position),
+                )?;
+            }
+        }
+    }
+
+    let workbook_output = rewrite_workbook_remove(
+        &workbook_source,
+        positions,
+        &removed,
+        &remaining,
+        catalog_len,
+        &workbook.formula_context,
+        &bundle_records,
+    )?;
+    let tabs = workbook.sheets().collect::<Vec<_>>();
+    let titles = tabs
+        .iter()
+        .map(|tab| tab.name().to_owned())
+        .collect::<Vec<_>>();
+    let title_refs = titles.iter().map(String::as_str).collect::<Vec<_>>();
+    let volatile = crate::volatile_dependencies::reorder_owner(&workbook.package, catalog_len)?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve(workbook.package.part_count().saturating_add(2))
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet-removal package replacements",
+            source,
+        })?;
+    replacements.push((workbook_uri.clone(), workbook_output));
+    for part in workbook.package.iter_parts() {
+        if part
+            .content_type()
+            .eq_ignore_ascii_case(litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES)
+        {
+            if let Some(output) = litchi_ooxml_common::xml::sheet_name::remove_titles(
+                workbook.package.get_part(part.partname())?.blob(),
+                &title_refs,
+                positions,
+                excel_name_eq,
+            )? {
+                replacements.push((part.partname().clone(), output));
+            }
+        }
+        if volatile.as_ref().is_some_and(|uri| uri == part.partname()) {
+            if let Some(output) = rewrite_volatile_dependencies_remove(
+                workbook.package.get_part(part.partname())?.blob(),
+                &removed,
+                &remaining,
+                catalog_len,
+            )? {
+                replacements.push((part.partname().clone(), output));
+            }
+        }
+    }
+    let mut package = workbook.package.clone();
+    package.replace_part_payloads(replacements)?;
+    apply_sheet_removal_view_dependencies(
+        &workbook_source,
+        &mut package,
+        &workbook_uri,
+        &bundle_records,
+        &removed,
+        &tabs,
+    )?;
+    remove_modeled_sheet_parts(
+        &mut package,
+        &workbook_uri,
+        &selected_rel_ids,
+        &roots,
+        &modeled_parts,
+    )?;
+    let validated = workbook.reparse_candidate(package)?;
+    *workbook = validated;
+    Ok(true)
+}
+
+fn validate_sheet_removal_positions(
+    positions: &[usize],
+    catalog_len: usize,
+) -> Result<(Vec<usize>, Vec<bool>)> {
+    if positions.is_empty() {
+        return Err(Error::InvalidFormat(
+            "sheet removal must select at least one catalog position".to_string(),
+        ));
+    }
+    let mut removed = Vec::new();
+    removed
+        .try_reserve_exact(catalog_len)
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet-removal catalog mask",
+            source,
+        })?;
+    removed.resize(catalog_len, false);
+    let mut previous = None;
+    for &position in positions {
+        if position >= catalog_len {
+            return Err(Error::InvalidFormat(format!(
+                "sheet removal position {position} exceeds catalog length {catalog_len}"
+            )));
+        }
+        if previous.is_some_and(|old| position <= old) {
+            return Err(Error::InvalidFormat(
+                "sheet-removal positions must be sorted and unique".to_string(),
+            ));
+        }
+        previous = Some(position);
+        removed[position] = true;
+    }
+    let mut remaining = Vec::new();
+    remaining
+        .try_reserve_exact(catalog_len)
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB remaining sheet positions",
+            source,
+        })?;
+    remaining.resize(catalog_len, usize::MAX);
+    let mut next = 0usize;
+    for (old, is_removed) in removed.iter().copied().enumerate() {
+        if !is_removed {
+            remaining[old] = next;
+            next = next.checked_add(1).ok_or(Error::CapacityOverflow {
+                resource: "XLSB remaining sheet position",
+            })?;
+        }
+    }
+    if next == 0 {
+        return Err(Error::InvalidFormat(
+            "sheet removal must leave at least one catalog tab".to_string(),
+        ));
+    }
+    Ok((remaining, removed))
+}
+
+/// Resolve the physical parts a tab removal is allowed to delete.
+///
+/// A sheet root is a modeled owner.  The only modeled internal child is its
+/// exclusive worksheet binary-index part.  Every other internal outgoing edge
+/// would lose content unless a format-specific cascade or detach operation is
+/// available, so it is refused before any candidate package is mutated.
+fn modeled_sheet_removal_parts(
+    package: &litchi_opc::OpcPackage,
+    workbook_uri: &PackURI,
+    selected_rel_ids: &[String],
+) -> Result<(Vec<PackURI>, HashSet<PackURI>)> {
+    let workbook = package.get_part(workbook_uri)?;
+    let mut roots: Vec<PackURI> = Vec::new();
+    roots
+        .try_reserve_exact(selected_rel_ids.len())
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB sheet-removal relationship roots",
+            source,
+        })?;
+    for rel_id in selected_rel_ids {
+        let relationship = workbook.rels().get(rel_id).ok_or_else(|| {
+            Error::InvalidRelationship(format!(
+                "selected BrtBundleSh relationship {rel_id:?} is absent from the workbook"
+            ))
+        })?;
+        if relationship.target_mode() != litchi_opc::TargetMode::Internal {
+            return Err(Error::InvalidRelationship(
+                "selected XLSB sheet relationship must target an internal part".to_string(),
+            ));
+        }
+        let target = relationship.target_partname()?;
+        let canonical = package
+            .part_metadata(&target)
+            .map(|part| part.partname().clone())
+            .ok_or_else(|| {
+                Error::InvalidRelationship(format!(
+                    "selected XLSB sheet relationship target {target} is absent"
+                ))
+            })?;
+        if !roots.iter().any(|root| root.is_equivalent_to(&canonical)) {
+            roots.push(canonical);
+        }
+    }
+    let mut modeled = HashSet::new();
+    modeled
+        .try_reserve(roots.len())
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB modeled sheet-removal parts",
+            source,
+        })?;
+    for root in &roots {
+        if !modeled.insert(root.clone()) {
+            return Err(Error::InvalidRelationship(
+                "multiple selected workbook tabs resolve to one physical sheet part".to_string(),
+            ));
+        }
+    }
+
+    let mut index_owners: HashSet<PackURI> = HashSet::new();
+    for root in &roots {
+        let part = package.get_part(root)?;
+        let mut index_relationship = None;
+        for relationship in part.rels().iter() {
+            if relationship.reltype() == crate::binary_index::BINARY_INDEX_RELATIONSHIP {
+                if index_relationship.is_some() {
+                    return Err(Error::InvalidRelationship(
+                        "worksheet has multiple binary-index relationships".to_string(),
+                    ));
+                }
+                if relationship.target_mode() != litchi_opc::TargetMode::Internal {
+                    return Err(Error::InvalidRelationship(
+                        "worksheet binary-index relationship cannot be external".to_string(),
+                    ));
+                }
+                index_relationship = Some(relationship);
+            } else if relationship.target_mode() == litchi_opc::TargetMode::Internal {
+                return Err(Error::UnsupportedFeature(format!(
+                    "sheet removal requires a disposition for outgoing internal relationship {} from {}",
+                    relationship.reltype(),
+                    root.as_str()
+                )));
+            }
+        }
+        let Some(relationship) = index_relationship else {
+            continue;
+        };
+        if part.content_type() != WORKSHEET_CONTENT_TYPE {
+            return Err(Error::InvalidRelationship(
+                "binary-index relationship has a non-worksheet owner".to_string(),
+            ));
+        }
+        let target = canonical_sheet_removal_target(package, relationship)?;
+        if target.is_equivalent_to(root) {
+            return Err(Error::InvalidRelationship(
+                "worksheet binary-index relationship targets its worksheet".to_string(),
+            ));
+        }
+        let index = package.get_part(&target)?;
+        if index.content_type() != crate::binary_index::BINARY_INDEX_CONTENT_TYPE {
+            return Err(Error::InvalidContentType {
+                expected: crate::binary_index::BINARY_INDEX_CONTENT_TYPE.to_string(),
+                got: index.content_type().to_string(),
+            });
+        }
+        let canonical = index.partname().clone();
+        if index_owners
+            .iter()
+            .any(|owner| owner.is_equivalent_to(&canonical))
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet removal requires a disposition for a binary-index part shared by selected tabs"
+                    .to_string(),
+            ));
+        }
+        index_owners.insert(canonical.clone());
+        modeled.insert(canonical);
+    }
+
+    // A binary index is an exclusive leaf.  External links may be discarded
+    // with it, but an internal child would require another modeled cascade.
+    for index in &index_owners {
+        let part = package.get_part(index)?;
+        for relationship in part.rels().iter() {
+            if relationship.target_mode() == litchi_opc::TargetMode::Internal {
+                return Err(Error::UnsupportedFeature(format!(
+                    "sheet removal requires a disposition for outgoing internal relationship {} from binary-index part {}",
+                    relationship.reltype(),
+                    index.as_str()
+                )));
+            }
+        }
+    }
+
+    // Validate every incoming edge before publication.  Workbook catalog
+    // edges to selected roots and the matching root-to-index edge are the
+    // only relationships that prove ownership; package-level or surviving
+    // part references would otherwise become dangling.
+    for relationship in package.rels().iter() {
+        if relationship.target_mode() != litchi_opc::TargetMode::Internal {
+            continue;
+        }
+        let target = canonical_sheet_removal_target(package, relationship)?;
+        if modeled.iter().any(|part| part.is_equivalent_to(&target)) {
+            return Err(Error::UnsupportedFeature(
+                "sheet removal requires a disposition for an incoming package relationship to a selected part"
+                    .to_string(),
+            ));
+        }
+    }
+    for source in package.iter_parts() {
+        let source_is_workbook = source.partname().is_equivalent_to(workbook_uri);
+        let source_is_root = roots
+            .iter()
+            .any(|root| root.is_equivalent_to(source.partname()));
+        for relationship in source.rels().iter() {
+            if relationship.target_mode() != litchi_opc::TargetMode::Internal {
+                continue;
+            }
+            let target = canonical_sheet_removal_target(package, relationship)?;
+            let Some(selected_target) = modeled.iter().find(|part| part.is_equivalent_to(&target))
+            else {
+                continue;
+            };
+            let target_is_root = roots
+                .iter()
+                .any(|root| root.is_equivalent_to(selected_target));
+            let target_is_index = index_owners
+                .iter()
+                .any(|index| index.is_equivalent_to(selected_target));
+            let allowed = if target_is_root && source_is_workbook {
+                selected_rel_ids
+                    .iter()
+                    .any(|selected_id| selected_id == relationship.r_id())
+            } else if target_is_index && source_is_root {
+                relationship.reltype() == crate::binary_index::BINARY_INDEX_RELATIONSHIP
+            } else {
+                false
+            };
+            if !allowed {
+                return Err(Error::UnsupportedFeature(format!(
+                    "sheet removal requires a disposition for incoming relationship from {} to a selected part",
+                    source.partname().as_str()
+                )));
+            }
+        }
+    }
+
+    Ok((roots, modeled))
+}
+
+fn reject_unmodeled_binary_sheet_name_dependencies(package: &litchi_opc::OpcPackage) -> Result<()> {
+    const XLSB_PIVOT_CACHE_DEFINITION_CONTENT_TYPE: &str =
+        "application/vnd.ms-excel.pivotCacheDefinition";
+    if package.iter_parts().any(|part| {
+        part.content_type()
+            .eq_ignore_ascii_case(XLSB_PIVOT_CACHE_DEFINITION_CONTENT_TYPE)
+            || part
+                .content_type()
+                .eq_ignore_ascii_case("application/vnd.ms-excel.table")
+    }) {
+        return Err(Error::UnsupportedFeature(
+            "sheet removal requires a disposition for XLSB pivot-cache or table formula dependencies"
+                .to_string(),
+        ));
+    }
+    Ok(())
+}
+
+fn reject_surviving_binary_sheet_dependencies(
+    package: &litchi_opc::OpcPackage,
+    removed_parts: &HashSet<PackURI>,
+    records: &[crate::package::records::BundleSheetRecord],
+    removed: &[bool],
+) -> Result<()> {
+    for part in package.iter_parts() {
+        if !part
+            .content_type()
+            .eq_ignore_ascii_case(WORKSHEET_CONTENT_TYPE)
+            || removed_parts
+                .iter()
+                .any(|removed| removed.is_equivalent_to(part.partname()))
+        {
+            continue;
+        }
+        let source = package.get_part(part.partname())?.blob();
+        for item in Records::new(source) {
+            let record = item?;
+            match record.kind() {
+                kind::FRT_BEGIN | kind::AC_BEGIN | kind::ARR_FMLA | kind::SHR_FMLA => {
+                    return Err(Error::UnsupportedFeature(
+                        "sheet removal requires a disposition for a surviving worksheet extension or formula-group record"
+                            .to_string(),
+                    ));
+                },
+                kind::H_LINK => {
+                    let hyperlink = crate::hyperlinks::Hyperlink::parse(record.payload())?;
+                    if !hyperlink.r_id.is_empty() {
+                        let Some(relationship) = part.rels().get(&hyperlink.r_id) else {
+                            return Err(Error::UnsupportedFeature(
+                                "sheet removal requires a disposition for an unresolved surviving BrtHLink relationship"
+                                    .to_string(),
+                            ));
+                        };
+                        if relationship.target_mode() != litchi_opc::TargetMode::External
+                            || !matches!(
+                                relationship.reltype(),
+                                litchi_opc::constants::relationship_type::HYPERLINK
+                                    | litchi_opc::constants::relationship_type::STRICT_HYPERLINK
+                            )
+                        {
+                            return Err(Error::UnsupportedFeature(
+                                "sheet removal requires a disposition for a non-external surviving BrtHLink relationship"
+                                    .to_string(),
+                            ));
+                        }
+                        continue;
+                    }
+                    let Some(location) = hyperlink.location.as_deref() else {
+                        continue;
+                    };
+                    if internal_hyperlink_targets_removed_sheet(location, records, removed) {
+                        return Err(Error::UnsupportedFeature(
+                            "sheet removal requires a disposition for a surviving BrtHLink internal location"
+                                .to_string(),
+                        ));
+                    }
+                },
+                _ => {},
+            }
+        }
+    }
+    Ok(())
+}
+
+fn internal_hyperlink_targets_removed_sheet(
+    location: &str,
+    records: &[crate::package::records::BundleSheetRecord],
+    removed: &[bool],
+) -> bool {
+    let mut location = location.trim();
+    if let Some(stripped) = location.strip_prefix('#') {
+        location = stripped;
+    }
+    let (sheet, quoted) = if location.starts_with('\'') {
+        let bytes = location.as_bytes();
+        let mut index = 1usize;
+        let mut close = None;
+        while index < bytes.len() {
+            if bytes[index] != b'\'' {
+                index = index.saturating_add(1);
+                continue;
+            }
+            if bytes.get(index.saturating_add(1)) == Some(&b'\'') {
+                index = index.saturating_add(2);
+                continue;
+            }
+            close = Some(index);
+            break;
+        }
+        let Some(close) = close else {
+            return true;
+        };
+        if bytes.get(close.saturating_add(1)) != Some(&b'!') {
+            return true;
+        }
+        (&location[1..close], true)
+    } else {
+        let Some(separator) = location.find('!') else {
+            return true;
+        };
+        (&location[..separator], false)
+    };
+    let mut unquoted = sheet.trim();
+    if unquoted.starts_with('[') {
+        return false;
+    }
+    if quoted && unquoted.contains("''") {
+        let mut decoded = String::with_capacity(unquoted.len());
+        let mut chars = unquoted.chars();
+        while let Some(character) = chars.next() {
+            if character == '\'' && chars.as_str().starts_with('\'') {
+                decoded.push('\'');
+                chars.next();
+            } else {
+                decoded.push(character);
+            }
+        }
+        unquoted = decoded.as_str();
+        return records.iter().enumerate().any(|(position, record)| {
+            removed.get(position).copied().unwrap_or(false) && excel_name_eq(unquoted, &record.name)
+        });
+    }
+    records.iter().enumerate().any(|(position, record)| {
+        removed.get(position).copied().unwrap_or(false) && excel_name_eq(unquoted, &record.name)
+    })
+}
+
+fn canonical_sheet_removal_target(
+    package: &litchi_opc::OpcPackage,
+    relationship: &litchi_opc::Relationship,
+) -> Result<PackURI> {
+    let target = relationship.target_partname()?;
+    package
+        .part_metadata(&target)
+        .map(|part| part.partname().clone())
+        .ok_or_else(|| {
+            Error::InvalidRelationship(format!(
+                "sheet-removal relationship target {target} is absent"
+            ))
+        })
+}
+
+fn remove_modeled_sheet_parts(
+    package: &mut litchi_opc::OpcPackage,
+    workbook_uri: &PackURI,
+    selected_rel_ids: &[String],
+    roots: &[PackURI],
+    modeled: &HashSet<PackURI>,
+) -> Result<()> {
+    let mut to_remove = Vec::new();
+    to_remove
+        .try_reserve_exact(modeled.len())
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB modeled sheet-removal deletion set",
+            source,
+        })?;
+    for part in package.iter_parts() {
+        if modeled
+            .iter()
+            .any(|removed| removed.is_equivalent_to(part.partname()))
+        {
+            to_remove.push(part.partname().clone());
+        }
+    }
+    for part in package.iter_parts() {
+        if to_remove
+            .iter()
+            .any(|partname| partname.is_equivalent_to(part.partname()))
+        {
+            continue;
+        }
+        for relationship in part.rels().iter() {
+            if relationship.target_mode() != litchi_opc::TargetMode::Internal {
+                continue;
+            }
+            let target = relationship.target_partname()?;
+            if !roots.iter().any(|root| target.is_equivalent_to(root)) {
+                continue;
+            }
+            if part.partname().is_equivalent_to(workbook_uri)
+                && selected_rel_ids
+                    .iter()
+                    .any(|selected_id| selected_id == relationship.r_id())
+            {
+                continue;
+            }
+            return Err(Error::InvalidRelationship(
+                "a surviving XLSB package part references a removed sheet part".to_string(),
+            ));
+        }
+    }
+    {
+        let workbook_part = package.get_part_mut(workbook_uri)?;
+        for rel_id in selected_rel_ids {
+            if workbook_part.rels_mut().remove(rel_id).is_none() {
+                return Err(Error::InvalidRelationship(format!(
+                    "selected workbook relationship {rel_id:?} disappeared before removal"
+                )));
+            }
+        }
+    }
+    for partname in to_remove {
+        package.remove_part(&partname);
+    }
+    Ok(())
+}
+
+fn reject_sheet_xml_dependencies(
+    package: &litchi_opc::OpcPackage,
+    removed_parts: &HashSet<PackURI>,
+    records: &[crate::package::records::BundleSheetRecord],
+    removed: &[bool],
+) -> Result<()> {
+    let mut replacement_name = "__litchi_removed_sheet__".to_string();
+    let mut suffix = 0usize;
+    while records
+        .iter()
+        .any(|record| excel_name_eq(&record.name, &replacement_name))
+    {
+        suffix = suffix.checked_add(1).ok_or(Error::CapacityOverflow {
+            resource: "sheet-removal XML guard name",
+        })?;
+        replacement_name = format!("__litchi_removed_sheet_{suffix}__");
+    }
+    let mut renames = Vec::new();
+    for (position, record) in records.iter().enumerate() {
+        if removed[position] {
+            renames.push(litchi_ooxml_common::xml::sheet_name::Rename {
+                before: record.name.as_str(),
+                after: replacement_name.as_str(),
+            });
+        }
+    }
+    if renames.is_empty() {
+        return Ok(());
+    }
+    for part in package.iter_parts() {
+        if removed_parts
+            .iter()
+            .any(|removed| removed.is_equivalent_to(part.partname()))
+            || part
+                .content_type()
+                .eq_ignore_ascii_case(litchi_opc::constants::content_type::OFC_EXTENDED_PROPERTIES)
+            || part
+                .content_type()
+                .eq_ignore_ascii_case(litchi_opc::constants::content_type::SML_EXTERNAL_LINK)
+            || part
+                .content_type()
+                .eq_ignore_ascii_case("application/vnd.ms-excel.externalLink")
+        {
+            continue;
+        }
+        let content_type = part.content_type().to_ascii_lowercase();
+        let part_name = part.partname().as_str().to_ascii_lowercase();
+        if !(content_type.contains("xml") || part_name.ends_with(".vml")) {
+            continue;
+        }
+        if litchi_ooxml_common::xml::sheet_name::rewrite(
+            package.get_part(part.partname())?.blob(),
+            &renames,
+            &[],
+            excel_name_eq,
+        )?
+        .is_some()
+        {
+            return Err(Error::UnsupportedFeature(
+                "sheet removal is unsupported while a surviving XML/VML part references a removed sheet"
+                    .to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn rewrite_workbook_remove(
+    source: &[u8],
+    positions: &[usize],
+    removed: &[bool],
+    remaining: &[usize],
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+    bundle_records: &[crate::package::records::BundleSheetRecord],
+) -> Result<Vec<u8>> {
+    let mut bundle_count = 0usize;
+    let mut bundle_open = false;
+    let mut saw_collection = false;
+    let mut closed = false;
+    for item in Records::new(source) {
+        let record = item?;
+        match record.kind() {
+            kind::BEGIN_BUNDLE_SHS => {
+                if bundle_open || saw_collection || !record.payload().is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "Workbook has duplicate or malformed BrtBundleShs collections".to_string(),
+                    ));
+                }
+                bundle_open = true;
+                saw_collection = true;
+            },
+            kind::BUNDLE_SH if bundle_open => {
+                bundle_count = bundle_count.checked_add(1).ok_or(Error::CapacityOverflow {
+                    resource: "XLSB removed catalog records",
+                })?;
+            },
+            kind::BUNDLE_SH => {
+                return Err(Error::InvalidFormat(
+                    "BrtBundleSh appears outside its BrtBeginBundleShs collection".to_string(),
+                ));
+            },
+            kind::END_BUNDLE_SHS => {
+                if !bundle_open || !record.payload().is_empty() {
+                    return Err(Error::InvalidFormat(
+                        "Workbook has an unbalanced BrtEndBundleShs collection".to_string(),
+                    ));
+                }
+                bundle_open = false;
+                closed = true;
+            },
+            _ if bundle_open => {
+                return Err(Error::UnsupportedFeature(
+                    "sheet removal cannot detach an unknown record interspersed with BrtBundleSh records"
+                        .to_string(),
+                ));
+            },
+            kind::BEGIN_BOOK
+            | kind::END_BOOK
+            | kind::FILE_VERSION
+            | kind::WORKBOOK_PROP
+            | kind::BEGIN_BOOK_VIEWS
+            | kind::END_BOOK_VIEWS
+            | kind::BOOK_VIEW
+            | kind::BEGIN_PIVOT_CACHE_IDS
+            | kind::END_PIVOT_CACHE_IDS
+            | kind::BEGIN_PIVOT_CACHE_ID
+            | kind::END_PIVOT_CACHE_ID
+            | kind::BEGIN_EXTERNALS
+            | kind::END_EXTERNALS
+            | kind::SUP_SELF
+            | kind::SUP_SAME
+            | kind::SUP_ADDIN
+            | kind::SUP_BOOK_SRC
+            | kind::EXTERN_SHEET
+            | kind::NAME
+            | kind::CALC_PROP => {},
+            other => {
+                return Err(Error::UnsupportedFeature(format!(
+                    "sheet removal cannot preserve unmodeled workbook record {other:?} at offset {} without a catalog dependency contract",
+                    record.offset()
+                )));
+            },
+        }
+    }
+    if bundle_open || !closed || !saw_collection || bundle_count != catalog_len {
+        return Err(Error::InvalidFormat(format!(
+            "Workbook BrtBundleSh count {bundle_count} differs from catalog size {catalog_len}",
+        )));
+    }
+    if bundle_records.len() != catalog_len
+        || positions.iter().any(|position| *position >= catalog_len)
+    {
+        return Err(Error::InvalidFormat(
+            "sheet-removal catalog metadata is inconsistent".to_string(),
+        ));
+    }
+    removal_book_view_transitions(source, removed, bundle_records)?;
+    let mut output = Vec::new();
+    output
+        .try_reserve_exact(source.len())
+        .map_err(|source| Error::Allocation {
+            resource: "XLSB removed workbook bytes",
+            source,
+        })?;
+    let mut bundle_index = 0usize;
+    let mut open = false;
+    for item in Records::new(source) {
+        let record = item?;
+        let raw = record_bytes(source, &record)?;
+        match record.kind() {
+            kind::BEGIN_BUNDLE_SHS => {
+                open = true;
+                output.extend_from_slice(raw);
+            },
+            kind::BUNDLE_SH if open => {
+                let position = bundle_index;
+                bundle_index = bundle_index.checked_add(1).ok_or(Error::CapacityOverflow {
+                    resource: "XLSB removal catalog ordinal",
+                })?;
+                if !removed[position] {
+                    output.extend_from_slice(raw);
+                }
+            },
+            kind::END_BUNDLE_SHS => {
+                open = false;
+                output.extend_from_slice(raw);
+            },
+            _ => {
+                let rewritten = rewrite_workbook_record_remove(
+                    raw,
+                    removed,
+                    remaining,
+                    catalog_len,
+                    context,
+                    bundle_records,
+                )?;
+                output.extend_from_slice(&rewritten);
+            },
+        }
+    }
+    Ok(output)
+}
+
+fn rewrite_workbook_record_remove(
+    raw: &[u8],
+    removed: &[bool],
+    remaining: &[usize],
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+    bundle_records: &[crate::package::records::BundleSheetRecord],
+) -> Result<Vec<u8>> {
+    let (header, header_len) = Header::parse(raw, RawLimits::DEFAULT)?;
+    let payload = raw.get(header_len..).ok_or(Error::InvalidLength {
+        expected: header_len,
+        found: raw.len(),
+    })?;
+    let payload = payload.get(..header.len()).ok_or(Error::InvalidLength {
+        expected: header_len.saturating_add(header.len()),
+        found: raw.len(),
+    })?;
+    let mut output = raw.to_vec();
+    match header.kind() {
+        kind::BOOK_VIEW => {
+            if payload.len() != 29 {
+                return Err(Error::InvalidLength {
+                    expected: 29,
+                    found: payload.len(),
+                });
+            }
+            for field_offset in [20usize, 24usize] {
+                let old = usize::try_from(u32::from_le_bytes(
+                    payload[field_offset..field_offset + 4]
+                        .try_into()
+                        .map_err(|_error| Error::InvalidLength {
+                            expected: field_offset.saturating_add(4),
+                            found: payload.len(),
+                        })?,
+                ))
+                .map_err(|_error| {
+                    Error::InvalidFormula("BrtBookView index overflow".to_string())
+                })?;
+                if old >= catalog_len || old >= removed.len() {
+                    return Err(Error::InvalidFormat(
+                        "BrtBookView points outside the sheet catalog".to_string(),
+                    ));
+                }
+                let new = if removed[old] {
+                    let fallback = fallback_visible_position(old, removed, bundle_records)?;
+                    remaining[fallback]
+                } else {
+                    *remaining.get(old).ok_or_else(|| {
+                        Error::InvalidFormat("BrtBookView index is unmapped".to_string())
+                    })?
+                };
+                output[header_len + field_offset..header_len + field_offset + 4].copy_from_slice(
+                    &u32::try_from(new)
+                        .map_err(|_error| Error::CapacityOverflow {
+                            resource: "removed workbook view index",
+                        })?
+                        .to_le_bytes(),
+                );
+            }
+        },
+        kind::NAME => {
+            reject_name_formula_dependencies(payload, removed, context)?;
+            if payload.len() < 9 {
+                return Err(Error::InvalidLength {
+                    expected: 9,
+                    found: payload.len(),
+                });
+            }
+            let old = u32::from_le_bytes(payload[5..9].try_into().map_err(|_error| {
+                Error::InvalidLength {
+                    expected: 9,
+                    found: payload.len(),
+                }
+            })?);
+            if old != u32::MAX {
+                let old = usize::try_from(old).map_err(|_error| {
+                    Error::InvalidFormula("BrtName sheet scope does not fit usize".to_string())
+                })?;
+                if old >= catalog_len {
+                    return Err(Error::InvalidFormula(
+                        "BrtName sheet scope exceeds the sheet catalog".to_string(),
+                    ));
+                }
+                if removed[old] {
+                    return Err(Error::UnsupportedFeature(
+                        "sheet removal cannot safely delete a sheet-scoped BrtName".to_string(),
+                    ));
+                }
+                output[header_len + 5..header_len + 9].copy_from_slice(
+                    &u32::try_from(remaining[old])
+                        .map_err(|_error| Error::CapacityOverflow {
+                            resource: "removed BrtName sheet scope",
+                        })?
+                        .to_le_bytes(),
+                );
+            }
+        },
+        kind::EXTERN_SHEET => {
+            let rewritten = rewrite_extern_sheet_payload_remove(
+                payload,
+                removed,
+                remaining,
+                catalog_len,
+                context,
+            )?;
+            if rewritten != payload {
+                output = replace_record_payload(&output, header_len, header.len(), &rewritten)?;
+            }
+        },
+        _ => {},
+    }
+    Ok(output)
+}
+
+fn reject_name_formula_dependencies(
+    payload: &[u8],
+    removed: &[bool],
+    context: &crate::package::formula::Context,
+) -> Result<()> {
+    let definition = crate::named_ranges::parse(payload).map_err(map_named_range_error)?;
+    let Some(formula) = definition.formula.as_deref() else {
+        return Ok(());
+    };
+    let scope = definition
+        .sheet_id
+        .map(|sheet| {
+            usize::try_from(sheet).map_err(|_error| {
+                Error::InvalidFormula("defined-name sheet scope does not fit usize".to_string())
+            })
+        })
+        .transpose()?;
+    let tokens = Parser::new(formula).parse().map_err(map_formula_error)?;
+    reject_removed_formula_targets(tokens, removed, context, scope)
+}
+
+fn reject_removed_formula_targets(
+    tokens: Vec<Token>,
+    removed: &[bool],
+    context: &crate::package::formula::Context,
+    scope: Option<usize>,
+) -> Result<()> {
+    for token in tokens {
+        let xti = match token {
+            Token::CellRef3d { sheet_index, .. }
+            | Token::AreaRef3d { sheet_index, .. }
+            | Token::ExternalName { sheet_index, .. } => Some(sheet_index),
+            Token::TableReference(reference) if !reference.invalid => Some(reference.sheet_index),
+            Token::Unknown(kind) => {
+                return Err(Error::UnsupportedFeature(format!(
+                    "sheet removal requires a disposition for unknown formula token 0x{kind:02X}"
+                )));
+            },
+            Token::Number(_)
+            | Token::String(_)
+            | Token::Bool(_)
+            | Token::Error(_)
+            | Token::Int(_)
+            | Token::MissingArg
+            | Token::Parenthesis
+            | Token::Attribute(_)
+            | Token::Array { .. }
+            | Token::Memory { .. }
+            | Token::CellRef { .. }
+            | Token::AreaRef { .. }
+            | Token::ReferenceError { .. }
+            | Token::BinaryOp(_)
+            | Token::UnaryOp(_)
+            | Token::Function { .. }
+            | Token::Name(_)
+            | Token::TableReference(_)
+            | Token::PivotName(_) => None,
+        };
+        let Some(xti) = xti else {
+            continue;
+        };
+        if name_formula_xti_removed(context, xti, removed, scope)? {
+            return Err(Error::UnsupportedFeature(
+                "sheet removal requires a disposition for a formula referencing a removed tab"
+                    .to_string(),
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn name_formula_xti_removed(
+    context: &crate::package::formula::Context,
+    index: u16,
+    removed: &[bool],
+    scope: Option<usize>,
+) -> Result<bool> {
+    let xti = context
+        .external_sheets
+        .get(usize::from(index))
+        .ok_or_else(|| {
+            Error::InvalidFormula(format!("defined-name XTI index {index} is absent"))
+        })?;
+    let link = context
+        .supporting_links
+        .get(usize::try_from(xti.external_link).map_err(|_error| {
+            Error::InvalidFormula("defined-name external-link index overflow".to_string())
+        })?)
+        .ok_or_else(|| {
+            Error::InvalidFormula(format!(
+                "defined-name XTI index {index} has no supporting link {}",
+                xti.external_link
+            ))
+        })?;
+    match link {
+        crate::package::formula::SupportingLink::SelfWorkbook => {
+            if (xti.first_sheet, xti.last_sheet) == (-1, -1) {
+                return Ok(false);
+            }
+            if xti.first_sheet < 0 || xti.last_sheet < xti.first_sheet {
+                return Err(Error::InvalidFormula(format!(
+                    "defined-name XTI index {index} has invalid internal sheet range {}..={}",
+                    xti.first_sheet, xti.last_sheet
+                )));
+            }
+            let first = usize::try_from(xti.first_sheet).map_err(|_error| {
+                Error::InvalidFormula("defined-name XTI first sheet overflow".to_string())
+            })?;
+            let last = usize::try_from(xti.last_sheet).map_err(|_error| {
+                Error::InvalidFormula("defined-name XTI last sheet overflow".to_string())
+            })?;
+            if last >= removed.len() {
+                return Err(Error::InvalidFormula(format!(
+                    "defined-name XTI last sheet {last} exceeds the worksheet catalog"
+                )));
+            }
+            Ok((first..=last).all(|sheet| removed[sheet]))
+        },
+        crate::package::formula::SupportingLink::SameSheet => {
+            if (xti.first_sheet, xti.last_sheet) != (-2, -2) {
+                return Err(Error::InvalidFormula(format!(
+                    "defined-name same-sheet XTI index {index} has invalid endpoints"
+                )));
+            }
+            let Some(scope) = scope else {
+                return Err(Error::UnsupportedFeature(
+                    "sheet removal requires a disposition for a workbook-scoped same-sheet defined-name formula"
+                        .to_string(),
+                ));
+            };
+            Ok(removed.get(scope).copied().unwrap_or(false))
+        },
+        crate::package::formula::SupportingLink::ExternalWorkbook(_)
+        | crate::package::formula::SupportingLink::AddIn => Ok(false),
+    }
+}
+
+fn map_named_range_error(error: crate::named_ranges::Error) -> Error {
+    match error {
+        crate::named_ranges::Error::Wire(error) => Error::Wire(error),
+        crate::named_ranges::Error::Formula(error) => map_formula_error(error),
+        crate::named_ranges::Error::InvalidLength { expected, found } => {
+            Error::InvalidLength { expected, found }
+        },
+        crate::named_ranges::Error::InvalidFormula(message) => Error::InvalidFormula(message),
+    }
+}
+
+fn map_formula_error(error: crate::formula::Error) -> Error {
+    match error {
+        crate::formula::Error::InvalidFormula(message) => Error::InvalidFormula(message),
+        crate::formula::Error::InvalidCellReference(message) => {
+            Error::InvalidCellReference(message)
+        },
+        crate::formula::Error::InvalidLength { expected, found } => {
+            Error::InvalidLength { expected, found }
+        },
+        crate::formula::Error::UnsupportedFeature(feature) => Error::UnsupportedFeature(feature),
+        crate::formula::Error::UnresolvedDependency(dependency) => {
+            Error::UnresolvedDependency(dependency)
+        },
+        crate::formula::Error::Encoding(message) => Error::Encoding(message),
+    }
+}
+
+fn fallback_visible_position(
+    old: usize,
+    removed: &[bool],
+    records: &[crate::package::records::BundleSheetRecord],
+) -> Result<usize> {
+    for position in old.saturating_add(1)..removed.len() {
+        if !removed[position] && records[position].state == 0 {
+            return Ok(position);
+        }
+    }
+    for position in (0..old).rev() {
+        if !removed[position] && records[position].state == 0 {
+            return Ok(position);
+        }
+    }
+    Err(Error::InvalidFormat(
+        "sheet removal leaves no visible tab for BrtBookView".to_string(),
+    ))
+}
+
+fn removal_book_view_transitions(
+    source: &[u8],
+    removed: &[bool],
+    records: &[crate::package::records::BundleSheetRecord],
+) -> Result<Vec<(usize, usize)>> {
+    let mut transitions = Vec::new();
+    let mut book_view_count = 0usize;
+    for item in Records::new(source) {
+        let record = item?;
+        if record.kind() != kind::BOOK_VIEW {
+            continue;
+        }
+        book_view_count = book_view_count.saturating_add(1);
+        let payload = record.payload();
+        if payload.len() != 29 {
+            return Err(Error::InvalidLength {
+                expected: 29,
+                found: payload.len(),
+            });
+        }
+        let old = usize::try_from(u32::from_le_bytes(payload[24..28].try_into().map_err(
+            |_error| Error::InvalidLength {
+                expected: 28,
+                found: payload.len(),
+            },
+        )?))
+        .map_err(|_error| Error::InvalidFormula("BrtBookView index overflow".to_string()))?;
+        if old >= removed.len() {
+            return Err(Error::InvalidFormat(
+                "BrtBookView points outside the sheet catalog".to_string(),
+            ));
+        }
+        if removed[old] {
+            let next = fallback_visible_position(old, removed, records)?;
+            transitions.push((old, next));
+        }
+    }
+    if book_view_count > 1 && !transitions.is_empty() {
+        return Err(Error::UnsupportedFeature(
+            "multiple BrtBookView active tabs cannot be relocated during sheet removal".to_string(),
+        ));
+    }
+    Ok(transitions)
+}
+
+fn apply_sheet_removal_view_dependencies(
+    source: &[u8],
+    package: &mut litchi_opc::OpcPackage,
+    workbook_uri: &PackURI,
+    records: &[crate::package::records::BundleSheetRecord],
+    removed: &[bool],
+    tabs: &[crate::sheet::Tab<'_>],
+) -> Result<()> {
+    let transitions = removal_book_view_transitions(source, removed, records)?;
+    let target = if let Some((_, target)) = transitions.first().copied() {
+        target
+    } else {
+        let mut book_view_count = 0usize;
+        for item in Records::new(source) {
+            if item?.kind() == kind::BOOK_VIEW {
+                book_view_count = book_view_count.saturating_add(1);
+            }
+        }
+        if book_view_count != 0 {
+            return Ok(());
+        }
+        let default_source = 0usize;
+        if removed.get(default_source).copied().unwrap_or(false) {
+            let fallback = fallback_visible_position(default_source, removed, records)?;
+            let first_survivor =
+                removed
+                    .iter()
+                    .position(|selected| !*selected)
+                    .ok_or_else(|| {
+                        Error::InvalidFormat(
+                            "sheet removal leaves no surviving catalog tab".to_string(),
+                        )
+                    })?;
+            if fallback != first_survivor {
+                return Err(Error::UnsupportedFeature(
+                    "sheet removal cannot preserve a hidden default tab without an authored BrtBookView"
+                        .to_string(),
+                ));
+            }
+            fallback
+        } else {
+            if records
+                .get(default_source)
+                .is_none_or(|record| record.state != 0)
+            {
+                return Err(Error::UnsupportedFeature(
+                    "sheet removal cannot preserve a hidden default tab without an authored BrtBookView"
+                        .to_string(),
+                ));
+            }
+            default_source
+        }
+    };
+    let tab = tabs.get(target).ok_or_else(|| {
+        Error::InvalidFormat("BrtBookView fallback exceeds the sheet catalog".to_string())
+    })?;
+    if !matches!(tab.kind(), Kind::Worksheet | Kind::Chart) {
+        return Err(Error::UnsupportedFeature(
+            "sheet removal cannot update selected flags for the fallback tab kind".to_string(),
+        ));
+    }
+    let Some(rel_id) = records[target].rel_id.as_deref() else {
+        return Err(Error::UnsupportedFeature(
+            "sheet removal cannot update selected flags for an unbound fallback tab".to_string(),
+        ));
+    };
+    let target_uri = {
+        let workbook_part = package.get_part(workbook_uri)?;
+        let relationship = workbook_part.rels().get(rel_id).ok_or_else(|| {
+            Error::InvalidRelationship(format!("sheet relationship {rel_id:?} is missing"))
+        })?;
+        if relationship.target_mode() != litchi_opc::TargetMode::Internal {
+            return Err(Error::InvalidRelationship(
+                "sheet relationship for a fallback tab is external".to_string(),
+            ));
+        }
+        let target = relationship.target_partname()?;
+        package
+            .part_metadata(&target)
+            .map(|part| part.partname().clone())
+            .ok_or_else(|| {
+                Error::InvalidRelationship(format!(
+                    "fallback sheet relationship target {target} is absent"
+                ))
+            })?
+    };
+    let source_blob = package.get_part(&target_uri)?.blob();
+    if let Some(output) = rewrite_sheet_view_flags(source_blob, tab.kind(), true)? {
+        package.replace_part_payloads(vec![(target_uri, output)])?;
+    }
+    Ok(())
+}
+
+fn rewrite_extern_sheet_payload_remove(
+    payload: &[u8],
+    removed: &[bool],
+    remaining: &[usize],
+    catalog_len: usize,
+    context: &crate::package::formula::Context,
+) -> Result<Vec<u8>> {
+    if payload.len() < 4 {
+        return Err(Error::InvalidLength {
+            expected: 4,
+            found: payload.len(),
+        });
+    }
+    let count = usize::try_from(u32::from_le_bytes(payload[..4].try_into().map_err(
+        |_error| Error::InvalidLength {
+            expected: 4,
+            found: payload.len(),
+        },
+    )?))
+    .map_err(|_error| Error::InvalidFormula("BrtExternSheet count overflow".to_string()))?;
+    let expected = 4usize
+        .checked_add(count.checked_mul(12).ok_or(Error::CapacityOverflow {
+            resource: "BrtExternSheet payload size",
+        })?)
+        .ok_or(Error::CapacityOverflow {
+            resource: "BrtExternSheet payload size",
+        })?;
+    if payload.len() != expected {
+        return Err(Error::InvalidLength {
+            expected,
+            found: payload.len(),
+        });
+    }
+    let mut output = payload.to_vec();
+    for entry in 0..count {
+        let offset = 4 + entry * 12;
+        let external_link =
+            u32::from_le_bytes(payload[offset..offset + 4].try_into().map_err(|_error| {
+                Error::InvalidLength {
+                    expected: offset + 4,
+                    found: payload.len(),
+                }
+            })?);
+        let first = i32::from_le_bytes(payload[offset + 4..offset + 8].try_into().map_err(
+            |_error| Error::InvalidLength {
+                expected: offset + 8,
+                found: payload.len(),
+            },
+        )?);
+        let last = i32::from_le_bytes(payload[offset + 8..offset + 12].try_into().map_err(
+            |_error| Error::InvalidLength {
+                expected: offset + 12,
+                found: payload.len(),
+            },
+        )?);
+        let link = context
+            .supporting_links
+            .get(usize::try_from(external_link).map_err(|_error| {
+                Error::InvalidFormula("BrtExternSheet supporting-link index overflow".to_string())
+            })?)
+            .ok_or_else(|| {
+                Error::InvalidFormula(
+                    "BrtExternSheet supporting-link index is unresolved".to_string(),
+                )
+            })?;
+        if matches!(link, crate::package::formula::SupportingLink::SameSheet)
+            && (first, last) != (-2, -2)
+        {
+            return Err(Error::InvalidFormula(
+                "same-sheet BrtExternSheet has invalid endpoints".to_string(),
+            ));
+        }
+        if !matches!(link, crate::package::formula::SupportingLink::SelfWorkbook) {
+            continue;
+        }
+        if (first, last) == (-2, -2) || (first, last) == (-1, -1) {
+            continue;
+        }
+        if first < 0 || last < first {
+            return Err(Error::InvalidFormula(
+                "internal BrtExternSheet range has invalid endpoints".to_string(),
+            ));
+        }
+        let first = usize::try_from(first).map_err(|_error| {
+            Error::InvalidFormula("internal BrtExternSheet first endpoint overflow".to_string())
+        })?;
+        let last = usize::try_from(last).map_err(|_error| {
+            Error::InvalidFormula("internal BrtExternSheet last endpoint overflow".to_string())
+        })?;
+        if last >= catalog_len || last >= removed.len() {
+            return Err(Error::InvalidFormula(
+                "internal BrtExternSheet range exceeds the sheet catalog".to_string(),
+            ));
+        }
+        let first_remaining = (first..=last).find(|position| !removed[*position]);
+        let Some(first_remaining) = first_remaining else {
+            output[offset + 4..offset + 8].copy_from_slice(&(-1_i32).to_le_bytes());
+            output[offset + 8..offset + 12].copy_from_slice(&(-1_i32).to_le_bytes());
+            continue;
+        };
+        let last_remaining = (first..=last)
+            .rev()
+            .find(|position| !removed[*position])
+            .ok_or_else(|| {
+                Error::InvalidFormula("internal XTI range has no endpoint".to_string())
+            })?;
+        let new_first = remaining[first_remaining];
+        let new_last = remaining[last_remaining];
+        output[offset + 4..offset + 8].copy_from_slice(
+            &i32::try_from(new_first)
+                .map_err(|_error| Error::CapacityOverflow {
+                    resource: "removed BrtExternSheet first endpoint",
+                })?
+                .to_le_bytes(),
+        );
+        output[offset + 8..offset + 12].copy_from_slice(
+            &i32::try_from(new_last)
+                .map_err(|_error| Error::CapacityOverflow {
+                    resource: "removed BrtExternSheet last endpoint",
+                })?
+                .to_le_bytes(),
+        );
+    }
+    Ok(output)
+}
+
+fn rewrite_volatile_dependencies_remove(
+    source: &[u8],
+    removed: &[bool],
+    remaining: &[usize],
+    catalog_len: usize,
+) -> Result<Option<Vec<u8>>> {
+    let mut output = source.to_vec();
+    let mut changed = false;
+    for item in Records::new(source) {
+        let record = item?;
+        if record.kind() != kind::VOL_REF {
+            continue;
+        }
+        if record.payload().len() != 12 {
+            return Err(Error::InvalidLength {
+                expected: 12,
+                found: record.payload().len(),
+            });
+        }
+        let old = usize::try_from(u32::from_le_bytes(
+            record.payload()[8..12]
+                .try_into()
+                .map_err(|_error| Error::InvalidLength {
+                    expected: 12,
+                    found: record.payload().len(),
+                })?,
+        ))
+        .map_err(|_error| Error::InvalidFormula("BrtVolRef sheet index overflow".to_string()))?;
+        if old >= catalog_len || old >= removed.len() {
+            return Err(Error::InvalidFormat(
+                "BrtVolRef sheet index exceeds the sheet catalog".to_string(),
+            ));
+        }
+        if removed[old] {
+            return Err(Error::UnsupportedFeature(
+                "sheet removal cannot safely delete a volatile dependency reference".to_string(),
+            ));
+        }
+        let new = remaining[old];
+        let (_, header_len) = Header::parse(
+            source.get(record.offset()..).ok_or_else(|| {
+                Error::InvalidFormat("BrtVolRef offset is outside its part".to_string())
+            })?,
+            RawLimits::DEFAULT,
+        )?;
+        output[record.offset() + header_len + 8..record.offset() + header_len + 12]
+            .copy_from_slice(
+                &u32::try_from(new)
+                    .map_err(|_error| Error::CapacityOverflow {
+                        resource: "removed BrtVolRef sheet index",
+                    })?
+                    .to_le_bytes(),
+            );
+        changed |= new != old;
+    }
+    Ok(changed.then_some(output))
+}
+
 /// Apply one complete-catalog permutation to the workbook and every modeled
 /// sheet-index dependency.  The package is edited through a replacement
 /// batch, so a refusal from any dependency leaves the source image untouched.
@@ -3776,6 +5432,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
             Operation::TransferCell { .. }
             | Operation::ReorderSheets { .. }
             | Operation::InsertSheet { .. }
+            | Operation::RemoveSheets { .. }
             | Operation::AddImage { .. }
             | Operation::TransferDrawing { .. } => {
                 return Err(Error::InvalidFormat(
@@ -4601,6 +6258,13 @@ fn encoded_operation_length(operation: &Operation) -> Result<usize> {
             )?)
         },
         Operation::InsertSheet { name, .. } => 18usize.checked_add(name.len()),
+        Operation::RemoveSheets { positions } => {
+            9usize.checked_add(positions.len().checked_mul(size_of::<u64>()).ok_or(
+                Error::CapacityOverflow {
+                    resource: "durable workbook patch sheet-removal bytes",
+                },
+            )?)
+        },
         Operation::SetSheetState { .. } => Some(10),
         Operation::TransferCell { source, .. } => 41usize.checked_add(source.len()),
         Operation::AddImage { image, .. } => 74usize
@@ -4654,6 +6318,13 @@ fn encode_operation(operation: &Operation, output: &mut Vec<u8>) -> Result<()> {
             output.push(state_to_wire(*state));
             push_usize(output, name.len())?;
             output.extend_from_slice(name.as_bytes());
+        },
+        Operation::RemoveSheets { positions } => {
+            output.push(10);
+            push_usize(output, positions.len())?;
+            for position in positions.iter().copied() {
+                push_usize(output, position)?;
+            }
         },
         Operation::SetSheetState {
             catalog_position,
@@ -4799,6 +6470,40 @@ fn decode_operation(data: &[u8], offset: &mut usize) -> Result<Operation> {
                 catalog_position,
                 name,
                 state,
+            })
+        },
+        10 => {
+            let count = read_next_usize(data, offset)?;
+            let available = data
+                .len()
+                .checked_sub(*offset)
+                .ok_or(Error::InvalidLength {
+                    expected: *offset,
+                    found: data.len(),
+                })?;
+            let required = count
+                .checked_mul(size_of::<u64>())
+                .ok_or(Error::CapacityOverflow {
+                    resource: "workbook patch sheet removal",
+                })?;
+            if required > available {
+                return Err(Error::InvalidLength {
+                    expected: offset.saturating_add(required),
+                    found: data.len(),
+                });
+            }
+            let mut positions = Vec::new();
+            positions
+                .try_reserve_exact(count)
+                .map_err(|source| Error::Allocation {
+                    resource: "workbook patch sheet removal",
+                    source,
+                })?;
+            for _ in 0..count {
+                positions.push(read_next_usize(data, offset)?);
+            }
+            Ok(Operation::RemoveSheets {
+                positions: positions.into(),
             })
         },
         5 => {
