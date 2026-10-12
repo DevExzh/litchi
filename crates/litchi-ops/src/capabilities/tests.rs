@@ -353,9 +353,10 @@ fn formats_without_a_variant_point_at_m6() {
 
 #[cfg(feature = "rtf")]
 #[test]
-fn rtf_advertises_native_paragraph_add_and_keeps_its_closure_gap() {
+fn rtf_advertises_native_paragraph_structural_writes_and_keeps_closure_gaps() {
     let capabilities = Capabilities::of(FileFormat::Rtf);
     assert!(capabilities.verb(Verb::Add).is_supported());
+    assert!(capabilities.verb(Verb::Swap).is_supported());
 
     let body = capabilities.element("body").expect("RTF body");
     assert!(body.operations().add);
@@ -375,6 +376,15 @@ fn rtf_advertises_native_paragraph_add_and_keeps_its_closure_gap() {
             }
     });
     assert!(add_gap.is_some(), "missing RTF paragraph add closure gap");
+    let swap_gap = capabilities.gaps().find(|gap| {
+        gap.subject()
+            == crate::node::spec::Subject::Operation {
+                verb: "swap",
+                element: "body",
+                context: "native-source-closure",
+            }
+    });
+    assert!(swap_gap.is_some(), "missing RTF paragraph swap closure gap");
     assert!(!capabilities.gaps().any(|gap| {
         gap.subject()
             == crate::node::spec::Subject::Operation {

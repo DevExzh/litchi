@@ -218,6 +218,8 @@ impl File {
     /// Legacy PPT supports slide swaps on retained native owners.
     /// XLSB supports complete-catalog tab ordering, including chart tabs, in
     /// retained source and eager owners.
+    /// RTF supports ordinary main-story paragraph swaps through its native
+    /// lifecycle editor.
     ///
     /// Both paths resolve against this snapshot. The returned handle owns the
     /// complete change; a failure leaves the original unchanged.
@@ -255,6 +257,10 @@ impl File {
             Self::Pptx(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Pptx(commit.into_file())),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Rtf(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]

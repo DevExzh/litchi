@@ -792,7 +792,13 @@ impl Capabilities {
             #[cfg(feature = "rtf")]
             if matches!(
                 verb,
-                Verb::Set | Verb::Add | Verb::Remove | Verb::Move | Verb::Edit | Verb::Batch
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
             ) && self.adapter() == Some(Adapter::Rtf)
             {
                 return Support::Supported;
@@ -1233,9 +1239,9 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 ];
 
 /// RTF's write adapter admits main-story paragraph text, paragraph insertion,
-/// removal and paragraph ordering.
+/// removal, paragraph ordering and paragraph swapping.
 /// Keep the remaining mutation verbs visible instead of making the format-level
-/// `set`/`remove`/`move`/`edit`/`batch` support look like general CRUD.
+/// `set`/`remove`/`move`/`swap`/`edit`/`batch` support look like general CRUD.
 #[cfg(feature = "rtf")]
 static RTF_WRITE_GAPS: [GapSpec; 4] = [
     GapSpec {
@@ -1272,11 +1278,11 @@ static RTF_WRITE_GAPS: [GapSpec; 4] = [
         subject: Subject::Operation {
             verb: "swap",
             element: "body",
-            context: "paragraph-text-only",
+            context: "native-source-closure",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF structural body editing",
-        reason: "the RTF write adapter does not expose element swaps",
+        follow_up: "M6 RTF rich paragraph preservation",
+        reason: "paragraph swapping requires the native editor to prove an ordinary literal body and retain both selected source boundaries",
     },
 ];
 

@@ -415,6 +415,99 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
     })
 }
 
+/// Exchange two ordinary main-story paragraphs in one native lifecycle edit.
+///
+/// Both paths are resolved against the same immutable source snapshot.  The
+/// native editor retains the selected paragraph payloads and owns the exact
+/// source splice, candidate validation, and reversible history; this adapter
+/// only charges the unified target and staging budgets and adopts the checked
+/// endpoint.
+pub(crate) fn swap_with_limits<'p, 'q>(
+    file: &Rtf,
+    left: PathArg<'p>,
+    right: PathArg<'q>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    file.admit_edit()?;
+    let nav = Nav::new(file);
+    let left = crate::path::resolve::get(&nav, &left)?;
+    let right = crate::path::resolve::get(&nav, &right)?;
+    let left = paragraph_position(left)?;
+    let right = paragraph_position(right)?;
+
+    let target_count = usize::from(left != right).saturating_add(1);
+    bound(
+        LimitKind::ExpandedTargets,
+        target_count,
+        limits.max_expanded_targets(),
+    )?;
+
+    // Native swap history retains both selected paragraph payloads and two
+    // position/string descriptors, including for the exact same-target no-op.
+    let left_bytes = file
+        .0
+        .package
+        .body()
+        .paragraphs()
+        .nth(left)
+        .map_or(0, |paragraph| paragraph.len());
+    let right_bytes = file
+        .0
+        .package
+        .body()
+        .paragraphs()
+        .nth(right)
+        .map_or(0, |paragraph| paragraph.len());
+    let payload_bytes = left_bytes
+        .checked_add(right_bytes)
+        .and_then(|bytes| bytes.checked_add(size_of::<usize>().saturating_mul(2)))
+        .and_then(|bytes| bytes.checked_add(size_of::<String>().saturating_mul(2)))
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    bound(
+        LimitKind::StagedBytes,
+        payload_bytes,
+        limits.max_staged_bytes(),
+    )?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+
+    let native_limits = NativeLimits::builder()
+        .max_operations(limits.max_operations())
+        .map_err(Error::from)?
+        .max_replacement_bytes(limits.max_staged_bytes())
+        .map_err(Error::from)?
+        .build()
+        .map_err(Error::from)?;
+    let options = EditOptions::new().semantic_limits(native_limits);
+    let mut edit = file.0.package.edit_with_options(options);
+    edit.swap_paragraphs(Position::new(left), Position::new(right))
+        .map_err(Error::from)?;
+    let native = edit.commit().map_err(Error::from)?;
+
+    let changed = native.diagnostics().changed();
+    let operation_count = native.diagnostics().operation_count();
+    let (package, patch) = native.into_parts();
+    let snapshot_bytes = patch_snapshot_bytes(&patch);
+    if snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+    }
+    let before = file.clone();
+    let after = if changed {
+        file.with_package(package)
+    } else {
+        // Equal-target swap is a native exact no-op. Preserve the original
+        // package identity and origin sidecar for atomic save and replay.
+        file.clone()
+    };
+    file.check_source()?;
+    Ok(Commit {
+        before,
+        after,
+        patch,
+        operations: operation_count,
+        snapshot_bytes,
+    })
+}
+
 fn move_destination(
     nav: &Nav<'_>,
     from: usize,

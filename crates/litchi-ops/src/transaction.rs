@@ -877,7 +877,7 @@ impl Edit {
     /// # Errors
     /// As [`File::swap`], with the mutation's item index and transaction limits.
     pub fn swap<'p, 'q>(&mut self, _a: impl IntoPath<'p>, _b: impl IntoPath<'q>) -> Result<()> {
-        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "ppt"))]
+        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "ppt", feature = "rtf"))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
@@ -900,6 +900,12 @@ impl Edit {
             ),
             #[cfg(feature = "pptx")]
             File::Pptx(handle) => wrap_pptx(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "rtf")]
+            File::Rtf(handle) => wrap_rtf(
                 handle,
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
                 (),

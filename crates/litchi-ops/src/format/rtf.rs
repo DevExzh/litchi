@@ -164,6 +164,27 @@ impl Rtf {
         write::move_to_with_limits(self, path, placement, limits)
     }
 
+    /// Exchange two ordinary main-story paragraphs through one bounded native
+    /// lifecycle edit.
+    pub(crate) fn swap<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+    ) -> Result<write::Commit> {
+        self.swap_with_limits(left, right, &SemanticLimits::default())
+    }
+
+    /// Exchange two paragraphs with the caller's target, staging and snapshot
+    /// limits.
+    pub(crate) fn swap_with_limits<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+        limits: &SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::swap_with_limits(self, left, right, limits)
+    }
+
     pub(crate) fn write_to(&self, sink: impl std::io::Write) -> Result<()> {
         self.0
             .package
