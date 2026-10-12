@@ -244,6 +244,20 @@ fn mixed_text_and_geometry_stays_in_one_edit_for_eager_and_positional_owners() {
         assert_eq!(text(&commit.file, FIRST), "changed");
         assert_eq!(length(&commit.file, SECOND, "x"), 914_400);
         assert_eq!(length(&commit.file, SECOND, "height"), 3_657_600);
+        assert_eq!(
+            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+            commit.file.to_bytes().unwrap()
+        );
+        assert_eq!(
+            commit
+                .patch
+                .inverse()
+                .apply(&commit.file)
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            before
+        );
         assert_eq!(source.to_bytes().expect("immutable source"), before);
     });
 }
