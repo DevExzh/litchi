@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0220 | [Aggregate PPT text publication](0220-ppt-aggregate-text-publication.md) | Bounded native text chunks publish once per edit; 1,411 existing native plus eight aggregate tests and 1,603 facade tests/doctests pass; 28 v2 routes verify actual history links; unified 10k improves 19.7–20.0×, positional 1k ratio 2.080 and 26–30× growth leave budgets and full goal open |
 | 0219 | [Grouped PPT drawing rewrites](0219-ppt-grouped-drawing-rewrite.md) | Strict framing/error order and exact publication bytes preserved; 1,411 native and 1,603 facade tests/doctests plus final focused checks pass; 28 paired routes verified; unified 1k improves 10.5–11.0× and 10k 5.2×, but 250–255× growth leaves scaling and the full goal open |
 | 0218 | [PPT shape edit runs](0218-ppt-shape-coalescing.md) | Direct text/geometry runs share native primary edits; 1,594 existing facade tests/doctests plus nine coalescer tests, harness checks, lint/docs pass; twenty named paired routes pass exact checks; 1k overhead 2.0–2.3%, 10k growth 122–124× leaves native linear scaling and full goal open |
 | 0217 | [Unified PPT slide structure](0217-ppt-slide-structure.md) | Native-backed remove/move/swap with history and capability dispatch; 1,585 existing facade tests/doctests plus nine structural tests pass; 18 paired local cases below 10% median overhead; insertion, shape CRUD, coalescing and full goal remain open |
