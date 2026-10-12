@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0215 | [Unified PPT navigation and views](0215-ppt-unified-read.md) | Native-backed get/find/query/views, typed anchor conversion, shared static shapes, source fences and capability golden; native/facade suites and lint/docs pass; native read scaling, unified PPT mutation and full goal remain open |
 | 0214 | [Signed PPT primary transactions](0214-ppt-signed-noops.md) | Exact signed no-ops preserve source bytes; changed writes return typed Signed; retained leniency, durable replay and facade classification covered; native/facade suites, feature/lint/docs/glossary checks pass; unified PPT navigation/mutation and full goal remain open |
 | 0213 | [Canonical PPT Builder and creation](0213-ppt-builder-creation.md) | Immutable build output, explicit encryption entropy, preserved speaker notes and unified create/publication; native/facade suites pass; signed no-op edits, unified navigation/mutation, performance and full goal remain open |
 | 0212 | [Canonical PPT primary transaction](0212-ppt-primary-edit.md) | Native-backed immutable Edit/Patch/Commit, finite operation policy, source fences and retained leniency; native/facade tests and lint/docs checks pass; signed no-ops, Builder, unified PPT read/write, performance and full goal remain open |

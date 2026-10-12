@@ -1,0 +1,210 @@
+{
+  "schema": 1,
+  "scope": "Exploratory PPT selected shape text, not frozen harness qualification",
+  "source_record": "0215-ppt-unified-read.md",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)",
+  "command": "CARGO_PROFILE_RELEASE_LTO=false cargo run --release -p litchi-ops --no-default-features --features ppt --example ppt_read_bench",
+  "build_environment": {
+    "external_lock": "Repository lock copied externally; cached cc 1.6.0 resolution; repository locks unchanged",
+    "LTO": false,
+    "samples": 7,
+    "reads_per_sample": 100
+  },
+  "benchmark_source_sha256": "e6bcd7cb4a1d96d95bb2d55226a9d2197ff0595d43c7abd5aae34700a1c056ec",
+  "binary_sha256": "5da7f29fd35968128e6f395ce87e2f002d9b4303c9ce65c8ee9ca361b72be7e5",
+  "cases": [
+    {
+      "slides": 1,
+      "source": "memory",
+      "repeats": 100,
+      "native_ns": [
+        281601,
+        292901,
+        283082,
+        292341,
+        283222,
+        288112,
+        281411
+      ],
+      "unified_get_ns": [
+        347972,
+        346222,
+        345661,
+        345942,
+        346091,
+        344791,
+        345822
+      ],
+      "unified_first_ns": [
+        357762,
+        341531,
+        354272,
+        341141,
+        349282,
+        340182,
+        345951
+      ]
+    },
+    {
+      "slides": 1,
+      "source": "positional",
+      "repeats": 100,
+      "native_ns": [
+        303971,
+        302411,
+        306372,
+        302941,
+        310492,
+        302202,
+        301871
+      ],
+      "unified_get_ns": [
+        644713,
+        642523,
+        638433,
+        631523,
+        632793,
+        638013,
+        637503
+      ],
+      "unified_first_ns": [
+        765544,
+        797604,
+        773563,
+        769074,
+        771503,
+        773704,
+        773294
+      ]
+    },
+    {
+      "slides": 100,
+      "source": "memory",
+      "repeats": 100,
+      "native_ns": [
+        659424,
+        643833,
+        650673,
+        642673,
+        649603,
+        650664,
+        643073
+      ],
+      "unified_get_ns": [
+        716463,
+        722823,
+        716134,
+        719934,
+        717563,
+        715283,
+        718553
+      ],
+      "unified_first_ns": [
+        711963,
+        716314,
+        712053,
+        718973,
+        717824,
+        711643,
+        719363
+      ]
+    },
+    {
+      "slides": 100,
+      "source": "positional",
+      "repeats": 100,
+      "native_ns": [
+        681234,
+        673313,
+        664163,
+        665623,
+        670003,
+        671033,
+        669973
+      ],
+      "unified_get_ns": [
+        1007074,
+        1011055,
+        1006215,
+        1007435,
+        1008005,
+        1010545,
+        1005235
+      ],
+      "unified_first_ns": [
+        1151546,
+        1146245,
+        1146376,
+        1152395,
+        1146525,
+        1143206,
+        1143225
+      ]
+    },
+    {
+      "slides": 1000,
+      "source": "memory",
+      "repeats": 100,
+      "native_ns": [
+        3825358,
+        3814588,
+        3819488,
+        3844678,
+        3820309,
+        3825858,
+        3820818
+      ],
+      "unified_get_ns": [
+        3920989,
+        3915818,
+        3918339,
+        3915928,
+        3910238,
+        3935799,
+        3915888
+      ],
+      "unified_first_ns": [
+        3898248,
+        3893619,
+        3894348,
+        3886629,
+        3892128,
+        3890719,
+        3894459
+      ]
+    },
+    {
+      "slides": 1000,
+      "source": "positional",
+      "repeats": 100,
+      "native_ns": [
+        3854378,
+        3854688,
+        3858018,
+        3853288,
+        3864769,
+        3843519,
+        3850868
+      ],
+      "unified_get_ns": [
+        4209410,
+        4209900,
+        4207630,
+        4206210,
+        4208510,
+        4215930,
+        4210900
+      ],
+      "unified_first_ns": [
+        4320410,
+        4334391,
+        4323741,
+        4327950,
+        4327450,
+        4331290,
+        4321890
+      ]
+    }
+  ],
+  "source_commit": "cc93039cee7e8327920dcd836b296f9759b50965"
+}
