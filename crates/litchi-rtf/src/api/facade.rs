@@ -50,6 +50,18 @@ pub struct Package {
 }
 
 impl Package {
+    /// Construct the minimal valid empty RTF package.
+    ///
+    /// The package is produced through the canonical [`crate::Builder`] path,
+    /// so it has the same strict source policy and native writer semantics as
+    /// an explicitly authored package.
+    ///
+    /// # Errors
+    /// Returns a typed authoring or strict-reopen error.
+    pub fn new() -> std::result::Result<Self, crate::builder::Error> {
+        crate::Builder::default().build()
+    }
+
     /// Obtain an owned read-only semantic projection of this snapshot.
     #[must_use]
     pub fn document(&self) -> Document {

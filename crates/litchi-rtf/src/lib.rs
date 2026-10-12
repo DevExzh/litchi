@@ -65,6 +65,7 @@
     reason = "items stay grouped by RTF feature area rather than by item kind"
 )]
 mod api;
+pub mod builder;
 mod codec;
 mod content;
 mod drawing;
@@ -189,6 +190,7 @@ pub mod style {
 }
 
 pub use api::{Document, Package};
+pub use builder::Builder;
 pub use codec::error::{RtfError as Error, RtfResult as Result};
 pub use tail_append::{
     DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendCommit, TailAppendDiagnostics,
