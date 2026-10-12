@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0241 | [Native-backed RTF run reads](0241-rtf-run-reads.md) | Borrowed run paths, local character properties, reusable plans and lexical formatting fixes; 1,497 native and 1,705 facade tests/doctests pass; three paired trials show bounded first reads and linear traversal, with generic-query overhead, run writes and full goal open |
 | 0240 | [Typed RTF body-paragraph selectors](0240-rtf-body-positions.md) | Primary body edits and paragraph transfer use Position; split alias removed, consumers and glossary gate migrated; 1,495 native and 1,697 facade tests/doctests pass; wider glossary, coverage, performance and full goal remain open |
 | 0239 | [Unified RTF paragraph layout](0239-rtf-unified-layout.md) | Eight native-backed layout properties, typed positions and atomic alignment/layout fanout; 1,492 native and 1,697 facade tests/doctests pass; small-document overhead, scaling and full goal remain open |
 | 0238 | [Unified RTF paragraph alignment](0238-rtf-unified-alignment.md) | Typed native alignment batches, read/query/set and atomic mixed text updates; lossless alignment-only publication and boundary readback fix; 1,490 native and 1,688 facade tests/doctests pass; small-query overhead, scaling and full goal remain open |
