@@ -2858,10 +2858,17 @@ fn remove_cell_record(
     index: usize,
     reference: Reference,
 ) -> Result<()> {
-    if record_kind(&records[index])? != MUL_RK {
-        records.remove(index);
-        return Ok(());
+    match record_kind(&records[index])? {
+        MUL_RK => remove_packed_rk(records, index, reference),
+        MUL_BLANK => remove_packed_blank(records, index, reference),
+        _ => {
+            records.remove(index);
+            Ok(())
+        },
     }
+}
+
+fn remove_packed_rk(records: &mut Vec<Vec<u8>>, index: usize, reference: Reference) -> Result<()> {
     let record = &mut records[index];
     let payload_len = usize::from(binary::read_u16_le_at(record, 2)?);
     let item_bytes = payload_len
@@ -2888,6 +2895,9 @@ fn remove_cell_record(
             .ok_or_else(|| Error::InvalidData("MulRk split column overflow".into()))?;
         let left = encode_rk_segment(reference.row(), first, &items[..item])?;
         let right = encode_rk_segment(reference.row(), right_first, &items[item + 1..])?;
+        records
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("retaining MulRk split"))?;
         records[index] = left;
         records.insert(index + 1, right);
         return Ok(());
@@ -2933,6 +2943,148 @@ fn remove_cell_record(
     Ok(())
 }
 
+fn remove_packed_blank(
+    records: &mut Vec<Vec<u8>>,
+    index: usize,
+    reference: Reference,
+) -> Result<()> {
+    let record = &mut records[index];
+    let payload_len = usize::from(binary::read_u16_le_at(record, 2)?);
+    let item_bytes = payload_len
+        .checked_sub(6)
+        .ok_or_else(|| Error::InvalidData("MulBlank payload is truncated".into()))?;
+    if item_bytes == 0 || item_bytes % 2 != 0 {
+        return Err(Error::InvalidData(
+            "MulBlank item framing is invalid".into(),
+        ));
+    }
+    let count = item_bytes / 2;
+    let first = binary::read_u16_le_at(record, 6)?;
+    let target = u16::from(reference.column());
+    let item = usize::from(target.checked_sub(first).ok_or_else(|| {
+        Error::UnsafeEdit("packed blank deletion target precedes its MulBlank range".into())
+    })?);
+    if item >= count {
+        return Err(Error::UnsafeEdit(
+            "packed blank deletion target exceeds its MulBlank range".into(),
+        ));
+    }
+
+    // An interior removal is represented by two records. Keeping standalone
+    // BLANK records for one-item sides avoids emitting an invalid one-item
+    // MulBlank while retaining each neighboring XF exactly.
+    if item != 0 && item + 1 != count {
+        let styles = decode_blank_styles(record)?;
+        let left = encode_blank_segment(reference.row(), first, &styles[..item])?;
+        let right_first = target
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidData("MulBlank split column overflow".into()))?;
+        let right = encode_blank_segment(reference.row(), right_first, &styles[item + 1..])?;
+        records
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("retaining MulBlank split"))?;
+        records[index] = left;
+        records.insert(index + 1, right);
+        return Ok(());
+    }
+
+    if count == 2 {
+        let remaining = usize::from(item == 0);
+        let item_offset = 8 + remaining * 2;
+        let column = first
+            .checked_add(u16::try_from(remaining).map_err(|_error| {
+                Error::InvalidData("MulBlank remaining column exceeds u16".into())
+            })?)
+            .ok_or_else(|| Error::InvalidData("MulBlank remaining column overflow".into()))?;
+        let style = binary::read_u16_le_at(record, item_offset)?;
+        let remaining_reference = Reference::new(u32::from(reference.row()), u32::from(column))?;
+        records[index] = scalar_record(BLANK, remaining_reference, &StyleIndex(style), &[]);
+        return Ok(());
+    }
+
+    let item_offset =
+        8usize
+            .checked_add(item.checked_mul(2).ok_or_else(|| {
+                Error::InvalidData("MulBlank deletion item offset overflow".into())
+            })?)
+            .ok_or_else(|| Error::InvalidData("MulBlank deletion offset overflow".into()))?;
+    record.drain(item_offset..item_offset + 2);
+    let new_payload = u16::try_from(payload_len - 2)
+        .map_err(|_error| Error::InvalidData("MulBlank payload exceeds u16".into()))?;
+    record[2..4].copy_from_slice(&new_payload.to_le_bytes());
+    if item == 0 {
+        record[6..8].copy_from_slice(&(first + 1).to_le_bytes());
+    } else {
+        let last = target - 1;
+        let end = record.len();
+        record[end - 2..end].copy_from_slice(&last.to_le_bytes());
+    }
+    Ok(())
+}
+
+fn decode_blank_styles(record: &[u8]) -> Result<Vec<u16>> {
+    let payload_len = usize::from(binary::read_u16_le_at(record, 2)?);
+    let item_bytes = payload_len
+        .checked_sub(6)
+        .ok_or_else(|| Error::InvalidData("MulBlank payload is truncated".into()))?;
+    if item_bytes == 0 || item_bytes % 2 != 0 {
+        return Err(Error::InvalidData(
+            "MulBlank item framing is invalid".into(),
+        ));
+    }
+    let count = item_bytes / 2;
+    let mut styles = Vec::new();
+    styles
+        .try_reserve_exact(count)
+        .map_err(|_error| Error::Allocation("retaining MulBlank styles"))?;
+    for item in 0..count {
+        styles.push(binary::read_u16_le_at(record, 8 + item * 2)?);
+    }
+    Ok(styles)
+}
+
+fn encode_blank_segment(row: u16, first_column: u16, styles: &[u16]) -> Result<Vec<u8>> {
+    if styles.is_empty() {
+        return Err(Error::InvalidData("MulBlank segment is empty".into()));
+    }
+    let last_column = first_column
+        .checked_add(
+            u16::try_from(styles.len() - 1)
+                .map_err(|_error| Error::InvalidData("MulBlank segment is too wide".into()))?,
+        )
+        .ok_or_else(|| Error::InvalidData("MulBlank segment column overflow".into()))?;
+    if last_column > 255 {
+        return Err(Error::InvalidData(
+            "MulBlank segment exceeds the BIFF8 worksheet grid".into(),
+        ));
+    }
+    if styles.len() == 1 {
+        let reference = Reference::new(u32::from(row), u32::from(first_column))?;
+        return Ok(scalar_record(BLANK, reference, &StyleIndex(styles[0]), &[]));
+    }
+    let item_bytes = styles
+        .len()
+        .checked_mul(2)
+        .ok_or_else(|| Error::InvalidData("MulBlank item length overflow".into()))?;
+    let payload_len = 6usize
+        .checked_add(item_bytes)
+        .ok_or_else(|| Error::InvalidData("MulBlank payload length overflow".into()))?;
+    let mut record = Vec::with_capacity(4 + payload_len);
+    record.extend_from_slice(&MUL_BLANK.to_le_bytes());
+    record.extend_from_slice(
+        &u16::try_from(payload_len)
+            .map_err(|_error| Error::InvalidData("MulBlank payload exceeds u16".into()))?
+            .to_le_bytes(),
+    );
+    record.extend_from_slice(&row.to_le_bytes());
+    record.extend_from_slice(&first_column.to_le_bytes());
+    for style in styles {
+        record.extend_from_slice(&style.to_le_bytes());
+    }
+    record.extend_from_slice(&last_column.to_le_bytes());
+    Ok(record)
+}
+
 fn insert_packed_rk(
     rows: &mut BTreeMap<u16, RowData>,
     reference: Reference,
@@ -2946,9 +3098,24 @@ fn insert_packed_rk(
     let encoded = super::encode_rk(*number).ok_or_else(|| {
         Error::UnsafeEdit("MulRk insertion value is not exactly RK-representable".into())
     })?;
+    if let std::collections::btree_map::Entry::Vacant(row) = rows.entry(reference.row()) {
+        let mut row_record = Vec::new();
+        crate::writer::biff::write_row(
+            &mut row_record,
+            u32::from(reference.row()),
+            u16::from(reference.column()),
+            u16::from(reference.column()) + 1,
+            255,
+            false,
+        )?;
+        row.insert(RowData {
+            row_record,
+            cell_records: Vec::new(),
+        });
+    }
     let row = rows
         .get_mut(&reference.row())
-        .ok_or_else(|| Error::UnsafeEdit("MulRk inverse has no adjacent ROW".into()))?;
+        .ok_or_else(|| Error::InvalidData("MulRk inverse ROW disappeared".into()))?;
     let target = u16::from(reference.column());
     let mut candidates = Vec::new();
     for (index, record) in row.cell_records.iter().enumerate() {
@@ -3012,9 +3179,26 @@ fn insert_packed_rk(
             "MulRk inverse has ambiguous adjacent packed records".into(),
         ));
     }
-    let index = candidates.first().copied().ok_or_else(|| {
-        Error::UnsafeEdit("MulRk inverse cannot find its adjacent packed record".into())
-    })?;
+    let Some(index) = candidates.first().copied() else {
+        // If a transaction removed every member of a packed source record,
+        // the first semantic inverse has no surviving neighbor to merge with.
+        // Restore one standalone RK in sorted row order; subsequent inverse
+        // operations can merge adjacent RK records back into a packed family.
+        let replacement = encode_rk_segment(reference.row(), target, &[(state.2.get(), encoded)])?;
+        let mut insertion = row.cell_records.len();
+        for (position, record) in row.cell_records.iter().enumerate() {
+            let kind = record_kind(record)?;
+            if is_cell_record(kind) && u16::from(cell_column(record)?) > target {
+                insertion = position;
+                break;
+            }
+        }
+        row.cell_records
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("retaining standalone RK inverse"))?;
+        row.cell_records.insert(insertion, replacement);
+        return Ok(());
+    };
     if record_kind(&row.cell_records[index])? == RK {
         let neighbor = &row.cell_records[index];
         let neighbor_column = binary::read_u16_le_at(neighbor, 6)?;
@@ -3497,9 +3681,7 @@ fn verify_record_state(
     source: &super::Snapshot,
 ) -> Result<()> {
     let kind = record_kind(record)?;
-    if kind != super::storage_record_kind(expected.0)
-        || record_style(record, reference)? != expected.2
-    {
+    if !record_storage_matches(kind, expected.0) || record_style(record, reference)? != expected.2 {
         return Err(Error::UnsafeEdit("structural cell state is stale".into()));
     }
     // Snapshot parsing already validated the semantic value. Reconfirm text
@@ -3518,8 +3700,20 @@ fn verify_record_state(
     Ok(())
 }
 
+fn record_storage_matches(kind: u16, expected: Storage) -> bool {
+    match expected {
+        // A packed numeric record becomes a standalone RK when its final
+        // neighboring member is removed. Likewise, a packed blank record can
+        // reduce to a standalone BLANK. Both forms retain the same cell
+        // state and are valid intermediate owners for a multi-cell edit.
+        Storage::MulRk => matches!(kind, RK | MUL_RK),
+        Storage::Blank => matches!(kind, BLANK | MUL_BLANK),
+        _ => kind == super::storage_record_kind(expected),
+    }
+}
+
 fn patch_record_style(record: &mut [u8], reference: Reference, style: StyleIndex) -> Result<()> {
-    if record_kind(record)? == MUL_RK {
+    if matches!(record_kind(record)?, MUL_RK | MUL_BLANK) {
         let first = binary::read_u16_le_at(record, 6)?;
         let index = usize::from(
             u16::from(reference.column())
@@ -3528,11 +3722,12 @@ fn patch_record_style(record: &mut [u8], reference: Reference, style: StyleIndex
                     Error::UnsafeEdit("MulRk style target precedes packed range".into())
                 })?,
         );
+        let item_size = if record_kind(record)? == MUL_RK { 6 } else { 2 };
         let offset = 8usize
             .checked_add(
                 index
-                    .checked_mul(6)
-                    .ok_or_else(|| Error::InvalidData("MulRk style offset overflow".into()))?,
+                    .checked_mul(item_size)
+                    .ok_or_else(|| Error::InvalidData("packed style offset overflow".into()))?,
             )
             .ok_or_else(|| Error::InvalidData("MulRk style offset overflow".into()))?;
         record
@@ -3549,7 +3744,8 @@ fn patch_record_style(record: &mut [u8], reference: Reference, style: StyleIndex
 }
 
 fn record_style(record: &[u8], reference: Reference) -> Result<StyleIndex> {
-    let index = if record_kind(record)? == MUL_RK {
+    let kind = record_kind(record)?;
+    let index = if matches!(kind, MUL_RK | MUL_BLANK) {
         let first = binary::read_u16_le_at(record, 6)?;
         let index = usize::from(
             u16::from(reference.column())
@@ -3558,7 +3754,8 @@ fn record_style(record: &[u8], reference: Reference) -> Result<StyleIndex> {
                     Error::UnsafeEdit("MulRk style target precedes packed range".into())
                 })?,
         );
-        binary::read_u16_le_at(record, 8 + index * 6)?
+        let item_size = if kind == MUL_RK { 6 } else { 2 };
+        binary::read_u16_le_at(record, 8 + index * item_size)?
     } else {
         binary::read_u16_le_at(record, 8)?
     };
@@ -4370,6 +4567,93 @@ mod tests {
         )
         .unwrap();
         assert_eq!(rows[&7].cell_records, [original]);
+    }
+
+    #[test]
+    fn mulblank_deletions_preserve_interior_and_edge_styles() {
+        let original = encode_blank_segment(7, 2, &[10, 11, 12, 13, 14]).unwrap();
+        let target = Reference::new(7, 4).unwrap();
+        let mut records = vec![original.clone()];
+        remove_cell_record(&mut records, 0, target).unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(record_kind(&records[0]).unwrap(), MUL_BLANK);
+        assert_eq!(record_kind(&records[1]).unwrap(), MUL_BLANK);
+        assert_eq!(decode_blank_styles(&records[0]).unwrap(), vec![10, 11]);
+        assert_eq!(decode_blank_styles(&records[1]).unwrap(), vec![13, 14]);
+        assert!(record_contains_reference(&records[0], Reference::new(7, 2).unwrap()).unwrap());
+        assert!(record_contains_reference(&records[1], Reference::new(7, 6).unwrap()).unwrap());
+        assert_eq!(
+            record_style(&records[0], Reference::new(7, 3).unwrap()).unwrap(),
+            StyleIndex(11)
+        );
+        assert_eq!(
+            record_style(&records[1], Reference::new(7, 5).unwrap()).unwrap(),
+            StyleIndex(13)
+        );
+
+        // Each split side can then be reduced at an edge without dropping its
+        // remaining neighbor or changing that neighbor's XF.
+        remove_cell_record(&mut records, 0, Reference::new(7, 2).unwrap()).unwrap();
+        remove_cell_record(&mut records, 1, Reference::new(7, 6).unwrap()).unwrap();
+        assert_eq!(records.len(), 2);
+        assert_eq!(record_kind(&records[0]).unwrap(), BLANK);
+        assert_eq!(record_kind(&records[1]).unwrap(), BLANK);
+        assert_eq!(
+            record_style(&records[0], Reference::new(7, 3).unwrap()).unwrap(),
+            StyleIndex(11)
+        );
+        assert_eq!(
+            record_style(&records[1], Reference::new(7, 5).unwrap()).unwrap(),
+            StyleIndex(13)
+        );
+    }
+
+    #[test]
+    fn several_mulrk_deletions_accept_reduced_standalone_owners() {
+        let original = encode_mul_rk(
+            7,
+            2,
+            &[
+                (0, super::super::encode_rk(1.0).unwrap()),
+                (1, super::super::encode_rk(2.0).unwrap()),
+                (2, super::super::encode_rk(3.0).unwrap()),
+                (3, super::super::encode_rk(4.0).unwrap()),
+                (4, super::super::encode_rk(5.0).unwrap()),
+            ],
+        )
+        .unwrap();
+        let mut records = vec![original];
+        for column in [4, 2, 6, 3, 5] {
+            let reference = Reference::new(7, column).unwrap();
+            let index = records
+                .iter()
+                .position(|record| record_contains_reference(record, reference).unwrap())
+                .expect("remaining packed member");
+            remove_cell_record(&mut records, index, reference).unwrap();
+        }
+        assert!(records.is_empty());
+    }
+
+    #[test]
+    fn packed_inverse_can_build_a_family_from_standalone_records() {
+        let mut rows = BTreeMap::from([(
+            7,
+            RowData {
+                row_record: Vec::new(),
+                cell_records: Vec::new(),
+            },
+        )]);
+        for (column, value, style) in [(2, 1.0, 0), (3, 2.0, 1), (4, 3.0, 2)] {
+            insert_packed_rk(
+                &mut rows,
+                Reference::new(7, column).unwrap(),
+                &(Storage::MulRk, Value::Number(value), StyleIndex(style)),
+            )
+            .unwrap();
+        }
+        let items = decode_rk_items(&rows[&7].cell_records[0]).unwrap();
+        assert_eq!(items.1, 2);
+        assert_eq!(items.2.len(), 3);
     }
 
     #[test]

@@ -57,10 +57,10 @@ fn xls_capabilities_expose_initial_scalar_write_surface() {
     use litchi_ops::capabilities::Subject;
 
     let caps = Capabilities::of(FileFormat::Xls);
-    for verb in [Verb::Set, Verb::Edit, Verb::Batch] {
+    for verb in [Verb::Set, Verb::Remove, Verb::Edit, Verb::Batch] {
         assert!(caps.verb(verb).is_supported(), "XLS {verb:?}");
     }
-    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
+    for verb in [Verb::Add, Verb::Move, Verb::Swap] {
         assert_eq!(
             caps.verb(verb).code(),
             Some(Code::UnsupportedCapability),
@@ -70,6 +70,7 @@ fn xls_capabilities_expose_initial_scalar_write_surface() {
 
     let cell = caps.element("cell").expect("XLS cell capability");
     assert!(cell.operations().set);
+    assert!(cell.operations().remove);
     for key in ["value", "clear"] {
         let property = cell.property(key).unwrap_or_else(|| panic!("{key}"));
         assert!(!property.get(), "XLS {key} is write-only");
@@ -78,6 +79,7 @@ fn xls_capabilities_expose_initial_scalar_write_surface() {
     }
     let sheet = caps.element("sheet").expect("XLS sheet capability");
     assert!(sheet.operations().set);
+    assert!(!sheet.operations().remove);
     assert!(sheet.property("name").unwrap().set());
     assert!(!sheet.property("hidden").unwrap().set());
     assert!(!sheet.property("visibility").unwrap().set());

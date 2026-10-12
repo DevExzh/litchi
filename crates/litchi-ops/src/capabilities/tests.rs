@@ -139,7 +139,7 @@ fn every_format_has_one_answer_for_its_reads() {
                 && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
             let xls_edit = format == FileFormat::Xls
                 && cfg!(feature = "xls")
-                && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
+                && matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch);
             assert_eq!(
                 capabilities.verb(verb),
                 if doc_edit
@@ -215,13 +215,13 @@ fn xls_adapter_advertises_initial_scalar_writes_and_keeps_other_edits_pending() 
     assert!(capabilities.verb(Verb::Create).is_supported());
     assert!(capabilities.elements().next().is_some());
 
-    for verb in [Verb::Set, Verb::Edit, Verb::Batch] {
+    for verb in [Verb::Set, Verb::Remove, Verb::Edit, Verb::Batch] {
         assert!(
             capabilities.verb(verb).is_supported(),
-            "XLS {verb:?} is supported for scalar writes"
+            "XLS {verb:?} is supported for admitted writes"
         );
     }
-    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
+    for verb in [Verb::Add, Verb::Move, Verb::Swap] {
         assert_eq!(
             capabilities.verb(verb).code(),
             Some(Code::UnsupportedCapability),
@@ -231,6 +231,7 @@ fn xls_adapter_advertises_initial_scalar_writes_and_keeps_other_edits_pending() 
 
     let cell = capabilities.element("cell").unwrap();
     assert!(cell.operations().set);
+    assert!(cell.operations().remove);
     assert!(cell.property("value").unwrap().set());
     assert!(cell.property("clear").unwrap().set());
     assert!(!cell.property("value").unwrap().get());

@@ -8,6 +8,7 @@
 #![cfg(feature = "xls")]
 
 use std::io::Cursor;
+use std::ops::Deref;
 
 use litchi_core::FileFormat;
 use litchi_core::selector::{Path as SelectorPath, Query, Scope};
@@ -128,16 +129,39 @@ fn native_cell_value(bytes: &[u8], row: u32, column: u32) -> Option<XlsValue> {
         })
 }
 
-fn open_owner(bytes: &[u8], eager: bool) -> File {
-    litchi_ops::open_bytes_with(
-        bytes.to_vec(),
-        &OpenOptions::new().source_mode(if eager {
-            SourceMode::Eager
-        } else {
-            SourceMode::Auto
-        }),
-    )
-    .expect("open XLS owner")
+struct Owner {
+    file: File,
+    source_guard: Option<tempfile::TempDir>,
+}
+
+impl Deref for Owner {
+    type Target = File;
+
+    fn deref(&self) -> &Self::Target {
+        &self.file
+    }
+}
+
+fn open_owner(bytes: &[u8], eager: bool) -> Owner {
+    if eager {
+        return Owner {
+            file: litchi_ops::open_bytes_with(
+                bytes.to_vec(),
+                &OpenOptions::new().source_mode(SourceMode::Eager),
+            )
+            .expect("open eager XLS owner"),
+            source_guard: None,
+        };
+    }
+
+    let source_guard = tempfile::tempdir().expect("create XLS source directory");
+    let path = source_guard.path().join("source.xls");
+    std::fs::write(&path, bytes).expect("write XLS source");
+    Owner {
+        file: litchi_ops::open_with(&path, &OpenOptions::new().source_mode(SourceMode::Auto))
+            .expect("open source-backed XLS owner"),
+        source_guard: Some(source_guard),
+    }
 }
 
 fn cell_text(file: &File, path: &str) -> Option<String> {
@@ -450,7 +474,7 @@ fn exactly_representable_unsigned_scalars_are_written_as_numbers() {
 
     for eager in [false, true] {
         let original = open_owner(&fixture(), eager);
-        let mut updated = original.clone();
+        let mut updated = original.file.clone();
         for value in values.iter().cloned() {
             let expected = match value {
                 PropValue::Unsigned(value) => value as f64,
@@ -799,7 +823,11 @@ fn signed_xls_refuses_writes_until_explicit_unsign() {
         Code::DocumentProtected
     );
 
-    let File::Signed(wrapper) = signed else {
+    let Owner {
+        file: signed_file,
+        source_guard: _source_guard,
+    } = signed;
+    let File::Signed(wrapper) = signed_file else {
         panic!("synthetic XLS signature must open as File::Signed");
     };
     let unsigned = wrapper.unsign();
@@ -884,10 +912,16 @@ fn xls_creation_and_write_capability_are_advertised() {
     );
     assert!(
         capabilities
+            .verb(litchi_ops::capabilities::Verb::Remove)
+            .is_supported()
+    );
+    assert!(
+        capabilities
             .verb(litchi_ops::capabilities::Verb::Save)
             .is_supported()
     );
     let cell = capabilities.element("cell").expect("cell capability");
     assert!(cell.property("value").expect("value property").set());
     assert!(cell.property("clear").expect("clear property").set());
+    assert!(cell.operations().remove);
 }

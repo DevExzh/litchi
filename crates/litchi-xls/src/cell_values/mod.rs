@@ -3,10 +3,11 @@
 //! The owner covers `Number` (`[MS-XLS]` 2.4.180), standalone and packed `RK`,
 //! `BoolErr`, `Blank`, `LabelSst`, and non-string `Formula` caches. Every
 //! fixed-width changes retain their source slots. Structural cell insertion,
-//! removal, row/column movement, and sheet rename regenerate the complete
+//! removal (including packed `MulRk`/`MulBlank` members), row/column movement,
+//! and sheet rename regenerate the complete
 //! affected row-block/`INDEX`/`DBCELL`/dimension closure. Operations that meet
-//! an unsupported formula, range, drawing, or packed-cell dependency are
-//! refused before bytes are changed. The complete CFB package is reopened
+//! an unsupported formula, range, or drawing dependency are refused
+//! before bytes are changed. The complete CFB package is reopened
 //! before publication, and every other captured stream retains its exact
 //! payload.
 
@@ -59,6 +60,7 @@ const FORMULA: u16 = 0x0006;
 const STRING: u16 = 0x0207;
 const CONTINUE: u16 = 0x003c;
 const MUL_RK: u16 = 0x00bd;
+const MUL_BLANK: u16 = 0x00be;
 const BLANK: u16 = 0x0201;
 const NUMBER: u16 = 0x0203;
 const BOOL_ERR: u16 = 0x0205;
@@ -282,7 +284,7 @@ pub enum Storage {
     MulRk,
     /// Boolean or error `BoolErr` record.
     BoolErr,
-    /// Formatting-only `Blank` record.
+    /// Formatting-only `Blank` record or member of a `MulBlank` record.
     Blank,
     /// Shared-string reference `LabelSst` record.
     LabelSst,
@@ -2168,11 +2170,14 @@ impl Edit {
         })
     }
 
-    /// Physically removes an existing standalone BIFF8 cell record.
+    /// Physically removes an existing BIFF8 cell record.
     ///
-    /// An edge member of `MulRk` can be removed while preserving or reducing
-    /// the packed record. Interior packed members and formula ownership groups
-    /// are refused because partial deletion would not preserve their semantics.
+    /// Members of `MulRk` and `MulBlank` can be removed at either edge or
+    /// interior position. Interior removal splits the packed record while
+    /// preserving every neighboring cell's coordinate and XF; a final pair
+    /// reduces to the corresponding standalone record. Formula ownership
+    /// groups remain refused because their dependency closure is wider than a
+    /// cell record.
     ///
     /// # Errors
     ///
@@ -6375,6 +6380,7 @@ fn parse_worksheet(data: &[u8], base_offset: usize) -> Result<Vec<Entry>> {
                 )?;
             },
             MUL_RK => parse_mul_rk_entries(record.payload(), kind_offset, &mut entries)?,
+            MUL_BLANK => parse_mul_blank_entries(record.payload(), kind_offset, &mut entries)?,
             BOOL_ERR => {
                 require_payload(record.payload(), 8)?;
                 let reference = parse_reference(record.payload(), kind)?;
@@ -6566,6 +6572,72 @@ fn parse_mul_rk_entries(
                 value: Value::Number(value),
             },
             Some(payload_offset(kind_offset, rk_offset)?),
+            kind_offset,
+            None,
+        )?;
+    }
+    Ok(())
+}
+
+fn parse_mul_blank_entries(
+    payload: &[u8],
+    kind_offset: usize,
+    entries: &mut Vec<Entry>,
+) -> Result<()> {
+    let Some(items_bytes) = payload.len().checked_sub(6) else {
+        return Err(Error::InvalidLength {
+            expected: 10,
+            found: payload.len(),
+        });
+    };
+    if items_bytes % 2 != 0 {
+        return Err(Error::InvalidRecord {
+            record_type: MUL_BLANK,
+            message: "MulBlank payload does not contain whole cells".into(),
+        });
+    }
+    let count = items_bytes / 2;
+    if !(2..=256).contains(&count) {
+        return Err(Error::InvalidRecord {
+            record_type: MUL_BLANK,
+            message: format!("MulBlank contains {count} cells; expected 2 through 256"),
+        });
+    }
+    let row = binary::read_u16_le_at(payload, 0)?;
+    let first_column = binary::read_u16_le_at(payload, 2)?;
+    let last_column = binary::read_u16_le_at(payload, payload.len() - 2)?;
+    let count_minus_one = u16::try_from(count - 1)
+        .map_err(|_error| Error::InvalidData("MulBlank cell count exceeds u16".into()))?;
+    if first_column.checked_add(count_minus_one) != Some(last_column) || last_column > 255 {
+        return Err(Error::InvalidRecord {
+            record_type: MUL_BLANK,
+            message: "MulBlank column extent is inconsistent or outside BIFF8".into(),
+        });
+    }
+    for index in 0..count {
+        let item_offset = 4_usize
+            .checked_add(index.checked_mul(2).ok_or_else(|| {
+                Error::InvalidData("MulBlank item offset multiplication overflow".into())
+            })?)
+            .ok_or_else(|| Error::InvalidData("MulBlank item offset overflow".into()))?;
+        let column_delta = u16::try_from(index)
+            .map_err(|_error| Error::InvalidData("MulBlank column index exceeds u16".into()))?;
+        let encoded_column = first_column
+            .checked_add(column_delta)
+            .ok_or_else(|| Error::InvalidData("MulBlank column overflow".into()))?;
+        let column = u8::try_from(encoded_column).map_err(|_error| Error::InvalidRecord {
+            record_type: MUL_BLANK,
+            message: "MulBlank column is outside the BIFF8 worksheet grid".into(),
+        })?;
+        push_entry(
+            entries,
+            Cell {
+                reference: Reference { row, column },
+                storage: Storage::Blank,
+                style: parse_style(payload, item_offset)?,
+                value: Value::Blank,
+            },
+            None,
             kind_offset,
             None,
         )?;

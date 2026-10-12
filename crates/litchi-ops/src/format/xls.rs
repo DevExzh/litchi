@@ -124,6 +124,23 @@ impl Xls {
         result
     }
 
+    /// Remove stored cells selected by a path or scoped query.
+    pub(crate) fn remove<'p>(&self, target: crate::target::TargetArg<'p>) -> Result<WriteCommit> {
+        self.remove_with_limits(target, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Remove stored cells under an explicit semantic budget.
+    pub(crate) fn remove_with_limits<'p>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<WriteCommit> {
+        self.check_source()?;
+        let result = write::remove_with_limits(self, target, limits);
+        self.check_source()?;
+        result
+    }
+
     pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
         use crate::create::{Conformance, Flavor};
         use crate::error::{Code, Error};

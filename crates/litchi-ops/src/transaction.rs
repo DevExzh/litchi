@@ -588,7 +588,7 @@ impl Edit {
             if self.coalesce_remove_parsed(&target, index)?.is_some() {
                 return Ok(());
             }
-            #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "pptx"))]
+            #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "pptx"))]
             let limits = self.limits;
             self.execute(|file| match file {
                 #[cfg(feature = "docx")]
@@ -601,6 +601,12 @@ impl Edit {
                 ),
                 #[cfg(feature = "xlsb")]
                 File::Xlsb(handle) => wrap_xlsb(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "xls")]
+                File::Xls(handle) => wrap_xls(
                     handle,
                     handle.remove_with_limits(target.clone(), &limits)?,
                     (),

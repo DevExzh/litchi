@@ -77,6 +77,51 @@ pub(crate) fn set_with_limits<'p, 'v>(
     result
 }
 
+/// Remove existing stored cells selected by a path, range, or scoped query.
+/// Missing coordinates are exact no-ops; all present coordinates are removed
+/// by one native transaction so row and worksheet neighbors never shift.
+pub(crate) fn remove_with_limits(
+    file: &Xls,
+    target: TargetArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    file.admit_edit()?;
+    let targets = resolve_removal_targets(file, &target, limits)?;
+    let staged = targets
+        .len()
+        .checked_mul(WRITE_ENTRY_OVERHEAD)
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    if staged > limits.max_staged_bytes() {
+        return Err(staged_limit(staged, limits.max_staged_bytes()));
+    }
+    if targets.is_empty() || !targets.iter().any(|target| target.present) {
+        return no_op(file, limits);
+    }
+    if limits.max_operations() < 1 {
+        return Err(operation_limit(1, limits.max_operations()));
+    }
+    if targets
+        .iter()
+        .any(|target| target.present && target.formula)
+    {
+        return Err(Error::new(
+            Code::UnsupportedCapability,
+            "formula cells require a dependency-aware removal handler",
+        )
+        .with_format(FileFormat::Xls));
+    }
+
+    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    for target in targets {
+        if target.present {
+            edit.remove_cell(Selector::Position(target.sheet), target.reference)
+                .map_err(native_edit_error)?;
+        }
+    }
+    let native = edit.commit().map_err(native_edit_error)?;
+    finish_commit(file, native, 1, limits)
+}
+
 fn is_sheet_property(props: &Props<'_>) -> bool {
     props
         .iter()
@@ -462,6 +507,24 @@ fn resolve_cell_targets(
         .with_format(FileFormat::Xls));
     }
     Ok(targets)
+}
+
+fn resolve_removal_targets(
+    file: &Xls,
+    target: &TargetArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Vec<CellTarget>> {
+    resolve_cell_targets(file, target, limits).map_err(|error| {
+        if error.code() == Code::UnsupportedElement {
+            Error::new(
+                Code::UnsupportedCapability,
+                "XLS removal supports stored cells and ranges; worksheet, row, and column removal are not integrated",
+            )
+            .with_format(FileFormat::Xls)
+        } else {
+            error
+        }
+    })
 }
 
 fn append_cell_node(

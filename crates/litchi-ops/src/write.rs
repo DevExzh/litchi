@@ -141,6 +141,8 @@ impl File {
     /// cells, ranges, and cell queries; virtual cells are exact no-ops and
     /// neighboring cells never shift.  A sheet query must be homogeneous, and
     /// complete-tab removal retains at least one visible tab.
+    /// XLS removes stored cell records from cells, ranges, and cell queries;
+    /// virtual cells are exact no-ops and worksheet neighbors never shift.
     ///
     /// # Errors
     /// Returns target, protection, source, dependency or capability errors.
@@ -167,6 +169,10 @@ impl File {
             Self::Xlsb(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Xlsb(commit.into_file())),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Xls(commit.after)),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .remove(_target.into_target()?)

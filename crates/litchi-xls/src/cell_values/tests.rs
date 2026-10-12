@@ -149,6 +149,41 @@ fn fixed_numeric_family_package(storage: Storage) -> (Vec<u8>, Reference) {
     (output.into_inner(), reference)
 }
 
+fn mul_blank_family_package() -> (Vec<u8>, Reference) {
+    let (source, reference) = fixed_numeric_family_package(Storage::MulRk);
+    let mut ole = OleFile::open(Cursor::new(source)).unwrap();
+    let workbook = ole.open_stream(&["Workbook"]).unwrap();
+    let mut rebuilt = Vec::new();
+    let mut replaced = false;
+    for record in Records::new(&workbook) {
+        let record = record.unwrap();
+        let mut kind = record.kind().get();
+        let mut payload = record.payload().to_vec();
+        if kind == MUL_RK {
+            assert_eq!(payload.len(), 18);
+            let mut blank = Vec::with_capacity(10);
+            blank.extend_from_slice(&payload[0..4]);
+            blank.extend_from_slice(&payload[4..6]);
+            blank.extend_from_slice(&payload[10..12]);
+            blank.extend_from_slice(&payload[16..18]);
+            kind = MUL_BLANK;
+            payload = blank;
+            replaced = true;
+        }
+        rebuilt.extend_from_slice(&kind.to_le_bytes());
+        rebuilt.extend_from_slice(&(u16::try_from(payload.len()).unwrap()).to_le_bytes());
+        rebuilt.extend_from_slice(&payload);
+    }
+    assert!(replaced);
+    let opaque = ole.open_stream(&["Opaque"]).unwrap();
+    let mut writer = OleWriter::new();
+    writer.create_stream(&["Workbook"], &rebuilt).unwrap();
+    writer.create_stream(&["Opaque"], &opaque).unwrap();
+    let mut output = Cursor::new(Vec::new());
+    writer.write_to(&mut output).unwrap();
+    (output.into_inner(), reference)
+}
+
 fn raw_rk_family_package(storage: Storage, raw_values: &[u32]) -> (Vec<u8>, Reference) {
     let (source, reference) = fixed_numeric_family_package(storage);
     let mut ole = OleFile::open(Cursor::new(source)).unwrap();
@@ -2209,6 +2244,130 @@ fn structural_scalar_replacement_splits_packed_numeric_cells() {
     assert!(matches!(remaining.value(), Value::Number(_)));
     let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
     assert_eq!(restored.bytes(), source.bytes());
+}
+
+#[test]
+fn packed_removal_supports_multiple_members_and_semantic_inverse() {
+    let (bytes, first) = fixed_numeric_family_package(Storage::MulRk);
+    let second = Reference::new(
+        u32::from(first.row()),
+        u32::from(first.column()).saturating_add(1),
+    )
+    .unwrap();
+    let source = Snapshot::from_bytes(bytes).unwrap();
+    let mut edit = source.edit();
+    edit.remove_cell("Sheet1".into(), first).unwrap();
+    edit.remove_cell("Sheet1".into(), second).unwrap();
+    let commit = edit.commit().unwrap();
+    let sheet = commit
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert!(sheet.cell(first).unwrap().is_none());
+    assert!(sheet.cell(second).unwrap().is_none());
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .bytes(),
+        source.bytes()
+    );
+    let semantic = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.snapshot())
+        .unwrap();
+    let restored = semantic
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert!(matches!(
+        restored.cell(first).unwrap().unwrap().value(),
+        Value::Number(_)
+    ));
+    assert!(matches!(
+        restored.cell(second).unwrap().unwrap().value(),
+        Value::Number(_)
+    ));
+}
+
+#[test]
+fn mulblank_members_are_indexed_and_removed_without_dropping_neighbors() {
+    let (bytes, first) = mul_blank_family_package();
+    let second = Reference::new(
+        u32::from(first.row()),
+        u32::from(first.column()).saturating_add(1),
+    )
+    .unwrap();
+    let source = Snapshot::from_bytes(bytes).unwrap();
+    let source_sheet = source.worksheet("Sheet1".into()).unwrap().unwrap();
+    assert_eq!(
+        source_sheet.cell(first).unwrap().unwrap().storage(),
+        Storage::Blank
+    );
+    assert_eq!(
+        source_sheet.cell(second).unwrap().unwrap().storage(),
+        Storage::Blank
+    );
+    let first_style = source_sheet.cell(first).unwrap().unwrap().style();
+    let second_style = source_sheet.cell(second).unwrap().unwrap().style();
+
+    let mut edit = source.edit();
+    edit.remove_cell("Sheet1".into(), first).unwrap();
+    let commit = edit.commit().unwrap();
+    let remaining = commit
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(second)
+        .unwrap()
+        .unwrap();
+    assert!(
+        commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(first)
+            .unwrap()
+            .is_none()
+    );
+    assert_eq!(remaining.storage(), Storage::Blank);
+    assert_eq!(remaining.style(), second_style);
+    assert_eq!(
+        commit
+            .patch()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap()
+            .bytes(),
+        source.bytes()
+    );
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.snapshot())
+        .unwrap();
+    let restored_sheet = restored
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    assert_eq!(
+        restored_sheet.cell(first).unwrap().unwrap().style(),
+        first_style
+    );
+    assert_eq!(
+        restored_sheet.cell(second).unwrap().unwrap().style(),
+        second_style
+    );
 }
 
 #[test]

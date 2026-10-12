@@ -745,7 +745,7 @@ impl Capabilities {
                 return Support::Supported;
             }
             #[cfg(feature = "xls")]
-            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
+            if matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch)
                 && self.adapter() == Some(Adapter::Xls)
             {
                 // The canonical XLS Package always retains its editable
@@ -1265,12 +1265,23 @@ static XLS_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     ),
 ];
 
-/// The first XLS write adapter deliberately admits only scalar cell payloads
-/// and worksheet names.  Keep the remaining write families visible as
+/// The initial XLS write adapter admits scalar cell payloads, stored-cell
+/// removal, and worksheet names. Keep the remaining write families visible as
 /// operation gaps so the format-level report does not imply that every edit
-/// verb has an implementation merely because `set`, `edit` and `batch` do.
+/// verb has an implementation merely because a subset of `set`, `remove`,
+/// `edit` and `batch` is integrated.
 #[cfg(feature = "xls")]
-static XLS_WRITE_GAPS: [GapSpec; 9] = [
+static XLS_WRITE_GAPS: [GapSpec; 10] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "cell",
+            context: "native-dependency-closure",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 XLS dependency-complete cell removal",
+        reason: "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
@@ -1329,7 +1340,7 @@ static XLS_WRITE_GAPS: [GapSpec; 9] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M2 XLS structural remove handlers",
-        reason: "cell, worksheet and other structural removals require native dependency-aware handlers beyond scalar clearing",
+        reason: "cell-record removal is integrated for ordinary stored cells; worksheet, row, column and other structural removals require their own native dependency-aware handlers",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2515,6 +2526,12 @@ impl Element {
             || (self.adapter == Adapter::Xlsb
                 && self.retains_source != Some(false)
                 && matches!(self.data().canonical, "cell" | "sheet")
+                && readable);
+        #[cfg(feature = "xls")]
+        let remove = remove
+            || (self.adapter == Adapter::Xls
+                && self.retains_source != Some(false)
+                && self.data().canonical == "cell"
                 && readable);
         Operations {
             add,

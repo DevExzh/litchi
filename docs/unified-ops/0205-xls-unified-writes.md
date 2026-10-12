@@ -96,6 +96,14 @@ The measured binary SHA-256 is
 `f47d754db2ae61aa64130b8d3c625587dfe51c2afeb82e62b12992b4fb6d0add`;
 no binary is committed.
 
+## Source-test correction (0206)
+
+Record 0206 found that the common write-test helper opened both branches
+from bytes, so its `Auto` branch was eager for CFB. The dedicated filesystem
+freshness/publication tests did use sources, but the broad source/eager claim
+above was too broad. The helper now opens real temporary filesystem sources
+and retains their lifetime; record 0206 reports the corrected validation.
+
 ## Remaining scope
 
 XLS structural verbs, formula/style authoring, security publication,

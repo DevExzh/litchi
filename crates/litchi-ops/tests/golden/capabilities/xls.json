@@ -24,10 +24,7 @@
       "reason": "edit verbs arrive with the write kernel in milestone M2"
     },
     "remove": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "move": {
       "supported": false,
@@ -342,7 +339,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "stable": [
@@ -1322,6 +1319,15 @@
     },
     {
       "subject": "operation",
+      "verb": "remove",
+      "element": "cell",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS dependency-complete cell removal",
+      "reason": "formula cells and unrepresented range or drawing dependencies remain refused; removing the last rich or opaque string identity requires a semantic inverse that retains its metadata"
+    },
+    {
+      "subject": "operation",
       "verb": "set",
       "element": "cell",
       "context": "non-scalar-properties",
@@ -1372,7 +1378,7 @@
       "context": "structural-elements",
       "code": "unsupported_capability",
       "followUp": "M2 XLS structural remove handlers",
-      "reason": "cell, worksheet and other structural removals require native dependency-aware handlers beyond scalar clearing"
+      "reason": "cell-record removal is integrated for ordinary stored cells; worksheet, row, column and other structural removals require their own native dependency-aware handlers"
     },
     {
       "subject": "operation",
