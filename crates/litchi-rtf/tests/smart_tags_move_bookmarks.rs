@@ -56,7 +56,7 @@ fn smart_tag_accepts_normative_direct_attribute_pcdata_and_preserves_source()
     let mut edit = document.edit();
     edit.set_smart_tag(0, edited_tag.clone())?;
     let commit = edit.commit()?;
-    let bytes = commit.snapshot().to_bytes()?;
+    let bytes = commit.package().to_bytes()?;
     let reopened = Package::from_bytes(&bytes)?;
     assert_eq!(reopened.smart_tags()[0].name, edited_tag.name);
     assert_eq!(reopened.smart_tags()[0].attributes[0].value, "4");
@@ -253,29 +253,27 @@ fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
         .set_move_bookmark(0, move_bookmark.clone())?;
     let commit = edit.commit()?;
     assert!(commit.diagnostics().changed());
-    assert_eq!(commit.snapshot().text(), source.text());
-    assert_eq!(commit.snapshot().smart_tags()[0], smart_tag);
-    assert_eq!(commit.snapshot().move_bookmarks()[0], move_bookmark);
+    assert_eq!(commit.package().text(), source.text());
+    assert_eq!(commit.package().smart_tags()[0], smart_tag);
+    assert_eq!(commit.package().move_bookmarks()[0], move_bookmark);
     assert!(
-        commit
-            .patch()
-            .apply(&source)?
-            .same_snapshot(commit.snapshot())
+        source
+            .apply(commit.patch())?
+            .same_snapshot(commit.package())
     );
     assert!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())?
+            .package()
+            .apply(&commit.patch().inverse())?
             .same_snapshot(&source)
     );
     let foreign = Package::parse(r#"{\rtf1\ansi other}"#)?;
     assert!(matches!(
-        commit.patch().apply(&foreign),
+        foreign.apply(commit.patch()),
         Err(litchi_rtf::edit::Error::PatchConflict)
     ));
 
-    let bytes = commit.snapshot().to_bytes()?;
+    let bytes = commit.package().to_bytes()?;
     std::fs::write("/var/tmp/litchi-spec-gap-smart-move.rtf", &bytes).map_err(|error| {
         litchi_rtf::Error::MalformedDocument(format!("artifact write failed: {error}"))
     })?;
@@ -288,7 +286,7 @@ fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
         .set_move_bookmark(0, source.move_bookmarks()[0].clone())?;
     let noop = noop.commit()?;
     assert!(!noop.diagnostics().changed());
-    assert!(noop.snapshot().same_snapshot(&source));
+    assert!(noop.package().same_snapshot(&source));
     Ok(())
 }
 
@@ -300,7 +298,7 @@ fn changed_publication_refuses_unmatched_move_source() -> Result<(), Box<dyn std
     noop.set_smart_tag(0, source.smart_tags()[0].clone())?;
     let noop = noop.commit()?;
     assert!(!noop.diagnostics().changed());
-    assert_eq!(noop.snapshot().to_bytes()?, source_bytes);
+    assert_eq!(noop.package().to_bytes()?, source_bytes);
 
     let mut edit = source.edit();
     edit.set_smart_tag(0, {

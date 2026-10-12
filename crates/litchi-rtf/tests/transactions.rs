@@ -63,7 +63,7 @@ fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
     assert_eq!(second.format().horizontal_scale_percent(), 80);
     assert_eq!(second.format().kerning_half_points(), 8);
 
-    let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
     let reopened_first = reopened
         .body()
         .runs()
@@ -81,9 +81,8 @@ fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
     assert_eq!(reopened_first.format().kerning_half_points(), 8);
     assert!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .same_snapshot(&source)
     );
@@ -99,7 +98,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         .set_text_expansion(span, litchi_rtf::CharacterExpansion::QuarterPoints(4))
         .unwrap();
     let quarter = quarter_edit.commit().unwrap();
-    let quarter_bytes = quarter.snapshot().to_bytes().unwrap();
+    let quarter_bytes = quarter.package().to_bytes().unwrap();
     assert!(
         quarter_bytes
             .windows(br"\expnd4 ".len())
@@ -117,7 +116,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         litchi_rtf::CharacterExpansion::QuarterPoints(4)
     );
 
-    let quarter_inverse = quarter.patch().inverse().apply(quarter.snapshot()).unwrap();
+    let quarter_inverse = quarter.package().apply(&quarter.patch().inverse()).unwrap();
     assert_eq!(
         quarter_inverse.to_bytes().unwrap(),
         source.to_bytes().unwrap()
@@ -128,7 +127,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         .set_text_expansion(span, litchi_rtf::CharacterExpansion::Twips(-15))
         .unwrap();
     let twips = twips_edit.commit().unwrap();
-    let twips_bytes = twips.snapshot().to_bytes().unwrap();
+    let twips_bytes = twips.package().to_bytes().unwrap();
     assert!(
         twips_bytes
             .windows(br"\expndtw-15 ".len())
@@ -146,7 +145,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         litchi_rtf::CharacterExpansion::Twips(-15)
     );
 
-    let twips_inverse = twips.patch().inverse().apply(twips.snapshot()).unwrap();
+    let twips_inverse = twips.package().apply(&twips.patch().inverse()).unwrap();
     assert_eq!(
         twips_inverse.to_bytes().unwrap(),
         quarter_document.to_bytes().unwrap()
@@ -157,7 +156,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         .set_text_expansion(span, litchi_rtf::CharacterExpansion::None)
         .unwrap();
     let reset = reset_edit.commit().unwrap();
-    let reset_bytes = reset.snapshot().to_bytes().unwrap();
+    let reset_bytes = reset.package().to_bytes().unwrap();
     assert!(
         reset_bytes
             .windows(br"\expnd0 ".len())
@@ -174,7 +173,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
             .expansion(),
         litchi_rtf::CharacterExpansion::None
     );
-    let reset_inverse = reset.patch().inverse().apply(reset.snapshot()).unwrap();
+    let reset_inverse = reset.package().apply(&reset.patch().inverse()).unwrap();
     assert_eq!(
         reset_inverse.to_bytes().unwrap(),
         twips_document.to_bytes().unwrap()
@@ -194,7 +193,7 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
         .set_text_horizontal_scale_percent(TextSpan::new(0, 5).unwrap(), 100)
         .unwrap();
     let scale_commit = scale_edit.commit().unwrap();
-    let scale_bytes = scale_commit.snapshot().to_bytes().unwrap();
+    let scale_bytes = scale_commit.package().to_bytes().unwrap();
     assert!(
         scale_bytes
             .windows(br"\charscalex100 ".len())
@@ -212,9 +211,8 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
         100
     );
     let scale_inverse = scale_commit
-        .patch()
-        .inverse()
-        .apply(scale_commit.snapshot())
+        .package()
+        .apply(&scale_commit.patch().inverse())
         .unwrap();
     assert_eq!(
         scale_inverse.to_bytes().unwrap(),
@@ -227,7 +225,7 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
         .set_text_kerning(TextSpan::new(0, 5).unwrap(), 0)
         .unwrap();
     let kerning_commit = kerning_edit.commit().unwrap();
-    let kerning_bytes = kerning_commit.snapshot().to_bytes().unwrap();
+    let kerning_bytes = kerning_commit.package().to_bytes().unwrap();
     assert!(
         kerning_bytes
             .windows(br"\kerning0 ".len())
@@ -245,9 +243,8 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
         0
     );
     let kerning_inverse = kerning_commit
-        .patch()
-        .inverse()
-        .apply(kerning_commit.snapshot())
+        .package()
+        .apply(&kerning_commit.patch().inverse())
         .unwrap();
     assert_eq!(
         kerning_inverse.to_bytes().unwrap(),
@@ -331,7 +328,7 @@ fn ordinary_positioning_crud_enforces_bounds_and_exact_noops() {
         .unwrap();
     let expansion_noop = expansion_noop.commit().unwrap();
     assert!(!expansion_noop.diagnostics().changed());
-    assert!(expansion_noop.snapshot().same_snapshot(&source));
+    assert!(expansion_noop.package().same_snapshot(&source));
 
     let mut scale_noop = source.edit();
     scale_noop
@@ -339,13 +336,13 @@ fn ordinary_positioning_crud_enforces_bounds_and_exact_noops() {
         .unwrap();
     let scale_noop = scale_noop.commit().unwrap();
     assert!(!scale_noop.diagnostics().changed());
-    assert!(scale_noop.snapshot().same_snapshot(&source));
+    assert!(scale_noop.package().same_snapshot(&source));
 
     let mut kerning_noop = source.edit();
     kerning_noop.set_text_kerning(span, 8).unwrap();
     let kerning_noop = kerning_noop.commit().unwrap();
     assert!(!kerning_noop.diagnostics().changed());
-    assert!(kerning_noop.snapshot().same_snapshot(&source));
+    assert!(kerning_noop.package().same_snapshot(&source));
 }
 
 #[test]
@@ -376,18 +373,18 @@ fn body_text_commit_is_atomic_reversible_and_source_checked() {
     let commit = edit.commit().unwrap();
 
     assert_eq!(source.text(), "Plain\nBody");
-    assert_eq!(commit.snapshot().text(), "Changed\nbody");
+    assert_eq!(commit.package().text(), "Changed\nbody");
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().operation_count(), 1);
 
-    let applied = commit.patch().apply(&source).unwrap();
-    assert!(applied.same_snapshot(commit.snapshot()));
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let applied = source.apply(commit.patch()).unwrap();
+    assert!(applied.same_snapshot(commit.package()));
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert!(restored.same_snapshot(&source));
 
     let other = Package::parse(r"{\rtf1\ansi Other}").unwrap();
     assert!(matches!(
-        commit.patch().apply(&other),
+        other.apply(commit.patch()),
         Err(Error::PatchConflict)
     ));
 }
@@ -400,7 +397,7 @@ fn body_text_noop_shares_the_source_snapshot() {
     let commit = edit.commit().unwrap();
 
     assert!(!commit.diagnostics().changed());
-    assert!(commit.snapshot().same_snapshot(&source));
+    assert!(commit.package().same_snapshot(&source));
 }
 
 #[test]
@@ -426,7 +423,7 @@ fn transaction_composes_disjoint_spans_and_a_property() {
     edit.set_paragraph_alignment(0, Alignment::Center).unwrap();
     let commit = edit.commit().unwrap();
 
-    assert_eq!(commit.snapshot().text(), "A Beta G");
+    assert_eq!(commit.package().text(), "A Beta G");
     assert_eq!(
         commit
             .snapshot()
@@ -499,11 +496,11 @@ fn body_text_splice_preserves_modeled_header_bytes_exactly() {
     let mut edit = document.edit();
     edit.replace_body_text("Changed\nbody").unwrap();
     let commit = edit.commit().unwrap();
-    let output = commit.snapshot().to_bytes().unwrap();
+    let output = commit.package().to_bytes().unwrap();
 
     assert_eq!(&output[..prefix.len()], prefix);
     assert_eq!(&output[prefix.len()..], br"Changed\par body}");
-    assert_eq!(commit.snapshot().text(), "Changed\nbody");
+    assert_eq!(commit.package().text(), "Changed\nbody");
 }
 
 #[test]
@@ -528,14 +525,13 @@ fn paragraph_text_edit_is_checked_local_and_reversible() {
     let commit = edit.commit().unwrap();
 
     assert_eq!(source.text(), "First\nSecond\nThird");
-    assert_eq!(commit.snapshot().text(), "First\nChanged\nThird");
+    assert_eq!(commit.package().text(), "First\nChanged\nThird");
     assert_eq!(commit.diagnostics().operation_count(), 1);
     assert!(commit.diagnostics().changed());
     assert!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .same_snapshot(&source)
     );
@@ -580,7 +576,7 @@ fn durable_multi_operation_patch_is_deterministic_reversible_and_source_checked(
     let applied = source.apply_durable(&decoded).unwrap();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
+        commit.package().to_bytes().unwrap()
     );
     let restored = applied.apply_durable(&decoded.inverse()).unwrap();
     assert_eq!(restored.text(), source.text());
@@ -674,7 +670,7 @@ fn no_op_patch_is_empty_durable_and_history_is_budgeted() {
     edit.set_paragraph_alignment(0, Alignment::Left).unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
-    assert!(commit.snapshot().same_snapshot(&source));
+    assert!(commit.package().same_snapshot(&source));
     let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
     assert!(durable.operations().is_empty());
     assert!(
@@ -704,7 +700,7 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
         .set_text_bold(TextSpan::new(0, 5).unwrap(), true)
         .unwrap();
     let formatted = formatting.commit().unwrap();
-    let runs = formatted.snapshot().body().runs().collect::<Vec<_>>();
+    let runs = formatted.package().body().runs().collect::<Vec<_>>();
     assert_eq!(runs[0].text(), "Alpha");
     assert!(runs[0].format().bold());
     assert!(!runs[1].format().bold());
@@ -718,7 +714,7 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
     let mut structure = source.edit();
     structure.insert_paragraph_after(0, "Inserted").unwrap();
     let inserted = structure.commit().unwrap();
-    assert_eq!(inserted.snapshot().text(), "Alpha\nInserted\nBeta");
+    assert_eq!(inserted.package().text(), "Alpha\nInserted\nBeta");
     let structural_patch = inserted.patch().to_durable(durable_limits(1)).unwrap();
     let structurally_applied = source.apply_durable(&structural_patch).unwrap();
     assert_eq!(structurally_applied.text(), "Alpha\nInserted\nBeta");
@@ -740,7 +736,7 @@ fn multiple_paragraph_insertions_have_target_relative_durable_inverses() {
         .insert_paragraph_after(1, "Y")
         .unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().text(), "A\nX\nB\nY\nC");
+    assert_eq!(commit.package().text(), "A\nX\nB\nY\nC");
 
     let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
     let durable_json: serde_json::Value =
@@ -756,7 +752,7 @@ fn multiple_paragraph_insertions_have_target_relative_durable_inverses() {
     let applied = source.apply_durable(&durable).unwrap();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
+        commit.package().to_bytes().unwrap()
     );
 
     let inverse = durable.inverse();
@@ -783,7 +779,7 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
         .set_text_italic(TextSpan::new(6, 10).unwrap(), true)
         .unwrap();
     let formatted = edit.commit().unwrap();
-    let runs = formatted.snapshot().body().runs().collect::<Vec<_>>();
+    let runs = formatted.package().body().runs().collect::<Vec<_>>();
     assert_eq!(
         runs.iter()
             .map(|run| (run.text(), run.format().italic()))
@@ -795,12 +791,11 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
             (" Gamma", false)
         ]
     );
-    assert_eq!(formatted.snapshot().text(), source.text());
+    assert_eq!(formatted.package().text(), source.text());
     assert_eq!(
         formatted
-            .patch()
-            .inverse()
-            .apply(formatted.snapshot())
+            .package()
+            .apply(&formatted.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -840,7 +835,7 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
     let applied = source.apply_durable(&decoded).unwrap();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        formatted.snapshot().to_bytes().unwrap()
+        formatted.package().to_bytes().unwrap()
     );
     let restored = applied.apply_durable(&decoded.inverse()).unwrap();
     assert_eq!(restored.text(), source.text());
@@ -853,7 +848,7 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
         .set_text_italic(TextSpan::new(6, 10).unwrap(), true)
         .unwrap();
     let mixed = mixed_edit.commit().unwrap();
-    let mixed_runs = mixed.snapshot().body().runs().collect::<Vec<_>>();
+    let mixed_runs = mixed.package().body().runs().collect::<Vec<_>>();
     assert!(
         mixed_runs
             .iter()
@@ -875,7 +870,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         .unwrap();
     let noop = noop.commit().unwrap();
     assert!(!noop.diagnostics().changed());
-    assert_eq!(noop.snapshot().to_bytes().unwrap(), original);
+    assert_eq!(noop.package().to_bytes().unwrap(), original);
 
     let plain = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let mut overlap = plain.edit();
@@ -1017,7 +1012,7 @@ fn underline_edit_preserves_uniform_body_character_baseline_and_inverse() {
     edit.set_text_underline(TextSpan::new(6, 10).unwrap(), UnderlineStyle::Single)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
     assert!(reopened.body().runs().all(|run| run.format().bold()));
     assert_eq!(
         reopened
@@ -1039,7 +1034,7 @@ fn underline_edit_preserves_uniform_body_character_baseline_and_inverse() {
             .underline(),
         UnderlineStyle::Single
     );
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(
         restored.to_bytes().unwrap(),
         source.to_bytes().unwrap(),
@@ -1090,7 +1085,7 @@ fn underline_property_supports_exact_styles_and_inverse() {
                 .underline(),
             style
         );
-        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
         assert!(
             restored
                 .body()
@@ -1271,7 +1266,7 @@ fn strike_edit_preserves_double_strike_and_creates_later_run_boundary() {
     edit.set_text_strike(TextSpan::new(6, 12).unwrap(), true)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     assert!(
         bytes
             .windows(br"\striked".len())
@@ -1298,7 +1293,7 @@ fn strike_edit_preserves_double_strike_and_creates_later_run_boundary() {
             .format()
             .strike()
     );
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
 
@@ -1403,14 +1398,14 @@ fn hidden_edit_is_noop_when_state_is_already_hidden_or_visible() {
         .unwrap();
     let visible_commit = visible.commit().unwrap();
     assert!(!visible_commit.diagnostics().changed());
-    assert!(visible_commit.snapshot().same_snapshot(&source));
+    assert!(visible_commit.package().same_snapshot(&source));
 
     let mut hidden = source.edit();
     hidden
         .set_text_hidden(TextSpan::new(0, 5).unwrap(), true)
         .unwrap();
     let hidden_commit = hidden.commit().unwrap();
-    let bytes = hidden_commit.snapshot().to_bytes().unwrap();
+    let bytes = hidden_commit.package().to_bytes().unwrap();
     assert!(bytes.windows(br"\v ".len()).any(|window| window == br"\v "));
     assert!(
         bytes
@@ -1433,9 +1428,8 @@ fn hidden_edit_is_noop_when_state_is_already_hidden_or_visible() {
     assert!(hidden_text.contains("Alpha"));
     assert!(visible_text.contains("Beta"));
     let restored = hidden_commit
-        .patch()
-        .inverse()
-        .apply(hidden_commit.snapshot())
+        .package()
+        .apply(&hidden_commit.patch().inverse())
         .unwrap();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
 }
@@ -1452,7 +1446,7 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
     edit.set_text_hidden(TextSpan::new(6, 10).unwrap(), true)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     let reopened = Package::from_bytes(&bytes).unwrap();
     let hidden_text = reopened
         .body()
@@ -1468,7 +1462,7 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
         .collect::<String>();
     assert!(hidden_text.contains("Beta"));
     assert!(visible_text.contains("Alpha"));
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
 
     let mixed = Package::parse(r"{\rtf1\ansi {\v Alpha} Beta}").unwrap();
@@ -1565,13 +1559,13 @@ fn small_caps_property_preserves_all_caps_and_run_boundaries() {
         .unwrap();
     let noop_commit = noop.commit().unwrap();
     assert!(!noop_commit.diagnostics().changed());
-    assert!(noop_commit.snapshot().same_snapshot(&source));
+    assert!(noop_commit.package().same_snapshot(&source));
 
     let mut edit = source.edit();
     edit.set_text_small_caps(TextSpan::new(6, 10).unwrap(), true)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     assert!(
         bytes
             .windows(br"\scaps ".len())
@@ -1599,7 +1593,7 @@ fn small_caps_property_preserves_all_caps_and_run_boundaries() {
     assert!(small_caps_text.contains("Beta"));
     assert!(reopened.body().runs().all(|run| run.format().all_caps()));
 
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert!(restored.body().runs().all(|run| !run.format().small_caps()));
     Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 }
@@ -1714,13 +1708,13 @@ fn all_caps_property_preserves_small_caps_and_both_control_boundaries() {
         .unwrap();
     let noop_commit = noop.commit().unwrap();
     assert!(!noop_commit.diagnostics().changed());
-    assert!(noop_commit.snapshot().same_snapshot(&source));
+    assert!(noop_commit.package().same_snapshot(&source));
 
     let mut edit = source.edit();
     edit.set_text_all_caps(TextSpan::new(6, 10).unwrap(), true)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     assert!(
         bytes
             .windows(br"\caps ".len())
@@ -1751,7 +1745,7 @@ fn all_caps_property_preserves_small_caps_and_both_control_boundaries() {
     assert!(all_caps_text.contains("Beta"));
     assert!(!all_caps_text.contains("Alpha"));
 
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| run.format().small_caps()));
     assert!(restored.body().runs().all(|run| !run.format().all_caps()));
@@ -1862,13 +1856,13 @@ fn double_strike_property_preserves_single_strike_and_both_control_boundaries() 
         .unwrap();
     let noop_commit = noop.commit().unwrap();
     assert!(!noop_commit.diagnostics().changed());
-    assert!(noop_commit.snapshot().same_snapshot(&source));
+    assert!(noop_commit.package().same_snapshot(&source));
 
     let mut edit = source.edit();
     edit.set_text_double_strike(TextSpan::new(6, 10).unwrap(), true)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     assert!(
         bytes
             .windows(br"\striked ".len())
@@ -1899,7 +1893,7 @@ fn double_strike_property_preserves_single_strike_and_both_control_boundaries() 
     assert!(double_strike_text.contains("Beta"));
     assert!(!double_strike_text.contains("Alpha"));
 
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| run.format().strike()));
     assert!(
@@ -2094,7 +2088,7 @@ fn core_subedits_compose_and_report_typed_conflicts() {
         .join(prepared_alignment)
         .unwrap();
     let committed = joined.commit().unwrap();
-    assert_eq!(committed.snapshot().text(), "A Beta");
+    assert_eq!(committed.package().text(), "A Beta");
     assert_eq!(
         committed
             .snapshot()
@@ -2150,7 +2144,7 @@ fn three_way_merge_is_non_mutating_until_resolved_and_committed() {
     let mut unresolved = *plan.finish().unwrap_err();
     unresolved.resolve(MergeResolution::Left);
     let merged = unresolved.finish().unwrap().commit().unwrap();
-    assert_eq!(merged.snapshot().text(), "Left Beta");
+    assert_eq!(merged.package().text(), "Left Beta");
     assert_eq!(source.text(), "Alpha Beta");
 }
 
@@ -2171,15 +2165,15 @@ fn retained_destinations_are_multi_operation_durable_and_reversible() {
     let commit = edit.commit().unwrap();
 
     assert_eq!(
-        commit.snapshot().sections()[0].headers_footers[0].text(),
+        commit.package().sections()[0].headers_footers[0].text(),
         "Running head"
     );
     assert_eq!(
-        commit.snapshot().tables()[0].rows()[0].cells()[0].text(),
+        commit.package().tables()[0].rows()[0].cells()[0].text(),
         "First"
     );
     assert_eq!(
-        commit.snapshot().tables()[0].rows()[0].cells()[1].text(),
+        commit.package().tables()[0].rows()[0].cells()[1].text(),
         "Second"
     );
     assert_eq!(source.tables()[0].rows()[0].cells()[0].text(), "A");
@@ -2188,7 +2182,7 @@ fn retained_destinations_are_multi_operation_durable_and_reversible() {
     let applied = source.apply_durable(&durable).unwrap();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
+        commit.package().to_bytes().unwrap()
     );
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert_eq!(restored.tables()[0].rows()[0].cells()[0].text(), "A");
@@ -2205,11 +2199,11 @@ fn note_and_annotation_text_are_durable_historical_mergeable_and_reopen() {
     edit.set_note_text(0, "Updated note").unwrap();
     edit.set_annotation_text(0, "Updated comment").unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().notes()[0].content, "Updated note");
-    assert_eq!(commit.snapshot().annotations()[0].text, "Updated comment");
-    assert_eq!(commit.snapshot().text(), source.text());
+    assert_eq!(commit.package().notes()[0].content, "Updated note");
+    assert_eq!(commit.package().annotations()[0].text, "Updated comment");
+    assert_eq!(commit.package().text(), source.text());
 
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     let serialized = String::from_utf8_lossy(&bytes);
     assert!(serialized.contains("\\footnote"));
     assert!(serialized.contains("\\annotation"));
@@ -2252,8 +2246,8 @@ fn note_and_annotation_text_are_durable_historical_mergeable_and_reopen() {
     let merge = MergePlan::new(left, right).unwrap();
     assert!(merge.conflicts().is_empty());
     let merged = merge.finish().unwrap().commit().unwrap();
-    assert_eq!(merged.snapshot().notes()[0].content, "Merged note");
-    assert_eq!(merged.snapshot().annotations()[0].text, "Merged comment");
+    assert_eq!(merged.package().notes()[0].content, "Merged note");
+    assert_eq!(merged.package().annotations()[0].text, "Merged comment");
 
     let mut first_note = source.edit();
     first_note.set_note_text(0, "First branch").unwrap();
@@ -2302,15 +2296,15 @@ fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens(
     let mut edit = source.edit();
     edit.set_shape_text(0, "Edited frame\nsecond line").unwrap();
     let commit = edit.commit().unwrap();
-    let edited = &commit.snapshot().shapes()[0];
+    let edited = &commit.package().shapes()[0];
     assert_eq!(edited.text, "Edited frame\nsecond line");
     assert_eq!(edited.position, original.position);
     assert_eq!(edited.geometry, original.geometry);
     assert_eq!(edited.properties, original.properties);
     assert_eq!(edited.text_formatting, original.text_formatting);
-    assert_eq!(commit.snapshot().text(), source.text());
+    assert_eq!(commit.package().text(), source.text());
 
-    let output = commit.snapshot().to_bytes().unwrap();
+    let output = commit.package().to_bytes().unwrap();
     assert!(String::from_utf8_lossy(&output).contains("\\shptxt Edited frame\\par second line"));
     let reopened = Package::from_bytes(&output).unwrap();
     assert_eq!(reopened.shapes()[0].text, "Edited frame\nsecond line");
@@ -2350,13 +2344,13 @@ fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens(
     let transfer = TransferPlan::shape(&source, 0, &target).unwrap();
     assert!(transfer.is_dependency_free());
     let transferred = transfer.commit().unwrap();
-    assert_eq!(transferred.snapshot().shapes().len(), 1);
-    assert_eq!(transferred.snapshot().shapes()[0].text, original.text);
+    assert_eq!(transferred.package().shapes().len(), 1);
+    assert_eq!(transferred.package().shapes()[0].text, original.text);
     assert_eq!(
-        transferred.snapshot().shapes()[0].position,
+        transferred.package().shapes()[0].position,
         target.text().len()
     );
-    let transferred_output = transferred.snapshot().to_bytes().unwrap();
+    let transferred_output = transferred.package().to_bytes().unwrap();
     let transferred_reopen = Package::from_bytes(&transferred_output).unwrap();
     assert_eq!(transferred_reopen.shapes()[0].geometry, original.geometry);
     let transfer_durable = transferred.patch().to_durable(durable_limits(1)).unwrap();
@@ -2455,11 +2449,11 @@ fn destination_subedits_join_disjointly_and_plan_same_target_conflicts() {
         .unwrap();
     let committed = joined.commit().unwrap();
     assert_eq!(
-        committed.snapshot().tables()[0].rows()[0].cells()[0].text(),
+        committed.package().tables()[0].rows()[0].cells()[0].text(),
         "First"
     );
     assert_eq!(
-        committed.snapshot().tables()[0].rows()[0].cells()[1].text(),
+        committed.package().tables()[0].rows()[0].cells()[1].text(),
         "Second"
     );
 
@@ -2520,13 +2514,13 @@ fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
         .unwrap();
     let noop_commit = noop.commit().unwrap();
     assert!(!noop_commit.diagnostics().changed());
-    assert!(noop_commit.snapshot().same_snapshot(&source));
+    assert!(noop_commit.package().same_snapshot(&source));
 
     let mut edit = source.edit();
     edit.set_text_font_size(TextSpan::new(6, 10).unwrap(), NonZeroU16::new(23).unwrap())
         .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     let encoded = String::from_utf8_lossy(&bytes);
     assert!(encoded.contains(r"\fs23 "));
     assert!(encoded.contains(r"\fs24 "));
@@ -2548,7 +2542,7 @@ fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
     assert!(size_23_text.contains("Beta"));
     assert!(size_24_text.contains("Alpha"));
 
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(restored.text(), source.text());
     assert!(
         restored
@@ -2758,21 +2752,21 @@ fn baseline_property_covers_all_states_reopen_noop_and_inverse() {
                 .baseline(),
             baseline
         );
-        assert_eq!(commit.snapshot().text(), source.text());
+        assert_eq!(commit.package().text(), source.text());
 
         if baseline == CharacterBaseline::Normal {
             assert!(!commit.diagnostics().changed());
-            assert!(commit.snapshot().same_snapshot(&source));
+            assert!(commit.package().same_snapshot(&source));
         } else {
             assert!(commit.diagnostics().changed());
         }
 
-        let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+        let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.body().runs().next().unwrap().format().baseline(),
             baseline
         );
-        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
         assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
     }
 }
@@ -2806,7 +2800,7 @@ fn baseline_property_respects_ungrouped_legacy_control_boundaries() {
         edit.set_text_baseline(TextSpan::new(5, 9).unwrap(), target)
             .unwrap();
         let commit = edit.commit().unwrap();
-        let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+        let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body()
@@ -2819,9 +2813,8 @@ fn baseline_property_respects_ungrouped_legacy_control_boundaries() {
         );
         assert_eq!(
             commit
-                .patch()
-                .inverse()
-                .apply(commit.snapshot())
+                .package()
+                .apply(&commit.patch().inverse())
                 .unwrap()
                 .to_bytes()
                 .unwrap(),
@@ -2838,7 +2831,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
     edit.set_text_baseline(TextSpan::new(6, 10).unwrap(), CharacterBaseline::Subscript)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
     let alpha = reopened
         .body()
         .runs()
@@ -2853,7 +2846,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
     assert_eq!(alpha.format().baseline(), CharacterBaseline::Normal);
     assert!(beta.format().bold());
     assert_eq!(beta.format().baseline(), CharacterBaseline::Subscript);
-    let committed_bytes = commit.snapshot().to_bytes().unwrap();
+    let committed_bytes = commit.package().to_bytes().unwrap();
     assert!(
         committed_bytes
             .windows(b"\\expndtw20".len())
@@ -2871,9 +2864,8 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -2935,7 +2927,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
         .unwrap();
     let noop_commit = noop.commit().unwrap();
     assert!(!noop_commit.diagnostics().changed());
-    assert!(noop_commit.snapshot().same_snapshot(&source));
+    assert!(noop_commit.package().same_snapshot(&source));
 
     let composed_source = Package::parse(r"{\rtf1\ansi\outl Alpha \outl0 Beta}").unwrap();
     let mut composed = composed_source.edit();
@@ -2947,7 +2939,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
         .unwrap();
     let composed_commit = composed.commit().unwrap();
     let composed_reopened =
-        Package::from_bytes(&composed_commit.snapshot().to_bytes().unwrap()).unwrap();
+        Package::from_bytes(&composed_commit.package().to_bytes().unwrap()).unwrap();
     let alpha = composed_reopened
         .body()
         .runs()
@@ -2969,7 +2961,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().operation_count(), 1);
 
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     assert!(
         bytes
             .windows(br"\outl".len())
@@ -3010,7 +3002,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
         assert!(format.hidden());
     }
 
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(restored.text(), source.text());
     let reopened_restored = Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
     let restored_alpha = reopened_restored
@@ -3120,7 +3112,7 @@ fn outline_property_has_durable_schema_replay_stale_and_malformed_value_guards()
         stale_edit
             .set_text_outline(TextSpan::new(0, 5).unwrap(), true)
             .unwrap();
-        stale_edit.commit().unwrap().into_snapshot()
+        stale_edit.commit().unwrap().into_package()
     };
     let stale_bytes = stale_source.to_bytes().unwrap();
     let mut stale_json: Value = serde_json::from_slice(&encoded).unwrap();
@@ -3208,7 +3200,7 @@ fn baseline_property_has_durable_schema_replay_stale_and_malformed_value_guards(
         stale_edit
             .set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Subscript)
             .unwrap();
-        stale_edit.commit().unwrap().into_snapshot()
+        stale_edit.commit().unwrap().into_package()
     };
     let stale_bytes = stale_source.to_bytes().unwrap();
     let mut stale_json: Value = serde_json::from_slice(&encoded).unwrap();
@@ -3281,7 +3273,7 @@ fn character_property_edits_preserve_paragraph_formatting() {
     edit.set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Superscript)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     assert!(
         bytes
             .windows(br"\sb120".len())
@@ -3299,9 +3291,8 @@ fn character_property_edits_preserve_paragraph_formatting() {
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),

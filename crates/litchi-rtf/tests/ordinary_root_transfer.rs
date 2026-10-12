@@ -39,7 +39,7 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
     )
     .unwrap();
     assert_eq!(nested_plan.dependency_count(), 2);
-    let nested = nested_plan.commit().unwrap().into_snapshot();
+    let nested = nested_plan.commit().unwrap().into_package();
     assert_eq!(
         nested.tables()[0].rows()[0].cells()[0].nested_tables()[0]
             .table
@@ -96,7 +96,7 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
     let style_plan =
         TransferPlan::style(&style_source, StyleKind::Paragraph, 1, &resource_target).unwrap();
     assert_eq!(style_plan.dependency_count(), 1);
-    let styled = style_plan.commit().unwrap().into_snapshot();
+    let styled = style_plan.commit().unwrap().into_package();
     assert!(styled.styles().iter().any(|style| style.id == 0));
     assert!(styled.styles().iter().any(|style| style.id == 1));
 
@@ -107,7 +107,7 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
     let drawing_field_plan =
         TransferPlan::field(&drawing_field_source, 0, &resource_target).unwrap();
     assert_eq!(drawing_field_plan.dependency_count(), 1);
-    let drawing_field = drawing_field_plan.commit().unwrap().into_snapshot();
+    let drawing_field = drawing_field_plan.commit().unwrap().into_package();
     assert_eq!(drawing_field.fields()[0].shapes.len(), 1);
     assert!(
         drawing_field.fields()[0]
@@ -133,7 +133,7 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
     .unwrap();
     let list_plan = TransferPlan::list(&list_source, 7, &list_target).unwrap();
     assert_eq!(list_plan.dependency_count(), 3);
-    let listed = list_plan.commit().unwrap().into_snapshot();
+    let listed = list_plan.commit().unwrap().into_package();
     assert_eq!(listed.pictures().len(), 2);
     assert_eq!(
         listed
@@ -159,7 +159,7 @@ fn nested_table_style_list_and_object_transfers_reopen_with_dependencies() {
     .unwrap();
     let object_plan = TransferPlan::object(&object_source, 0, &resource_target).unwrap();
     assert_eq!(object_plan.dependency_count(), 1);
-    let object = object_plan.commit().unwrap().into_snapshot();
+    let object = object_plan.commit().unwrap().into_package();
     assert_eq!(object.pictures().len(), 1);
     assert_eq!(object.objects().len(), 1);
     Package::from_bytes(&object.to_bytes().unwrap()).unwrap();

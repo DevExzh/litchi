@@ -48,10 +48,10 @@ fn paragraph_batch_matches_scalar_bytes_for_first_middle_and_last() {
     scalar.replace_paragraph_text(3, "Four").unwrap();
     let scalar = scalar.commit().unwrap();
 
-    assert_eq!(batched.snapshot().text(), "One\nSecond\nThree\nFour");
+    assert_eq!(batched.package().text(), "One\nSecond\nThree\nFour");
     assert_eq!(
-        batched.snapshot().to_bytes().unwrap(),
-        scalar.snapshot().to_bytes().unwrap()
+        batched.package().to_bytes().unwrap(),
+        scalar.package().to_bytes().unwrap()
     );
     assert_eq!(batched.diagnostics().operation_count(), 3);
 }
@@ -160,16 +160,16 @@ fn paragraph_batch_preserves_noops_and_conflict_rules() {
     let mixed = mixed.commit().unwrap();
     assert!(mixed.diagnostics().changed());
     assert_eq!(mixed.diagnostics().operation_count(), 2);
-    assert_eq!(mixed.snapshot().text(), "First\nChanged\nThird");
+    assert_eq!(mixed.package().text(), "First\nChanged\nThird");
 
     let mut noop = source.edit();
     noop.replace_body_paragraph_texts(&replacements(&[(0, "First"), (1, "Second"), (2, "Third")]))
         .unwrap();
     let noop = noop.commit().unwrap();
     assert!(!noop.diagnostics().changed());
-    assert!(noop.snapshot().same_snapshot(&source));
+    assert!(noop.package().same_snapshot(&source));
     assert_eq!(
-        noop.snapshot().to_bytes().unwrap(),
+        noop.package().to_bytes().unwrap(),
         source.to_bytes().unwrap()
     );
 
@@ -208,7 +208,7 @@ fn paragraph_batch_is_durable_reversible_and_source_checked() {
     let applied = source.apply_durable(&durable).unwrap();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
+        commit.package().to_bytes().unwrap()
     );
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
@@ -277,8 +277,8 @@ fn protected_exact_noops_remain_byte_identical() {
             .unwrap();
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
-        assert!(commit.snapshot().same_snapshot(&source));
-        assert_eq!(commit.snapshot().to_bytes().unwrap(), exact);
+        assert!(commit.package().same_snapshot(&source));
+        assert_eq!(commit.package().to_bytes().unwrap(), exact);
     }
 
     let destination =
@@ -292,8 +292,8 @@ fn protected_exact_noops_remain_byte_identical() {
     .unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
-    assert!(commit.snapshot().same_snapshot(&destination));
-    assert_eq!(commit.snapshot().to_bytes().unwrap(), exact);
+    assert!(commit.package().same_snapshot(&destination));
+    assert_eq!(commit.package().to_bytes().unwrap(), exact);
 }
 
 #[test]
@@ -304,7 +304,7 @@ fn paragraph_batch_preserves_transport_encoding_and_opaque_guards() {
         .replace_body_paragraph_texts(&replacements(&[(0, "Changed")]))
         .unwrap();
     let cp1252_commit = cp1252_edit.commit().unwrap();
-    assert_eq!(cp1252_commit.snapshot().text(), "Changed\nSuite");
+    assert_eq!(cp1252_commit.package().text(), "Changed\nSuite");
     assert!(
         cp1252_commit
             .snapshot()
@@ -365,12 +365,12 @@ fn batch_commit_is_immutable_across_partial_sink_failure() {
     edit.replace_body_paragraph_texts(&replacements(&[(0, "One"), (2, "Three")]))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let exact = commit.snapshot().to_bytes().unwrap();
+    let exact = commit.package().to_bytes().unwrap();
     let mut sink = FailAfter {
         accepted: 0,
         limit: exact.len() / 2,
     };
-    assert!(commit.snapshot().write_to(&mut sink).is_err());
-    assert_eq!(commit.snapshot().to_bytes().unwrap(), exact);
+    assert!(commit.package().write_to(&mut sink).is_err());
+    assert_eq!(commit.package().to_bytes().unwrap(), exact);
     assert_eq!(source.text(), "First\nSecond\nThird");
 }

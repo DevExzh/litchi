@@ -27,10 +27,10 @@ fn split_is_lossless_durable_reversible_and_sequential() {
     let commit = edit.commit().unwrap();
     let expected = br"{\rtf1\ansi First\par Sec\par ond\par Third}";
 
-    assert_eq!(commit.snapshot().text(), "First\nSec\nond\nThird");
-    assert_eq!(commit.snapshot().to_bytes().unwrap(), expected);
+    assert_eq!(commit.package().text(), "First\nSec\nond\nThird");
+    assert_eq!(commit.package().to_bytes().unwrap(), expected);
     let mut streamed = Vec::new();
-    commit.snapshot().write_to(&mut streamed).unwrap();
+    commit.package().write_to(&mut streamed).unwrap();
     assert_eq!(streamed, expected);
 
     let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
@@ -114,8 +114,8 @@ fn merge_removes_only_the_adjacent_boundary() {
     let commit = edit.commit().unwrap();
     let expected = br"{\rtf1\ansi FirstSecond\par Third}";
 
-    assert_eq!(commit.snapshot().text(), "FirstSecond\nThird");
-    assert_eq!(commit.snapshot().to_bytes().unwrap(), expected);
+    assert_eq!(commit.package().text(), "FirstSecond\nThird");
+    assert_eq!(commit.package().to_bytes().unwrap(), expected);
 
     let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
     let applied = source.apply_durable(&durable).unwrap();
@@ -145,7 +145,7 @@ fn merge_preserves_exact_boundary_bytes_in_durable_inverse() {
     edit.merge_paragraphs(0, 1).unwrap();
     let commit = edit.commit().unwrap();
     let expected = br"{\rtf1\ansi First\par}";
-    assert_eq!(commit.snapshot().to_bytes().unwrap(), expected);
+    assert_eq!(commit.package().to_bytes().unwrap(), expected);
 
     let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
     let applied = source.apply_durable(&durable).unwrap();

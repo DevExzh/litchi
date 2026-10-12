@@ -70,13 +70,13 @@ fn selected_payload_splice_preserves_hex_layout_metadata_and_other_bytes() {
     let mut edit = source.edit();
     edit.replace_picture_payload(0, PNG_C).unwrap();
     let commit = edit.commit().unwrap();
-    let output = commit.snapshot().to_bytes().unwrap();
+    let output = commit.package().to_bytes().unwrap();
     let expected = two_picture_source().replace("0102aBcd", "1122cDef");
 
     assert_eq!(output, expected.as_bytes());
-    assert_eq!(commit.snapshot().pictures()[0].data(), PNG_C);
-    assert_eq!(commit.snapshot().pictures()[1], before_second);
-    assert_eq!(commit.snapshot().text(), source.text());
+    assert_eq!(commit.package().pictures()[0].data(), PNG_C);
+    assert_eq!(commit.package().pictures()[1], before_second);
+    assert_eq!(commit.package().text(), source.text());
     assert!(commit.diagnostics().changed());
     assert_eq!(commit.diagnostics().operation_count(), 1);
 }
@@ -88,16 +88,15 @@ fn no_op_shares_snapshot_and_patch_inverse_is_exact_and_source_checked() {
     no_op.replace_picture_payload(0, PNG_A).unwrap();
     let no_op = no_op.commit().unwrap();
     assert!(!no_op.diagnostics().changed());
-    assert!(no_op.snapshot().same_snapshot(&source));
+    assert!(no_op.package().same_snapshot(&source));
 
     let mut edit = source.edit();
     edit.replace_picture_payload(0, PNG_C).unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -105,7 +104,7 @@ fn no_op_shares_snapshot_and_patch_inverse_is_exact_and_source_checked() {
     );
     let stale = Package::parse(r"{\rtf1 unrelated}").unwrap();
     assert!(matches!(
-        commit.patch().apply(&stale),
+        stale.apply(commit.patch()),
         Err(Error::PatchConflict)
     ));
 }
@@ -120,13 +119,13 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
     let mut edit = source.edit();
     edit.replace_picture_payloads(&replacements).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().pictures()[0].data(), PNG_C);
-    assert_eq!(commit.snapshot().pictures()[1].data(), PNG_A);
+    assert_eq!(commit.package().pictures()[0].data(), PNG_C);
+    assert_eq!(commit.package().pictures()[1].data(), PNG_A);
     let durable = commit.patch().to_durable(durable_limits(2)).unwrap();
     let applied = source.apply_durable(&durable).unwrap();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
+        commit.package().to_bytes().unwrap()
     );
     assert_eq!(
         applied
@@ -430,7 +429,7 @@ fn durable_patch_is_deterministic_exactly_reversible_and_stale_checked() {
     let applied = source.apply_durable(&decoded).unwrap();
     assert_eq!(
         applied.to_bytes().unwrap(),
-        commit.snapshot().to_bytes().unwrap()
+        commit.package().to_bytes().unwrap()
     );
     let restored = applied.apply_durable(&decoded.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());

@@ -440,7 +440,7 @@ fn documents_opened_through_an_opt_in_stay_editable() {
         let mut edit = document.edit();
         edit.replace_paragraph_text(index, expected).unwrap();
         let commit = edit.commit().unwrap();
-        let snapshot = commit.snapshot();
+        let snapshot = commit.package();
         assert!(snapshot.text().contains(expected), "{:?}", snapshot.text());
         assert!(snapshot.text().contains("caf\u{e9} bad\u{1}"));
         // The re-read applies the original leniency: whatever defects the
@@ -457,7 +457,7 @@ fn documents_opened_through_an_opt_in_stay_editable() {
     let mut edit = document.edit();
     edit.remove_paragraph(0).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().paragraph_count(), 2);
+    assert_eq!(commit.package().paragraph_count(), 2);
 }
 
 // F9.12: undefined or undecodable font charsets and code pages fall back to

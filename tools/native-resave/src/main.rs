@@ -333,7 +333,7 @@ fn generate_rtf(output: &Path) -> Result<()> {
     let document = litchi_rtf::Package::from_bytes(&source)?;
     let mut edit = document.edit();
     edit.set_shape_text(0, SENTINEL)?;
-    let changed = edit.commit()?.into_snapshot().to_bytes()?;
+    let changed = edit.commit()?.into_package().to_bytes()?;
     fs::write(output, changed)?;
     readback_rtf(output)
 }

@@ -40,8 +40,8 @@ fn large_libreoffice_producer_artifacts_round_trip_exactly() {
             accepted = accepted.saturating_add(1);
             assert_eq!(document.to_bytes().unwrap(), bytes, "fixture: {fixture}");
             let commit = document.edit().commit().unwrap();
-            assert!(commit.snapshot().same_snapshot(&document));
-            assert_eq!(commit.snapshot().to_bytes().unwrap(), bytes);
+            assert!(commit.package().same_snapshot(&document));
+            assert_eq!(commit.package().to_bytes().unwrap(), bytes);
         }
     }
     assert!(accepted > 0, "no large producer fixture was accepted");
@@ -117,7 +117,7 @@ fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
         .unwrap()
         .commit()
         .unwrap()
-        .into_snapshot();
+        .into_package();
     assert_ne!(
         changed.to_bytes().unwrap(),
         microsoft_target.to_bytes().unwrap()
@@ -141,7 +141,7 @@ fn microsoft_and_libreoffice_corpus_policy_and_output_reopen() {
         .unwrap()
         .commit()
         .unwrap()
-        .into_snapshot();
+        .into_package();
     assert_ne!(transferred.to_bytes().unwrap(), target.to_bytes().unwrap());
     let reopened = Package::from_bytes(&transferred.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.objects().len(), 1);
@@ -200,7 +200,7 @@ fn one_real_libreoffice_run_accepts_checked_italic_edit_when_closure_holds() {
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     return;
                 }
@@ -239,7 +239,7 @@ fn one_real_libreoffice_run_accepts_checked_underline_edit_when_closure_holds() 
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     return;
                 }
@@ -273,7 +273,7 @@ fn one_real_libreoffice_run_accepts_checked_strike_edit_when_closure_holds() {
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     return;
                 }
@@ -307,7 +307,7 @@ fn one_real_libreoffice_run_accepts_checked_hidden_edit_when_closure_holds() {
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     assert!(reopened.body().runs().any(|candidate| {
                         candidate.text() == run.text() && candidate.format().hidden()
@@ -344,7 +344,7 @@ fn one_real_libreoffice_run_accepts_checked_small_caps_edit_when_closure_holds()
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     assert!(reopened.body().runs().any(|candidate| {
                         candidate.text() == run.text() && candidate.format().small_caps()
@@ -381,7 +381,7 @@ fn one_real_libreoffice_run_accepts_checked_all_caps_edit_when_closure_holds() {
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     let all_caps_text = reopened
                         .body()
@@ -422,7 +422,7 @@ fn one_real_libreoffice_run_accepts_checked_double_strike_edit_when_closure_hold
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     let double_strike_text = reopened
                         .body()
@@ -468,7 +468,7 @@ fn one_real_libreoffice_run_accepts_checked_font_size_edit_when_closure_holds() 
                     && let Ok(commit) = edit.commit()
                 {
                     let reopened =
-                        Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+                        Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
                     assert_eq!(reopened.text(), document.text(), "fixture: {fixture}");
                     let changed_text = reopened
                         .body()

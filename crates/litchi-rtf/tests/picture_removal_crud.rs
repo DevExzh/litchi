@@ -42,14 +42,14 @@ fn removes_one_exact_group_without_reserializing_surrounding_bytes() {
     let commit = edit.commit().unwrap();
 
     assert_eq!(
-        commit.snapshot().to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap(),
         input.replace(SECOND, "").as_bytes()
     );
     assert_eq!(
-        commit.snapshot().pictures(),
+        commit.package().pictures(),
         &[retained_first, retained_third]
     );
-    assert_eq!(commit.snapshot().text(), document.text());
+    assert_eq!(commit.package().text(), document.text());
     assert_eq!(commit.diagnostics().operation_count(), 1);
     assert!(commit.diagnostics().changed());
 }
@@ -62,14 +62,13 @@ fn source_relative_batch_is_atomic_and_exactly_reversible() {
     edit.remove_pictures(&[0, 2]).unwrap();
     let commit = edit.commit().unwrap();
     let expected = input.replace(FIRST, "").replace(THIRD, "");
-    assert_eq!(commit.snapshot().to_bytes().unwrap(), expected.as_bytes());
-    assert_eq!(commit.snapshot().pictures().len(), 1);
+    assert_eq!(commit.package().to_bytes().unwrap(), expected.as_bytes());
+    assert_eq!(commit.package().pictures().len(), 1);
 
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -97,10 +96,10 @@ fn adjacent_batch_restores_original_group_order_at_one_collapsed_offset() {
     let mut edit = document.edit();
     edit.remove_pictures(&[0, 1, 2]).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.snapshot().pictures().is_empty());
+    assert!(commit.package().pictures().is_empty());
 
     let durable = commit.patch().to_durable(durable_limits(3)).unwrap();
-    let restored = commit.snapshot().apply_durable(&durable.inverse()).unwrap();
+    let restored = commit.package().apply_durable(&durable.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), input.as_bytes());
 }
 
@@ -237,11 +236,11 @@ fn durable_inverse_refuses_a_foreign_artifact_even_with_the_same_visible_text() 
     let commit = edit.commit().unwrap();
     let durable = commit.patch().to_durable(durable_limits(1)).unwrap();
 
-    let foreign_bytes = String::from_utf8(commit.snapshot().to_bytes().unwrap())
+    let foreign_bytes = String::from_utf8(commit.package().to_bytes().unwrap())
         .unwrap()
         .replace("89504E47", "89504e47");
     let foreign = Package::parse(&foreign_bytes).unwrap();
-    assert_eq!(foreign.text(), commit.snapshot().text());
+    assert_eq!(foreign.text(), commit.package().text());
     assert!(matches!(
         foreign.apply_durable(&durable.inverse()),
         Err(Error::PatchConflict)

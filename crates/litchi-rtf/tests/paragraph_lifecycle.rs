@@ -59,19 +59,17 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
 
         assert!(commit.diagnostics().changed());
         assert_eq!(commit.diagnostics().operation_count(), 1);
-        assert_complete_reopen(commit.snapshot(), &expected);
+        assert_complete_reopen(commit.package(), &expected);
         assert!(
-            commit
-                .patch()
-                .apply(&source)
+            source
+                .apply(commit.patch())
                 .unwrap()
-                .same_snapshot(commit.snapshot())
+                .same_snapshot(commit.package())
         );
         assert!(
             commit
-                .patch()
-                .inverse()
-                .apply(commit.snapshot())
+                .package()
+                .apply(&commit.patch().inverse())
                 .unwrap()
                 .same_snapshot(&source)
         );
@@ -81,7 +79,7 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
             let removed = source.apply_durable(&durable).unwrap();
             assert_eq!(
                 removed.to_bytes().unwrap(),
-                commit.snapshot().to_bytes().unwrap()
+                commit.package().to_bytes().unwrap()
             );
             let restored = removed.apply_durable(&durable.inverse()).unwrap();
             assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
@@ -89,7 +87,7 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
 
         let foreign = Package::parse(r"{\rtf1\ansi Foreign}").unwrap();
         assert!(matches!(
-            commit.patch().apply(&foreign),
+            foreign.apply(commit.patch()),
             Err(Error::PatchConflict)
         ));
     }
@@ -102,9 +100,9 @@ fn removing_the_only_paragraph_yields_an_empty_story_and_durable_inverse_restore
     edit.remove_paragraph(0).unwrap();
     let commit = edit.commit().unwrap();
 
-    assert_eq!(commit.snapshot().text(), "");
-    assert_eq!(commit.snapshot().paragraph_count(), 0);
-    assert_complete_reopen(commit.snapshot(), &[]);
+    assert_eq!(commit.package().text(), "");
+    assert_eq!(commit.package().paragraph_count(), 0);
+    assert_complete_reopen(commit.package(), &[]);
 
     let durable = commit.patch().to_durable(durable_limits()).unwrap();
     let json = durable.to_deterministic_json().unwrap();
@@ -131,12 +129,12 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
     let mut forward = source.edit();
     forward.move_paragraph(0, 3).unwrap();
     let forward = forward.commit().unwrap();
-    assert_complete_reopen(forward.snapshot(), &["Second", "Third", "Fourth", "First"]);
+    assert_complete_reopen(forward.package(), &["Second", "Third", "Fourth", "First"]);
 
     let mut backward = source.edit();
     backward.move_paragraph(3, 0).unwrap();
     let backward = backward.commit().unwrap();
-    assert_complete_reopen(backward.snapshot(), &["Fourth", "First", "Second", "Third"]);
+    assert_complete_reopen(backward.package(), &["Fourth", "First", "Second", "Third"]);
 
     let durable = forward.patch().to_durable(durable_limits()).unwrap();
     let json = durable.to_deterministic_json().unwrap();
@@ -148,7 +146,7 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
     let moved = source.apply_durable(&durable).unwrap();
     assert_eq!(
         moved.to_bytes().unwrap(),
-        forward.snapshot().to_bytes().unwrap()
+        forward.package().to_bytes().unwrap()
     );
     let restored = moved.apply_durable(&durable.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
@@ -162,7 +160,7 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
     noop.move_paragraph(2, 2).unwrap();
     let noop = noop.commit().unwrap();
     assert!(!noop.diagnostics().changed());
-    assert!(noop.snapshot().same_snapshot(&source));
+    assert!(noop.package().same_snapshot(&source));
     assert!(
         noop.patch()
             .to_durable(durable_limits())
@@ -304,15 +302,15 @@ fn partial_sink_failure_does_not_mutate_the_published_snapshot() {
     let mut edit = source.edit();
     edit.remove_paragraph(1).unwrap();
     let commit = edit.commit().unwrap();
-    let exact = commit.snapshot().to_bytes().unwrap();
+    let exact = commit.package().to_bytes().unwrap();
     let mut sink = PartialSink {
         remaining: 7,
         bytes: Vec::new(),
     };
 
-    assert!(commit.snapshot().write_to(&mut sink).is_err());
+    assert!(commit.package().write_to(&mut sink).is_err());
     assert!(!sink.bytes.is_empty());
     assert!(sink.bytes.len() < exact.len());
-    assert_eq!(commit.snapshot().to_bytes().unwrap(), exact);
-    assert_complete_reopen(commit.snapshot(), &["First", "Third", "Fourth"]);
+    assert_eq!(commit.package().to_bytes().unwrap(), exact);
+    assert_complete_reopen(commit.package(), &["First", "Third", "Fourth"]);
 }

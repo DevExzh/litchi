@@ -97,23 +97,22 @@ fn first_middle_last_batch_preserves_text_runs_and_unrelated_paragraph_propertie
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
         source.to_bytes().unwrap()
     );
 
-    assert_eq!(commit.snapshot().text(), before_text);
-    assert_eq!(layout(commit.snapshot(), 0).space_before(), 0);
-    assert!(!layout(commit.snapshot(), 0).keep_together());
-    assert_eq!(layout(commit.snapshot(), 1).left_indent(), 360);
-    assert!(layout(commit.snapshot(), 1).keep_with_next());
-    assert_eq!(layout(commit.snapshot(), 2).right_indent(), 0);
-    assert_eq!(layout(commit.snapshot(), 2).first_line_indent(), 120);
-    assert!(!layout(commit.snapshot(), 2).page_break_before());
+    assert_eq!(commit.package().text(), before_text);
+    assert_eq!(layout(commit.package(), 0).space_before(), 0);
+    assert!(!layout(commit.package(), 0).keep_together());
+    assert_eq!(layout(commit.package(), 1).left_indent(), 360);
+    assert!(layout(commit.package(), 1).keep_with_next());
+    assert_eq!(layout(commit.package(), 2).right_indent(), 0);
+    assert_eq!(layout(commit.package(), 2).first_line_indent(), 120);
+    assert!(!layout(commit.package(), 2).page_break_before());
     let after_runs = commit
         .snapshot()
         .body()
@@ -141,7 +140,7 @@ fn first_middle_last_batch_preserves_text_runs_and_unrelated_paragraph_propertie
         })
         .collect::<Vec<_>>();
     assert_eq!(after_formats, before_formats);
-    let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), before_text);
     assert_eq!(layout(&reopened, 1).left_indent(), 360);
 }
@@ -237,7 +236,7 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
         Err(Error::ParagraphLayoutTextConflict)
     ));
     let commit = edit.commit().unwrap();
-    assert!(layout(commit.snapshot(), 0).keep_together());
+    assert!(layout(commit.package(), 0).keep_together());
     assert_eq!(
         commit
             .snapshot()
@@ -266,8 +265,8 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
         .join(after.into_sub_edit("after", limits).unwrap())
         .unwrap();
     let composed = composition.commit().unwrap();
-    assert_eq!(layout(composed.snapshot(), 0).space_before(), 120);
-    assert_eq!(layout(composed.snapshot(), 1).space_after(), 80);
+    assert_eq!(layout(composed.package(), 0).space_before(), 120);
+    assert_eq!(layout(composed.package(), 1).space_after(), 80);
 
     let mut left = source.edit();
     left.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_left_indent(100))
@@ -327,7 +326,7 @@ fn durable_layout_patch_is_deterministic_reversible_and_stale_checked() {
     ])
     .unwrap();
     let commit = edit.commit().unwrap();
-    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
     assert_eq!(
         restored.to_bytes().unwrap(),
         source.to_bytes().unwrap(),
@@ -412,8 +411,8 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
         .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_frame(frame))
         .unwrap();
     let created = create.commit().unwrap();
-    assert_eq!(layout(created.snapshot(), 0).frame(), Some(frame));
-    let created_bytes = created.snapshot().to_bytes().unwrap();
+    assert_eq!(layout(created.package(), 0).frame(), Some(frame));
+    let created_bytes = created.package().to_bytes().unwrap();
     let created_text = String::from_utf8(created_bytes.clone()).unwrap();
     assert!(created_text.contains(r"\absw720"));
     assert!(created_text.contains(r"\posnegx-80"));
@@ -422,9 +421,8 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
     assert_eq!(reopened.text(), source.text());
     assert_eq!(
         created
-            .patch()
-            .inverse()
-            .apply(created.snapshot())
+            .package()
+            .apply(&created.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -437,33 +435,32 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
         wrap: ParagraphFrameWrap::Through,
         ..frame
     };
-    let mut update = created.snapshot().edit();
+    let mut update = created.package().edit();
     update
         .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_frame(updated_frame))
         .unwrap();
     let updated = update.commit().unwrap();
-    assert_eq!(layout(updated.snapshot(), 0).frame(), Some(updated_frame));
+    assert_eq!(layout(updated.package(), 0).frame(), Some(updated_frame));
     assert!(matches!(
-        updated.patch().apply(&source),
+        source.apply(updated.patch()),
         Err(Error::PatchConflict)
     ));
 
-    let mut remove = updated.snapshot().edit();
+    let mut remove = updated.package().edit();
     remove
         .patch_paragraph_layout(0, ParagraphLayoutPatch::new().clear_frame())
         .unwrap();
     let removed = remove.commit().unwrap();
-    assert_eq!(layout(removed.snapshot(), 0).frame(), None);
-    assert_eq!(removed.snapshot().text(), source.text());
+    assert_eq!(layout(removed.package(), 0).frame(), None);
+    assert_eq!(removed.package().text(), source.text());
     assert_eq!(
         removed
-            .patch()
-            .inverse()
-            .apply(removed.snapshot())
+            .package()
+            .apply(&removed.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
-        updated.snapshot().to_bytes().unwrap()
+        updated.package().to_bytes().unwrap()
     );
 }
 
@@ -499,7 +496,7 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
         )
         .unwrap();
     let unknown_commit = unknown_edit.commit().unwrap();
-    let unknown_after = unknown_commit.snapshot().to_bytes().unwrap();
+    let unknown_after = unknown_commit.package().to_bytes().unwrap();
     assert!(
         unknown_after
             .windows(br"\future42".len())
@@ -517,13 +514,12 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
             .windows(br"{\*\vendor retained}".len())
             .any(|window| window == br"{\*\vendor retained}")
     );
-    assert_eq!(unknown_commit.snapshot().opaque(), unknown.opaque());
-    assert_eq!(unknown_commit.snapshot().text(), unknown.text());
+    assert_eq!(unknown_commit.package().opaque(), unknown.opaque());
+    assert_eq!(unknown_commit.package().text(), unknown.text());
     assert_eq!(
         unknown_commit
-            .patch()
-            .inverse()
-            .apply(unknown_commit.snapshot())
+            .package()
+            .apply(&unknown_commit.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -566,7 +562,7 @@ fn frame_layout_preserves_zero_width_bookmark_events() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     assert!(String::from_utf8_lossy(&bytes).contains(r"\bkmkstart bm"));
     let reopened = RtfDocument::parse_bytes(&bytes).unwrap();
     assert_eq!(reopened.bookmarks().bookmarks().len(), 1);
@@ -575,9 +571,8 @@ fn frame_layout_preserves_zero_width_bookmark_events() {
     assert_eq!(reopened.bookmarks().bookmarks()[0].content, "two");
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -597,7 +592,7 @@ fn frame_layout_does_not_duplicate_leading_zero_width_bookmark_events() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     assert_eq!(
         bytes
             .windows(br"\bkmkstart leading".len())
@@ -609,9 +604,8 @@ fn frame_layout_does_not_duplicate_leading_zero_width_bookmark_events() {
     assert_eq!(reopened.bookmarks().bookmarks().len(), 1);
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -629,7 +623,7 @@ fn frame_layout_preserves_offset_only_break_events() {
     )
     .unwrap();
     let commit = edit.commit().unwrap();
-    let bytes = commit.snapshot().to_bytes().unwrap();
+    let bytes = commit.package().to_bytes().unwrap();
     let serialized = String::from_utf8_lossy(&bytes);
     assert!(serialized.contains(r"\page "));
     assert!(serialized.contains(r"\column "));
@@ -652,18 +646,17 @@ fn frame_layout_preserves_leading_body_opaque_destination() {
     edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))
         .unwrap();
     let committed = edit.commit().unwrap();
-    let after = committed.snapshot().to_bytes().unwrap();
+    let after = committed.package().to_bytes().unwrap();
     assert!(
         after
             .windows(br"{\*\vendor leading}".len())
             .any(|window| { window == br"{\*\vendor leading}" })
     );
-    assert_eq!(committed.snapshot().opaque(), source.opaque());
+    assert_eq!(committed.package().opaque(), source.opaque());
     assert_eq!(
         committed
-            .patch()
-            .inverse()
-            .apply(committed.snapshot())
+            .package()
+            .apply(&committed.patch().inverse())
             .unwrap()
             .to_bytes()
             .unwrap(),
@@ -680,7 +673,7 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
         .unwrap();
     let noop = noop.commit().unwrap();
     assert!(!noop.diagnostics().changed());
-    assert_eq!(noop.snapshot().to_bytes().unwrap(), exact);
+    assert_eq!(noop.package().to_bytes().unwrap(), exact);
 
     let mut changed = protected.edit();
     changed

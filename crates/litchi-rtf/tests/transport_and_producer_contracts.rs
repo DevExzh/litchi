@@ -31,8 +31,8 @@ fn literal_byte1252_transport_is_exact_and_changed_write_is_atomic_on_refusal() 
     assert_eq!(document.to_bytes().unwrap(), source);
 
     let noop = document.edit().commit().unwrap();
-    assert!(noop.snapshot().same_snapshot(&document));
-    assert_eq!(noop.snapshot().to_bytes().unwrap(), source);
+    assert!(noop.package().same_snapshot(&document));
+    assert_eq!(noop.package().to_bytes().unwrap(), source);
 
     let mut edit = document.edit();
     edit.replace_paragraph_text(0, "changed").unwrap();
@@ -55,8 +55,8 @@ fn specification_lzfu_transport_is_exact_and_changed_write_fails_closed() {
     assert_eq!(streamed, LZFU_SPEC);
 
     let noop = document.edit().commit().unwrap();
-    assert!(noop.snapshot().same_snapshot(&document));
-    assert_eq!(noop.snapshot().to_bytes().unwrap(), LZFU_SPEC);
+    assert!(noop.package().same_snapshot(&document));
+    assert_eq!(noop.package().to_bytes().unwrap(), LZFU_SPEC);
 
     let mut edit = document.edit();
     edit.replace_paragraph_text(0, "changed").unwrap();
@@ -83,9 +83,9 @@ fn libreoffice_watermark_is_visible_through_public_header_shapes_and_exact_on_no
     assert_eq!(document.to_bytes().unwrap(), source);
 
     let noop = document.edit().commit().unwrap();
-    assert!(noop.snapshot().same_snapshot(&document));
+    assert!(noop.package().same_snapshot(&document));
     let mut streamed = Vec::new();
-    noop.snapshot().write_to(&mut streamed).unwrap();
+    noop.package().write_to(&mut streamed).unwrap();
     assert_eq!(streamed, source);
     let reopened = Package::from_bytes(&streamed).unwrap();
     assert_eq!(reopened.to_bytes().unwrap(), source);
@@ -112,7 +112,7 @@ fn relsize_public_edit_and_checked_native_resave_reopen_semantically() {
     let commit = edit.commit().unwrap();
     assert_eq!(commit.diagnostics().operation_count(), 1);
     assert!(commit.diagnostics().changed());
-    let generated = commit.snapshot().to_bytes().unwrap();
+    let generated = commit.package().to_bytes().unwrap();
     let generated_reopen = Package::from_bytes(&generated).unwrap();
     let generated_shape = &generated_reopen.shapes()[0];
     assert_eq!(generated_shape.text, NATIVE_SENTINEL);
