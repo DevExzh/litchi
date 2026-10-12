@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0235 | [Unified RTF paragraph moves](0235-rtf-unified-move.md) | Native placements, exact history/batches and empty-boundary preservation; durable boundary refusal; 1,476 native and 1,660 facade tests/doctests pass; paired changed moves within 10% reference, no-op overhead and full goal remain open |
 | 0234 | [Unified RTF paragraph removal](0234-rtf-unified-remove.md) | Atomic original-position removal, edit/batch/history and source-preserving empty/boundary handling; 1,474 native and 1,650 facade tests/doctests pass; paired fanout measured through 10k targets; tiny-document overhead, coalescing, structural CRUD and full goal remain open |
 | 0233 | [Unified RTF paragraph text writes](0233-rtf-unified-write.md) | Native paragraph set/query fanout, edit/batch/history, typed bounds and source policy; inline-break preservation and semantic patch weights fixed; structural CRUD, coalescing, performance qualification and full goal remain open |
 | 0232 | [Unified RTF paragraph reads](0232-rtf-unified-read.md) | Native borrowed root/body/paragraph paths, lazy queries, children and views; truthful element gaps; RTF writes and full goal remain open |
