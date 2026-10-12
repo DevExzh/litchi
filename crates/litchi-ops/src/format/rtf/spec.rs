@@ -232,9 +232,12 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
 ];
 
-/// Read-only local character properties for a native RTF run.  The scalar
-/// types follow the common word-processing run registry, while the native RTF
-/// projection keeps its own exact underline token vocabulary.
+/// Local character properties for a native RTF run.  The scalar types follow
+/// the common word-processing run registry, while the native RTF projection
+/// keeps its own exact underline token vocabulary.  The ten format facets are
+/// writable through the native omission-preserving run patch; text, font and
+/// foreground colour remain read-only until their source-preserving editors
+/// exist.
 pub(crate) const RUN_PROPS: &[PropSpec] = &[
     PropSpec {
         name: "text",
@@ -251,19 +254,31 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
     PropSpec {
         name: "size",
         ty: ValueType::Length(LengthSpec::FONT_SIZE),
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
         name: "bold",
         ty: ValueType::Bool,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
         name: "italic",
         ty: ValueType::Bool,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
@@ -275,43 +290,71 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
     PropSpec {
         name: "underline",
         ty: ValueType::Token(&RUN_UNDERLINE),
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
         name: "strike",
         ty: ValueType::Bool,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
         name: "dstrike",
         ty: ValueType::Bool,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
         name: "vanish",
         ty: ValueType::Bool,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
         name: "caps",
         ty: ValueType::Bool,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
         name: "smallcaps",
         ty: ValueType::Bool,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {
         name: "outline",
         ty: ValueType::Bool,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
 ];

@@ -154,17 +154,30 @@ fn compiled_run_queries_are_reusable_and_bound_to_current_immutable_owner() {
 }
 
 #[test]
-fn read_only_run_capabilities_do_not_admit_paragraph_mutations() {
+fn run_capabilities_admit_format_sets_but_keep_structural_gaps() {
     let file = open_bytes(br"{\rtf1\ansi First\par Second}").unwrap();
     let before = file.to_bytes().unwrap();
     let run = file.capabilities().element("r").unwrap();
     assert!(run.gap().is_none());
     let ops = run.operations();
     assert!(ops.get && ops.query);
-    assert!(!ops.set && !ops.add && !ops.remove);
+    assert!(ops.set && !ops.add && !ops.remove);
+    let writable = [
+        "size",
+        "bold",
+        "italic",
+        "underline",
+        "strike",
+        "dstrike",
+        "vanish",
+        "caps",
+        "smallcaps",
+        "outline",
+    ];
     for property in run.properties() {
         assert!(property.get());
-        assert!(!property.set() && !property.add());
+        assert_eq!(property.set(), writable.contains(&property.name()));
+        assert!(!property.add());
     }
     assert!(
         file.capabilities()

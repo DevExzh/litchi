@@ -1242,9 +1242,11 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// dependency-free paragraph layout facets, paragraph insertion, removal,
 /// paragraph ordering and paragraph swapping. Keep the remaining mutation
 /// verbs visible instead of making the format-level `set`/`remove`/`move`/
-/// `swap`/`edit`/`batch` support look like general CRUD.
+/// `swap`/`edit`/`batch` support look like general CRUD.  Run `set` is
+/// available for the ten local character-format facets; the remaining run
+/// structural verbs stay explicit gaps until their native editors exist.
 #[cfg(feature = "rtf")]
-static RTF_WRITE_GAPS: [GapSpec; 9] = [
+static RTF_WRITE_GAPS: [GapSpec; 8] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
@@ -1284,16 +1286,6 @@ static RTF_WRITE_GAPS: [GapSpec; 9] = [
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF rich paragraph preservation",
         reason: "paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "run",
-            context: "native-run-edit",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF atomic native run edits",
-        reason: "run property updates require an atomic native character-run editor that preserves all source boundaries and formatting controls",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2730,8 +2722,10 @@ impl Element {
                 && matches!(self.data().canonical, "slide" | "shape" | "placeholder")
                 && readable);
         #[cfg(feature = "rtf")]
-        let settable =
-            settable || (self.adapter == Adapter::Rtf && self.data().canonical == "p" && readable);
+        let settable = settable
+            || (self.adapter == Adapter::Rtf
+                && matches!(self.data().canonical, "p" | "r")
+                && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
