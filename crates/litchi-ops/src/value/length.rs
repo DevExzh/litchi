@@ -181,6 +181,22 @@ impl Length {
         Self(twips as i64 * 635)
     }
 
+    /// Convert this length to a checked signed 32-bit twip value.
+    ///
+    /// Native Word paragraph properties use twips while the unified value
+    /// layer stores lengths as EMU.  Conversion rounds half away from zero,
+    /// matching the existing Word spacing setter, and refuses values outside
+    /// the native signed range instead of truncating them.
+    #[cfg(feature = "rtf")]
+    pub(crate) fn checked_twips(self) -> Option<i32> {
+        let adjusted = if self.0 >= 0 {
+            self.0.checked_add(317)?
+        } else {
+            self.0.checked_sub(317)?
+        };
+        i32::try_from(adjusted.checked_div(635)?).ok()
+    }
+
     /// The length in EMU.
     #[must_use]
     pub const fn emu(self) -> i64 {

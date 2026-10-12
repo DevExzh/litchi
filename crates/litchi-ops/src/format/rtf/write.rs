@@ -9,8 +9,8 @@ use litchi_core::selector::{Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
 use litchi_rtf::Alignment;
 use litchi_rtf::edit::{
-    EditOptions, ParagraphAlignmentUpdate, ParagraphTextReplacement, Patch,
-    SemanticLimits as NativeLimits,
+    EditOptions, ParagraphAlignmentUpdate, ParagraphLayoutPatch, ParagraphLayoutUpdate,
+    ParagraphTextReplacement, Patch, SemanticLimits as NativeLimits,
 };
 
 use super::{Nav, Node, Rtf};
@@ -200,12 +200,17 @@ pub(crate) fn set_with_limits<'p, 'v>(
 ) -> Result<Commit> {
     file.admit_edit()?;
     let props = Props::from_props(props)?;
-    let (text, alignment) = paragraph_properties(&props)?;
+    let ParagraphProperties {
+        text,
+        alignment,
+        layout,
+    } = paragraph_properties(&props)?;
     let positions =
         resolve_paragraph_targets(file, &target, limits.max_expanded_targets(), |_| {})?;
 
     let property_count = usize::from(text.is_some())
         .checked_add(usize::from(alignment.is_some()))
+        .and_then(|count| count.checked_add(usize::from(layout.is_some())))
         .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
     let operations = positions
         .len()
@@ -243,8 +248,15 @@ pub(crate) fn set_with_limits<'p, 'v>(
             .checked_mul(size_of::<ParagraphAlignmentUpdate>())
             .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))
     })?;
+    let layout_action_bytes = layout.map_or(Ok(0), |_| {
+        positions
+            .len()
+            .checked_mul(size_of::<ParagraphLayoutUpdate>())
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))
+    })?;
     let action_bytes = text_action_bytes
         .checked_add(alignment_action_bytes)
+        .and_then(|bytes| bytes.checked_add(layout_action_bytes))
         .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
     let staged_bytes = replacement_bytes
         .checked_add(action_bytes)
@@ -281,6 +293,16 @@ pub(crate) fn set_with_limits<'p, 'v>(
         }
     }
 
+    let mut layouts = Vec::new();
+    if let Some(layout) = layout {
+        layouts
+            .try_reserve_exact(positions.len())
+            .map_err(|source| TransactionError::Allocation { source })?;
+        for position in &positions {
+            layouts.push(ParagraphLayoutUpdate::new(Position::new(*position), layout));
+        }
+    }
+
     let native_limits = NativeLimits::builder()
         .max_operations(limits.max_operations())
         .map_err(Error::from)?
@@ -296,6 +318,14 @@ pub(crate) fn set_with_limits<'p, 'v>(
     }
     if !alignments.is_empty() {
         edit.set_body_paragraph_alignments(&alignments)
+            .map_err(Error::from)?;
+    }
+    if !layouts.is_empty() {
+        // The native editor deliberately rejects text-plus-layout batches
+        // with a typed `ParagraphLayoutTextConflict`; keeping both staged in
+        // this one edit preserves that policy instead of silently splitting
+        // the caller's request into two publications.
+        edit.patch_body_paragraph_layouts(&layouts)
             .map_err(Error::from)?;
     }
     let native = edit.commit().map_err(Error::from)?;
@@ -654,9 +684,25 @@ fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
     Ok(())
 }
 
-fn paragraph_properties<'a>(props: &'a Props<'_>) -> Result<(Option<&'a str>, Option<Alignment>)> {
+struct ParagraphProperties<'a> {
+    text: Option<&'a str>,
+    alignment: Option<Alignment>,
+    layout: Option<ParagraphLayoutPatch>,
+}
+
+fn paragraph_properties<'a>(props: &'a Props<'_>) -> Result<ParagraphProperties<'a>> {
     for (key, _) in props.iter() {
-        if !key.eq_ignore_ascii_case("text") && !key.eq_ignore_ascii_case("align") {
+        let supported = key.eq_ignore_ascii_case("text")
+            || key.eq_ignore_ascii_case("align")
+            || key.eq_ignore_ascii_case("spaceBefore")
+            || key.eq_ignore_ascii_case("spaceAfter")
+            || key.eq_ignore_ascii_case("indent")
+            || key.eq_ignore_ascii_case("rightIndent")
+            || key.eq_ignore_ascii_case("firstLineIndent")
+            || key.eq_ignore_ascii_case("keepNext")
+            || key.eq_ignore_ascii_case("keepLines")
+            || key.eq_ignore_ascii_case("pageBreakBefore");
+        if !supported {
             return Err(Error::new(
                 Code::UnsupportedCapability,
                 "the requested RTF property is not writable",
@@ -679,14 +725,99 @@ fn paragraph_properties<'a>(props: &'a Props<'_>) -> Result<(Option<&'a str>, Op
     let text = text.transpose()?;
     let alignment = props.get("align").map(|value| paragraph_alignment(value));
     let alignment = alignment.transpose()?;
-    if text.is_none() && alignment.is_none() {
+
+    let mut layout = ParagraphLayoutPatch::new();
+    let mut has_layout = false;
+    if let Some(value) = props.get("spaceBefore") {
+        layout = layout.with_space_before(paragraph_twips(value, "spaceBefore", true)?);
+        has_layout = true;
+    }
+    if let Some(value) = props.get("spaceAfter") {
+        layout = layout.with_space_after(paragraph_twips(value, "spaceAfter", true)?);
+        has_layout = true;
+    }
+    if let Some(value) = props.get("indent") {
+        layout = layout.with_left_indent(paragraph_twips(value, "indent", false)?);
+        has_layout = true;
+    }
+    if let Some(value) = props.get("rightIndent") {
+        layout = layout.with_right_indent(paragraph_twips(value, "rightIndent", false)?);
+        has_layout = true;
+    }
+    if let Some(value) = props.get("firstLineIndent") {
+        layout = layout.with_first_line_indent(paragraph_twips(value, "firstLineIndent", false)?);
+        has_layout = true;
+    }
+    if let Some(value) = props.get("keepNext") {
+        layout = layout.with_keep_with_next(paragraph_bool(value, "keepNext")?);
+        has_layout = true;
+    }
+    if let Some(value) = props.get("keepLines") {
+        layout = layout.with_keep_together(paragraph_bool(value, "keepLines")?);
+        has_layout = true;
+    }
+    if let Some(value) = props.get("pageBreakBefore") {
+        layout = layout.with_page_break_before(paragraph_bool(value, "pageBreakBefore")?);
+        has_layout = true;
+    }
+
+    if text.is_none() && alignment.is_none() && !has_layout {
         return Err(Error::new(
             Code::UnsupportedCapability,
-            "RTF paragraph writes require a `text` or `align` property",
+            "RTF paragraph writes require a `text`, `align`, or layout property",
         )
         .with_format(FileFormat::Rtf));
     }
-    Ok((text, alignment))
+    Ok(ParagraphProperties {
+        text,
+        alignment,
+        layout: has_layout.then_some(layout),
+    })
+}
+
+fn paragraph_twips(value: &PropValue<'_>, key: &'static str, nonnegative: bool) -> Result<i32> {
+    let ty = if nonnegative {
+        ValueType::Length(super::spec::SPACING)
+    } else {
+        ValueType::Length(super::spec::SIGNED_POINTS)
+    };
+    value
+        .with_coerced(ty, |value| {
+            let Some(Scalar::Length(value)) = value else {
+                return Err(Error::new(
+                    Code::InvalidValue,
+                    "RTF paragraph layout requires a length value",
+                )
+                .with_property(key)
+                .with_format(FileFormat::Rtf));
+            };
+            let Some(twips) = value.checked_twips() else {
+                return Err(Error::new(
+                    Code::InvalidValue,
+                    "RTF paragraph layout length is outside the native twip range",
+                )
+                .with_property(key)
+                .with_format(FileFormat::Rtf));
+            };
+            Ok(twips)
+        })
+        .map_err(|error| error.with_property(key).with_format(FileFormat::Rtf))
+}
+
+fn paragraph_bool(value: &PropValue<'_>, key: &'static str) -> Result<bool> {
+    value
+        .with_coerced(ValueType::Bool, |value| {
+            let Some(Scalar::Bool(value)) = value else {
+                return Err(Error::new(
+                    Code::InvalidValue,
+                    "RTF paragraph layout requires a boolean value",
+                )
+                .with_property(key)
+                .with_format(FileFormat::Rtf));
+            };
+            Ok(value)
+        })
+        .map_err(|error| error.with_property(key).with_format(FileFormat::Rtf))
 }
 
 fn paragraph_alignment(value: &PropValue<'_>) -> Result<Alignment> {

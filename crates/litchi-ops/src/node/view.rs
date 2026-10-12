@@ -14,6 +14,8 @@ use super::path::NodePath;
 use super::spec::PropSpec;
 use super::value::{Key, Value};
 use crate::error::{Error, Result};
+#[cfg(feature = "rtf")]
+use crate::value::Length;
 
 /// The deepest `depth` a view honours; larger requests are refused. It bounds
 /// the serializer's recursion (record 0010 §2.5; OfficeCLI clamps to 256 and
@@ -400,16 +402,29 @@ impl<'a> Source<'a> {
             #[cfg(any(test, feature = "test-support"))]
             Self::Fake(values) => values.get(index)?.as_ref().map(Value::borrowed),
             #[cfg(feature = "rtf")]
-            Self::Rtf(paragraph) => match index {
-                0 => Some(Value::Text(
-                    paragraph
-                        .as_str()
-                        .map_or_else(|| Cow::Owned(paragraph.to_text()), Cow::Borrowed),
-                )),
-                1 => Some(Value::Token(crate::format::rtf::alignment_name(
-                    paragraph.format().alignment(),
-                ))),
-                _ => None,
+            Self::Rtf(paragraph) => {
+                let layout = paragraph.format().layout();
+                match index {
+                    0 => Some(Value::Text(
+                        paragraph
+                            .as_str()
+                            .map_or_else(|| Cow::Owned(paragraph.to_text()), Cow::Borrowed),
+                    )),
+                    1 => Some(Value::Token(crate::format::rtf::alignment_name(
+                        paragraph.format().alignment(),
+                    ))),
+                    2 => Some(Value::Length(Length::from_twips(layout.space_before()))),
+                    3 => Some(Value::Length(Length::from_twips(layout.space_after()))),
+                    4 => Some(Value::Length(Length::from_twips(layout.left_indent()))),
+                    5 => Some(Value::Length(Length::from_twips(layout.right_indent()))),
+                    6 => Some(Value::Length(Length::from_twips(
+                        layout.first_line_indent(),
+                    ))),
+                    7 => Some(Value::Bool(layout.keep_with_next())),
+                    8 => Some(Value::Bool(layout.keep_together())),
+                    9 => Some(Value::Bool(layout.page_break_before())),
+                    _ => None,
+                }
             },
             #[cfg(feature = "docx")]
             Self::Docx(ref props) => props.get(index),

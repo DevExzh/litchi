@@ -6,7 +6,7 @@ use crate::node::spec::{
 };
 use crate::path::navigate::ElementKind;
 use crate::path::vocabulary::{self, Vocabulary};
-use crate::value::Tokens;
+use crate::value::{LengthContext, LengthSpec, LengthStyle, Tokens};
 
 /// A RTF node kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -85,6 +85,15 @@ const BODY: ElementSpec<Kind> = ElementSpec {
 pub(crate) static ALIGNMENT: Tokens =
     Tokens::new("alignment", &["left", "right", "center", "justify"], &[]);
 
+/// Nonnegative paragraph spacing, read as Word twips and printed in points.
+pub(crate) const SPACING: LengthSpec =
+    LengthSpec::new(LengthContext::WordSpacing, LengthStyle::Points);
+
+/// Signed paragraph offsets, read with the ordinary signed length coercion
+/// and printed in points.
+pub(crate) const SIGNED_POINTS: LengthSpec =
+    LengthSpec::new(LengthContext::Emu, LengthStyle::Points);
+
 pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     PropSpec {
         name: "text",
@@ -99,6 +108,86 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     PropSpec {
         name: "align",
         ty: crate::value::ValueType::Token(&ALIGNMENT),
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+    PropSpec {
+        name: "spaceBefore",
+        ty: crate::value::ValueType::Length(SPACING),
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+    PropSpec {
+        name: "spaceAfter",
+        ty: crate::value::ValueType::Length(SPACING),
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+    PropSpec {
+        name: "indent",
+        ty: crate::value::ValueType::Length(SIGNED_POINTS),
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+    PropSpec {
+        name: "rightIndent",
+        ty: crate::value::ValueType::Length(SIGNED_POINTS),
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+    PropSpec {
+        name: "firstLineIndent",
+        ty: crate::value::ValueType::Length(SIGNED_POINTS),
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+    PropSpec {
+        name: "keepNext",
+        ty: crate::value::ValueType::Bool,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+    PropSpec {
+        name: "keepLines",
+        ty: crate::value::ValueType::Bool,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+    PropSpec {
+        name: "pageBreakBefore",
+        ty: crate::value::ValueType::Bool,
         access: Access {
             get: true,
             set: true,

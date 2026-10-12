@@ -517,3 +517,17 @@ fn word_spacing_uses_unsigned_twips_and_rounds_at_the_leaf_unit() {
         assert!(Length::parse_in(input, LengthContext::WordSpacing).is_err());
     }
 }
+
+#[cfg(feature = "rtf")]
+#[test]
+fn checked_twips_rounds_signed_boundaries_and_refuses_i32_overflow() {
+    let emu = |value: i64| Length::from_emu(value).checked_twips();
+    assert_eq!(emu(317), Some(0));
+    assert_eq!(emu(318), Some(1));
+    assert_eq!(emu(-317), Some(0));
+    assert_eq!(emu(-318), Some(-1));
+
+    let maximum = Length::from_twips(i32::MAX).emu();
+    assert_eq!(emu(maximum), Some(i32::MAX));
+    assert_eq!(emu(maximum + 635), None);
+}
