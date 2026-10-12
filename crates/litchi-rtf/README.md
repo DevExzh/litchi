@@ -96,11 +96,14 @@ syntax; exact body splices preserve unknown destinations byte-for-byte.
 
 `transport::decompress` enforces a finite 256 MiB expansion ceiling before
 allocation. Applications with a different document budget can call
-`transport::decompress_with_limits` with an explicit `transport::Limits`
-value. Document parsing and file opening also use finite source, token,
-binary-payload, and expansion ceilings through `read::Limits`; custom profiles
-are accepted by `Document::parse_with_limits`, `Document::from_bytes_with_limits`,
-and `Document::open_with_limits`.
+`transport::decompress_with_limits` with an explicit `transport::DecompressionLimits`
+value. Document parsing and file opening use checked `SourceLimits` profiles
+for input, events, binary payloads, expansion and opaque retention. Build a
+profile with `SourceLimits::builder()` and fallible `max_*` setters, then pass
+`OpenOptions::new().source_limits(profile)` to `Document::parse_with_options`,
+`Document::from_bytes_with_options` or `Document::open_with_options`. Input
+defaults to 512 MiB; zero explicitly denies a dimension. Explicit repair is
+selected with `OpenOptions::leniency`.
 
 ## License
 

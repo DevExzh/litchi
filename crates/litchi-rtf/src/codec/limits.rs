@@ -107,7 +107,6 @@ impl SourceLimits {
     };
 
     /// Start a checked builder initialized with the standard defaults.
-    #[must_use]
     pub const fn builder() -> SourceLimitsBuilder {
         SourceLimitsBuilder {
             limits: Self::DEFAULT,
@@ -304,7 +303,6 @@ impl OpenOptions {
     }
 
     /// Return the selected physical source profile.
-    #[must_use]
     pub const fn source_limits_value(self) -> SourceLimits {
         self.source_limits
     }

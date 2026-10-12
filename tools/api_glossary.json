@@ -2651,6 +2651,102 @@
       "families": [
         "litchi_ppt::package::edit"
       ]
+    },
+    {
+      "id": "rtf-minimal",
+      "package": "litchi-rtf",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "ParseLimits",
+          "scope": "litchi_rtf",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "ParseOptions",
+          "scope": "litchi_rtf",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_rtf::read",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters",
+          "recursive": false
+        },
+        {
+          "name": "Options",
+          "scope": "litchi_rtf::read",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters",
+          "recursive": false
+        },
+        {
+          "name": "ParseLimits",
+          "scope": "litchi_rtf::read",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "ParseOptions",
+          "scope": "litchi_rtf::read",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "new",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_max_source_bytes",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_max_tokens",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_max_binary_bytes",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_max_total_binary_bytes",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_max_decompressed_bytes",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_max_opaque_nodes",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_max_opaque_node_bytes",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_max_total_opaque_bytes",
+          "scope": "litchi_rtf::read::SourceLimits",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_rtf::read::OpenOptions",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "with_leniency",
+          "scope": "litchi_rtf::read::OpenOptions",
+          "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        }
+      ],
+      "families": []
     }
   ]
 }

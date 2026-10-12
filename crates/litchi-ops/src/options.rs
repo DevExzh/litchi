@@ -81,6 +81,9 @@ pub struct OpenOptions {
     /// Legacy `PowerPoint` source limits.
     #[cfg(feature = "ppt")]
     pub(crate) ppt_source_limits: Option<litchi_ppt::SourceLimits>,
+    /// Native RTF source limits and explicit repair policy.
+    #[cfg(feature = "rtf")]
+    pub(crate) rtf_options: Option<litchi_rtf::OpenOptions>,
     /// ODF package limits shared by ODT, ODS and ODP.
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     pub(crate) odf_limits: Option<litchi_odf_common::SourcePackageLimits>,
@@ -108,6 +111,8 @@ impl OpenOptions {
             doc: None,
             #[cfg(feature = "ppt")]
             ppt_source_limits: None,
+            #[cfg(feature = "rtf")]
+            rtf_options: None,
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
             odf_limits: None,
         }
@@ -248,6 +253,14 @@ impl OpenOptions {
         self
     }
 
+    /// Replace the native RTF source limits and repair policy.
+    #[cfg(feature = "rtf")]
+    #[must_use]
+    pub const fn rtf_options(mut self, options: litchi_rtf::OpenOptions) -> Self {
+        self.rtf_options = Some(options);
+        self
+    }
+
     /// Replace the ODF package limits used for ODT, ODS and ODP inputs.
     ///
     /// ```
@@ -359,6 +372,8 @@ mod tests {
         assert_eq!(options.doc, None);
         #[cfg(feature = "ppt")]
         assert_eq!(options.ppt_source_limits, None);
+        #[cfg(feature = "rtf")]
+        assert_eq!(options.rtf_options, None);
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
         assert_eq!(options.odf_limits, None);
     }

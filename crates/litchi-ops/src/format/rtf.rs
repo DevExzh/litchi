@@ -34,10 +34,13 @@ impl Rtf {
     /// literal code-page, and compressed (LZFu/MELA) transports alike.
     ///
     /// Every facade route (path, bytes, reader) reaches RTF through these
-    /// detected bytes, so this is the only constructor. RTF has no open
-    /// sub-options; the input ceiling was applied by detection.
-    pub(crate) fn from_bytes(bytes: Vec<u8>, _options: &OpenOptions) -> Result<Self> {
-        let document = RtfDocument::from_owned_bytes(bytes)?;
+    /// detected bytes, so this is the only constructor. Native source limits
+    /// and repair policy apply in addition to the detection input ceiling.
+    pub(crate) fn from_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
+        let document = RtfDocument::from_owned_bytes_with_options(
+            bytes,
+            options.rtf_options.unwrap_or_default(),
+        )?;
         Ok(Self(Arc::new(RtfState { document })))
     }
 

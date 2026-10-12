@@ -95,6 +95,21 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
 | Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); 🔴 remaining specialized ingress and ODF (W3) |
 
+### RTF source dimensions
+
+RTF uses checked `SourceLimits`/`SourceLimitsBuilder`, `SourceLimitKind`, and
+`Error::{InvalidLimit, Limit}` for eight ingress dimensions (record 0222):
+input bytes, lexer events, individual and aggregate binary bytes, decompressed
+bytes, opaque node count, individual opaque node bytes and aggregate opaque
+bytes. Input defaults to 512 MiB; other existing finite defaults are retained.
+Zero explicitly denies a dimension. Values above `isize::MAX` are invalid.
+`OpenOptions::{source_limits, leniency}` carries the profile and explicit repair
+policy, including through unified `OpenOptions::rtf_options`.
+
+This migration does not rename the separate semantic edit limits or structural
+`LimitExceeded` errors. The canonical RTF package/projection split, transaction
+vocabulary and unified read/write adapter remain pending.
+
 ### PPT source dimensions
 
 PPT uses checked `SourceLimits`/`SourceLimitsBuilder` and typed

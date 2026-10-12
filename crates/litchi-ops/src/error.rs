@@ -1576,7 +1576,8 @@ impl Classify for litchi_ppt::Error {
 impl Classify for litchi_rtf::Error {
     fn classify(&self) -> Class {
         match self {
-            Self::LimitExceeded { .. } => Class::of(Code::LimitExceeded),
+            Self::Limit { .. } | Self::LimitExceeded { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::AllocationFailed { .. } => Class::of(Code::InternalError),
             _ => Class::of(Code::CorruptFile),
         }

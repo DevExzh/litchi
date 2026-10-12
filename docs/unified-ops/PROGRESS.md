@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0222 | [RTF source limits and open policy](0222-rtf-source-limits.md) | Checked native SourceLimits/OpenOptions and typed ingress errors; unified options now forwarded; 1,423 native and 1,610 facade tests/doctests, minimal profile, lint/docs/glossary/boundaries pass; RTF owner/CRUD migration and full goal remain open |
 | 0221 | [PPT planning over the retained scene](0221-ppt-planning.md) | Initial scene cache retained, text-only planning avoids nodes/body copies, duplicate source probes removed; 1,605 facade tests/doctests and 52 PPT-only checks pass; all 28 exact proofs unchanged; 1k ratios 1.396/1.619 meet 2×, positional single-op and rollover scaling remain open |
 | 0220 | [Aggregate PPT text publication](0220-ppt-aggregate-text-publication.md) | Bounded native text chunks publish once per edit; 1,411 existing native plus eight aggregate tests and 1,603 facade tests/doctests pass; 28 v2 routes verify actual history links; unified 10k improves 19.7–20.0×, positional 1k ratio 2.080 and 26–30× growth leave budgets and full goal open |
 | 0219 | [Grouped PPT drawing rewrites](0219-ppt-grouped-drawing-rewrite.md) | Strict framing/error order and exact publication bytes preserved; 1,411 native and 1,603 facade tests/doctests plus final focused checks pass; 28 paired routes verified; unified 1k improves 10.5–11.0× and 10k 5.2×, but 250–255× growth leaves scaling and the full goal open |
