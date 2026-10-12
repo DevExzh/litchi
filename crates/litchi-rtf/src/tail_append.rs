@@ -3712,8 +3712,20 @@ pub struct TailAppendCommit {
 impl TailAppendCommit {
     /// Published immutable candidate snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Package {
+    pub const fn package(&self) -> &Package {
         &self.snapshot
+    }
+
+    /// Consume the commit and return its published package.
+    #[must_use]
+    pub fn into_package(self) -> Package {
+        self.snapshot
+    }
+
+    /// Split the published package and its reversible patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, TailAppendPatch) {
+        (self.snapshot, self.patch)
     }
 
     /// Exact-source-checked reversible in-memory patch.
@@ -3777,11 +3789,26 @@ impl TailAppendPatch {
     }
 
     /// Applies this patch only to the exact source artifact that created it.
-    pub fn apply(&self, source: &Package) -> Result<Package, TailAppendError> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package, TailAppendError> {
         if source.source_bytes() != self.before.source_bytes() {
             return Err(TailAppendError::PatchConflict);
         }
-        Ok(self.after.clone())
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        if source.options() == self.after.options() {
+            return Ok(self.after.clone());
+        }
+        let bytes = self.after.source_bytes().ok_or(TailAppendError::UnsupportedSource(
+            "patch target has no retained source artifact",
+        ))?;
+        Ok(Package::from_bytes_with_options(bytes, source.options())?)
+    }
+
+    /// Whether this patch preserves the exact source artifact.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        self.before.source_bytes() == self.after.source_bytes()
     }
 
     /// Returns the exact inverse patch.

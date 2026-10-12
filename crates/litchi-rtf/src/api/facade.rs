@@ -608,6 +608,17 @@ impl Package {
         patch.apply(self)
     }
 
+    /// Apply an exact-source logical-tail patch under this package's open policy.
+    ///
+    /// # Errors
+    /// Returns an error for a source conflict or candidate admission failure.
+    pub fn apply_tail_append(
+        &self,
+        patch: &crate::tail_append::TailAppendPatch,
+    ) -> Result<Self, crate::tail_append::TailAppendError> {
+        patch.apply(self)
+    }
+
     /// Applies a shared durable RTF semantic patch to this exact snapshot.
     ///
     /// # Errors

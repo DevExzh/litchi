@@ -69,7 +69,10 @@ Replaying into an equal-byte owner preserves its retained opening policy.
 Records 0227–0228 add checked operation-count and replacement-byte
 `SemanticLimits` through `EditOptions`. Replacement admission precedes incoming
 payload copies; text uses UTF-8 bytes and pictures use preserved wire bytes.
-Focused append/redaction vocabulary remains pending.
+Logical-tail commits now use the same package accessors and `into_parts`;
+replay is `Package::apply_tail_append`, preserves recipient policy, and exposes
+`Patch::is_noop` (0229). Remaining append family names/policies and redaction
+vocabulary remain pending.
 
 ## 3. Open, create, save
 

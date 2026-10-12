@@ -2954,6 +2954,18 @@
           "scope": "litchi_rtf::edit::Error",
           "replacement": "use Limit with SemanticLimitKind::Operations",
           "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_rtf::tail_append::TailAppendCommit",
+          "replacement": "use package, into_package or into_parts",
+          "recursive": false
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_rtf::tail_append::TailAppendPatch",
+          "replacement": "use Package::apply_tail_append",
+          "recursive": false
         }
       ],
       "families": []

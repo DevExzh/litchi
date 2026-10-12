@@ -200,15 +200,15 @@ fn empty_append_is_an_exact_noop_and_shares_snapshot() {
     edit.append_text_paragraphs(&[]).unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
-    assert!(commit.snapshot().same_snapshot(&source));
-    assert_eq!(retained_bytes(commit.snapshot()), exact);
+    assert!(commit.package().same_snapshot(&source));
+    assert_eq!(retained_bytes(commit.package()), exact);
     assert_eq!(commit.diagnostics().inserted_bytes(), 0);
 
     let mut empty_runs = source.tail_append(TailSelector::Body);
     empty_runs.append_runs(&[]).unwrap();
     let empty_run_commit = empty_runs.commit().unwrap();
     assert!(!empty_run_commit.diagnostics().changed());
-    assert!(empty_run_commit.snapshot().same_snapshot(&source));
+    assert!(empty_run_commit.package().same_snapshot(&source));
 
     let durable = commit.patch().to_durable(patch_limits()).unwrap();
     let durable_inverse = durable.inverse();
@@ -234,7 +234,7 @@ fn appends_plain_paragraphs_before_the_exact_root_close() {
     let mut output = Vec::new();
     commit.write_to(&mut output, patch_limits()).unwrap();
 
-    assert_eq!(commit.snapshot().text(), " A\nB\nC\nD + E\nF{G}\\H\tI\n");
+    assert_eq!(commit.package().text(), " A\nB\nC\nD + E\nF{G}\\H\tI\n");
     assert!(output.starts_with(br"{\rtf1\ansi  A\par {\b B}\par C"));
     assert!(output.ends_with(b"} \r\n"));
     assert!(
@@ -257,8 +257,8 @@ fn appending_after_an_existing_paragraph_break_does_not_add_an_empty_paragraph()
     let mut edit = source.tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["B"]).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().text(), "A\nB\n");
-    assert_eq!(commit.snapshot().paragraph_count(), 2);
+    assert_eq!(commit.package().text(), "A\nB\n");
+    assert_eq!(commit.package().paragraph_count(), 2);
 }
 
 #[test]
@@ -267,7 +267,7 @@ fn unicode_appends_reset_the_source_unicode_fallback_state_locally() {
     let mut edit = source.tail_append(TailSelector::Body);
     edit.append_text_paragraphs(&["é😀"]).unwrap();
     let commit = edit.commit().unwrap();
-    assert_eq!(commit.snapshot().text(), "A\né😀\n");
+    assert_eq!(commit.package().text(), "A\né😀\n");
 }
 
 #[test]
@@ -278,9 +278,9 @@ fn exact_source_patch_and_durable_inverse_round_trip_bytes() {
     let commit = edit.commit().unwrap();
     let patch = commit.patch();
 
-    let applied = patch.apply(&source).unwrap();
-    assert_eq!(retained_bytes(&applied), retained_bytes(commit.snapshot()));
-    let restored = patch.inverse().apply(&applied).unwrap();
+    let applied = source.apply_tail_append(patch).unwrap();
+    assert_eq!(retained_bytes(&applied), retained_bytes(commit.package()));
+    let restored = applied.apply_tail_append(&patch.inverse()).unwrap();
     assert_eq!(retained_bytes(&restored), retained_bytes(&source));
 
     let durable = patch.to_durable(patch_limits()).unwrap();
@@ -291,7 +291,7 @@ fn exact_source_patch_and_durable_inverse_round_trip_bytes() {
     let durable_applied = decoded.apply(&source).unwrap();
     assert_eq!(
         retained_bytes(&durable_applied),
-        retained_bytes(commit.snapshot())
+        retained_bytes(commit.package())
     );
     let inverse = decoded.inverse();
     let inverse_encoded = inverse.to_deterministic_json().unwrap();
@@ -302,7 +302,7 @@ fn exact_source_patch_and_durable_inverse_round_trip_bytes() {
 
     let foreign = Package::parse(r"{\rtf1\ansi Foreign}").unwrap();
     assert!(matches!(
-        patch.apply(&foreign),
+        foreign.apply_tail_append(patch),
         Err(TailAppendError::PatchConflict)
     ));
 }
@@ -495,7 +495,7 @@ fn unsupported_active_opaque_protected_compressed_and_binary_sources_refuse() {
             .windows(br"\future42".len())
             .any(|window| window == br"\future42")
     );
-    assert_eq!(opaque_commit.snapshot().text(), "AB\nx\n");
+    assert_eq!(opaque_commit.package().text(), "AB\nx\n");
 
     let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 A}").unwrap();
     let mut protected_edit = protected.tail_append(TailSelector::Body);
@@ -944,4 +944,90 @@ fn publication_plan_preserves_unknown_source_bytes_and_semantic_closure() {
     );
     let reopened = Package::from_bytes(&sink.output).unwrap();
     assert_eq!(reopened.text(), "AB\nC\n");
+}
+
+#[test]
+fn native_replay_preserves_recipient_policy_and_noop_identity() {
+    let bytes = br"{\rtf1\ansi A}";
+    let source = Package::from_bytes(bytes).unwrap();
+    let options = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(bytes.len())
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    let recipient = Package::from_bytes_with_options(bytes, options).unwrap();
+    let noop = source.tail_append(TailSelector::Body).commit().unwrap();
+    assert!(noop.patch().is_noop());
+    assert!(
+        recipient
+            .apply_tail_append(noop.patch())
+            .unwrap()
+            .same_snapshot(&recipient)
+    );
+    let mut edit = source.tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["additional text"]).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(!commit.patch().is_noop());
+    assert!(matches!(
+        recipient.apply_tail_append(commit.patch()),
+        Err(TailAppendError::Rtf(litchi_rtf::RtfError::Limit { kind: litchi_rtf::SourceLimitKind::InputBytes, .. }))
+    ));
+    assert_eq!(recipient.open_options(), options);
+    assert_eq!(recipient.to_bytes().unwrap(), bytes);
+
+    let (package, patch) = commit.into_parts();
+    assert_eq!(
+        source
+            .apply_tail_append(&patch)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        package.to_bytes().unwrap()
+    );
+    assert_eq!(
+        package
+            .apply_tail_append(&patch.inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        bytes
+    );
+    assert!(
+        source
+            .tail_append(TailSelector::Body)
+            .commit()
+            .unwrap()
+            .into_package()
+            .same_snapshot(&source)
+    );
+}
+
+#[test]
+fn native_replay_retains_distinct_admitting_recipient_profile() {
+    let bytes = br"{\rtf1\ansi A}";
+    let source = Package::from_bytes(bytes).unwrap();
+    let options = OpenOptions::new().source_limits(
+        SourceLimits::builder()
+            .max_input_bytes(4096)
+            .unwrap()
+            .build()
+            .unwrap(),
+    );
+    let recipient = Package::from_bytes_with_options(bytes, options).unwrap();
+    let mut edit = source.tail_append(TailSelector::Body);
+    edit.append_text_paragraphs(&["B"]).unwrap();
+    let commit = edit.commit().unwrap();
+    let applied = recipient.apply_tail_append(commit.patch()).unwrap();
+    assert_eq!(applied.open_options(), options);
+    assert_eq!(
+        applied.to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
+    let restored = applied
+        .apply_tail_append(&commit.patch().inverse())
+        .unwrap();
+    assert_eq!(restored.open_options(), options);
+    assert_eq!(restored.to_bytes().unwrap(), bytes);
 }

@@ -16984,7 +16984,7 @@ fn verify_rtf_logical_tail_gates(
     }
     if noop.diagnostics().changed()
         || noop.diagnostics().operation_count() != 0
-        || !noop.snapshot().same_snapshot(source)
+        || !noop.package().same_snapshot(source)
     {
         return Err("RTF logical-tail empty append was not an exact no-op".into());
     }
@@ -17000,11 +17000,11 @@ fn verify_rtf_logical_tail_gates(
         appended,
     )?;
 
-    let applied = changed.patch().apply(source)?;
+    let applied = source.apply_tail_append(changed.patch())?;
     if applied.to_bytes()? != expected {
         return Err("RTF logical-tail in-memory patch replay differs from publication".into());
     }
-    let restored = changed.patch().inverse().apply(&applied)?;
+    let restored = applied.apply_tail_append(&changed.patch().inverse())?;
     if restored.to_bytes()? != source.to_bytes()? {
         return Err("RTF logical-tail in-memory inverse did not restore exact source".into());
     }
@@ -17040,7 +17040,7 @@ fn verify_rtf_logical_tail_gates(
 
     let foreign = litchi_rtf::Package::parse(r"{\rtf1\ansi foreign source}")?;
     if !matches!(
-        changed.patch().apply(&foreign),
+        foreign.apply_tail_append(changed.patch()),
         Err(litchi_rtf::TailAppendError::PatchConflict)
     ) || !matches!(
         decoded.apply(&foreign),
@@ -17053,7 +17053,7 @@ fn verify_rtf_logical_tail_gates(
     stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
     let stale = stale_edit.commit()?.into_package();
     if !matches!(
-        changed.patch().apply(&stale),
+        stale.apply_tail_append(changed.patch()),
         Err(litchi_rtf::TailAppendError::PatchConflict)
     ) || !matches!(
         decoded.apply(&stale),
@@ -33439,7 +33439,7 @@ fn run_rtf_logical_tail_append(
         let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
         edit.commit()?
     };
-    let expected = changed.snapshot().to_bytes()?;
+    let expected = changed.package().to_bytes()?;
     verify_rtf_logical_tail_gates(&source, &changed, &noop, &appended, limits, &expected)?;
     let expected_digest = sha256_hex(&expected);
     let source_bytes = u64::try_from(corpus.archive.len())?;
@@ -33939,7 +33939,7 @@ fn run_rtf_logical_tail_publication(
         let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
         edit.commit()?
     };
-    let expected_changed = changed.snapshot().to_bytes()?;
+    let expected_changed = changed.package().to_bytes()?;
     let expected_output = if append {
         expected_changed.clone()
     } else {
