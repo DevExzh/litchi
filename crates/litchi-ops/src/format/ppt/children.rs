@@ -1,0 +1,301 @@
+//! Lazy direct-child traversal for legacy PowerPoint nodes.
+//!
+//! Presentation children are catalog entries.  Slide and group children are
+//! native shape records loaded only when the iterator is first pulled.  Each
+//! subsequent pull checks the retained source, so an iterator cannot quietly
+//! continue over a source that changed after a node was selected.
+
+use std::sync::Arc;
+
+use litchi_ppt::shapes::{ShapeEnum, ShapeType};
+
+use super::Ppt;
+use super::node::{Item, Node};
+use super::spec::Kind;
+use crate::error::{Error, Result};
+use crate::path::navigate::KindSet;
+
+/// The children of one legacy PPT node.
+pub(crate) struct Children<'f> {
+    file: &'f Ppt,
+    kinds: KindSet<Kind>,
+    state: State,
+}
+
+enum State {
+    Done,
+    Slides {
+        next: usize,
+        end: usize,
+    },
+    Shapes {
+        slide: usize,
+        parent: Arc<[crate::node::PathStep<'static>]>,
+        source: ShapeSource,
+        next: usize,
+        counters: [usize; Kind::COUNT],
+    },
+}
+
+pub(crate) enum ShapeSource {
+    /// The slide is parsed only when the first child is requested.
+    Slide(usize),
+    /// A parsed slide/group root array and the index trail to a group whose
+    /// direct children are being listed.  The trail points into `roots`, so a
+    /// nested group never copies its child payloads.
+    Tree {
+        roots: Arc<[ShapeEnum<'static>]>,
+        path: Arc<[usize]>,
+    },
+}
+
+impl ShapeSource {
+    pub(crate) fn tree(roots: Arc<[ShapeEnum<'static>]>, path: Arc<[usize]>) -> Self {
+        Self::Tree { roots, path }
+    }
+
+    pub(crate) fn direct(&self) -> Option<&[ShapeEnum<'static>]> {
+        match self {
+            Self::Slide(_) => None,
+            Self::Tree { roots, path } if path.is_empty() => Some(roots),
+            Self::Tree { roots, path } => resolve_shape(roots, path)
+                .and_then(|shape| shape.as_group())
+                .map(|group| group.children()),
+        }
+    }
+
+    pub(crate) fn roots(&self) -> Option<Arc<[ShapeEnum<'static>]>> {
+        match self {
+            Self::Slide(_) => None,
+            Self::Tree { roots, .. } => Some(Arc::clone(roots)),
+        }
+    }
+
+    pub(crate) fn child_path(&self, index: usize) -> Option<Arc<[usize]>> {
+        let path = match self {
+            Self::Slide(_) => return None,
+            Self::Tree { path, .. } => path,
+        };
+        let mut child = path.to_vec();
+        child.push(index);
+        Some(Arc::from(child.into_boxed_slice()))
+    }
+}
+
+/// Build an eager source for navigation or availability probes.  View
+/// traversal uses the `Slide` variant above to defer this read until `next`.
+pub(crate) fn source_for(parent: &Node<'_>) -> Result<Option<ShapeSource>> {
+    match parent.item() {
+        Item::Slide(slide) => {
+            let Some(slide) = parent.file().reader().slide_at(slide.position)? else {
+                return Err(missing_slide(slide.position));
+            };
+            Ok(Some(ShapeSource::tree(
+                slide.shared_shapes()?,
+                Arc::from(Vec::<usize>::new().into_boxed_slice()),
+            )))
+        },
+        Item::Shape(shape) if shape.kind == Kind::Group => {
+            let source = ShapeSource::tree(Arc::clone(&shape.source), Arc::clone(&shape.path));
+            Ok(source.direct().is_some().then_some(source))
+        },
+        _ => Ok(None),
+    }
+}
+
+impl<'f> Children<'f> {
+    /// Construct a lazy child iterator for `parent`.
+    pub(crate) fn of(parent: &Node<'f>, kinds: KindSet<Kind>) -> Self {
+        let file = parent.file();
+        let state = match parent.item() {
+            Item::Presentation if kinds.contains(Kind::Slide) => State::Slides {
+                next: 0,
+                end: file.reader().slide_count(),
+            },
+            Item::Presentation => State::Done,
+            Item::Slide(slide) if wants_shapes(kinds) => State::Shapes {
+                slide: slide.position,
+                parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
+                source: ShapeSource::Slide(slide.position),
+                next: 0,
+                counters: [0; Kind::COUNT],
+            },
+            Item::Slide(_) => State::Done,
+            Item::Shape(shape) if shape.kind == Kind::Group => {
+                if !wants_shapes(kinds) {
+                    return Self {
+                        file,
+                        kinds,
+                        state: State::Done,
+                    };
+                }
+                let source = ShapeSource::tree(Arc::clone(&shape.source), Arc::clone(&shape.path));
+                if source.direct().is_some() {
+                    State::Shapes {
+                        slide: shape.slide,
+                        parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
+                        source,
+                        next: 0,
+                        counters: [0; Kind::COUNT],
+                    }
+                } else {
+                    State::Done
+                }
+            },
+            Item::Shape(_) => State::Done,
+        };
+        Self { file, kinds, state }
+    }
+
+    fn step(&mut self) -> Result<Option<Node<'f>>> {
+        self.file.check_source()?;
+        let result = self.step_unfenced();
+        self.file.check_source().and(result)
+    }
+
+    fn step_unfenced(&mut self) -> Result<Option<Node<'f>>> {
+        let state = std::mem::replace(&mut self.state, State::Done);
+        match state {
+            State::Done => Ok(None),
+            State::Slides { next, end } => {
+                if next >= end {
+                    return Ok(None);
+                }
+                self.state = State::Slides {
+                    next: next + 1,
+                    end,
+                };
+                Ok(Some(Node::slide_node(self.file, next)))
+            },
+            State::Shapes {
+                slide,
+                parent,
+                source,
+                mut next,
+                mut counters,
+            } => {
+                let source = match source {
+                    ShapeSource::Slide(position) => {
+                        let slide_ref = self
+                            .file
+                            .reader()
+                            .slide_at(position)?
+                            .ok_or_else(|| missing_slide(position))?;
+                        ShapeSource::tree(
+                            slide_ref.shared_shapes()?,
+                            Arc::from(Vec::<usize>::new().into_boxed_slice()),
+                        )
+                    },
+                    source => source,
+                };
+
+                let Some(direct_len) = source.direct().map(|direct| direct.len()) else {
+                    return Ok(None);
+                };
+                while next < direct_len {
+                    let index = next;
+                    next += 1;
+                    let Some((kind, is_placeholder)) = (|| {
+                        let direct = source.direct()?;
+                        let shape = direct.get(index)?;
+                        Some((
+                            physical_kind(shape)?,
+                            matches!(shape, ShapeEnum::Placeholder(_)),
+                        ))
+                    })() else {
+                        continue;
+                    };
+                    let ordinal = counters[kind as usize];
+                    counters[kind as usize] = ordinal.saturating_add(1);
+                    let wanted = self.kinds.contains(kind)
+                        || (is_placeholder && self.kinds.contains(Kind::Placeholder));
+                    if !wanted {
+                        continue;
+                    }
+
+                    let Some(roots) = source.roots() else {
+                        return Ok(None);
+                    };
+                    let Some(path) = source.child_path(index) else {
+                        return Ok(None);
+                    };
+                    let node =
+                        Node::shape_node(self.file, &parent, slide, kind, ordinal, roots, path);
+                    self.state = State::Shapes {
+                        slide,
+                        parent,
+                        source,
+                        next,
+                        counters,
+                    };
+                    return Ok(Some(node));
+                }
+                Ok(None)
+            },
+        }
+    }
+}
+
+fn wants_shapes(kinds: KindSet<Kind>) -> bool {
+    [
+        Kind::Shape,
+        Kind::Placeholder,
+        Kind::Picture,
+        Kind::Table,
+        Kind::Group,
+        Kind::Connector,
+    ]
+    .into_iter()
+    .any(|kind| kinds.contains(kind))
+}
+
+impl<'f> Iterator for Children<'f> {
+    type Item = Result<Node<'f>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        match self.step() {
+            Ok(Some(node)) => Some(Ok(node)),
+            Ok(None) => None,
+            Err(error) => {
+                self.state = State::Done;
+                Some(Err(error))
+            },
+        }
+    }
+}
+
+impl<'f> std::iter::FusedIterator for Children<'f> {}
+
+/// Classify one native shape into the physical navigation kind.
+pub(crate) fn physical_kind(shape: &ShapeEnum<'_>) -> Option<Kind> {
+    Some(match shape {
+        ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_) => Kind::Shape,
+        ShapeEnum::Picture(_) => Kind::Picture,
+        ShapeEnum::Table(_) => Kind::Table,
+        ShapeEnum::Group(_) => Kind::Group,
+        ShapeEnum::Line(line) => match line.shape_type() {
+            ShapeType::Connector => Kind::Connector,
+            _ => Kind::Shape,
+        },
+    })
+}
+
+fn resolve_shape<'a>(
+    source: &'a [ShapeEnum<'static>],
+    path: &[usize],
+) -> Option<&'a ShapeEnum<'static>> {
+    let (&first, rest) = path.split_first()?;
+    let mut shape = source.get(first)?;
+    for &index in rest {
+        shape = shape.as_group()?.children().get(index)?;
+    }
+    Some(shape)
+}
+
+fn missing_slide(position: usize) -> Error {
+    Error::new(
+        crate::Code::InternalError,
+        format!("slide {} vanished from the catalog", position + 1),
+    )
+    .with_format(litchi_core::FileFormat::Ppt)
+}

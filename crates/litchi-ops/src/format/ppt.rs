@@ -25,6 +25,19 @@ use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
+mod children;
+mod nav;
+mod node;
+mod spec;
+mod views;
+
+pub(crate) use children::Children;
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub(crate) use node::Props;
+pub(crate) use spec::SPEC;
+pub(crate) use views::{Json as ViewJson, view_json, view_to};
+
 /// An opened legacy PowerPoint (`.ppt`) presentation.
 ///
 /// One `Arc` wide: cloning is one atomic increment, and the handle is
