@@ -14,15 +14,18 @@
 //! be right after several hidden publications.
 
 use std::collections::BTreeMap;
-use std::io::Cursor;
-use std::sync::Arc;
+use std::io::{self, Cursor};
+use std::sync::{
+    Arc,
+    atomic::{AtomicU64, Ordering},
+};
 
-use litchi_cfb::{OleFile, OleWriter};
-use litchi_core::Position;
+use litchi_cfb::{OleError, OleFile, OleWriter};
+use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_ppt::package::edit::{EditOptions, Error, ShapeTextReplacement};
 use litchi_ppt::shapes::{Shape, ShapeEnum, ShapeType};
 use litchi_ppt::text_edit::Target;
-use litchi_ppt::{CurrentUser, Package, Record, RecordType};
+use litchi_ppt::{CurrentUser, OpenOptions, Package, Record, RecordType, SourceLimits};
 
 const MAX_CHUNK: usize = 256;
 const MAX_AGGREGATE: usize = 4096;
@@ -269,6 +272,156 @@ fn assert_replaced_texts(package: &Package, slide_count: usize, textboxes_per_sl
             assert_eq!(texts[slide][shape], format!("target-{slide:02}-{shape:04}"));
         }
     }
+}
+
+struct VersionedSource {
+    bytes: Vec<u8>,
+    revision: AtomicU64,
+}
+
+impl VersionedSource {
+    fn new(bytes: Vec<u8>) -> Self {
+        Self {
+            bytes,
+            revision: AtomicU64::new(0),
+        }
+    }
+
+    fn change(&self) {
+        self.revision.fetch_add(1, Ordering::AcqRel);
+    }
+}
+
+impl ReadAt for VersionedSource {
+    fn len(&self) -> io::Result<u64> {
+        Ok(self.bytes.len() as u64)
+    }
+
+    fn version(&self) -> io::Result<SourceVersion> {
+        Ok(SourceVersion::new(
+            0x0220,
+            self.revision.load(Ordering::Acquire),
+        ))
+    }
+
+    fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+        let offset =
+            usize::try_from(offset).map_err(|_| io::Error::from(io::ErrorKind::InvalidInput))?;
+        let input = self.bytes.get(offset..).unwrap_or_default();
+        let count = input.len().min(output.len());
+        output[..count].copy_from_slice(&input[..count]);
+        Ok(count)
+    }
+}
+
+#[test]
+fn too_many_chunks_checks_source_freshness_before_limit_admission() {
+    let source_owner = Arc::new(VersionedSource::new(fixture(1, 1)));
+    let source = Package::from_read_at(source_owner.clone()).expect("open positional fixture");
+    let mut edit = source.edit().expect("start positional chunk edit");
+    let empty: &[ShapeTextReplacement] = &[];
+    let too_many_chunks = vec![empty; 4097];
+
+    // The caller's source changed after the edit was captured.  The stale
+    // source refusal must win over the cheap chunk-count refusal, even though
+    // this plan contains no target resolution work.
+    source_owner.change();
+    let error = match edit.set_shape_text_chunks(&too_many_chunks) {
+        Ok(_) => panic!("stale source must be refused"),
+        Err(error) => error,
+    };
+    assert!(matches!(
+        error,
+        Error::Package(litchi_ppt::Error::Ole(OleError::SourceChanged { .. }))
+    ));
+    assert_eq!(edit.operation_count(), 0);
+}
+
+#[test]
+fn aggregate_replacement_byte_limit_precedes_target_and_signed_checks() {
+    let unsigned_bytes = fixture(1, 4);
+    let unsigned_limits = SourceLimits::builder()
+        .max_input_bytes(unsigned_bytes.len())
+        .expect("unsigned package byte limit")
+        .build()
+        .expect("build unsigned package limits");
+    let unsigned = Package::from_bytes_with_options(
+        &unsigned_bytes,
+        OpenOptions::new().source_limits(unsigned_limits),
+    )
+    .expect("open byte-limited unsigned package");
+    assert_eq!(
+        unsigned.source_limits().max_input_bytes(),
+        unsigned_bytes.len()
+    );
+
+    // The target is invalid on purpose.  The replacement is only a few
+    // kilobytes, but exceeds the selected package ceiling.  The byte-bound
+    // refusal must precede slide/shape resolution and leave the edit retryable.
+    let oversized_text = "x".repeat(unsigned_bytes.len() + 1);
+    let invalid_target = [ShapeTextReplacement::new(
+        Target::new(Position::new(99), Position::new(99)),
+        oversized_text,
+    )];
+    let mut unsigned_edit = unsigned.edit().expect("start byte-limited edit");
+    let error = unsigned_edit
+        .set_shape_text_chunks(&[invalid_target.as_slice()])
+        .expect_err("aggregate replacement bytes must be bounded");
+    assert!(matches!(
+        error,
+        Error::Package(litchi_ppt::Error::ResourceLimit(message))
+            if message.contains("aggregate replacement bytes")
+    ));
+    assert_eq!(unsigned_edit.operation_count(), 0);
+    assert_eq!(
+        unsigned_edit.source().to_bytes().expect("source bytes"),
+        unsigned_bytes
+    );
+    let noop = [ShapeTextReplacement::new(
+        Target::new(Position::new(0), Position::new(0)),
+        "source-00-0000",
+    )];
+    assert_eq!(
+        unsigned_edit
+            .set_shape_text_chunks(&[noop.as_slice()])
+            .expect("retry with bounded no-op"),
+        0
+    );
+
+    // Repeat the same admission check on a signed source.  Without the
+    // aggregate byte check this path would return Error::Signed instead.
+    let signed_bytes = signed_cfb(&unsigned_bytes);
+    let signed_limits = SourceLimits::builder()
+        .max_input_bytes(signed_bytes.len())
+        .expect("signed package byte limit")
+        .build()
+        .expect("build signed package limits");
+    let signed = Package::from_bytes_with_options(
+        &signed_bytes,
+        OpenOptions::new().source_limits(signed_limits),
+    )
+    .expect("open byte-limited signed package");
+    let signed_oversized = [ShapeTextReplacement::new(
+        Target::new(Position::new(0), Position::new(0)),
+        "y".repeat(signed_bytes.len() + 1),
+    )];
+    let mut signed_edit = signed.edit().expect("start signed byte-limited edit");
+    let error = signed_edit
+        .set_shape_text_chunks(&[signed_oversized.as_slice()])
+        .expect_err("signed aggregate byte bound must precede signature policy");
+    assert!(matches!(
+        error,
+        Error::Package(litchi_ppt::Error::ResourceLimit(message))
+            if message.contains("aggregate replacement bytes")
+    ));
+    assert_eq!(signed_edit.operation_count(), 0);
+    assert_eq!(
+        signed_edit
+            .source()
+            .to_bytes()
+            .expect("signed source bytes"),
+        signed_bytes
+    );
 }
 
 #[test]
