@@ -17,7 +17,7 @@ use crate::error::{Code, Error, Result};
 use crate::props::Props;
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
-use litchi_core::selector::{Path, Step};
+use litchi_core::selector::{Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
 use litchi_rtf::edit::{
     EditOptions, ParagraphAlignmentUpdate, ParagraphLayout, ParagraphLayoutPatch,
@@ -28,11 +28,7 @@ use litchi_rtf::text::{Break, Inline};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Family {
-    Paragraph {
-        text: bool,
-        alignment: bool,
-        layout: bool,
-    },
+    Paragraph,
     RunText,
     RunFormat,
     Noop,
@@ -104,7 +100,6 @@ pub(crate) struct Plan {
     text: Option<String>,
     alignment: Option<litchi_rtf::Alignment>,
     layout: Option<ParagraphLayoutPatch>,
-    layout_intent: LayoutIntent,
     format: RunFormatPatch,
     staged_bytes: usize,
     changed: bool,
@@ -261,6 +256,9 @@ pub(crate) struct Run {
     last_key: Option<(usize, usize)>,
     unsafe_run_paragraph: Option<usize>,
     structural_paragraph_text: bool,
+    paragraph_text: bool,
+    paragraph_alignment: bool,
+    paragraph_layout: bool,
     staged_bytes: usize,
     native_operations: usize,
 }
@@ -309,6 +307,9 @@ impl Run {
             last_key: None,
             unsafe_run_paragraph: None,
             structural_paragraph_text: false,
+            paragraph_text: false,
+            paragraph_alignment: false,
+            paragraph_layout: false,
             native_operations: 0,
         })
     }
@@ -324,11 +325,33 @@ impl Run {
         let Some(target) = direct_target(path) else {
             return Ok(None);
         };
-        make_plan(&self.base, &self.source, target, props, &self.limits).map(Some)
+        if self.limits.max_expanded_targets() < 1 {
+            return Err(TransactionError::Limit {
+                kind: LimitKind::ExpandedTargets,
+                observed: 1,
+                maximum: self.limits.max_expanded_targets(),
+            }
+            .into());
+        }
+        make_plan(
+            &self.base,
+            &self.source,
+            target,
+            props,
+            &self.limits,
+            self.staged_bytes,
+        )
+        .map(Some)
     }
 
     pub(crate) fn requires_barrier(&self, plan: &Plan) -> bool {
-        if self.family != Some(plan.family) {
+        let Some(family) = self.family else {
+            return false;
+        };
+        if self.items.len() >= self.limits.max_expanded_targets() {
+            return true;
+        }
+        if family != plan.family {
             return true;
         }
         if self
@@ -342,6 +365,13 @@ impl Run {
             return true;
         }
         if self.structural_paragraph_text {
+            return true;
+        }
+        if matches!(plan.family, Family::Paragraph)
+            && ((self.paragraph_layout && plan.text.is_some())
+                || (self.paragraph_text && plan.layout.is_some())
+                || (plan.structural_text && (self.paragraph_alignment || self.paragraph_layout)))
+        {
             return true;
         }
         if matches!(plan.target, Target::Run { .. })
@@ -363,6 +393,14 @@ impl Run {
     }
 
     pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
+        if self.items.len() >= self.limits.max_expanded_targets() {
+            return Err(TransactionError::Limit {
+                kind: LimitKind::ExpandedTargets,
+                observed: self.items.len().saturating_add(1),
+                maximum: self.limits.max_expanded_targets(),
+            }
+            .into());
+        }
         if self.requires_barrier(&plan) {
             return Err(Error::new(
                 Code::InternalError,
@@ -383,6 +421,11 @@ impl Run {
         let changed = plan.changed;
         if plan.structural_text {
             self.structural_paragraph_text = true;
+        }
+        if matches!(plan.family, Family::Paragraph) {
+            self.paragraph_text |= plan.text.is_some();
+            self.paragraph_alignment |= plan.alignment.is_some();
+            self.paragraph_layout |= plan.layout.is_some();
         }
         if matches!(plan.family, Family::RunText) && !plan.stable_run_text {
             self.unsafe_run_paragraph = Some(plan.paragraph());
@@ -466,8 +509,12 @@ fn direct_target(path: &Path<'_>) -> Option<Target> {
 }
 
 fn body_step(step: &Step<'_>) -> bool {
-    (name_is(step, "body"))
-        && (step.predicates().is_empty() || step.index() == Some(Position::new(0)))
+    name_is(step, "body")
+        && match step.predicates() {
+            [] => true,
+            [Predicate::Index(position)] => position.get() == 0,
+            _ => false,
+        }
 }
 
 fn name_is(step: &Step<'_>, name: &str) -> bool {
@@ -480,6 +527,7 @@ fn make_plan(
     target: Target,
     props: &Props<'_>,
     limits: &SemanticLimits,
+    staged_base: usize,
 ) -> Result<Plan> {
     match target {
         Target::Paragraph(position) => {
@@ -511,18 +559,14 @@ fn make_plan(
                 .and_then(|bytes| bytes.checked_add(properties.text.map_or(0, str::len)))
                 .and_then(|bytes| bytes.checked_add(size_of::<ParagraphLayoutUpdate>()))
                 .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
-            let family = Family::Paragraph {
-                text: properties.text.is_some(),
-                alignment: properties.alignment.is_some(),
-                layout: properties.layout.is_some(),
-            };
+            let family = Family::Paragraph;
+            admit_staged(staged_base, per_target, limits)?;
             Ok(Plan {
                 target,
                 family,
                 text: properties.text.map(str::to_owned),
                 alignment: properties.alignment,
                 layout: properties.layout,
-                layout_intent,
                 format: RunFormatPatch::new(),
                 staged_bytes: per_target,
                 changed: text_changed || alignment_changed || layout_changed,
@@ -557,13 +601,13 @@ fn make_plan(
                 Some(size_of::<RunFormatUpdate>())
             }
             .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+            admit_staged(staged_base, per_target, limits)?;
             Ok(Plan {
                 target: Target::Run { paragraph, run },
                 family,
                 text: text.map(str::to_owned),
                 alignment: None,
                 layout: None,
-                layout_intent: LayoutIntent::default(),
                 format,
                 staged_bytes: per_target,
                 changed: text_changed || format_changed,
@@ -575,15 +619,25 @@ fn make_plan(
     }
 }
 
-fn source_text(file: &Rtf, range: &Range<usize>) -> &str {
+fn source_text<'a>(file: &'a Rtf, range: &Range<usize>) -> &'a str {
     file.0.package.text().get(range.clone()).unwrap_or("")
+}
+
+fn admit_staged(base: usize, incoming: usize, limits: &SemanticLimits) -> Result<usize> {
+    let observed = base
+        .checked_add(incoming)
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    if observed > limits.max_staged_bytes() {
+        return Err(staged_limit(observed, limits.max_staged_bytes()));
+    }
+    Ok(observed)
 }
 
 fn stable_run_text(text: &str) -> bool {
     !text.is_empty()
-        && text
-            .bytes()
-            .all(|byte| byte.is_ascii_graphic() || byte == b' ')
+        && text.bytes().all(|byte| {
+            (byte.is_ascii_graphic() && !matches!(byte, b'\\' | b'{' | b'}')) || byte == b' '
+        })
 }
 
 fn layout_intent(props: &Props<'_>) -> Result<LayoutIntent> {
@@ -653,19 +707,34 @@ fn stage_native(edit: &mut litchi_rtf::edit::Edit, items: &[Item]) -> Result<()>
         return Ok(());
     };
     match first.plan.family {
-        Family::Paragraph { .. } => {
+        Family::Paragraph => {
             let mut texts = Vec::new();
             let mut alignments = Vec::new();
             let mut layouts = Vec::new();
-            texts
-                .try_reserve_exact(items.len())
-                .map_err(|source| TransactionError::Allocation { source })?;
-            alignments
-                .try_reserve_exact(items.len())
-                .map_err(|source| TransactionError::Allocation { source })?;
-            layouts
-                .try_reserve_exact(items.len())
-                .map_err(|source| TransactionError::Allocation { source })?;
+            let text_count = items.iter().filter(|item| item.plan.text.is_some()).count();
+            let alignment_count = items
+                .iter()
+                .filter(|item| item.plan.alignment.is_some())
+                .count();
+            let layout_count = items
+                .iter()
+                .filter(|item| item.plan.layout.is_some())
+                .count();
+            if text_count != 0 {
+                texts
+                    .try_reserve_exact(text_count)
+                    .map_err(|source| TransactionError::Allocation { source })?;
+            }
+            if alignment_count != 0 {
+                alignments
+                    .try_reserve_exact(alignment_count)
+                    .map_err(|source| TransactionError::Allocation { source })?;
+            }
+            if layout_count != 0 {
+                layouts
+                    .try_reserve_exact(layout_count)
+                    .map_err(|source| TransactionError::Allocation { source })?;
+            }
             for item in items {
                 let plan = &item.plan;
                 let Target::Paragraph(position) = plan.target else {
