@@ -322,7 +322,7 @@ fn swap_preserves_empty_terminal_and_decoded_unicode_paragraphs() {
         reordered.swap(0, 2);
         assert_eq!(paragraph_texts(&commit.package()), reordered);
         assert_complete_reopen(
-            &commit.package(),
+            commit.package(),
             &reordered.iter().map(String::as_str).collect::<Vec<_>>(),
         );
         let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
