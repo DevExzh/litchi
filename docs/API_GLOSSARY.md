@@ -1485,3 +1485,12 @@ through text replacements and removals using semantic UTF-8 byte positions.
 The emitted terminal paragraph delimiter participates in projection. No public
 transaction alias or facade-specific rewrite API is introduced; exact source
 bytes, candidate validation and source-bound inverse history remain native-owned.
+
+### RTF run insertion (0246)
+
+`RunTextInsertion` carries typed paragraph and run-boundary `Position` values.
+`Edit::insert_run` and `Edit::insert_body_runs` publish through the native owner;
+source-relative batch boundaries are nondecreasing and equal positions preserve
+input order. The unified `add` verb supplies placement and property coercion,
+returning the canonical path of the whole inserted run. Formatting inherits the
+right neighbor, last left neighbor at append, or the empty paragraph delimiter.
