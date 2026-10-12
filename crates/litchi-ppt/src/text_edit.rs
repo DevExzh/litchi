@@ -2537,38 +2537,34 @@ pub(crate) fn replace_shape_texts_batch(
     // one framing walk per drawing; this loop retains the caller's request
     // order for all typed shape/text errors.
     for target in targets {
-        if !index_failures.contains(&target.slide_persist_id) {
-            if let Entry::Vacant(entry) = indexed_shapes.entry(target.slide_persist_id) {
-                let shape_ids =
-                    requested_shapes
-                        .get(&target.slide_persist_id)
-                        .ok_or_else(|| {
-                            PackageError::Corrupted(
-                                "PPT batch shape-text indexing lost its requested identities"
-                                    .into(),
-                            )
-                        })?;
-                let slide_record =
-                    original_slides
-                        .get(&target.slide_persist_id)
-                        .ok_or_else(|| {
-                            PackageError::Corrupted(
-                                "PPT batch shape-text indexing lost its original slide record"
-                                    .into(),
-                            )
-                        })?;
-                match index_slide_text_targets(slide_record, shape_ids) {
-                    Ok(index) => {
-                        entry.insert(index);
-                    },
-                    Err(_error) => {
-                        // A malformed OfficeArt subtree takes the slow error
-                        // path below, which replays the old one-target
-                        // inspector in caller order and therefore preserves
-                        // its exact first-error precedence.
-                        index_failures.insert(target.slide_persist_id);
-                    },
-                }
+        if !index_failures.contains(&target.slide_persist_id)
+            && let Entry::Vacant(entry) = indexed_shapes.entry(target.slide_persist_id)
+        {
+            let shape_ids = requested_shapes
+                .get(&target.slide_persist_id)
+                .ok_or_else(|| {
+                    PackageError::Corrupted(
+                        "PPT batch shape-text indexing lost its requested identities".into(),
+                    )
+                })?;
+            let slide_record = original_slides
+                .get(&target.slide_persist_id)
+                .ok_or_else(|| {
+                    PackageError::Corrupted(
+                        "PPT batch shape-text indexing lost its original slide record".into(),
+                    )
+                })?;
+            match index_slide_text_targets(slide_record, shape_ids) {
+                Ok(index) => {
+                    entry.insert(index);
+                },
+                Err(_error) => {
+                    // A malformed OfficeArt subtree takes the slow error
+                    // path below, which replays the old one-target
+                    // inspector in caller order and therefore preserves
+                    // its exact first-error precedence.
+                    index_failures.insert(target.slide_persist_id);
+                },
             }
         }
         let text = match inspected_shapes.get(&(target.slide_persist_id, target.native_shape_id)) {
