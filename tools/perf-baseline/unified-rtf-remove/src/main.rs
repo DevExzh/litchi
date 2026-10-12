@@ -388,7 +388,7 @@ fn measure_case(
         "paragraphs": count,
         "removed": removed,
         "selector": match shape {
-            Shape::SinglePath => path_text,
+            Shape::SinglePath => path_text.as_str(),
             Shape::QueryAll => "/body/p",
         },
         "corpus": {

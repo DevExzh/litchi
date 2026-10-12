@@ -36,7 +36,8 @@ pub(crate) fn set_with_limits<'p, 'v>(
     file.admit_edit()?;
     let props = Props::from_props(props)?;
     let text = paragraph_text(&props)?;
-    let positions = resolve_paragraph_targets(file, &target, limits.max_expanded_targets())?;
+    let positions =
+        resolve_paragraph_targets(file, &target, limits.max_expanded_targets(), |_| {})?;
 
     let operations = positions.len();
     if operations > limits.max_operations() {
@@ -121,7 +122,12 @@ pub(crate) fn remove_with_limits<'p>(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     file.admit_edit()?;
-    let positions = resolve_paragraph_targets(file, &target, limits.max_expanded_targets())?;
+    let mut removed_bytes = 0usize;
+    let positions =
+        resolve_paragraph_targets(file, &target, limits.max_expanded_targets(), |node| {
+            removed_bytes =
+                removed_bytes.saturating_add(node.paragraph.map_or(0, |paragraph| paragraph.len()));
+        })?;
     let operations = positions.len();
     if operations > limits.max_operations() {
         return Err(TransactionError::Limit {
@@ -135,20 +141,6 @@ pub(crate) fn remove_with_limits<'p>(
     // Native removal retains each selected paragraph's text for stale-source
     // checks and reversible history. Charge that retained payload before the
     // native operation allocates its owned copies.
-    let mut removed_bytes = 0usize;
-    let mut selected = positions.iter().copied();
-    let mut next = selected.next();
-    for (position, paragraph) in file.0.package.body().paragraphs().enumerate() {
-        if next == Some(position) {
-            removed_bytes = removed_bytes
-                .checked_add(paragraph.len())
-                .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
-            next = selected.next();
-        }
-        if next.is_none() {
-            break;
-        }
-    }
     let action_bytes = operations
         .checked_mul(size_of::<usize>() + size_of::<String>())
         .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
@@ -168,8 +160,12 @@ pub(crate) fn remove_with_limits<'p>(
         .map_err(Error::from)?;
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
-    edit.remove_body_paragraphs(&positions)
-        .map_err(Error::from)?;
+    if let [position] = positions.as_slice() {
+        edit.remove_paragraph(*position).map_err(Error::from)?;
+    } else {
+        edit.remove_body_paragraphs(&positions)
+            .map_err(Error::from)?;
+    }
     let native = edit.commit().map_err(Error::from)?;
 
     let changed = native.diagnostics().changed();
@@ -228,11 +224,13 @@ fn resolve_paragraph_targets(
     file: &Rtf,
     target: &TargetArg<'_>,
     maximum: usize,
+    mut selected: impl FnMut(Node<'_>),
 ) -> Result<Vec<usize>> {
     let mut positions = Vec::new();
     if let Some(path) = target.path() {
         let node = crate::path::resolve::get(&Nav::new(file), path)?;
         append_paragraph(&mut positions, node, maximum)?;
+        selected(node);
     } else if let Some(query) = target.query() {
         let walk = crate::query::run(Nav::new(file), query.clone())?;
         if !walk.plan().diagnostics().is_empty() {
@@ -243,7 +241,9 @@ fn resolve_paragraph_targets(
             .with_format(FileFormat::Rtf));
         }
         for node in walk {
-            append_paragraph(&mut positions, node?, maximum)?;
+            let node = node?;
+            append_paragraph(&mut positions, node, maximum)?;
+            selected(node);
         }
     } else {
         return Err(
@@ -271,7 +271,7 @@ fn append_paragraph(positions: &mut Vec<usize>, node: Node<'_>, maximum: usize) 
     let Some(position) = node.paragraph_position() else {
         return Err(Error::new(
             Code::UnsupportedCapability,
-            "RTF text writes target paragraph nodes",
+            "RTF mutations target paragraph nodes",
         )
         .with_format(FileFormat::Rtf));
     };

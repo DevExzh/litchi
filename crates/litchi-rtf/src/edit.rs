@@ -9276,7 +9276,7 @@ fn paragraph_removal_needs_delimiter(source: &[u8], range: &Range<usize>) -> boo
         && source
             .get(range.end..)
             .and_then(|suffix| suffix.first())
-            .is_some_and(|byte| byte.is_ascii_alphabetic())
+            .is_some_and(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b' '))
 }
 
 /// Deterministic facts about a published transaction.
