@@ -216,7 +216,7 @@ fn terminal_boundary_moves_are_source_bound_even_without_empty_paragraphs() {
     edit.move_paragraph(0, 2).unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
-        paragraph_texts(&commit.package()),
+        paragraph_texts(commit.package()),
         ["Second", "Third", "First"]
     );
     assert!(matches!(
