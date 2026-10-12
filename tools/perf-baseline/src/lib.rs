@@ -16589,7 +16589,7 @@ fn semantic_rtf_plain_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Err
     }
     source.push('}');
 
-    let document = litchi_rtf::Document::parse(&source)?;
+    let document = litchi_rtf::Package::parse(&source)?;
     let bytes = document.to_bytes()?;
     if bytes != source.as_bytes() {
         return Err("semantic RTF generator lost exact source identity".into());
@@ -16641,7 +16641,7 @@ fn semantic_rtf_bytes(
         },
     };
 
-    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    let document = litchi_rtf::Package::from_bytes(&archive)?;
     if document.to_bytes()? != archive {
         return Err("semantic RTF variant lost exact source identity".into());
     }
@@ -16653,7 +16653,7 @@ fn build_semantic_rtf_corpus(
     variant: RtfSemanticVariant,
 ) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_rtf_bytes(shape, variant)?;
-    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    let document = litchi_rtf::Package::from_bytes(&archive)?;
     verify_semantic_rtf(&document, shape, variant, &[])?;
     let target_payload = semantic_rtf_variant_text(variant, 0, false).into_bytes();
     let content_bytes = semantic_rtf_expected_text(shape, variant, &[]).len();
@@ -16708,7 +16708,7 @@ fn build_rtf_lifecycle_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Er
     }
     source.push('}');
     let archive = source.into_bytes();
-    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    let document = litchi_rtf::Package::from_bytes(&archive)?;
     if document.to_bytes()? != archive {
         return Err("RTF lifecycle corpus lost exact source identity".into());
     }
@@ -16832,7 +16832,7 @@ fn build_rtf_picture_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Erro
     if !archive.is_ascii() {
         return Err("RTF picture corpus is not ASCII transport".into());
     }
-    let document = litchi_rtf::Document::from_bytes(&archive)?;
+    let document = litchi_rtf::Package::from_bytes(&archive)?;
     if document.to_bytes()? != archive {
         return Err("RTF picture corpus lost exact source identity".into());
     }
@@ -16922,7 +16922,7 @@ fn rtf_logical_tail_limits(
 }
 
 fn stage_rtf_logical_tail(
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     paragraphs: &[&str],
     limits: litchi_rtf::TailAppendLimits,
 ) -> Result<litchi_rtf::TailAppendCommit, Box<dyn Error>> {
@@ -16932,8 +16932,8 @@ fn stage_rtf_logical_tail(
 }
 
 fn verify_rtf_logical_tail_projection(
-    document: &litchi_rtf::Document,
-    source: &litchi_rtf::Document,
+    document: &litchi_rtf::Package,
+    source: &litchi_rtf::Package,
     appended: &[String],
 ) -> Result<(), Box<dyn Error>> {
     let mut expected = source
@@ -16968,7 +16968,7 @@ fn verify_rtf_logical_tail_projection(
 }
 
 fn verify_rtf_logical_tail_gates(
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     changed: &litchi_rtf::TailAppendCommit,
     noop: &litchi_rtf::TailAppendCommit,
     appended: &[String],
@@ -16995,7 +16995,7 @@ fn verify_rtf_logical_tail_gates(
         return Err("RTF logical-tail sequential publication differs from candidate".into());
     }
     verify_rtf_logical_tail_projection(
-        &litchi_rtf::Document::from_bytes(expected)?,
+        &litchi_rtf::Package::from_bytes(expected)?,
         source,
         appended,
     )?;
@@ -17038,7 +17038,7 @@ fn verify_rtf_logical_tail_gates(
         return Err("RTF logical-tail durable no-op lost exact source identity".into());
     }
 
-    let foreign = litchi_rtf::Document::parse(r"{\rtf1\ansi foreign source}")?;
+    let foreign = litchi_rtf::Package::parse(r"{\rtf1\ansi foreign source}")?;
     if !matches!(
         changed.patch().apply(&foreign),
         Err(litchi_rtf::TailAppendError::PatchConflict)
@@ -26556,7 +26556,7 @@ fn xlsx_output_ceiling(bytes: usize) -> Result<u64, Box<dyn Error>> {
 }
 
 fn verify_semantic_rtf(
-    document: &litchi_rtf::Document,
+    document: &litchi_rtf::Package,
     shape: SemanticShape,
     variant: RtfSemanticVariant,
     updated: &[usize],
@@ -26629,7 +26629,7 @@ fn semantic_rtf_lifecycle_projection(
 
 fn stage_semantic_rtf_lifecycle(
     case: Case,
-    document: &litchi_rtf::Document,
+    document: &litchi_rtf::Package,
 ) -> Result<litchi_rtf::edit::Commit, Box<dyn Error>> {
     let paragraph_count = document.paragraph_count();
     if paragraph_count < 2 {
@@ -26661,7 +26661,7 @@ fn semantic_rtf_durable_limits() -> litchi_core::patch::PatchLimits {
 }
 
 fn verify_semantic_rtf_lifecycle_projection(
-    document: &litchi_rtf::Document,
+    document: &litchi_rtf::Package,
     expected: &[String],
 ) -> Result<(), Box<dyn Error>> {
     if document.paragraph_count() != expected.len() {
@@ -26680,7 +26680,7 @@ fn verify_semantic_rtf_lifecycle_projection(
 
 fn verify_semantic_rtf_lifecycle_commit(
     case: Case,
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     commit: &litchi_rtf::edit::Commit,
     expected_projection: &[String],
     expected_bytes: &[u8],
@@ -26691,7 +26691,7 @@ fn verify_semantic_rtf_lifecycle_commit(
     if commit.snapshot().to_bytes()? != expected_bytes {
         return Err("semantic RTF lifecycle commit differs from expected bytes".into());
     }
-    let reopened = litchi_rtf::Document::from_bytes(expected_bytes)?;
+    let reopened = litchi_rtf::Package::from_bytes(expected_bytes)?;
     verify_semantic_rtf_lifecycle_projection(&reopened, expected_projection)?;
 
     let applied = commit.patch().apply(source)?;
@@ -32005,12 +32005,12 @@ fn run_semantic_rtf(
     .then(|| semantic_rtf_lifecycle_projection(case, shape))
     .transpose()?;
     let expected_changed = if lifecycle_projection.is_some() {
-        let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         stage_semantic_rtf_lifecycle(case, &document)?
             .snapshot()
             .to_bytes()?
     } else if !updated.is_empty() {
-        let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         let mut edit = document.edit();
         if case == Case::RtfSemanticOnePercentEditSave {
             edit.replace_body_paragraph_texts(&replacements)?;
@@ -32025,7 +32025,7 @@ fn run_semantic_rtf(
         corpus.archive.clone()
     };
     if let Some(expected_projection) = lifecycle_projection.as_deref() {
-        let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         let commit = stage_semantic_rtf_lifecycle(case, &document)?;
         verify_semantic_rtf_lifecycle_commit(
             case,
@@ -32049,14 +32049,14 @@ fn run_semantic_rtf(
             Case::RtfSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let document = litchi_rtf::Document::from_bytes(&owned)?;
+                let document = litchi_rtf::Package::from_bytes(&owned)?;
                 let duration = started.elapsed();
                 verify_semantic_rtf(&document, shape, variant, &[])?;
                 std::hint::black_box(document);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticParagraphCount => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let count = document.paragraph_count();
                 let duration = started.elapsed();
@@ -32068,7 +32068,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticListParagraphs => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let count = document.body().paragraphs().count();
                 let duration = started.elapsed();
@@ -32080,7 +32080,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticCollectParagraphs => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let paragraphs = document.body().paragraphs().collect::<Vec<_>>();
                 let duration = started.elapsed();
@@ -32094,7 +32094,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticOneParagraph => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let paragraph = document
                     .body()
@@ -32111,7 +32111,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticFullText => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
                 let text = document.text();
                 let duration = started.elapsed();
@@ -32123,7 +32123,7 @@ fn run_semantic_rtf(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::RtfSemanticTextToSink => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
                 sink.reserve_budget()?;
                 let options = litchi_core::TextOutputOptions::new(
@@ -32168,7 +32168,7 @@ fn run_semantic_rtf(
             | Case::RtfSemanticOnePercentEditSave
             | Case::RtfSemanticRemoveParagraphSave
             | Case::RtfSemanticMoveParagraphSave => {
-                let document = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+                let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
                 let mut sink = CountingSink::bounded(sink_ceiling, sink_ceiling);
                 sink.reserve_budget()?;
                 let started = Instant::now();
@@ -32235,7 +32235,7 @@ fn run_semantic_rtf(
                 if sink.bytes != expected_changed {
                     return Err("semantic RTF save differs from deterministic output".into());
                 }
-                let reopened = litchi_rtf::Document::from_bytes(&sink.bytes)?;
+                let reopened = litchi_rtf::Package::from_bytes(&sink.bytes)?;
                 if let Some(expected_projection) = lifecycle_projection.as_deref() {
                     verify_semantic_rtf_lifecycle_projection(&reopened, expected_projection)?;
                 } else {
@@ -32282,7 +32282,7 @@ struct RtfParagraphSplitMergeExpectation {
     output_changed: Range<usize>,
 }
 
-fn rtf_plain_paragraph_projection(document: &litchi_rtf::Document) -> Vec<String> {
+fn rtf_plain_paragraph_projection(document: &litchi_rtf::Package) -> Vec<String> {
     document
         .body()
         .paragraphs()
@@ -32317,7 +32317,7 @@ fn rtf_paragraph_split_merge_expectation(
     {
         return Err("RTF paragraph split/merge requires the plain lifecycle corpus".into());
     }
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     let source_projection = rtf_plain_paragraph_projection(&source);
     if source_projection.len() != source.paragraph_count()
         || source_projection.len() != corpus.manifest.entry_count
@@ -32441,7 +32441,7 @@ fn forge_rtf_result_artifact(value: &mut serde_json::Value) -> bool {
 
 fn stage_rtf_paragraph_split_merge(
     case: Case,
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     expectation: &RtfParagraphSplitMergeExpectation,
 ) -> Result<litchi_rtf::edit::Commit, Box<dyn Error>> {
     let mut edit = source.edit();
@@ -32467,7 +32467,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     corpus: &Corpus,
     expectation: &RtfParagraphSplitMergeExpectation,
 ) -> Result<RtfParagraphSplitMergeGateSummary, Box<dyn Error>> {
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     if source.to_bytes()? != corpus.archive
         || sha256_hex(&corpus.archive) != corpus.manifest.archive_sha256
     {
@@ -32494,7 +32494,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     if !exact_source_splice_verified {
         return Err("RTF paragraph split/merge expected output changed unrelated bytes".into());
     }
-    let reopened = litchi_rtf::Document::from_bytes(&expectation.expected_output)?;
+    let reopened = litchi_rtf::Package::from_bytes(&expectation.expected_output)?;
     let semantic_reopen_verified = rtf_plain_paragraph_projection(&reopened)
         == expectation.expected_projection
         && reopened.text() == expectation.expected_projection.join("\n")
@@ -32550,7 +32550,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
     let stale = stale_edit.commit()?.into_snapshot();
     let stale_source_refusal_verified = stale.apply_durable(&decoded).is_err();
-    let foreign = litchi_rtf::Document::parse(r"{\rtf1\ansi Foreign\par Source}")?;
+    let foreign = litchi_rtf::Package::parse(r"{\rtf1\ansi Foreign\par Source}")?;
     let foreign_source_refusal_verified = foreign.apply_durable(&decoded).is_err();
     if !volatile_forward_verified
         || !volatile_inverse_verified
@@ -32603,13 +32603,13 @@ fn verify_rtf_paragraph_split_merge_gates(
         _ => false,
     } && limited.operation_count() == 0;
     let unsafe_source =
-        litchi_rtf::Document::parse(r"{\rtf1\ansi First{\b nested}Second\par Third}")?;
+        litchi_rtf::Package::parse(r"{\rtf1\ansi First{\b nested}Second\par Third}")?;
     let unsafe_refusal_verified = match case {
         Case::RtfSemanticSplitParagraphSave => unsafe_source.edit().split_paragraph(0, 1).is_err(),
         Case::RtfSemanticMergeParagraphSave => unsafe_source.edit().merge_paragraphs(0, 1).is_err(),
         _ => false,
     };
-    let protected = litchi_rtf::Document::parse(
+    let protected = litchi_rtf::Package::parse(
         r"{\rtf1\ansi\readprot\enforceprot1 First\par Second\par Third}",
     )?;
     let protected_refusal_verified = match case {
@@ -32708,7 +32708,7 @@ fn run_rtf_paragraph_split_merge(
         let mut sink = WindowedHashingSink::new(output_bytes, RTF_LOGICAL_TAIL_SINK_WINDOW_BYTES)?;
         let lifecycle_started = Instant::now();
         let open_started = Instant::now();
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         let open_duration = open_started.elapsed();
         let stage_started = Instant::now();
         let mut edit = source.edit();
@@ -32964,7 +32964,7 @@ fn verify_rtf_picture_crud_gates(
         return Err("non-picture case passed to RTF picture CRUD gates".into());
     }
     let shape = semantic_shape(corpus)?;
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     let picture_count = rtf_picture_count(shape);
     if source.pictures().len() != picture_count
         || source.to_bytes()? != corpus.archive
@@ -33049,7 +33049,7 @@ fn verify_rtf_picture_crud_gates(
             "RTF picture CRUD public commit differs from the independent exact splice".into(),
         );
     }
-    let reopened = litchi_rtf::Document::from_bytes(&expected_output)?;
+    let reopened = litchi_rtf::Package::from_bytes(&expected_output)?;
     if reopened.text() != source.text() {
         return Err("RTF picture CRUD semantic reopen changed visible text".into());
     }
@@ -33190,7 +33190,7 @@ fn verify_rtf_picture_crud_gates(
         .position(|byte| *byte == b'0')
         .ok_or("RTF picture CRUD source has no mutable stale byte")?;
     stale_bytes[stale_offset] = b'1';
-    let stale = litchi_rtf::Document::from_bytes(&stale_bytes)?;
+    let stale = litchi_rtf::Package::from_bytes(&stale_bytes)?;
     let stale_source_refusal_verified = stale.apply_durable(&decoded).is_err();
     let mut foreign_bytes = corpus.archive.clone();
     let foreign_offset = foreign_bytes
@@ -33198,7 +33198,7 @@ fn verify_rtf_picture_crud_gates(
         .position(|window| window == b"root0")
         .ok_or("RTF picture CRUD source has no foreign marker")?;
     foreign_bytes[foreign_offset + 4] = b'X';
-    let foreign = litchi_rtf::Document::from_bytes(&foreign_bytes)?;
+    let foreign = litchi_rtf::Package::from_bytes(&foreign_bytes)?;
     let foreign_source_refusal_verified = foreign.apply_durable(&decoded).is_err();
     if !stale_source_refusal_verified || !foreign_source_refusal_verified {
         return Err("RTF picture CRUD stale/foreign refusal gate failed".into());
@@ -33227,9 +33227,8 @@ fn verify_rtf_picture_crud_gates(
         let over_limit = (0..=litchi_rtf::edit::MAX_PICTURE_REMOVAL_OPERATIONS).collect::<Vec<_>>();
         source.edit().remove_pictures(&over_limit).is_err()
     };
-    let nested = litchi_rtf::Document::parse(
-        r"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a192a3b4c}}}",
-    )?;
+    let nested =
+        litchi_rtf::Package::parse(r"{\rtf1{\*\shppict{\pict\pngblip 89504e470d0a1a0a192a3b4c}}}")?;
     let nested_refusal = if case == Case::RtfPicturePayloadBatchReplace {
         nested
             .edit()
@@ -33318,7 +33317,7 @@ fn run_rtf_picture_crud(
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let lifecycle_started = Instant::now();
         let open_started = Instant::now();
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         let open_duration = open_started.elapsed();
         let stage_started = Instant::now();
         let mut edit = source.edit();
@@ -33413,7 +33412,7 @@ fn run_rtf_logical_tail_append(
         return Err("RTF logical-tail cases require the plain uncompressed corpus".into());
     }
     let shape = semantic_shape(corpus)?;
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     let appended = (0..rtf_logical_tail_paragraph_count(shape))
         .map(|index| rtf_logical_tail_text(shape, index))
         .collect::<Vec<_>>();
@@ -33631,7 +33630,7 @@ fn rtf_tail_publication_context_with_token(
 }
 
 fn stage_rtf_tail_prepared(
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     paragraphs: &[&str],
     limits: litchi_rtf::TailAppendLimits,
     publication_limits: litchi_rtf::TailAppendPublicationLimits,
@@ -33681,11 +33680,11 @@ fn digest_rtf_tail_prepared(
 
 fn verify_rtf_tail_reopen_phase(
     expected: &[u8],
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     appended: &[String],
 ) -> Result<u64, Box<dyn Error>> {
     let started = Instant::now();
-    let reopened = litchi_rtf::Document::from_bytes(expected)?;
+    let reopened = litchi_rtf::Package::from_bytes(expected)?;
     verify_rtf_logical_tail_projection(&reopened, source, appended)?;
     if appended.is_empty() && reopened.to_bytes()? != source.to_bytes()? {
         return Err("RTF publication-plan no-op reopen changed exact source bytes".into());
@@ -33694,7 +33693,7 @@ fn verify_rtf_tail_reopen_phase(
 }
 
 fn verify_rtf_tail_publication_plan_gates(
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     plan: &litchi_rtf::TailAppendPublicationPlan,
     expected: &[u8],
     expected_digest: &str,
@@ -33724,12 +33723,12 @@ fn verify_rtf_tail_publication_plan_gates(
         return Err("RTF publication plan output differs from the exact candidate".into());
     }
     verify_rtf_logical_tail_projection(
-        &litchi_rtf::Document::from_bytes(&published)?,
+        &litchi_rtf::Package::from_bytes(&published)?,
         source,
         appended,
     )?;
 
-    let foreign = litchi_rtf::Document::from_bytes(&source.to_bytes()?)?;
+    let foreign = litchi_rtf::Package::from_bytes(&source.to_bytes()?)?;
     let foreign_context = rtf_tail_publication_context(
         u64::try_from(expected.len())?,
         u64::try_from(plan.inserted_bytes())?,
@@ -33845,7 +33844,7 @@ fn verify_rtf_tail_publication_plan_gates(
 }
 
 fn verify_rtf_tail_publication_lifecycle(
-    source: &litchi_rtf::Document,
+    source: &litchi_rtf::Package,
     changed: &litchi_rtf::TailAppendCommit,
     noop: &litchi_rtf::TailAppendCommit,
     plan: &litchi_rtf::TailAppendPublicationPlan,
@@ -33891,7 +33890,7 @@ fn run_rtf_logical_tail_publication(
     }
     let (implementation, append, plan_based) = rtf_tail_publication_parameters(case)?;
     let shape = semantic_shape(corpus)?;
-    let source = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let source = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     let changed_appended = (0..rtf_logical_tail_paragraph_count(shape))
         .map(|index| rtf_logical_tail_text(shape, index))
         .collect::<Vec<_>>();
@@ -60162,7 +60161,7 @@ fn verify_streaming_xlsx(bytes: Vec<u8>, shape: SemanticShape) -> Result<(), Box
 }
 
 fn verify_streaming_rtf(bytes: &[u8], shape: SemanticShape) -> Result<(), Box<dyn Error>> {
-    let document = litchi_rtf::Document::from_bytes(bytes)?;
+    let document = litchi_rtf::Package::from_bytes(bytes)?;
     if document.paragraph_count() != shape.streaming_units() {
         return Err("streaming RTF paragraph count differs from its shape".into());
     }
@@ -67454,7 +67453,7 @@ mod tests {
     #[test]
     fn semantic_rtf_lifecycle_cases_are_matched_durable_and_transport_bounded() {
         let corpus = build_rtf_lifecycle_corpus(SemanticShape::Tiny).unwrap();
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive).unwrap();
 
         for case in [
             Case::RtfSemanticRemoveParagraphSave,
@@ -67490,7 +67489,7 @@ mod tests {
 
         for variant in [RtfSemanticVariant::Byte1252, RtfSemanticVariant::Lzfu] {
             let corpus = build_semantic_rtf_corpus(SemanticShape::Tiny, variant).unwrap();
-            let document = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+            let document = litchi_rtf::Package::from_bytes(&corpus.archive).unwrap();
             let exact = document.to_bytes().unwrap();
             let selected = document.paragraph_count() / 2;
 
@@ -67522,7 +67521,7 @@ mod tests {
 
         let watermark =
             build_semantic_rtf_corpus(SemanticShape::Tiny, RtfSemanticVariant::Watermark).unwrap();
-        let watermark = litchi_rtf::Document::from_bytes(&watermark.archive).unwrap();
+        let watermark = litchi_rtf::Package::from_bytes(&watermark.archive).unwrap();
         let exact = watermark.to_bytes().unwrap();
         let mut remove = watermark.edit();
         remove.remove_paragraph(0).unwrap();
@@ -67539,7 +67538,7 @@ mod tests {
         assert_eq!(noop.snapshot().to_bytes().unwrap(), exact);
 
         let opaque =
-            litchi_rtf::Document::parse(r"{\rtf1\ansi First\par \b Opaque\b0\par Third}").unwrap();
+            litchi_rtf::Package::parse(r"{\rtf1\ansi First\par \b Opaque\b0\par Third}").unwrap();
         let exact = opaque.to_bytes().unwrap();
         for case in [
             Case::RtfSemanticRemoveParagraphSave,
@@ -67769,7 +67768,7 @@ mod tests {
         assert_eq!(result.case, "rtf_semantic_one_percent_edit_save");
         assert!(result.sink.is_some());
 
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive).unwrap();
         let mut invalid = super::semantic_update_indices(source.paragraph_count())
             .unwrap()
             .into_iter()
@@ -67800,7 +67799,7 @@ mod tests {
             "957645f9109433d8dc25a66e384a496b19a97ed5ff4fab4bb981f8cda3c6e02e"
         );
 
-        let source = litchi_rtf::Document::from_bytes(&corpus.archive).unwrap();
+        let source = litchi_rtf::Package::from_bytes(&corpus.archive).unwrap();
         let replacements = super::semantic_update_indices(source.paragraph_count())
             .unwrap()
             .into_iter()

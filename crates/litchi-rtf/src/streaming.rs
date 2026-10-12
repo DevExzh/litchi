@@ -1119,7 +1119,7 @@ fn copy_char(output: &mut [u8; 32], character: char) -> usize {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::Document;
+    use crate::Package;
     use litchi_core::{Budget, CancellationSource, ExecutionLimits, Limits};
     use std::mem::size_of;
     use std::num::{NonZeroU64, NonZeroUsize};
@@ -1262,7 +1262,7 @@ mod tests {
             );
 
             assert!(sink.max_request <= MAX_ASCII_BATCH_BYTES);
-            let document = Document::from_bytes(&sink.bytes).expect("reopen");
+            let document = Package::from_bytes(&sink.bytes).expect("reopen");
             assert_eq!(
                 document
                     .body()
@@ -1386,7 +1386,7 @@ mod tests {
         let second = writer().finish().expect("finish");
         assert_eq!(first, second);
         assert_eq!(first, b"{\\rtf1\\ansi\\ansicpg1252\\uc1\\deff0 }");
-        let document = Document::from_bytes(&first).expect("parse");
+        let document = Package::from_bytes(&first).expect("parse");
         assert!(document.is_empty());
     }
 
@@ -1404,7 +1404,7 @@ mod tests {
         value.start_paragraph().expect("second paragraph");
         value.finish_paragraph().expect("empty paragraph");
         let bytes = value.finish().expect("finish");
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         let paragraphs: Vec<String> = document
             .body()
             .paragraphs()
@@ -1430,7 +1430,7 @@ mod tests {
         assert!(text.contains(r"\u"));
         assert!(text.contains(r"\line "));
         assert!(text.contains(r"\tab "));
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         assert_eq!(
             document
                 .body()
@@ -1454,7 +1454,7 @@ mod tests {
         let bytes = value.finish().expect("finish");
         let wire = String::from_utf8(bytes.clone()).expect("wire");
         assert_eq!(wire.matches(r"\line ").count(), 1);
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         assert_eq!(
             document
                 .body()
@@ -1701,7 +1701,7 @@ mod tests {
         value.finish_run().expect("run");
         value.finish_paragraph().expect("paragraph");
         let bytes = value.finish().expect("finish");
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         assert_eq!(
             document
                 .body()
@@ -1792,7 +1792,7 @@ mod tests {
         value.finish_run().expect("run");
         value.finish_paragraph().expect("paragraph");
         let bytes = value.finish().expect("finish");
-        let document = Document::from_bytes(&bytes).expect("parse");
+        let document = Package::from_bytes(&bytes).expect("parse");
         assert_eq!(
             document
                 .body()

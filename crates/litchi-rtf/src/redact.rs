@@ -175,7 +175,7 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Capture a bounded inventory from one immutable document snapshot.
-    pub(crate) fn from_document(source: &Package) -> Result<Self, Error> {
+    pub(crate) fn from_package(source: &Package) -> Result<Self, Error> {
         let model = source.model();
         let references = model.external_references();
         let spans = model.external_reference_source_spans();
@@ -409,17 +409,17 @@ fn collect_unsupported(
     } else {
         for item in safety {
             match item {
-                crate::validation::FieldSafety::Neutral => {}
+                crate::validation::FieldSafety::Neutral => {},
                 crate::validation::FieldSafety::External
                 | crate::validation::FieldSafety::Active
                 | crate::validation::FieldSafety::ExternalAndActive => {
                     push_unique(unsupported, UnsupportedReference::Field)?;
-                }
+                },
                 crate::validation::FieldSafety::ExternalUnknown
                 | crate::validation::FieldSafety::ActiveUnknown
                 | crate::validation::FieldSafety::ExternalAndActiveUnknown => {
                     push_unique(unsupported, UnsupportedReference::UnknownField)?;
-                }
+                },
             }
         }
     }
@@ -836,7 +836,7 @@ pub(crate) fn apply_forward(
             limit: MAX_REFERENCES,
         }));
     }
-    let snapshot = Snapshot::from_document(source)?;
+    let snapshot = Snapshot::from_package(source)?;
     if patch.operations().is_empty() {
         return Ok(source.clone());
     }
@@ -869,7 +869,7 @@ pub(crate) fn apply_forward(
                 return Err(Error::DurablePatch(
                     "unknown external-reference redaction target".to_string(),
                 ));
-            }
+            },
         };
         let selected_kind = match kind {
             ReferenceKind::NextFile => &mut selected_next_file,
@@ -905,7 +905,7 @@ pub(crate) fn apply_forward(
                 return Err(Error::DurablePatch(
                     "invalid external-reference redaction mode".to_string(),
                 ));
-            }
+            },
         };
         if let Some(existing) = mode
             && existing != operation_mode

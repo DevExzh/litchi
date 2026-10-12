@@ -24,7 +24,7 @@
 
 //! Typed Rich Text Format documents.
 //!
-//! [`Document`] is the ordinary immutable, lifetime-free snapshot. Parsing and
+//! [`Package`] is the immutable owner; [`Document`] is its read-only projection. Parsing and
 //! opening live in [`read`], streaming serialization lives in [`mod@write`], and
 //! Outlook's compressed-RTF transport lives in [`transport`]. The retained
 //! mutable parser model is an advanced interface under [`raw`].
@@ -33,7 +33,7 @@
 //!
 //! The crate keeps format mechanics behind responsibility-focused boundaries:
 //!
-//! - `api` owns the immutable [`Document`] facade and borrowed [`text::Story`]
+//! - `api` owns immutable [`Package`] snapshots, [`Document`] projections and [`text::Story`]
 //!   views.
 //! - `codec` owns bounded transport decoding, tokenization, parsing, and
 //!   serialization.
@@ -49,11 +49,11 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_rtf::{Document, Result};
+//! use litchi_rtf::{Package, Result};
 //!
 //! # fn main() -> Result<()> {
 //! let rtf_text = r#"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello World!\par}"#;
-//! let doc = Document::parse(rtf_text)?;
+//! let doc = Package::parse(rtf_text)?;
 //! assert_eq!(doc.text(), "Hello World!\n");
 //! assert_eq!(doc.body().paragraphs().count(), 1);
 //! # Ok(())
@@ -122,7 +122,7 @@ use text::{
 
 /// Concise document-opening facade.
 pub mod read {
-    pub use crate::api::Document;
+    pub use crate::api::{Document, Package};
     pub use crate::codec::limits::{
         OpenOptions, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
     };
@@ -188,7 +188,7 @@ pub mod style {
     };
 }
 
-pub use api::Document;
+pub use api::{Document, Package};
 pub use codec::error::{RtfError as Error, RtfResult as Result};
 pub use tail_append::{
     DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendCommit, TailAppendDiagnostics,

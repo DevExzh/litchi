@@ -330,7 +330,7 @@ fn generate_rtf(output: &Path) -> Result<()> {
     let source = fs::read(fixture(
         "test-data/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf",
     ))?;
-    let document = litchi_rtf::Document::from_bytes(&source)?;
+    let document = litchi_rtf::Package::from_bytes(&source)?;
     let mut edit = document.edit();
     edit.set_shape_text(0, SENTINEL)?;
     let changed = edit.commit()?.into_snapshot().to_bytes()?;
@@ -341,7 +341,7 @@ fn generate_rtf(output: &Path) -> Result<()> {
 #[cfg(feature = "rtf")]
 fn readback_rtf(input: &Path) -> Result<()> {
     let bytes = fs::read(input)?;
-    let document = litchi_rtf::Document::from_bytes(&bytes)?;
+    let document = litchi_rtf::Package::from_bytes(&bytes)?;
     let text = document
         .shapes()
         .first()

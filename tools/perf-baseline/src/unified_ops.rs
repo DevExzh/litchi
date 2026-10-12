@@ -3032,7 +3032,7 @@ fn run_rtf(
     let variant = crate::semantic_rtf_variant(corpus)?;
     // The predecessor's native oracle, which does not use the code under
     // measurement.
-    let native = litchi_rtf::Document::from_bytes(&corpus.archive)?;
+    let native = litchi_rtf::Package::from_bytes(&corpus.archive)?;
     crate::verify_semantic_rtf(&native, shape, variant, &[])?;
     let expected = TextProjection {
         text_sha256: sha256_hex(native.text().as_bytes()),

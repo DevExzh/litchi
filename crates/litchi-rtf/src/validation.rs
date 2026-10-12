@@ -58,7 +58,7 @@ pub(crate) fn classify_field(field: &crate::Field<'_>) -> FieldSafety {
         FieldType::Hyperlink => match field.parsed_code() {
             ParsedFieldCode::Hyperlink(code) if code.external_target.is_some() => {
                 FieldSafety::External
-            }
+            },
             ParsedFieldCode::Hyperlink(code) if code.bookmark.is_some() => FieldSafety::Neutral,
             ParsedFieldCode::Hyperlink(_) => FieldSafety::ExternalUnknown,
             ParsedFieldCode::Reference(_)
@@ -73,14 +73,14 @@ pub(crate) fn classify_field(field: &crate::Field<'_>) -> FieldSafety {
             } else {
                 FieldSafety::ExternalAndActiveUnknown
             }
-        }
+        },
         FieldType::Link => {
             if field.link_field().is_some() {
                 FieldSafety::External
             } else {
                 FieldSafety::ExternalUnknown
             }
-        }
+        },
         FieldType::Include
         | FieldType::Import
         | FieldType::IncludeText
@@ -90,42 +90,42 @@ pub(crate) fn classify_field(field: &crate::Field<'_>) -> FieldSafety {
             } else {
                 FieldSafety::ExternalUnknown
             }
-        }
+        },
         FieldType::ReferencedDocument => {
             if field.referenced_document().is_some() {
                 FieldSafety::External
             } else {
                 FieldSafety::ExternalUnknown
             }
-        }
+        },
         FieldType::MacroButton => {
             if field.macro_button().is_some() {
                 FieldSafety::Active
             } else {
                 FieldSafety::ActiveUnknown
             }
-        }
+        },
         FieldType::Embed => {
             if field.embed_field().is_some() {
                 FieldSafety::Active
             } else {
                 FieldSafety::ActiveUnknown
             }
-        }
+        },
         FieldType::AddIn | FieldType::Control | FieldType::HtmlControl => {
             if field.active_content_field().is_some() {
                 FieldSafety::Active
             } else {
                 FieldSafety::ActiveUnknown
             }
-        }
+        },
         FieldType::Print => {
             if field.print_field().is_some() {
                 FieldSafety::Active
             } else {
                 FieldSafety::ActiveUnknown
             }
-        }
+        },
         // Mail-merge fields are not resolved by the parser, but they are
         // executable data-source operations at the host boundary.  Keep the
         // classification conservative even for a cached result: a valid
@@ -136,14 +136,14 @@ pub(crate) fn classify_field(field: &crate::Field<'_>) -> FieldSafety {
         FieldType::MailMergeData => external_and_active(field.mail_merge_data().is_some()),
         FieldType::MergeRecord | FieldType::MergeSequence => {
             external_and_active(field.mail_merge_counter().is_some())
-        }
+        },
         FieldType::MailMergeNext => external_and_active(field.mail_merge_next().is_some()),
         FieldType::MailMergeNextIf | FieldType::MailMergeSkipIf => {
             external_and_active(field.mail_merge_conditional_control().is_some())
-        }
+        },
         FieldType::AddressBlock | FieldType::GreetingLine => {
             external_and_active(field.mail_merge_recipient_field().is_some())
-        }
+        },
         // MERGEBARCODE consumes merge data and emits host-rendered content.
         // It does not itself identify a data source, so report it as active
         // without claiming an external link.
@@ -487,7 +487,7 @@ impl ValidationReport {
     /// Build a report from an already parsed immutable facade without parsing
     /// or traversing the same document once per check.
     #[must_use]
-    pub fn from_document(document: &crate::Package) -> Self {
+    pub fn from_package(document: &crate::Package) -> Self {
         build_report(document.model(), document.limits())
     }
 
@@ -687,16 +687,16 @@ fn build_report(document: &RtfDocument<'_>, parse_limits: SourceLimits) -> Valid
                 if !object.link_self {
                     external = true;
                 }
-            }
+            },
             crate::ObjectKind::Unknown => {
                 unknown_object = true;
                 unknown_external = true;
                 unknown_active = true;
-            }
+            },
             crate::ObjectKind::Embedded
             | crate::ObjectKind::Html
             | crate::ObjectKind::InstallableCommand
-            | crate::ObjectKind::OleControl => {}
+            | crate::ObjectKind::OleControl => {},
         }
     }
 
@@ -706,27 +706,27 @@ fn build_report(document: &RtfDocument<'_>, parse_limits: SourceLimits) -> Valid
     if field_safety.len() == document.fields().len() {
         for safety in field_safety {
             match safety {
-                FieldSafety::Neutral => {}
+                FieldSafety::Neutral => {},
                 FieldSafety::External => external = true,
                 FieldSafety::ExternalUnknown => {
                     external = true;
                     unknown_external = true;
-                }
+                },
                 FieldSafety::Active => active = true,
                 FieldSafety::ActiveUnknown => {
                     active = true;
                     unknown_active = true;
-                }
+                },
                 FieldSafety::ExternalAndActive => {
                     external = true;
                     active = true;
-                }
+                },
                 FieldSafety::ExternalAndActiveUnknown => {
                     external = true;
                     active = true;
                     unknown_external = true;
                     unknown_active = true;
-                }
+                },
             }
         }
     } else {

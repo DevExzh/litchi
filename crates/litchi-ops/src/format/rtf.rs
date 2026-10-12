@@ -1,16 +1,14 @@
 //! Handle for Rich Text Format (`.rtf`) inputs.
 //!
-//! RTF is tier 3 and read-only in M0a (record 0003 §2.3). The handle carries
-//! the facade's eager `RtfDocument` over unchanged. That owner already keeps
-//! the input it was parsed from and exposes `Document::edit()`, so M6 can add
-//! the write handler without reshaping this state.
+//! The handle retains the native immutable `Package`. Existing family views
+//! borrow its advanced read-only model; unified editing can use the same owner.
 
 use std::fmt;
 use std::sync::Arc;
 
 use litchi_core::Metadata;
-use litchi_rtf::RtfDocument;
 use litchi_rtf::leniency::ToleranceReport;
+use litchi_rtf::{Package, RtfDocument};
 
 use crate::{OpenOptions, Result};
 
@@ -19,8 +17,8 @@ use crate::{OpenOptions, Result};
 pub struct Rtf(Arc<RtfState>);
 
 struct RtfState {
-    /// The eager reader the facade's document pipeline builds today.
-    document: RtfDocument<'static>,
+    /// The native immutable owner, including retained open policies.
+    package: Package,
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -37,11 +35,9 @@ impl Rtf {
     /// detected bytes, so this is the only constructor. Native source limits
     /// and repair policy apply in addition to the detection input ceiling.
     pub(crate) fn from_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
-        let document = RtfDocument::from_owned_bytes_with_options(
-            bytes,
-            options.rtf_options.unwrap_or_default(),
-        )?;
-        Ok(Self(Arc::new(RtfState { document })))
+        let package =
+            Package::from_owned_bytes_with_options(bytes, options.rtf_options.unwrap_or_default())?;
+        Ok(Self(Arc::new(RtfState { package })))
     }
 
     /// The document's plain text.
@@ -51,7 +47,7 @@ impl Rtf {
     /// None today; the text was decoded at open. The `Result` keeps the
     /// read surface uniform across formats.
     pub fn text(&self) -> Result<String> {
-        Ok(self.0.document.text())
+        Ok(self.0.package.text().to_owned())
     }
 
     /// The number of body paragraphs.
@@ -60,7 +56,7 @@ impl Rtf {
     ///
     /// None today; see [`Self::text`].
     pub fn paragraph_count(&self) -> Result<usize> {
-        Ok(self.0.document.paragraph_count())
+        Ok(self.0.package.raw().paragraph_count())
     }
 
     /// Document properties projected from the `\info` group and the
@@ -70,7 +66,7 @@ impl Rtf {
     ///
     /// None today; see [`Self::text`].
     pub fn metadata(&self) -> Result<Option<Metadata>> {
-        Ok(Some(metadata(&self.0.document)))
+        Ok(Some(metadata(self.0.package.raw())))
     }
 
     /// Everything the reader repaired while parsing, which happens entirely
@@ -80,12 +76,12 @@ impl Rtf {
     ///
     /// None today; see [`Self::text`].
     pub fn tolerance_report(&self) -> Result<ToleranceReport> {
-        Ok(self.0.document.tolerance_report().clone())
+        Ok(self.0.package.tolerance_report().clone())
     }
 
     /// The retained leaf owner, for the crate's family views.
     pub(crate) fn document(&self) -> &RtfDocument<'static> {
-        &self.0.document
+        self.0.package.raw()
     }
 }
 

@@ -2744,6 +2744,126 @@
           "name": "with_leniency",
           "scope": "litchi_rtf::read::OpenOptions",
           "replacement": "use checked SourceLimits and consuming OpenOptions setters"
+        },
+        {
+          "name": "parse",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "parse_with_options",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "parse_with_limits",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_options",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "from_owned_bytes",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "from_owned_bytes_with_options",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "from_owned_bytes_with_limits",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "open",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "open_with_options",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "edit_with_limits",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "apply_durable",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "tail_append",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "tail_append_with_limits",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "lifecycle and publication belong to Package",
+          "recursive": false
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_rtf::edit",
+          "replacement": "use the concrete Package owner",
+          "recursive": false
         }
       ],
       "families": []

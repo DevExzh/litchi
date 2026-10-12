@@ -24,32 +24,56 @@ fn visible_text_fragment<'a>(inline: crate::text::Inline<'a>) -> Option<&'a str>
 /// Immutable, cheap-to-share RTF document snapshot.
 ///
 /// Parsing always detaches the retained model from the input. Cloning a
-/// `Document` therefore shares one immutable snapshot rather than duplicating
+/// `Package` therefore shares one immutable snapshot rather than duplicating
 /// its strings, pictures, objects, and other resources.
 ///
 /// Attached document state is not publicly mutable:
 ///
 /// ```compile_fail
-/// use litchi_rtf::Document;
+/// use litchi_rtf::Package;
 ///
-/// let mut document = Document::parse(r"{\rtf1 immutable}").unwrap();
+/// let mut document = Package::parse(r"{\rtf1 immutable}").unwrap();
 /// document.clear_fields();
 /// ```
 ///
 /// Parser storage is not part of the ordinary facade:
 ///
 /// ```compile_fail
-/// use litchi_rtf::Document;
+/// use litchi_rtf::Package;
 ///
-/// let document = Document::parse(r"{\rtf1 semantic}").unwrap();
+/// let document = Package::parse(r"{\rtf1 semantic}").unwrap();
 /// let parser_blocks = document.blocks();
 /// ```
 #[derive(Clone)]
-pub struct Document {
+pub struct Package {
     inner: Arc<Inner>,
 }
 
-impl Document {
+impl Package {
+    /// Obtain an owned read-only semantic projection of this snapshot.
+    #[must_use]
+    pub fn document(&self) -> Document {
+        Document {
+            owner: self.clone(),
+        }
+    }
+
+    /// The checked source profile retained by this package.
+    pub fn source_limits(&self) -> SourceLimits {
+        self.inner.options.source_limits_value()
+    }
+
+    /// The open policy retained for edits and candidate admission.
+    pub fn open_options(&self) -> OpenOptions {
+        self.inner.options
+    }
+
+    /// Borrow the advanced retained model without mutable access.
+    #[must_use]
+    pub fn raw(&self) -> &RtfDocument<'static> {
+        &self.inner.model
+    }
+
     /// Parse UTF-8 RTF source with the production-safe resource profile.
     ///
     /// # Errors
@@ -332,7 +356,7 @@ impl Document {
     /// repairs syntax, or mutates the document.
     #[must_use]
     pub fn validation_report(&self) -> crate::ValidationReport {
-        crate::ValidationReport::from_document(self)
+        crate::ValidationReport::from_package(self)
     }
 
     /// Alias for [`Self::validation_report`].
@@ -385,7 +409,7 @@ impl Document {
     pub fn external_reference_redaction_snapshot(
         &self,
     ) -> Result<crate::redact::Snapshot, crate::edit::Error> {
-        crate::redact::Snapshot::from_document(self)
+        crate::redact::Snapshot::from_package(self)
     }
 
     /// Borrow annotations in source order.
@@ -530,7 +554,7 @@ impl Document {
     /// This is separate from ordinary reversible edit replay.  The operation
     /// is source/artifact checked, candidate-parsed, and visible-text checked;
     /// no inverse or repair certification is provided.  The returned value is
-    /// an ordinary [`Document`]; replay does not carry the [`crate::redact::Diagnostics`]
+    /// an ordinary [`Package`]; replay does not carry the [`crate::redact::Diagnostics`]
     /// captured when the patch was planned.  In particular, a best-effort
     /// patch can only replay its source-bound removals: callers must capture a
     /// fresh [`Self::external_reference_redaction_snapshot`] and inspect its
@@ -543,15 +567,253 @@ impl Document {
     }
 }
 
-impl fmt::Debug for Document {
+impl fmt::Debug for Package {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         formatter
-            .debug_struct("Document")
+            .debug_struct("Package")
             .field("paragraphs", &self.paragraph_count())
             .field("tables", &self.tables().len())
             .field("pictures", &self.pictures().len())
             .field("fields", &self.fields().len())
             .field("sections", &self.sections().len())
+            .finish_non_exhaustive()
+    }
+}
+
+/// Owned read-only semantic projection of an immutable RTF package.
+///
+/// A projection shares its package's model and lazy text cache. It remains valid
+/// after the originating package is dropped and never observes later edits.
+/// Lifecycle and publication belong to [`Package`].
+///
+/// ```compile_fail
+/// let document = litchi_rtf::Package::parse(r"{\rtf1 readonly}").unwrap().document();
+/// document.edit();
+/// ```
+/// ```compile_fail
+/// let document = litchi_rtf::Package::parse(r"{\rtf1 readonly}").unwrap().document();
+/// document.to_bytes();
+/// ```
+/// ```compile_fail
+/// let document = litchi_rtf::Document::parse(r"{\rtf1 readonly}").unwrap();
+/// ```
+#[derive(Clone)]
+pub struct Document {
+    owner: Package,
+}
+
+impl Document {
+    /// Every repair the parse applied, in discovery order.
+    ///
+    /// An empty report means the source conformed and nothing was
+    /// substituted. Word-compatible repairs are recorded under every
+    /// [`Leniency`](crate::leniency::Leniency), including the default
+    /// strict posture.
+    #[inline]
+    #[must_use]
+    pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
+        self.owner.tolerance_report()
+    }
+
+    /// Borrow the document's plain text.
+    ///
+    /// The flattened text is materialized at most once per snapshot and is
+    /// then shared by every clone.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        self.owner.text()
+    }
+
+    /// Write body paragraphs as bounded UTF-8 text to a sequential, non-seek sink.
+    ///
+    /// Character formatting is intentionally omitted, inline line breaks remain
+    /// `\n`, and paragraph separators come from `options`. Unsupported inert
+    /// destinations are retained by the document but do not become visible text.
+    /// The immutable document snapshot is never changed.
+    ///
+    /// # Errors
+    /// Returns a typed resource-limit or partial sink failure.
+    pub fn write_text_to<W: Write + ?Sized>(
+        &self,
+        output: &mut W,
+        options: litchi_core::TextOutputOptions<'_>,
+    ) -> Result<litchi_core::TextOutputReport, litchi_core::TextOutputError<crate::Error>> {
+        self.owner.write_text_to(output, options)
+    }
+
+    /// Whether the body contains no text.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.owner.is_empty()
+    }
+
+    /// Number of logical body paragraphs.
+    ///
+    /// The parser retains this exact value with the immutable snapshot.
+    #[must_use]
+    pub fn paragraph_count(&self) -> usize {
+        self.owner.paragraph_count()
+    }
+
+    /// Borrow the main text story through lazy semantic views.
+    #[must_use]
+    pub fn body(&self) -> crate::text::Story<'_> {
+        self.owner.body()
+    }
+
+    /// Borrow the document font resources.
+    #[must_use]
+    pub fn fonts(&self) -> crate::font::Catalog<'_> {
+        self.owner.fonts()
+    }
+
+    /// Borrow the document color resources.
+    #[must_use]
+    pub fn colors(&self) -> crate::color::Palette<'_> {
+        self.owner.colors()
+    }
+
+    /// Borrow body tables in source order.
+    #[must_use]
+    pub fn tables(&self) -> &[crate::table::Table<'_>] {
+        self.owner.tables()
+    }
+
+    /// Borrow pictures in source order.
+    #[must_use]
+    pub fn pictures(&self) -> &[crate::picture::Picture<'_>] {
+        self.owner.pictures()
+    }
+
+    /// Borrow root body shapes in source order.
+    #[must_use]
+    pub fn shapes(&self) -> &[crate::Shape<'_>] {
+        self.owner.shapes()
+    }
+
+    /// Borrow fields in source order.
+    #[must_use]
+    pub fn fields(&self) -> &[crate::field::Field<'_>] {
+        self.owner.fields()
+    }
+
+    /// Borrow inert SmartTag/factoid ranges in body source order.
+    #[must_use]
+    pub fn smart_tags(&self) -> &[crate::SmartTag<'_>] {
+        self.owner.smart_tags()
+    }
+
+    /// Borrow complete inert main-body tracked-move start/end ranges in source order.
+    ///
+    /// Equal tags with opposite kinds identify the two move locations, but the
+    /// bounded model does not expose a cross-location pair index or execute
+    /// move/deleted/inserted semantics.
+    #[must_use]
+    pub fn move_bookmarks(&self) -> &[crate::MoveBookmark<'_>] {
+        self.owner.move_bookmarks()
+    }
+
+    /// Borrow inert embedded and linked object records in body order.
+    #[must_use]
+    pub fn objects(&self) -> &[crate::EmbeddedObject<'_>] {
+        self.owner.objects()
+    }
+
+    /// Produce a bounded, content-free semantic and security inventory.
+    ///
+    /// The report reuses this immutable snapshot. It never reparses the
+    /// source, follows or resolves references, executes fields or objects,
+    /// repairs syntax, or mutates the document.
+    #[must_use]
+    pub fn validation_report(&self) -> crate::ValidationReport {
+        self.owner.validation_report()
+    }
+
+    /// Alias for [`Self::validation_report`].
+    #[must_use]
+    pub fn security_report(&self) -> crate::ValidationReport {
+        self.owner.security_report()
+    }
+
+    /// Borrow list definitions in list-table order.
+    #[must_use]
+    pub fn lists(&self) -> &[crate::list::List<'_>] {
+        self.owner.lists()
+    }
+
+    /// Borrow list-instance overrides in override-table order.
+    #[must_use]
+    pub fn list_overrides(&self) -> &[crate::list::ListOverride] {
+        self.owner.list_overrides()
+    }
+
+    /// Borrow sections in source order.
+    #[must_use]
+    pub fn sections(&self) -> &[crate::section::Section<'_>] {
+        self.owner.sections()
+    }
+
+    /// Borrow named styles in stylesheet order.
+    #[must_use]
+    pub fn styles(&self) -> &[crate::style::Style<'_>] {
+        self.owner.styles()
+    }
+
+    /// Borrow inert document metadata.
+    #[must_use]
+    pub fn info(&self) -> &crate::metadata::Info<'_> {
+        self.owner.info()
+    }
+
+    /// Borrow inert top-level `nextfile` and `template` metadata without
+    /// resolving either name.
+    #[must_use]
+    pub fn external_references(&self) -> &crate::DocumentExternalReferences<'_> {
+        self.owner.external_references()
+    }
+
+    /// Borrow annotations in source order.
+    #[must_use]
+    pub fn annotations(&self) -> &[crate::review::Annotation<'_>] {
+        self.owner.annotations()
+    }
+
+    /// Borrow footnotes and endnotes in source order.
+    #[must_use]
+    pub fn notes(&self) -> &[crate::review::Note<'_>] {
+        self.owner.notes()
+    }
+
+    /// Lazily traverse footnotes in source order.
+    #[must_use]
+    pub fn footnotes(&self) -> impl DoubleEndedIterator<Item = &crate::review::Note<'_>> + '_ {
+        self.owner.footnotes()
+    }
+
+    /// Lazily traverse endnotes in source order.
+    #[must_use]
+    pub fn endnotes(&self) -> impl DoubleEndedIterator<Item = &crate::review::Note<'_>> + '_ {
+        self.owner.endnotes()
+    }
+
+    /// Borrow tracked revisions in source order.
+    #[must_use]
+    pub fn revisions(&self) -> &[crate::review::Revision<'_>] {
+        self.owner.revisions()
+    }
+
+    /// Borrow unsupported syntax retained as bounded inert data.
+    #[must_use]
+    pub fn opaque(&self) -> &[crate::opaque::Node] {
+        self.owner.opaque()
+    }
+}
+
+impl fmt::Debug for Document {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Document")
+            .field("paragraphs", &self.paragraph_count())
             .finish_non_exhaustive()
     }
 }
@@ -563,7 +825,7 @@ mod tests {
         clippy::expect_used,
         reason = "test assertions panic on failure by design"
     )]
-    use super::Document;
+    use super::Package;
     use crate::text::{Break, Inline, Paragraph};
 
     fn paragraph_signature(
@@ -592,7 +854,7 @@ mod tests {
     }
 
     fn assert_nth_matches_repeated_next(source: &str) {
-        let document = Document::parse(source).unwrap();
+        let document = Package::parse(source).unwrap();
         let paragraphs = document.body().paragraphs().count();
         assert_eq!(document.paragraph_count(), paragraphs);
         for index in 0..=paragraphs {
@@ -624,7 +886,7 @@ mod tests {
 
     #[test]
     fn semantic_story_traversal_does_not_flatten_the_snapshot() {
-        let document = Document::parse(r"{\rtf1 one\line two\par three}").unwrap();
+        let document = Package::parse(r"{\rtf1 one\line two\par three}").unwrap();
         assert!(document.inner.text.get().is_none());
         assert_eq!(document.paragraph_count(), 2);
 
@@ -642,7 +904,7 @@ mod tests {
 
     #[test]
     fn valid_paragraph_edit_preserves_retained_count() {
-        let document = Document::parse(r"{\rtf1 one\par two\par three}").unwrap();
+        let document = Package::parse(r"{\rtf1 one\par two\par three}").unwrap();
         assert_eq!(document.paragraph_count(), 3);
 
         document

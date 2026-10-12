@@ -1234,7 +1234,7 @@ mod rtf {
     #[test]
     fn unified_rtf_compressed_transport_matches_plain_source() {
         let source = br#"{\rtf1\ansi Plain source\par Second paragraph}"#.to_vec();
-        let native = litchi_rtf::Document::from_bytes(&source).unwrap();
+        let native = litchi_rtf::Package::from_bytes(&source).unwrap();
         let plain = crate::open_bytes(source.clone()).unwrap();
         assert_eq!(plain.text().unwrap(), native.text());
         assert_eq!(
