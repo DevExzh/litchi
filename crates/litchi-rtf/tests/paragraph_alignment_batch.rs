@@ -25,6 +25,22 @@ fn alignments(document: &Package) -> Vec<Alignment> {
 }
 
 #[test]
+fn native_parser_keeps_alignment_on_the_paragraph_before_each_break() {
+    let source =
+        Package::parse(r"{\rtf1\ansi\qr First\par\qc Second\par\qj Third\par\ql Fourth}").unwrap();
+
+    assert_eq!(
+        alignments(&source),
+        [
+            Alignment::Right,
+            Alignment::Center,
+            Alignment::Justify,
+            Alignment::Left,
+        ]
+    );
+}
+
+#[test]
 fn batch_updates_first_middle_and_last_and_reopens() {
     let source = Package::parse(r"{\rtf1\ansi\qc\b First\b0\par\qr Second\par\qj Third}").unwrap();
     let requested = updates(&[

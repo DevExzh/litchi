@@ -103,6 +103,13 @@ impl<'a> Parser<'a> {
                         }
                     } else {
                         text_buffer.push(b'\n');
+                        // Keep the paragraph break in a block carrying the
+                        // paragraph state that ended the paragraph.  If it
+                        // remains buffered, a following alignment control
+                        // gets attached to the break and the lazy paragraph
+                        // view reads the next paragraph's alignment for the
+                        // paragraph that just ended.
+                        self.flush_text_buffer(&mut text_buffer)?;
                     }
                 }
                 if matches!(control, ControlWord::Par) {
