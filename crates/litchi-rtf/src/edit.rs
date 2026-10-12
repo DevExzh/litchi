@@ -3608,6 +3608,20 @@ impl Edit {
         self.patch_body_run_formats(&[RunFormatUpdate::new(paragraph, run, patch)])
     }
 
+    /// Stages replacement of one ordinary body run's text.
+    ///
+    /// The selector is resolved against the immutable source run axis. Use
+    /// [`Self::replace_body_run_texts`] when several source-ordered runs must
+    /// be changed in one bounded operation batch.
+    pub fn replace_run_text(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        text: impl Into<String>,
+    ) -> Result<&mut Self, Error> {
+        self.replace_body_run_texts(&[RunTextReplacement::new(paragraph, run, text)])
+    }
+
     /// Atomically stages source-ordered character-format patches for ordinary
     /// body runs.
     ///
@@ -5524,6 +5538,13 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
     let source_runs = ordinary_run_source_map(&edit.source)?;
+    let preserve_terminal_empty = terminal_paragraph_becomes_empty(&edit.source, &edit.operations);
+    let terminal_run = edit
+        .source
+        .body()
+        .paragraphs()
+        .nth(edit.source.paragraph_count().saturating_sub(1))
+        .map_or(0, |paragraph| paragraph.runs().count().saturating_sub(1));
     let mut replacements = Vec::new();
     replacements
         .try_reserve_exact(edit.operations.len().saturating_mul(2))
@@ -5634,7 +5655,15 @@ fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, E
             let _text_before = text_before.as_deref().ok_or(Error::UnsupportedSource(
                 "run-text operation has no source text precondition",
             ))?;
-            let encoded = encoded_run_text_replacement(text_after, changed, edit.source.limits())?;
+            let encoded = if preserve_terminal_empty
+                && text_after.is_empty()
+                && *paragraph == edit.source.paragraph_count().saturating_sub(1)
+                && *run == terminal_run
+            {
+                PARAGRAPH_SPLIT_BYTES.to_vec()
+            } else {
+                encoded_run_text_replacement(text_after, changed, edit.source.limits())?
+            };
             replacements.push((source_run.source.clone(), encoded));
         } else {
             replacements.push((
@@ -5666,6 +5695,46 @@ fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, E
         operation_count,
         semantic_delta,
     ))
+}
+
+fn terminal_paragraph_becomes_empty(source: &Package, operations: &[Operation]) -> bool {
+    if source.text().ends_with('\n') {
+        return false;
+    }
+    let paragraph_index = source.paragraph_count().saturating_sub(1);
+    let Some(paragraph) = source.body().paragraphs().nth(paragraph_index) else {
+        return false;
+    };
+    let mut operation_index = 0usize;
+    let mut has_run = false;
+    for (run_index, source_run) in paragraph.runs().enumerate() {
+        has_run = true;
+        while operations.get(operation_index).is_some_and(|operation| {
+            matches!(
+                operation,
+                Operation::RunFormat { paragraph, run, .. }
+                    if (*paragraph, *run) < (paragraph_index, run_index)
+            )
+        }) {
+            operation_index = operation_index.saturating_add(1);
+        }
+        let text = match operations.get(operation_index) {
+            Some(Operation::RunFormat {
+                paragraph: operation_paragraph,
+                run: operation_run,
+                text_after: Some(text),
+                ..
+            }) if *operation_paragraph == paragraph_index && *operation_run == run_index => {
+                operation_index = operation_index.saturating_add(1);
+                text.as_str()
+            },
+            _ => source_run.text(),
+        };
+        if !text.is_empty() {
+            return false;
+        }
+    }
+    has_run
 }
 
 fn encoded_run_text_replacement(

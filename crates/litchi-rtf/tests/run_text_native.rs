@@ -105,6 +105,40 @@ fn native_run_text_empty_replacement_removes_only_selected_runs() {
 }
 
 #[test]
+fn native_run_text_all_empty_preserves_terminal_paragraph_axis() {
+    for source_bytes in [
+        br"{\rtf1\ansi One}".as_slice(),
+        br"{\rtf1\ansi One\par Two}".as_slice(),
+        br"{\rtf1\ansi One\par Two\par Three}".as_slice(),
+    ] {
+        let source = Package::from_bytes(source_bytes).unwrap();
+        let paragraph_count = source.paragraph_count();
+        let replacements = source
+            .body()
+            .paragraphs()
+            .enumerate()
+            .flat_map(|(paragraph, value)| {
+                value
+                    .runs()
+                    .enumerate()
+                    .map(move |(run, _)| replacement(paragraph, run, ""))
+            })
+            .collect::<Vec<_>>();
+        let mut edit = source.edit();
+        edit.replace_body_run_texts(&replacements).unwrap();
+        let changed = edit.commit().unwrap();
+        assert_eq!(changed.package().paragraph_count(), paragraph_count);
+        assert!(
+            changed
+                .package()
+                .body()
+                .paragraphs()
+                .all(|paragraph| paragraph.is_empty())
+        );
+    }
+}
+
+#[test]
 fn native_run_text_batch_is_atomic_and_typed() {
     let source = Package::from_bytes(SOURCE).unwrap();
     let valid = replacement(0, 0, "changed");
