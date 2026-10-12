@@ -88,6 +88,14 @@ table rebuilds, source-backed writes, memory peaks, batched scaling or the full
 performance program. The paired harness is
 `crates/litchi-ops/examples/xls_write_bench.rs`.
 
+The [measurement JSON](results/0205-xls-write.json) contains all samples.
+Source commit: `f5f4dd74abd28c407ec6ac4c1494e684c7df1ab1`. Build with
+`cargo build --release -p litchi-ops --features xls --example xls_write_bench`
+and run with `LITCHI_XLS_BENCH_SAMPLES=5 target/release/examples/xls_write_bench`.
+The measured binary SHA-256 is
+`f47d754db2ae61aa64130b8d3c625587dfe51c2afeb82e62b12992b4fb6d0add`;
+no binary is committed.
+
 ## Remaining scope
 
 XLS structural verbs, formula/style authoring, security publication,
