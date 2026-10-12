@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{
     EditOptions, Package, SemanticLimitKind, SemanticLimits,
     edit::{Composition, CompositionError, CompositionLimits, Error},
@@ -164,7 +165,7 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
     ] {
         let source = source();
         let mut edit = source.edit();
-        edit.remove_paragraph(position).unwrap();
+        edit.remove_paragraph(Position::new(position)).unwrap();
         let commit = edit.commit().unwrap();
 
         assert!(commit.diagnostics().changed());
@@ -207,7 +208,7 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
 fn removing_the_only_paragraph_yields_an_empty_story_and_durable_inverse_restores_it() {
     let source = Package::parse(r"{\rtf1\ansi Only}").unwrap();
     let mut edit = source.edit();
-    edit.remove_paragraph(0).unwrap();
+    edit.remove_paragraph(Position::new(0)).unwrap();
     let commit = edit.commit().unwrap();
 
     assert_eq!(commit.package().text(), "");
@@ -237,12 +238,16 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
     let source = source();
 
     let mut forward = source.edit();
-    forward.move_paragraph(0, 3).unwrap();
+    forward
+        .move_paragraph(Position::new(0), Position::new(3))
+        .unwrap();
     let forward = forward.commit().unwrap();
     assert_complete_reopen(forward.package(), &["Second", "Third", "Fourth", "First"]);
 
     let mut backward = source.edit();
-    backward.move_paragraph(3, 0).unwrap();
+    backward
+        .move_paragraph(Position::new(3), Position::new(0))
+        .unwrap();
     let backward = backward.commit().unwrap();
     assert_complete_reopen(backward.package(), &["Fourth", "First", "Second", "Third"]);
 
@@ -267,7 +272,8 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
     ));
 
     let mut noop = source.edit();
-    noop.move_paragraph(2, 2).unwrap();
+    noop.move_paragraph(Position::new(2), Position::new(2))
+        .unwrap();
     let noop = noop.commit().unwrap();
     assert!(!noop.diagnostics().changed());
     assert!(noop.package().same_snapshot(&source));
@@ -372,7 +378,8 @@ fn moving_empty_paragraphs_preserves_tail_and_terminal_boundaries() {
             (2, 0, ["Third", "First", ""]),
         ] {
             let mut edit = source.edit();
-            edit.move_paragraph(position, final_position).unwrap();
+            edit.move_paragraph(Position::new(position), Position::new(final_position))
+                .unwrap();
             let commit = edit.commit().unwrap();
             assert_eq!(commit.package().paragraph_count(), expected.len());
             assert_eq!(paragraph_texts(commit.package()), expected);
@@ -393,7 +400,8 @@ fn moving_empty_paragraphs_preserves_tail_and_terminal_boundaries() {
 fn terminal_boundary_moves_are_source_bound_even_without_empty_paragraphs() {
     let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third\par}").unwrap();
     let mut edit = source.edit();
-    edit.move_paragraph(0, 2).unwrap();
+    edit.move_paragraph(Position::new(0), Position::new(2))
+        .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(
         paragraph_texts(commit.package()),
@@ -412,14 +420,14 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
     let source = source();
     let mut invalid = source.edit();
     assert!(matches!(
-        invalid.remove_paragraph(4),
+        invalid.remove_paragraph(Position::new(4)),
         Err(Error::ParagraphOutOfRange {
             position: 4,
             count: 4
         })
     ));
     assert!(matches!(
-        invalid.move_paragraph(0, 4),
+        invalid.move_paragraph(Position::new(0), Position::new(4)),
         Err(Error::ParagraphOutOfRange {
             position: 4,
             count: 4
@@ -429,7 +437,7 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
     let mut bounded =
         source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
     assert!(matches!(
-        bounded.remove_paragraph(0),
+        bounded.remove_paragraph(Position::new(0)),
         Err(Error::Limit {
             kind: SemanticLimitKind::Operations,
             observed: 1,
@@ -438,16 +446,16 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
     ));
 
     let mut structural = source.edit();
-    structural.remove_paragraph(1).unwrap();
+    structural.remove_paragraph(Position::new(1)).unwrap();
     assert!(matches!(
-        structural.move_paragraph(2, 0),
+        structural.move_paragraph(Position::new(2), Position::new(0)),
         Err(Error::Conflict {
             existing: 0,
             incoming: 1
         })
     ));
     assert!(matches!(
-        structural.replace_paragraph_text(0, "changed"),
+        structural.replace_paragraph_text(Position::new(0), "changed"),
         Err(Error::Conflict {
             existing: 0,
             incoming: 1
@@ -456,19 +464,21 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
 
     let mut property = source.edit();
     property
-        .set_paragraph_alignment(0, litchi_rtf::Alignment::Center)
+        .set_paragraph_alignment(Position::new(0), litchi_rtf::Alignment::Center)
         .unwrap();
     assert!(matches!(
-        property.remove_paragraph(1),
+        property.remove_paragraph(Position::new(1)),
         Err(Error::StructuralPropertyConflict)
     ));
     assert_eq!(source.text(), "First\nSecond\nThird\nFourth");
 
     let limits = CompositionLimits::new(4, 8, 16, 8);
     let mut remove = source.edit();
-    remove.remove_paragraph(0).unwrap();
+    remove.remove_paragraph(Position::new(0)).unwrap();
     let mut reorder = source.edit();
-    reorder.move_paragraph(3, 0).unwrap();
+    reorder
+        .move_paragraph(Position::new(3), Position::new(0))
+        .unwrap();
     let mut composition = Composition::new(&source, limits);
     composition
         .join(remove.into_sub_edit("remove", limits).unwrap())
@@ -491,7 +501,7 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
     for source in cases {
         let exact = source.to_bytes().unwrap();
         let mut edit = source.edit();
-        edit.remove_paragraph(0).unwrap();
+        edit.remove_paragraph(Position::new(0)).unwrap();
         assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
         assert_eq!(source.to_bytes().unwrap(), exact);
     }
@@ -501,7 +511,7 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
     cp1252.extend_from_slice(br"\par Two}");
     let source = Package::from_bytes(&cp1252).unwrap();
     let mut edit = source.edit();
-    edit.remove_paragraph(0).unwrap();
+    edit.remove_paragraph(Position::new(0)).unwrap();
     assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
     assert_eq!(source.to_bytes().unwrap(), cp1252);
 
@@ -509,7 +519,8 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
     let compressed = compress(raw, true).unwrap();
     let source = Package::from_bytes(&compressed).unwrap();
     let mut edit = source.edit();
-    edit.move_paragraph(0, 1).unwrap();
+    edit.move_paragraph(Position::new(0), Position::new(1))
+        .unwrap();
     assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
     assert_eq!(source.to_bytes().unwrap(), compressed);
 }
@@ -539,7 +550,7 @@ impl Write for PartialSink {
 fn partial_sink_failure_does_not_mutate_the_published_snapshot() {
     let source = source();
     let mut edit = source.edit();
-    edit.remove_paragraph(1).unwrap();
+    edit.remove_paragraph(Position::new(1)).unwrap();
     let commit = edit.commit().unwrap();
     let exact = commit.package().to_bytes().unwrap();
     let mut sink = PartialSink {

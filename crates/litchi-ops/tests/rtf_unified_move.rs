@@ -37,7 +37,8 @@ fn all_placements_match_native_final_positions() {
         let source = file();
         let native = litchi_rtf::Package::from_bytes(INPUT).unwrap();
         let mut edit = native.edit();
-        edit.move_paragraph(from, to).unwrap();
+        edit.move_paragraph(Position::new(from), Position::new(to))
+            .unwrap();
         let expected = edit.commit().unwrap().into_package();
         let path = format!("/body/p[{}]", from + 1);
         let actual = source.move_to(path.as_str(), placement).unwrap();

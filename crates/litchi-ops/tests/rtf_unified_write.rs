@@ -1,5 +1,6 @@
 #![cfg(feature = "rtf")]
 
+use litchi_core::Position;
 use litchi_core::selector::{Path, Scope};
 use litchi_ops::error::Source;
 use litchi_ops::query::Query;
@@ -48,10 +49,9 @@ fn query_fanout_matches_one_native_batch() {
         .unwrap();
     let native = litchi_rtf::Package::from_bytes(INPUT).unwrap();
     let mut edit = native.edit();
-    edit.replace_body_paragraph_texts(
-        &[0, 1, 2]
-            .map(|position| litchi_rtf::edit::ParagraphTextReplacement::new(position, "same")),
-    )
+    edit.replace_body_paragraph_texts(&[0, 1, 2].map(|position| {
+        litchi_rtf::edit::ParagraphTextReplacement::new(Position::new(position), "same")
+    }))
     .unwrap();
     let expected = edit.commit().unwrap().into_package();
     assert_eq!(changed.to_bytes().unwrap(), expected.to_bytes().unwrap());

@@ -276,7 +276,10 @@ pub(crate) fn set_with_limits<'p, 'v>(
                 .try_reserve_exact(text.len())
                 .map_err(|source| TransactionError::Allocation { source })?;
             replacement.push_str(text);
-            replacements.push(ParagraphTextReplacement::new(*position, replacement));
+            replacements.push(ParagraphTextReplacement::new(
+                Position::new(*position),
+                replacement,
+            ));
         }
     }
 
@@ -401,9 +404,11 @@ pub(crate) fn remove_with_limits<'p>(
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
     if let [position] = positions.as_slice() {
-        edit.remove_paragraph(*position).map_err(Error::from)?;
+        edit.remove_paragraph(Position::new(*position))
+            .map_err(Error::from)?;
     } else {
-        edit.remove_body_paragraphs(&positions)
+        let native_positions: Vec<_> = positions.iter().copied().map(Position::new).collect();
+        edit.remove_body_paragraphs(&native_positions)
             .map_err(Error::from)?;
     }
     let native = edit.commit().map_err(Error::from)?;
@@ -490,7 +495,8 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
         .map_err(Error::from)?;
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
-    edit.move_paragraph(from.get(), to).map_err(Error::from)?;
+    edit.move_paragraph(from, Position::new(to))
+        .map_err(Error::from)?;
     let native = edit.commit().map_err(Error::from)?;
 
     let changed = native.diagnostics().changed();

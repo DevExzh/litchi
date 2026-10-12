@@ -1,6 +1,7 @@
 //! Core-backed composition and non-applying merge plans for RTF edits.
 
 use super::{Edit, EditOptions, Error, Operation, Package, SemanticLimits};
+use litchi_core::Position;
 use litchi_core::patch as core;
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -2448,7 +2449,7 @@ fn commit_durable_operations(
                     .ok_or_else(|| {
                         CompositionError::Durable("invalid paragraph alignment".to_string())
                     })?;
-                edit.set_paragraph_alignment(position, alignment)
+                edit.set_paragraph_alignment(Position::new(position), alignment)
                     .map_err(CompositionError::Edit)?;
             }
             "character-bold.set" => {

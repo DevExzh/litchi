@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{Package, ProtectionType, edit::Error};
 
 fn source() -> Package {
@@ -32,7 +33,8 @@ fn assert_paragraphs(document: &Package, expected: &[&str]) {
 fn batch_positions_are_relative_to_the_original_snapshot() {
     let source = source();
     let mut edit = source.edit();
-    edit.remove_body_paragraphs(&[0, 2]).unwrap();
+    edit.remove_body_paragraphs(&[Position::new(0), Position::new(2)])
+        .unwrap();
     let commit = edit.commit().unwrap();
 
     assert_paragraphs(commit.package(), &["Second", "Fourth"]);
@@ -58,10 +60,18 @@ fn batch_positions_are_relative_to_the_original_snapshot() {
 #[test]
 fn first_middle_last_and_all_removals_preserve_the_unselected_story() {
     for (positions, expected) in [
-        (&[0][..], &["Second", "Third", "Fourth"][..]),
-        (&[1][..], &["First", "Third", "Fourth"][..]),
-        (&[3][..], &["First", "Second", "Third"][..]),
-        (&[0, 1, 2, 3][..], &[][..]),
+        (&[Position::new(0)][..], &["Second", "Third", "Fourth"][..]),
+        (&[Position::new(1)][..], &["First", "Third", "Fourth"][..]),
+        (&[Position::new(3)][..], &["First", "Second", "Third"][..]),
+        (
+            &[
+                Position::new(0),
+                Position::new(1),
+                Position::new(2),
+                Position::new(3),
+            ][..],
+            &[][..],
+        ),
     ] {
         let source = source();
         let mut edit = source.edit();
@@ -77,11 +87,11 @@ fn scalar_and_single_batch_removal_share_source_boundaries() {
     let source = source();
 
     let mut scalar = source.edit();
-    scalar.remove_paragraph(3).unwrap();
+    scalar.remove_paragraph(Position::new(3)).unwrap();
     let scalar = scalar.commit().unwrap();
 
     let mut batch = source.edit();
-    batch.remove_body_paragraphs(&[3]).unwrap();
+    batch.remove_body_paragraphs(&[Position::new(3)]).unwrap();
     let batch = batch.commit().unwrap();
 
     assert_eq!(
@@ -95,7 +105,7 @@ fn scalar_and_single_batch_removal_share_source_boundaries() {
 fn adjacent_empty_paragraph_removal_is_one_atomic_source_splice() {
     let source = Package::parse(r"{\rtf1\ansi First\par\par Third}").unwrap();
     let mut edit = source.edit();
-    edit.remove_body_paragraphs(&[1]).unwrap();
+    edit.remove_body_paragraphs(&[Position::new(1)]).unwrap();
     let commit = edit.commit().unwrap();
 
     assert_paragraphs(commit.package(), &["First", "Third"]);
@@ -109,7 +119,7 @@ fn adjacent_empty_paragraph_removal_is_one_atomic_source_splice() {
 fn trailing_paragraph_boundary_supports_empty_middle_removal() {
     let source = Package::parse(r"{\rtf1\ansi First\par\par Third\par}").unwrap();
     let mut edit = source.edit();
-    edit.remove_body_paragraphs(&[1]).unwrap();
+    edit.remove_body_paragraphs(&[Position::new(1)]).unwrap();
     let commit = edit.commit().unwrap();
 
     assert_paragraphs(commit.package(), &["First", "Third"]);
@@ -124,12 +134,14 @@ fn batch_removal_keeps_an_unselected_empty_paragraph() {
     let source = Package::parse(r"{\rtf1\ansi First\par\par Third}").unwrap();
 
     let mut ends = source.edit();
-    ends.remove_body_paragraphs(&[2]).unwrap();
+    ends.remove_body_paragraphs(&[Position::new(2)]).unwrap();
     let ends = ends.commit().unwrap();
     assert_paragraphs(ends.package(), &["First", ""]);
 
     let mut separated = source.edit();
-    separated.remove_body_paragraphs(&[0, 2]).unwrap();
+    separated
+        .remove_body_paragraphs(&[Position::new(0), Position::new(2)])
+        .unwrap();
     let separated = separated.commit().unwrap();
     assert_paragraphs(separated.package(), &[""]);
 }
@@ -147,14 +159,14 @@ fn removal_batch_validates_empty_order_and_bounds_without_staging() {
 
     let mut unordered = source.edit();
     assert!(matches!(
-        unordered.remove_body_paragraphs(&[2, 1]),
+        unordered.remove_body_paragraphs(&[Position::new(2), Position::new(1)]),
         Err(Error::ParagraphRemovalBatchOutOfOrder { .. })
     ));
     assert_eq!(unordered.operation_count(), 0);
 
     let mut late = source.edit();
     assert!(matches!(
-        late.remove_body_paragraphs(&[0, 99]),
+        late.remove_body_paragraphs(&[Position::new(0), Position::new(99)]),
         Err(Error::ParagraphOutOfRange {
             position: 99,
             count: 4
@@ -168,7 +180,8 @@ fn protected_batch_refuses_publication_and_leaves_source_unchanged() {
     let source = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
     let exact = source.to_bytes().unwrap();
     let mut edit = source.edit();
-    edit.remove_body_paragraphs(&[0, 1]).unwrap();
+    edit.remove_body_paragraphs(&[Position::new(0), Position::new(1)])
+        .unwrap();
     assert!(matches!(
         edit.commit(),
         Err(Error::ProtectedDocument {
@@ -182,7 +195,8 @@ fn protected_batch_refuses_publication_and_leaves_source_unchanged() {
 fn batch_patch_inverse_is_exact_and_durable_projection_is_source_bound() {
     let source = source();
     let mut edit = source.edit();
-    edit.remove_body_paragraphs(&[1, 3]).unwrap();
+    edit.remove_body_paragraphs(&[Position::new(1), Position::new(3)])
+        .unwrap();
     let commit = edit.commit().unwrap();
     let limits = litchi_core::patch::PatchLimits::new(
         litchi_core::patch::BlobLimits::new(0, 0, 0),

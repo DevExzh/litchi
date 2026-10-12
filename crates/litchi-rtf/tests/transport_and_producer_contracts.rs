@@ -4,6 +4,7 @@
     reason = "fixed fixtures and test assertions are intentionally direct"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{
     Package,
     edit::Error,
@@ -35,7 +36,8 @@ fn literal_byte1252_transport_is_exact_and_changed_write_is_atomic_on_refusal() 
     assert_eq!(noop.package().to_bytes().unwrap(), source);
 
     let mut edit = document.edit();
-    edit.replace_paragraph_text(0, "changed").unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
     assert!(matches!(edit.commit(), Err(Error::Rtf(_))));
     assert_eq!(document.to_bytes().unwrap(), source);
 }
@@ -59,7 +61,8 @@ fn specification_lzfu_transport_is_exact_and_changed_write_fails_closed() {
     assert_eq!(noop.package().to_bytes().unwrap(), LZFU_SPEC);
 
     let mut edit = document.edit();
-    edit.replace_paragraph_text(0, "changed").unwrap();
+    edit.replace_paragraph_text(Position::new(0), "changed")
+        .unwrap();
     assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
     assert_eq!(document.to_bytes().unwrap(), LZFU_SPEC);
 }

@@ -8,6 +8,7 @@
 use crate::Package;
 use crate::codec::limits::{OpenOptions, SourceLimitKind, SourceLimits};
 use crate::codec::writer::{Charset, RtfWriter, WriterOptions};
+use litchi_core::Position;
 use std::fmt;
 use std::io::{self, Write};
 
@@ -401,7 +402,8 @@ mod tests {
             .build()
             .expect("package");
         let mut edit = package.edit();
-        edit.replace_paragraph_text(0, "after").expect("replace");
+        edit.replace_paragraph_text(Position::new(0), "after")
+            .expect("replace");
         let changed = edit.commit().expect("commit").package().clone();
         assert_eq!(package.text(), "before");
         assert_eq!(changed.text(), "after");

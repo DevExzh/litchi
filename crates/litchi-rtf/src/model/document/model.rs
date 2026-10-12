@@ -19,6 +19,7 @@ use super::super::types::{
     ColorTable, FontTable, Formatting, Paragraph as RtfParagraph, Run, StyleBlock,
 };
 use bumpalo::Bump;
+use litchi_core::Position;
 use std::borrow::Cow;
 use std::collections::HashSet;
 use std::fs::File;
@@ -6416,7 +6417,7 @@ mod source_tests {
         let source = br"{\rtf1\ansi original}";
         let document = crate::Package::from_bytes(source).expect("parse RTF");
         let mut edit = document.edit();
-        edit.replace_paragraph_text(0, "changed")
+        edit.replace_paragraph_text(Position::new(0), "changed")
             .expect("replace paragraph text");
         let changed = edit
             .commit()

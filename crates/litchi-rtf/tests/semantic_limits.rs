@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{
     EditOptions, HeaderFooterType, OpenOptions, Package, SemanticLimitKind, SemanticLimits,
     SmartTagAttribute, SourceLimits, TableCellPath,
@@ -191,8 +192,8 @@ fn scalar_replacements_are_aggregated_at_exact_and_above_boundaries() {
 fn paragraph_batches_admit_exact_payload_and_reject_aggregate_overflow_atomically() {
     let source = Package::parse(r"{\rtf1\ansi One\par Two\par Three}").unwrap();
     let exact_batch = [
-        ParagraphTextReplacement::new(0, "Uno"),
-        ParagraphTextReplacement::new(1, "Deux"),
+        ParagraphTextReplacement::new(Position::new(0), "Uno"),
+        ParagraphTextReplacement::new(Position::new(1), "Deux"),
     ];
     let mut exact =
         source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 7)));
@@ -200,8 +201,8 @@ fn paragraph_batches_admit_exact_payload_and_reject_aggregate_overflow_atomicall
     assert_eq!(exact.commit().unwrap().package().text(), "Uno\nDeux\nThree");
 
     let overflow_batch = [
-        ParagraphTextReplacement::new(0, "Uno"),
-        ParagraphTextReplacement::new(1, "Deux"),
+        ParagraphTextReplacement::new(Position::new(0), "Uno"),
+        ParagraphTextReplacement::new(Position::new(1), "Deux"),
     ];
     let mut overflow =
         source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 6)));
@@ -214,7 +215,9 @@ fn paragraph_batches_admit_exact_payload_and_reject_aggregate_overflow_atomicall
         })
     ));
     assert_eq!(overflow.operation_count(), 0);
-    overflow.replace_paragraph_text(0, "A").unwrap();
+    overflow
+        .replace_paragraph_text(Position::new(0), "A")
+        .unwrap();
     assert_eq!(overflow.commit().unwrap().package().text(), "A\nTwo\nThree");
 }
 
@@ -223,13 +226,15 @@ fn paragraph_structural_scalar_uses_the_same_replacement_budget() {
     let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let mut exact =
         source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 3)));
-    exact.replace_paragraph_text(0, "A\nB").unwrap();
+    exact
+        .replace_paragraph_text(Position::new(0), "A\nB")
+        .unwrap();
     assert_eq!(exact.commit().unwrap().package().text(), "A\nB");
 
     let mut overflow =
         source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 2)));
     assert!(matches!(
-        overflow.replace_paragraph_text(0, "A\nB"),
+        overflow.replace_paragraph_text(Position::new(0), "A\nB"),
         Err(Error::Limit {
             kind: SemanticLimitKind::ReplacementBytes,
             observed: 3,

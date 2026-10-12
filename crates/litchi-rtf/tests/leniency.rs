@@ -8,6 +8,7 @@
 //! default, opt-in repairs only under a named `Leniency`, and conformant input
 //! reports clean.
 
+use litchi_core::Position;
 use litchi_rtf::leniency::{
     Defect, FontDefect, Leniency, ParameterDefect, SyntaxDefect, ToleranceReport, ToleratedDefect,
     UnicodeDefect,
@@ -438,7 +439,8 @@ fn documents_opened_through_an_opt_in_stay_editable() {
 
     for (index, expected) in [(0, "Second"), (2, "Last")] {
         let mut edit = document.edit();
-        edit.replace_paragraph_text(index, expected).unwrap();
+        edit.replace_paragraph_text(Position::new(index), expected)
+            .unwrap();
         let commit = edit.commit().unwrap();
         let snapshot = commit.package();
         assert!(snapshot.text().contains(expected), "{:?}", snapshot.text());
@@ -455,7 +457,7 @@ fn documents_opened_through_an_opt_in_stay_editable() {
     }
 
     let mut edit = document.edit();
-    edit.remove_paragraph(0).unwrap();
+    edit.remove_paragraph(Position::new(0)).unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.package().paragraph_count(), 2);
 }

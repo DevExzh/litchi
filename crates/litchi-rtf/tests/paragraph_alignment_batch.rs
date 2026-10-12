@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::edit::{Error, ParagraphAlignmentUpdate, TextSpan};
 use litchi_rtf::{Alignment, EditOptions, Package, SemanticLimitKind, SemanticLimits};
 
@@ -11,7 +12,7 @@ fn updates(values: &[(usize, Alignment)]) -> Vec<ParagraphAlignmentUpdate> {
     values
         .iter()
         .map(|(position, alignment)| {
-            ParagraphAlignmentUpdate::new(litchi_core::Position::new(*position), *alignment)
+            ParagraphAlignmentUpdate::new(Position::new(*position), *alignment)
         })
         .collect()
 }
@@ -111,7 +112,7 @@ fn batch_shape_bounds_and_conflicts_fail_before_staging() {
 
     let mut duplicate = source.edit();
     duplicate
-        .set_paragraph_alignment(2, Alignment::Center)
+        .set_paragraph_alignment(Position::new(2), Alignment::Center)
         .unwrap();
     let same = updates(&[(1, Alignment::Right), (2, Alignment::Left)]);
     assert!(matches!(

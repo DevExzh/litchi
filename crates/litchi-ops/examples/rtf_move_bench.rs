@@ -1,7 +1,7 @@
 //! Paired RTF paragraph move timing; setup and exact output checks are untimed.
 #[cfg(feature = "rtf")]
 fn main() -> Result<(), Box<dyn std::error::Error>> {
-    use litchi_core::selector::Path;
+    use litchi_core::{Position, selector::Path};
     use litchi_ops::{Placement, open_bytes};
     use std::hint::black_box;
     use std::time::Instant;
@@ -20,7 +20,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         let options = litchi_rtf::EditOptions::new().semantic_limits(limits);
         let native_once = || -> Result<litchi_rtf::Package, litchi_rtf::edit::Error> {
             let mut edit = native.edit_with_options(options);
-            edit.move_paragraph(0, count - 1)?;
+            edit.move_paragraph(Position::new(0), Position::new(count - 1))?;
             Ok(edit.commit()?.into_package())
         };
         let expected = native_once()?.to_bytes()?;

@@ -4,6 +4,7 @@
 //! validation are outside the timed intervals.  Each route reuses one warmed
 //! immutable owner for the complete ABBA sample sequence.
 
+use litchi_core::Position;
 use litchi_core::selector::{Path, Query, Scope};
 use litchi_ops::{File, OpenOptions, SourceMode, open_bytes_with};
 use litchi_rtf::{EditOptions, Package, SemanticLimits as NativeLimits};
@@ -91,13 +92,13 @@ fn native_once(
     owner: &Package,
     shape: Shape,
     position: usize,
-    positions: &[usize],
+    positions: &[Position],
     options: EditOptions,
 ) -> Result<Package> {
     let mut edit = owner.edit_with_options(options);
     match shape {
         Shape::SinglePath => {
-            edit.remove_paragraph(position)?;
+            edit.remove_paragraph(Position::new(position))?;
         },
         Shape::QueryAll => {
             edit.remove_body_paragraphs(positions)?;
@@ -255,7 +256,7 @@ fn measure_case(
 ) -> Result<Value> {
     let options = native_options()?;
     let position = count / 2;
-    let positions = (0..count).collect::<Vec<_>>();
+    let positions = (0..count).map(Position::new).collect::<Vec<_>>();
     let path_text = format!("/body/p[{}]", position + 1);
     let path = Path::parse(&path_text)?.into_owned();
     let query = match shape {

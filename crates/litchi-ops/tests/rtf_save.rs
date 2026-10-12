@@ -1,6 +1,6 @@
 #![cfg(feature = "rtf")]
 
-use litchi_core::{Durability, FileFormat};
+use litchi_core::{Durability, FileFormat, Position};
 use litchi_ops::{Code, Overwrite, SaveOptions, SaveTo, create, open, open_bytes};
 
 #[test]
@@ -181,7 +181,8 @@ fn native_edit_and_retained_navigation_bytes_publish_without_rewriting() {
         .build()
         .unwrap();
     let mut edit = original.edit();
-    edit.replace_paragraph_text(0, "after").unwrap();
+    edit.replace_paragraph_text(Position::new(0), "after")
+        .unwrap();
     let changed = edit.commit().unwrap().into_package();
     let path = dir.path().join("changed.rtf");
     changed.save(&path).unwrap();

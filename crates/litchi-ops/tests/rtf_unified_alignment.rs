@@ -102,8 +102,10 @@ fn selector_fanout_and_mixed_properties_match_one_native_commit() {
     assert_eq!(commit.diagnostics.operations(), 1);
     let native = litchi_rtf::Package::from_bytes(INPUT).unwrap();
     let mut edit = native.edit();
-    edit.replace_body_paragraph_texts(&[0, 1, 2].map(|p| ParagraphTextReplacement::new(p, "same")))
-        .unwrap();
+    edit.replace_body_paragraph_texts(
+        &[0, 1, 2].map(|p| ParagraphTextReplacement::new(Position::new(p), "same")),
+    )
+    .unwrap();
     edit.set_body_paragraph_alignments(
         &[0, 1, 2].map(|p| ParagraphAlignmentUpdate::new(Position::new(p), Alignment::Right)),
     )

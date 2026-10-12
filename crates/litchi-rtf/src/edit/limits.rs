@@ -19,7 +19,7 @@ pub enum SemanticLimitKind {
 /// let limits = SemanticLimits::builder().max_operations(1)?.build()?;
 /// let package = Package::parse(r"{\rtf1 Before}")?;
 /// let mut edit = package.edit_with_options(EditOptions::new().semantic_limits(limits));
-/// edit.replace_paragraph_text(0, "After")?;
+/// edit.replace_paragraph_text(litchi_core::Position::new(0), "After")?;
 /// assert_eq!(edit.commit()?.package().text(), "After");
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```

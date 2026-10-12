@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{
     Alignment, CharacterBaseline, EditOptions, HeaderFooterType, OpenOptions, Package,
     SemanticLimitKind, SemanticLimits, SourceLimits, TableCellPath, UnderlineStyle,
@@ -428,7 +429,8 @@ fn transaction_composes_disjoint_spans_and_a_property() {
         .unwrap();
     edit.replace_text(TextSpan::new(0, 5).unwrap(), "A")
         .unwrap();
-    edit.set_paragraph_alignment(0, Alignment::Center).unwrap();
+    edit.set_paragraph_alignment(Position::new(0), Alignment::Center)
+        .unwrap();
     let commit = edit.commit().unwrap();
 
     assert_eq!(commit.package().text(), "A Beta G");
@@ -462,10 +464,10 @@ fn overlapping_spans_duplicate_properties_and_operation_bounds_conflict() {
 
     let mut properties = source.edit();
     properties
-        .set_paragraph_alignment(0, Alignment::Center)
+        .set_paragraph_alignment(Position::new(0), Alignment::Center)
         .unwrap();
     assert!(matches!(
-        properties.set_paragraph_alignment(0, Alignment::Right),
+        properties.set_paragraph_alignment(Position::new(0), Alignment::Right),
         Err(Error::Conflict {
             existing: 0,
             incoming: 1
@@ -491,9 +493,10 @@ fn overlapping_spans_duplicate_properties_and_operation_bounds_conflict() {
 fn structural_and_property_operations_fail_closed() {
     let source = Package::parse(r"{\rtf1\ansi First\par Second}").unwrap();
     let mut edit = source.edit();
-    edit.set_paragraph_alignment(1, Alignment::Right).unwrap();
+    edit.set_paragraph_alignment(Position::new(1), Alignment::Right)
+        .unwrap();
     assert!(matches!(
-        edit.replace_paragraph_text(0, "One\nInserted"),
+        edit.replace_paragraph_text(Position::new(0), "One\nInserted"),
         Err(Error::StructuralPropertyConflict)
     ));
 }
@@ -531,7 +534,8 @@ fn body_splice_preserves_unknown_metadata_group_and_surrounding_writer_bytes() {
 fn paragraph_text_edit_is_checked_local_and_reversible() {
     let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let mut edit = source.edit();
-    edit.replace_paragraph_text(1, "Changed").unwrap();
+    edit.replace_paragraph_text(Position::new(1), "Changed")
+        .unwrap();
     let commit = edit.commit().unwrap();
 
     assert_eq!(source.text(), "First\nSecond\nThird");
@@ -552,13 +556,14 @@ fn paragraph_text_edit_rejects_out_of_range_before_staging() {
     let source = Package::parse(r"{\rtf1 Only}").unwrap();
     let mut edit = source.edit();
     assert!(matches!(
-        edit.replace_paragraph_text(1, "never"),
+        edit.replace_paragraph_text(Position::new(1), "never"),
         Err(Error::ParagraphOutOfRange {
             position: 1,
             count: 1
         })
     ));
-    edit.replace_paragraph_text(0, "Changed").unwrap();
+    edit.replace_paragraph_text(Position::new(0), "Changed")
+        .unwrap();
     assert_eq!(edit.commit().unwrap().package().text(), "Changed");
 }
 
@@ -570,7 +575,8 @@ fn durable_multi_operation_patch_is_deterministic_reversible_and_source_checked(
         .unwrap();
     edit.replace_text(TextSpan::new(0, 5).unwrap(), "A")
         .unwrap();
-    edit.set_paragraph_alignment(0, Alignment::Right).unwrap();
+    edit.set_paragraph_alignment(Position::new(0), Alignment::Right)
+        .unwrap();
     let commit = edit.commit().unwrap();
     let durable = commit.patch().to_durable(durable_limits(3)).unwrap();
     let first = durable.to_deterministic_json().unwrap();
@@ -677,7 +683,8 @@ fn no_op_patch_is_empty_durable_and_history_is_budgeted() {
     let mut edit = source.edit();
     edit.replace_text(TextSpan::new(0, 4).unwrap(), "Same")
         .unwrap();
-    edit.set_paragraph_alignment(0, Alignment::Left).unwrap();
+    edit.set_paragraph_alignment(Position::new(0), Alignment::Left)
+        .unwrap();
     let commit = edit.commit().unwrap();
     assert!(!commit.diagnostics().changed());
     assert!(commit.package().same_snapshot(&source));
@@ -722,7 +729,9 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
     assert!(!restored.body().runs().next().unwrap().format().bold());
 
     let mut structure = source.edit();
-    structure.insert_paragraph_after(0, "Inserted").unwrap();
+    structure
+        .insert_paragraph_after(Position::new(0), "Inserted")
+        .unwrap();
     let inserted = structure.commit().unwrap();
     assert_eq!(inserted.package().text(), "Alpha\nInserted\nBeta");
     let structural_patch = inserted.patch().to_durable(durable_limits(1)).unwrap();
@@ -741,9 +750,9 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
 fn multiple_paragraph_insertions_have_target_relative_durable_inverses() {
     let source = Package::parse(r"{\rtf1\ansi A\par B\par C}").unwrap();
     let mut edit = source.edit();
-    edit.insert_paragraph_after(0, "X")
+    edit.insert_paragraph_after(Position::new(0), "X")
         .unwrap()
-        .insert_paragraph_after(1, "Y")
+        .insert_paragraph_after(Position::new(1), "Y")
         .unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(commit.package().text(), "A\nX\nB\nY\nC");
@@ -2090,7 +2099,7 @@ fn core_subedits_compose_and_report_typed_conflicts() {
     let prepared_text = text_edit.into_sub_edit("text", limits).unwrap();
     let mut alignment_edit = source.edit();
     alignment_edit
-        .set_paragraph_alignment(0, Alignment::Center)
+        .set_paragraph_alignment(Position::new(0), Alignment::Center)
         .unwrap();
     let prepared_alignment = alignment_edit.into_sub_edit("alignment", limits).unwrap();
     let mut joined = Composition::new(&source, limits);
@@ -3321,7 +3330,7 @@ fn history_weight_includes_long_before_text_and_native_descriptors() {
         .build()
         .unwrap();
     let mut edit = source.edit();
-    edit.replace_paragraph_text(0, "x").unwrap();
+    edit.replace_paragraph_text(Position::new(0), "x").unwrap();
     let commit = edit.commit().unwrap();
     let endpoints = source.to_bytes().unwrap().len() + commit.package().to_bytes().unwrap().len();
     let minimum = u64::try_from(endpoints + before_text.len() + 1).unwrap();

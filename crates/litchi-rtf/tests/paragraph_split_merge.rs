@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{
     EditOptions, Package, ProtectionType, SemanticLimitKind, SemanticLimits, edit::Error,
 };
@@ -33,7 +34,7 @@ fn split_is_lossless_durable_reversible_and_sequential() {
     let source_bytes = source.to_bytes().unwrap();
 
     let mut edit = source.edit();
-    edit.split_paragraph(1, 3).unwrap();
+    edit.split_paragraph(Position::new(1), 3).unwrap();
     let commit = edit.commit().unwrap();
     let expected = br"{\rtf1\ansi First\par Sec\par ond\par Third}";
 
@@ -57,7 +58,7 @@ fn split_is_lossless_durable_reversible_and_sequential() {
 
     let leading_empty = Package::parse(r"{\rtf1\ansi First\par}").unwrap();
     let mut leading_edit = leading_empty.edit();
-    leading_edit.split_paragraph(0, 0).unwrap();
+    leading_edit.split_paragraph(Position::new(0), 0).unwrap();
     let leading_commit = leading_edit.commit().unwrap();
     let leading_durable = leading_commit
         .patch()
@@ -81,7 +82,7 @@ fn durable_split_rejects_forged_noncanonical_boundary() {
 
     let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let mut edit = source.edit();
-    edit.split_paragraph(1, 6).unwrap();
+    edit.split_paragraph(Position::new(1), 6).unwrap();
     let durable = edit
         .commit()
         .unwrap()
@@ -120,7 +121,8 @@ fn merge_removes_only_the_adjacent_boundary() {
     let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let source_bytes = source.to_bytes().unwrap();
     let mut edit = source.edit();
-    edit.merge_paragraphs(0, 1).unwrap();
+    edit.merge_paragraphs(Position::new(0), Position::new(1))
+        .unwrap();
     let commit = edit.commit().unwrap();
     let expected = br"{\rtf1\ansi FirstSecond\par Third}";
 
@@ -135,7 +137,7 @@ fn merge_removes_only_the_adjacent_boundary() {
 
     let mut non_adjacent = source.edit();
     assert!(matches!(
-        non_adjacent.merge_paragraphs(0, 2),
+        non_adjacent.merge_paragraphs(Position::new(0), Position::new(2)),
         Err(Error::ParagraphMergeNonAdjacent {
             first: 0,
             second: 2
@@ -152,7 +154,8 @@ fn merge_preserves_exact_boundary_bytes_in_durable_inverse() {
     let source = Package::parse(r"{\rtf1\ansi First\par\par}").unwrap();
     let source_bytes = source.to_bytes().unwrap();
     let mut edit = source.edit();
-    edit.merge_paragraphs(0, 1).unwrap();
+    edit.merge_paragraphs(Position::new(0), Position::new(1))
+        .unwrap();
     let commit = edit.commit().unwrap();
     let expected = br"{\rtf1\ansi First\par}";
     assert_eq!(commit.package().to_bytes().unwrap(), expected);
@@ -202,7 +205,7 @@ fn split_and_merge_refuse_external_and_dynamic_metadata_exactly() {
 
         let mut split = source.edit();
         assert!(matches!(
-            split.split_paragraph(0, 1),
+            split.split_paragraph(Position::new(0), 1),
             Err(Error::UnsupportedSource(_))
         ));
         assert_eq!(split.operation_count(), 0);
@@ -210,7 +213,7 @@ fn split_and_merge_refuse_external_and_dynamic_metadata_exactly() {
 
         let mut merge = source.edit();
         assert!(matches!(
-            merge.merge_paragraphs(0, 1),
+            merge.merge_paragraphs(Position::new(0), Position::new(1)),
             Err(Error::UnsupportedSource(_))
         ));
         assert_eq!(merge.operation_count(), 0);
@@ -224,7 +227,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
 
     let mut out_of_range = source.edit();
     assert!(matches!(
-        out_of_range.split_paragraph(0, usize::MAX),
+        out_of_range.split_paragraph(Position::new(0), usize::MAX),
         Err(Error::ParagraphSplitOffsetOutOfRange {
             position: 0,
             offset: usize::MAX,
@@ -236,7 +239,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     let mut limited =
         source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
     assert!(matches!(
-        limited.split_paragraph(0, 1),
+        limited.split_paragraph(Position::new(0), 1),
         Err(Error::Limit {
             kind: SemanticLimitKind::Operations,
             observed: 1,
@@ -248,7 +251,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     let unicode = Package::parse(r"{\rtf1\ansi Caf\'e9}").unwrap();
     let mut non_boundary = unicode.edit();
     assert!(matches!(
-        non_boundary.split_paragraph(0, 4),
+        non_boundary.split_paragraph(Position::new(0), 4),
         Err(Error::SpanNotOnCharacterBoundary { .. })
     ));
     assert_eq!(non_boundary.operation_count(), 0);
@@ -256,7 +259,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     let terminal = Package::parse(r"{\rtf1\ansi First}").unwrap();
     let mut terminal_edit = terminal.edit();
     assert!(matches!(
-        terminal_edit.split_paragraph(0, 5),
+        terminal_edit.split_paragraph(Position::new(0), 5),
         Err(Error::ParagraphSplitAtEndRequiresBoundary { position: 0 })
     ));
     assert_eq!(terminal_edit.operation_count(), 0);
@@ -267,7 +270,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     ] {
         let source = Package::parse(unsafe_source).unwrap();
         let mut edit = source.edit();
-        let result = edit.split_paragraph(0, 1);
+        let result = edit.split_paragraph(Position::new(0), 1);
         assert!(
             result.is_err(),
             "unsafe source unexpectedly accepted: {unsafe_source}"
@@ -277,7 +280,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
 
     let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
     let mut edit = protected.edit();
-    edit.split_paragraph(0, 1).unwrap();
+    edit.split_paragraph(Position::new(0), 1).unwrap();
     assert!(matches!(
         edit.commit(),
         Err(Error::ProtectedDocument {
@@ -288,7 +291,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     let undelimited_empty = Package::parse(r"{\rtf1\ansi\par First}").unwrap();
     let mut undelimited_edit = undelimited_empty.edit();
     assert!(matches!(
-        undelimited_edit.merge_paragraphs(0, 1),
+        undelimited_edit.merge_paragraphs(Position::new(0), Position::new(1)),
         Err(Error::UnsupportedSource(_))
     ));
     assert_eq!(undelimited_edit.operation_count(), 0);

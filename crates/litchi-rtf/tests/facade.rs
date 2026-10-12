@@ -7,6 +7,7 @@
     reason = "test assertions panic on failure by design and rebind fixture names across steps"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::write::Writer;
 use litchi_rtf::{Document, OpenOptions, Package, SourceLimits};
 use litchi_rtf::{text, text::Inline};
@@ -304,7 +305,7 @@ fn story_retains_exact_text_length_across_fragmentation_and_edits() {
     let source_len = source.body().len();
     let projection = source.document();
     let mut edit = source.edit();
-    edit.replace_paragraph_text(0, "a longer replacement")
+    edit.replace_paragraph_text(Position::new(0), "a longer replacement")
         .unwrap();
     let changed = edit.commit().unwrap().package().clone();
 

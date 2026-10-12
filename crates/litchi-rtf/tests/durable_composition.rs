@@ -4,6 +4,7 @@
     reason = "transaction assertions intentionally panic on failure"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::edit::{CompositionError, DurableComposition, DurableMergePlan, MergeResolution};
 use litchi_rtf::{
     Alignment, CharacterBaseline, EditOptions, Package, SemanticLimits, UnderlineStyle,
@@ -809,7 +810,7 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
         .replace_text(TextSpan::new(5, 5).unwrap(), "Inserted")
         .unwrap();
     left_edit
-        .set_paragraph_alignment(0, Alignment::Right)
+        .set_paragraph_alignment(Position::new(0), Alignment::Right)
         .unwrap();
     let left_patch = left_edit
         .commit()
@@ -824,7 +825,7 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
         .replace_text(TextSpan::new(0, 5).unwrap(), "Alpha")
         .unwrap();
     right_edit
-        .set_paragraph_alignment(0, Alignment::Right)
+        .set_paragraph_alignment(Position::new(0), Alignment::Right)
         .unwrap();
     let right_patch = right_edit
         .commit()

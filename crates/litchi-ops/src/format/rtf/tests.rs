@@ -1,6 +1,6 @@
 use super::*;
 use crate::detect::{DetectedFormat, detect_format_smart};
-use litchi_core::detection::FileFormat;
+use litchi_core::{Position, detection::FileFormat};
 use std::path::PathBuf;
 
 fn fixture(relative: &str) -> PathBuf {
@@ -122,7 +122,9 @@ fn paragraph_move_matches_the_native_final_position_contract() {
 
     let native = Package::from_bytes(&input).expect("native RTF");
     let mut native_edit = native.edit();
-    native_edit.move_paragraph(0, 2).expect("native move");
+    native_edit
+        .move_paragraph(Position::new(0), Position::new(2))
+        .expect("native move");
     let expected = native_edit
         .commit()
         .expect("native commit")

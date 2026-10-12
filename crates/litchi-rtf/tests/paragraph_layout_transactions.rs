@@ -278,7 +278,8 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
         ParagraphLayoutPatch::new().with_keep_together(true),
     )
     .unwrap();
-    edit.set_paragraph_alignment(0, Alignment::Center).unwrap();
+    edit.set_paragraph_alignment(Position::new(0), Alignment::Center)
+        .unwrap();
     assert!(matches!(
         edit.replace_text(TextSpan::new(0, 3).unwrap(), "First"),
         Err(Error::ParagraphLayoutTextConflict)
@@ -839,10 +840,11 @@ fn layout_refuses_each_exclusive_lifecycle_without_poisoning_it() {
         let mut edit = source.edit();
         match case {
             0 => {
-                edit.remove_paragraph(0).unwrap();
+                edit.remove_paragraph(Position::new(0)).unwrap();
             },
             1 => {
-                edit.move_paragraph(0, 2).unwrap();
+                edit.move_paragraph(Position::new(0), Position::new(2))
+                    .unwrap();
             },
             2 => {
                 edit.swap_paragraphs(Position::new(0), Position::new(2))

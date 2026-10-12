@@ -5,6 +5,7 @@
     reason = "test assertions use bounded fixtures and rebind policy variants"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{OpenOptions, Package, SourceLimits};
 
 const SOURCE: &[u8] = br"{\rtf1\ansi old}";
@@ -13,7 +14,8 @@ const SOURCE: &[u8] = br"{\rtf1\ansi old}";
 fn canonical_parts_replay_and_inverse_preserve_source() {
     let source = Package::from_bytes(SOURCE).unwrap();
     let mut edit = source.edit();
-    edit.replace_paragraph_text(0, "replacement").unwrap();
+    edit.replace_paragraph_text(Position::new(0), "replacement")
+        .unwrap();
     let commit = edit.commit().unwrap();
     assert!(commit.diagnostics().changed());
     assert!(!commit.patch().is_noop());
@@ -59,7 +61,7 @@ fn exact_noop_replay_keeps_recipient_owner_and_policy() {
 fn replay_admits_candidate_under_recipient_policy() {
     let source = Package::from_bytes(SOURCE).unwrap();
     let mut edit = source.edit();
-    edit.replace_paragraph_text(0, "a much longer replacement")
+    edit.replace_paragraph_text(Position::new(0), "a much longer replacement")
         .unwrap();
     let commit = edit.commit().unwrap();
     let limits = SourceLimits::builder()

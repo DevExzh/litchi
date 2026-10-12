@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{
     EditOptions, HeaderFooterType, OpenOptions, Package, ProtectionType, SemanticLimitKind,
     SemanticLimits, SourceLimits,
@@ -23,7 +24,7 @@ fn semantic_limits(max_operations: usize) -> SemanticLimits {
 fn replacements(values: &[(usize, &str)]) -> Vec<ParagraphTextReplacement> {
     values
         .iter()
-        .map(|(position, text)| ParagraphTextReplacement::new(*position, *text))
+        .map(|(position, text)| ParagraphTextReplacement::new(Position::new(*position), *text))
         .collect()
 }
 
@@ -42,7 +43,7 @@ fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
 fn paragraph_batch_matches_scalar_bytes_for_first_middle_and_last() {
     let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third\par Fourth}").unwrap();
     let batch = replacements(&[(0, "One"), (2, "Three"), (3, "Four")]);
-    assert_eq!(batch[0].position(), 0);
+    assert_eq!(batch[0].position(), Position::new(0));
     assert_eq!(batch[0].replacement(), "One");
 
     let mut batched = source.edit();
@@ -50,9 +51,15 @@ fn paragraph_batch_matches_scalar_bytes_for_first_middle_and_last() {
     let batched = batched.commit().unwrap();
 
     let mut scalar = source.edit();
-    scalar.replace_paragraph_text(0, "One").unwrap();
-    scalar.replace_paragraph_text(2, "Three").unwrap();
-    scalar.replace_paragraph_text(3, "Four").unwrap();
+    scalar
+        .replace_paragraph_text(Position::new(0), "One")
+        .unwrap();
+    scalar
+        .replace_paragraph_text(Position::new(2), "Three")
+        .unwrap();
+    scalar
+        .replace_paragraph_text(Position::new(3), "Four")
+        .unwrap();
     let scalar = scalar.commit().unwrap();
 
     assert_eq!(batched.package().text(), "One\nSecond\nThree\nFour");
@@ -126,7 +133,8 @@ fn paragraph_batch_rejects_bad_shape_and_late_selector_atomically() {
         })
     ));
     assert_eq!(late.operation_count(), 0);
-    late.replace_paragraph_text(1, "Changed").unwrap();
+    late.replace_paragraph_text(Position::new(1), "Changed")
+        .unwrap();
     assert_eq!(
         late.commit().unwrap().package().text(),
         "First\nChanged\nThird"
@@ -217,7 +225,7 @@ fn paragraph_batch_preserves_noops_and_conflict_rules() {
 
     let mut property = source.edit();
     property
-        .set_paragraph_alignment(0, litchi_rtf::Alignment::Center)
+        .set_paragraph_alignment(Position::new(0), litchi_rtf::Alignment::Center)
         .unwrap();
     assert!(matches!(
         property.replace_body_paragraph_texts(&replacements(&[(1, "Two\nInserted")])),

@@ -1,5 +1,6 @@
 #![cfg(feature = "rtf")]
 
+use litchi_core::Position;
 use litchi_core::selector::{Path, Scope};
 use litchi_ops::error::Source;
 use litchi_ops::query::Query;
@@ -33,7 +34,7 @@ fn scalar_removal_matches_native_bytes_and_preserves_input() {
         let source = file();
         let native = litchi_rtf::Package::from_bytes(INPUT).unwrap();
         let mut edit = native.edit();
-        edit.remove_paragraph(position).unwrap();
+        edit.remove_paragraph(Position::new(position)).unwrap();
         let expected = edit.commit().unwrap().into_package();
         let actual = source.remove(path).unwrap();
         assert_eq!(actual.to_bytes().unwrap(), expected.to_bytes().unwrap());

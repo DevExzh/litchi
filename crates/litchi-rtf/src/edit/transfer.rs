@@ -2,6 +2,7 @@
 
 use super::{Commit, Edit, Error, HeaderFooterParagraph, Package};
 use crate::{RtfWriter, TableCellPath};
+use litchi_core::Position;
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
 use std::io;
@@ -42,7 +43,7 @@ impl TransferPlan {
             ));
         }
         let mut edit = target.edit();
-        edit.insert_paragraph_after(insert_after, text)?;
+        edit.insert_paragraph_after(Position::new(insert_after), text)?;
         Ok(Self {
             edit,
             dependency_count: 0,
