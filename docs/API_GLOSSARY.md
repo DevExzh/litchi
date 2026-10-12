@@ -1371,3 +1371,12 @@ shared post-detachment contract; removal selectors resolve before descending
 native staging. A swap composes at most two native slide moves in one edit.
 Exact self moves/swaps preserve snapshot identity. Slide and shape insertion,
 shape removal, and consecutive-command coalescing remain open.
+
+## Unified PPT shape runs (0218)
+
+Consecutive direct shape setters use one canonical native PPT `Edit` and retain
+its `Commit`/`Patch` proof. Reads, selectors, repeated targets and structural
+commands publish the preceding run before resolving against its new snapshot.
+Native operation and semantic retention limits remain enforced across run
+boundaries. This does not add a mutable presentation model or change public
+operation names.

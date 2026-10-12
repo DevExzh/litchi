@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0218 | [PPT shape edit runs](0218-ppt-shape-coalescing.md) | Direct text/geometry runs share native primary edits; 1,594 existing facade tests/doctests plus nine coalescer tests, harness checks, lint/docs pass; twenty named paired routes pass exact checks; 1k overhead 2.0–2.3%, 10k growth 122–124× leaves native linear scaling and full goal open |
 | 0217 | [Unified PPT slide structure](0217-ppt-slide-structure.md) | Native-backed remove/move/swap with history and capability dispatch; 1,585 existing facade tests/doctests plus nine structural tests pass; 18 paired local cases below 10% median overhead; insertion, shape CRUD, coalescing and full goal remain open |
 | 0216 | [Unified PPT setters](0216-ppt-unified-set.md) | Native text/anchor and existing visibility-record writes; path/query, edit/batch/history and immutable publication; 1,585 facade tests/doctests pass; paired write overhead 6.4–39.2% (budget gap); structural CRUD, nested writes, batch coalescing and full goal remain open |
 | 0215 | [Unified PPT navigation and views](0215-ppt-unified-read.md) | Native-backed get/find/query/views, typed anchor conversion, shared static shapes, source fences and capability golden; native/facade suites and lint/docs pass; native read scaling, unified PPT mutation and full goal remain open |
