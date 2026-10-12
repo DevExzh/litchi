@@ -17,7 +17,9 @@ use litchi_ops::{
     open_bytes_with, props,
 };
 
-const INPUT: &[u8] = br#"{\rtf1\ansi\deff0{\fonttbl{\f0\fnil Arial;}}\b First\b0 plain\par\qc Second\par\sb120\keep\i Third\i0 tail\par Fourth}"#;
+const RICH_INPUT: &[u8] = br#"{\rtf1\ansi\deff0{\fonttbl{\f0\fnil Arial;}}\b First\b0 plain\par\qc Second\par\sb120\keep\i Third\i0 tail\par Fourth}"#;
+
+const INPUT: &[u8] = br"{\rtf1\ansi Firstplain\par Second\par Thirdtail\par Fourth}";
 
 fn eager(bytes: &[u8]) -> File {
     open_bytes_with(
@@ -82,58 +84,40 @@ fn batch_set(
 }
 
 #[test]
-fn ordered_direct_paragraph_sets_preserve_family_publications_for_both_owners() {
+fn ordered_direct_paragraph_text_sets_share_one_publication_for_both_owners() {
     let bytes = INPUT;
     each_owner(bytes, |source| {
         let before = source.to_bytes().expect("source bytes");
         let oracle = source
-            .set("/body/p[1]", props! {"align" => "right"})
+            .set("/body/p[1]", props! {"text" => "First changed"})
             .expect("paragraph one")
             .set("/body/p[2]", props! {"text" => "Second changed"})
             .expect("paragraph two")
-            .set(
-                "/body/p[3]",
-                props! {"spaceBefore" => "6pt", "keepNext" => true},
-            )
+            .set("/body/p[3]", props! {"text" => "Third changed"})
             .expect("paragraph three")
-            .set(
-                "/body/p[4]",
-                props! {"text" => "Fourth changed", "align" => "center"},
-            )
+            .set("/body/p[4]", props! {"text" => "Fourth changed"})
             .expect("paragraph four");
 
         let commit = source
             .edit(|edit| {
-                edit.set("/body/p[1]", props! {"align" => "right"})?;
+                edit.set("/body/p[1]", props! {"text" => "First changed"})?;
                 edit.set("/body/p[2]", props! {"text" => "Second changed"})?;
-                edit.set(
-                    "/body/p[3]",
-                    props! {"spaceBefore" => "6pt", "keepNext" => true},
-                )?;
-                edit.set(
-                    "/body/p[4]",
-                    props! {"text" => "Fourth changed", "align" => "center"},
-                )
+                edit.set("/body/p[3]", props! {"text" => "Third changed"})?;
+                edit.set("/body/p[4]", props! {"text" => "Fourth changed"})
             })
             .expect("ordered paragraph edit");
 
         assert!(commit.diagnostics.changed());
         assert_eq!(commit.diagnostics.operations(), 4);
-        // Native paragraph text and layout edits are incompatible even when
-        // their paragraph targets are distinct.  The ordered input therefore
-        // publishes the compatible align/text run, the layout run, and the
-        // final text+align run separately.
-        assert_eq!(commit.diagnostics.commits(), 3);
+        assert_eq!(commit.diagnostics.commits(), 1);
         assert_eq!(
             commit.file.to_bytes().expect("coalesced bytes"),
             oracle.to_bytes().unwrap()
         );
-        assert_eq!(property(&commit.file, "/body/p[1]", "align"), "right");
+        assert_eq!(text(&commit.file, "/body/p[1]"), "First changed");
         assert_eq!(text(&commit.file, "/body/p[2]"), "Second changed");
-        assert_eq!(property(&commit.file, "/body/p[3]", "spaceBefore"), "6pt");
-        assert_eq!(property(&commit.file, "/body/p[3]", "keepNext"), "true");
+        assert_eq!(text(&commit.file, "/body/p[3]"), "Third changed");
         assert_eq!(text(&commit.file, "/body/p[4]"), "Fourth changed");
-        assert_eq!(property(&commit.file, "/body/p[4]", "align"), "center");
         assert_eq!(source.to_bytes().expect("source remains immutable"), before);
         assert_eq!(
             commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
@@ -153,8 +137,55 @@ fn ordered_direct_paragraph_sets_preserve_family_publications_for_both_owners() 
 }
 
 #[test]
-fn ordered_direct_run_text_and_format_sets_share_one_publication() {
+fn ordered_direct_paragraph_format_sets_share_one_publication() {
     each_owner(INPUT, |source| {
+        let before = source.to_bytes().unwrap();
+        let oracle = source
+            .set("/body/p[1]", props! {"align" => "right"})
+            .unwrap()
+            .set("/body/p[2]", props! {"spaceBefore" => "6pt"})
+            .unwrap()
+            .set("/body/p[3]", props! {"keepNext" => true})
+            .unwrap()
+            .set("/body/p[4]", props! {"align" => "center"})
+            .unwrap();
+        let commit = source
+            .edit(|edit| {
+                edit.set("/body/p[1]", props! {"align" => "right"})?;
+                edit.set("/body/p[2]", props! {"spaceBefore" => "6pt"})?;
+                edit.set("/body/p[3]", props! {"keepNext" => true})?;
+                edit.set("/body/p[4]", props! {"align" => "center"})
+            })
+            .expect("ordered paragraph formatting edit");
+        assert_eq!(commit.diagnostics.operations(), 4);
+        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+        assert_eq!(property(&commit.file, "/body/p[1]", "align"), "right");
+        assert_eq!(property(&commit.file, "/body/p[2]", "spaceBefore"), "6pt");
+        assert_eq!(property(&commit.file, "/body/p[3]", "keepNext"), "true");
+        assert_eq!(property(&commit.file, "/body/p[4]", "align"), "center");
+        assert_eq!(source.to_bytes().unwrap(), before);
+    });
+}
+
+#[test]
+fn paragraph_format_then_text_preserves_native_failure_boundary() {
+    let source = eager(INPUT);
+    let before = source.to_bytes().unwrap();
+    let error = source
+        .edit(|edit| {
+            edit.set("/body/p[1]", props! {"align" => "right"})?;
+            edit.set("/body/p[2]", props! {"text" => "text after format"})
+        })
+        .expect_err("native paragraph format/text closure");
+    assert_eq!(error.item(), Some(1));
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    assert_eq!(source.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn ordered_direct_run_text_and_format_sets_share_one_publication() {
+    each_owner(RICH_INPUT, |source| {
         let before = source.to_bytes().expect("source bytes");
         let oracle = source
             .set(
@@ -233,14 +264,14 @@ fn repeated_and_descending_direct_targets_close_runs_and_keep_sequential_results
         let repeated = source
             .edit(|edit| {
                 edit.set("/body/p[1]", props! {"text" => "first staged"})?;
-                edit.set("/body/p[1]", props! {"align" => "right"})?;
+                edit.set("/body/p[1]", props! {"text" => "first final"})?;
                 edit.set("/body/p[2]", props! {"text" => "second staged"})
             })
             .expect("repeated paragraph target");
         let repeated_oracle = source
             .set("/body/p[1]", props! {"text" => "first staged"})
             .unwrap()
-            .set("/body/p[1]", props! {"align" => "right"})
+            .set("/body/p[1]", props! {"text" => "first final"})
             .unwrap()
             .set("/body/p[2]", props! {"text" => "second staged"})
             .unwrap();
@@ -250,19 +281,19 @@ fn repeated_and_descending_direct_targets_close_runs_and_keep_sequential_results
             repeated.file.to_bytes().unwrap(),
             repeated_oracle.to_bytes().unwrap()
         );
-        assert_eq!(property(&repeated.file, "/body/p[1]", "align"), "right");
+        assert_eq!(text(&repeated.file, "/body/p[1]"), "first final");
 
         let descending = source
             .edit(|edit| {
-                edit.set("/body/p[3]", props! {"align" => "right"})?;
-                edit.set("/body/p[1]", props! {"align" => "center"})?;
+                edit.set("/body/p[3]", props! {"text" => "third staged"})?;
+                edit.set("/body/p[1]", props! {"text" => "first descending"})?;
                 edit.set("/body/p[2]", props! {"text" => "middle staged"})
             })
             .expect("descending paragraph targets");
         let descending_oracle = source
-            .set("/body/p[3]", props! {"align" => "right"})
+            .set("/body/p[3]", props! {"text" => "third staged"})
             .unwrap()
-            .set("/body/p[1]", props! {"align" => "center"})
+            .set("/body/p[1]", props! {"text" => "first descending"})
             .unwrap()
             .set("/body/p[2]", props! {"text" => "middle staged"})
             .unwrap();
@@ -272,9 +303,9 @@ fn repeated_and_descending_direct_targets_close_runs_and_keep_sequential_results
             descending.file.to_bytes().unwrap(),
             descending_oracle.to_bytes().unwrap()
         );
-        assert_eq!(property(&descending.file, "/body/p[1]", "align"), "center");
+        assert_eq!(text(&descending.file, "/body/p[1]"), "first descending");
         assert_eq!(text(&descending.file, "/body/p[2]"), "middle staged");
-        assert_eq!(property(&descending.file, "/body/p[3]", "align"), "right");
+        assert_eq!(text(&descending.file, "/body/p[3]"), "third staged");
     });
 }
 
@@ -310,31 +341,27 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
 
     let read = source
         .edit(|edit| {
-            edit.set("/body/p[1]", props! {"align" => "right"})?;
+            edit.set("/body/p[1]", props! {"text" => "before-read"})?;
             assert_eq!(
                 edit.get("/body/p[1]")?.view().text()?.as_deref(),
-                Some("Firstplain")
+                Some("before-read")
             );
-            edit.set("/body/p[2]", props! {"align" => "center"})
+            edit.set("/body/p[2]", props! {"text" => "after-read"})
         })
         .expect("read barrier");
     assert_eq!(read.diagnostics.commits(), 2);
-    assert_eq!(property(&read.file, "/body/p[2]", "align"), "center");
+    assert_eq!(text(&read.file, "/body/p[2]"), "after-read");
 
     let query_result = source
         .edit(|edit| {
-            edit.set("/body/p[1]", props! {"align" => "right"})?;
-            edit.set(query("p[align=left]"), props! {"align" => "center"})?;
-            edit.set("/body/p[2]", props! {"text" => "after query"})
+            edit.set("/body/p[1]", props! {"text" => "before"})?;
+            edit.set(query("p[text=before]"), props! {"text" => "query"})?;
+            edit.set("/body/p[2]", props! {"text" => "after"})
         })
         .expect("query barrier");
     assert_eq!(query_result.diagnostics.commits(), 3);
-    assert_eq!(property(&query_result.file, "/body/p[1]", "align"), "right");
-    assert_eq!(
-        property(&query_result.file, "/body/p[3]", "align"),
-        "center"
-    );
-    assert_eq!(text(&query_result.file, "/body/p[2]"), "after query");
+    assert_eq!(text(&query_result.file, "/body/p[1]"), "query");
+    assert_eq!(text(&query_result.file, "/body/p[2]"), "after");
 
     let raw = litchi_ops::path::raw::path("/body/p[2]").expect("raw RTF path");
     let raw_result = source
@@ -349,7 +376,7 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
 
     let structural = source
         .edit(|edit| {
-            edit.set("/body/p[1]", props! {"align" => "right"})?;
+            edit.set("/body/p[1]", props! {"text" => "before-remove"})?;
             edit.remove("/body/p[4]")?;
             edit.set("/body/p[2]", props! {"text" => "after remove"})
         })
@@ -360,7 +387,7 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
 
     let moved = source
         .edit(|edit| {
-            edit.set("/body/p[1]", props! {"align" => "right"})?;
+            edit.set("/body/p[1]", props! {"text" => "before-move"})?;
             edit.move_to("/body/p[4]", Placement::Start)?;
             edit.set("/body/p[2]", props! {"text" => "after move"})
         })
@@ -373,9 +400,9 @@ fn reads_queries_raw_paths_and_structural_commands_close_direct_runs() {
 fn atomic_batch_coalesces_ordered_sets_while_best_effort_keeps_item_boundaries() {
     let commands = || {
         [
-            batch_set("/body/p[1]", Props::new().with("align", "right")),
+            batch_set("/body/p[1]", Props::new().with("text", "first batch")),
             batch_set("/body/p[2]", Props::new().with("text", "second batch")),
-            batch_set("/body/p[3]", Props::new().with("spaceAfter", "3pt")),
+            batch_set("/body/p[3]", Props::new().with("text", "third batch")),
         ]
     };
     each_owner(INPUT, |source| {
@@ -389,8 +416,9 @@ fn atomic_batch_coalesces_ordered_sets_while_best_effort_keeps_item_boundaries()
         }));
         assert_eq!(atomic.diagnostics.operations(), 3);
         assert_eq!(atomic.diagnostics.commits(), 1);
-        assert_eq!(property(&atomic.file, "/body/p[1]", "align"), "right");
+        assert_eq!(text(&atomic.file, "/body/p[1]"), "first batch");
         assert_eq!(text(&atomic.file, "/body/p[2]"), "second batch");
+        assert_eq!(text(&atomic.file, "/body/p[3]"), "third batch");
         assert_eq!(source.to_bytes().unwrap(), before);
 
         let best = source
@@ -399,8 +427,9 @@ fn atomic_batch_coalesces_ordered_sets_while_best_effort_keeps_item_boundaries()
         assert_eq!(best.results.len(), 3);
         assert_eq!(best.diagnostics.operations(), 3);
         assert_eq!(best.diagnostics.commits(), 3);
-        assert_eq!(property(&best.file, "/body/p[1]", "align"), "right");
+        assert_eq!(text(&best.file, "/body/p[1]"), "first batch");
         assert_eq!(text(&best.file, "/body/p[2]"), "second batch");
+        assert_eq!(text(&best.file, "/body/p[3]"), "third batch");
         assert_eq!(source.to_bytes().unwrap(), before);
     });
 }
@@ -456,7 +485,7 @@ fn atomic_and_best_effort_batches_preserve_failure_indices_and_rollback() {
         .batch(commands(), BatchMode::Atomic)
         .expect_err("atomic invalid item");
     assert_eq!(error.item(), Some(1));
-    assert_eq!(error.code(), Code::UnsupportedProperty);
+    assert_eq!(error.code(), Code::UnsupportedCapability);
     assert_eq!(source.to_bytes().unwrap(), before);
 
     let commit = source
@@ -470,7 +499,7 @@ fn atomic_and_best_effort_batches_preserve_failure_indices_and_rollback() {
     assert!(matches!(
         &commit.results[1],
         litchi_ops::ItemResult::Failed(error)
-            if error.item() == Some(1) && error.code() == Code::UnsupportedProperty
+            if error.item() == Some(1) && error.code() == Code::UnsupportedCapability
     ));
     assert!(matches!(
         &commit.results[2],
@@ -487,10 +516,10 @@ fn pending_native_failure_precedes_a_later_invalid_property() {
     let source = eager(INPUT);
     let before = source.to_bytes().unwrap();
     let result = source.edit(|edit| {
-        // Paragraph replacement cannot contain a line break.  The direct
-        // planner admits this item and the native batch reports it when the
-        // pending run is flushed for the following command.
-        edit.set("/body/p[1]", props! {"text" => "first\nsecond"})?;
+        // Run replacement cannot contain a line break.  The direct planner
+        // admits this item and the native batch reports it when the pending
+        // run is flushed for the following command.
+        edit.set("/body/p[1]/r[1]", props! {"text" => "first\nsecond"})?;
         edit.set("/body/p[2]", props! {"unknown-property" => true})
     });
     let error = result.expect_err("pending native failure");
@@ -513,8 +542,8 @@ fn pending_native_failure_precedes_operation_limit_excess_in_edit_and_batch() {
         .edit_with_limits(&limits, |edit| {
             // The first item is retained by the direct planner until the
             // second item forces the pending native run to publish.
-            edit.set("/body/p[1]", props! {"text" => "first\nsecond"})?;
-            edit.set("/body/p[2]", props! {"text" => "limit item"})
+            edit.set("/body/p[1]/r[1]", props! {"text" => "first\nsecond"})?;
+            edit.set("/body/p[2]/r[1]", props! {"text" => "limit item"})
         })
         .expect_err("native failure must precede operation limit");
     assert_eq!(error.item(), Some(0));
@@ -524,8 +553,11 @@ fn pending_native_failure_precedes_operation_limit_excess_in_edit_and_batch() {
     let error = source
         .batch_with_limits(
             [
-                batch_set("/body/p[1]", Props::new().with("text", "first\nsecond")),
-                batch_set("/body/p[2]", Props::new().with("text", "limit item")),
+                batch_set(
+                    "/body/p[1]/r[1]",
+                    Props::new().with("text", "first\nsecond"),
+                ),
+                batch_set("/body/p[2]/r[1]", Props::new().with("text", "limit item")),
             ],
             BatchMode::Atomic,
             &limits,
@@ -626,26 +658,47 @@ fn variable_unicode_run_replacements_preserve_ordered_boundaries() {
 }
 
 #[test]
-fn aggregate_direct_set_limits_are_checked_before_publication() {
+fn direct_set_limits_roll_over_or_refuse_without_partial_publication() {
     let source = eager(INPUT);
     let before = source.to_bytes().unwrap();
+    let operation_limits = SemanticLimits::builder()
+        .max_operations(1)
+        .expect("operation limit")
+        .build()
+        .expect("limits");
+    let error = source
+        .edit_with_limits(&operation_limits, |edit| {
+            edit.set("/body/p[1]", props! {"text" => "bounded one"})?;
+            edit.set("/body/p[2]", props! {"text" => "bounded two"})
+        })
+        .expect_err("aggregate operation limit");
+    assert!(matches!(
+        error.leaf(),
+        Source::Transaction(TransactionError::Limit {
+            kind: LimitKind::Operations,
+            ..
+        })
+    ));
+    assert_eq!(source.to_bytes().unwrap(), before);
+
+    let expanded_limits = SemanticLimits::builder()
+        .max_expanded_targets(1)
+        .expect("target limit")
+        .build()
+        .expect("limits");
+    let rolled = source
+        .edit_with_limits(&expanded_limits, |edit| {
+            edit.set("/body/p[1]", props! {"text" => "expanded one"})?;
+            edit.set("/body/p[2]", props! {"text" => "expanded two"})
+        })
+        .expect("expanded target rollover");
+    assert_eq!(rolled.diagnostics.operations(), 2);
+    assert_eq!(rolled.diagnostics.commits(), 2);
+    assert_eq!(text(&rolled.file, "/body/p[1]"), "expanded one");
+    assert_eq!(text(&rolled.file, "/body/p[2]"), "expanded two");
+    assert_eq!(source.to_bytes().unwrap(), before);
+
     for (limits, kind) in [
-        (
-            SemanticLimits::builder()
-                .max_operations(1)
-                .expect("operation limit")
-                .build()
-                .expect("limits"),
-            LimitKind::Operations,
-        ),
-        (
-            SemanticLimits::builder()
-                .max_expanded_targets(1)
-                .expect("target limit")
-                .build()
-                .expect("limits"),
-            LimitKind::ExpandedTargets,
-        ),
         (
             SemanticLimits::builder()
                 .max_staged_bytes(1)
@@ -665,10 +718,9 @@ fn aggregate_direct_set_limits_are_checked_before_publication() {
     ] {
         let error = source
             .edit_with_limits(&limits, |edit| {
-                edit.set("/body/p[1]", props! {"text" => "bounded one"})?;
-                edit.set("/body/p[2]", props! {"text" => "bounded two"})
+                edit.set("/body/p[1]", props! {"text" => "bounded"})
             })
-            .expect_err("aggregate RTF limit");
+            .expect_err("individual RTF limit");
         assert!(
             matches!(
                 error.leaf(),
@@ -679,4 +731,29 @@ fn aggregate_direct_set_limits_are_checked_before_publication() {
         );
         assert_eq!(source.to_bytes().unwrap(), before);
     }
+}
+
+#[test]
+fn filtered_paths_keep_ordinary_resolution_semantics() {
+    let source = eager(INPUT);
+    for path in [
+        "/body/p[1][text=missing]",
+        "/body[1][text=missing]/p[1]",
+        "/body/p[1]/r[1][text=missing]",
+    ] {
+        let ordinary = source.set(path, props! {"text" => "unexpected"});
+        let transaction = source.edit(|edit| edit.set(path, props! {"text" => "unexpected"}));
+        match (ordinary, transaction) {
+            (Err(left), Err(right)) => assert_eq!(left.code(), right.code(), "{path}"),
+            (Ok(left), Ok(right)) => assert_eq!(
+                left.to_bytes().unwrap(),
+                right.file.to_bytes().unwrap(),
+                "{path}"
+            ),
+            (left, right) => {
+                panic!("different filtered-path admission for {path}: {left:?}, {right:?}")
+            },
+        }
+    }
+    assert_eq!(source.to_bytes().unwrap(), INPUT);
 }
