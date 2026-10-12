@@ -1080,23 +1080,39 @@ impl Edit {
             let mut planned = if let Some(run) = self.rtf.as_ref() {
                 run.plan(_target, _props)
             } else if crate::format::rtf::write::coalesce::direct_candidate(_target, _props)? {
-                let run = crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?;
+                let Some(run) =
+                    crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?
+                else {
+                    return Ok(None);
+                };
                 let plan = run.plan(_target, _props)?;
                 self.rtf = Some(run);
                 Ok(plan)
             } else {
                 Ok(None)
             };
-            if planned.is_err() {
+            if let Err(error) = &planned {
+                let error = error.clone();
                 // Resolve admission errors only after publishing an earlier
                 // deferred native failure, preserving wire attribution.
                 self.flush_pending()?;
+                // A structural edit can create a positional target. A full
+                // coalesced staging window can also admit the next mutation
+                // after publication; an individually oversized plan still
+                // fails when retried against the fresh window.
+                if !matches!(error.code(), Code::PathNotFound | Code::LimitExceeded) {
+                    return Err(error);
+                }
                 let File::Rtf(handle) = self.current.clone() else {
                     return Err(pending());
                 };
                 planned = if crate::format::rtf::write::coalesce::direct_candidate(_target, _props)?
                 {
-                    let run = crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?;
+                    let Some(run) =
+                        crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?
+                    else {
+                        return Ok(None);
+                    };
                     let plan = run.plan(_target, _props)?;
                     self.rtf = Some(run);
                     Ok(plan)
@@ -1127,27 +1143,41 @@ impl Edit {
                 if !crate::format::rtf::write::coalesce::direct_candidate(_target, _props)? {
                     return Ok(None);
                 }
-                let run = crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?;
-                plan = run
-                    .plan(_target, _props)?
-                    .ok_or_else(|| Error::new(Code::InternalError, "RTF set plan disappeared"))?;
+                let Some(run) =
+                    crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?
+                else {
+                    return Ok(None);
+                };
+                plan = run.plan(_target, _props)?.ok_or_else(|| {
+                    crate::Error::new(Code::InternalError, "RTF set plan disappeared")
+                })?;
                 self.rtf = Some(run);
             }
             if self.rtf.is_none() {
                 let File::Rtf(handle) = self.current.clone() else {
                     return Err(pending());
                 };
-                let run = crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?;
-                plan = run
-                    .plan(_target, _props)?
-                    .ok_or_else(|| Error::new(Code::InternalError, "RTF set plan disappeared"))?;
+                let Some(run) =
+                    crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?
+                else {
+                    return Ok(None);
+                };
+                plan = run.plan(_target, _props)?.ok_or_else(|| {
+                    crate::Error::new(Code::InternalError, "RTF set plan disappeared")
+                })?;
                 self.rtf = Some(run);
             }
             let run = self
                 .rtf
                 .as_mut()
-                .ok_or_else(|| Error::new(Code::InternalError, "RTF run missing"))?;
-            let changed = run.stage(plan, _index)?;
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "RTF run missing"))?;
+            let changed = match run.stage(plan, _index) {
+                Ok(changed) => changed,
+                Err(error) => {
+                    self.flush_pending()?;
+                    return Err(error);
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }

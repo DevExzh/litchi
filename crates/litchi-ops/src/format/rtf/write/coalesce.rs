@@ -136,7 +136,6 @@ struct RunMeta {
 struct SourceIndex {
     paragraphs: Box<[ParagraphMeta]>,
     runs: Box<[RunMeta]>,
-    charge: usize,
 }
 
 impl SourceIndex {
@@ -212,7 +211,6 @@ impl SourceIndex {
         Ok(Self {
             paragraphs: paragraphs.into_boxed_slice(),
             runs: runs.into_boxed_slice(),
-            charge: cache_charge,
         })
     }
 
@@ -282,9 +280,25 @@ pub(crate) fn direct_candidate(target: &TargetArg<'_>, props: &Props<'_>) -> Res
 }
 
 impl Run {
-    pub(crate) fn new(base: &Rtf, limits: &SemanticLimits) -> Result<Self> {
+    pub(crate) fn new(base: &Rtf, limits: &SemanticLimits) -> Result<Option<Self>> {
         base.admit_edit()?;
-        let source = SourceIndex::build(base, limits)?;
+        let source = match SourceIndex::build(base, limits) {
+            Ok(source) => source,
+            Err(error)
+                if matches!(
+                    error.leaf(),
+                    crate::error::Source::Transaction(TransactionError::Limit {
+                        kind: LimitKind::StagedBytes,
+                        ..
+                    })
+                ) =>
+            {
+                // The bounded optimization index must not narrow scalar
+                // mutation admission. The ordinary resolver walks the axis.
+                return Ok(None);
+            },
+            Err(error) => return Err(error),
+        };
         let native_limits = NativeLimits::builder()
             .max_operations(limits.max_operations())
             .map_err(Error::from)?
@@ -296,10 +310,12 @@ impl Run {
             .0
             .package
             .edit_with_options(EditOptions::new().semantic_limits(native_limits));
-        Ok(Self {
+        Ok(Some(Self {
             base: base.clone(),
             edit,
-            staged_bytes: source.charge,
+            // Index storage has its own check against the staging bound;
+            // it is not authored payload/action charge (nor a heap budget).
+            staged_bytes: 0,
             source,
             limits: *limits,
             items: Vec::new(),
@@ -311,7 +327,7 @@ impl Run {
             paragraph_alignment: false,
             paragraph_layout: false,
             native_operations: 0,
-        })
+        }))
     }
 
     pub(crate) fn plan(&self, target: &TargetArg<'_>, props: &Props<'_>) -> Result<Option<Plan>> {
@@ -368,9 +384,14 @@ impl Run {
             return true;
         }
         if matches!(plan.family, Family::Paragraph)
-            && ((self.paragraph_layout && plan.text.is_some())
-                || (self.paragraph_text && plan.layout.is_some())
-                || (plan.structural_text && (self.paragraph_alignment || self.paragraph_layout)))
+            && (((self.paragraph_layout || self.paragraph_alignment) && plan.text.is_some())
+                || (self.paragraph_text
+                    && (plan.layout.is_some() || (plan.alignment.is_some() && plan.changed)))
+                || (plan.structural_text
+                    && self
+                        .items
+                        .iter()
+                        .any(|item| item.plan.alignment.is_some() || item.plan.layout.is_some())))
         {
             return true;
         }
@@ -424,7 +445,7 @@ impl Run {
         }
         if matches!(plan.family, Family::Paragraph) {
             self.paragraph_text |= plan.text.is_some();
-            self.paragraph_alignment |= plan.alignment.is_some();
+            self.paragraph_alignment |= plan.alignment.is_some() && plan.changed;
             self.paragraph_layout |= plan.layout.is_some();
         }
         if matches!(plan.family, Family::RunText) && !plan.stable_run_text {
@@ -553,11 +574,21 @@ fn make_plan(
                 }
                 .into());
             }
-            let per_target = action_count
-                .checked_mul(size_of::<ParagraphTextReplacement>())
-                .and_then(|bytes| bytes.checked_add(current_text.len()))
-                .and_then(|bytes| bytes.checked_add(properties.text.map_or(0, str::len)))
-                .and_then(|bytes| bytes.checked_add(size_of::<ParagraphLayoutUpdate>()))
+            let per_target = properties
+                .text
+                .map_or(0, |text| {
+                    size_of::<ParagraphTextReplacement>().saturating_add(text.len())
+                })
+                .checked_add(
+                    usize::from(properties.alignment.is_some())
+                        * size_of::<ParagraphAlignmentUpdate>(),
+                )
+                .and_then(|bytes| {
+                    bytes.checked_add(
+                        usize::from(properties.layout.is_some())
+                            * size_of::<ParagraphLayoutUpdate>(),
+                    )
+                })
                 .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
             let family = Family::Paragraph;
             admit_staged(staged_base, per_target, limits)?;

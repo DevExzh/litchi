@@ -159,7 +159,48 @@ fn ordered_direct_paragraph_format_sets_share_one_publication() {
             .expect("ordered paragraph formatting edit");
         assert_eq!(commit.diagnostics.operations(), 4);
         assert_eq!(commit.diagnostics.commits(), 1);
-        assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+        // Sequential native formatting publication retains redundant control
+        // prefixes. Compare semantics with it and exact bytes with one native
+        // bulk transaction, which is the coalesced publication contract.
+        let native = litchi_rtf::Package::from_bytes(INPUT).unwrap();
+        let mut edit = native.edit();
+        edit.set_body_paragraph_alignments(&[
+            litchi_rtf::edit::ParagraphAlignmentUpdate::new(
+                litchi_core::Position::new(0),
+                litchi_rtf::Alignment::Right,
+            ),
+            litchi_rtf::edit::ParagraphAlignmentUpdate::new(
+                litchi_core::Position::new(3),
+                litchi_rtf::Alignment::Center,
+            ),
+        ])
+        .unwrap();
+        edit.patch_body_paragraph_layouts(&[
+            litchi_rtf::edit::ParagraphLayoutUpdate::new(
+                litchi_core::Position::new(1),
+                litchi_rtf::edit::ParagraphLayoutPatch::new().with_space_before(120),
+            ),
+            litchi_rtf::edit::ParagraphLayoutUpdate::new(
+                litchi_core::Position::new(2),
+                litchi_rtf::edit::ParagraphLayoutPatch::new().with_keep_with_next(true),
+            ),
+        ])
+        .unwrap();
+        assert_eq!(
+            commit.file.to_bytes().unwrap(),
+            edit.commit().unwrap().package().to_bytes().unwrap()
+        );
+        for (path, key) in [
+            ("/body/p[1]", "align"),
+            ("/body/p[2]", "spaceBefore"),
+            ("/body/p[3]", "keepNext"),
+            ("/body/p[4]", "align"),
+        ] {
+            assert_eq!(
+                property(&commit.file, path, key),
+                property(&oracle, path, key)
+            );
+        }
         assert_eq!(property(&commit.file, "/body/p[1]", "align"), "right");
         assert_eq!(property(&commit.file, "/body/p[2]", "spaceBefore"), "6pt");
         assert_eq!(property(&commit.file, "/body/p[3]", "keepNext"), "true");
@@ -756,4 +797,56 @@ fn filtered_paths_keep_ordinary_resolution_semantics() {
         }
     }
     assert_eq!(source.to_bytes().unwrap(), INPUT);
+}
+
+#[test]
+fn staging_windows_roll_over_and_small_limits_keep_scalar_noop_admission() {
+    let source = eager(INPUT);
+    let tiny = SemanticLimits::builder()
+        .max_staged_bytes(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let noop = source
+        .edit_with_limits(&tiny, |edit| edit.set("/body/p[1]/r[1]", Props::new()))
+        .unwrap();
+    assert!(!noop.diagnostics.changed());
+    assert_eq!(noop.file.to_bytes().unwrap(), INPUT);
+
+    let bounded = SemanticLimits::builder()
+        .max_staged_bytes(1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    let payload = "x".repeat(700);
+    let commit = source
+        .edit_with_limits(&bounded, |edit| {
+            edit.set("/body/p[1]", props! {"text" => payload.as_str()})?;
+            edit.set("/body/p[2]", props! {"text" => payload.as_str()})
+        })
+        .unwrap();
+    assert_eq!(commit.diagnostics.commits(), 2);
+    assert_eq!(text(&commit.file, "/body/p[1]"), payload);
+    assert_eq!(text(&commit.file, "/body/p[2]"), payload);
+    assert_eq!(source.to_bytes().unwrap(), INPUT);
+}
+
+#[test]
+fn noop_alignment_before_structural_text_is_a_native_boundary() {
+    let source = eager(INPUT);
+    let commit = source
+        .edit(|edit| {
+            edit.set("/body/p[1]", props! {"align" => "left"})?;
+            edit.set("/body/p[2]", props! {"text" => "x\ny"})
+        })
+        .unwrap();
+    let oracle = source
+        .set("/body/p[1]", props! {"align" => "left"})
+        .unwrap()
+        .set("/body/p[2]", props! {"text" => "x\ny"})
+        .unwrap();
+    assert_eq!(commit.diagnostics.commits(), 2);
+    assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+    assert_eq!(text(&commit.file, "/body/p[2]"), "x");
+    assert_eq!(text(&commit.file, "/body/p[3]"), "y");
 }

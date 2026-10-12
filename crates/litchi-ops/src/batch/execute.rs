@@ -154,6 +154,9 @@ impl File {
             let mut results = Vec::new();
             for (index, item) in items.into_iter().enumerate() {
                 if index >= limits.max_operations() {
+                    // Resolve an earlier deferred native failure before
+                    // attributing a later wire-item limit failure.
+                    edit.flush_pending()?;
                     return Err(Error::from(TransactionError::Limit {
                         kind: LimitKind::Operations,
                         observed: index.saturating_add(1),

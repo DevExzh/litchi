@@ -528,7 +528,7 @@ fn validate_output(case: &Prepared, output: &[u8]) -> Result<(), Box<dyn std::er
         },
         Family::ParagraphLayoutAlignment => {
             for paragraph in reopened.body().paragraphs() {
-                assert_eq!(paragraph.to_text().starts_with("paragraph"), true);
+                assert!(paragraph.to_text().starts_with("paragraph"));
                 assert_eq!(paragraph.format().alignment(), Alignment::Center);
                 let layout = paragraph.format().layout();
                 assert_eq!(layout.space_before(), 120);

@@ -86,7 +86,7 @@ impl std::error::Error for Error {
 /// Bounds on an explicit transaction: 10,000 mutation calls and 256 MiB of
 /// retained native snapshots by default. XLSX, XLSB, XLS, PPT, PPTX and RTF mutations additionally default
 /// to 65,536 expanded targets and a 16 MiB staged payload/action charge.
-/// Coalesced XLSX/XLSB cell and PPTX shape runs close before their summed charge
+/// Coalesced XLSX/XLSB cell, PPTX shape and RTF direct-set runs close before their summed charge
 /// exceeds the staged-byte bound; an individual oversized mutation is refused.
 ///
 /// Snapshot bytes are a conservative logical charge, counting shared data at
@@ -127,13 +127,13 @@ impl SemanticLimits {
     pub const fn max_operations(self) -> usize {
         self.operations
     }
-    /// Maximum distinct XLS/XLSX/XLSB grid or PPT/PPTX slide or shape targets expanded by one mutation.
+    /// Maximum distinct grid, slide, shape or RTF body targets expanded by one mutation.
     /// This adapter admission bound is independent of native transfer limits.
     #[must_use]
     pub const fn max_expanded_targets(self) -> usize {
         self.expanded_targets
     }
-    /// Maximum authored payload/action charge staged by one XLS/XLSX/XLSB or PPT/PPTX mutation.
+    /// Maximum authored payload/action charge staged by one mutation.
     /// Counts repeated scalar payloads before native staging. Coalesced cell
     /// runs also close at this bound. This is separate from retained snapshots
     /// and does not measure total allocator use.
