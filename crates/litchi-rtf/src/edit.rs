@@ -4229,6 +4229,16 @@ impl Edit {
                 "candidate body text did not survive RTF validation",
             ));
         }
+        if self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::MoveParagraph { .. }))
+            && snapshot.paragraph_count() != self.source.paragraph_count()
+        {
+            return Err(Error::UnsupportedSource(
+                "candidate paragraph move did not preserve body paragraph boundaries",
+            ));
+        }
         if property_operation && source_alignments(&snapshot) != alignments {
             return Err(Error::UnsupportedSource(
                 "candidate paragraph alignment did not survive RTF validation",
@@ -5798,7 +5808,18 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
     ) {
         return Ok(source.text().to_string());
     }
-    let mut paragraphs = plain_lifecycle_paragraphs(source)?;
+    let is_move = matches!(operation, Operation::MoveParagraph { .. });
+    let mut paragraphs = plain_lifecycle_paragraphs(source, is_move)?;
+    // A terminal `\par` is retained in the story text as one final newline,
+    // while the paragraph iterator treats that break as the terminator of the
+    // preceding paragraph.  Keep the same boundary on a reordered candidate;
+    // an empty final paragraph also needs one terminal break to remain
+    // addressable after a move.
+    let preserve_terminal_break = is_move
+        && source.text().ends_with('\n')
+        && paragraphs
+            .last()
+            .is_some_and(|paragraph| !paragraph.is_empty());
     match operation {
         Operation::RemoveParagraph { position, text } => {
             let actual = paragraphs
@@ -5884,10 +5905,17 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
             ));
         },
     }
-    Ok(paragraphs.join("\n"))
+    let mut projected = paragraphs.join("\n");
+    if preserve_terminal_break || (is_move && paragraphs.last().is_some_and(String::is_empty)) {
+        projected.push('\n');
+    }
+    Ok(projected)
 }
 
-fn plain_lifecycle_paragraphs(source: &Package) -> Result<Vec<String>, Error> {
+fn plain_lifecycle_paragraphs(
+    source: &Package,
+    allow_terminal_break: bool,
+) -> Result<Vec<String>, Error> {
     let source_bytes = source
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
@@ -5916,9 +5944,19 @@ fn plain_lifecycle_paragraphs(source: &Package) -> Result<Vec<String>, Error> {
         .paragraphs()
         .map(|paragraph| paragraph.to_text())
         .collect::<Vec<_>>();
-    if paragraphs.iter().any(|paragraph| paragraph.contains('\n'))
-        || paragraphs.join("\n") != source.text()
-    {
+    if paragraphs.iter().any(|paragraph| paragraph.contains('\n')) {
+        return Err(Error::UnsupportedSource(
+            "paragraph lifecycle editing requires an unambiguous ordinary body story",
+        ));
+    }
+    let joined = paragraphs.join("\n");
+    let text = source.text();
+    let matches_joined = text == joined
+        || (allow_terminal_break
+            && text.ends_with('\n')
+            && text.len() == joined.len().saturating_add(1)
+            && text.strip_suffix('\n') == Some(joined.as_str()));
+    if !matches_joined {
         return Err(Error::UnsupportedSource(
             "paragraph lifecycle editing requires an unambiguous ordinary body story",
         ));

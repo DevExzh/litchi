@@ -179,6 +179,36 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
 }
 
 #[test]
+fn moving_empty_paragraphs_preserves_tail_and_terminal_boundaries() {
+    for (input, check_durable_inverse) in [
+        (br"{\rtf1\ansi First\par\par Third}".as_slice(), true),
+        (br"{\rtf1\ansi First\par\par Third\par}".as_slice(), false),
+    ] {
+        let source = Package::from_bytes(input).unwrap();
+        assert_eq!(paragraph_texts(&source), ["First", "", "Third"]);
+        for (position, final_position, expected) in [
+            (1, 0, ["", "First", "Third"]),
+            (1, 2, ["First", "Third", ""]),
+            (2, 0, ["Third", "First", ""]),
+        ] {
+            let mut edit = source.edit();
+            edit.move_paragraph(position, final_position).unwrap();
+            let commit = edit.commit().unwrap();
+            assert_eq!(commit.package().paragraph_count(), expected.len());
+            assert_eq!(paragraph_texts(commit.package()), expected);
+            assert_complete_reopen(commit.package(), &expected);
+            if check_durable_inverse {
+                let durable = commit.patch().to_durable(durable_limits()).unwrap();
+                let moved = source.apply_durable(&durable).unwrap();
+                assert_eq!(paragraph_texts(&moved), expected);
+                let restored = moved.apply_durable(&durable.inverse()).unwrap();
+                assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+            }
+        }
+    }
+}
+
+#[test]
 fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication() {
     let source = source();
     let mut invalid = source.edit();
