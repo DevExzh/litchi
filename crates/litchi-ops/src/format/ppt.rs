@@ -252,6 +252,37 @@ impl Ppt {
         result
     }
 
+    /// Admit one direct shape path for a transaction coalescer.
+    ///
+    /// The coalescer deliberately accepts only an absolute ordinal path to a
+    /// top-level shape or placeholder. Queries, slide targets, raw paths and
+    /// every structural or content selector remain on the ordinary writer so
+    /// their resolution and diagnostics retain the one-shot contract.
+    pub(crate) fn shape_plan(
+        &self,
+        target: &crate::target::TargetArg<'_>,
+        props: &crate::Props<'_>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<Option<write::coalesce::Plan>> {
+        let mut scene = None;
+        self.shape_plan_cached(target, props, limits, &mut scene)
+    }
+
+    /// Resolve one direct shape path using a caller-owned slide scene cache.
+    /// A transaction run uses this form to avoid reparsing one slide for each
+    /// ordinal shape in a homogeneous batch.
+    pub(crate) fn shape_plan_cached(
+        &self,
+        target: &crate::target::TargetArg<'_>,
+        props: &crate::Props<'_>,
+        limits: &crate::transaction::SemanticLimits,
+        scene: &mut Option<write::coalesce::SceneCache>,
+    ) -> Result<Option<write::coalesce::Plan>> {
+        self.check_source()?;
+        let result = write::coalesce::shape_plan(self, target, props, limits, scene);
+        self.check_source().and(result)
+    }
+
     /// Remove slides selected by a path or a scoped query through the native
     /// primary PPT transaction.
     pub(crate) fn remove<'p>(&self, target: crate::target::TargetArg<'p>) -> Result<WriteCommit> {

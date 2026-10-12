@@ -7,6 +7,8 @@
 //! this module does not maintain a second presentation model or rewrite raw
 //! streams itself.
 
+pub(crate) mod coalesce;
+
 use std::collections::HashSet;
 
 use litchi_core::{FileFormat, Position};
