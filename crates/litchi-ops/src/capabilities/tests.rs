@@ -139,6 +139,9 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
+            let ppt_edit = format == FileFormat::Ppt
+                && cfg!(feature = "ppt")
+                && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
             let pptx_edit = format == FileFormat::Pptx
                 && cfg!(feature = "pptx")
                 && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
@@ -151,6 +154,7 @@ fn every_format_has_one_answer_for_its_reads() {
                     || docx_edit
                     || xlsx_edit
                     || pptx_edit
+                    || ppt_edit
                     || xls_edit
                     || (format == FileFormat::Xlsb
                         && cfg!(feature = "xlsb")

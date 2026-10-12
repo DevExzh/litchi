@@ -22,6 +22,9 @@ fn fixture() -> Vec<u8> {
     let mut builder = Builder::new();
     let first = builder.add_slide().expect("first slide");
     builder
+        .set_slide_timing(first, litchi_ppt::writer::SlideTiming::default())
+        .expect("editable timing record");
+    builder
         .add_textbox(first, 10, 10, 240, 40, "first")
         .expect("first textbox");
     builder
@@ -29,6 +32,9 @@ fn fixture() -> Vec<u8> {
         .expect("second textbox");
 
     let second = builder.add_slide().expect("second slide");
+    builder
+        .set_slide_timing(second, litchi_ppt::writer::SlideTiming::default())
+        .expect("editable timing record");
     builder
         .add_textbox(second, 10, 10, 240, 40, "second")
         .expect("third textbox");
@@ -101,9 +107,10 @@ fn text(file: &File, path: &str) -> String {
 }
 
 fn length(file: &File, path: &str, key: &str) -> i64 {
-    let property = file
+    let node = file
         .get(path)
-        .unwrap_or_else(|error| panic!("resolve {path}: {error}"))
+        .unwrap_or_else(|error| panic!("resolve {path}: {error}"));
+    let property = node
         .view()
         .format()
         .unwrap_or_else(|error| panic!("read {path} properties: {error}"))
@@ -206,6 +213,12 @@ fn scoped_queries_and_slide_visibility_write_only_selected_nodes() {
             .set("/slide[1]", props! { "hidden" => true })
             .expect("hide slide");
         assert!(hidden(&hidden_slide, "/slide[1]"));
+        let released = litchi_ops::open_bytes_with(
+            hidden_slide.to_bytes().expect("hidden bytes"),
+            &OpenOptions::new().retain_source(false),
+        )
+        .expect("released projection");
+        assert!(hidden(&released, "/slide[1]"));
         assert!(!hidden(&hidden_slide, "/slide[2]"));
         let visible_slide = hidden_slide
             .set("/slide[1]", props! { "hidden" => false })
@@ -226,6 +239,11 @@ fn edit_history_batch_modes_and_rollback_are_atomic() {
             })
             .expect("transaction");
         assert!(commit.diagnostics.changed());
+        let reopened = eager(&before);
+        assert!(
+            commit.patch.apply(&reopened).is_err(),
+            "history belongs to the exact immutable handle, not equal bytes"
+        );
         assert_eq!(text(&commit.file, FIRST), "staged");
         assert_eq!(
             commit
@@ -301,8 +319,8 @@ fn unsupported_properties_invalid_values_and_limits_leave_input_unchanged() {
         );
         assert_eq!(
             source
-                .set(FIRST, props! { "width" => 0 })
-                .expect_err("zero width")
+                .set(FIRST, props! { "width" => "-1pt" })
+                .expect_err("negative width")
                 .code(),
             Code::InvalidValue
         );
@@ -397,4 +415,192 @@ fn positional_save_reopens_the_native_revision_and_preserves_the_old_handle() {
     assert_eq!(text(&reopened, FIRST), "saved revision");
     assert_eq!(text(&source, FIRST), "first");
     assert_eq!(source.to_bytes().expect("old source bytes"), bytes);
+}
+
+#[test]
+fn physical_shape_ordinal_maps_to_native_source_order_after_a_picture() {
+    let mut builder = Builder::new();
+    let slide = builder.add_slide().expect("slide");
+    let image = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/images/png/lena.png"),
+    )
+    .expect("PNG fixture");
+    builder
+        .add_picture(slide, 1, 1, 20, 20, image)
+        .expect("picture");
+    builder
+        .add_textbox(slide, 10, 10, 100, 40, "selected")
+        .expect("text");
+    let bytes = builder.build().expect("package").to_bytes().expect("bytes");
+    each_owner(&bytes, |source| {
+        assert!(source.get("/slide[1]/picture[1]").is_ok());
+        assert_eq!(text(&source, FIRST), "selected");
+        let edited = source
+            .set(FIRST, props! { "text" => "correct target" })
+            .expect("set text after picture");
+        assert_eq!(text(&edited, FIRST), "correct target");
+        assert!(edited.get("/slide[1]/picture[1]").is_ok());
+        assert_eq!(text(&source, FIRST), "selected");
+    });
+}
+
+#[test]
+fn absent_visibility_record_is_an_explicit_native_gap() {
+    let mut builder = Builder::new();
+    builder.add_slide().expect("slide without timing");
+    let bytes = builder.build().expect("package").to_bytes().expect("bytes");
+    each_owner(&bytes, |file| {
+        assert!(property(&file, "/slide[1]", "hidden").is_none());
+        let error = file
+            .set("/slide[1]", props! { "hidden" => true })
+            .expect_err("native timing insertion is not implemented");
+        assert_eq!(error.code(), Code::UnsupportedCapability);
+        assert_eq!(file.to_bytes().expect("unchanged"), bytes);
+    });
+}
+
+#[test]
+fn binary_ppt_soft_line_breaks_are_not_subject_to_xml_character_rules() {
+    let bytes = fixture();
+    let file = eager(&bytes);
+    let value = "first\u{b}second";
+    let edited = file
+        .set(FIRST, props! { "text" => value })
+        .expect("native soft break");
+    let package = litchi_ppt::Package::from_bytes(&bytes).expect("native");
+    let mut native = package.edit().expect("edit");
+    native
+        .set_shape_text(
+            litchi_ppt::text_edit::Target::new(
+                litchi_core::Position::new(0),
+                litchi_core::Position::new(0),
+            ),
+            value,
+        )
+        .expect("native set");
+    assert_eq!(
+        edited.to_bytes().expect("facade bytes"),
+        native
+            .commit()
+            .expect("commit")
+            .into_package()
+            .to_bytes()
+            .expect("native bytes")
+    );
+    assert_eq!(text(&edited, FIRST), value);
+}
+
+#[test]
+fn expansion_staging_and_snapshot_limits_refuse_without_publication() {
+    let source = eager(&fixture());
+    let before = source.to_bytes().expect("source");
+    for limits in [
+        SemanticLimits::builder()
+            .max_expanded_targets(1)
+            .expect("target limit")
+            .build()
+            .expect("limits"),
+        SemanticLimits::builder()
+            .max_staged_bytes(1)
+            .expect("staging limit")
+            .build()
+            .expect("limits"),
+        SemanticLimits::builder()
+            .max_snapshot_bytes(1)
+            .expect("snapshot limit")
+            .build()
+            .expect("limits"),
+    ] {
+        let error = source
+            .edit_with_limits(&limits, |edit| {
+                edit.set(scoped_shapes(), props! { "text" => "bounded" })
+            })
+            .expect_err("bounded fanout");
+        assert_eq!(error.code(), Code::LimitExceeded);
+        assert_eq!(source.to_bytes().expect("unchanged"), before);
+    }
+}
+
+#[test]
+fn geometry_quantization_and_full_anchor_noops_preserve_native_contract() {
+    let bytes = fixture();
+    let native = litchi_ppt::Package::from_bytes(&bytes).expect("native");
+    let mut edit = native.edit().expect("edit");
+    edit.set_shape_anchor(
+        litchi_ppt::text_edit::Target::new(
+            litchi_core::Position::new(0),
+            litchi_core::Position::new(0),
+        ),
+        litchi_ppt::Anchor::full(80, 80, 2000, 400).expect("full anchor"),
+    )
+    .expect("native full encoding");
+    let full = edit
+        .commit()
+        .expect("native commit")
+        .into_package()
+        .to_bytes()
+        .expect("bytes");
+    let file = eager(&full);
+    let noop = file
+        .set(FIRST, props! { "x" => "10pt", "width" => "240pt" })
+        .expect("same bounds");
+    assert_eq!(noop.to_bytes().expect("no-op bytes"), full);
+    let rounded = file
+        .set(FIRST, props! { "x" => "1600emu", "width" => "0emu" })
+        .expect("quantized geometry");
+    assert_eq!(length(&rounded, FIRST, "x"), 1587);
+    assert_eq!(length(&rounded, FIRST, "width"), 0);
+}
+
+#[test]
+fn empty_properties_preserve_bytes_and_history() {
+    each_owner(&fixture(), |source| {
+        let before = source.to_bytes().unwrap();
+        for path in [FIRST, "/slide[1]"] {
+            let commit = source.edit(|edit| edit.set(path, Props::new())).unwrap();
+            assert!(commit.patch.is_noop());
+            assert!(!commit.diagnostics.changed());
+            assert_eq!(commit.file.to_bytes().unwrap(), before);
+            assert_eq!(
+                commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+                before
+            );
+        }
+        assert_eq!(
+            source
+                .set(scoped_shapes(), Props::new())
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            before
+        );
+        assert!(source.set("/slide[99]", Props::new()).is_err());
+    });
+}
+
+#[test]
+fn text_fanout_crosses_native_batch_boundary() {
+    let mut builder = Builder::new();
+    let slide = builder.add_slide().unwrap();
+    let count = litchi_ppt::slide_order::MAX_SHAPE_TEXT_REPLACEMENTS + 1;
+    for _ in 0..count {
+        builder
+            .add_textbox(slide, 10, 10, 240, 40, "before")
+            .unwrap();
+    }
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    each_owner(&bytes, |source| {
+        let before = source.to_bytes().unwrap();
+        let changed = source
+            .set(scoped_shapes(), props! { "text" => "after" })
+            .unwrap();
+        for position in 1..=count {
+            assert_eq!(
+                text(&changed, &format!("/slide[1]/shape[{position}]")),
+                "after"
+            );
+        }
+        assert_eq!(source.to_bytes().unwrap(), before);
+    });
 }

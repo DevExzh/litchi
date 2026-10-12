@@ -15,10 +15,7 @@
       "supported": true
     },
     "set": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "add": {
       "supported": false,
@@ -45,16 +42,10 @@
       "reason": "edit verbs arrive with the write kernel in milestone M2"
     },
     "edit": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "batch": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "save": {
       "supported": true
@@ -162,7 +153,7 @@
       "parent": "presentation",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -256,6 +247,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
         }
       },
       "predicates": {
@@ -281,7 +278,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -319,25 +316,25 @@
         "x": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "width": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rotation": {
@@ -351,6 +348,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -375,7 +378,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -402,25 +405,25 @@
         "x": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "y": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "width": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "height": {
           "type": "length",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "rotation": {
@@ -434,6 +437,12 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -1888,6 +1897,33 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended",
       "reason": "legacy PPT exposes only common geometry in the unified node view"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "slide",
+      "context": "native-visibility-record",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPT visibility atom insertion",
+      "reason": "slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "shape",
+      "context": "native-shape-preservation",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPT nested-shape and rich-text edits",
+      "reason": "top-level shape text and anchors require native closure admission; nested groups, new text bodies and rich-text formatting remain unsupported"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "presentation",
+      "context": "native-write-coalescing",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPT shared native edit runs and performance qualification",
+      "reason": "consecutive unified sets currently publish separate native transactions under semantic snapshot limits"
     },
     {
       "subject": "view",

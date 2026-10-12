@@ -719,33 +719,56 @@ fn pptx_reports_selection_and_structural_writes() {
 #[test]
 fn ppt_reports_unified_reads_and_keeps_writes_granular() {
     let format = Capabilities::of(FileFormat::Ppt);
-    for verb in [Verb::Get, Verb::Find, Verb::Query, Verb::View] {
+    for verb in [
+        Verb::Get,
+        Verb::Find,
+        Verb::Query,
+        Verb::View,
+        Verb::Set,
+        Verb::Edit,
+        Verb::Batch,
+    ] {
         assert!(format.verb(verb).is_supported(), "PPT {verb:?}");
     }
     assert!(format.verb(Verb::Save).is_supported());
     assert!(format.verb(Verb::Create).is_supported());
-    for verb in [
-        Verb::Set,
-        Verb::Add,
-        Verb::Remove,
-        Verb::Move,
-        Verb::Swap,
-        Verb::Edit,
-        Verb::Batch,
-    ] {
+    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
         assert_eq!(
             format.verb(verb).code(),
             Some(Code::UnsupportedCapability),
             "PPT {verb:?} remains a write gap"
         );
     }
+    for name in ["shape", "placeholder"] {
+        let element = format.element(name).expect("shape element");
+        for key in ["text", "x", "y", "width", "height"] {
+            assert!(
+                element.property(key).expect("setter property").set(),
+                "PPT {name}.{key}"
+            );
+        }
+        assert!(
+            !element
+                .property("rotation")
+                .expect("read-only property")
+                .set()
+        );
+    }
+    assert!(
+        format
+            .element("slide")
+            .expect("slide")
+            .property("hidden")
+            .expect("hidden")
+            .set()
+    );
     for name in ["presentation", "slide", "shape"] {
         let element = format
             .element(name)
             .unwrap_or_else(|| panic!("missing PPT {name}"));
         let operations = element.operations();
         assert!(operations.get, "PPT {name} is readable");
-        assert!(!operations.set, "PPT {name} is not settable");
+        assert_eq!(operations.set, name != "presentation", "PPT {name} setter");
         assert!(!operations.add, "PPT {name} is not addable");
         assert!(!operations.remove, "PPT {name} is not removable");
     }
@@ -771,6 +794,30 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
         released.capabilities().verb(Verb::Save).code(),
         Some(Code::UnsupportedCapability)
     );
+    for verb in [Verb::Set, Verb::Edit, Verb::Batch] {
+        assert_eq!(
+            released.capabilities().verb(verb).code(),
+            Some(Code::UnsupportedCapability)
+        );
+    }
+    for name in ["slide", "shape", "placeholder"] {
+        assert!(
+            !released
+                .capabilities()
+                .element(name)
+                .expect("element")
+                .operations()
+                .set
+        );
+        assert!(
+            released
+                .capabilities()
+                .element(name)
+                .expect("element")
+                .properties()
+                .all(|property| !property.set())
+        );
+    }
     assert!(released.capabilities().verb(Verb::Create).is_supported());
     assert!(released.root().is_ok());
 }

@@ -777,6 +777,15 @@ impl Capabilities {
                 }
                 return Support::Supported;
             }
+            #[cfg(feature = "ppt")]
+            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
+                && self.adapter() == Some(Adapter::Ppt)
+            {
+                if self.retains_source == Some(false) {
+                    return RETAINED_SOURCE.support();
+                }
+                return Support::Supported;
+            }
             return EDITS.support();
         }
         match verb {
@@ -2553,6 +2562,12 @@ impl Element {
                 && self.retains_source != Some(false)
                 && matches!(self.data().canonical, "slide" | "shape" | "placeholder")
                 && readable);
+        #[cfg(feature = "ppt")]
+        let settable = settable
+            || (self.adapter == Adapter::Ppt
+                && self.retains_source != Some(false)
+                && matches!(self.data().canonical, "slide" | "shape" | "placeholder")
+                && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
@@ -2691,6 +2706,15 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "sheet" => crate::format::xlsx::SHEET_CAPABILITY_PROPS,
                 "row" => crate::format::xlsx::ROW_CAPABILITY_PROPS,
                 "col" => crate::format::xlsx::COLUMN_CAPABILITY_PROPS,
+                _ => props,
+            }
+        } else { props };
+        #[cfg(feature = "ppt")]
+        let props = if adapter == Adapter::Ppt {
+            match crate::path::navigate::ElementKind::name(element.kind) {
+                "shape" => crate::format::ppt::SHAPE_CAPABILITY_PROPS,
+                "placeholder" => crate::format::ppt::PLACEHOLDER_CAPABILITY_PROPS,
+                "slide" => crate::format::ppt::SLIDE_CAPABILITY_PROPS,
                 _ => props,
             }
         } else { props };
@@ -2915,8 +2939,46 @@ static PPTX_WRITE_GAPS: [GapSpec; 14] = [
     },
 ];
 
+#[cfg(feature = "ppt")]
+const PPT_WRITE_GAPS: &[GapSpec] = &[
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "slide",
+            context: "native-visibility-record",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT visibility atom insertion",
+        reason: "slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "shape",
+            context: "native-shape-preservation",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT nested-shape and rich-text edits",
+        reason: "top-level shape text and anchors require native closure admission; nested groups, new text bodies and rich-text formatting remain unsupported",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "batch",
+            element: "presentation",
+            context: "native-write-coalescing",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT shared native edit runs and performance qualification",
+        reason: "consecutive unified sets currently publish separate native transactions under semantic snapshot limits",
+    },
+];
+
 /// Format-level option gaps that do not belong to the read spec table.
 fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>> {
+    #[cfg(feature = "ppt")]
+    if adapter == Adapter::Ppt {
+        return PPT_WRITE_GAPS.get(index).map(Some);
+    }
     #[cfg(feature = "doc")]
     if adapter == Adapter::Doc {
         if let Some(gap) = DOC_CREATION_OPTION_GAPS.get(index) {

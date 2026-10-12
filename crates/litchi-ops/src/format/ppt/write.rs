@@ -100,7 +100,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     let props = Props::from_props(props)?;
     let nodes = resolve_nodes(file, &target, limits)?;
     let plans = build_plans(nodes, &props, limits)?;
-    let native = stage_plans(file, &plans)?;
+    let native = stage_plans(file, plans, limits)?;
     file.check_source()?;
     finish_commit(file, native, limits)
 }
@@ -205,6 +205,9 @@ fn build_plans(
                 kinds.push(kind);
             }
         }
+        if props.is_empty() {
+            return Ok(Vec::new());
+        }
         let first_kind = kinds[0];
         let values = admit_shape_props(props, first_kind, limits)?;
         // A query can intentionally select both physical shapes and semantic
@@ -253,6 +256,9 @@ fn build_plans(
             return Err(unsupported_target(
                 "one PPT write cannot mix slide and shape targets",
             ));
+        }
+        if props.is_empty() {
+            return Ok(Vec::new());
         }
         let values = admit_slide_props(props, limits)?;
         let per_target = size_of::<SlideValues>() + 2 * size_of::<usize>();
@@ -341,13 +347,13 @@ fn admit_shape_props_from_table<const N: usize, const A: usize>(
                         text.len(),
                         limits.max_staged_bytes(),
                     )?;
-                    validate_text(text)?;
                     let mut owned = String::new();
                     owned
                         .try_reserve_exact(text.len())
                         .map_err(|source| allocation(source, "PPT shape text"))?;
                     owned.push_str(text);
                     values.text = Some(owned);
+                    Ok(())
                 },
                 ShapeSetter::X | ShapeSetter::Y | ShapeSetter::Width | ShapeSetter::Height => {
                     let Some(Scalar::Length(value)) = value else {
@@ -361,6 +367,7 @@ fn admit_shape_props_from_table<const N: usize, const A: usize>(
                         ShapeSetter::Text => unreachable!("PPT text setter in geometry branch"),
                     };
                     values.geometry[index] = Some(value.emu());
+                    Ok(())
                 },
             })
             .map_err(|error| error.with_format(FileFormat::Ppt))?;
@@ -507,13 +514,75 @@ fn master_from_emu(value: i64, property: &'static str) -> Result<i64> {
         .map_err(|_| invalid_geometry("PPT length conversion overflow").with_property(property))
 }
 
-fn stage_plans(file: &Ppt, plans: &[Plan]) -> Result<litchi_ppt::Commit> {
-    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+fn stage_plans(
+    file: &Ppt,
+    plans: Vec<Plan>,
+    limits: &SemanticLimits,
+) -> Result<litchi_ppt::Commit> {
+    let operations = plans
+        .iter()
+        .map(|plan| match plan {
+            Plan::Shape(plan) => {
+                usize::from(plan.text.is_some()) + usize::from(plan.anchor.is_some())
+            },
+            Plan::Slide(_) => 1,
+        })
+        .sum::<usize>();
+    let maximum = litchi_ppt::package::edit::MAX_OPERATIONS;
+    if operations > maximum {
+        return Err(native_edit_error(litchi_ppt::package::edit::Error::Limit {
+            kind: litchi_ppt::package::edit::LimitKind::Operations,
+            observed: operations,
+            maximum,
+        }));
+    }
+    let package = file.editable_package()?;
+    // The before image alone is a lower bound; reject before the native edit
+    // captures it. The complete before/after charge is checked after commit.
+    let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
+    let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
+    if minimum > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
+    }
+    let mut edit = package.edit().map_err(native_edit_error)?;
+    if plans.len() > 1
+        && plans.iter().all(|plan| {
+            matches!(
+                plan,
+                Plan::Shape(ShapePlan {
+                    text: Some(_),
+                    anchor: None,
+                    ..
+                })
+            )
+        })
+    {
+        let mut replacements = Vec::new();
+        replacements
+            .try_reserve_exact(plans.len())
+            .map_err(|source| allocation(source, "PPT text batch"))?;
+        for plan in plans {
+            if let Plan::Shape(ShapePlan {
+                target,
+                text: Some(text),
+                ..
+            }) = plan
+            {
+                replacements.push(litchi_ppt::slide_order::ShapeTextReplacement::new(
+                    target, text,
+                ));
+            }
+        }
+        for chunk in replacements.chunks(litchi_ppt::slide_order::MAX_SHAPE_TEXT_REPLACEMENTS) {
+            edit.set_shape_texts(chunk).map_err(native_edit_error)?;
+        }
+        return edit.commit().map_err(native_edit_error);
+    }
     for plan in plans {
         match plan {
             Plan::Shape(plan) => {
-                if let Some(text) = &plan.text {
-                    edit.set_shape_text(plan.target, text.clone())
+                if let Some(text) = plan.text {
+                    edit.set_shape_text(plan.target, text)
                         .map_err(native_edit_error)?;
                 }
                 if let Some(anchor) = plan.anchor {
@@ -562,26 +631,6 @@ fn finish_commit(
         operations,
         snapshot_bytes,
     })
-}
-
-fn validate_text(value: &str) -> Result<()> {
-    if !value.chars().all(|character| {
-        matches!(
-            character,
-            '\t' | '\n' | '\r'
-                | '\u{20}'..='\u{d7ff}'
-                | '\u{e000}'..='\u{fffd}'
-                | '\u{10000}'..='\u{10ffff}'
-        )
-    }) {
-        return Err(Error::new(
-            Code::InvalidValue,
-            "text contains a character that PPT cannot represent",
-        )
-        .with_format(FileFormat::Ppt)
-        .with_property("text"));
-    }
-    Ok(())
 }
 
 fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {

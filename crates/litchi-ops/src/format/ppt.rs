@@ -17,7 +17,7 @@ use std::io::{Cursor, Write};
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
-use litchi_core::{FileFormat, Metadata, OwnedSource, Position, ReadAt};
+use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt};
 use litchi_ppt::text_edit::{self, SourceSnapshot};
 use litchi_ppt::{Package, SourceBackedPackage, SourceLimits};
 
@@ -250,19 +250,6 @@ impl Ppt {
         let result = write::set_with_limits(self, target, props, limits);
         self.check_source()?;
         result
-    }
-
-    /// Read a slide's native fixed-width hidden flag. The presentation
-    /// projection already parses the optional timing record, so this remains
-    /// cheap and available after an explicit source release.
-    pub(crate) fn slide_hidden(&self, position: Position) -> Result<Option<bool>> {
-        self.check_source()?;
-        let hidden = self
-            .reader()
-            .slide_at(position.get())?
-            .and_then(|slide| slide.timing().map(|timing| timing.hidden));
-        self.check_source()?;
-        Ok(hidden)
     }
 
     /// Opens the presentation over the positional package filesystem

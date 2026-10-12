@@ -111,6 +111,8 @@ enum Leaf {
     Xlsb(Box<crate::format::xlsb::write::Patch>),
     #[cfg(feature = "xls")]
     Xls(Box<litchi_xls::Patch>),
+    #[cfg(feature = "ppt")]
+    Ppt(Box<litchi_ppt::Patch>),
     #[cfg(feature = "pptx")]
     Pptx {
         source: crate::format::pptx::Editable,
@@ -239,7 +241,8 @@ impl File {
     /// diagnostics. Integrates DOCX main-document writes, supported XLSX/XLSB
     /// cell and worksheet writes, immutable XLS cell writes, plus PPTX shape text,
     /// slide/text-box creation, slide ordering, top-level shape removal and
-    /// dependency-free slide removal.
+    /// dependency-free slide removal. Legacy PPT supports native shape text/anchor
+    /// and slide visibility setters.
     ///
     /// # Errors
     /// Returns the first failed mutation with its zero-based item index, the
@@ -268,7 +271,7 @@ impl File {
     }
 
     /// [`Self::edit`] with caller-selected operation, retained-snapshot and
-    /// XLSX/PPTX target-expansion and staging limits.
+    /// format-specific target-expansion and staging limits.
     ///
     /// # Errors
     /// As [`Self::edit`]. A failed limit check discards the complete candidate.
@@ -381,6 +384,8 @@ impl Edit {
     /// validation retains sequential semantics.
     /// Distinct direct PPTX shape text/geometry sets also share a native edit.
     /// Repeated PPTX shapes close their run before resolving partial properties.
+    /// Legacy PPT sets each use an isolated native edit and retain its patch;
+    /// coalesced native runs are not yet integrated for that format.
     /// Reads and selectors close pending runs; repeated XLSX cells and font
     /// assignments close the payload run.
     /// A successful call stages its assignments; native commit errors can surface
@@ -444,6 +449,7 @@ impl Edit {
             }
             #[cfg(any(
                 feature = "doc",
+                feature = "ppt",
                 feature = "xlsx",
                 feature = "pptx",
                 feature = "xlsb",
@@ -475,6 +481,10 @@ impl Edit {
                 #[cfg(feature = "xls")]
                 File::Xls(handle) => {
                     wrap_xls(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
+                #[cfg(feature = "ppt")]
+                File::Ppt(handle) => {
+                    wrap_ppt(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
                 #[cfg(feature = "pptx")]
                 File::Pptx(handle) => {
@@ -1717,6 +1727,31 @@ fn wrap_xls<T>(
     ))
 }
 
+#[cfg(feature = "ppt")]
+fn wrap_ppt<T>(
+    _before: &crate::format::ppt::Ppt,
+    commit: crate::format::ppt::write::WriteCommit,
+    value: T,
+) -> Result<(Step, T)> {
+    let crate::format::ppt::write::WriteCommit {
+        before,
+        after,
+        patch,
+        operations,
+        snapshot_bytes,
+    } = commit;
+    Ok((
+        Step {
+            before: File::Ppt(before),
+            after: File::Ppt(after),
+            leaf: Leaf::Ppt(Box::new(patch)),
+            leaf_operations: operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
 #[cfg(feature = "xlsx")]
 fn wrap_xlsx<T>(
     before: &crate::format::xlsx::Xlsx,
@@ -1776,6 +1811,8 @@ fn changed(steps: &[Step]) -> Result<bool> {
         (Leaf::Xlsb(first), Leaf::Xlsb(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "xls")]
         (Leaf::Xls(first), Leaf::Xls(last)) => Ok(first.before() != last.after()),
+        #[cfg(feature = "ppt")]
+        (Leaf::Ppt(first), Leaf::Ppt(last)) => Ok(first.before() != last.after()),
         #[cfg(feature = "pptx")]
         (Leaf::Pptx { source, .. }, Leaf::Pptx { target, .. }) => Ok(!source.same_content(target)?),
         #[cfg(feature = "docx")]
@@ -1797,6 +1834,8 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         (File::Xlsb(left), File::Xlsb(right)) => left.same_snapshot(right),
         #[cfg(feature = "xls")]
         (File::Xls(left), File::Xls(right)) => left.same_snapshot(right),
+        #[cfg(feature = "ppt")]
+        (File::Ppt(left), File::Ppt(right)) => left.same_snapshot(right),
         #[cfg(feature = "pptx")]
         (File::Pptx(left), File::Pptx(right)) => left.same_snapshot(right),
         #[cfg(feature = "docx")]
@@ -1841,6 +1880,8 @@ fn admit(file: &File) -> Result<()> {
         File::Xlsb(handle) => handle.admit_edit(),
         #[cfg(feature = "xls")]
         File::Xls(handle) => handle.admit_edit(),
+        #[cfg(feature = "ppt")]
+        File::Ppt(handle) => handle.admit_edit(),
         _ => check_source(file),
     }
 }
@@ -1870,6 +1911,8 @@ fn check_source(file: &File) -> Result<()> {
         File::Xlsb(handle) => handle.check_source(),
         #[cfg(feature = "xls")]
         File::Xls(handle) => handle.check_source(),
+        #[cfg(feature = "ppt")]
+        File::Ppt(handle) => handle.check_source(),
         File::Signed(signed) => Err(crate::Error::signed(signed.format())),
         File::Locked(locked) => Err(locked.read_error()),
         #[allow(unreachable_patterns)]

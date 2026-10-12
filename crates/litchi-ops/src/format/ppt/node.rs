@@ -400,7 +400,7 @@ impl<'a> Props<'a> {
                     number: selected.slide_number(),
                     slide_id: selected.slide_id(),
                     persist_id: selected.persist_id(),
-                    hidden: node.file.slide_hidden(Position::new(slide.position))?,
+                    hidden: selected.timing().map(|timing| timing.hidden),
                 }
             },
             Item::Shape(shape) => PropKind::Shape {

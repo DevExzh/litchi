@@ -975,7 +975,7 @@ const fn same_name(left: &str, right: &str) -> bool {
     }
     let mut index = 0;
     while index < left.len() {
-        if left[index].to_ascii_lowercase() != right[index].to_ascii_lowercase() {
+        if !left[index].eq_ignore_ascii_case(&right[index]) {
             return false;
         }
         index += 1;
@@ -987,7 +987,7 @@ const SHAPE_WRITE_COUNT: usize = SHAPE_PROPS.len() + 1;
 const PLACEHOLDER_WRITE_COUNT: usize = PLACEHOLDER_PROPS.len() + 1;
 
 pub(super) const SHAPE_WRITE_TABLE: crate::registry::Table<ShapeSetter, SHAPE_WRITE_COUNT, 0> =
-    crate::registry::Table::new(shape_write_entries::<SHAPE_WRITE_COUNT>(&SHAPE_PROPS), []);
+    crate::registry::Table::new(shape_write_entries::<SHAPE_WRITE_COUNT>(SHAPE_PROPS), []);
 pub(crate) const SHAPE_CAPABILITY_PROPS: &[PropSpec] = &SHAPE_WRITE_TABLE.readable();
 
 pub(super) const PLACEHOLDER_WRITE_TABLE: crate::registry::Table<
@@ -995,7 +995,7 @@ pub(super) const PLACEHOLDER_WRITE_TABLE: crate::registry::Table<
     PLACEHOLDER_WRITE_COUNT,
     0,
 > = crate::registry::Table::new(
-    shape_write_entries::<PLACEHOLDER_WRITE_COUNT>(&PLACEHOLDER_PROPS),
+    shape_write_entries::<PLACEHOLDER_WRITE_COUNT>(PLACEHOLDER_PROPS),
     [],
 );
 pub(crate) const PLACEHOLDER_CAPABILITY_PROPS: &[PropSpec] = &PLACEHOLDER_WRITE_TABLE.readable();

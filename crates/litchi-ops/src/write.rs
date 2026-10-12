@@ -244,6 +244,9 @@ impl File {
     /// selectors of one target family.
     /// PPTX slide shapes and placeholders accept text replacement or clearing;
     /// scoped selectors share one native commit.
+    /// Legacy PPT top-level shapes and placeholders accept text and geometry;
+    /// slides accept `hidden`. PPT anchors round to the nearest 1/576-inch
+    /// master unit. Native closure checks may refuse unsupported records.
     /// Default [`crate::transaction::SemanticLimits`] bound expanded targets
     /// and staged payloads. Use [`Self::edit_with_limits`] to select those bounds.
     ///
@@ -279,6 +282,10 @@ impl File {
             Self::Xls(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Xls(commit.after)),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Ppt(commit.after)),
             #[cfg(feature = "xlsx")]
             Self::Xlsx(handle) => handle
                 .set(_target.into_target()?, _props)

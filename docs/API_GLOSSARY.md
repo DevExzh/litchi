@@ -1351,3 +1351,14 @@ children; `Shape::clone_box` is removed. Unified nodes retain shared native
 arrays and index trails. Native identities require raw paths or queries;
 unimplemented stories and properties remain explicit capability gaps.
 Unified PPT mutations and full API/ADR migration remain open.
+
+## Unified PPT setters (0216)
+
+`File::set`, explicit edits and batches route top-level PPT shape text/anchor
+changes and slide visibility through canonical `Package::edit` and its
+`Commit`/`Patch` family. Native source-order targets are distinct from physical
+navigation ordinals. The facade adopts the committed package directly and keeps
+the native proof in snapshot-bound history. Anchor inputs round to native master
+units; unchanged bounds preserve the original anchor encoding. Signed, encrypted,
+released and stale owners keep explicit refusals. Native visibility-record
+insertion, nested writes and consecutive-command coalescing remain open.
