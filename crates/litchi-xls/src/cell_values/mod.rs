@@ -428,6 +428,124 @@ struct SheetData {
     name: String,
     workbook_index: usize,
     entries: Arc<Vec<Entry>>,
+    cell_index: Arc<CellIndex>,
+}
+
+/// Immutable coordinate index for one worksheet's source-order cell inventory.
+///
+/// `entries` intentionally remains in Workbook-stream order because that is
+/// the public iteration order and the source-slot order used by the physical
+/// patcher.  These sidecars are sorted only by coordinate, so lookups and
+/// bounded row/column occupancy checks do not repeatedly scan that inventory.
+#[derive(Debug, Clone)]
+struct CellIndex {
+    by_reference: Vec<IndexedCell>,
+    by_column: Vec<IndexedCell>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct IndexedCell {
+    reference: Reference,
+    entry: usize,
+}
+
+impl CellIndex {
+    fn from_entries(entries: &[Entry]) -> Result<Self> {
+        let mut by_reference = Vec::new();
+        by_reference
+            .try_reserve_exact(entries.len())
+            .map_err(|_error| Error::Allocation("indexing worksheet cell coordinates"))?;
+        let mut by_column = Vec::new();
+        by_column
+            .try_reserve_exact(entries.len())
+            .map_err(|_error| Error::Allocation("indexing worksheet column coordinates"))?;
+        for (entry, item) in entries.iter().enumerate() {
+            let indexed = IndexedCell {
+                reference: item.cell.reference,
+                entry,
+            };
+            by_reference.push(indexed);
+            by_column.push(indexed);
+        }
+        by_reference.sort_unstable_by_key(|item| (item.reference, item.entry));
+        by_column.sort_unstable_by_key(|item| {
+            (item.reference.column(), item.reference.row(), item.entry)
+        });
+        Ok(Self {
+            by_reference,
+            by_column,
+        })
+    }
+
+    fn unique_entry_index(&self, entries: &[Entry], reference: Reference) -> Result<Option<usize>> {
+        let start = self
+            .by_reference
+            .partition_point(|item| item.reference < reference);
+        let Some(item) = self.by_reference.get(start) else {
+            return Ok(None);
+        };
+        if item.reference != reference {
+            return Ok(None);
+        }
+        let duplicate = self
+            .by_reference
+            .get(start + 1)
+            .is_some_and(|candidate| candidate.reference == reference);
+        if duplicate {
+            return Err(Error::UnsafeEdit(format!(
+                "cell ({}, {}) has duplicate BIFF8 Number records",
+                reference.row(),
+                reference.column()
+            )));
+        }
+        let entry = entries
+            .get(item.entry)
+            .ok_or_else(|| Error::UnsafeEdit("worksheet coordinate index is stale".into()))?;
+        if entry.cell.reference != reference {
+            return Err(Error::UnsafeEdit(
+                "worksheet coordinate index disagrees with its source inventory".into(),
+            ));
+        }
+        Ok(Some(item.entry))
+    }
+
+    fn any_rows(&self, start: u16, end: u16) -> bool {
+        let first = self.by_reference.partition_point(|item| {
+            item.reference
+                < Reference {
+                    row: start,
+                    column: 0,
+                }
+        });
+        self.by_reference[first..]
+            .iter()
+            .take_while(|item| item.reference.row() <= end)
+            .any(|item| item.reference.row() >= start)
+    }
+
+    fn any_columns(&self, start: u8, end: u8) -> bool {
+        let first = self.by_column.partition_point(|item| {
+            (item.reference.column(), item.reference.row()) < (start, 0_u16)
+        });
+        self.by_column[first..]
+            .iter()
+            .take_while(|item| item.reference.column() <= end)
+            .any(|item| item.reference.column() >= start)
+    }
+}
+
+impl SheetData {
+    fn unique_entry_index(&self, reference: Reference) -> Result<Option<usize>> {
+        self.cell_index.unique_entry_index(&self.entries, reference)
+    }
+
+    fn any_rows(&self, start: u16, end: u16) -> bool {
+        self.cell_index.any_rows(start, end)
+    }
+
+    fn any_columns(&self, start: u8, end: u8) -> bool {
+        self.cell_index.any_columns(start, end)
+    }
 }
 
 #[derive(Clone, Copy)]
@@ -971,6 +1089,8 @@ impl Snapshot {
             changes: Vec::new(),
             structural_changes: Vec::new(),
             resource_changes: Vec::new(),
+            fixed_index: FixedChangeIndex::default(),
+            structural_index: StructuralChangeIndex::default(),
         }
     }
 
@@ -1079,20 +1199,23 @@ impl<'a> Worksheet<'a> {
     ///
     /// Returns an exact-source ambiguity error for duplicate `Number` records.
     pub fn number(self, reference: Reference) -> Result<Option<Number>> {
-        unique_entry(&self.data().entries, reference).map(|entry| {
-            entry.and_then(|item| {
-                if item.cell.storage != Storage::Number {
-                    return None;
-                }
-                let Value::Number(value) = &item.cell.value else {
-                    return None;
-                };
-                Some(Number {
-                    reference,
-                    value: *value,
+        self.data()
+            .unique_entry_index(reference)
+            .map(|entry| entry.map(|index| &self.data().entries[index]))
+            .map(|entry| {
+                entry.and_then(|item| {
+                    if item.cell.storage != Storage::Number {
+                        return None;
+                    }
+                    let Value::Number(value) = &item.cell.value else {
+                        return None;
+                    };
+                    Some(Number {
+                        reference,
+                        value: *value,
+                    })
                 })
             })
-        })
     }
 
     /// Looks up any transaction-owned cell.
@@ -1101,7 +1224,9 @@ impl<'a> Worksheet<'a> {
     ///
     /// Returns an exact-source ambiguity error for duplicate cell records.
     pub fn cell(self, reference: Reference) -> Result<Option<&'a Cell>> {
-        unique_entry(&self.data().entries, reference).map(|entry| entry.map(|item| &item.cell))
+        self.data()
+            .unique_entry_index(reference)
+            .map(|entry| entry.map(|index| &self.data().entries[index].cell))
     }
 }
 
@@ -1166,6 +1291,367 @@ enum ResourceChange {
     },
 }
 
+#[derive(Debug, Clone, Copy)]
+struct StagedCell {
+    sheet: usize,
+    reference: Reference,
+    change: usize,
+}
+
+/// Sorted sidecar for staged fixed-width cell operations.
+///
+/// The transaction vector remains the canonical operation storage.  This
+/// index only maps a source coordinate to its operation position, preserving
+/// repeated-write coalescing while making overlap checks logarithmic.
+#[derive(Debug, Clone, Default)]
+struct FixedChangeIndex {
+    cells: Vec<StagedCell>,
+}
+
+impl FixedChangeIndex {
+    fn sort(&mut self) {
+        self.cells
+            .sort_unstable_by_key(|item| (item.sheet, item.reference, item.change));
+    }
+
+    fn range(&self, sheet: usize, reference: Reference) -> std::ops::Range<usize> {
+        let start = self.lower_bound(sheet, reference);
+        let end = self.upper_bound(sheet, reference);
+        start..end
+    }
+
+    fn lower_bound(&self, sheet: usize, reference: Reference) -> usize {
+        self.cells
+            .partition_point(|item| (item.sheet, item.reference) < (sheet, reference))
+    }
+
+    fn upper_bound(&self, sheet: usize, reference: Reference) -> usize {
+        let mut index = self.lower_bound(sheet, reference);
+        while self
+            .cells
+            .get(index)
+            .is_some_and(|item| item.sheet == sheet && item.reference == reference)
+        {
+            index += 1;
+        }
+        index
+    }
+
+    fn first(&self, sheet: usize, reference: Reference) -> Option<usize> {
+        self.cells
+            .get(self.lower_bound(sheet, reference))
+            .filter(|item| item.sheet == sheet && item.reference == reference)
+            .map(|item| item.change)
+    }
+
+    fn any_effective(
+        &self,
+        changes: &[Change],
+        source: &Snapshot,
+        sheet: usize,
+        reference: Reference,
+    ) -> bool {
+        self.range(sheet, reference).any(|position| {
+            self.cells
+                .get(position)
+                .and_then(|item| changes.get(item.change))
+                .is_some_and(|change| change_is_effective(source, change))
+        })
+    }
+
+    fn has_sheet(&self, sheet: usize) -> bool {
+        let start = self.cells.partition_point(|item| item.sheet < sheet);
+        self.cells
+            .get(start)
+            .is_some_and(|item| item.sheet == sheet)
+    }
+
+    fn any_in_range(&self, sheet: usize, range: CellRange) -> bool {
+        let start = self.lower_bound(
+            sheet,
+            Reference {
+                row: range.start().row(),
+                column: 0,
+            },
+        );
+        self.cells[start..]
+            .iter()
+            .take_while(|item| item.sheet == sheet && item.reference.row() <= range.end().row())
+            .any(|item| range.contains(item.reference))
+    }
+
+    fn reserve_one(&mut self) -> Result<()> {
+        self.cells
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("indexing staged XLS cell changes"))
+    }
+
+    fn reserve_for_join(&mut self, additions: usize) -> Result<()> {
+        self.cells
+            .try_reserve(additions)
+            .map_err(|_error| Error::Allocation("indexing staged XLS cell changes"))
+    }
+
+    fn insert(&mut self, item: StagedCell) {
+        let mut position = self.lower_bound(item.sheet, item.reference);
+        while self.cells.get(position).is_some_and(|existing| {
+            existing.sheet == item.sheet && existing.reference == item.reference
+        }) {
+            position += 1;
+        }
+        self.cells.insert(position, item);
+    }
+
+    fn rebuild_in_place(&mut self, changes: &[Change]) {
+        self.cells.clear();
+        for (change, item) in changes.iter().enumerate() {
+            self.cells.push(StagedCell {
+                sheet: item.sheet,
+                reference: item.reference,
+                change,
+            });
+        }
+        self.sort();
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+struct StructuralChangeIndex {
+    cells: Vec<StagedStructuralCell>,
+    axes: Vec<StagedStructuralSheet>,
+    renames: Vec<StagedStructuralSheet>,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StagedStructuralCell {
+    sheet: usize,
+    reference: Reference,
+    change: usize,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct StagedStructuralSheet {
+    sheet: usize,
+    change: usize,
+}
+
+impl StructuralChangeIndex {
+    fn push(&mut self, item: &StructuralChange, change: usize) {
+        match item {
+            StructuralChange::Cell {
+                sheet, reference, ..
+            } => self.cells.push(StagedStructuralCell {
+                sheet: *sheet,
+                reference: *reference,
+                change,
+            }),
+            StructuralChange::Rows { sheet, .. } | StructuralChange::Columns { sheet, .. } => {
+                self.axes.push(StagedStructuralSheet {
+                    sheet: *sheet,
+                    change,
+                });
+            },
+            StructuralChange::RenameSheet { sheet, .. } => {
+                self.renames.push(StagedStructuralSheet {
+                    sheet: *sheet,
+                    change,
+                });
+            },
+        }
+    }
+
+    fn sort(&mut self) {
+        self.cells
+            .sort_unstable_by_key(|item| (item.sheet, item.reference, item.change));
+        self.axes
+            .sort_unstable_by_key(|item| (item.sheet, item.change));
+        self.renames
+            .sort_unstable_by_key(|item| (item.sheet, item.change));
+    }
+
+    fn cell(&self, sheet: usize, reference: Reference) -> Option<usize> {
+        let index = self
+            .cells
+            .partition_point(|item| (item.sheet, item.reference) < (sheet, reference));
+        self.cells
+            .get(index)
+            .filter(|item| item.sheet == sheet && item.reference == reference)
+            .map(|item| item.change)
+    }
+
+    fn axis(&self, sheet: usize) -> Option<usize> {
+        let index = self.axes.partition_point(|item| item.sheet < sheet);
+        self.axes
+            .get(index)
+            .filter(|item| item.sheet == sheet)
+            .map(|item| item.change)
+    }
+
+    fn rename(&self, sheet: usize) -> Option<usize> {
+        let index = self.renames.partition_point(|item| item.sheet < sheet);
+        self.renames
+            .get(index)
+            .filter(|item| item.sheet == sheet)
+            .map(|item| item.change)
+    }
+
+    fn has_cell_sheet(&self, sheet: usize) -> bool {
+        let index = self.cells.partition_point(|item| item.sheet < sheet);
+        self.cells
+            .get(index)
+            .is_some_and(|item| item.sheet == sheet)
+    }
+
+    fn overlaps(&self, change: &StructuralChange) -> bool {
+        let sheet = operation_sheet_index(change);
+        match change {
+            StructuralChange::Cell { reference, .. } => {
+                self.axis(sheet).is_some() || self.cell(sheet, *reference).is_some()
+            },
+            StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => {
+                self.axis(sheet).is_some() || self.has_cell_sheet(sheet)
+            },
+            StructuralChange::RenameSheet { .. } => self.rename(sheet).is_some(),
+        }
+    }
+
+    fn conflict_with(
+        &self,
+        changes: &[StructuralChange],
+        right: &StructuralChange,
+    ) -> Option<usize> {
+        let sheet = operation_sheet_index(right);
+        match right {
+            StructuralChange::Cell { reference, .. } => {
+                if let Some(index) = self.axis(sheet)
+                    && !structural_changes_equal(&changes[index], right)
+                {
+                    return Some(index);
+                }
+                self.cell(sheet, *reference)
+                    .filter(|index| !structural_changes_equal(&changes[*index], right))
+            },
+            StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => {
+                if let Some(index) = self.axis(sheet) {
+                    if !structural_changes_equal(&changes[index], right) {
+                        return Some(index);
+                    }
+                }
+                self.first_cell_sheet(sheet)
+            },
+            StructuralChange::RenameSheet { .. } => self
+                .rename(sheet)
+                .filter(|index| !structural_changes_equal(&changes[*index], right)),
+        }
+    }
+
+    fn equal_with(&self, changes: &[StructuralChange], right: &StructuralChange) -> bool {
+        let sheet = operation_sheet_index(right);
+        match right {
+            StructuralChange::Cell { reference, .. } => self
+                .cell(sheet, *reference)
+                .is_some_and(|index| structural_changes_equal(&changes[index], right)),
+            StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => self
+                .axis(sheet)
+                .is_some_and(|index| structural_changes_equal(&changes[index], right)),
+            StructuralChange::RenameSheet { .. } => self
+                .rename(sheet)
+                .is_some_and(|index| structural_changes_equal(&changes[index], right)),
+        }
+    }
+
+    fn first_cell_sheet(&self, sheet: usize) -> Option<usize> {
+        let index = self.cells.partition_point(|item| item.sheet < sheet);
+        self.cells
+            .get(index)
+            .filter(|item| item.sheet == sheet)
+            .map(|item| item.change)
+    }
+
+    fn reserve_one(&mut self, change: &StructuralChange) -> Result<()> {
+        match change {
+            StructuralChange::Cell { .. } => self
+                .cells
+                .try_reserve(1)
+                .map_err(|_error| Error::Allocation("indexing structural XLS cells")),
+            StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => self
+                .axes
+                .try_reserve(1)
+                .map_err(|_error| Error::Allocation("indexing structural XLS axes")),
+            StructuralChange::RenameSheet { .. } => self
+                .renames
+                .try_reserve(1)
+                .map_err(|_error| Error::Allocation("indexing structural XLS renames")),
+        }
+    }
+
+    fn insert(&mut self, change: &StructuralChange, index: usize) {
+        match change {
+            StructuralChange::Cell {
+                sheet, reference, ..
+            } => {
+                let position = self.cells.partition_point(|item| {
+                    (item.sheet, item.reference, item.change) < (*sheet, *reference, index)
+                });
+                self.cells.insert(
+                    position,
+                    StagedStructuralCell {
+                        sheet: *sheet,
+                        reference: *reference,
+                        change: index,
+                    },
+                );
+            },
+            StructuralChange::Rows { sheet, .. } | StructuralChange::Columns { sheet, .. } => {
+                let position = self
+                    .axes
+                    .partition_point(|item| (item.sheet, item.change) < (*sheet, index));
+                self.axes.insert(
+                    position,
+                    StagedStructuralSheet {
+                        sheet: *sheet,
+                        change: index,
+                    },
+                );
+            },
+            StructuralChange::RenameSheet { sheet, .. } => {
+                let position = self
+                    .renames
+                    .partition_point(|item| (item.sheet, item.change) < (*sheet, index));
+                self.renames.insert(
+                    position,
+                    StagedStructuralSheet {
+                        sheet: *sheet,
+                        change: index,
+                    },
+                );
+            },
+        }
+    }
+
+    fn reserve_for_join(&mut self, additions: usize) -> Result<()> {
+        self.cells
+            .try_reserve(additions)
+            .map_err(|_error| Error::Allocation("indexing structural XLS cells"))?;
+        self.axes
+            .try_reserve(additions)
+            .map_err(|_error| Error::Allocation("indexing structural XLS axes"))?;
+        self.renames
+            .try_reserve(additions)
+            .map_err(|_error| Error::Allocation("indexing structural XLS renames"))
+    }
+
+    fn rebuild_in_place(&mut self, changes: &[StructuralChange]) {
+        self.cells.clear();
+        self.axes.clear();
+        self.renames.clear();
+        for (change, item) in changes.iter().enumerate() {
+            self.push(item, change);
+        }
+        self.sort();
+    }
+}
+
 /// Detached, failure-atomic edits of existing fixed-width BIFF8 cell fields.
 #[derive(Clone)]
 pub struct Edit {
@@ -1173,6 +1659,8 @@ pub struct Edit {
     changes: Vec<Change>,
     structural_changes: Vec<StructuralChange>,
     resource_changes: Vec<ResourceChange>,
+    fixed_index: FixedChangeIndex,
+    structural_index: StructuralChangeIndex,
 }
 
 /// One exact cell targeted differently by independently prepared transactions.
@@ -1244,6 +1732,39 @@ pub enum JoinError {
 }
 
 impl Edit {
+    /// Resolves one cell against the immutable pre-edit source inventory.
+    ///
+    /// This is crate-private so the unified facade can perform one fenced
+    /// coordinate lookup without decoding a second public cell payload.  It
+    /// deliberately does not observe staged values; callers needing staged
+    /// semantics must commit and read the resulting snapshot.
+    pub(crate) fn source_cell(
+        &self,
+        selector: Selector<'_>,
+        reference: Reference,
+    ) -> Result<Option<&Cell>> {
+        let sheet = self.source.resolve_sheet(selector)?.ok_or_else(|| {
+            Error::WorksheetNotFound("cell-value source lookup worksheet selector".into())
+        })?;
+        let sheet_data = &self.source.inner.sheets[sheet];
+        Ok(sheet_data
+            .unique_entry_index(reference)?
+            .map(|index| &sheet_data.entries[index].cell))
+    }
+
+    fn fixed_overlaps_structural(&self, change: &StructuralChange) -> bool {
+        let sheet = operation_sheet_index(change);
+        match change {
+            StructuralChange::Cell { reference, .. } => {
+                self.fixed_index.first(sheet, *reference).is_some()
+            },
+            StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => {
+                self.fixed_index.has_sheet(sheet)
+            },
+            StructuralChange::RenameSheet { .. } => false,
+        }
+    }
+
     /// Joins independently prepared changes against the same exact snapshot.
     ///
     /// Disjoint and byte-equivalent cell outcomes compose deterministically.
@@ -1268,12 +1789,13 @@ impl Edit {
             if !change_is_effective(&incoming.source, right) {
                 continue;
             }
-            if let Some(left) = self
-                .changes
-                .iter()
-                .filter(|left| change_is_effective(&self.source, left))
-                .find(|left| left.sheet == right.sheet && left.entry == right.entry)
-            {
+            let left = self
+                .fixed_index
+                .range(right.sheet, right.reference)
+                .filter_map(|position| self.fixed_index.cells.get(position))
+                .filter_map(|item| self.changes.get(item.change))
+                .find(|left| change_is_effective(&self.source, left));
+            if let Some(left) = left {
                 if left.storage != right.storage || !values_equal(&left.value, &right.value) {
                     conflicts
                         .try_reserve(1)
@@ -1285,7 +1807,12 @@ impl Edit {
                         right_storage: right.storage,
                     });
                 }
-            } else {
+            } else if self
+                .fixed_index
+                .range(right.sheet, right.reference)
+                .next()
+                .is_none()
+            {
                 additions = additions.saturating_add(1);
             }
         }
@@ -1294,16 +1821,39 @@ impl Edit {
         }
         let mut structural_conflicts = Vec::new();
         for right in &incoming.structural_changes {
-            for left in &self.structural_changes {
-                if structural_changes_overlap(left, right) && !structural_changes_equal(left, right)
-                {
-                    structural_conflicts
-                        .try_reserve(1)
-                        .map_err(|_error| JoinError::Allocation)?;
-                    structural_conflicts.push(OperationConflict {
-                        target: structural_target(&self.source, right),
-                    });
-                }
+            if self
+                .structural_index
+                .conflict_with(&self.structural_changes, right)
+                .is_some()
+                || self.fixed_overlaps_structural(right)
+            {
+                structural_conflicts
+                    .try_reserve(1)
+                    .map_err(|_error| JoinError::Allocation)?;
+                structural_conflicts.push(OperationConflict {
+                    target: structural_target(&self.source, right),
+                });
+            }
+        }
+        for right in &incoming.changes {
+            if !change_is_effective(&incoming.source, right) {
+                continue;
+            }
+            if self.structural_index.overlaps(&StructuralChange::Cell {
+                sheet: right.sheet,
+                reference: right.reference,
+                before: None,
+                after: None,
+            }) {
+                structural_conflicts
+                    .try_reserve(1)
+                    .map_err(|_error| JoinError::Allocation)?;
+                structural_conflicts.push(OperationConflict {
+                    target: semantic_target(
+                        self.source.inner.sheets[right.sheet].workbook_index,
+                        right.reference,
+                    ),
+                });
             }
         }
         for right in &incoming.resource_changes {
@@ -1363,9 +1913,8 @@ impl Edit {
             .iter()
             .filter(|right| {
                 !self
-                    .structural_changes
-                    .iter()
-                    .any(|left| structural_changes_equal(left, right))
+                    .structural_index
+                    .equal_with(&self.structural_changes, right)
             })
             .count();
         let observed = observed
@@ -1393,19 +1942,42 @@ impl Edit {
         self.changes
             .try_reserve(additions)
             .map_err(|_error| JoinError::Allocation)?;
+        self.fixed_index
+            .reserve_for_join(additions)
+            .map_err(|_error| JoinError::Allocation)?;
+        self.structural_changes
+            .try_reserve(structural_additions)
+            .map_err(|_error| JoinError::Allocation)?;
+        self.structural_index
+            .reserve_for_join(structural_additions)
+            .map_err(|_error| JoinError::Allocation)?;
+        self.resource_changes
+            .try_reserve(resource_additions)
+            .map_err(|_error| JoinError::Allocation)?;
         for change in incoming.changes {
             if !change_is_effective(&incoming.source, &change) {
                 continue;
             }
-            if self
-                .changes
-                .iter()
-                .filter(|left| change_is_effective(&self.source, left))
-                .any(|left| left.sheet == change.sheet && left.entry == change.entry)
-            {
+            if self.fixed_index.any_effective(
+                &self.changes,
+                &self.source,
+                change.sheet,
+                change.reference,
+            ) {
                 continue;
             }
+            if let Some(change_index) = self.fixed_index.first(change.sheet, change.reference) {
+                self.changes[change_index] = change;
+                continue;
+            }
+            let change_index = self.changes.len();
             self.changes.push(change);
+            let item = &self.changes[change_index];
+            self.fixed_index.insert(StagedCell {
+                sheet: item.sheet,
+                reference: item.reference,
+                change: change_index,
+            });
         }
         self.changes.sort_by_key(|change| {
             (
@@ -1413,23 +1985,22 @@ impl Edit {
                 change.reference,
             )
         });
-        self.structural_changes
-            .try_reserve(structural_additions)
-            .map_err(|_error| JoinError::Allocation)?;
+        self.fixed_index.rebuild_in_place(&self.changes);
         for change in incoming.structural_changes {
             if !self
-                .structural_changes
-                .iter()
-                .any(|left| structural_changes_equal(left, &change))
+                .structural_index
+                .equal_with(&self.structural_changes, &change)
             {
+                let index = self.structural_changes.len();
                 self.structural_changes.push(change);
+                self.structural_index
+                    .insert(&self.structural_changes[index], index);
             }
         }
         self.structural_changes
             .sort_by_key(|change| structural_target(&self.source, change));
-        self.resource_changes
-            .try_reserve(resource_additions)
-            .map_err(|_error| JoinError::Allocation)?;
+        self.structural_index
+            .rebuild_in_place(&self.structural_changes);
         for change in incoming.resource_changes {
             if !self
                 .resource_changes
@@ -1469,13 +2040,15 @@ impl Edit {
             .resolve_sheet(selector)?
             .ok_or_else(|| Error::WorksheetNotFound("cell-value edit worksheet selector".into()))?;
         let entries = &self.source.inner.sheets[sheet_index].entries;
-        let entry = unique_entry_index(entries, reference)?.ok_or_else(|| {
-            Error::UnsupportedFeature(format!(
-                "cell ({}, {}) is absent or is not encoded as a BIFF8 Number record",
-                reference.row(),
-                reference.column()
-            ))
-        })?;
+        let entry = self.source.inner.sheets[sheet_index]
+            .unique_entry_index(reference)?
+            .ok_or_else(|| {
+                Error::UnsupportedFeature(format!(
+                    "cell ({}, {}) is absent or is not encoded as a BIFF8 Number record",
+                    reference.row(),
+                    reference.column()
+                ))
+            })?;
         if entries[entry].cell.storage != Storage::Number {
             return Err(Error::UnsupportedFeature(format!(
                 "cell ({}, {}) is not encoded as a standalone BIFF8 Number record",
@@ -1876,13 +2449,15 @@ impl Edit {
             .resolve_sheet(selector)?
             .ok_or_else(|| Error::WorksheetNotFound("cell-value edit worksheet selector".into()))?;
         let entries = &self.source.inner.sheets[sheet_index].entries;
-        let entry_index = unique_entry_index(entries, reference)?.ok_or_else(|| {
-            Error::UnsupportedFeature(format!(
-                "cell ({}, {}) has no representable source record slot",
-                reference.row(),
-                reference.column()
-            ))
-        })?;
+        let entry_index = self.source.inner.sheets[sheet_index]
+            .unique_entry_index(reference)?
+            .ok_or_else(|| {
+                Error::UnsupportedFeature(format!(
+                    "cell ({}, {}) has no representable source record slot",
+                    reference.row(),
+                    reference.column()
+                ))
+            })?;
         let source_cell = entries[entry_index].cell.clone();
         if source_cell.storage == Storage::Formula
             && (matches!(
@@ -1972,9 +2547,11 @@ impl Edit {
             .resolve_sheet(selector)?
             .ok_or_else(|| Error::WorksheetNotFound("cell clear worksheet selector".into()))?;
         let entries = &self.source.inner.sheets[sheet_index].entries;
-        let entry_index = unique_entry_index(entries, reference)?.ok_or_else(|| {
-            Error::UnsupportedFeature("an absent BIFF8 cell is already clear".into())
-        })?;
+        let entry_index = self.source.inner.sheets[sheet_index]
+            .unique_entry_index(reference)?
+            .ok_or_else(|| {
+                Error::UnsupportedFeature("an absent BIFF8 cell is already clear".into())
+            })?;
         if entries[entry_index].cell.storage != Storage::Blank {
             return Err(Error::UnsafeEdit(
                 "removing this cell requires a whole row-block rewrite".into(),
@@ -2089,7 +2666,10 @@ impl Edit {
             ));
         }
         let sheet = self.require_sheet(selector, "Formula insertion")?;
-        if unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?.is_some() {
+        if self.source.inner.sheets[sheet]
+            .unique_entry_index(reference)?
+            .is_some()
+        {
             return Err(Error::UnsafeEdit(
                 "authored Formula target is occupied".into(),
             ));
@@ -2147,7 +2727,10 @@ impl Edit {
     ) -> Result<()> {
         self.require_effective_style(style)?;
         let sheet = self.require_sheet(selector, "cell insertion")?;
-        if unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?.is_some() {
+        if self.source.inner.sheets[sheet]
+            .unique_entry_index(reference)?
+            .is_some()
+        {
             return Err(Error::UnsafeEdit(
                 "BIFF8 cell insertion target is occupied".into(),
             ));
@@ -2184,7 +2767,8 @@ impl Edit {
     /// Returns a typed absence, ambiguity, dependency, or bound error.
     pub fn remove_cell(&mut self, selector: Selector<'_>, reference: Reference) -> Result<()> {
         let sheet = self.require_sheet(selector, "cell removal")?;
-        let entry = unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?
+        let entry = self.source.inner.sheets[sheet]
+            .unique_entry_index(reference)?
             .ok_or_else(|| Error::UnsafeEdit("BIFF8 cell removal target is absent".into()))?;
         let cell = &self.source.inner.sheets[sheet].entries[entry].cell;
         if cell.storage == Storage::Formula {
@@ -2213,7 +2797,8 @@ impl Edit {
     ) -> Result<()> {
         self.require_effective_style(style)?;
         let sheet = self.require_sheet(selector, "cell style edit")?;
-        let entry = unique_entry_index(&self.source.inner.sheets[sheet].entries, reference)?
+        let entry = self.source.inner.sheets[sheet]
+            .unique_entry_index(reference)?
             .ok_or_else(|| Error::UnsafeEdit("BIFF8 style target is absent".into()))?;
         let cell = &self.source.inner.sheets[sheet].entries[entry].cell;
         self.stage_structural(StructuralChange::Cell {
@@ -2520,10 +3105,9 @@ impl Edit {
                 insert,
             } => {
                 self.require_effective_style(*style)?;
-                if self.structural_changes.iter().any(|change| {
-                    operation_sheet_index(change) == *sheet
-                        && !matches!(change, StructuralChange::RenameSheet { .. })
-                }) {
+                if self.structural_index.axis(*sheet).is_some()
+                    || self.structural_index.has_cell_sheet(*sheet)
+                {
                     return Err(Error::UnsafeEdit(
                         "authored Formula cannot overlap another structural worksheet edit".into(),
                     ));
@@ -2545,7 +3129,9 @@ impl Edit {
                 let sheet_data = self.source.inner.sheets.get(*sheet).ok_or_else(|| {
                     Error::UnsafeEdit("authored Formula sheet dependency is stale".into())
                 })?;
-                let current = unique_entry(&sheet_data.entries, *reference)?;
+                let current = sheet_data
+                    .unique_entry_index(*reference)?
+                    .map(|index| &sheet_data.entries[index]);
                 if *insert && current.is_some() {
                     return Err(Error::UnsafeEdit(
                         "authored Formula insertion target is occupied".into(),
@@ -2745,23 +3331,20 @@ impl Edit {
                 "structural worksheet edit overlaps an authored Formula".into(),
             ));
         }
-        if self
-            .structural_changes
-            .iter()
-            .any(|existing| structural_changes_overlap(existing, &change))
-        {
+        if self.structural_index.overlaps(&change) {
             return Err(Error::UnsafeEdit(
                 "overlapping structural operations must be prepared and joined separately".into(),
             ));
         }
-        let fixed_overlap = self.changes.iter().any(|fixed| {
-            fixed.sheet == sheet
-                && match &change {
-                    StructuralChange::Cell { reference, .. } => fixed.reference == *reference,
-                    StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => true,
-                    StructuralChange::RenameSheet { .. } => false,
-                }
-        });
+        let fixed_overlap = match &change {
+            StructuralChange::Cell { reference, .. } => {
+                self.fixed_index.first(sheet, *reference).is_some()
+            },
+            StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => {
+                self.fixed_index.has_sheet(sheet)
+            },
+            StructuralChange::RenameSheet { .. } => false,
+        };
         if fixed_overlap {
             return Err(Error::UnsafeEdit(
                 "fixed-width and structural operations overlap in one worksheet".into(),
@@ -2782,7 +3365,11 @@ impl Edit {
         self.structural_changes
             .try_reserve(1)
             .map_err(|_error| Error::Allocation("staging structural XLS changes"))?;
+        self.structural_index.reserve_one(&change)?;
+        let index = self.structural_changes.len();
         self.structural_changes.push(change);
+        self.structural_index
+            .insert(&self.structural_changes[index], index);
         Ok(())
     }
 
@@ -2793,31 +3380,21 @@ impl Edit {
         storage: Storage,
         value: Value,
     ) -> Result<()> {
-        if self.structural_changes.iter().any(|change| {
-            operation_sheet_index(change) == sheet_index
-                && match change {
-                    StructuralChange::Cell {
-                        reference: structural_reference,
-                        ..
-                    } => {
-                        *structural_reference
-                            == self.source.inner.sheets[sheet_index].entries[entry]
-                                .cell
-                                .reference
-                    },
-                    StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => true,
-                    StructuralChange::RenameSheet { .. } => false,
-                }
+        let reference = self.source.inner.sheets[sheet_index].entries[entry]
+            .cell
+            .reference;
+        if self.structural_index.overlaps(&StructuralChange::Cell {
+            sheet: sheet_index,
+            reference,
+            before: None,
+            after: None,
         }) {
             return Err(Error::UnsafeEdit(
                 "fixed-width and structural operations overlap in one worksheet".into(),
             ));
         }
-        if let Some(change) = self
-            .changes
-            .iter_mut()
-            .find(|change| change.sheet == sheet_index && change.entry == entry)
-        {
+        if let Some(change_index) = self.fixed_index.first(sheet_index, reference) {
+            let change = &mut self.changes[change_index];
             change.storage = storage;
             change.value = value;
         } else {
@@ -2835,14 +3412,19 @@ impl Edit {
             self.changes
                 .try_reserve(1)
                 .map_err(|_error| Error::Allocation("staging Number cell changes"))?;
+            self.fixed_index.reserve_one()?;
+            let change_index = self.changes.len();
             self.changes.push(Change {
                 sheet: sheet_index,
                 entry,
-                reference: self.source.inner.sheets[sheet_index].entries[entry]
-                    .cell
-                    .reference,
+                reference,
                 storage,
                 value,
+            });
+            self.fixed_index.insert(StagedCell {
+                sheet: sheet_index,
+                reference,
+                change: change_index,
             });
         }
         Ok(())
@@ -3182,14 +3764,9 @@ fn ensure_transfer_has_no_staged_target_overlap(
     sheet: usize,
     target_range: CellRange,
 ) -> Result<()> {
-    if transaction
-        .changes
-        .iter()
-        .any(|change| change.sheet == sheet && target_range.contains(change.reference))
-        || transaction.structural_changes.iter().any(|change| {
-            operation_sheet_index(change) == sheet
-                && !matches!(change, StructuralChange::RenameSheet { .. })
-        })
+    if transaction.fixed_index.any_in_range(sheet, target_range)
+        || transaction.structural_index.has_cell_sheet(sheet)
+        || transaction.structural_index.axis(sheet).is_some()
         || transaction.resource_changes.iter().any(|change| {
             formula_resource_cell(change).is_some_and(|(resource_sheet, reference)| {
                 resource_sheet == sheet && target_range.contains(reference)
@@ -4257,9 +4834,12 @@ fn append_structural_semantic(
         } => {
             preconditions.insert("state".to_string(), optional_cell_state(before.as_ref()));
             if matches!(before, Some((Storage::Formula, _, _))) {
-                let entry = unique_entry(&sheet_data.entries, *reference)?.ok_or_else(|| {
-                    Error::UnsafeEdit("Formula dependency owner is absent".into())
-                })?;
+                let entry = sheet_data
+                    .unique_entry_index(*reference)?
+                    .map(|index| &sheet_data.entries[index])
+                    .ok_or_else(|| {
+                        Error::UnsafeEdit("Formula dependency owner is absent".into())
+                    })?;
                 append_formula_dependency(snapshot, entry, &mut preconditions)?;
             }
             if let Some((_, _, style)) = after {
@@ -4285,11 +4865,7 @@ fn append_structural_semantic(
             insert,
         } => {
             let end = start.saturating_add(*count);
-            if !insert
-                && snapshot.inner.sheets[*sheet].entries.iter().any(|entry| {
-                    entry.cell.reference.row() >= *start && entry.cell.reference.row() < end
-                })
-            {
+            if !insert && snapshot.inner.sheets[*sheet].any_rows(*start, end.saturating_sub(1)) {
                 return Err(Error::UnsafeEdit(
                     "durable row deletion is refused when the deleted span contains cells".into(),
                 ));
@@ -4317,11 +4893,7 @@ fn append_structural_semantic(
             insert,
         } => {
             let end = start.saturating_add(*count);
-            if !insert
-                && snapshot.inner.sheets[*sheet].entries.iter().any(|entry| {
-                    entry.cell.reference.column() >= *start && entry.cell.reference.column() < end
-                })
-            {
+            if !insert && snapshot.inner.sheets[*sheet].any_columns(*start, end.saturating_sub(1)) {
                 return Err(Error::UnsafeEdit(
                     "durable column deletion is refused when the deleted span contains cells"
                         .into(),
@@ -4373,7 +4945,9 @@ fn append_structural_semantic(
             ..
         } = change
         {
-            let entry = unique_entry(&sheet_data.entries, *reference)?
+            let entry = sheet_data
+                .unique_entry_index(*reference)?
+                .map(|index| &sheet_data.entries[index])
                 .ok_or_else(|| Error::UnsafeEdit("Formula dependency owner is absent".into()))?;
             append_formula_dependency(snapshot, entry, &mut inverse_preconditions)?;
         }
@@ -5116,7 +5690,9 @@ fn apply_formula_semantic(
         source.inner.sheets.get(sheet).ok_or_else(|| {
             Error::UnsafeEdit("Formula semantic sheet dependency is stale".into())
         })?;
-    let current = unique_entry(&sheet_data.entries, reference)?;
+    let current = sheet_data
+        .unique_entry_index(reference)?
+        .map(|index| &sheet_data.entries[index]);
     if !expected && current.is_some() {
         return Err(Error::UnsafeEdit(
             "Formula insertion precondition target is occupied".into(),
@@ -5173,7 +5749,8 @@ fn apply_fixed_semantic(
     let (sheet_position, reference) = parse_semantic_target(&operation.target)?;
     let sheet_index = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
     let sheet = &source.inner.sheets[sheet_index];
-    let entry_index = unique_entry_index(&sheet.entries, reference)?
+    let entry_index = sheet
+        .unique_entry_index(reference)?
         .ok_or_else(|| Error::UnsafeEdit("semantic patch cell is absent".into()))?;
     let cell = &sheet.entries[entry_index].cell;
     let expected = operation
@@ -5222,13 +5799,16 @@ fn apply_structural_cell_semantic(
     let (sheet_position, reference) = parse_semantic_target(&operation.target)?;
     let sheet_index = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
     let sheet = &source.inner.sheets[sheet_index];
-    let current = unique_entry(&sheet.entries, reference)?.map(|entry| {
-        (
-            entry.cell.storage,
-            entry.cell.value.clone(),
-            entry.cell.style,
-        )
-    });
+    let current = sheet
+        .unique_entry_index(reference)?
+        .map(|index| &sheet.entries[index])
+        .map(|entry| {
+            (
+                entry.cell.storage,
+                entry.cell.value.clone(),
+                entry.cell.style,
+            )
+        });
     let expected = operation
         .preconditions
         .get("state")
@@ -5239,7 +5819,8 @@ fn apply_structural_cell_semantic(
             "structural cell patch precondition is stale".into(),
         ));
     }
-    if let Some(entry) = unique_entry(&sheet.entries, reference)? {
+    if let Some(index) = sheet.unique_entry_index(reference)? {
+        let entry = &sheet.entries[index];
         verify_formula_dependency(source, entry, operation)?;
     }
     let after = parse_optional_cell_state(&operation.value)?;
@@ -5659,6 +6240,7 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
         changes,
         structural_changes,
         resource_changes,
+        ..
     } = transaction;
 
     if !structural_changes.is_empty() || !resource_changes.is_empty() {
@@ -5777,6 +6359,7 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         changes,
         structural_changes,
         resource_changes,
+        ..
     } = transaction;
 
     if !structural_changes.is_empty() || !resource_changes.is_empty() {
@@ -6244,6 +6827,7 @@ fn parse_workbook_stream(
             message: "BoundSheet8 points outside the Workbook stream".into(),
         })?;
         let entries = parse_worksheet(data, start)?;
+        let cell_index = CellIndex::from_entries(&entries)?;
         sheets
             .try_reserve(1)
             .map_err(|_error| Error::Allocation("indexing editable worksheets"))?;
@@ -6251,6 +6835,7 @@ fn parse_workbook_stream(
             name: bound.name.clone(),
             workbook_index,
             entries: Arc::new(entries),
+            cell_index: Arc::new(cell_index),
         });
     }
     if xf_records.is_empty() {
@@ -7146,31 +7731,6 @@ fn verify_public_numeric_readback<R: Read + Seek>(
     Ok(())
 }
 
-fn structural_changes_overlap(left: &StructuralChange, right: &StructuralChange) -> bool {
-    match (left, right) {
-        (
-            StructuralChange::RenameSheet { sheet: left, .. },
-            StructuralChange::RenameSheet { sheet: right, .. },
-        ) => left == right,
-        (StructuralChange::RenameSheet { .. }, _) | (_, StructuralChange::RenameSheet { .. }) => {
-            false
-        },
-        (
-            StructuralChange::Cell {
-                sheet: left_sheet,
-                reference: left_reference,
-                ..
-            },
-            StructuralChange::Cell {
-                sheet: right_sheet,
-                reference: right_reference,
-                ..
-            },
-        ) => left_sheet == right_sheet && left_reference == right_reference,
-        (left, right) => operation_sheet_index(left) == operation_sheet_index(right),
-    }
-}
-
 fn structural_changes_equal(left: &StructuralChange, right: &StructuralChange) -> bool {
     match (left, right) {
         (
@@ -7809,10 +8369,12 @@ fn require_bof(payload: &[u8], expected_substream: u16) -> Result<()> {
     Ok(())
 }
 
+#[cfg(test)]
 fn unique_entry(entries: &[Entry], reference: Reference) -> Result<Option<&Entry>> {
     Ok(unique_entry_index(entries, reference)?.map(|index| &entries[index]))
 }
 
+#[cfg(test)]
 fn unique_entry_index(entries: &[Entry], reference: Reference) -> Result<Option<usize>> {
     let mut found = None;
     for (index, entry) in entries.iter().enumerate() {
@@ -7832,15 +8394,14 @@ fn unique_entry_index(entries: &[Entry], reference: Reference) -> Result<Option<
 
 fn verify_readback(snapshot: &Snapshot, changes: &[Change]) -> Result<()> {
     for change in changes {
-        let entries = &snapshot
-            .inner
-            .sheets
-            .get(change.sheet)
-            .ok_or_else(|| Error::UnsafeEdit("edited worksheet disappeared on readback".into()))?
-            .entries;
-        let cell = &unique_entry(entries, change.reference)?
-            .ok_or_else(|| Error::UnsafeEdit("edited cell was not found on readback".into()))?
-            .cell;
+        let sheet =
+            snapshot.inner.sheets.get(change.sheet).ok_or_else(|| {
+                Error::UnsafeEdit("edited worksheet disappeared on readback".into())
+            })?;
+        let entry = sheet
+            .unique_entry_index(change.reference)?
+            .ok_or_else(|| Error::UnsafeEdit("edited cell was not found on readback".into()))?;
+        let cell = &sheet.entries[entry].cell;
         if cell.storage != change.storage || !values_equal(&cell.value, &change.value) {
             return Err(Error::UnsafeEdit(
                 "edited cell value failed semantic readback".into(),
@@ -7863,15 +8424,12 @@ fn verify_structural_readback(
                 after,
                 ..
             } => {
-                let entries = &snapshot
-                    .inner
-                    .sheets
-                    .get(*sheet)
-                    .ok_or_else(|| {
-                        Error::UnsafeEdit("structurally edited worksheet disappeared".into())
-                    })?
-                    .entries;
-                let actual = unique_entry(entries, *reference)?
+                let sheet_data = snapshot.inner.sheets.get(*sheet).ok_or_else(|| {
+                    Error::UnsafeEdit("structurally edited worksheet disappeared".into())
+                })?;
+                let actual = sheet_data
+                    .unique_entry_index(*reference)?
+                    .map(|index| &sheet_data.entries[index])
                     .map(|entry| (entry.cell.storage, &entry.cell.value, entry.cell.style));
                 match (after, actual) {
                     (None, None) => {},
@@ -7991,7 +8549,9 @@ fn verify_resource_readback(snapshot: &Snapshot, changes: &[ResourceChange]) -> 
                 let sheet_data = snapshot.inner.sheets.get(*sheet).ok_or_else(|| {
                     Error::UnsafeEdit("Formula readback sheet dependency is stale".into())
                 })?;
-                let current = unique_entry(&sheet_data.entries, *reference)?;
+                let current = sheet_data
+                    .unique_entry_index(*reference)?
+                    .map(|index| &sheet_data.entries[index]);
                 let present = match current {
                     Some(entry) => authored_formula_record_matches(
                         snapshot, entry, *reference, *style, tokens,
@@ -8046,7 +8606,6 @@ fn verify_shifted_cells(
     shift: Shift,
 ) -> Result<()> {
     let before = &source.inner.sheets[sheet].entries;
-    let after = &snapshot.inner.sheets[sheet].entries;
     for entry in before.iter() {
         let reference = match shift {
             Shift::Rows {
@@ -8098,7 +8657,10 @@ fn verify_shifted_cells(
                 }
             },
         };
-        let found = unique_entry(after, reference)?
+        let after_sheet = &snapshot.inner.sheets[sheet];
+        let found = after_sheet
+            .unique_entry_index(reference)?
+            .and_then(|index| after_sheet.entries.get(index))
             .ok_or_else(|| Error::UnsafeEdit("shifted cell disappeared on readback".into()))?;
         if found.cell.storage != entry.cell.storage
             || found.cell.style != entry.cell.style
@@ -8114,3 +8676,6 @@ fn verify_shifted_cells(
 
 #[cfg(test)]
 mod tests;
+
+#[cfg(test)]
+mod index_tests;

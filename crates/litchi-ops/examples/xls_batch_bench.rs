@@ -21,6 +21,7 @@
 //! ```
 //!
 //! Set `LITCHI_XLS_BENCH_SAMPLES` to change the repeat count (default five).
+//! Set `LITCHI_XLS_BENCH_REVERSE=1` to stage coordinates in descending order.
 
 #[cfg(all(feature = "xls", any(unix, windows)))]
 mod enabled {
@@ -54,6 +55,7 @@ mod enabled {
     struct Report {
         schema: &'static str,
         samples: usize,
+        staging_order: &'static str,
         warmup_passes: usize,
         native_stage_limit: usize,
         generation_included: bool,
@@ -136,11 +138,12 @@ mod enabled {
             .filter(|value| *value > 0)
             .unwrap_or(DEFAULT_SAMPLES);
 
+        let reverse = std::env::var("LITCHI_XLS_BENCH_REVERSE").as_deref() == Ok("1");
         let mut cases = Vec::with_capacity(CASES.len() * 4);
         for source_backed in [false, true] {
             for operation in [Operation::Set, Operation::Remove] {
                 for &cells in CASES {
-                    let fixture = prepare(cells, operation, source_backed);
+                    let fixture = prepare(cells, operation, source_backed, reverse);
                     let warmup_native = native_edit(&fixture);
                     let warmup_edit = unified_edit(&fixture);
                     let warmup_batch = unified_batch(&fixture, fixture.batch_items.clone());
@@ -279,6 +282,7 @@ mod enabled {
         let report = Report {
             schema: "litchi.xls_batch_bench.v1",
             samples,
+            staging_order: if reverse { "descending" } else { "ascending" },
             warmup_passes: 1,
             native_stage_limit: NATIVE_STAGE_LIMIT,
             generation_included: false,
@@ -294,7 +298,7 @@ mod enabled {
         println!();
     }
 
-    fn prepare(cells: usize, operation: Operation, source_backed: bool) -> Fixture {
+    fn prepare(cells: usize, operation: Operation, source_backed: bool, reverse: bool) -> Fixture {
         let mut builder = Builder::new();
         let sheet = builder.add_worksheet("Sheet1").expect("add Sheet1");
         let mut references = Vec::with_capacity(cells);
@@ -312,8 +316,12 @@ mod enabled {
             .expect("build benchmark XLS")
             .to_bytes()
             .expect("publish benchmark XLS");
-        let batch_items = make_batch_items(&paths, operation);
+        if reverse {
+            references.reverse();
+            paths.reverse();
+        }
         let expected_checksum = expected_checksum(&references, operation);
+        let batch_items = make_batch_items(&paths, operation);
         let (native, unified, source_path, tempdir) = if source_backed {
             let tempdir = tempfile::tempdir().expect("create benchmark tempdir");
             let path = tempdir.path().join("fixture.xls");

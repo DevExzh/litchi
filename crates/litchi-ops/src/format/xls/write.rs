@@ -865,6 +865,16 @@ pub(crate) mod coalesce {
             props: &Props<'_>,
             limits: &SemanticLimits,
         ) -> Result<Option<Plan>> {
+            self.cell_plan_with_source(target, props, limits, None)
+        }
+
+        fn cell_plan_with_source(
+            &self,
+            target: &TargetArg<'_>,
+            props: &Props<'_>,
+            limits: &SemanticLimits,
+            source: Option<&litchi_xls::Edit>,
+        ) -> Result<Option<Plan>> {
             self.check_source()?;
             let result = (|| {
                 let Some(path) = target.path() else {
@@ -886,7 +896,7 @@ pub(crate) mod coalesce {
                 if matches!(admitted.assignment, CellAssignment::Noop) {
                     return Ok(None);
                 }
-                let Some((target, current)) = direct_target(self, target, limits)? else {
+                let Some((target, current)) = direct_target(self, target, limits, source)? else {
                     return Ok(None);
                 };
                 // Formula cells are deliberately left to the ordinary setter,
@@ -935,6 +945,15 @@ pub(crate) mod coalesce {
             target: &TargetArg<'_>,
             limits: &SemanticLimits,
         ) -> Result<Option<Plan>> {
+            self.remove_plan_with_source(target, limits, None)
+        }
+
+        fn remove_plan_with_source(
+            &self,
+            target: &TargetArg<'_>,
+            limits: &SemanticLimits,
+            source: Option<&litchi_xls::Edit>,
+        ) -> Result<Option<Plan>> {
             self.check_source()?;
             let result = (|| {
                 let Some(path) = target.path() else {
@@ -946,7 +965,7 @@ pub(crate) mod coalesce {
                 if step.cell_ref().is_none() {
                     return Ok(None);
                 }
-                let Some((target, _)) = direct_target(self, target, limits)? else {
+                let Some((target, _)) = direct_target(self, target, limits, source)? else {
                     return Ok(None);
                 };
                 if target.formula {
@@ -1000,7 +1019,8 @@ pub(crate) mod coalesce {
             props: &Props<'_>,
             limits: &SemanticLimits,
         ) -> Result<Option<Plan>> {
-            self.base.cell_plan(target, props, limits)
+            self.base
+                .cell_plan_with_source(target, props, limits, Some(&self.edit))
         }
 
         pub(crate) fn remove_plan(
@@ -1008,7 +1028,8 @@ pub(crate) mod coalesce {
             target: &TargetArg<'_>,
             limits: &SemanticLimits,
         ) -> Result<Option<Plan>> {
-            self.base.remove_plan(target, limits)
+            self.base
+                .remove_plan_with_source(target, limits, Some(&self.edit))
         }
 
         pub(crate) fn first_index(&self) -> Option<usize> {
@@ -1185,6 +1206,7 @@ pub(crate) mod coalesce {
         file: &Xls,
         target: &TargetArg<'_>,
         limits: &SemanticLimits,
+        source: Option<&litchi_xls::Edit>,
     ) -> Result<Option<(CellTarget, Option<NativeValue>)>> {
         let Some(path) = target.path() else {
             return Ok(None);
@@ -1198,7 +1220,12 @@ pub(crate) mod coalesce {
         if limits.max_expanded_targets() == 0 {
             return Err(super::expanded_limit(1, limits.max_expanded_targets()));
         }
-        let node = crate::path::resolve::get(&super::Nav::new(file), path)?;
+        let nav = if source.is_some() {
+            super::Nav::coordinates(file)
+        } else {
+            super::Nav::new(file)
+        };
+        let node = crate::path::resolve::get(&nav, path)?;
         if node.element() != Kind::Cell {
             return Ok(None);
         }
@@ -1209,11 +1236,25 @@ pub(crate) mod coalesce {
             );
         };
         let reference = Reference::new(row, column).map_err(native_value_error)?;
-        let state = node.cell_state()?;
-        let (present, formula) = cell_state_facts(state);
-        let current = match state {
-            super::CellState::Stored(cell) => native_value(&cell.value),
-            super::CellState::Missing | super::CellState::Stub => None,
+        let (present, formula, current) = if let Some(source) = source {
+            let cell = source
+                .source_cell(Selector::Position(node.sheet_position()), reference)
+                .map_err(native_edit_error)?;
+            (
+                cell.is_some(),
+                cell.is_some_and(|cell| {
+                    cell.storage() == litchi_xls::cell_values::Storage::Formula
+                }),
+                cell.map(|cell| cell.value().clone()),
+            )
+        } else {
+            let state = node.cell_state()?;
+            let (present, formula) = cell_state_facts(state);
+            let current = match state {
+                super::CellState::Stored(cell) => native_value(&cell.value),
+                super::CellState::Missing | super::CellState::Stub => None,
+            };
+            (present, formula, current)
         };
         file.check_source()?;
         Ok(Some((

@@ -21,11 +21,24 @@ use crate::query::inspect::{HeaderBinding, HeaderKey, Inspect};
 #[derive(Debug, Clone, Copy)]
 pub(crate) struct Nav<'f> {
     file: &'f Xls,
+    coordinates_only: bool,
 }
 
 impl<'f> Nav<'f> {
     pub(crate) const fn new(file: &'f Xls) -> Self {
-        Self { file }
+        Self {
+            file,
+            coordinates_only: false,
+        }
+    }
+
+    /// Resolve direct structural coordinates without decoding their payload.
+    /// The native edit inventory supplies cell facts for a coalesced run.
+    pub(super) const fn coordinates(file: &'f Xls) -> Self {
+        Self {
+            file,
+            coordinates_only: true,
+        }
     }
 
     fn found(node: Node<'f>) -> Lookup<Node<'f>, GapSpec> {
@@ -90,7 +103,11 @@ impl<'f> Nav<'f> {
                 self.file,
                 position,
                 at,
-                CellSource::Direct(sheet.handle.cell(at)?),
+                if self.coordinates_only {
+                    CellSource::Stub
+                } else {
+                    CellSource::Direct(sheet.handle.cell(at)?)
+                },
             )));
         }
         let grid = sheet.grid()?.clone();

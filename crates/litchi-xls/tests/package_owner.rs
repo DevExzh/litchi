@@ -881,3 +881,85 @@ fn transformed_byte_handoff_retains_native_policies_and_source_fences() {
         )))
     ));
 }
+
+#[test]
+fn primary_source_cell_uses_the_admitted_inventory_and_original_state() {
+    use litchi_xls::cell_values::{Reference, Value};
+
+    let bytes = authored_package();
+    for source_backed in [false, true] {
+        let source = Arc::new(CountingReadAt::new(bytes.clone()));
+        let package = if source_backed {
+            Package::from_source(
+                litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap(),
+            )
+            .unwrap()
+        } else {
+            Package::from_bytes(&bytes).unwrap()
+        };
+        let mut edit = package.edit().unwrap();
+        let original = Reference::new(3, 2).unwrap();
+        let missing = Reference::new(10, 2).unwrap();
+        let reads = source.read_count();
+        assert_eq!(
+            edit.source_cell(0usize, original).unwrap().unwrap().value(),
+            &Value::Number(4.5)
+        );
+        assert!(edit.source_cell("Sheet1", missing).unwrap().is_none());
+        edit.set_value(0usize, original, Value::Number(9.0))
+            .unwrap();
+        edit.insert_cell(0usize, missing, Value::Number(10.0))
+            .unwrap();
+        assert_eq!(
+            edit.source_cell("Sheet1", original)
+                .unwrap()
+                .unwrap()
+                .value(),
+            &Value::Number(4.5)
+        );
+        assert!(edit.source_cell(0usize, missing).unwrap().is_none());
+        assert!(edit.source_cell("missing sheet", original).is_err());
+        assert_eq!(
+            source.read_count(),
+            reads,
+            "source cell lookup must reuse the admitted inventory"
+        );
+        let commit = edit.commit().unwrap();
+        let next = commit.package().edit().unwrap();
+        assert_eq!(
+            next.source_cell(0usize, original).unwrap().unwrap().value(),
+            &Value::Number(9.0)
+        );
+        assert_eq!(
+            next.source_cell(0usize, missing).unwrap().unwrap().value(),
+            &Value::Number(10.0)
+        );
+        assert_eq!(package.to_bytes().unwrap(), bytes);
+    }
+}
+
+#[test]
+fn primary_source_cell_keeps_the_source_fence() {
+    use litchi_xls::cell_values::Reference;
+    let source = Arc::new(CountingReadAt::new(authored_package()));
+    let package = Package::from_source(
+        litchi_xls::SourceBackedWorkbook::from_read_at(source.clone()).unwrap(),
+    )
+    .unwrap();
+    let edit = package.edit().unwrap();
+    source.bump();
+    for sheet in [0usize, 100usize] {
+        let error = edit
+            .source_cell(sheet, Reference::new(3, 2).unwrap())
+            .unwrap_err();
+        assert!(
+            matches!(
+                error,
+                litchi_xls::EditError::Package(PackageError::Source(
+                    SourceBackedError::SourceChanged { .. }
+                ))
+            ),
+            "source freshness must precede even missing-sheet lookup: {error}"
+        );
+    }
+}

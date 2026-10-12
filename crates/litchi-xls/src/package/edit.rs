@@ -424,6 +424,42 @@ impl Edit {
         self.options
     }
 
+    /// Look up a transaction-owned cell in the immutable source of this edit.
+    ///
+    /// This reuses the inventory admitted when the edit started. It reports
+    /// the original cell, even after that coordinate has been staged for a
+    /// change; commit before looking up a changed candidate. Source-backed
+    /// edits check freshness before and after the lookup.
+    ///
+    /// ```
+    /// use litchi_xls::{Package, cell_values::{Reference, Value}};
+    /// let package = Package::new()?;
+    /// let mut edit = package.edit()?;
+    /// let cell = Reference::new(0, 0)?;
+    /// assert!(edit.source_cell(0usize, cell)?.is_none());
+    /// edit.insert_cell(0usize, cell, Value::Number(1.0))?;
+    /// assert!(edit.source_cell(0usize, cell)?.is_none());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-freshness error, a missing/ambiguous worksheet error,
+    /// or an ambiguity error for duplicate physical cell records.
+    pub fn source_cell<'a>(
+        &self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+    ) -> Result<Option<&cell_values::Cell>> {
+        check_source_guard(self.source_guard.as_ref())?;
+        let result = self
+            .inner
+            .source_cell(selector.into(), reference)
+            .map_err(Error::from);
+        check_source_guard(self.source_guard.as_ref())?;
+        result
+    }
+
     /// Set one existing numeric cell while preserving its storage family.
     pub fn set_numeric<'a>(
         &mut self,
