@@ -619,96 +619,106 @@ fn run_format_patch(props: &Props<'_>) -> Result<RunFormatPatch> {
 }
 
 fn run_bool(value: &PropValue<'_>, key: &'static str) -> Result<bool> {
-    value.with_coerced(ValueType::Bool, |value| {
-        let Some(Scalar::Bool(value)) = value else {
-            return Err(Error::new(
-                Code::InvalidValue,
-                "RTF run character formatting requires a boolean value",
-            )
-            .with_property(key)
-            .with_format(FileFormat::Rtf));
-        };
-        Ok(value)
-    })
+    value
+        .with_coerced(ValueType::Bool, |value| {
+            let Some(Scalar::Bool(value)) = value else {
+                return Err(Error::new(
+                    Code::InvalidValue,
+                    "RTF run character formatting requires a boolean value",
+                )
+                .with_property(key)
+                .with_format(FileFormat::Rtf));
+            };
+            Ok(value)
+        })
+        .map_err(|error| error.with_property(key).with_format(FileFormat::Rtf))
 }
 
 fn run_size(value: &PropValue<'_>) -> Result<NonZeroU16> {
-    value.with_coerced(ValueType::Length(LengthSpec::FONT_SIZE), |value| {
-        let Some(Scalar::Length(value)) = value else {
-            return Err(Error::new(
-                Code::InvalidValue,
-                "RTF run size requires a font-size length",
-            )
-            .with_property("size")
-            .with_format(FileFormat::Rtf));
-        };
-        let emu = value.emu();
-        if emu <= 0 || emu % 6_350 != 0 {
-            return Err(Error::new(
-                Code::InvalidValue,
-                "RTF run size must be a positive whole half-point",
-            )
-            .with_property("size")
-            .with_format(FileFormat::Rtf));
-        }
-        let half_points = emu / 6_350;
-        let half_points = u16::try_from(half_points).map_err(|_| {
-            Error::new(
-                Code::InvalidValue,
-                "RTF run size is outside the native half-point range",
-            )
-            .with_property("size")
-            .with_format(FileFormat::Rtf)
-        })?;
-        NonZeroU16::new(half_points).ok_or_else(|| {
-            Error::new(Code::InvalidValue, "RTF run size must be positive")
+    value
+        .with_coerced(ValueType::Length(LengthSpec::FONT_SIZE), |value| {
+            let Some(Scalar::Length(value)) = value else {
+                return Err(Error::new(
+                    Code::InvalidValue,
+                    "RTF run size requires a font-size length",
+                )
+                .with_property("size")
+                .with_format(FileFormat::Rtf));
+            };
+            let emu = value.emu();
+            if emu <= 0 || emu % 6_350 != 0 {
+                return Err(Error::new(
+                    Code::InvalidValue,
+                    "RTF run size must be a positive whole half-point",
+                )
+                .with_property("size")
+                .with_format(FileFormat::Rtf));
+            }
+            let half_points = emu / 6_350;
+            let half_points = u16::try_from(half_points).map_err(|_| {
+                Error::new(
+                    Code::InvalidValue,
+                    "RTF run size is outside the native half-point range",
+                )
                 .with_property("size")
                 .with_format(FileFormat::Rtf)
+            })?;
+            NonZeroU16::new(half_points).ok_or_else(|| {
+                Error::new(Code::InvalidValue, "RTF run size must be positive")
+                    .with_property("size")
+                    .with_format(FileFormat::Rtf)
+            })
         })
-    })
+        .map_err(|error| error.with_property("size").with_format(FileFormat::Rtf))
 }
 
 fn run_underline(value: &PropValue<'_>) -> Result<UnderlineStyle> {
-    value.with_coerced(ValueType::Token(&super::spec::RUN_UNDERLINE), |value| {
-        let Some(Scalar::Token(value)) = value else {
-            return Err(Error::new(
-                Code::InvalidValue,
-                "RTF run underline requires a known underline token",
-            )
-            .with_property("underline")
-            .with_format(FileFormat::Rtf));
-        };
-        let underline = match value {
-            "none" => UnderlineStyle::None,
-            "single" => UnderlineStyle::Single,
-            "double" => UnderlineStyle::Double,
-            "dotted" => UnderlineStyle::Dotted,
-            "dashed" => UnderlineStyle::Dashed,
-            "dashDot" => UnderlineStyle::DashDot,
-            "dashDotDot" => UnderlineStyle::DashDotDot,
-            "words" => UnderlineStyle::Words,
-            "thick" => UnderlineStyle::Thick,
-            "wave" => UnderlineStyle::Wave,
-            "hairline" => UnderlineStyle::Hairline,
-            "thickDotted" => UnderlineStyle::ThickDotted,
-            "thickDashed" => UnderlineStyle::ThickDashed,
-            "thickDashDot" => UnderlineStyle::ThickDashDot,
-            "thickDashDotDot" => UnderlineStyle::ThickDashDotDot,
-            "thickLongDash" => UnderlineStyle::ThickLongDash,
-            "longDash" => UnderlineStyle::LongDash,
-            "heavyWave" => UnderlineStyle::HeavyWave,
-            "doubleWave" => UnderlineStyle::DoubleWave,
-            _ => {
+    value
+        .with_coerced(ValueType::Token(&super::spec::RUN_UNDERLINE), |value| {
+            let Some(Scalar::Token(value)) = value else {
                 return Err(Error::new(
                     Code::InvalidValue,
-                    "RTF run underline token is not supported",
+                    "RTF run underline requires a known underline token",
                 )
                 .with_property("underline")
                 .with_format(FileFormat::Rtf));
-            },
-        };
-        Ok(underline)
-    })
+            };
+            let underline = match value {
+                "none" => UnderlineStyle::None,
+                "single" => UnderlineStyle::Single,
+                "double" => UnderlineStyle::Double,
+                "dotted" => UnderlineStyle::Dotted,
+                "dashed" => UnderlineStyle::Dashed,
+                "dashDot" => UnderlineStyle::DashDot,
+                "dashDotDot" => UnderlineStyle::DashDotDot,
+                "words" => UnderlineStyle::Words,
+                "thick" => UnderlineStyle::Thick,
+                "wave" => UnderlineStyle::Wave,
+                "hairline" => UnderlineStyle::Hairline,
+                "thickDotted" => UnderlineStyle::ThickDotted,
+                "thickDashed" => UnderlineStyle::ThickDashed,
+                "thickDashDot" => UnderlineStyle::ThickDashDot,
+                "thickDashDotDot" => UnderlineStyle::ThickDashDotDot,
+                "thickLongDash" => UnderlineStyle::ThickLongDash,
+                "longDash" => UnderlineStyle::LongDash,
+                "heavyWave" => UnderlineStyle::HeavyWave,
+                "doubleWave" => UnderlineStyle::DoubleWave,
+                _ => {
+                    return Err(Error::new(
+                        Code::InvalidValue,
+                        "RTF run underline token is not supported",
+                    )
+                    .with_property("underline")
+                    .with_format(FileFormat::Rtf));
+                },
+            };
+            Ok(underline)
+        })
+        .map_err(|error| {
+            error
+                .with_property("underline")
+                .with_format(FileFormat::Rtf)
+        })
 }
 
 /// Remove every selected ordinary body paragraph in one native transaction.
