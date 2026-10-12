@@ -4595,7 +4595,9 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
 /// otherwise non-literal sources to the established lifecycle projection,
 /// which reports its existing typed refusal when it cannot preserve them.
 fn commit_body_paragraph_insertion(edit: &Edit) -> Result<Option<(Package, Vec<Change>)>, Error> {
-    let map = match ordinary_paragraph_source_map(&edit.source) {
+    // This splice explicitly supplies missing control-word delimiters. Other
+    // structural routes retain their stricter undelimited-source admission.
+    let map = match ordinary_paragraph_source_map_inner(&edit.source, false, true) {
         Ok(map) => map,
         Err(Error::UnsupportedSource(_)) => return Ok(None),
         Err(error) => return Err(error),
@@ -5544,18 +5546,19 @@ struct OrdinaryParagraphSourceMap {
 /// encoded characters, visible control symbols, nested groups, and all other
 /// controls fail closed rather than being guessed around.
 fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSourceMap, Error> {
-    ordinary_paragraph_source_map_inner(source, false)
+    ordinary_paragraph_source_map_inner(source, false, false)
 }
 
 fn ordinary_paragraph_source_map_with_lines(
     source: &Package,
 ) -> Result<OrdinaryParagraphSourceMap, Error> {
-    ordinary_paragraph_source_map_inner(source, true)
+    ordinary_paragraph_source_map_inner(source, true, false)
 }
 
 fn ordinary_paragraph_source_map_inner(
     source: &Package,
     allow_inline_line: bool,
+    allow_undelimited_start: bool,
 ) -> Result<OrdinaryParagraphSourceMap, Error> {
     let source_bytes = source
         .source_bytes()
@@ -5636,6 +5639,20 @@ fn ordinary_paragraph_source_map_inner(
         .ok_or(Error::UnsupportedSource(
             "ordinary paragraph source span is outside the source",
         ))?;
+    if !allow_undelimited_start
+        && source.text().starts_with('\n')
+        && body_bytes
+            .get(..4)
+            .is_some_and(|prefix| prefix.eq_ignore_ascii_case(br"\par"))
+        && body_span.start != 0
+        && !source_bytes
+            .get(body_span.start - 1)
+            .is_some_and(u8::is_ascii_whitespace)
+    {
+        return Err(Error::UnsupportedSource(
+            "leading empty paragraph has no safe control-word delimiter",
+        ));
+    }
     let body_input = std::str::from_utf8(body_bytes)
         .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
     let arena = Bump::new();
@@ -8594,55 +8611,10 @@ fn validate_opaque_preservation(
 
 fn encoded_body_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>, Error> {
     let mut output = BoundedVec::new(limits.max_input_bytes());
-    match write_body_text_with_utf16(&mut RtfWriter::new(&mut output), text) {
+    match RtfWriter::new(&mut output).write_text(text) {
         Ok(()) => Ok(output.into_inner()),
         Err(error) => Err(output.map_io_error(error)),
     }
-}
-
-/// Write insertion text with RTF's signed UTF-16 `\uN` representation.
-///
-/// The general writer preserves its established wire spelling, including its
-/// historical scalar-value encoding. Paragraph insertion needs a stricter
-/// local encoding because the candidate is immediately parsed for exact
-/// semantic readback, and astral scalars must be emitted as surrogate units.
-fn write_body_text_with_utf16<W: io::Write>(
-    writer: &mut RtfWriter<W>,
-    text: &str,
-) -> io::Result<()> {
-    let mut plain_start = 0usize;
-    for (offset, character) in text.char_indices() {
-        if character.len_utf8() <= 3 {
-            continue;
-        }
-
-        let plain = text.get(plain_start..offset).ok_or_else(|| {
-            io::Error::new(
-                io::ErrorKind::InvalidInput,
-                "RTF text span is not on UTF-8 boundaries",
-            )
-        })?;
-        writer.write_text(plain)?;
-        let mut units = [0u16; 2];
-        for unit in character.encode_utf16(&mut units) {
-            let value = i32::from(*unit);
-            let signed_value = if value > i32::from(i16::MAX) {
-                value - (i32::from(u16::MAX) + 1)
-            } else {
-                value
-            };
-            writer.write_control_word("u", Some(signed_value))?;
-            writer.write_str("?")?;
-        }
-        plain_start = offset + character.len_utf8();
-    }
-    let plain = text.get(plain_start..).ok_or_else(|| {
-        io::Error::new(
-            io::ErrorKind::InvalidInput,
-            "RTF text span is not on UTF-8 boundaries",
-        )
-    })?;
-    writer.write_text(plain)
 }
 
 #[derive(Clone, Copy)]
@@ -9495,7 +9467,7 @@ fn encoded_body_len(text: &str) -> Result<usize, Error> {
             '\n' | '\t' => 5,
             value if (value as u32) < 0x20 => 4,
             value if value.is_ascii() => 1,
-            _ => 10,
+            value => 10 * value.len_utf16(),
         };
         total.checked_add(width).ok_or(Error::InputTooLarge {
             observed: usize::MAX,
@@ -10871,7 +10843,7 @@ impl Patch {
     /// Appending an empty paragraph to a non-terminal ordinary story is
     /// source-bound for the same reason: its two control boundaries are not
     /// represented by the shared `paragraph.insert` payload.
-    /// Other positioned paragraph insertions are admitted only when a forward
+    /// Paragraph insertions and removals are admitted only when a forward
     /// and inverse durable replay both reproduce the exact source artifacts.
     ///
     /// # Errors
@@ -10958,15 +10930,10 @@ impl Patch {
                 .ok_or(litchi_core::patch::PatchError::InvalidText {
                     field: "RTF target artifact",
                 })?;
-        let has_paragraph_insertion = self.changes.iter().any(|change| {
-            matches!(
-                change,
-                Change::RemoveParagraph {
-                    restoring: true,
-                    ..
-                }
-            )
-        });
+        let has_paragraph_lifecycle = self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::RemoveParagraph { .. }));
         let operations = self
             .changes
             .iter()
@@ -10984,9 +10951,9 @@ impl Patch {
             BlobBundle::new(limits.blobs()),
             BlobBundle::new(limits.blobs()),
         )?;
-        if has_paragraph_insertion {
+        if has_paragraph_lifecycle {
             let exact_replay_error = || litchi_core::patch::PatchError::InvalidText {
-                field: "RTF paragraph insertion durable replay is not byte-exact",
+                field: "RTF paragraph lifecycle durable replay is not byte-exact",
             };
             let applied =
                 apply_durable(&self.before, &durable).map_err(|_error| exact_replay_error())?;

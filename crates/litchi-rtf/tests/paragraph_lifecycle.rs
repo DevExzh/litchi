@@ -79,7 +79,12 @@ fn positioned_insert_preserves_empty_paragraphs_and_terminal_boundaries() {
             let mut edit = source.edit();
             edit.insert_paragraph(litchi_core::Position::new(position), *value)
                 .unwrap();
-            let commit = edit.commit().unwrap();
+            let commit = edit.commit().unwrap_or_else(|error| {
+                panic!(
+                    "source={:?}, position={position}, value={value:?}: {error:?}",
+                    source.text()
+                )
+            });
             let mut expected = paragraph_texts(&source);
             expected.insert(position, (*value).to_string());
             assert_eq!(paragraph_texts(commit.package()), expected);
@@ -90,10 +95,24 @@ fn positioned_insert_preserves_empty_paragraphs_and_terminal_boundaries() {
             );
             let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
             assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
-            if !value.is_empty() {
+            let source_bound = (source.text() == "A\n\nB" && position == 1)
+                || (source.text() == "A\nB\n" && position == count);
+            if source_bound {
+                assert!(matches!(
+                    commit.patch().to_durable(durable_limits()),
+                    Err(litchi_core::patch::PatchError::InvalidText { .. })
+                ));
+                assert!(matches!(
+                    commit.patch().inverse().to_durable(durable_limits()),
+                    Err(litchi_core::patch::PatchError::InvalidText { .. })
+                ));
+            } else if !value.is_empty() {
                 let durable = commit.patch().to_durable(durable_limits()).unwrap();
                 let applied = source.apply_durable(&durable).unwrap();
-                assert_eq!(applied.to_bytes().unwrap(), commit.package().to_bytes().unwrap());
+                assert_eq!(
+                    applied.to_bytes().unwrap(),
+                    commit.package().to_bytes().unwrap()
+                );
                 let restored = applied.apply_durable(&durable.inverse()).unwrap();
                 assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
             }
@@ -114,7 +133,10 @@ fn positioned_insert_into_an_empty_story_creates_a_real_empty_paragraph() {
     assert_complete_reopen(commit.package(), &[""]);
     let durable = commit.patch().to_durable(durable_limits()).unwrap();
     let applied = source.apply_durable(&durable).unwrap();
-    assert_eq!(applied.to_bytes().unwrap(), commit.package().to_bytes().unwrap());
+    assert_eq!(
+        applied.to_bytes().unwrap(),
+        commit.package().to_bytes().unwrap()
+    );
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 }
@@ -452,4 +474,42 @@ fn partial_sink_failure_does_not_mutate_the_published_snapshot() {
     assert!(sink.bytes.len() < exact.len());
     assert_eq!(commit.package().to_bytes().unwrap(), exact);
     assert_complete_reopen(commit.package(), &["First", "Third", "Fourth"]);
+}
+
+#[test]
+fn positioned_insertion_admits_bounds_before_retaining_payload_and_stays_reusable() {
+    let source = Package::new().unwrap();
+    let limits = SemanticLimits::builder()
+        .max_replacement_bytes(3)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(limits));
+    assert!(matches!(
+        edit.insert_paragraph(litchi_core::Position::new(0), "abc"),
+        Err(Error::Limit {
+            kind: SemanticLimitKind::ReplacementBytes,
+            ..
+        })
+    ));
+    assert!(matches!(
+        edit.insert_paragraph(litchi_core::Position::new(1), "ab"),
+        Err(Error::ParagraphOutOfRange { .. })
+    ));
+    edit.insert_paragraph(litchi_core::Position::new(0), "ab")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(paragraph_texts(commit.package()), ["ab"]);
+    assert_eq!(commit.diagnostics().operation_count(), 1);
+    assert_eq!(source.paragraph_count(), 0);
+    let mut denied =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
+    assert!(matches!(
+        denied.insert_paragraph(litchi_core::Position::new(0), ""),
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
+            ..
+        })
+    ));
+    assert!(!denied.commit().unwrap().diagnostics().changed());
 }

@@ -84,7 +84,8 @@ pub(crate) fn add_with_limits<'p, 'n>(
         .map_err(Error::from)?;
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
-    edit.insert_paragraph(position, text).map_err(Error::from)?;
+    edit.insert_paragraph(Position::new(position), text)
+        .map_err(Error::from)?;
     let native = edit.commit().map_err(Error::from)?;
 
     let changed = native.diagnostics().changed();
@@ -457,7 +458,7 @@ fn move_destination(
                 )
                 .with_format(FileFormat::Rtf));
             }
-            position.map_or(last, litchi_core::Position::get)
+            position.map_or(last, Position::get)
         },
     };
     if destination >= count {

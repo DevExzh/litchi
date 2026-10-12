@@ -330,12 +330,17 @@ fn capabilities_publish_text_writes_and_structural_gaps() {
     use litchi_ops::capabilities::Verb;
     let source = file();
     let capabilities = source.capabilities();
-    for verb in [Verb::Set, Verb::Remove, Verb::Move, Verb::Edit, Verb::Batch] {
+    for verb in [
+        Verb::Set,
+        Verb::Remove,
+        Verb::Move,
+        Verb::Add,
+        Verb::Edit,
+        Verb::Batch,
+    ] {
         assert!(capabilities.verb(verb).is_supported());
     }
-    for verb in [Verb::Add, Verb::Swap] {
-        assert!(!capabilities.verb(verb).is_supported());
-    }
+    assert!(!capabilities.verb(Verb::Swap).is_supported());
     assert!(
         capabilities
             .element("p")

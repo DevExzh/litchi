@@ -72,11 +72,14 @@ impl<W: Write> RtfWriter<W> {
                 c if c.is_ascii() => continue,
                 c => {
                     self.write_text_span(text, plain_start, offset)?;
-                    // Write Unicode character
-                    let code = c as i32;
-                    self.write_control_word("u", Some(code))?;
-                    // Fallback character
-                    self.write_str("?")?;
+                    // RTF stores signed UTF-16 units, including a surrogate
+                    // pair for astral scalars. Each unit has its own fallback.
+                    let mut units = [0u16; 2];
+                    for unit in c.encode_utf16(&mut units) {
+                        let signed = i16::from_ne_bytes(unit.to_ne_bytes());
+                        self.write_control_word("u", Some(i32::from(signed)))?;
+                        self.write_str("?")?;
+                    }
                     plain_start = offset + ch.len_utf8();
                     continue;
                 },
