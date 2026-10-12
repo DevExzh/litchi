@@ -218,9 +218,15 @@ impl fmt::Display for TransferDependency {
 #[non_exhaustive]
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Refusal {
-    /// The CFB is signed, encrypted, or contains storage metadata that the
-    /// stream-only incremental publisher cannot preserve faithfully.
+    /// The CFB is encrypted or contains storage metadata that the stream-only
+    /// incremental publisher cannot preserve faithfully. Signed sources have
+    /// the more precise [`Refusal::Signed`] policy below.
     UnsupportedSource,
+    /// The CFB carries a digital-signature component.  Read-only planning and
+    /// exact no-op transactions remain valid, but any changed publication
+    /// would invalidate the signature and is refused before a lower-level
+    /// writer can drop or rewrite it.
+    Signed,
     /// The read path repaired a cyclic UserEdit chain.  The native append-only
     /// editor still requires a strict chain, so this source is read-only.
     RepairedUserEditChain,
@@ -257,6 +263,9 @@ impl fmt::Display for Refusal {
         match self {
             Self::UnsupportedSource => formatter.write_str(
                 "PPT source cannot be republished through the safe slide-order transaction",
+            ),
+            Self::Signed => formatter.write_str(
+                "PPT signed source cannot be changed through the safe slide-order transaction",
             ),
             Self::RepairedUserEditChain => formatter
                 .write_str("PPT source contains a repaired UserEdit chain and is read-only"),
@@ -583,6 +592,7 @@ pub struct Snapshot {
     leniency: crate::leniency::Leniency,
     chain_repaired: bool,
     has_review_history: bool,
+    has_signature: bool,
 }
 
 impl Snapshot {
@@ -633,6 +643,7 @@ impl Snapshot {
             .into());
         }
         let mut package = Reader::from_reader_with_limits(Cursor::new(bytes.as_slice()), limits)?;
+        let has_signature = package.contains_signature_component()?;
         let presentation = package.presentation_with_options(options)?;
         let directory = presentation.slide_directory();
         // Resolve the live document through the already parsed presentation.
@@ -700,6 +711,7 @@ impl Snapshot {
             leniency: options.get_leniency(),
             chain_repaired,
             has_review_history,
+            has_signature,
         })
     }
 
@@ -750,6 +762,7 @@ impl Snapshot {
             leniency: self.leniency,
             chain_repaired: self.chain_repaired,
             has_review_history: self.has_review_history,
+            has_signature: self.has_signature,
         })
     }
 
@@ -802,6 +815,7 @@ impl Snapshot {
                 leniency: self.leniency,
                 chain_repaired: self.chain_repaired,
                 has_review_history: self.has_review_history,
+                has_signature: self.has_signature,
             },
             changes,
         ))
@@ -859,6 +873,14 @@ impl Snapshot {
     /// not own exactly one supported `PowerPoint` client anchor.
     pub fn shape_anchor(&self, target: crate::text_edit::Target) -> Result<crate::Anchor> {
         self.require_position(target.slide())?;
+        if self.has_signature {
+            return crate::text_edit::inspect_shape_anchor_readonly(
+                self.bytes(),
+                target,
+                self.open_options(),
+            )
+            .map_err(Error::from);
+        }
         crate::text_edit::inspect_shape_anchor(self.bytes(), target).map_err(Error::from)
     }
 
@@ -916,8 +938,10 @@ impl Snapshot {
     ///
     /// # Errors
     ///
-    /// Returns a typed refusal for signed/encrypted or metadata-bearing CFB
-    /// sources and for position-dependent reviewer history.
+    /// Returns a typed refusal for encrypted or metadata-bearing CFB sources
+    /// and for position-dependent reviewer history. Signed sources are
+    /// admitted for exact no-op planning; changed operations return
+    /// [`Refusal::Signed`] before publication.
     pub fn edit(&self) -> Result<Transaction> {
         self.require_editable()?;
         Ok(Transaction {
@@ -1011,6 +1035,9 @@ impl Snapshot {
     /// error for malformed source records.
     pub fn plan_transfer_from(&self, donor: &Self, slide: Position) -> Result<TransferPlan> {
         self.require_editable()?;
+        if self.has_signature || donor.has_signature {
+            return Err(Error::Refused(Refusal::Signed));
+        }
         donor.require_position(slide)?;
         let donor_slide = donor.document.slides()[slide.get()];
         let group = donor.document.edit().slide_group(slide.get())?;
@@ -1111,6 +1138,15 @@ impl Snapshot {
     }
 
     fn require_editable(&self) -> Result<()> {
+        // A signed source may still be opened for a read-only transaction.
+        // The individual operation owners perform the changed/no-op split so
+        // that an exact no-op can retain the original CFB, including nested
+        // signature storages, without invoking the mutation editor.  This
+        // admission also deliberately precedes history-closure refusals:
+        // returning the exact source does not depend on appending a new edit.
+        if self.has_signature {
+            return Ok(());
+        }
         // The append-only native editor intentionally reads the UserEdit
         // chain with strict semantics.  A tolerated cyclic chain is safe for
         // read projection, but cannot yet be used as an edit base because
@@ -1673,6 +1709,7 @@ impl Transaction {
         if from == destination {
             return Ok(());
         }
+        self.require_change_allowed()?;
         let before_order = order_digest(&self.document)?;
         self.document
             .move_slide(from.get(), destination.get())
@@ -1717,6 +1754,7 @@ impl Transaction {
         if before == hidden {
             return Ok(());
         }
+        self.require_change_allowed()?;
         self.working = replace_slide_hidden(&self.working, source_position, hidden)?;
         let change = SlideVisibilityChange {
             position,
@@ -1757,6 +1795,7 @@ impl Transaction {
         if before == advance {
             return Ok(());
         }
+        self.require_change_allowed()?;
         self.working = replace_slide_advance(&self.working, source_position, advance)?;
         let change = SlideAdvanceChange {
             target: source_position,
@@ -1797,6 +1836,7 @@ impl Transaction {
         if before == visual {
             return Ok(());
         }
+        self.require_change_allowed()?;
         self.working = replace_slide_transition_visual(&self.working, source_position, visual)?;
         let change = SlideTransitionVisualChange {
             target: source_position,
@@ -1837,11 +1877,22 @@ impl Transaction {
             .map(Position::new)
             .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
         let source_target = crate::text_edit::Target::new(source_position, target.shape());
+        let after = value.into();
+        if self.source.has_signature {
+            let before = crate::text_edit::inspect_shape_text_readonly(
+                self.working.bytes(),
+                source_target,
+                self.source.open_options(),
+            )?;
+            if before == after {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let text_snapshot =
             crate::text_edit::Snapshot::from_shared_bytes(self.working.shared_bytes())?;
         let mut text_edit = text_snapshot.edit_text(source_target)?;
         let before = text_edit.text().to_string();
-        let after = value.into();
         text_edit.set_text(after.clone())?;
         let commit = text_edit.commit()?;
         if commit.patch().is_empty() {
@@ -1923,6 +1974,20 @@ impl Transaction {
             );
         }
 
+        if self.source.has_signature {
+            for (target, replacement) in &mapped {
+                let before = crate::text_edit::inspect_shape_text_readonly(
+                    self.working.bytes(),
+                    *target,
+                    self.source.open_options(),
+                )?;
+                if before != *replacement {
+                    return Err(Error::Refused(Refusal::Signed));
+                }
+            }
+            return Ok(0);
+        }
+
         let Some(publication) = crate::text_edit::replace_shape_texts_batch(
             self.working.shared_bytes(),
             &mapped,
@@ -1988,6 +2053,17 @@ impl Transaction {
             .map(Position::new)
             .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
         let source_target = crate::text_edit::Target::new(source_position, target.shape());
+        if self.source.has_signature {
+            let before = crate::text_edit::inspect_shape_anchor_readonly(
+                self.working.bytes(),
+                source_target,
+                self.source.open_options(),
+            )?;
+            if before == anchor {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let rewritten =
             crate::text_edit::replace_shape_anchor(self.working.bytes(), source_target, anchor)?;
         if rewritten.before == rewritten.after {
@@ -2025,6 +2101,12 @@ impl Transaction {
                 PackageError::InvalidFormat(format!("external media ID {id} was not found"))
             })?;
         let before = media_path_of(object)?;
+        if self.source.has_signature {
+            if before.as_deref() == path.as_deref() {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let mut transaction = media.edit();
         transaction.set_path(id, path.clone())?;
         let commit = transaction.commit()?;
@@ -2067,6 +2149,12 @@ impl Transaction {
             .ok_or_else(|| {
                 PackageError::InvalidFormat(format!("external media ID {id} was not found"))
             })?;
+        if self.source.has_signature {
+            if before == playback {
+                return Ok(());
+            }
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let mut transaction = media.edit();
         transaction.set_playback(id, playback)?;
         let commit = transaction.commit()?;
@@ -2099,6 +2187,7 @@ impl Transaction {
     /// Returns a typed position refusal or a structural validation error.
     pub fn remove_slide(&mut self, position: Position) -> Result<()> {
         self.require_position(position)?;
+        self.require_change_allowed()?;
         let before_order = order_digest(&self.document)?;
         let slides = self.document.slides()?;
         let selected = slides[position.get()];
@@ -2126,6 +2215,7 @@ impl Transaction {
     /// Returns a typed refusal for a stale/different target or a package error
     /// when identifier allocation or structural validation fails.
     pub fn insert_transfer(&mut self, position: Position, plan: &TransferPlan) -> Result<()> {
+        self.require_change_allowed()?;
         if plan.target_artifact != self.source.artifact_digest() {
             return Err(Error::Refused(Refusal::TransferTargetMismatch));
         }
@@ -2191,6 +2281,9 @@ impl Transaction {
     /// Returns an error if publication, preservation checks, full reopen, or
     /// semantic readback fails.
     pub fn commit(self) -> Result<Commit> {
+        if self.source.has_signature && self.source.bytes() != self.working.bytes() {
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let document_commit = if self.structural.is_empty()
             || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
         {
@@ -2202,6 +2295,11 @@ impl Transaction {
         };
         let source = self.source;
         let working = self.working;
+        if source.has_signature
+            && (!document_commit.patch().is_empty() || source.bytes() != working.bytes())
+        {
+            return Err(Error::Refused(Refusal::Signed));
+        }
         if document_commit.patch().is_empty() {
             // Any staged structural operations net to the published working
             // artifact, which the patch retains as its target.
@@ -2320,6 +2418,9 @@ impl Transaction {
     /// Returns the same typed error as [`Self::commit`].
     #[cfg(feature = "performance-diagnostics")]
     pub fn commit_profiled(self, mut observer: impl FnMut(DiagnosticEvent)) -> Result<Commit> {
+        if self.source.has_signature && self.source.bytes() != self.working.bytes() {
+            return Err(Error::Refused(Refusal::Signed));
+        }
         let document_commit = if self.structural.is_empty()
             || (self.media_path_changes.is_empty() && self.media_playback_changes.is_empty())
         {
@@ -2335,6 +2436,11 @@ impl Transaction {
         };
         let source = self.source;
         let working = self.working;
+        if source.has_signature
+            && (!document_commit.patch().is_empty() || source.bytes() != working.bytes())
+        {
+            return Err(Error::Refused(Refusal::Signed));
+        }
 
         if document_commit.patch().is_empty() {
             observe_phase(&mut observer, DiagnosticPhase::StructuralNoOp, || Ok(()))?;
@@ -2478,6 +2584,13 @@ impl Transaction {
     fn require_position(&self, position: Position) -> Result<()> {
         if position.get() >= self.slide_count() {
             return Err(Error::Refused(Refusal::SlideNotFound { position }));
+        }
+        Ok(())
+    }
+
+    fn require_change_allowed(&self) -> Result<()> {
+        if self.source.has_signature {
+            return Err(Error::Refused(Refusal::Signed));
         }
         Ok(())
     }
@@ -3542,6 +3655,23 @@ fn apply_durable_text(
         .get("text_sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| invalid_durable_patch("missing shape-text precondition"))?;
+    if snapshot.has_signature {
+        let current = crate::text_edit::inspect_shape_text_readonly(
+            snapshot.bytes(),
+            target,
+            snapshot.open_options(),
+        )?;
+        if artifact_hash(current.as_bytes()) != expected {
+            return Err(PackageError::InvalidFormat(
+                "PPT durable shape-text semantic precondition does not match".into(),
+            )
+            .into());
+        }
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
     let text_snapshot = crate::text_edit::Snapshot::from_bytes(snapshot.bytes().to_vec())?;
     let mut edit = text_snapshot.edit_text(target)?;
     if artifact_hash(edit.text().as_bytes()) != expected {
@@ -3598,11 +3728,18 @@ fn apply_durable_media_path(
         .get("path_sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| invalid_durable_patch("missing external-media path precondition"))?;
-    if media_path_digest(snapshot.external_media_path(id)?.as_deref()) != expected {
+    let current = snapshot.external_media_path(id)?;
+    if media_path_digest(current.as_deref()) != expected {
         return Err(PackageError::InvalidFormat(
             "PPT durable external-media path precondition does not match".into(),
         )
         .into());
+    }
+    if snapshot.has_signature {
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
     }
     let mut transaction = snapshot.edit()?;
     transaction.set_external_media_path(id, replacement)?;
@@ -3625,11 +3762,18 @@ fn apply_durable_media_playback(
         .get("playback_sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| invalid_durable_patch("missing external-media playback precondition"))?;
-    if playback_digest(snapshot.external_media_playback(id)?) != expected {
+    let current = snapshot.external_media_playback(id)?;
+    if playback_digest(current) != expected {
         return Err(PackageError::InvalidFormat(
             "PPT durable external-media playback precondition does not match".into(),
         )
         .into());
+    }
+    if snapshot.has_signature {
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
     }
     let mut transaction = snapshot.edit()?;
     transaction.set_external_media_playback(id, replacement)?;
@@ -3713,6 +3857,24 @@ fn apply_durable_anchor(
         .get("anchor_sha256")
         .and_then(serde_json::Value::as_str)
         .ok_or_else(|| invalid_durable_patch("missing shape-anchor precondition"))?;
+    let replacement = parse_anchor_value(&operation.value)?;
+    if snapshot.has_signature {
+        let current = crate::text_edit::inspect_shape_anchor_readonly(
+            snapshot.bytes(),
+            target,
+            snapshot.open_options(),
+        )?;
+        if artifact_hash(&current.to_bytes()) != expected {
+            return Err(PackageError::InvalidFormat(
+                "PPT durable shape-anchor semantic precondition does not match".into(),
+            )
+            .into());
+        }
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
     let current = crate::text_edit::inspect_shape_anchor(snapshot.bytes(), target)?;
     if artifact_hash(&current.to_bytes()) != expected {
         return Err(PackageError::InvalidFormat(
@@ -3720,7 +3882,6 @@ fn apply_durable_anchor(
         )
         .into());
     }
-    let replacement = parse_anchor_value(&operation.value)?;
     let rewritten = crate::text_edit::replace_shape_anchor(snapshot.bytes(), target, replacement)?;
     Snapshot::from_bytes_with_options(rewritten.bytes, snapshot.open_options())
 }
@@ -3750,6 +3911,12 @@ fn apply_durable_slide_visibility(
         .value
         .as_bool()
         .ok_or_else(|| invalid_durable_patch("slide-hidden value must be boolean"))?;
+    if snapshot.has_signature {
+        if snapshot.slide_hidden(target)? == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
     replace_slide_hidden(snapshot, target, replacement)
 }
 
@@ -3775,11 +3942,14 @@ fn apply_durable_slide_advance(
         )
         .into());
     }
-    replace_slide_advance(
-        snapshot,
-        target,
-        parse_slide_advance_value(&operation.value)?,
-    )
+    let replacement = parse_slide_advance_value(&operation.value)?;
+    if snapshot.has_signature {
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
+    replace_slide_advance(snapshot, target, replacement)
 }
 
 fn apply_durable_slide_transition_visual(
@@ -3804,11 +3974,14 @@ fn apply_durable_slide_transition_visual(
         )
         .into());
     }
-    replace_slide_transition_visual(
-        snapshot,
-        target,
-        parse_transition_visual_value(&operation.value)?,
-    )
+    let replacement = parse_transition_visual_value(&operation.value)?;
+    if snapshot.has_signature {
+        if current == replacement {
+            return Ok(snapshot.clone());
+        }
+        return Err(Error::Refused(Refusal::Signed));
+    }
+    replace_slide_transition_visual(snapshot, target, replacement)
 }
 
 fn parse_anchor_value(value: &serde_json::Value) -> Result<crate::Anchor> {
@@ -4078,12 +4251,55 @@ fn editor_persisted_slides(
 }
 
 fn persisted_record(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
+    if snapshot.has_signature {
+        return persisted_record_readonly(snapshot, persist_id);
+    }
     crate::embedded::object::Editor::open_records_arc_with_limit(
         snapshot.shared_bytes(),
         snapshot.limits.max_package_bytes,
     )?
     .persisted_record(persist_id)
     .map_err(Error::from)
+}
+
+/// Reads one persisted record without opening the mutation-capable editor.
+///
+/// A signed CFB can be projected through the normal presentation parser, but
+/// the append-only editor must reject it before it can publish a changed
+/// package.  The read-only path therefore resolves the selected persist ID
+/// from the presentation's retained mapping and slices the original record
+/// bytes directly from the PowerPoint Document stream.  This preserves the
+/// same source limits and leniency policy captured by the snapshot.
+fn persisted_record_readonly(snapshot: &Snapshot, persist_id: u32) -> Result<Vec<u8>> {
+    let mut package =
+        Reader::from_reader_with_limits(Cursor::new(snapshot.bytes()), snapshot.limits)?;
+    let presentation = package.presentation_with_options(snapshot.open_options())?;
+    let factory = crate::slide::SlideFactory::new_shared_with_limits(
+        &presentation.inner.powerpoint_document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+        presentation.source_limits(),
+    );
+    let slide = factory.parse_slide(persist_id)?;
+    let document = slide.doc_data();
+    let tail = document.get(slide.offset..).ok_or_else(|| {
+        PackageError::Corrupted(
+            "PPT selected persist record offset exceeds its document stream".into(),
+        )
+    })?;
+    let (_, consumed) = crate::Record::parse_with_limits(tail, 0, presentation.source_limits())?;
+    let end = slide.offset.checked_add(consumed).ok_or_else(|| {
+        PackageError::Corrupted("PPT selected persist record length overflows".into())
+    })?;
+    document
+        .get(slide.offset..end)
+        .map(ToOwned::to_owned)
+        .ok_or_else(|| {
+            PackageError::Corrupted(
+                "PPT selected persist record exceeds its document stream".into(),
+            )
+            .into()
+        })
 }
 
 fn inspect_slide_hidden(snapshot: &Snapshot, position: Position) -> Result<bool> {
@@ -6566,6 +6782,7 @@ fn take_length_prefixed<'a>(bytes: &'a [u8], offset: &mut usize, limit: usize) -
 )]
 mod tests {
     use super::*;
+    use litchi_cfb::{OleFile, OleWriter};
 
     fn fixture(name: &str) -> Vec<u8> {
         std::fs::read(
@@ -6600,6 +6817,22 @@ mod tests {
             .unwrap();
         let mut output = Cursor::new(Vec::new());
         crate::raw::encode(&mut writer, &mut output).unwrap();
+        output.into_inner()
+    }
+
+    fn signed_fixture(bytes: &[u8]) -> Vec<u8> {
+        let mut source = OleFile::open(Cursor::new(bytes)).unwrap();
+        let mut writer = OleWriter::new();
+        for path in source.list_streams() {
+            let names: Vec<&str> = path.iter().map(String::as_str).collect();
+            let data = source.open_stream(&names).unwrap();
+            writer.create_stream(&names, &data).unwrap();
+        }
+        writer
+            .create_stream(&["_signatures"], b"opaque synthetic signature")
+            .unwrap();
+        let mut output = Cursor::new(Vec::new());
+        writer.write_to(&mut output).unwrap();
         output.into_inner()
     }
 
@@ -6648,7 +6881,7 @@ mod tests {
     fn open_ole_live_document_inspection_matches_byte_ingress() {
         let bytes = authored_fixture();
         let expected = crate::embedded::object::Editor::inspect_live_document(&bytes).unwrap();
-        let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes.as_slice())).unwrap();
+        let mut ole = OleFile::open(Cursor::new(bytes.as_slice())).unwrap();
         let actual =
             crate::embedded::object::Editor::inspect_live_document_from_ole(&mut ole).unwrap();
 
@@ -6832,6 +7065,44 @@ mod tests {
         assert_eq!(history.current(), &source);
         assert!(history.redo());
         assert_eq!(history.current(), commit.snapshot());
+    }
+
+    #[test]
+    fn signed_durable_semantic_noop_replays_exactly_and_changed_replay_is_refused() {
+        use litchi_core::patch::{BlobBundle, Reversible, ReversibleOperation};
+
+        let source = Snapshot::from_bytes(signed_fixture(&authored_fixture())).unwrap();
+        let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
+        let limits = patch_limits();
+        let no_op = litchi_core::patch::Patch::<Reversible>::new(
+            limits,
+            "litchi-ppt",
+            [ReversibleOperation::new(
+                durable_text_operation(limits, target, "first slide", "first slide").unwrap(),
+                durable_text_operation(limits, target, "first slide", "first slide").unwrap(),
+            )],
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )
+        .unwrap();
+        let replayed = source.apply_durable(&no_op).unwrap();
+        assert_eq!(replayed.bytes(), source.bytes());
+
+        let changed = litchi_core::patch::Patch::<Reversible>::new(
+            limits,
+            "litchi-ppt",
+            [ReversibleOperation::new(
+                durable_text_operation(limits, target, "first slide", "changed").unwrap(),
+                durable_text_operation(limits, target, "changed", "first slide").unwrap(),
+            )],
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
+        )
+        .unwrap();
+        assert!(matches!(
+            source.apply_durable(&changed),
+            Err(Error::Refused(Refusal::Signed))
+        ));
     }
 
     #[test]

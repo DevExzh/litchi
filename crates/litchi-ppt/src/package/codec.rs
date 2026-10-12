@@ -230,6 +230,41 @@ impl<R: Read + Seek> Reader<R> {
         self.source_limits
     }
 
+    /// Whether the already-parsed CFB directory contains a digital-signature
+    /// stream or storage, including one nested below a storage.  This is kept
+    /// on the reader so source admission does not parse the same CFB a second
+    /// time merely to make the signed/no-op mutation decision.
+    pub(crate) fn contains_signature_component(&self) -> Result<bool> {
+        let max_entries = self
+            .source_limits
+            .max_events()
+            .min(self.ole.directory_entry_count());
+        let mut pending = vec![Vec::<String>::new()];
+        let mut discovered = 0usize;
+        while let Some(path) = pending.pop() {
+            let refs = path.iter().map(String::as_str).collect::<Vec<_>>();
+            let mut found = false;
+            let remaining = max_entries.saturating_sub(discovered);
+            self.ole
+                .visit_directory_entry_refs(&refs, remaining, |entry| {
+                    discovered = discovered.saturating_add(1);
+                    if is_signature_component(&entry.name) {
+                        found = true;
+                    }
+                    if entry.entry_type == 1 {
+                        let mut child = path.clone();
+                        child.push(entry.name.clone());
+                        pending.push(child);
+                    }
+                    Ok::<(), OleError>(())
+                })?;
+            if found {
+                return Ok(true);
+            }
+        }
+        Ok(false)
+    }
+
     /// Read the live document-comparison snapshot from the presentation.
     ///
     /// # Errors
@@ -343,6 +378,17 @@ impl<R: Read + Seek> Reader<R> {
             .document_summary_information()?
             .and_then(|stream| stream.section(USER_DEFINED_PROPERTIES_FMTID).cloned()))
     }
+}
+
+fn is_signature_component(name: &str) -> bool {
+    [
+        "_xmlsignatures",
+        "_signatures",
+        "DigitalSignature",
+        "\u{0005}DigitalSignature",
+    ]
+    .iter()
+    .any(|marker| name.eq_ignore_ascii_case(marker))
 }
 
 fn validate_powerpoint_document_stream<R: Read + Seek>(ole: &OleFile<R>) -> Result<()> {

@@ -1551,3 +1551,46 @@ fn ppt_authoring_errors_preserve_their_typed_cause() {
         Code::InvalidArgument,
     );
 }
+
+#[cfg(feature = "ppt")]
+#[test]
+fn ppt_primary_edit_errors_preserve_policy_codes_and_typed_sources() {
+    use litchi_ppt::package::edit::{Error as EditError, LimitKind};
+    let error = assert_code(EditError::Signed, Code::DocumentProtected);
+    assert!(matches!(error.leaf(), Source::PptEdit(EditError::Signed)));
+    assert_code(EditError::PatchConflict, Code::InvalidInput);
+    assert_code(
+        EditError::from(litchi_ppt::slide_order::Error::Refused(
+            litchi_ppt::slide_order::Refusal::TransferTargetMismatch,
+        )),
+        Code::InvalidInput,
+    );
+    assert_code(
+        EditError::from(litchi_ppt::slide_order::Error::Refused(
+            litchi_ppt::slide_order::Refusal::DuplicateShapeTextTarget {
+                target: litchi_ppt::text_edit::Target::new(
+                    litchi_core::Position::new(0),
+                    litchi_core::Position::new(0),
+                ),
+            },
+        )),
+        Code::InvalidArgument,
+    );
+
+    assert_code(
+        EditError::InvalidLimit {
+            kind: LimitKind::Operations,
+            value: 0,
+            maximum: 4096,
+        },
+        Code::InvalidArgument,
+    );
+    assert_code(
+        EditError::Limit {
+            kind: LimitKind::Operations,
+            observed: 2,
+            maximum: 1,
+        },
+        Code::LimitExceeded,
+    );
+}

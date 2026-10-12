@@ -2277,6 +2277,15 @@ fn presentation(bytes: &[u8]) -> PackageResult<Presentation> {
     package.presentation()
 }
 
+fn presentation_with_options(
+    bytes: &[u8],
+    options: crate::package::OpenOptions<'_>,
+) -> PackageResult<Presentation> {
+    let mut package =
+        Reader::from_reader_with_limits(Cursor::new(bytes), options.get_source_limits())?;
+    package.presentation_with_options(options)
+}
+
 fn presentation_shared(bytes: Arc<[u8]>) -> PackageResult<Presentation> {
     let mut package = Reader::from_reader(Cursor::new(bytes))?;
     package.presentation()
@@ -2328,6 +2337,67 @@ fn resolve_shape(bytes: &[u8], target: Target) -> Result<ShapeLocation> {
     let (persist_id, shape_id) = resolve_shape_target(bytes, target)?;
     let editor = crate::embedded::object::Editor::open_records(bytes.to_vec())?;
     resolve_shape_record(persist_id, shape_id, &editor)
+}
+
+/// Reads one shape's text without opening the mutation-capable persisted
+/// record editor.  Signed packages use this path to distinguish an exact
+/// semantic no-op from a changed request while retaining the signature CFB
+/// components byte-for-byte.
+pub(crate) fn inspect_shape_text_readonly(
+    bytes: &[u8],
+    target: Target,
+    options: crate::package::OpenOptions<'_>,
+) -> Result<String> {
+    let location = resolve_shape_readonly(bytes, target, options)?;
+    Ok(inspect_slide(&location.slide_record, location.shape_id)?.text)
+}
+
+/// Reads one shape's anchor without opening the mutation-capable persisted
+/// record editor.  This is deliberately a read-only companion to
+/// [`inspect_shape_anchor`], whose normal path also prepares a publication.
+pub(crate) fn inspect_shape_anchor_readonly(
+    bytes: &[u8],
+    target: Target,
+    options: crate::package::OpenOptions<'_>,
+) -> Result<crate::Anchor> {
+    let location = resolve_shape_readonly(bytes, target, options)?;
+    inspect_anchor(&location.slide_record, location.shape_id)
+}
+
+fn resolve_shape_readonly(
+    bytes: &[u8],
+    target: Target,
+    options: crate::package::OpenOptions<'_>,
+) -> Result<ShapeLocation> {
+    let presentation = presentation_with_options(bytes, options)?;
+    let (persist_id, shape_id) = resolve_shape_target_in_presentation(&presentation, target)?;
+    let factory = crate::slide::SlideFactory::new_shared_with_limits(
+        &presentation.inner.powerpoint_document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+        presentation.source_limits(),
+    );
+    let slide = factory.parse_slide(persist_id)?;
+    let document = slide.doc_data();
+    let tail = document.get(slide.offset..).ok_or_else(|| {
+        PackageError::Corrupted("PPT selected slide offset exceeds its document stream".into())
+    })?;
+    let (_, consumed) = crate::Record::parse_with_limits(tail, 0, presentation.source_limits())?;
+    let slide_end = slide
+        .offset
+        .checked_add(consumed)
+        .ok_or_else(|| PackageError::Corrupted("PPT selected slide length overflows".into()))?;
+    let slide_record = document
+        .get(slide.offset..slide_end)
+        .ok_or_else(|| {
+            PackageError::Corrupted("PPT selected slide exceeds its document stream".into())
+        })?
+        .to_vec();
+    Ok(ShapeLocation {
+        persist_id,
+        shape_id,
+        slide_record,
+    })
 }
 
 fn resolve_shape_target(bytes: &[u8], target: Target) -> Result<(u32, u32)> {

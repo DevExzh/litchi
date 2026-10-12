@@ -365,6 +365,9 @@ pub enum Source {
     /// A legacy PowerPoint binary error.
     #[cfg(feature = "ppt")]
     Ppt(litchi_ppt::Error),
+    /// A canonical primary PPT edit or patch error.
+    #[cfg(feature = "ppt")]
+    PptEdit(litchi_ppt::package::edit::Error),
     /// A source-backed legacy PowerPoint text-edit error.
     #[cfg(feature = "ppt")]
     PptTextEdit(litchi_ppt::text_edit::Error),
@@ -444,6 +447,8 @@ impl Source {
             Self::XlsSource(error) => Some(error),
             #[cfg(feature = "ppt")]
             Self::Ppt(error) => Some(error),
+            #[cfg(feature = "ppt")]
+            Self::PptEdit(error) => Some(error),
             #[cfg(feature = "ppt")]
             Self::PptTextEdit(error) => Some(error),
             #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
@@ -1264,7 +1269,7 @@ impl Classify for litchi_core::patch::PatchError {
     }
 }
 
-#[cfg(feature = "doc")]
+#[cfg(any(feature = "doc", feature = "ppt"))]
 impl Classify for litchi_core::patch::CompositionError {
     fn classify(&self) -> Class {
         use litchi_core::patch::CompositionError;
@@ -1472,6 +1477,54 @@ impl Classify for litchi_xls::SourceBackedError {
             Self::WorkbookStreamMissing | Self::InvalidData(_) => Class::of(Code::CorruptFile),
             Self::Allocation { .. } => Class::of(Code::InternalError),
         }
+    }
+}
+
+#[cfg(feature = "ppt")]
+impl Classify for litchi_ppt::package::edit::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Package(error) => error.classify(),
+            Self::Native(error) => match error {
+                litchi_ppt::slide_order::Error::Package(error) => error.classify(),
+                litchi_ppt::slide_order::Error::Text(error) => error.classify(),
+                litchi_ppt::slide_order::Error::Composition(error) => error.classify(),
+                litchi_ppt::slide_order::Error::Refused(refusal) => match refusal {
+                    litchi_ppt::slide_order::Refusal::Signed => {
+                        Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION)
+                    },
+                    litchi_ppt::slide_order::Refusal::SlideNotFound { .. } => {
+                        Class::of(Code::NotFound)
+                    },
+                    litchi_ppt::slide_order::Refusal::DuplicateShapeTextTarget { .. } => {
+                        Class::of(Code::InvalidArgument)
+                    },
+                    litchi_ppt::slide_order::Refusal::TransferTargetMismatch => {
+                        Class::of(Code::InvalidInput)
+                    },
+                    _ => Class::of(Code::UnsupportedCapability),
+                },
+            },
+            Self::Signed => Class::suggest(Code::DocumentProtected, SIGNED_SUGGESTION),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::Limit { .. } => Class::of(Code::LimitExceeded),
+            Self::PatchConflict => Class::of(Code::InvalidInput),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
+#[cfg(feature = "ppt")]
+impl From<litchi_ppt::package::edit::Error> for Error {
+    fn from(error: litchi_ppt::package::edit::Error) -> Self {
+        let class = error.classify();
+        let message = class.code.summary();
+        Self::from_class(
+            class,
+            message,
+            Some(FileFormat::Ppt),
+            Source::PptEdit(error),
+        )
     }
 }
 

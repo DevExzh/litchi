@@ -120,6 +120,8 @@ pub enum Error {
     },
     /// A patch's exact source image does not match the receiving package.
     PatchConflict,
+    /// A changed write would invalidate the package signature.
+    Signed,
 }
 
 impl From<PackageError> for Error {
@@ -130,7 +132,10 @@ impl From<PackageError> for Error {
 
 impl From<slide_order::Error> for Error {
     fn from(error: slide_order::Error) -> Self {
-        Self::Native(error)
+        match error {
+            slide_order::Error::Refused(slide_order::Refusal::Signed) => Self::Signed,
+            error => Self::Native(error),
+        }
     }
 }
 
@@ -162,6 +167,7 @@ impl fmt::Debug for Error {
                 .field("maximum", maximum)
                 .finish(),
             Self::PatchConflict => formatter.write_str("Error::PatchConflict"),
+            Self::Signed => formatter.write_str("Error::Signed"),
         }
     }
 }
@@ -169,6 +175,9 @@ impl fmt::Debug for Error {
 impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            Self::Signed => {
+                formatter.write_str("changed PPT writes require explicit signature removal")
+            },
             Self::Package(_) => formatter.write_str("PPT package operation failed"),
             Self::Native(_) => formatter.write_str("PPT native edit operation failed"),
             Self::InvalidLimit {
@@ -199,7 +208,9 @@ impl std::error::Error for Error {
         match self {
             Self::Package(error) => Some(error),
             Self::Native(error) => Some(error),
-            Self::InvalidLimit { .. } | Self::Limit { .. } | Self::PatchConflict => None,
+            Self::InvalidLimit { .. } | Self::Limit { .. } | Self::PatchConflict | Self::Signed => {
+                None
+            },
         }
     }
 }
@@ -210,7 +221,7 @@ impl Error {
     pub const fn limit_kind(&self) -> Option<LimitKind> {
         match self {
             Self::InvalidLimit { kind, .. } | Self::Limit { kind, .. } => Some(*kind),
-            Self::Package(_) | Self::Native(_) | Self::PatchConflict => None,
+            Self::Package(_) | Self::Native(_) | Self::PatchConflict | Self::Signed => None,
         }
     }
 
@@ -224,7 +235,7 @@ impl Error {
                 maximum,
                 ..
             } => Some((*value, *maximum)),
-            Self::Package(_) | Self::Native(_) | Self::PatchConflict => None,
+            Self::Package(_) | Self::Native(_) | Self::PatchConflict | Self::Signed => None,
         }
     }
 }
@@ -536,7 +547,7 @@ impl Edit {
         // Check the retained source even when the native operation failed.
         // A source change must never be hidden by a later semantic refusal.
         ensure_source_version(&self.package, self.expected_source)?;
-        let result = result.map_err(Error::Native)?;
+        let result = result.map_err(Error::from)?;
         self.inner = candidate;
         self.operation_count = self
             .operation_count

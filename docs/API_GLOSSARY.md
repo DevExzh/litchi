@@ -118,6 +118,10 @@ are implemented in 0212. Record 0213 adds canonical `Builder::build()` and
 explicit codec escape hatch. Encrypted authoring consumes caller-supplied
 one-use `EncryptionEntropy`, including on failed admission. Unified PPT
 creation/publication is integrated; navigation and mutation remain open.
+Record 0214 adds `package::edit::Error::Signed`: signed primary transactions
+admit exact no-ops and refuse changed writes before native encoding. Read-only
+inspection retains selected source limits and leniency; exact no-op patches
+preserve the complete original signed artifact.
 
 ### OPC source dimensions
 
