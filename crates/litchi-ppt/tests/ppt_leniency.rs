@@ -1302,6 +1302,26 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
         assert_eq!(textbox.text(), "edited");
     }
 
+    let native =
+        litchi_ppt::slide_order::Snapshot::from_bytes_with_options(bytes.clone(), options).unwrap();
+    assert_eq!(native.leniency(), Leniency::TolerateUserEditChainDefects);
+    assert!(matches!(
+        native.edit(),
+        Err(litchi_ppt::slide_order::Error::Refused(
+            litchi_ppt::slide_order::Refusal::RepairedUserEditChain
+        ))
+    ));
+    let canonical = litchi_ppt::Package::from_bytes_with_options(&bytes, options).unwrap();
+    assert!(matches!(
+        canonical.edit(),
+        Err(litchi_ppt::package::edit::Error::Native(
+            litchi_ppt::slide_order::Error::Refused(
+                litchi_ppt::slide_order::Refusal::RepairedUserEditChain
+            )
+        ))
+    ));
+    assert_eq!(canonical.to_bytes().unwrap(), bytes);
+
     // The opted-in control (no cycle) repairs nothing.
     let control = Reader::from_reader(Cursor::new(edited.deck.bytes.clone()))
         .unwrap()

@@ -184,6 +184,7 @@ pub use encryption::EncryptionProfile;
 pub use non_zoom_view::{
     NoZoomViewInfo, NonZoomViewKind, OutlineSorterViewInfo, OutlineSorterViewInformation,
 };
+pub use package::edit::{Commit, Diagnostics, Edit, EditOptions, LimitKind, Patch};
 pub use package::{
     EncryptionKind, Error, OpenOptions, Package, SourceBackedPackage, SourceLimitKind,
     SourceLimits, SourceLimitsBuilder,

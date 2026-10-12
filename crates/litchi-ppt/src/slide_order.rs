@@ -17,7 +17,7 @@ pub use litchi_core::Position;
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 
 use crate::document_structure;
-use crate::package::{Error as PackageError, SourceLimits};
+use crate::package::{Error as PackageError, OpenOptions, SourceLimits};
 use crate::raw::Reader;
 
 /// Explicit bounded undo/redo history for slide-order snapshots.
@@ -221,6 +221,9 @@ pub enum Refusal {
     /// The CFB is signed, encrypted, or contains storage metadata that the
     /// stream-only incremental publisher cannot preserve faithfully.
     UnsupportedSource,
+    /// The read path repaired a cyclic UserEdit chain.  The native append-only
+    /// editor still requires a strict chain, so this source is read-only.
+    RepairedUserEditChain,
     /// A source or destination position is outside the current slide list.
     SlideNotFound { position: Position },
     /// Reviewer diff trees associate their slide entries by list position.
@@ -255,6 +258,8 @@ impl fmt::Display for Refusal {
             Self::UnsupportedSource => formatter.write_str(
                 "PPT source cannot be republished through the safe slide-order transaction",
             ),
+            Self::RepairedUserEditChain => formatter
+                .write_str("PPT source contains a repaired UserEdit chain and is read-only"),
             Self::SlideNotFound { position } => {
                 write!(
                     formatter,
@@ -575,6 +580,8 @@ pub struct Snapshot {
     document: document_structure::Snapshot,
     document_persist_id: u32,
     limits: SourceLimits,
+    leniency: crate::leniency::Leniency,
+    chain_repaired: bool,
     has_review_history: bool,
 }
 
@@ -605,6 +612,18 @@ impl Snapshot {
     /// Returns an error when the artifact exceeds the limits or its live
     /// presentation structure is malformed.
     pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourceLimits) -> Result<Self> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new().source_limits(limits))
+    }
+
+    /// Captures an owned exact PPT artifact under explicit source limits and
+    /// a selected leniency policy.
+    ///
+    /// Strict remains the default.  The selected policy is retained by the
+    /// immutable snapshot and is reused by every native publication reopen,
+    /// so a canonical package edit cannot silently fall back to strict while
+    /// processing a caller-selected source.
+    pub fn from_bytes_with_options(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {
+        let limits = options.get_source_limits();
         if bytes.len() > limits.max_package_bytes {
             return Err(PackageError::Limit {
                 kind: crate::SourceLimitKind::InputBytes,
@@ -614,16 +633,34 @@ impl Snapshot {
             .into());
         }
         let mut package = Reader::from_reader_with_limits(Cursor::new(bytes.as_slice()), limits)?;
-        let presentation = package.presentation()?;
+        let presentation = package.presentation_with_options(options)?;
         let directory = presentation.slide_directory();
-        let (document_persist_id, document_bytes) =
-            crate::embedded::object::Editor::inspect_live_document_from_ole(package.ole_file())?;
-        if document_persist_id != directory.document_persist_id() {
+        // Resolve the live document through the already parsed presentation.
+        // The embedded append-only editor intentionally walks UserEdit chains
+        // strictly; using it here would discard a caller-selected tolerant
+        // read before we can record whether that repair is editable.
+        let document_persist_id = directory.document_persist_id();
+        let document_offset = directory.document_offset();
+        let document_stream = presentation.document_stream();
+        let (document_record, document_consumed) =
+            crate::Record::parse_with_limits(document_stream, document_offset, limits)?;
+        if document_record.record_type != crate::RecordType::Document {
             return Err(PackageError::Corrupted(
-                "PPT slide-order snapshot resolved inconsistent live document identities".into(),
+                "PPT slide-order snapshot resolved a non-document live record".into(),
             )
             .into());
         }
+        let document_end = document_offset
+            .checked_add(document_consumed)
+            .ok_or_else(|| {
+                PackageError::Corrupted("PPT live document record offset overflows".into())
+            })?;
+        let document_bytes = document_stream
+            .get(document_offset..document_end)
+            .ok_or_else(|| {
+                PackageError::Corrupted("PPT live document record exceeds its stream".into())
+            })?
+            .to_vec();
         let document_limits = document_structure::Limits {
             max_bytes: limits.max_record_bytes.min(limits.max_input_bytes),
             max_records: limits.max_records,
@@ -647,6 +684,12 @@ impl Snapshot {
         }
         let review = presentation.document_comparison()?.review()?;
         let has_review_history = review.diff_tree_count() != 0;
+        let chain_repaired = presentation
+            .tolerance_report()
+            .defects()
+            .iter()
+            .any(|defect| matches!(defect.defect, crate::leniency::Defect::UserEditChain(_)))
+            || presentation.tolerance_report().unrecorded() != 0;
         drop(presentation);
         drop(package);
         Ok(Self {
@@ -654,6 +697,8 @@ impl Snapshot {
             document,
             document_persist_id,
             limits,
+            leniency: options.get_leniency(),
+            chain_repaired,
             has_review_history,
         })
     }
@@ -687,7 +732,7 @@ impl Snapshot {
 
         let bytes = publication.into_output();
         if self.limits != SourceLimits::default() {
-            return Self::from_bytes_with_limits(bytes.to_vec(), self.limits);
+            return Self::from_bytes_with_options(bytes.to_vec(), self.open_options());
         }
         if bytes.len() > self.limits.max_package_bytes {
             return Err(PackageError::Limit {
@@ -702,6 +747,8 @@ impl Snapshot {
             document: self.document.clone(),
             document_persist_id: self.document_persist_id,
             limits: self.limits,
+            leniency: self.leniency,
+            chain_repaired: self.chain_repaired,
             has_review_history: self.has_review_history,
         })
     }
@@ -735,7 +782,7 @@ impl Snapshot {
 
         let (bytes, changes) = publication.into_parts();
         if self.limits != SourceLimits::default() {
-            let reopened = Self::from_bytes_with_limits(bytes.to_vec(), self.limits)?;
+            let reopened = Self::from_bytes_with_options(bytes.to_vec(), self.open_options())?;
             return Ok((reopened, changes));
         }
         if bytes.len() > self.limits.max_package_bytes {
@@ -752,6 +799,8 @@ impl Snapshot {
                 document: self.document.clone(),
                 document_persist_id: self.document_persist_id,
                 limits: self.limits,
+                leniency: self.leniency,
+                chain_repaired: self.chain_repaired,
                 has_review_history: self.has_review_history,
             },
             changes,
@@ -849,6 +898,18 @@ impl Snapshot {
     #[must_use]
     pub const fn limits(&self) -> SourceLimits {
         self.limits
+    }
+
+    /// Leniency policy retained by this immutable snapshot.
+    #[must_use]
+    pub const fn leniency(&self) -> crate::leniency::Leniency {
+        self.leniency
+    }
+
+    fn open_options(&self) -> OpenOptions<'static> {
+        OpenOptions::new()
+            .source_limits(self.limits)
+            .leniency(self.leniency)
     }
 
     /// Starts an isolated source-bound order edit.
@@ -1050,6 +1111,15 @@ impl Snapshot {
     }
 
     fn require_editable(&self) -> Result<()> {
+        // The append-only native editor intentionally reads the UserEdit
+        // chain with strict semantics.  A tolerated cyclic chain is safe for
+        // read projection, but cannot yet be used as an edit base because
+        // appending a new edit would otherwise retain an ambiguous history.
+        // Clean packages opened under the same leniency policy remain
+        // editable; selecting a policy alone is not a refusal.
+        if self.chain_repaired {
+            return Err(Error::Refused(Refusal::RepairedUserEditChain));
+        }
         if self.has_review_history {
             return Err(Error::Refused(Refusal::ReviewHistoryDependency));
         }
@@ -1923,7 +1993,8 @@ impl Transaction {
         if rewritten.before == rewritten.after {
             return Ok(());
         }
-        self.working = Snapshot::from_bytes_with_limits(rewritten.bytes, self.source.limits)?;
+        self.working =
+            Snapshot::from_bytes_with_options(rewritten.bytes, self.source.open_options())?;
         let change = ShapeAnchorChange {
             target: source_target,
             before: rewritten.before,
@@ -2193,7 +2264,7 @@ impl Transaction {
         } else {
             validate_unrelated_picture_publication(working.bytes(), &bytes)?;
         }
-        let snapshot = Snapshot::from_bytes_with_limits(bytes, source.limits)?;
+        let snapshot = Snapshot::from_bytes_with_options(bytes, source.open_options())?;
         if snapshot.document.slides() != document_commit.snapshot().slides() {
             return Err(PackageError::Corrupted(
                 "published PPT slide order did not round-trip through the live document".into(),
@@ -2344,7 +2415,7 @@ impl Transaction {
             },
         )?;
         let snapshot = observe_phase(&mut observer, DiagnosticPhase::PublicReopen, || {
-            Snapshot::from_bytes_with_limits(bytes, source.limits)
+            Snapshot::from_bytes_with_options(bytes, source.open_options())
         })?;
         if snapshot.document.slides() != document_commit.snapshot().slides() {
             return Err(PackageError::Corrupted(
@@ -3481,7 +3552,10 @@ fn apply_durable_text(
     }
     edit.set_text(replacement)?;
     let committed = edit.commit()?;
-    Snapshot::from_bytes_with_limits(committed.snapshot().bytes().to_vec(), snapshot.limits)
+    Snapshot::from_bytes_with_options(
+        committed.snapshot().bytes().to_vec(),
+        snapshot.open_options(),
+    )
 }
 
 fn is_formatting_operation(operation: &str) -> bool {
@@ -3648,7 +3722,7 @@ fn apply_durable_anchor(
     }
     let replacement = parse_anchor_value(&operation.value)?;
     let rewritten = crate::text_edit::replace_shape_anchor(snapshot.bytes(), target, replacement)?;
-    Snapshot::from_bytes_with_limits(rewritten.bytes, snapshot.limits)
+    Snapshot::from_bytes_with_options(rewritten.bytes, snapshot.open_options())
 }
 
 fn apply_durable_slide_visibility(
@@ -3958,7 +4032,7 @@ fn publish_live_document(snapshot: &Snapshot, document: &[u8]) -> Result<Snapsho
     editor.replace_persisted_record(snapshot.document_persist_id, document.to_vec())?;
     let bytes = editor.finish()?;
     crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
-    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    let published = Snapshot::from_bytes_with_options(bytes, snapshot.open_options())?;
     if published.document.slides() != snapshot.document.slides() {
         return Err(PackageError::Corrupted(
             "PPT live-document owner publication changed slide structure".into(),
@@ -4132,7 +4206,7 @@ fn replace_slide_hidden(
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
     crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
-    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    let published = Snapshot::from_bytes_with_options(bytes, snapshot.open_options())?;
     if published.document != snapshot.document || published.slide_hidden(position)? != replacement {
         return Err(PackageError::Corrupted(
             "PPT slide visibility replacement did not round-trip exactly".into(),
@@ -4263,7 +4337,7 @@ fn replace_slide_advance(
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
     crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
-    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    let published = Snapshot::from_bytes_with_options(bytes, snapshot.open_options())?;
     if published.document != snapshot.document || published.slide_advance(position)? != replacement
     {
         return Err(PackageError::Corrupted(
@@ -4411,7 +4485,7 @@ fn replace_slide_transition_visual(
     editor.replace_persisted_record(slide.persist_id(), rewritten_record)?;
     let bytes = editor.finish()?;
     crate::font::validate_unrelated_streams(snapshot.bytes(), &bytes)?;
-    let published = Snapshot::from_bytes_with_limits(bytes, snapshot.limits)?;
+    let published = Snapshot::from_bytes_with_options(bytes, snapshot.open_options())?;
     if published.document != snapshot.document
         || published.slide_transition_visual(position)? != replacement
     {
@@ -4924,8 +4998,9 @@ struct PictureInventory {
 }
 
 fn picture_inventory(snapshot: &Snapshot) -> Result<PictureInventory> {
-    let mut package = Reader::from_reader(Cursor::new(snapshot.bytes()))?;
-    let presentation = package.presentation()?;
+    let mut package =
+        Reader::from_reader_with_limits(Cursor::new(snapshot.bytes()), snapshot.limits)?;
+    let presentation = package.presentation_with_options(snapshot.open_options())?;
     let slots = presentation
         .image_store()?
         .map_or(0, |store| u32::from(store.len()));

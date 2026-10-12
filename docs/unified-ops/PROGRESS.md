@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0212 | [Canonical PPT primary transaction](0212-ppt-primary-edit.md) | Native-backed immutable Edit/Patch/Commit, finite operation policy, source fences and retained leniency; native/facade tests and lint/docs checks pass; signed no-ops, Builder, unified PPT read/write, performance and full goal remain open |
 | 0211 | [Immutable PPT owner and owned presentation](0211-ppt-immutable-owner.md) | Canonical shared Package/Presentation, explicit raw Reader, exact atomic publication and facade adoption; native/facade regressions pass; primary PPT transactions, Builder, unified read/write and full goal remain open |
 | 0210 | [Checked PPT source policies](0210-ppt-source-limits.md) | Canonical checked SourceLimits/OpenOptions, typed errors and all-stream admission before payload reads; native/facade tests, lint/docs, feature/glossary/boundary checks pass; primary immutable PPT owner, unified PPT read/write and full goal remain open |
 | 0209 | [XLS publication dependency scans and patch ownership](0209-xls-publication-work.md) | Profile-backed removal of scalar selection scans and deep native patch cloning; 3,342 tests/doctests and lint/docs/checks pass; measured 10k atomic sets ~17% faster, removals 33–36% faster; source 1k removal ratio 2.093× remains open; repeated bounded publication and complete performance/CRUD goal remain open |

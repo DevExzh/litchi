@@ -2586,9 +2586,41 @@
           "name": "Package",
           "scope": "litchi_ppt::raw",
           "replacement": "use raw::Reader for the cursor-based reader"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_ppt::package::edit",
+          "replacement": "use Edit"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ppt::package::edit::Edit",
+          "replacement": "drop the owned edit"
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ppt::package::edit::Commit",
+          "replacement": "use package()"
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ppt::package::edit::Commit",
+          "replacement": "use into_package()"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_ppt::package::edit::Commit",
+          "replacement": "use diagnostics().changed()"
+        },
+        {
+          "name": "is_empty",
+          "scope": "litchi_ppt::package::edit::Patch",
+          "replacement": "use is_noop()"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_ppt::package::edit"
+      ]
     }
   ]
 }

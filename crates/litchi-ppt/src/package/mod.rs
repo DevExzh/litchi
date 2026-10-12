@@ -5,6 +5,7 @@ pub(crate) mod model;
 mod owner;
 pub(crate) use model::Reader;
 pub use owner::Package;
+pub mod edit;
 pub mod property_set;
 mod source;
 
@@ -14,7 +15,6 @@ mod tests;
 pub use model::{
     EncryptionKind, Error, OpenOptions, Result, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
-pub use property_set::{Commit, Patch, Snapshot, Transaction};
 pub use source::SourceBackedPackage;
 
 /// Preflight all declared CFB stream lengths for a positional owner before a
