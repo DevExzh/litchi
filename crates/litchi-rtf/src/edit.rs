@@ -4581,6 +4581,11 @@ fn commit_body_paragraph_removals(edit: Edit, operation_count: usize) -> Result<
         }
         merged.push((range, replacement));
     }
+    for (range, replacement) in &mut merged {
+        if paragraph_removal_needs_delimiter(source_bytes, range) {
+            replacement.push(b' ');
+        }
+    }
 
     let bytes = splice_body_ranges(source_bytes, &merged, edit.source.limits())?;
     let semantic_delta = {
@@ -9261,6 +9266,17 @@ fn splice_body_ranges(
         "paragraph source replacement ends outside the source",
     ))?);
     Ok(output)
+}
+
+fn paragraph_removal_needs_delimiter(source: &[u8], range: &Range<usize>) -> bool {
+    source
+        .get(..range.start)
+        .and_then(|prefix| prefix.last())
+        .is_some_and(|byte| byte.is_ascii_alphabetic())
+        && source
+            .get(range.end..)
+            .and_then(|suffix| suffix.first())
+            .is_some_and(|byte| byte.is_ascii_alphabetic())
 }
 
 /// Deterministic facts about a published transaction.
