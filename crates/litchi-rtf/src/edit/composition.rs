@@ -362,7 +362,8 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::InsertParagraph { .. }
         | Operation::RemoveParagraph { .. }
         | Operation::RestoreParagraph { .. }
-        | Operation::MoveParagraph { .. } => PublicationDomain::Lifecycle,
+        | Operation::MoveParagraph { .. }
+        | Operation::SwapParagraph { .. } => PublicationDomain::Lifecycle,
         Operation::Text { .. }
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }

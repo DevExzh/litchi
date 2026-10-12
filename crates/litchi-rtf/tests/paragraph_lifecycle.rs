@@ -281,6 +281,84 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
 }
 
 #[test]
+fn swap_is_one_atomic_native_lifecycle_operation_with_exact_inverse() {
+    let source = source();
+    let mut edit = source.edit();
+    edit.swap_paragraphs(litchi_core::Position::new(0), litchi_core::Position::new(3))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(
+        paragraph_texts(commit.package()),
+        ["Fourth", "Second", "Third", "First"]
+    );
+    assert_eq!(commit.diagnostics().operation_count(), 1);
+    assert!(commit.diagnostics().changed());
+    assert_complete_reopen(commit.package(), &["Fourth", "Second", "Third", "First"]);
+    let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+    assert!(matches!(
+        commit.patch().to_durable(durable_limits()),
+        Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF paragraph swaps are source-bound"
+        })
+    ));
+}
+
+#[test]
+fn swap_preserves_empty_terminal_and_decoded_unicode_paragraphs() {
+    for input in [
+        br"{\rtf1\ansi First\par\par Third}".as_slice(),
+        br"{\rtf1\ansi First\par\par Third\par}".as_slice(),
+        br"{\rtf1\ansi First\par caf\'e9\par Third}".as_slice(),
+    ] {
+        let source = Package::from_bytes(input).unwrap();
+        let expected = paragraph_texts(&source);
+        let mut edit = source.edit();
+        edit.swap_paragraphs(litchi_core::Position::new(0), litchi_core::Position::new(2))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let mut reordered = expected.clone();
+        reordered.swap(0, 2);
+        assert_eq!(paragraph_texts(&commit.package()), reordered);
+        assert_complete_reopen(
+            &commit.package(),
+            &reordered.iter().map(String::as_str).collect::<Vec<_>>(),
+        );
+        let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+        assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+        assert!(matches!(
+            commit.patch().to_durable(durable_limits()),
+            Err(litchi_core::patch::PatchError::InvalidText { .. })
+        ));
+    }
+}
+
+#[test]
+fn swap_same_position_is_noop_even_for_protected_or_unsupported_sources() {
+    for source in [
+        Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap(),
+        Package::parse(r"{\rtf1\ansi \b First\par Second}").unwrap(),
+    ] {
+        let exact = source.to_bytes().unwrap();
+        let mut edit = source.edit();
+        edit.swap_paragraphs(litchi_core::Position::new(1), litchi_core::Position::new(1))
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.package().to_bytes().unwrap(), exact);
+        assert!(
+            commit
+                .patch()
+                .to_durable(durable_limits())
+                .unwrap()
+                .operations()
+                .is_empty()
+        );
+    }
+}
+
+#[test]
 fn moving_empty_paragraphs_preserves_tail_and_terminal_boundaries() {
     for input in [
         br"{\rtf1\ansi First\par\par Third}".as_slice(),

@@ -1041,6 +1041,12 @@ enum Operation {
         final_position: usize,
         text: String,
     },
+    SwapParagraph {
+        first: usize,
+        second: usize,
+        first_text: String,
+        second_text: String,
+    },
     TableCellText {
         path: TableCellPath,
         before: String,
@@ -1138,7 +1144,9 @@ impl Operation {
             Self::MoveBookmark { after, .. } => after.tag.len().saturating_add(after.content.len()),
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
             Self::RestoreParagraph { text, .. } => text.len().saturating_add(1),
-            Self::RemoveParagraph { .. } | Self::MoveParagraph { .. } => 0,
+            Self::RemoveParagraph { .. }
+            | Self::MoveParagraph { .. }
+            | Self::SwapParagraph { .. } => 0,
             Self::PicturePayload(operation) => operation.after_transport.len(),
             Self::PictureRemoval(_) => 0,
             Self::RootTransfer { after, .. } => after.len(),
@@ -1239,7 +1247,8 @@ impl Operation {
             Self::InsertParagraph { .. }
             | Self::RemoveParagraph { .. }
             | Self::RestoreParagraph { .. }
-            | Self::MoveParagraph { .. } => vec!["body:structure".to_string()],
+            | Self::MoveParagraph { .. }
+            | Self::SwapParagraph { .. } => vec!["body:structure".to_string()],
             Self::TableCellText { path, .. } => vec![table_cell_effect(path)],
             Self::HeaderFooterText { target, .. } => vec![header_footer_effect(*target)],
             Self::AnnotationText { index, .. } => vec![annotation_effect(*index)],
@@ -1280,6 +1289,7 @@ impl Operation {
             | Self::RemoveParagraph { .. }
             | Self::RestoreParagraph { .. }
             | Self::MoveParagraph { .. }
+            | Self::SwapParagraph { .. }
             | Self::TableCellText { .. }
             | Self::HeaderFooterText { .. }
             | Self::AnnotationText { .. }
@@ -1352,6 +1362,7 @@ impl Operation {
             } | Self::RemoveParagraph { .. }
                 | Self::RestoreParagraph { .. }
                 | Self::MoveParagraph { .. }
+                | Self::SwapParagraph { .. }
         )
     }
 
@@ -1674,6 +1685,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -1736,6 +1748,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -1802,6 +1815,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -1864,6 +1878,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -1937,6 +1952,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -2077,6 +2093,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -2143,6 +2160,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -2205,6 +2223,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -2271,6 +2290,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -2337,6 +2357,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -2399,6 +2420,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -2595,6 +2617,70 @@ impl Edit {
             position,
             final_position,
             text,
+        });
+        Ok(self)
+    }
+
+    /// Atomically swaps two ordinary body paragraphs selected against the
+    /// immutable source snapshot.
+    ///
+    /// Positions are zero-based and are interpreted against the source list;
+    /// unlike two moves, the pair is one lifecycle operation and is published
+    /// as one candidate. Equal positions are an exact no-op, including for a
+    /// protected or otherwise unsupported source. Distinct positions retain
+    /// the source paragraph text as typed preconditions for the in-memory
+    /// reversible patch.
+    ///
+    /// # Errors
+    /// Returns an error when either position is outside the immutable base,
+    /// conflicting work is already staged, or finite limits are exceeded.
+    /// Changed publication additionally refuses non-plain, ambiguous,
+    /// compressed, opaque, or protected sources.
+    pub fn swap_paragraphs(
+        &mut self,
+        first: litchi_core::Position,
+        second: litchi_core::Position,
+    ) -> Result<&mut Self, Error> {
+        let first = first.get();
+        let second = second.get();
+        let count = self.source.paragraph_count();
+        for position in [first, second] {
+            if position >= count {
+                return Err(Error::ParagraphOutOfRange { position, count });
+            }
+        }
+        self.ensure_lifecycle_room()?;
+        self.operations.try_reserve(1).map_err(|_error| {
+            Error::Write("could not reserve paragraph swap operation".to_string())
+        })?;
+
+        // Do not inspect or copy the source text for an exact no-op. This
+        // keeps staging usable for protected and unsupported source closures.
+        if first == second {
+            self.operations.push(Operation::SwapParagraph {
+                first,
+                second,
+                first_text: String::new(),
+                second_text: String::new(),
+            });
+            return Ok(self);
+        }
+
+        let first_text = clone_bounded_text(
+            paragraph_text_at(&self.source, first)?,
+            self.source.limits(),
+            "could not reserve first swapped paragraph text",
+        )?;
+        let second_text = clone_bounded_text(
+            paragraph_text_at(&self.source, second)?,
+            self.source.limits(),
+            "could not reserve second swapped paragraph text",
+        )?;
+        self.operations.push(Operation::SwapParagraph {
+            first,
+            second,
+            first_text,
+            second_text,
         });
         Ok(self)
     }
@@ -2947,6 +3033,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -3467,6 +3554,7 @@ impl Edit {
                     | Operation::RemoveParagraph { .. }
                     | Operation::RestoreParagraph { .. }
                     | Operation::MoveParagraph { .. }
+                    | Operation::SwapParagraph { .. }
             )
         }) {
             return Err(Error::StructuralPropertyConflict);
@@ -3916,7 +4004,8 @@ impl Edit {
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
-                | Operation::MoveParagraph { .. } => {},
+                | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. } => {},
                 Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -4288,14 +4377,15 @@ impl Edit {
                 "candidate paragraph insertion did not preserve the new paragraph boundary",
             ));
         }
-        if self
-            .operations
-            .iter()
-            .any(|operation| matches!(operation, Operation::MoveParagraph { .. }))
-            && snapshot.paragraph_count() != self.source.paragraph_count()
+        if self.operations.iter().any(|operation| {
+            matches!(
+                operation,
+                Operation::MoveParagraph { .. } | Operation::SwapParagraph { .. }
+            )
+        }) && snapshot.paragraph_count() != self.source.paragraph_count()
         {
             return Err(Error::UnsupportedSource(
-                "candidate paragraph move did not preserve body paragraph boundaries",
+                "candidate paragraph reorder did not preserve body paragraph boundaries",
             ));
         }
         if property_operation && source_alignments(&snapshot) != alignments {
@@ -5149,6 +5239,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
             | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
@@ -5250,6 +5341,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::PicturePayload(_)
             | Operation::PictureRemoval(_)
             | Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
@@ -5917,7 +6009,8 @@ fn project_text(
     if let [
         operation @ (Operation::RemoveParagraph { .. }
         | Operation::RestoreParagraph { .. }
-        | Operation::MoveParagraph { .. }),
+        | Operation::MoveParagraph { .. }
+        | Operation::SwapParagraph { .. }),
     ] = operations
     {
         return Ok((project_lifecycle_text(source, operation)?, Vec::new()));
@@ -5959,6 +6052,7 @@ fn project_text(
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -6035,11 +6129,19 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
             position,
             final_position,
             ..
+        }
+        | Operation::SwapParagraph {
+            first: position,
+            second: final_position,
+            ..
         } if position == final_position
     ) {
         return Ok(source.text().to_string());
     }
-    let is_move = matches!(operation, Operation::MoveParagraph { .. });
+    let is_move = matches!(
+        operation,
+        Operation::MoveParagraph { .. } | Operation::SwapParagraph { .. }
+    );
     let preserves_terminal_break =
         is_move || matches!(operation, Operation::RestoreParagraph { .. });
     let mut paragraphs = plain_lifecycle_paragraphs(source, preserves_terminal_break)?;
@@ -6104,6 +6206,32 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
             }
             let paragraph = paragraphs.remove(*position);
             paragraphs.insert(*final_position, paragraph);
+        },
+        Operation::SwapParagraph {
+            first,
+            second,
+            first_text,
+            second_text,
+        } => {
+            let count = paragraphs.len();
+            if *first >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *first,
+                    count,
+                });
+            }
+            if *second >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *second,
+                    count,
+                });
+            }
+            if paragraphs.get(*first).map(String::as_str) != Some(first_text)
+                || paragraphs.get(*second).map(String::as_str) != Some(second_text)
+            {
+                return Err(Error::StalePrecondition("swapped paragraph text differs"));
+            }
+            paragraphs.swap(*first, *second);
         },
         Operation::Text { .. }
         | Operation::Alignment { .. }
@@ -6405,6 +6533,7 @@ fn base_bold_for_edit(source: &Package, operations: &[Operation]) -> Result<bool
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -6469,6 +6598,7 @@ fn base_bold_for_edit(source: &Package, operations: &[Operation]) -> Result<bool
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -6523,6 +6653,7 @@ fn base_italic_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -6587,6 +6718,7 @@ fn base_italic_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -6644,6 +6776,7 @@ fn base_underline_for_edit(
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -6708,6 +6841,7 @@ fn base_underline_for_edit(
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -6765,6 +6899,7 @@ fn base_font_size_for_edit(
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -6829,6 +6964,7 @@ fn base_font_size_for_edit(
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -7152,6 +7288,7 @@ fn base_baseline_for_edit(
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -7216,6 +7353,7 @@ fn base_baseline_for_edit(
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -7284,6 +7422,7 @@ fn base_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -7348,6 +7487,7 @@ fn base_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -7388,6 +7528,7 @@ fn base_double_strike_for_edit(source: &Package, operations: &[Operation]) -> Re
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -7452,6 +7593,7 @@ fn base_double_strike_for_edit(source: &Package, operations: &[Operation]) -> Re
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -7506,6 +7648,7 @@ fn base_hidden_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -7570,6 +7713,7 @@ fn base_hidden_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -7624,6 +7768,7 @@ fn base_small_caps_for_edit(source: &Package, operations: &[Operation]) -> Resul
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -7688,6 +7833,7 @@ fn base_small_caps_for_edit(source: &Package, operations: &[Operation]) -> Resul
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -7742,6 +7888,7 @@ fn base_all_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -7806,6 +7953,7 @@ fn base_all_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
                 | Operation::MoveParagraph { .. }
+                | Operation::SwapParagraph { .. }
                 | Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -7864,6 +8012,7 @@ fn operation_changes_semantics(operation: &Operation) -> bool {
             final_position,
             ..
         } => position != final_position,
+        Operation::SwapParagraph { first, second, .. } => first != second,
         Operation::SmartTag { before, after, .. } => before != after,
         Operation::MoveBookmark { before, after, .. } => before != after,
         Operation::RootTransfer { before, after, .. } => before != after,
@@ -8415,6 +8564,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::RemoveParagraph { .. }
             | Operation::RestoreParagraph { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -9855,6 +10005,12 @@ enum Change {
         final_position: usize,
         text: String,
     },
+    SwapParagraph {
+        first: usize,
+        second: usize,
+        first_text: String,
+        second_text: String,
+    },
     SplitParagraph {
         position: usize,
         offset: usize,
@@ -10140,6 +10296,17 @@ impl Change {
                 final_position: *position,
                 text: text.clone(),
             },
+            Self::SwapParagraph {
+                first,
+                second,
+                first_text,
+                second_text,
+            } => Self::SwapParagraph {
+                first: *first,
+                second: *second,
+                first_text: second_text.clone(),
+                second_text: first_text.clone(),
+            },
             Self::SplitParagraph {
                 position,
                 boundary,
@@ -10308,6 +10475,11 @@ impl Change {
             Self::InsertParagraph { text, .. }
             | Self::RemoveParagraph { text, .. }
             | Self::MoveParagraph { text, .. } => weight_str(text),
+            Self::SwapParagraph {
+                first_text,
+                second_text,
+                ..
+            } => weight_str(first_text).saturating_add(weight_str(second_text)),
             Self::SplitParagraph {
                 before,
                 boundary,
@@ -10619,6 +10791,17 @@ fn semantic_changes_with_replacement(
                 final_position: *final_position,
                 text: text.clone(),
             }),
+            Operation::SwapParagraph {
+                first,
+                second,
+                first_text,
+                second_text,
+            } if first != second => Some(Change::SwapParagraph {
+                first: *first,
+                second: *second,
+                first_text: first_text.clone(),
+                second_text: second_text.clone(),
+            }),
             Operation::Text {
                 raw_structure:
                     Some(RawParagraphOperation::Split {
@@ -10752,6 +10935,7 @@ fn semantic_changes_with_replacement(
             | Operation::HorizontalScale { .. }
             | Operation::Kerning { .. }
             | Operation::MoveParagraph { .. }
+            | Operation::SwapParagraph { .. }
             | Operation::TableCellText { .. }
             | Operation::HeaderFooterText { .. }
             | Operation::AnnotationText { .. }
@@ -10867,6 +11051,15 @@ impl Patch {
                 field: "RTF paragraph-layout durable patches are not supported",
             });
         }
+        if self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::SwapParagraph { .. }))
+        {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF paragraph swaps are source-bound",
+            });
+        }
         if self.changes.len() > 1
             && self
                 .changes
@@ -10895,10 +11088,12 @@ impl Patch {
                 field: "RTF empty-paragraph insertions are source-bound",
             });
         }
-        let has_move = self
-            .changes
-            .iter()
-            .any(|change| matches!(change, Change::MoveParagraph { .. }));
+        let has_move = self.changes.iter().any(|change| {
+            matches!(
+                change,
+                Change::MoveParagraph { .. } | Change::SwapParagraph { .. }
+            )
+        });
         let has_empty_or_terminal_boundary = has_move
             && (self.before.text().ends_with('\n')
                 || self.after.text().ends_with('\n')
@@ -11325,6 +11520,9 @@ fn durable_operation(
                 Value::String(final_position.to_string()),
             )
         },
+        Change::SwapParagraph { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF paragraph swaps are source-bound",
+        }),
         Change::SplitParagraph {
             position,
             offset,
