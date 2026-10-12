@@ -7,6 +7,7 @@
 use litchi_core::Position;
 use litchi_rtf::Package;
 use litchi_rtf::edit::{Error, History, HistoryLimits, RunFormatPatch, RunTextReplacement};
+use litchi_rtf::opaque::Anchor;
 
 const SOURCE: &[u8] =
     br"{\rtf1\ansi{\fonttbl{\f0\fnil Example Sans;}}{\colortbl;\red255\green0\blue0;}{\info{\title Keep title}}{\header Keep header}\f0\cf1\qr Plain{\i Italic}\b Bold\par\pard\qc Tail}";
@@ -291,4 +292,146 @@ fn native_run_text_replacement_budget_preflights_whole_batch_and_accumulates() {
     let changed = edit.commit().unwrap();
     assert_eq!(paragraph_text(changed.package(), 0), "aabBold");
     assert_eq!(source.to_bytes().unwrap(), SOURCE);
+}
+
+#[test]
+fn native_run_text_replacement_projects_opaque_anchors_across_utf8_runs() {
+    let source_bytes =
+        br"{\rtf1\ansi{\*\before opaque}A{\i B}{\*\middle opaque}\u38634?{\b C}{\*\after opaque}}";
+    let source = Package::from_bytes(source_bytes).unwrap();
+    assert_eq!(source.text(), "AB雪C");
+    assert_eq!(source.body().runs().count(), 4);
+    assert_eq!(
+        source
+            .opaque()
+            .iter()
+            .filter_map(|node| match node.anchor() {
+                Anchor::Body(position) => Some(position),
+                Anchor::Structural { .. } => None,
+            })
+            .collect::<Vec<_>>(),
+        [0, 2, 6]
+    );
+
+    let opaque_sources = source
+        .opaque()
+        .iter()
+        .map(|node| node.source().to_vec())
+        .collect::<Vec<_>>();
+    let mut edit = source.edit();
+    edit.replace_body_run_texts(&[
+        replacement(0, 0, "alpha"),
+        replacement(0, 1, "β"),
+        replacement(0, 2, "水"),
+        replacement(0, 3, "omega"),
+    ])
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.package().text(), "alphaβ水omega");
+    assert_eq!(
+        commit
+            .package()
+            .opaque()
+            .iter()
+            .filter_map(|node| match node.anchor() {
+                Anchor::Body(position) => Some(position),
+                Anchor::Structural { .. } => None,
+            })
+            .collect::<Vec<_>>(),
+        [0, 7, 15]
+    );
+    assert_eq!(
+        commit
+            .package()
+            .opaque()
+            .iter()
+            .map(|node| node.source().to_vec())
+            .collect::<Vec<_>>(),
+        opaque_sources
+    );
+    let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
+    assert_eq!(reopened.text(), "alphaβ水omega");
+    assert_eq!(
+        reopened
+            .opaque()
+            .iter()
+            .filter_map(|node| match node.anchor() {
+                Anchor::Body(position) => Some(position),
+                Anchor::Structural { .. } => None,
+            })
+            .collect::<Vec<_>>(),
+        [0, 7, 15]
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        source_bytes
+    );
+}
+
+#[test]
+fn native_run_text_removal_projects_opaque_anchors_through_terminal_empty_paragraph() {
+    let source_bytes =
+        br"{\rtf1\ansi{\*\before opaque}A{\i B}{\*\middle opaque}{\b C}{\*\after opaque}}";
+    let source = Package::from_bytes(source_bytes).unwrap();
+    assert_eq!(source.text(), "ABC");
+    assert_eq!(source.body().runs().count(), 3);
+    let opaque_sources = source
+        .opaque()
+        .iter()
+        .map(|node| node.source().to_vec())
+        .collect::<Vec<_>>();
+
+    let mut edit = source.edit();
+    edit.replace_body_run_texts(&[
+        replacement(0, 0, ""),
+        replacement(0, 1, ""),
+        replacement(0, 2, ""),
+    ])
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(commit.package().paragraph_count(), 1);
+    assert!(
+        commit
+            .package()
+            .body()
+            .paragraphs()
+            .next()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(
+        commit
+            .package()
+            .opaque()
+            .iter()
+            .filter_map(|node| match node.anchor() {
+                Anchor::Body(position) => Some(position),
+                Anchor::Structural { .. } => None,
+            })
+            .collect::<Vec<_>>(),
+        [0, 0, 0]
+    );
+    assert_eq!(
+        commit
+            .package()
+            .opaque()
+            .iter()
+            .map(|node| node.source().to_vec())
+            .collect::<Vec<_>>(),
+        opaque_sources
+    );
+    assert_eq!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        source_bytes
+    );
 }

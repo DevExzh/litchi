@@ -10654,19 +10654,162 @@ fn formatting_for_span(
 }
 
 fn project_base_span(span: TextSpan, operations: &[Operation]) -> Result<TextSpan, Error> {
+    let changes = base_position_changes(None, operations)?;
     Ok(TextSpan {
-        start: project_base_position(span.start, operations)?,
-        end: project_base_position(span.end, operations)?,
+        start: project_base_position_from_changes(span.start, &changes)?,
+        end: project_base_position_from_changes(span.end, &changes)?,
     })
 }
 
-fn project_base_position(position: usize, operations: &[Operation]) -> Result<usize, Error> {
-    let mut changes = operations
-        .iter()
-        .filter_map(|operation| match operation {
-            Operation::Text { span, after, .. } => Some((*span, after.len())),
+fn ordinary_run_text_spans(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<Vec<(TextSpan, usize)>, Error> {
+    let mut requested = Vec::new();
+    requested
+        .try_reserve_exact(operations.len())
+        .map_err(|_error| Error::Write("could not reserve run-text selectors".to_string()))?;
+    for operation in operations {
+        if let Operation::RunFormat {
+            paragraph,
+            run,
+            text_before: Some(_),
+            text_after: Some(after),
+            ..
+        } = operation
+        {
+            requested.push((*paragraph, *run, after.len()));
+        }
+    }
+    if requested.windows(2).any(|pair| {
+        let left = pair[0];
+        let right = pair[1];
+        (right.0, right.1) <= (left.0, left.1)
+    }) {
+        return Err(Error::UnsupportedSource(
+            "run-text operations are not source ordered",
+        ));
+    }
+    let mut spans = Vec::new();
+    spans
+        .try_reserve_exact(requested.len())
+        .map_err(|_error| Error::Write("could not reserve run-text spans".to_string()))?;
+    if requested.is_empty() {
+        return Ok(spans);
+    }
+    let mut body_position = 0usize;
+    let mut requested_index = 0usize;
+    for (paragraph_index, paragraph) in source.body().paragraphs().enumerate() {
+        let paragraph_end = body_position
+            .checked_add(paragraph.len())
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: usize::MAX,
+            })?;
+        let mut run_start = body_position;
+        for (run_index, run) in paragraph.runs().enumerate() {
+            let run_end = run_start
+                .checked_add(run.text().len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: usize::MAX,
+                })?;
+            while requested
+                .get(requested_index)
+                .is_some_and(|(paragraph, run, _)| {
+                    *paragraph == paragraph_index && *run == run_index
+                })
+            {
+                let (_, _, replacement_len) = requested
+                    .get(requested_index)
+                    .copied()
+                    .ok_or(Error::UnsupportedSource(
+                        "run-text selector cursor disappeared",
+                    ))?;
+                spans.push((
+                    TextSpan {
+                        start: run_start,
+                        end: run_end,
+                    },
+                    replacement_len,
+                ));
+                requested_index = requested_index.saturating_add(1);
+            }
+            run_start = run_end;
+        }
+        let terminated = source.text().as_bytes().get(paragraph_end) == Some(&b'\n');
+        body_position = paragraph_end
+            .checked_add(usize::from(terminated))
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: usize::MAX,
+            })?;
+    }
+    if let Some((paragraph, run, _)) = requested.get(requested_index).copied() {
+        if paragraph >= source.paragraph_count() {
+            return Err(Error::ParagraphOutOfRange {
+                position: paragraph,
+                count: source.paragraph_count(),
+            });
+        }
+        let count = source
+            .body()
+            .paragraphs()
+            .nth(paragraph)
+            .map_or(0, |value| value.runs().count());
+        return Err(Error::RunOutOfRange {
+            paragraph,
+            run,
+            count,
+        });
+    }
+    Ok(spans)
+}
+
+#[derive(Clone, Copy)]
+struct BasePositionChange {
+    span: TextSpan,
+    source_end: usize,
+    projected_end: usize,
+}
+
+/// Collect the semantic body replacements which move positioned body
+/// metadata.  Run-text operations address a native run rather than storing a
+/// [`TextSpan`], so their source span is derived from the immutable run axis
+/// when the caller supplies the source package.
+fn base_position_changes(
+    source: Option<&Package>,
+    operations: &[Operation],
+) -> Result<Vec<BasePositionChange>, Error> {
+    let run_text_spans = source
+        .map(|source| ordinary_run_text_spans(source, operations))
+        .transpose()?
+        .unwrap_or_default();
+    let mut run_text_index = 0usize;
+    let mut raw = Vec::new();
+    raw.try_reserve_exact(operations.len())
+        .map_err(|_error| Error::Write("could not reserve body position changes".to_string()))?;
+    for operation in operations {
+        match operation {
+            Operation::Text { span, after, .. } => raw.push((*span, after.len())),
             Operation::InsertParagraph { span, text, .. } => {
-                Some((*span, text.len().saturating_add(1)))
+                raw.push((*span, text.len().saturating_add(1)));
+            },
+            Operation::RunFormat {
+                text_before: Some(_),
+                text_after: Some(_),
+                ..
+            } => {
+                if source.is_some() {
+                    let (span, replacement_len) = run_text_spans
+                        .get(run_text_index)
+                        .copied()
+                        .ok_or(Error::UnsupportedSource(
+                            "run-text source span cursor disappeared",
+                        ))?;
+                    raw.push((span, replacement_len));
+                    run_text_index = run_text_index.saturating_add(1);
+                }
             },
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
@@ -10698,21 +10841,17 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             | Operation::PictureRemoval(_)
             | Operation::SmartTag { .. }
             | Operation::MoveBookmark { .. }
-            | Operation::RootTransfer { .. } => None,
-        })
-        .collect::<Vec<_>>();
-    changes.sort_unstable_by_key(|(span, _)| (span.start, span.end));
+            | Operation::RootTransfer { .. } => {},
+        }
+    }
+    raw.sort_unstable_by_key(|(span, _)| (span.start, span.end));
+    let mut changes = Vec::new();
+    changes
+        .try_reserve_exact(raw.len())
+        .map_err(|_error| Error::Write("could not reserve body position changes".to_string()))?;
     let mut source_cursor = 0usize;
     let mut projected_cursor = 0usize;
-    for (span, replacement_len) in changes {
-        if position <= span.start {
-            return projected_cursor
-                .checked_add(position.saturating_sub(source_cursor))
-                .ok_or(Error::InputTooLarge {
-                    observed: usize::MAX,
-                    limit: usize::MAX,
-                });
-        }
+    for (span, replacement_len) in raw {
         projected_cursor = projected_cursor
             .checked_add(span.start.saturating_sub(source_cursor))
             .and_then(|value| value.checked_add(replacement_len))
@@ -10721,7 +10860,35 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
                 limit: usize::MAX,
             })?;
         source_cursor = span.end;
+        changes.push(BasePositionChange {
+            span,
+            source_end: source_cursor,
+            projected_end: projected_cursor,
+        });
     }
+    Ok(changes)
+}
+
+fn project_base_position_from_changes(
+    position: usize,
+    changes: &[BasePositionChange],
+) -> Result<usize, Error> {
+    // The strict comparison preserves the existing boundary rule: an opaque
+    // node at a replacement's start remains before inserted text, while a
+    // node after the replaced span follows the new text.  Binary search keeps
+    // validation bounded when a source carries many opaque anchors and run
+    // replacements.
+    let change_count = changes.partition_point(|change| change.span.start < position);
+    let (source_cursor, projected_cursor) = if change_count == 0 {
+        (0, 0)
+    } else {
+        let change = changes
+            .get(change_count.saturating_sub(1))
+            .ok_or(Error::UnsupportedSource(
+                "body position change cursor disappeared",
+            ))?;
+        (change.source_end, change.projected_end)
+    };
     projected_cursor
         .checked_add(position.saturating_sub(source_cursor))
         .ok_or(Error::InputTooLarge {
@@ -10854,6 +11021,7 @@ fn validate_opaque_preservation(
             "body-anchored opaque syntax changed during publication",
         ));
     }
+    let position_changes = base_position_changes(Some(source), operations)?;
     for (source_node, target_node) in source_nodes.iter().zip(&target_nodes) {
         let crate::opaque::Anchor::Body(source_position) = source_node.anchor() else {
             return Err(Error::UnsupportedSource(
@@ -10865,7 +11033,8 @@ fn validate_opaque_preservation(
                 "target opaque anchor is not a body position",
             ));
         };
-        let projected_position = project_base_position(source_position, operations)?;
+        let projected_position =
+            project_base_position_from_changes(source_position, &position_changes)?;
         if target_position != projected_position
             || target_node.kind() != source_node.kind()
             || target_node.source() != source_node.source()
