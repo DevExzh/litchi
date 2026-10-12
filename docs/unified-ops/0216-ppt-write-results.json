@@ -1,0 +1,169 @@
+{
+  "source_commit": "8f25264cbfe3a1395fa4432e2626713d18bb73a4",
+  "probe": "crates/litchi-ops/examples/ppt_write_bench.rs",
+  "probe_sha256": "48a66a387959d504516bc641690347cf287b529a9cd437737c0dc3085339f54f",
+  "binary_sha256": "6661164aacf88ee89286a8804c888eb4e2de2d485c765fbb06ab57226a7f07b5",
+  "rustc": "rustc 1.95.0 (59807616e 2026-04-14)\nbinary: rustc\ncommit-hash: 59807616e1fa2540724bfbac14d7976d7e4a3860\ncommit-date: 2026-04-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.95.0\nLLVM version: 22.1.2",
+  "build_command": "CARGO_PROFILE_RELEASE_LTO=false CARGO_INCREMENTAL=0 cargo run --release -p litchi-ops --no-default-features --features ppt --example ppt_write_bench",
+  "lock_adjustment": "External scratch Cargo.lock only: offline cc 1.7.0 downgraded to cached 1.6.0 using -Z lockfile-path and resolver.lockfile-path. Repository locks unchanged.",
+  "method": "Seven alternating native/unified AB/BA samples, ten immutable writes per sample. Fixture creation, opening, path parsing and exact output byte comparison excluded from timing. No frozen harness qualification or allocation claims.",
+  "follow_up": "Single-write 10% budget missed except one-shape memory case; profile target projection, owner adoption and source-fence costs. Coalesce consecutive unified commands in a native edit and add frozen harness routes.",
+  "cases": [
+    {
+      "shapes": 1,
+      "source": "memory",
+      "repeats": 10,
+      "native_ns": [
+        1257856,
+        1191566,
+        1171745,
+        1186036,
+        1187485,
+        1176676,
+        1170196
+      ],
+      "unified_ns": [
+        1295816,
+        1281356,
+        1264616,
+        1268366,
+        1252196,
+        1247496,
+        1245125
+      ],
+      "median_paired_ratio": 1.0640311537554392,
+      "native_median_ns_per_write": 118603.6,
+      "unified_median_ns_per_write": 126461.6
+    },
+    {
+      "shapes": 1,
+      "source": "positional",
+      "repeats": 10,
+      "native_ns": [
+        1238776,
+        1221285,
+        1205666,
+        1223696,
+        1198725,
+        1209346,
+        1205226
+      ],
+      "unified_ns": [
+        1352266,
+        1327047,
+        1333627,
+        1328016,
+        1343247,
+        1347416,
+        1341496
+      ],
+      "median_paired_ratio": 1.106133041820869,
+      "native_median_ns_per_write": 120934.6,
+      "unified_median_ns_per_write": 134149.6
+    },
+    {
+      "shapes": 100,
+      "source": "memory",
+      "repeats": 10,
+      "native_ns": [
+        4200770,
+        4202470,
+        4027589,
+        3968898,
+        3944089,
+        3916318,
+        3907969
+      ],
+      "unified_ns": [
+        5469446,
+        5454526,
+        5162905,
+        5411606,
+        5235755,
+        5190625,
+        5203725
+      ],
+      "median_paired_ratio": 1.3253839448175557,
+      "native_median_ns_per_write": 396889.8,
+      "unified_median_ns_per_write": 523575.5
+    },
+    {
+      "shapes": 100,
+      "source": "positional",
+      "repeats": 10,
+      "native_ns": [
+        3866838,
+        3854788,
+        3817209,
+        3846319,
+        3824288,
+        3821138,
+        3807098
+      ],
+      "unified_ns": [
+        5173595,
+        5141984,
+        5138254,
+        5138114,
+        5153605,
+        5118634,
+        5133535
+      ],
+      "median_paired_ratio": 1.3395574826138181,
+      "native_median_ns_per_write": 382428.8,
+      "unified_median_ns_per_write": 513825.4
+    },
+    {
+      "shapes": 1000,
+      "source": "memory",
+      "repeats": 10,
+      "native_ns": [
+        30359354,
+        30920737,
+        29732602,
+        31045138,
+        30766357,
+        30706176,
+        29488661
+      ],
+      "unified_ns": [
+        41752789,
+        42709893,
+        41385637,
+        42994574,
+        43143585,
+        43326806,
+        43063835
+      ],
+      "median_paired_ratio": 1.3919278575080647,
+      "native_median_ns_per_write": 3070617.6,
+      "unified_median_ns_per_write": 4299457.4
+    },
+    {
+      "shapes": 1000,
+      "source": "positional",
+      "repeats": 10,
+      "native_ns": [
+        29854212,
+        29657271,
+        29316069,
+        30770746,
+        31189489,
+        30682846,
+        31180678
+      ],
+      "unified_ns": [
+        41769318,
+        41431598,
+        41152816,
+        42587903,
+        42245701,
+        42590933,
+        42728253
+      ],
+      "median_paired_ratio": 1.3881024270043267,
+      "native_median_ns_per_write": 3068284.6,
+      "unified_median_ns_per_write": 4224570.1
+    }
+  ]
+}
