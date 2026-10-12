@@ -451,7 +451,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
                 .with_format(FileFormat::Rtf),
         );
     }
-    let to = move_destination(&nav, from.get(), count, &placement)?;
+    let to = move_destination(&nav, from, count, &placement)?;
 
     bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
     let text_bytes = selected.paragraph.map_or(0, |paragraph| paragraph.len());
@@ -481,7 +481,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
         .map_err(Error::from)?;
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
-    edit.move_paragraph(from, Position::new(to))
+    edit.move_paragraph(Position::new(from), Position::new(to))
         .map_err(Error::from)?;
     let native = edit.commit().map_err(Error::from)?;
 

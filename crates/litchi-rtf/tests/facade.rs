@@ -285,12 +285,9 @@ fn inline_character_controls_split_native_runs_and_restore_groups() {
     assert_eq!(run("size_off").format().size().get(), 24);
     assert_eq!(
         run("under_double").format().underline(),
-        litchi_rtf::text::Underline::Double
+        text::Underline::Double
     );
-    assert_eq!(
-        run("under_off").format().underline(),
-        litchi_rtf::text::Underline::None
-    );
+    assert_eq!(run("under_off").format().underline(), text::Underline::None);
     assert!(run("struck").format().strike());
     assert!(!run("strike_off").format().strike());
     assert!(run("dstruck").format().double_strike());
@@ -326,26 +323,26 @@ fn inline_character_controls_split_native_runs_and_restore_groups() {
 
 #[test]
 fn every_native_underline_control_starts_a_distinct_run() {
-    const STYLES: &[(&str, litchi_rtf::text::Underline)] = &[
-        (r"\ul", litchi_rtf::text::Underline::Single),
-        (r"\ulnone", litchi_rtf::text::Underline::None),
-        (r"\uldb", litchi_rtf::text::Underline::Double),
-        (r"\uld", litchi_rtf::text::Underline::Dotted),
-        (r"\uldash", litchi_rtf::text::Underline::Dashed),
-        (r"\uldashd", litchi_rtf::text::Underline::DashDot),
-        (r"\uldashdd", litchi_rtf::text::Underline::DashDotDot),
-        (r"\ulw", litchi_rtf::text::Underline::Words),
-        (r"\ulth", litchi_rtf::text::Underline::Thick),
-        (r"\ulwave", litchi_rtf::text::Underline::Wave),
-        (r"\ulhair", litchi_rtf::text::Underline::Hairline),
-        (r"\ulthd", litchi_rtf::text::Underline::ThickDotted),
-        (r"\ulthdash", litchi_rtf::text::Underline::ThickDashed),
-        (r"\ulthdashd", litchi_rtf::text::Underline::ThickDashDot),
-        (r"\ulthdashdd", litchi_rtf::text::Underline::ThickDashDotDot),
-        (r"\ulthldash", litchi_rtf::text::Underline::ThickLongDash),
-        (r"\ulldash", litchi_rtf::text::Underline::LongDash),
-        (r"\ulhwave", litchi_rtf::text::Underline::HeavyWave),
-        (r"\ululdbwave", litchi_rtf::text::Underline::DoubleWave),
+    const STYLES: &[(&str, text::Underline)] = &[
+        (r"\ul", text::Underline::Single),
+        (r"\ulnone", text::Underline::None),
+        (r"\uldb", text::Underline::Double),
+        (r"\uld", text::Underline::Dotted),
+        (r"\uldash", text::Underline::Dashed),
+        (r"\uldashd", text::Underline::DashDot),
+        (r"\uldashdd", text::Underline::DashDotDot),
+        (r"\ulw", text::Underline::Words),
+        (r"\ulth", text::Underline::Thick),
+        (r"\ulwave", text::Underline::Wave),
+        (r"\ulhair", text::Underline::Hairline),
+        (r"\ulthd", text::Underline::ThickDotted),
+        (r"\ulthdash", text::Underline::ThickDashed),
+        (r"\ulthdashd", text::Underline::ThickDashDot),
+        (r"\ulthdashdd", text::Underline::ThickDashDotDot),
+        (r"\ulthldash", text::Underline::ThickLongDash),
+        (r"\ulldash", text::Underline::LongDash),
+        (r"\ulhwave", text::Underline::HeavyWave),
+        (r"\ululdbwave", text::Underline::DoubleWave),
     ];
     let mut source = String::from(r"{\rtf1\ansi");
     for (index, (control, _)) in STYLES.iter().enumerate() {
@@ -375,7 +372,7 @@ fn every_native_underline_control_starts_a_distinct_run() {
         assert_eq!(styled.format().underline(), *style, "{control}");
         assert_eq!(
             reset.format().underline(),
-            litchi_rtf::text::Underline::None,
+            text::Underline::None,
             "reset after {control}"
         );
     }

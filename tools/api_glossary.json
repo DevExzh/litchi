@@ -3162,6 +3162,22 @@
       "families": [
         "litchi_rtf::tail_append"
       ]
+    },
+    {
+      "id": "ops-rtf",
+      "package": "litchi-ops",
+      "default_features": false,
+      "features": [
+        "rtf"
+      ],
+      "banned_names": [
+        {
+          "name": "paragraph_text",
+          "scope": "litchi_ops::format::rtf::Node",
+          "replacement": "Node::text for paragraph and run text"
+        }
+      ],
+      "families": []
     }
   ]
 }

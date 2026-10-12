@@ -132,7 +132,7 @@ pub(crate) const SIGNED_POINTS: LengthSpec =
 pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     PropSpec {
         name: "text",
-        ty: crate::value::ValueType::Text,
+        ty: ValueType::Text,
         access: Access {
             get: true,
             set: true,
@@ -142,7 +142,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "align",
-        ty: crate::value::ValueType::Token(&ALIGNMENT),
+        ty: ValueType::Token(&ALIGNMENT),
         access: Access {
             get: true,
             set: true,
@@ -152,7 +152,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "spaceBefore",
-        ty: crate::value::ValueType::Length(SPACING),
+        ty: ValueType::Length(SPACING),
         access: Access {
             get: true,
             set: true,
@@ -162,7 +162,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "spaceAfter",
-        ty: crate::value::ValueType::Length(SPACING),
+        ty: ValueType::Length(SPACING),
         access: Access {
             get: true,
             set: true,
@@ -172,7 +172,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "indent",
-        ty: crate::value::ValueType::Length(SIGNED_POINTS),
+        ty: ValueType::Length(SIGNED_POINTS),
         access: Access {
             get: true,
             set: true,
@@ -182,7 +182,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "rightIndent",
-        ty: crate::value::ValueType::Length(SIGNED_POINTS),
+        ty: ValueType::Length(SIGNED_POINTS),
         access: Access {
             get: true,
             set: true,
@@ -192,7 +192,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "firstLineIndent",
-        ty: crate::value::ValueType::Length(SIGNED_POINTS),
+        ty: ValueType::Length(SIGNED_POINTS),
         access: Access {
             get: true,
             set: true,
@@ -202,7 +202,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "keepNext",
-        ty: crate::value::ValueType::Bool,
+        ty: ValueType::Bool,
         access: Access {
             get: true,
             set: true,
@@ -212,7 +212,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "keepLines",
-        ty: crate::value::ValueType::Bool,
+        ty: ValueType::Bool,
         access: Access {
             get: true,
             set: true,
@@ -222,7 +222,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
     PropSpec {
         name: "pageBreakBefore",
-        ty: crate::value::ValueType::Bool,
+        ty: ValueType::Bool,
         access: Access {
             get: true,
             set: true,
