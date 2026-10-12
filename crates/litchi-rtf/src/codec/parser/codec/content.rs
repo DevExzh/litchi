@@ -337,13 +337,13 @@ impl<'a> Parser<'a> {
                 }
             },
             _ => {
-                // Formatting takes effect at its lexical position.  Alignment,
-                // character, and paragraph-property changes must flush a
-                // pending paragraph break before changing the state attached
-                // to that preceding boundary.  Keep this list scoped to
-                // controls that alter retained block properties: flushing on
-                // every paragraph break would multiply dense plain-text
-                // blocks without improving the paragraph model.
+                // Formatting takes effect at its lexical position. Alignment,
+                // character, and paragraph-property changes must flush pending
+                // text before changing the state attached to that preceding
+                // text. Keep this list scoped to controls that alter retained
+                // block properties: flushing on every control would multiply
+                // dense plain-text blocks without improving the paragraph
+                // model.
                 if matches!(
                     control,
                     ControlWord::LeftAlign
@@ -376,6 +376,33 @@ impl<'a> Parser<'a> {
                         | ControlWord::PageBreakBefore
                         | ControlWord::WidowControl
                         | ControlWord::Bold(_)
+                        | ControlWord::Italic(_)
+                        | ControlWord::FontSize(_)
+                        | ControlWord::ColorForeground(_)
+                        | ControlWord::Underline(_)
+                        | ControlWord::UnderlineNone
+                        | ControlWord::UnderlineDouble
+                        | ControlWord::UnderlineDotted
+                        | ControlWord::UnderlineDashed
+                        | ControlWord::UnderlineDashDot
+                        | ControlWord::UnderlineDashDotDot
+                        | ControlWord::UnderlineWords
+                        | ControlWord::UnderlineThick
+                        | ControlWord::UnderlineWave
+                        | ControlWord::UnderlineHairline
+                        | ControlWord::UnderlineThickDotted
+                        | ControlWord::UnderlineThickDashed
+                        | ControlWord::UnderlineThickDashDot
+                        | ControlWord::UnderlineThickDashDotDot
+                        | ControlWord::UnderlineThickLongDash
+                        | ControlWord::UnderlineLongDash
+                        | ControlWord::UnderlineHeavyWave
+                        | ControlWord::UnderlineDoubleWave
+                        | ControlWord::Strike(_)
+                        | ControlWord::DoubleStrike(_)
+                        | ControlWord::Hidden(_)
+                        | ControlWord::AllCaps(_)
+                        | ControlWord::SmallCaps(_)
                         | ControlWord::Superscript(_)
                         | ControlWord::Subscript(_)
                         | ControlWord::NoSuperSub(_)

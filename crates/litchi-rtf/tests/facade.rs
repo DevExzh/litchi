@@ -219,6 +219,169 @@ fn run_format_resolves_checked_color_values() {
 }
 
 #[test]
+fn inline_character_controls_split_native_runs_and_restore_groups() {
+    let document = Package::parse(
+        r"{\rtf1\ansi{\fonttbl{\f0\fnil Base;}{\f1\fswiss Alt;}}{\colortbl;\red255\green0\blue0;}\f0 base\f1 alt\f0 base_again\i italic\i0 italic_off\fs28 big\fs24 size_off\uldb under_double\ulnone under_off\strike struck\strike0 strike_off\striked dstruck\striked0 dstrike_off\v hidden\v0 hidden_off\caps caps\caps0 caps_off\scaps smallcaps\scaps0 smallcaps_off\outl outline\outl0 outline_off\cf1 red\cf0 color_off{\b grouped_bold{\i nested_italic}grouped_restored}after_group}",
+    )
+    .unwrap();
+
+    let runs: Vec<_> = document.body().runs().collect();
+    let texts: Vec<_> = runs.iter().map(|run| run.text()).collect();
+    assert_eq!(
+        texts,
+        vec![
+            "base",
+            "alt",
+            "base_again",
+            "italic",
+            "italic_off",
+            "big",
+            "size_off",
+            "under_double",
+            "under_off",
+            "struck",
+            "strike_off",
+            "dstruck",
+            "dstrike_off",
+            "hidden",
+            "hidden_off",
+            "caps",
+            "caps_off",
+            "smallcaps",
+            "smallcaps_off",
+            "outline",
+            "outline_off",
+            "red",
+            "color_off",
+            "grouped_bold",
+            "nested_italic",
+            "grouped_restored",
+            "after_group",
+        ]
+    );
+
+    let run = |text: &str| runs.iter().find(|run| run.text() == text).unwrap();
+    assert_eq!(
+        run("base")
+            .format()
+            .font()
+            .map(litchi_rtf::font::Font::name),
+        Some("Base")
+    );
+    assert_eq!(
+        run("alt").format().font().map(litchi_rtf::font::Font::name),
+        Some("Alt")
+    );
+    assert_eq!(
+        run("base_again")
+            .format()
+            .font()
+            .map(litchi_rtf::font::Font::name),
+        Some("Base")
+    );
+    assert!(run("italic").format().italic());
+    assert!(!run("italic_off").format().italic());
+    assert_eq!(run("big").format().size().get(), 28);
+    assert_eq!(run("size_off").format().size().get(), 24);
+    assert_eq!(
+        run("under_double").format().underline(),
+        litchi_rtf::text::Underline::Double
+    );
+    assert_eq!(
+        run("under_off").format().underline(),
+        litchi_rtf::text::Underline::None
+    );
+    assert!(run("struck").format().strike());
+    assert!(!run("strike_off").format().strike());
+    assert!(run("dstruck").format().double_strike());
+    assert!(!run("dstrike_off").format().double_strike());
+    assert!(run("hidden").format().hidden());
+    assert!(!run("hidden_off").format().hidden());
+    assert!(run("caps").format().all_caps());
+    assert!(!run("caps_off").format().all_caps());
+    assert!(run("smallcaps").format().small_caps());
+    assert!(!run("smallcaps_off").format().small_caps());
+    assert!(run("outline").format().outline());
+    assert!(!run("outline_off").format().outline());
+    assert_eq!(
+        run("red").format().foreground(),
+        Some(litchi_rtf::color::Value::Rgb(
+            litchi_rtf::color::Color::new(255, 0, 0)
+        ))
+    );
+    assert_eq!(
+        run("color_off").format().foreground(),
+        Some(litchi_rtf::color::Value::Automatic)
+    );
+
+    assert!(run("grouped_bold").format().bold());
+    assert!(!run("grouped_bold").format().italic());
+    assert!(run("nested_italic").format().bold());
+    assert!(run("nested_italic").format().italic());
+    assert!(run("grouped_restored").format().bold());
+    assert!(!run("grouped_restored").format().italic());
+    assert!(!run("after_group").format().bold());
+    assert!(!run("after_group").format().italic());
+}
+
+#[test]
+fn every_native_underline_control_starts_a_distinct_run() {
+    const STYLES: &[(&str, litchi_rtf::text::Underline)] = &[
+        (r"\ul", litchi_rtf::text::Underline::Single),
+        (r"\ulnone", litchi_rtf::text::Underline::None),
+        (r"\uldb", litchi_rtf::text::Underline::Double),
+        (r"\uld", litchi_rtf::text::Underline::Dotted),
+        (r"\uldash", litchi_rtf::text::Underline::Dashed),
+        (r"\uldashd", litchi_rtf::text::Underline::DashDot),
+        (r"\uldashdd", litchi_rtf::text::Underline::DashDotDot),
+        (r"\ulw", litchi_rtf::text::Underline::Words),
+        (r"\ulth", litchi_rtf::text::Underline::Thick),
+        (r"\ulwave", litchi_rtf::text::Underline::Wave),
+        (r"\ulhair", litchi_rtf::text::Underline::Hairline),
+        (r"\ulthd", litchi_rtf::text::Underline::ThickDotted),
+        (r"\ulthdash", litchi_rtf::text::Underline::ThickDashed),
+        (r"\ulthdashd", litchi_rtf::text::Underline::ThickDashDot),
+        (r"\ulthdashdd", litchi_rtf::text::Underline::ThickDashDotDot),
+        (r"\ulthldash", litchi_rtf::text::Underline::ThickLongDash),
+        (r"\ulldash", litchi_rtf::text::Underline::LongDash),
+        (r"\ulhwave", litchi_rtf::text::Underline::HeavyWave),
+        (r"\ululdbwave", litchi_rtf::text::Underline::DoubleWave),
+    ];
+    let mut source = String::from(r"{\rtf1\ansi");
+    for (index, (control, _)) in STYLES.iter().enumerate() {
+        source.push_str(control);
+        source.push(' ');
+        source.push('u');
+        source.push_str(&index.to_string());
+        source.push_str(r"\ulnone off");
+        source.push_str(&index.to_string());
+    }
+    source.push('}');
+
+    let document = Package::parse(&source).unwrap();
+    let runs: Vec<_> = document.body().runs().collect();
+    assert_eq!(runs.len(), STYLES.len() * 2);
+    for (index, (control, style)) in STYLES.iter().enumerate() {
+        let styled_text = format!("u{index}");
+        let reset_text = format!("off{index}");
+        let styled = runs
+            .iter()
+            .find(|run| run.text() == styled_text.as_str())
+            .unwrap();
+        let reset = runs
+            .iter()
+            .find(|run| run.text() == reset_text.as_str())
+            .unwrap();
+        assert_eq!(styled.format().underline(), *style, "{control}");
+        assert_eq!(
+            reset.format().underline(),
+            litchi_rtf::text::Underline::None,
+            "reset after {control}"
+        );
+    }
+}
+
+#[test]
 fn snapshot_to_bytes_matches_streaming_facade() {
     let document = Package::parse(r"{\rtf1\ansi concise}").unwrap();
     let direct = document.to_bytes().unwrap();
