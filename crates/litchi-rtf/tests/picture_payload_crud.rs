@@ -321,7 +321,7 @@ fn jpeg_payload_retains_markers_and_exact_layout() {
     let replacement = [0xff, 0xd8, 0xaa, 0x55, 0xff, 0xd9];
     let mut edit = source.edit();
     edit.replace_picture_payload(0, replacement).unwrap();
-    let output = edit.commit().unwrap().snapshot().to_bytes().unwrap();
+    let output = edit.commit().unwrap().package().to_bytes().unwrap();
     assert_eq!(
         output,
         br"{\rtf1 A{\pict\jpegblip\picw9\pich8 Ff D8 aa55 fF d9}B}"

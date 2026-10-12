@@ -114,7 +114,7 @@ fn first_middle_last_batch_preserves_text_runs_and_unrelated_paragraph_propertie
     assert_eq!(layout(commit.package(), 2).first_line_indent(), 120);
     assert!(!layout(commit.package(), 2).page_break_before());
     let after_runs = commit
-        .snapshot()
+        .package()
         .body()
         .runs()
         .map(|run| {
@@ -128,7 +128,7 @@ fn first_middle_last_batch_preserves_text_runs_and_unrelated_paragraph_propertie
         .collect::<Vec<_>>();
     assert_eq!(after_runs, before_runs);
     let after_formats = commit
-        .snapshot()
+        .package()
         .body()
         .paragraphs()
         .map(|paragraph| {
@@ -239,7 +239,7 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
     assert!(layout(commit.package(), 0).keep_together());
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .body()
             .paragraphs()
             .next()
@@ -536,7 +536,7 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
     let metadata_after = metadata_edit
         .commit()
         .unwrap()
-        .snapshot()
+        .package()
         .to_bytes()
         .unwrap();
     let metadata_prefix = br"{\rtf1\ansi{\info{\*\futuremeta vendor-byte-payload}}";

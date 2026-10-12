@@ -3968,8 +3968,8 @@ latency or allocation claim.
 
 ## Opt-in RTF semantic corpus matrix
 
-The RTF cases exercise only the ordinary native `litchi_rtf::Document` facade:
-owned-byte open, lazy paragraph enumeration, one middle paragraph, first
+The RTF cases exercise the ordinary native `litchi_rtf::Package` owner and its
+read-only document projection: owned-byte open, lazy paragraph enumeration, one middle paragraph, first
 complete-text materialization, bounded semantic-text output to a forward-only
 sink, exact source streaming, exact empty-edit publication, and
 capability-bounded one-paragraph and `ceil(1%)` paragraph edit/save. The two
@@ -4041,7 +4041,7 @@ ceiling. The corpus uses mixed-case hexadecimal digits with deterministic
 spaces/newlines, so the independent expected-output splice replaces only
 digit slots while preserving every source whitespace byte and each slot's
 case. Each selector reports separate open, stage, commit, publication, and
-lifecycle vectors; publication is `commit.snapshot().write_to` into a bounded
+lifecycle vectors; publication is `commit.package().write_to` into a bounded
 hashing sink. Untimed gates cover semantic reopen, raw unselected preservation,
 exact no-op identity, volatile patch apply/inverse, deterministic durable JSON
 serialization plus forward/inverse/stale/foreign checks, refusal cases,
@@ -4901,7 +4901,7 @@ native-Office claim is made.
   outputs are compared byte-for-byte with the untimed numeric oracle, while
   missing and duplicate names are checked against their exact typed errors.
 - `rtf_semantic_open`: parse deterministic owned transport bytes through
-  public `Document::from_bytes`.
+  public `Package::from_bytes`.
 - `rtf_semantic_paragraph_count`: query the public exact paragraph cardinality.
 - `rtf_semantic_collect_paragraphs`: collect all lazy paragraph views so the
   allocation behavior is guarded separately from traversal.
@@ -4912,12 +4912,12 @@ native-Office claim is made.
 - `rtf_semantic_text_to_sink`: write semantic UTF-8 body text to a pre-reserved,
   bounded, forward-only non-seek sink and verify the complete output outside
   the timed interval.
-- `rtf_semantic_stream_save`: stream the immutable snapshot through public
-  `Document::write_to` and require byte-exact source output.
-- `rtf_semantic_noop_edit_save`: commit an empty edit, require shared snapshot
+- `rtf_semantic_stream_save`: stream the immutable package through public
+  `Package::write_to` and require byte-exact source output.
+- `rtf_semantic_noop_edit_save`: commit an empty edit, require shared package
   identity and exact bytes, then stream through the same forward-only sink.
 - `rtf_semantic_one_edit_save`: replace the middle paragraph through the
-  checked native transaction, stream the changed snapshot, reopen it, and
+  checked native transaction, stream the changed package, reopen it, and
   verify its complete semantic projection and sink counters.
 - `rtf_semantic_one_percent_edit_save`: select deterministic evenly spaced
   `ceil(1%)` paragraph positions, stage one bounded atomic batch, commit once,

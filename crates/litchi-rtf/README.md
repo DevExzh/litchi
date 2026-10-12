@@ -96,7 +96,7 @@ reads through the package or a `Package::document()` projection, and publishes
 changes through `Package::edit()` or composed sub-edits. A projection shares
 the package's immutable state and remains valid when its owner is dropped;
 projections do not own lifecycle or publication operations.
-Canonical edits of retained destinations refuse snapshots containing unknown
+Canonical edits of retained destinations refuse packages containing unknown
 syntax; exact body splices preserve unknown destinations byte-for-byte.
 
 `transport::decompress` enforces a finite 256 MiB expansion ceiling before

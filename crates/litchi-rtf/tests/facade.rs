@@ -306,7 +306,7 @@ fn story_retains_exact_text_length_across_fragmentation_and_edits() {
     let mut edit = source.edit();
     edit.replace_paragraph_text(0, "a longer replacement")
         .unwrap();
-    let changed = edit.commit().unwrap().snapshot().clone();
+    let changed = edit.commit().unwrap().package().clone();
 
     assert_eq!(source.body().len(), source_len);
     assert_eq!(source.body().len(), source.text().len());

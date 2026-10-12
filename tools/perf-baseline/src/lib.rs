@@ -17051,7 +17051,7 @@ fn verify_rtf_logical_tail_gates(
 
     let mut stale_edit = source.edit();
     stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
-    let stale = stale_edit.commit()?.into_snapshot();
+    let stale = stale_edit.commit()?.into_package();
     if !matches!(
         changed.patch().apply(&stale),
         Err(litchi_rtf::TailAppendError::PatchConflict)
@@ -26688,17 +26688,17 @@ fn verify_semantic_rtf_lifecycle_commit(
     if !commit.diagnostics().changed() || commit.diagnostics().operation_count() != 1 {
         return Err("semantic RTF lifecycle commit has unexpected diagnostics".into());
     }
-    if commit.snapshot().to_bytes()? != expected_bytes {
+    if commit.package().to_bytes()? != expected_bytes {
         return Err("semantic RTF lifecycle commit differs from expected bytes".into());
     }
     let reopened = litchi_rtf::Package::from_bytes(expected_bytes)?;
     verify_semantic_rtf_lifecycle_projection(&reopened, expected_projection)?;
 
-    let applied = commit.patch().apply(source)?;
+    let applied = source.apply(commit.patch())?;
     if applied.to_bytes()? != expected_bytes {
         return Err("semantic RTF lifecycle patch replay differs from publication".into());
     }
-    let restored = commit.patch().inverse().apply(&applied)?;
+    let restored = applied.apply(&commit.patch().inverse())?;
     if restored.to_bytes()? != source.to_bytes()? {
         return Err("semantic RTF lifecycle inverse did not restore exact source bytes".into());
     }
@@ -26721,7 +26721,7 @@ fn verify_semantic_rtf_lifecycle_commit(
 
     let mut stale_edit = source.edit();
     stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
-    let stale = stale_edit.commit()?.into_snapshot();
+    let stale = stale_edit.commit()?.into_package();
     if !matches!(
         stale.apply_durable(&decoded),
         Err(litchi_rtf::edit::Error::PatchConflict)
@@ -26735,8 +26735,8 @@ fn verify_semantic_rtf_lifecycle_commit(
         let noop = noop.commit()?;
         if noop.diagnostics().changed()
             || noop.diagnostics().operation_count() != 1
-            || !noop.snapshot().same_snapshot(source)
-            || noop.snapshot().to_bytes()? != source.to_bytes()?
+            || !noop.package().same_snapshot(source)
+            || noop.package().to_bytes()? != source.to_bytes()?
             || !noop.patch().to_durable(limits)?.operations().is_empty()
         {
             return Err("semantic RTF equal-position move was not an exact no-op".into());
@@ -32007,7 +32007,7 @@ fn run_semantic_rtf(
     let expected_changed = if lifecycle_projection.is_some() {
         let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
         stage_semantic_rtf_lifecycle(case, &document)?
-            .snapshot()
+            .package()
             .to_bytes()?
     } else if !updated.is_empty() {
         let document = litchi_rtf::Package::from_bytes(&corpus.archive)?;
@@ -32020,7 +32020,7 @@ fn run_semantic_rtf(
                 semantic_rtf_variant_text(variant, selected, true),
             )?;
         }
-        edit.commit()?.snapshot().to_bytes()?
+        edit.commit()?.package().to_bytes()?
     } else {
         corpus.archive.clone()
     };
@@ -32178,11 +32178,11 @@ fn run_semantic_rtf(
                         let commit = document.edit().commit()?;
                         if commit.diagnostics().changed()
                             || commit.diagnostics().operation_count() != 0
-                            || !commit.snapshot().same_snapshot(&document)
+                            || !commit.package().same_snapshot(&document)
                         {
                             return Err("semantic RTF no-op commit changed its source".into());
                         }
-                        (commit.into_snapshot(), &[][..], None)
+                        (commit.into_package(), &[][..], None)
                     },
                     Case::RtfSemanticOneEditSave => {
                         let mut edit = document.edit();
@@ -32198,7 +32198,7 @@ fn run_semantic_rtf(
                                 "semantic RTF changed commit has unexpected diagnostics".into()
                             );
                         }
-                        let published = commit.snapshot().clone();
+                        let published = commit.package().clone();
                         (published, updated.as_slice(), Some(commit))
                     },
                     Case::RtfSemanticOnePercentEditSave => {
@@ -32212,7 +32212,7 @@ fn run_semantic_rtf(
                                 "semantic RTF one-percent commit has unexpected diagnostics".into(),
                             );
                         }
-                        let published = commit.snapshot().clone();
+                        let published = commit.package().clone();
                         (published, updated.as_slice(), Some(commit))
                     },
                     Case::RtfSemanticRemoveParagraphSave | Case::RtfSemanticMoveParagraphSave => {
@@ -32224,7 +32224,7 @@ fn run_semantic_rtf(
                                 "semantic RTF lifecycle commit has unexpected diagnostics".into()
                             );
                         }
-                        let published = commit.snapshot().clone();
+                        let published = commit.package().clone();
                         (published, &[][..], Some(commit))
                     },
                     _ => return Err("non-save RTF case reached save branch".into()),
@@ -32242,11 +32242,11 @@ fn run_semantic_rtf(
                     verify_semantic_rtf(&reopened, shape, variant, expected_updates)?;
                 }
                 if let Some(commit) = commit {
-                    let applied = commit.patch().apply(&document)?;
+                    let applied = document.apply(commit.patch())?;
                     if applied.to_bytes()? != sink.bytes {
                         return Err("semantic RTF patch replay differs from publication".into());
                     }
-                    let restored = commit.patch().inverse().apply(&applied)?;
+                    let restored = applied.apply(&commit.patch().inverse())?;
                     if restored.to_bytes()? != corpus.archive {
                         return Err(
                             "semantic RTF inverse did not restore exact source bytes".into()
@@ -32505,7 +32505,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     let commit = stage_rtf_paragraph_split_merge(case, &source, expectation)?;
     if !commit.diagnostics().changed()
         || commit.diagnostics().operation_count() != 1
-        || commit.snapshot().to_bytes()? != expectation.expected_output
+        || commit.package().to_bytes()? != expectation.expected_output
     {
         return Err("RTF paragraph split/merge commit differs from expected splice".into());
     }
@@ -32514,16 +32514,16 @@ fn verify_rtf_paragraph_split_merge_gates(
     let limits = semantic_rtf_durable_limits();
     let exact_noop_verified = !noop.diagnostics().changed()
         && noop.diagnostics().operation_count() == 0
-        && noop.snapshot().same_snapshot(&source)
-        && noop.snapshot().to_bytes()? == corpus.archive
+        && noop.package().same_snapshot(&source)
+        && noop.package().to_bytes()? == corpus.archive
         && noop.patch().to_durable(limits)?.operations().is_empty();
     if !exact_noop_verified {
         return Err("RTF paragraph split/merge exact no-op gate failed".into());
     }
 
-    let volatile_forward = commit.patch().apply(&source)?;
+    let volatile_forward = source.apply(commit.patch())?;
     let volatile_forward_verified = volatile_forward.to_bytes()? == expectation.expected_output;
-    let volatile_inverse = commit.patch().inverse().apply(&volatile_forward)?;
+    let volatile_inverse = volatile_forward.apply(&commit.patch().inverse())?;
     let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
 
     let durable = commit.patch().to_durable(limits)?;
@@ -32548,7 +32548,7 @@ fn verify_rtf_paragraph_split_merge_gates(
             .is_err();
     let mut stale_edit = source.edit();
     stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
-    let stale = stale_edit.commit()?.into_snapshot();
+    let stale = stale_edit.commit()?.into_package();
     let stale_source_refusal_verified = stale.apply_durable(&decoded).is_err();
     let foreign = litchi_rtf::Package::parse(r"{\rtf1\ansi Foreign\par Source}")?;
     let foreign_source_refusal_verified = foreign.apply_durable(&decoded).is_err();
@@ -32645,14 +32645,14 @@ fn verify_rtf_paragraph_split_merge_gates(
             .unwrap_or(1)
             .max(1),
     };
-    let partial_sink_verified = commit.snapshot().write_to(&mut partial).is_err()
+    let partial_sink_verified = commit.package().write_to(&mut partial).is_err()
         && partial.accepted > 0
         && partial.accepted < u64::try_from(expectation.expected_output.len())?;
     let mut zero = PrefixFailSink {
         accepted: 0,
         fail_after: 0,
     };
-    let zero_sink_verified = commit.snapshot().write_to(&mut zero).is_err() && zero.accepted == 0;
+    let zero_sink_verified = commit.package().write_to(&mut zero).is_err() && zero.accepted == 0;
     if !partial_sink_verified || !zero_sink_verified {
         return Err("RTF paragraph split/merge partial/zero sink gate failed".into());
     }
@@ -32729,14 +32729,14 @@ fn run_rtf_paragraph_split_merge(
         let commit = edit.commit()?;
         let commit_duration = commit_started.elapsed();
         let publication_started = Instant::now();
-        commit.snapshot().write_to(&mut sink)?;
+        commit.package().write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let lifecycle_duration = lifecycle_started.elapsed();
         let (sink_summary, digest) = sink.finish();
         if digest != output_digest || sink_summary.accepted_bytes != output_bytes {
             return Err("RTF paragraph split/merge timed publication hash differs".into());
         }
-        std::hint::black_box(commit.snapshot());
+        std::hint::black_box(commit.package());
         record_elapsed(
             &mut elapsed,
             iteration,
@@ -33038,11 +33038,11 @@ fn verify_rtf_picture_crud_gates(
             .collect::<Vec<_>>();
         let mut edit = source.edit();
         edit.replace_picture_payloads(&replacements)?;
-        edit.commit()?.snapshot().to_bytes()?
+        edit.commit()?.package().to_bytes()?
     } else {
         let mut edit = source.edit();
         edit.remove_pictures(&selected_positions)?;
-        edit.commit()?.snapshot().to_bytes()?
+        edit.commit()?.package().to_bytes()?
     };
     if api_output != expected_output {
         return Err(
@@ -33128,8 +33128,8 @@ fn verify_rtf_picture_crud_gates(
     };
     let exact_noop_verified = !noop.diagnostics().changed()
         && noop.diagnostics().operation_count() == expected_noop_operations
-        && noop.snapshot().same_snapshot(&source)
-        && noop.snapshot().to_bytes()? == corpus.archive;
+        && noop.package().same_snapshot(&source)
+        && noop.package().to_bytes()? == corpus.archive;
     if !exact_noop_verified {
         return Err("RTF picture CRUD exact no-op gate failed".into());
     }
@@ -33152,7 +33152,7 @@ fn verify_rtf_picture_crud_gates(
     let commit = changed_edit.commit()?;
     if !commit.diagnostics().changed()
         || commit.diagnostics().operation_count() != selected_positions.len()
-        || commit.snapshot().to_bytes()? != expected_output
+        || commit.package().to_bytes()? != expected_output
     {
         return Err("RTF picture CRUD commit diagnostics differ from expected output".into());
     }
@@ -33169,9 +33169,9 @@ fn verify_rtf_picture_crud_gates(
             &durable_json,
             durable_limits,
         )?;
-    let volatile_forward = commit.patch().apply(&source)?;
+    let volatile_forward = source.apply(commit.patch())?;
     let volatile_forward_verified = volatile_forward.to_bytes()? == expected_output;
-    let volatile_inverse = commit.patch().inverse().apply(&volatile_forward)?;
+    let volatile_inverse = volatile_forward.apply(&commit.patch().inverse())?;
     let volatile_inverse_verified = volatile_inverse.to_bytes()? == corpus.archive;
     let forward = source.apply_durable(&decoded)?;
     let durable_forward_verified = forward.to_bytes()? == expected_output;
@@ -33247,12 +33247,12 @@ fn verify_rtf_picture_crud_gates(
         fail_after: 1,
     };
     let partial_sink_verified =
-        commit.snapshot().write_to(&mut partial).is_err() && partial.accepted == 1;
+        commit.package().write_to(&mut partial).is_err() && partial.accepted == 1;
     let mut zero = PrefixFailSink {
         accepted: 0,
         fail_after: 0,
     };
-    let zero_sink_verified = commit.snapshot().write_to(&mut zero).is_err() && zero.accepted == 0;
+    let zero_sink_verified = commit.package().write_to(&mut zero).is_err() && zero.accepted == 0;
     if !partial_sink_verified || !zero_sink_verified {
         return Err("RTF picture CRUD partial/zero sink gate failed".into());
     }
@@ -33336,14 +33336,14 @@ fn run_rtf_picture_crud(
         let commit_duration = commit_started.elapsed();
         let publication_started = Instant::now();
         let mut sink = HashingDiscardSink::without_authoring_window(output_bytes);
-        commit.snapshot().write_to(&mut sink)?;
+        commit.package().write_to(&mut sink)?;
         let publication_duration = publication_started.elapsed();
         let lifecycle_duration = lifecycle_started.elapsed();
         let (sink_summary, digest) = sink.finish();
         if digest != output_digest || sink_summary.accepted_bytes != output_bytes {
             return Err("RTF picture CRUD timed publication hash differs".into());
         }
-        std::hint::black_box(commit.snapshot());
+        std::hint::black_box(commit.package());
         record_elapsed(
             &mut elapsed,
             iteration,
@@ -33744,7 +33744,7 @@ fn verify_rtf_tail_publication_plan_gates(
 
     let mut stale_edit = source.edit();
     stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-publication-stale")?;
-    let stale = stale_edit.commit()?.into_snapshot();
+    let stale = stale_edit.commit()?.into_package();
     let stale_context = rtf_tail_publication_context(
         u64::try_from(expected.len())?,
         u64::try_from(plan.inserted_bytes())?,
@@ -67484,8 +67484,8 @@ mod tests {
         noop.move_paragraph(0, 0).unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
-        assert!(noop.snapshot().same_snapshot(&source));
-        assert_eq!(noop.snapshot().to_bytes().unwrap(), corpus.archive);
+        assert!(noop.package().same_snapshot(&source));
+        assert_eq!(noop.package().to_bytes().unwrap(), corpus.archive);
 
         for variant in [RtfSemanticVariant::Byte1252, RtfSemanticVariant::Lzfu] {
             let corpus = build_semantic_rtf_corpus(SemanticShape::Tiny, variant).unwrap();
@@ -67515,8 +67515,8 @@ mod tests {
             noop.move_paragraph(0, 0).unwrap();
             let noop = noop.commit().unwrap();
             assert!(!noop.diagnostics().changed());
-            assert!(noop.snapshot().same_snapshot(&document));
-            assert_eq!(noop.snapshot().to_bytes().unwrap(), exact);
+            assert!(noop.package().same_snapshot(&document));
+            assert_eq!(noop.package().to_bytes().unwrap(), exact);
         }
 
         let watermark =
@@ -67534,8 +67534,8 @@ mod tests {
         noop.move_paragraph(0, 0).unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
-        assert!(noop.snapshot().same_snapshot(&watermark));
-        assert_eq!(noop.snapshot().to_bytes().unwrap(), exact);
+        assert!(noop.package().same_snapshot(&watermark));
+        assert_eq!(noop.package().to_bytes().unwrap(), exact);
 
         let opaque =
             litchi_rtf::Package::parse(r"{\rtf1\ansi First\par \b Opaque\b0\par Third}").unwrap();
@@ -67564,8 +67564,8 @@ mod tests {
         opaque_noop.move_paragraph(0, 0).unwrap();
         let opaque_noop = opaque_noop.commit().unwrap();
         assert!(!opaque_noop.diagnostics().changed());
-        assert!(opaque_noop.snapshot().same_snapshot(&opaque));
-        assert_eq!(opaque_noop.snapshot().to_bytes().unwrap(), exact);
+        assert!(opaque_noop.package().same_snapshot(&opaque));
+        assert_eq!(opaque_noop.package().to_bytes().unwrap(), exact);
     }
 
     #[test]
