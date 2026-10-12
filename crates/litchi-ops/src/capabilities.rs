@@ -1244,7 +1244,7 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// verbs visible instead of making the format-level `set`/`remove`/`move`/
 /// `swap`/`edit`/`batch` support look like general CRUD.
 #[cfg(feature = "rtf")]
-static RTF_WRITE_GAPS: [GapSpec; 4] = [
+static RTF_WRITE_GAPS: [GapSpec; 9] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
@@ -1284,6 +1284,56 @@ static RTF_WRITE_GAPS: [GapSpec; 4] = [
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF rich paragraph preservation",
         reason: "paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "run",
+            context: "native-run-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF atomic native run edits",
+        reason: "run property updates require an atomic native character-run editor that preserves all source boundaries and formatting controls",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "run",
+            context: "native-run-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF atomic native run edits",
+        reason: "run insertion requires an atomic native character-run editor that preserves neighboring source boundaries and formatting controls",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "run",
+            context: "native-run-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF atomic native run edits",
+        reason: "run removal requires an atomic native character-run editor that preserves unselected source boundaries and formatting controls",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "run",
+            context: "native-run-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF atomic native run edits",
+        reason: "run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "run",
+            context: "native-run-edit",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF atomic native run edits",
+        reason: "run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls",
     },
 ];
 

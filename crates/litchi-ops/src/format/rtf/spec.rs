@@ -6,7 +6,7 @@ use crate::node::spec::{
 };
 use crate::path::navigate::ElementKind;
 use crate::path::vocabulary::{self, Vocabulary};
-use crate::value::{LengthContext, LengthSpec, LengthStyle, Tokens};
+use crate::value::{ColorContext, LengthContext, LengthSpec, LengthStyle, Tokens, ValueType};
 
 /// A RTF node kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -18,6 +18,8 @@ pub enum Kind {
     Body,
     /// An ordinary main-story paragraph (`/body/p[N]`).
     Paragraph,
+    /// A contiguous character-format run (`/body/p[N]/r[N]`).
+    Run,
 }
 
 impl Kind {
@@ -28,6 +30,7 @@ impl Kind {
             Self::Document => "document",
             Self::Body => "body",
             Self::Paragraph => "paragraph",
+            Self::Run => "run",
         }
     }
 }
@@ -41,6 +44,7 @@ impl ElementKind for Kind {
             "document" => Some(Self::Document),
             "body" => Some(Self::Body),
             "p" | "paragraph" => Some(Self::Paragraph),
+            "r" | "run" => Some(Self::Run),
             _ => None,
         }
     }
@@ -50,6 +54,7 @@ impl ElementKind for Kind {
             Self::Document => "document",
             Self::Body => "body",
             Self::Paragraph => "p",
+            Self::Run => "r",
         }
     }
 
@@ -84,6 +89,36 @@ const BODY: ElementSpec<Kind> = ElementSpec {
 
 pub(crate) static ALIGNMENT: Tokens =
     Tokens::new("alignment", &["left", "right", "center", "justify"], &[]);
+
+/// The complete local underline vocabulary retained by the native RTF
+/// formatter.  Every native variant has its own token so a read never
+/// collapses a dotted, dashed, or wave underline into the generic `single`
+/// value used by some other document families.
+pub(crate) static RUN_UNDERLINE: Tokens = Tokens::new(
+    "underline",
+    &[
+        "none",
+        "single",
+        "double",
+        "dotted",
+        "dashed",
+        "dashDot",
+        "dashDotDot",
+        "words",
+        "thick",
+        "wave",
+        "hairline",
+        "thickDotted",
+        "thickDashed",
+        "thickDashDot",
+        "thickDashDotDot",
+        "thickLongDash",
+        "longDash",
+        "heavyWave",
+        "doubleWave",
+    ],
+    &[],
+);
 
 /// Nonnegative paragraph spacing, read as Word twips and printed in points.
 pub(crate) const SPACING: LengthSpec =
@@ -197,6 +232,90 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
     },
 ];
 
+/// Read-only local character properties for a native RTF run.  The scalar
+/// types follow the common word-processing run registry, while the native RTF
+/// projection keeps its own exact underline token vocabulary.
+pub(crate) const RUN_PROPS: &[PropSpec] = &[
+    PropSpec {
+        name: "text",
+        ty: ValueType::Text,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "font",
+        ty: ValueType::Text,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "size",
+        ty: ValueType::Length(LengthSpec::FONT_SIZE),
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "bold",
+        ty: ValueType::Bool,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "italic",
+        ty: ValueType::Bool,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "color",
+        ty: ValueType::Color(ColorContext::Word),
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "underline",
+        ty: ValueType::Token(&RUN_UNDERLINE),
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "strike",
+        ty: ValueType::Bool,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "dstrike",
+        ty: ValueType::Bool,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "vanish",
+        ty: ValueType::Bool,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "caps",
+        ty: ValueType::Bool,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "smallcaps",
+        ty: ValueType::Bool,
+        access: Access::READ,
+        raw: false,
+    },
+    PropSpec {
+        name: "outline",
+        ty: ValueType::Bool,
+        access: Access::READ,
+        raw: false,
+    },
+];
+
 pub(crate) const fn alignment_name(alignment: litchi_rtf::Alignment) -> &'static str {
     match alignment {
         litchi_rtf::Alignment::Left => "left",
@@ -206,15 +325,51 @@ pub(crate) const fn alignment_name(alignment: litchi_rtf::Alignment) -> &'static
     }
 }
 
+pub(crate) const fn underline_name(underline: litchi_rtf::text::Underline) -> &'static str {
+    match underline {
+        litchi_rtf::text::Underline::None => "none",
+        litchi_rtf::text::Underline::Single => "single",
+        litchi_rtf::text::Underline::Double => "double",
+        litchi_rtf::text::Underline::Dotted => "dotted",
+        litchi_rtf::text::Underline::Dashed => "dashed",
+        litchi_rtf::text::Underline::DashDot => "dashDot",
+        litchi_rtf::text::Underline::DashDotDot => "dashDotDot",
+        litchi_rtf::text::Underline::Words => "words",
+        litchi_rtf::text::Underline::Thick => "thick",
+        litchi_rtf::text::Underline::Wave => "wave",
+        litchi_rtf::text::Underline::Hairline => "hairline",
+        litchi_rtf::text::Underline::ThickDotted => "thickDotted",
+        litchi_rtf::text::Underline::ThickDashed => "thickDashed",
+        litchi_rtf::text::Underline::ThickDashDot => "thickDashDot",
+        litchi_rtf::text::Underline::ThickDashDotDot => "thickDashDotDot",
+        litchi_rtf::text::Underline::ThickLongDash => "thickLongDash",
+        litchi_rtf::text::Underline::LongDash => "longDash",
+        litchi_rtf::text::Underline::HeavyWave => "heavyWave",
+        litchi_rtf::text::Underline::DoubleWave => "doubleWave",
+    }
+}
+
 const PARAGRAPH: ElementSpec<Kind> = ElementSpec {
     kind: Kind::Paragraph,
     name: "paragraph",
     aliases: &["p", "paragraph"],
     parents: &[Kind::Body],
-    children: &[],
+    children: &[Kind::Run],
     identities: &[],
     paths: &["/body/p[N]"],
     props: PARAGRAPH_PROPS,
+    gap: None,
+};
+
+const RUN: ElementSpec<Kind> = ElementSpec {
+    kind: Kind::Run,
+    name: "run",
+    aliases: &["r", "run"],
+    parents: &[Kind::Paragraph],
+    children: &[],
+    identities: &[],
+    paths: &["/body/p[N]/r[N]"],
+    props: RUN_PROPS,
     gap: None,
 };
 
@@ -222,9 +377,8 @@ const PARAGRAPH: ElementSpec<Kind> = ElementSpec {
 /// node-view projection.
 pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
     root: Kind::Document,
-    elements: &[DOCUMENT, BODY, PARAGRAPH],
+    elements: &[DOCUMENT, BODY, PARAGRAPH, RUN],
     gaps: &[
-        read_gap("run"),
         read_gap("table"),
         read_gap("row"),
         read_gap("cell"),

@@ -14,7 +14,7 @@ pub(crate) use nav::Nav;
 pub use node::Node;
 pub use spec::Kind;
 pub(crate) use spec::SPEC;
-pub(crate) use spec::alignment_name;
+pub(crate) use spec::{alignment_name, underline_name};
 
 use std::fmt;
 use std::path::Path;

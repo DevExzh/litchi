@@ -1426,3 +1426,19 @@ commands publish the preceding run before resolving against its new snapshot.
 Native operation and semantic retention limits remain enforced across run
 boundaries. This does not add a mutable presentation model or change public
 operation names.
+
+## RTF unified borrowed run axis (0241)
+
+RTF unified nodes expose the canonical `Node::text` projection for both
+paragraphs and character runs; the former paragraph-specific text accessor is
+removed. Run nodes retain borrowed native `litchi_rtf::text::Run` values and
+provide `as_run()`, `run_position()`, and their containing
+`paragraph_position()`. Paragraph children are lazy native `runs()` cursors,
+so structural break tokens do not become run nodes and empty paragraphs keep
+their zero-child behavior.
+
+The `/body/p[N]/r[N]` axis accepts both `r` and `run` spellings and projects
+read-only local text, font, size, character flags, foreground color, and each
+native underline variant as a distinct token. Run properties and the run
+element support `get` and `query`; `set`, `add`, `remove`, `move`, and `swap`
+remain explicit capability gaps until the native atomic run editor exists.

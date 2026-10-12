@@ -15,7 +15,7 @@ use super::spec::PropSpec;
 use super::value::{Key, Value};
 use crate::error::{Error, Result};
 #[cfg(feature = "rtf")]
-use crate::value::Length;
+use crate::value::{Color, Length};
 
 /// The deepest `depth` a view honours; larger requests are refused. It bounds
 /// the serializer's recursion (record 0010 §2.5; OfficeCLI clamps to 256 and
@@ -370,7 +370,10 @@ pub(crate) enum Source<'a> {
     Fake(&'a [Option<Value<'static>>]),
     /// A borrowed native RTF paragraph.
     #[cfg(feature = "rtf")]
-    Rtf(litchi_rtf::text::Paragraph<'a>),
+    RtfParagraph(litchi_rtf::text::Paragraph<'a>),
+    /// A borrowed native RTF character run.
+    #[cfg(feature = "rtf")]
+    RtfRun(litchi_rtf::text::Run<'a>),
     /// A DOCX node's parsed property set.
     #[cfg(feature = "docx")]
     Docx(crate::format::docx::Props<'a>),
@@ -402,7 +405,7 @@ impl<'a> Source<'a> {
             #[cfg(any(test, feature = "test-support"))]
             Self::Fake(values) => values.get(index)?.as_ref().map(Value::borrowed),
             #[cfg(feature = "rtf")]
-            Self::Rtf(paragraph) => {
+            Self::RtfParagraph(paragraph) => {
                 let layout = paragraph.format().layout();
                 match index {
                     0 => Some(Value::Text(
@@ -423,6 +426,40 @@ impl<'a> Source<'a> {
                     7 => Some(Value::Bool(layout.keep_with_next())),
                     8 => Some(Value::Bool(layout.keep_together())),
                     9 => Some(Value::Bool(layout.page_break_before())),
+                    _ => None,
+                }
+            },
+            #[cfg(feature = "rtf")]
+            Self::RtfRun(run) => {
+                let format = run.format();
+                match index {
+                    0 => Some(Value::Text(Cow::Borrowed(run.text()))),
+                    1 => format
+                        .font()
+                        .map(|font| Value::Text(Cow::Borrowed(font.name()))),
+                    2 => Some(Value::Length(Length::from_half_points(i32::from(
+                        format.size().get(),
+                    )))),
+                    3 => Some(Value::Bool(format.bold())),
+                    4 => Some(Value::Bool(format.italic())),
+                    5 => format.foreground().and_then(|value| match value {
+                        litchi_rtf::color::Value::Automatic => Some(Value::Color(Color::AUTO)),
+                        litchi_rtf::color::Value::Rgb(color) => Some(Value::Color(Color::rgb(
+                            color.red(),
+                            color.green(),
+                            color.blue(),
+                        ))),
+                        _ => None,
+                    }),
+                    6 => Some(Value::Token(crate::format::rtf::underline_name(
+                        format.underline(),
+                    ))),
+                    7 => Some(Value::Bool(format.strike())),
+                    8 => Some(Value::Bool(format.double_strike())),
+                    9 => Some(Value::Bool(format.hidden())),
+                    10 => Some(Value::Bool(format.all_caps())),
+                    11 => Some(Value::Bool(format.small_caps())),
+                    12 => Some(Value::Bool(format.outline())),
                     _ => None,
                 }
             },

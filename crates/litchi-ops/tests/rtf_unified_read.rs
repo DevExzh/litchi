@@ -99,10 +99,7 @@ fn views_and_capabilities_agree_on_supported_read_surface() {
             .unwrap()
             .contains("[/body/p[3]] ABC")
     );
-    assert_eq!(
-        file.get("/body/p[1]/r[1]").unwrap_err().code(),
-        Code::UnsupportedCapability
-    );
+    assert_eq!(text(&file, "/body/p[1]/r[1]"), "First");
 }
 
 #[test]

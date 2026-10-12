@@ -1,4 +1,4 @@
-//! Path and query navigation for the RTF root/body/paragraph vocabulary.
+//! Path and query navigation for the RTF root/body/paragraph/run vocabulary.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -77,6 +77,32 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 });
                 Ok(paragraph.map_or(Lookup::Missing, Lookup::Found))
             },
+            (Kind::Paragraph, Kind::Run) => {
+                let Some(paragraph) = parent.paragraph else {
+                    return Ok(Lookup::Missing);
+                };
+                let Some(paragraph_position) = parent.paragraph_position else {
+                    return Ok(Lookup::Missing);
+                };
+                let position = match step.select {
+                    Select::None => Some(0),
+                    Select::Ordinal(position) => Some(position.get()),
+                    Select::Last => paragraph.runs().count().checked_sub(1),
+                    _ => return Ok(Lookup::NotApplicable),
+                };
+                let run = position.and_then(|position| {
+                    paragraph.runs().nth(position).map(|run| {
+                        Node::run(
+                            self.doc,
+                            paragraph_position,
+                            Position::new(position),
+                            paragraph,
+                            run,
+                        )
+                    })
+                });
+                Ok(run.map_or(Lookup::Missing, Lookup::Found))
+            },
             _ => Ok(Lookup::NotApplicable),
         }
     }
@@ -85,18 +111,13 @@ impl<'f> Navigate<'f> for Nav<'f> {
         let wants = match parent.kind {
             Kind::Document => kinds.contains(Kind::Body),
             Kind::Body => kinds.contains(Kind::Paragraph),
-            Kind::Paragraph => false,
+            Kind::Paragraph => kinds.contains(Kind::Run),
+            Kind::Run => false,
         };
         Ok(if wants {
             Children::of(parent)
         } else {
-            Children {
-                doc: self.doc,
-                next: 0,
-                body: false,
-                done: true,
-                paragraphs: None,
-            }
+            Children::empty(self.doc)
         })
     }
 
@@ -109,7 +130,12 @@ impl<'f> Navigate<'f> for Nav<'f> {
         match parent.kind {
             Kind::Document => out.kind("body", 1),
             Kind::Body => out.kind("p", self.doc.0.package.paragraph_count()),
-            Kind::Paragraph => {},
+            Kind::Paragraph => {
+                if let Some(paragraph) = parent.paragraph {
+                    out.kind("r", paragraph.runs().count());
+                }
+            },
+            Kind::Run => {},
         }
         Ok(())
     }
@@ -128,7 +154,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
     }
 
     fn text<'n>(&'n self, node: &'n Node<'f>) -> Result<Option<Cow<'n, str>>> {
-        node.paragraph_text()
+        node.text()
     }
 
     fn format<'n>(&'n self, node: &'n Node<'f>) -> Result<Format<'n>> {
@@ -144,12 +170,15 @@ impl<'f> Inspect<'f> for Nav<'f> {
     ) -> fmt::Result {
         let step = match kind {
             Kind::Body => PathStep::new("body"),
-            Kind::Paragraph => node
-                .path()
-                .steps()
-                .last()
-                .copied()
-                .unwrap_or_else(|| PathStep::at("p", ordinal)),
+            Kind::Paragraph | Kind::Run => {
+                node.path().steps().last().copied().unwrap_or_else(|| {
+                    if kind == Kind::Run {
+                        PathStep::at("r", ordinal)
+                    } else {
+                        PathStep::at("p", ordinal)
+                    }
+                })
+            },
             Kind::Document => PathStep::new("document"),
         };
         fmt::Display::fmt(&step, out)

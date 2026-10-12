@@ -12,15 +12,20 @@ use crate::node::{
     Children as ViewChildren, Format, NodePath, PathStep, Preview, Project, ViewOptions,
 };
 
-/// A root, body or ordinary main-story paragraph in a RTF document.
+/// A root, body, paragraph, or borrowed character run in an RTF document.
 #[derive(Clone, Copy)]
 pub struct Node<'f> {
     pub(super) doc: &'f Rtf,
     pub(super) kind: Kind,
-    pub(super) position: Option<usize>,
-    /// Borrowed native paragraph retained by both direct lookup and lazy walks.
+    /// The containing paragraph's zero-based main-story position.
+    pub(super) paragraph_position: Option<Position>,
+    /// The run's zero-based position within its containing paragraph.
+    pub(super) run_position: Option<Position>,
+    /// Borrowed native paragraph retained by paragraph and run nodes.
     pub(super) paragraph: Option<litchi_rtf::text::Paragraph<'f>>,
-    pub(super) steps: [PathStep<'static>; 2],
+    /// Borrowed native run retained by run nodes.
+    pub(super) run: Option<litchi_rtf::text::Run<'f>>,
+    pub(super) steps: [PathStep<'static>; 3],
 }
 
 impl<'f> Node<'f> {
@@ -28,9 +33,15 @@ impl<'f> Node<'f> {
         Self {
             doc,
             kind: Kind::Document,
-            position: None,
+            paragraph_position: None,
+            run_position: None,
             paragraph: None,
-            steps: [PathStep::new("document"), PathStep::new("body")],
+            run: None,
+            steps: [
+                PathStep::new("document"),
+                PathStep::new("body"),
+                PathStep::new("p"),
+            ],
         }
     }
 
@@ -38,9 +49,15 @@ impl<'f> Node<'f> {
         Self {
             doc,
             kind: Kind::Body,
-            position: None,
+            paragraph_position: None,
+            run_position: None,
             paragraph: None,
-            steps: [PathStep::new("body"), PathStep::new("p")],
+            run: None,
+            steps: [
+                PathStep::new("body"),
+                PathStep::new("p"),
+                PathStep::new("r"),
+            ],
         }
     }
 
@@ -52,9 +69,37 @@ impl<'f> Node<'f> {
         Self {
             doc,
             kind: Kind::Paragraph,
-            position: Some(position.get()),
+            paragraph_position: Some(position),
+            run_position: None,
             paragraph: Some(paragraph),
-            steps: [PathStep::new("body"), PathStep::at("p", position)],
+            run: None,
+            steps: [
+                PathStep::new("body"),
+                PathStep::at("p", position),
+                PathStep::new("r"),
+            ],
+        }
+    }
+
+    pub(super) const fn run(
+        doc: &'f Rtf,
+        paragraph_position: Position,
+        run_position: Position,
+        paragraph: litchi_rtf::text::Paragraph<'f>,
+        run: litchi_rtf::text::Run<'f>,
+    ) -> Self {
+        Self {
+            doc,
+            kind: Kind::Run,
+            paragraph_position: Some(paragraph_position),
+            run_position: Some(run_position),
+            paragraph: Some(paragraph),
+            run: Some(run),
+            steps: [
+                PathStep::new("body"),
+                PathStep::at("p", paragraph_position),
+                PathStep::at("r", run_position),
+            ],
         }
     }
 
@@ -64,17 +109,31 @@ impl<'f> Node<'f> {
         self.kind
     }
 
-    /// The paragraph's zero-based main-story position.
+    /// The containing paragraph's zero-based main-story position.
     #[must_use]
     pub const fn paragraph_position(&self) -> Option<Position> {
-        match self.position {
-            Some(position) => Some(Position::new(position)),
-            None => None,
-        }
+        self.paragraph_position
     }
 
-    /// The paragraph text for a paragraph node.
-    pub fn paragraph_text(&self) -> Result<Option<Cow<'f, str>>> {
+    /// The run's zero-based position within its containing paragraph.
+    #[must_use]
+    pub const fn run_position(&self) -> Option<Position> {
+        self.run_position
+    }
+
+    /// The borrowed native run retained by this run node.
+    #[must_use]
+    pub const fn as_run(&self) -> Option<litchi_rtf::text::Run<'f>> {
+        self.run
+    }
+
+    /// The node's visible text. Paragraph text remains borrowed when the
+    /// native story stores it contiguously; fragmented paragraphs use the
+    /// native formatter's owned fallback. Runs always borrow their text.
+    pub fn text(&self) -> Result<Option<Cow<'f, str>>> {
+        if let Some(run) = self.run {
+            return Ok(Some(Cow::Borrowed(run.text())));
+        }
         Ok(self.paragraph.map(|paragraph| {
             paragraph
                 .as_str()
@@ -97,7 +156,8 @@ impl<'f> Node<'f> {
         match self.kind {
             Kind::Document => NodePath::new(&[]),
             Kind::Body => NodePath::new(&self.steps[..1]),
-            Kind::Paragraph => NodePath::new(&self.steps),
+            Kind::Paragraph => NodePath::new(&self.steps[..2]),
+            Kind::Run => NodePath::new(&self.steps),
         }
     }
 
@@ -138,30 +198,39 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn text(&self) -> Result<Option<Cow<'_, str>>> {
-        self.paragraph_text()
+        Node::text(self)
     }
 
     fn preview(&self) -> Result<Option<Preview<'_>>> {
-        Ok(self.paragraph_text()?.map(Preview::Prefix))
+        Ok(Node::text(self)?.map(Preview::Prefix))
     }
 
     fn child_count(&self, _: &ViewOptions) -> Result<Option<u32>> {
         let count = match self.kind {
             Kind::Document => 1,
             Kind::Body => self.doc.0.package.paragraph_count(),
-            Kind::Paragraph => 0,
+            Kind::Paragraph => self
+                .paragraph
+                .map_or(0, |paragraph| paragraph.runs().count()),
+            Kind::Run => 0,
         };
         Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
     }
 
     fn format(&self) -> Result<Format<'_>> {
-        Ok(self.paragraph.map_or_else(Format::empty, |paragraph| {
-            Format::new(
+        match (self.kind, self.paragraph, self.run) {
+            (Kind::Paragraph, Some(paragraph), _) => Ok(Format::new(
                 super::spec::PARAGRAPH_PROPS,
-                crate::node::Source::Rtf(paragraph),
+                crate::node::Source::RtfParagraph(paragraph),
             )
-            .without(&["text"])
-        }))
+            .without(&["text"])),
+            (Kind::Run, _, Some(run)) => Ok(Format::new(
+                super::spec::RUN_PROPS,
+                crate::node::Source::RtfRun(run),
+            )
+            .without(&["text"])),
+            _ => Ok(Format::empty()),
+        }
     }
 
     fn children(&self, _: &ViewOptions) -> ViewChildren<'_, 'f> {

@@ -60,7 +60,7 @@ pub(crate) fn add_with_limits<'p, 'n>(
         )
         .with_format(FileFormat::Rtf));
     }
-    let text = add_paragraph_text(node.props())?;
+    let text = add_text(node.props())?;
     let count = file.0.package.paragraph_count();
     let position = add_position(file, count, node.placement())?;
 
@@ -117,7 +117,7 @@ pub(crate) fn add_with_limits<'p, 'n>(
     ))
 }
 
-fn add_paragraph_text<'a>(props: &'a Props<'_>) -> Result<&'a str> {
+fn add_text<'a>(props: &'a Props<'_>) -> Result<&'a str> {
     if props.is_empty() {
         return Ok("");
     }
@@ -443,13 +443,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
     file.admit_edit()?;
     let nav = Nav::new(file);
     let selected = crate::path::resolve::get(&nav, &path)?;
-    let Some(from) = selected.paragraph_position() else {
-        return Err(Error::new(
-            Code::UnsupportedType,
-            "RTF moves target ordinary body paragraphs",
-        )
-        .with_format(FileFormat::Rtf));
-    };
+    let from = paragraph_position(selected)?;
     let count = file.0.package.paragraph_count();
     if count == 0 {
         return Err(
@@ -658,6 +652,13 @@ fn move_destination(
 }
 
 fn paragraph_position(node: Node<'_>) -> Result<usize> {
+    if node.element_kind() != super::Kind::Paragraph {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "RTF mutations target ordinary body paragraphs",
+        )
+        .with_format(FileFormat::Rtf));
+    }
     node.paragraph_position().map_or_else(
         || {
             Err(Error::new(
@@ -893,6 +894,13 @@ fn resolve_paragraph_targets(
 }
 
 fn append_paragraph(positions: &mut Vec<Position>, node: Node<'_>, maximum: usize) -> Result<()> {
+    if node.element_kind() != super::Kind::Paragraph {
+        return Err(Error::new(
+            Code::UnsupportedCapability,
+            "RTF mutations target paragraph nodes",
+        )
+        .with_format(FileFormat::Rtf));
+    }
     let Some(position) = node.paragraph_position() else {
         return Err(Error::new(
             Code::UnsupportedCapability,
