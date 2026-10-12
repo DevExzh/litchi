@@ -118,19 +118,53 @@ fn empty_paragraphs_are_real_runs_and_unicode_source_fragments_keep_paths_valid(
     );
 
     let unicode = br"{\rtf1\ansi\uc1 A\u233?B{\i C\u38634?D}\tab end}";
+    let native = litchi_rtf::Package::from_bytes(unicode).unwrap();
+    let native_runs = native
+        .body()
+        .paragraphs()
+        .next()
+        .unwrap()
+        .runs()
+        .map(|run| run.text())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        native_runs,
+        vec!["A", "é", "B", "C", "雪", "D", "\t end"],
+        "the insertion boundary must follow the native source run axis"
+    );
+    let before_b = native_runs
+        .iter()
+        .position(|run| *run == "B")
+        .expect("the fixture must expose B as its own native run");
+    let before_b_text = native_runs
+        .iter()
+        .take(before_b)
+        .copied()
+        .collect::<String>();
+    let after_b_text = native_runs
+        .iter()
+        .skip(before_b)
+        .copied()
+        .collect::<String>();
     let source = open_bytes(unicode).unwrap();
     let added = source
         .add(
             "/body/p[1]",
-            run_node("inserted").at(Placement::Position(Position::new(1))),
+            run_node("inserted").at(Placement::Position(Position::new(before_b))),
         )
         .unwrap();
-    assert_eq!(added.path.to_string(), "/body/p[1]/r[2]");
+    assert_eq!(
+        added.path.to_string(),
+        format!("/body/p[1]/r[{}]", before_b + 1)
+    );
     assert_eq!(text(&added.file, &added.path.to_string()), "inserted");
-    assert_eq!(text(&added.file, "/body/p[1]"), "AéBinsertedC雪D\t end");
+    assert_eq!(
+        text(&added.file, "/body/p[1]"),
+        format!("{before_b_text}inserted{after_b_text}")
+    );
     assert_eq!(
         added.file.to_bytes().unwrap(),
-        native_run_add(unicode, 0, 1, "inserted", RunFormatPatch::new())
+        native_run_add(unicode, 0, before_b, "inserted", RunFormatPatch::new())
     );
     assert_eq!(
         open_bytes(added.file.to_bytes().unwrap())
@@ -176,7 +210,7 @@ fn formatting_defaults_inherit_and_compound_properties_match_native_patch() {
         native_run_add(input, 0, 1, "inherited", RunFormatPatch::new())
     );
 
-    let compound_text = "new \\ {text}\té雪";
+    let compound_text = "new \\ {text}\té雪😀\tCR:\rVT:\u{b}NUL:\0";
     let format = RunFormatPatch::new()
         .with_bold(true)
         .with_italic(true)
@@ -232,9 +266,10 @@ fn formatting_defaults_inherit_and_compound_properties_match_native_patch() {
         text(&changed.file, "/body/p[1]"),
         format!("PrefixItalicSuffix{compound_text}")
     );
-    assert!(
-        !text(&changed.file, &changed.path.to_string()).is_empty(),
-        "the created path must resolve to a native run fragment"
+    assert_eq!(
+        text(&changed.file, &changed.path.to_string()),
+        compound_text,
+        "the created path must resolve to the complete inserted run"
     );
 }
 
