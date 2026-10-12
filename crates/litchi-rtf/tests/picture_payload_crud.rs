@@ -191,6 +191,31 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
 }
 
 #[test]
+fn replacement_budget_counts_exact_picture_transport_bytes() {
+    let source = Package::parse(two_picture_source()).unwrap();
+    // The first payload's source transport includes its two spaces and CRLF:
+    // eight hex pairs + one space + eight pairs + CRLF + one space + eight
+    // pairs = 28 bytes. The second transport is 25 bytes.
+    let limits = SemanticLimits::builder()
+        .max_replacement_bytes(28)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(limits));
+    edit.replace_picture_payload(0, PNG_C).unwrap();
+    assert!(matches!(
+        edit.replace_picture_payload(1, PNG_A),
+        Err(Error::Limit {
+            kind: SemanticLimitKind::ReplacementBytes,
+            observed: 53,
+            maximum: 28,
+        })
+    ));
+    assert_eq!(edit.operation_count(), 1);
+    assert!(edit.commit().unwrap().diagnostics().changed());
+}
+
+#[test]
 fn refuses_size_format_nested_opaque_and_protected_sources() {
     let source = Package::parse(two_picture_source()).unwrap();
     let mut wrong_size = source.edit();
