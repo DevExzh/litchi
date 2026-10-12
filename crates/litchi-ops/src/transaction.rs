@@ -1949,7 +1949,16 @@ fn changed(steps: &[Step]) -> Result<bool> {
     };
     #[cfg(feature = "rtf")]
     if let (File::Rtf(before), File::Rtf(after)) = (&first.before, &last.after) {
-        return Ok(!before.same_content(after));
+        if let [
+            Step {
+                leaf: Leaf::Rtf(patch),
+                ..
+            },
+        ] = steps
+        {
+            return Ok(!patch.is_noop());
+        }
+        return Ok(!before.same_content(after)?);
     }
     match (&first.leaf, &last.leaf) {
         #[cfg(feature = "doc")]

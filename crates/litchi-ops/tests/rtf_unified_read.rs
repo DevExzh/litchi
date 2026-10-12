@@ -83,7 +83,7 @@ fn views_and_capabilities_agree_on_supported_read_surface() {
     for verb in [Verb::Get, Verb::Find, Verb::Query] {
         assert!(file.capabilities().verb(verb).is_supported());
     }
-    assert!(!file.capabilities().verb(Verb::Set).is_supported());
+    assert!(file.capabilities().verb(Verb::Set).is_supported());
     assert_eq!(
         file.view(Mode::Text).unwrap(),
         "First\nsecond\n\nABC\nlast\n"

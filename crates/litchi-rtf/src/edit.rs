@@ -4453,25 +4453,23 @@ fn commit_body_paragraph_batch(edit: Edit, operation_count: usize) -> Result<Com
         let paragraph = map
             .paragraphs
             .iter()
-            .find(|paragraph| paragraph.text == *span)
+            .find(|paragraph| paragraph.text == (span.start..span.end))
             .ok_or(Error::UnsupportedSource(
                 "paragraph batch selector lost its source range",
             ))?;
-        if edit.source.text().get(span.clone()) != Some(before.as_str()) {
+        if edit.source.text().get(span.start..span.end) != Some(before.as_str()) {
             return Err(Error::StalePrecondition("paragraph text differs"));
         }
         let mut encoded = encoded_body_text(after, edit.source.limits())?;
-        let previous_is_alpha = paragraph
+        let previous_is_control_tail = paragraph
             .source
             .start
             .checked_sub(1)
             .and_then(|index| source_bytes.get(index))
-            .is_some_and(u8::is_ascii_alphabetic);
+            .is_some_and(u8::is_ascii_alphanumeric);
         if paragraph.source.start == paragraph.source.end
-            && encoded
-                .first()
-                .is_some_and(|byte| byte.is_ascii_alphanumeric())
-            && previous_is_alpha
+            && !encoded.is_empty()
+            && previous_is_control_tail
         {
             encoded.insert(0, b' ');
         }

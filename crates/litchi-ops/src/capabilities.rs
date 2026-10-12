@@ -1234,7 +1234,17 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// paragraph text.  Keep the remaining mutation verbs visible instead of
 /// making the format-level `set`/`edit`/`batch` support look like general CRUD.
 #[cfg(feature = "rtf")]
-static RTF_WRITE_GAPS: [GapSpec; 4] = [
+static RTF_WRITE_GAPS: [GapSpec; 5] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "paragraph",
+            context: "native-source-closure",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF rich paragraph preservation",
+        reason: "paragraph text replacement requires the native editor to prove the source formatting and destination closure",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
@@ -1253,7 +1263,7 @@ static RTF_WRITE_GAPS: [GapSpec; 4] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF structural body editing",
-        reason: "the RTF write adapter preserves the existing paragraph structure and does not remove elements",
+        reason: "the RTF write adapter does not expose element removal",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -1263,7 +1273,7 @@ static RTF_WRITE_GAPS: [GapSpec; 4] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF structural body editing",
-        reason: "the RTF write adapter preserves paragraph order and does not move elements",
+        reason: "the RTF write adapter does not expose element moves",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -1273,7 +1283,7 @@ static RTF_WRITE_GAPS: [GapSpec; 4] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF structural body editing",
-        reason: "the RTF write adapter preserves paragraph order and does not reorder elements",
+        reason: "the RTF write adapter does not expose element swaps",
     },
 ];
 

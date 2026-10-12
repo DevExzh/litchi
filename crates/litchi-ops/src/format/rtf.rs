@@ -71,12 +71,11 @@ impl Rtf {
     }
 
     /// Whether two handles serialize to the same exact RTF artifact.
-    pub(crate) fn same_content(&self, other: &Self) -> bool {
-        self.same_snapshot(other)
-            || matches!(
-                (self.0.package.to_bytes(), other.0.package.to_bytes()),
-                (Ok(left), Ok(right)) if left == right
-            )
+    pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
+        Ok(
+            self.same_snapshot(other)
+                || self.0.package.to_bytes()? == other.0.package.to_bytes()?,
+        )
     }
 
     /// RTF packages retain their immutable source and native edit options.

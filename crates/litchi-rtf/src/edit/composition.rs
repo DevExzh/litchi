@@ -192,6 +192,7 @@ impl Composition {
         });
         let limits = SemanticLimits::for_operations(&operations, self.source.source_limits());
         Edit {
+            paragraph_batch_len: None,
             source: self.source,
             limits,
             operations,

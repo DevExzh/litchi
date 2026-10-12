@@ -11,9 +11,9 @@ pub enum LimitKind {
     Operations,
     /// Retained native snapshot and patch data.
     SnapshotBytes,
-    /// Distinct XLS/XLSX/XLSB grid or PPT/PPTX slide or shape targets expanded by one mutation.
+    /// Distinct targets expanded by one mutation.
     ExpandedTargets,
-    /// Authored XLS/XLSX/XLSB/PPT/PPTX payload and action charge staged by one mutation.
+    /// Authored payload and action charge staged by one mutation.
     StagedBytes,
 }
 
@@ -84,7 +84,7 @@ impl std::error::Error for Error {
 }
 
 /// Bounds on an explicit transaction: 10,000 mutation calls and 256 MiB of
-/// retained native snapshots by default. XLSX, XLSB, XLS, PPT and PPTX mutations additionally default
+/// retained native snapshots by default. XLSX, XLSB, XLS, PPT, PPTX and RTF mutations additionally default
 /// to 65,536 expanded targets and a 16 MiB staged payload/action charge.
 /// Coalesced XLSX/XLSB cell and PPTX shape runs close before their summed charge
 /// exceeds the staged-byte bound; an individual oversized mutation is refused.

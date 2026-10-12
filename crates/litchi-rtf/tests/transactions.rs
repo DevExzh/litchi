@@ -3311,3 +3311,23 @@ fn character_property_edits_preserve_paragraph_formatting() {
         exact
     );
 }
+
+#[test]
+fn history_weight_includes_long_before_text_and_native_descriptors() {
+    let before_text = "A".repeat(4096);
+    let source = litchi_rtf::Builder::new()
+        .text(&before_text)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit();
+    edit.replace_paragraph_text(0, "x").unwrap();
+    let commit = edit.commit().unwrap();
+    let endpoints = source.to_bytes().unwrap().len() + commit.package().to_bytes().unwrap().len();
+    let minimum = u64::try_from(endpoints + before_text.len() + 1).unwrap();
+    assert!(commit.patch().history_weight() > minimum);
+    assert_eq!(
+        commit.patch().history_weight(),
+        commit.patch().inverse().history_weight()
+    );
+}

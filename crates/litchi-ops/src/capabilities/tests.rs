@@ -126,6 +126,9 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
+            let rtf_edit = format == FileFormat::Rtf
+                && cfg!(feature = "rtf")
+                && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
             let doc_edit = format == FileFormat::Doc
                 && cfg!(feature = "doc")
                 && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
@@ -155,7 +158,8 @@ fn every_format_has_one_answer_for_its_reads() {
                 && matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch);
             assert_eq!(
                 capabilities.verb(verb),
-                if doc_edit
+                if rtf_edit
+                    || doc_edit
                     || docx_edit
                     || xlsx_edit
                     || pptx_edit
