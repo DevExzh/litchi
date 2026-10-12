@@ -266,7 +266,7 @@ fn invalid_values_and_unsupported_run_properties_leave_source_unchanged() {
         .unwrap();
     assert_eq!(property(&half_point, "/body/p[1]/r[2]", "size"), "12.5pt");
     for props in [
-        props! {"bold"=>true,"text"=>"replacement"}
+        props! {"bold"=>true,"font"=>"replacement"}
             .into_iter()
             .collect::<Props<'_>>(),
         props! {"font"=>"New font"}

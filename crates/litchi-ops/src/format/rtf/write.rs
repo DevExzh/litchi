@@ -1,4 +1,4 @@
-//! Unified paragraph-property writes over the native immutable RTF editor.
+//! Unified paragraph and run writes over the native immutable RTF editor.
 //!
 //! Target resolution is performed against one retained `Rtf` snapshot.  The
 //! complete selection is then staged as one native paragraph batch, which
@@ -11,7 +11,7 @@ use litchi_rtf::Alignment;
 use litchi_rtf::UnderlineStyle;
 use litchi_rtf::edit::{
     EditOptions, ParagraphAlignmentUpdate, ParagraphLayoutPatch, ParagraphLayoutUpdate,
-    ParagraphTextReplacement, Patch, RunFormatPatch, RunFormatUpdate,
+    ParagraphTextReplacement, Patch, RunFormatPatch, RunFormatUpdate, RunTextReplacement,
     SemanticLimits as NativeLimits,
 };
 use std::num::NonZeroU16;
@@ -206,7 +206,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
     let resolved = resolve_mutation_targets(file, &target, limits.max_expanded_targets())?;
     let positions = match resolved {
         MutationTargets::Run(targets) => {
-            return set_run_formats_with_limits(file, targets, &props, limits);
+            return set_runs_with_limits(file, targets, &props, limits);
         },
         MutationTargets::Paragraph(positions) => positions,
     };
@@ -460,17 +460,18 @@ fn resolve_mutation_targets(
     }
 }
 
-/// Admit run-format properties and publish all selected runs in one native
+/// Admit run text/format properties and publish all selected runs in one native
 /// transaction.  `RunFormatPatch` is omission-preserving, so one compound
 /// setter keeps every unselected character facet and every unrelated source
 /// destination intact.
-fn set_run_formats_with_limits(
+fn set_runs_with_limits(
     file: &Rtf,
     targets: Vec<(Position, Position)>,
     props: &Props<'_>,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     let patch = run_format_patch(props)?;
+    let text = run_text(props)?;
 
     let native_limits = NativeLimits::builder()
         .max_operations(limits.max_operations())
@@ -481,7 +482,7 @@ fn set_run_formats_with_limits(
         .map_err(Error::from)?;
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
-    let native = if patch.is_empty() {
+    let native = if patch.is_empty() && text.is_none() {
         // An empty property map is a validated, exact no-op.  Still resolve
         // the target so a miss or an abusive selector cannot be hidden behind
         // the no-op shortcut. It carries no native operation or staging
@@ -497,21 +498,44 @@ fn set_run_formats_with_limits(
             }
             .into());
         }
+        let per_target = if let Some(text) = text {
+            size_of::<RunTextReplacement>().checked_add(text.len())
+        } else {
+            Some(size_of::<RunFormatUpdate>())
+        }
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
         let staged_bytes = operations
-            .checked_mul(size_of::<RunFormatUpdate>())
+            .checked_mul(per_target)
             .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
         if staged_bytes > limits.max_staged_bytes() {
             return Err(staged_limit(staged_bytes, limits.max_staged_bytes()));
         }
 
-        let mut updates = Vec::new();
-        updates
-            .try_reserve_exact(targets.len())
-            .map_err(|source| TransactionError::Allocation { source })?;
-        for (paragraph, run) in targets {
-            updates.push(RunFormatUpdate::new(paragraph, run, patch));
+        if let Some(text) = text {
+            let mut updates = Vec::new();
+            updates
+                .try_reserve_exact(targets.len())
+                .map_err(|source| TransactionError::Allocation { source })?;
+            for (paragraph, run) in targets {
+                let mut replacement = String::new();
+                replacement
+                    .try_reserve_exact(text.len())
+                    .map_err(|source| TransactionError::Allocation { source })?;
+                replacement.push_str(text);
+                updates
+                    .push(RunTextReplacement::new(paragraph, run, replacement).with_format(patch));
+            }
+            edit.replace_body_run_texts(&updates).map_err(Error::from)?;
+        } else {
+            let mut updates = Vec::new();
+            updates
+                .try_reserve_exact(targets.len())
+                .map_err(|source| TransactionError::Allocation { source })?;
+            for (paragraph, run) in targets {
+                updates.push(RunFormatUpdate::new(paragraph, run, patch));
+            }
+            edit.patch_body_run_formats(&updates).map_err(Error::from)?;
         }
-        edit.patch_body_run_formats(&updates).map_err(Error::from)?;
         edit.commit().map_err(Error::from)?
     };
 
@@ -579,6 +603,20 @@ fn append_run(
     Ok(())
 }
 
+fn run_text<'a>(props: &'a Props<'_>) -> Result<Option<&'a str>> {
+    let mut text = None;
+    for (key, value) in props.iter() {
+        if key.eq_ignore_ascii_case("text") {
+            text = Some(value.as_text().ok_or_else(|| {
+                Error::new(Code::InvalidValue, "RTF run text requires a text value")
+                    .with_property("text")
+                    .with_format(FileFormat::Rtf)
+            })?);
+        }
+    }
+    Ok(text)
+}
+
 fn run_format_patch(props: &Props<'_>) -> Result<RunFormatPatch> {
     if props.is_empty() {
         return Ok(RunFormatPatch::new());
@@ -586,7 +624,9 @@ fn run_format_patch(props: &Props<'_>) -> Result<RunFormatPatch> {
     let mut patch = RunFormatPatch::new();
     for (key, value) in props.iter() {
         let name = key.as_str();
-        if name.eq_ignore_ascii_case("bold") {
+        if name.eq_ignore_ascii_case("text") {
+            continue;
+        } else if name.eq_ignore_ascii_case("bold") {
             patch = patch.with_bold(run_bool(value, "bold")?);
         } else if name.eq_ignore_ascii_case("italic") {
             patch = patch.with_italic(run_bool(value, "italic")?);

@@ -1243,7 +1243,7 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// paragraph ordering and paragraph swapping. Keep the remaining mutation
 /// verbs visible instead of making the format-level `set`/`remove`/`move`/
 /// `swap`/`edit`/`batch` support look like general CRUD.  Run `set` is
-/// available for the ten local character-format facets; the remaining run
+/// available for text and ten local character-format facets; the remaining run
 /// structural verbs stay explicit gaps until their native editors exist.
 #[cfg(feature = "rtf")]
 static RTF_WRITE_GAPS: [GapSpec; 9] = [
@@ -1255,7 +1255,7 @@ static RTF_WRITE_GAPS: [GapSpec; 9] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF rich run preservation",
-        reason: "changed run formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; native mixed-operation composition and durable replay remain unsupported",
+        reason: "changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported",
     },
     GapSpec {
         subject: Subject::Operation {

@@ -5538,13 +5538,6 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
     let source_runs = ordinary_run_source_map(&edit.source)?;
-    let preserve_terminal_empty = terminal_paragraph_becomes_empty(&edit.source, &edit.operations);
-    let terminal_run = edit
-        .source
-        .body()
-        .paragraphs()
-        .nth(edit.source.paragraph_count().saturating_sub(1))
-        .map_or(0, |paragraph| paragraph.runs().count().saturating_sub(1));
     let mut replacements = Vec::new();
     replacements
         .try_reserve_exact(edit.operations.len().saturating_mul(2))
@@ -5618,6 +5611,13 @@ fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, E
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
     let source_runs = ordinary_run_source_map(&edit.source)?;
+    let preserve_terminal_empty = terminal_paragraph_becomes_empty(&edit.source, &edit.operations);
+    let terminal_run = edit
+        .source
+        .body()
+        .paragraphs()
+        .nth(edit.source.paragraph_count().saturating_sub(1))
+        .map_or(0, |paragraph| paragraph.runs().count().saturating_sub(1));
     let mut replacements = Vec::new();
     replacements
         .try_reserve_exact(edit.operations.len().saturating_mul(2))
@@ -5854,7 +5854,11 @@ fn validate_run_text_candidate(
                     .take_while(|offset| *offset <= common_limit)
                     .last()
                     .unwrap_or(0);
-                if common == 0 || !remaining.starts_with(&expected_remaining[..common]) {
+                if common == 0
+                    || expected_remaining
+                        .get(..common)
+                        .is_none_or(|prefix| !remaining.starts_with(prefix))
+                {
                     return Err(Error::UnsupportedSource(
                         "candidate run-text publication changed run text",
                     ));

@@ -43,7 +43,19 @@ fn native_run_text_replacement_preserves_omitted_facets_and_metadata() {
     assert!(changed.format().bold());
     assert!(changed.format().italic());
     assert_eq!(changed.format().font().unwrap().name(), "Example Sans");
-    assert_eq!(changed.format().color().unwrap().to_string(), "#FF0000");
+    assert_eq!(
+        changed.format().foreground(),
+        source
+            .body()
+            .paragraphs()
+            .next()
+            .unwrap()
+            .runs()
+            .nth(1)
+            .unwrap()
+            .format()
+            .foreground()
+    );
     assert_eq!(runs.next().unwrap().text(), "Bold");
     assert_eq!(paragraph_text(commit.package(), 1), "Tail");
     let bytes = commit.package().to_bytes().unwrap();
@@ -84,7 +96,17 @@ fn native_run_text_replacement_supports_unicode_escape_tab_and_unicode_fallback_
             .collect::<Vec<_>>();
         edit.replace_body_run_texts(&updates).unwrap();
         let changed = edit.commit().unwrap();
-        assert_eq!(changed.package().body().runs().count(), expected_runs);
+        let formats = source
+            .body()
+            .runs()
+            .map(|run| (run.format().bold(), run.format().italic()))
+            .collect::<Vec<_>>();
+        let mut offset = 0usize;
+        for run in changed.package().body().runs() {
+            let expected = formats[offset / "雪 😀 \\ {}\tX".len()];
+            assert_eq!((run.format().bold(), run.format().italic()), expected);
+            offset += run.text().len();
+        }
         assert_eq!(
             paragraph_text(changed.package(), 0),
             "雪 😀 \\ {}\tX".repeat(expected_runs)
@@ -211,7 +233,14 @@ fn native_run_text_noop_inverse_history_and_durable_refusal_are_exact() {
     assert!(
         changed
             .patch()
-            .to_durable(litchi_core::patch::PatchLimits::default())
+            .to_durable(litchi_core::patch::PatchLimits::new(
+                litchi_core::patch::BlobLimits::new(0, 0, 0),
+                1024 * 1024,
+                10,
+                8,
+                256 * 1024,
+                512 * 1024
+            ))
             .is_err()
     );
 
@@ -226,4 +255,40 @@ fn native_run_text_noop_inverse_history_and_durable_refusal_are_exact() {
     assert_eq!(history.current().to_bytes().unwrap(), source_bytes);
     assert!(history.redo());
     assert_eq!(history.current().to_bytes().unwrap(), changed_bytes);
+}
+
+#[test]
+fn native_run_text_replacement_budget_preflights_whole_batch_and_accumulates() {
+    let source = Package::from_bytes(SOURCE).unwrap();
+    let limits = litchi_rtf::SemanticLimits::builder()
+        .max_replacement_bytes(3)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_with_options(litchi_rtf::EditOptions::new().semantic_limits(limits));
+    assert!(matches!(
+        edit.replace_body_run_texts(&[replacement(0, 0, "aa"), replacement(0, 1, "bb")]),
+        Err(Error::Limit {
+            kind: litchi_rtf::SemanticLimitKind::ReplacementBytes,
+            observed: 4,
+            maximum: 3
+        })
+    ));
+    assert_eq!(edit.operation_count(), 0);
+    edit.replace_run_text(Position::new(0), Position::new(0), "aa")
+        .unwrap();
+    assert!(matches!(
+        edit.replace_run_text(Position::new(0), Position::new(1), "bb"),
+        Err(Error::Limit {
+            kind: litchi_rtf::SemanticLimitKind::ReplacementBytes,
+            observed: 4,
+            maximum: 3
+        })
+    ));
+    assert_eq!(edit.operation_count(), 1);
+    edit.replace_run_text(Position::new(0), Position::new(1), "b")
+        .unwrap();
+    let changed = edit.commit().unwrap();
+    assert_eq!(paragraph_text(changed.package(), 0), "aabBold");
+    assert_eq!(source.to_bytes().unwrap(), SOURCE);
 }

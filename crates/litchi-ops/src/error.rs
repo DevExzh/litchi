@@ -1628,6 +1628,8 @@ impl Classify for litchi_rtf::edit::Error {
             | Self::EmptyParagraphLayoutBatch
             | Self::EmptyParagraphLayoutPatch { .. }
             | Self::ParagraphLayoutBatchOutOfOrder { .. }
+            | Self::EmptyRunTextBatch
+            | Self::RunTextBatchOutOfOrder { .. }
             | Self::EmptyRunFormatBatch
             | Self::EmptyRunFormatPatch { .. }
             | Self::RunFormatBatchOutOfOrder { .. }

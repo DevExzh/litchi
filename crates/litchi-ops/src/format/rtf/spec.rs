@@ -242,7 +242,11 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
     PropSpec {
         name: "text",
         ty: ValueType::Text,
-        access: Access::READ,
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
         raw: false,
     },
     PropSpec {

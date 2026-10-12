@@ -163,6 +163,7 @@ fn run_capabilities_admit_format_sets_but_keep_structural_gaps() {
     assert!(ops.get && ops.query);
     assert!(ops.set && !ops.add && !ops.remove);
     let writable = [
+        "text",
         "size",
         "bold",
         "italic",
@@ -184,7 +185,10 @@ fn run_capabilities_admit_format_sets_but_keep_structural_gaps() {
             .gaps()
             .any(|gap| matches!(gap.subject(), Subject::Operation { element: "run", .. }))
     );
-    assert!(file.set("/body/p[1]/r[1]", props! {"text"=>"bad"}).is_err());
+    assert!(
+        file.set("/body/p[1]/r[1]", props! {"font"=>"Other"})
+            .is_err()
+    );
     assert!(file.remove("/body/p[1]/r[1]").is_err());
     assert!(
         file.set(Query::parse("p, r").unwrap(), props! {"text"=>"bad"})

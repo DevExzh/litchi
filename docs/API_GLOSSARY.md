@@ -1456,3 +1456,15 @@ The unified run registry now marks the ten integrated character properties as
 settable. Run text, font/color resource edits and structural run verbs retain
 explicit gaps. No facade-owned parallel run model or property-by-property
 publication is introduced.
+
+### RTF run text replacement (0243)
+
+`edit::RunTextReplacement` carries typed paragraph/run `Position` selectors,
+owned replacement text and an optional `RunFormatPatch`. Primary `Edit` exposes
+`replace_run_text` and atomic ordered `replace_body_run_texts`; text and supplied
+character facets publish together as one operation per target. The new semantic
+change retains before/after text for exact source-bound patch history; durable
+replay remains an explicit gap. Unicode may change native run fragmentation,
+while text and local formatting coverage remain invariant outside selected text.
+The unified run registry now advertises `text` as writable alongside the ten
+character facets; resource and structural run gaps remain explicit.
