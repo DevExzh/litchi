@@ -13,8 +13,8 @@ use litchi_core::selector::{Path as SelectorPath, Query, Scope};
 use litchi_ops::error::Source;
 use litchi_ops::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use litchi_ops::{
-    BatchItem, BatchMode, Code, File, OpenOptions, Placement, Props, SourceMode, open_bytes_with,
-    props,
+    BatchItem, BatchMode, Code, File, OpenOptions, Placement, Props, SourceMode, open_bytes,
+    open_bytes_with, props,
 };
 
 const INPUT: &[u8] = br#"{\rtf1\ansi\deff0{\fonttbl{\f0\fnil Arial;}}\b First\b0 plain\par\qc Second\par\sb120\keep\i Third\i0 tail\par Fourth}"#;
@@ -494,6 +494,126 @@ fn pending_native_failure_precedes_a_later_invalid_property() {
     assert_eq!(error.code(), Code::UnsupportedCapability);
     assert!(matches!(error.leaf(), Source::RtfEdit(_)));
     assert_eq!(source.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn pending_native_failure_precedes_operation_limit_excess_in_edit_and_batch() {
+    let limits = SemanticLimits::builder()
+        .max_operations(1)
+        .expect("operation limit")
+        .build()
+        .expect("limits");
+    let source = eager(INPUT);
+    let before = source.to_bytes().unwrap();
+    let error = source
+        .edit_with_limits(&limits, |edit| {
+            // The first item is retained by the direct planner until the
+            // second item forces the pending native run to publish.
+            edit.set("/body/p[1]", props! {"text" => "first\nsecond"})?;
+            edit.set("/body/p[2]", props! {"text" => "limit item"})
+        })
+        .expect_err("native failure must precede operation limit");
+    assert_eq!(error.item(), Some(0));
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    assert_eq!(source.to_bytes().unwrap(), before);
+
+    let error = source
+        .batch_with_limits(
+            [
+                batch_set("/body/p[1]", Props::new().with("text", "first\nsecond")),
+                batch_set("/body/p[2]", Props::new().with("text", "limit item")),
+            ],
+            BatchMode::Atomic,
+            &limits,
+        )
+        .expect_err("native failure must precede batch operation limit");
+    assert_eq!(error.item(), Some(0));
+    assert_eq!(error.code(), Code::UnsupportedCapability);
+    assert_eq!(source.to_bytes().unwrap(), before);
+}
+
+#[test]
+fn empty_run_text_removal_retargets_the_next_run_in_the_same_paragraph() {
+    let input = br"{\rtf1\ansi Plain{\i Italic}\b Bold\par Tail}";
+    let source = open_bytes(input).expect("open run-shift fixture");
+    let before = source.to_bytes().unwrap();
+    let commit = source
+        .edit(|edit| {
+            edit.set("/body/p[1]/r[1]", props! {"text" => ""})?;
+            // The first run is now gone, so this path refers to the former
+            // italic run.  Resolving against the original snapshot would
+            // replace Plain's position and lose the native format boundary.
+            edit.set("/body/p[1]/r[1]", props! {"text" => "retargeted"})
+        })
+        .expect("empty run followed by same-paragraph set");
+    let oracle = source
+        .set("/body/p[1]/r[1]", props! {"text" => ""})
+        .unwrap()
+        .set("/body/p[1]/r[1]", props! {"text" => "retargeted"})
+        .unwrap();
+    assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+    assert_eq!(text(&commit.file, "/body/p[1]"), "retargetedBold");
+    assert_eq!(property(&commit.file, "/body/p[1]/r[1]", "italic"), "true");
+    assert_eq!(property(&commit.file, "/body/p[1]/r[2]", "bold"), "true");
+    assert_eq!(commit.diagnostics.operations(), 2);
+    assert_eq!(source.to_bytes().unwrap(), before);
+    assert_eq!(
+        commit
+            .patch
+            .inverse()
+            .apply(&commit.file)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
+}
+
+#[test]
+fn variable_unicode_run_replacements_preserve_ordered_boundaries() {
+    let input = br"{\rtf1\ansi\uc1 A\u233?B{\i C\u38634?D}\tab end}";
+    let source = open_bytes(input).expect("open unicode run fixture");
+    let before = source.to_bytes().unwrap();
+    let replacements = [
+        ("/body/p[1]/r[1]", "A long 🦀"),
+        ("/body/p[1]/r[2]", "é plus 🦀"),
+        ("/body/p[1]/r[3]", "B"),
+        ("/body/p[1]/r[4]", "C variable"),
+        ("/body/p[1]/r[5]", "雪 and 🦀"),
+        ("/body/p[1]/r[6]", "D tail"),
+        ("/body/p[1]/r[7]", "\tend expanded"),
+    ];
+    let mut oracle = source.clone();
+    for (path, value) in replacements {
+        oracle = oracle
+            .set(path, props! {"text" => value})
+            .expect("sequential unicode replacement");
+    }
+    let commit = source
+        .edit(|edit| {
+            for (path, value) in replacements {
+                edit.set(path, props! {"text" => value})?;
+            }
+            Ok::<_, litchi_ops::Error>(())
+        })
+        .expect("ordered unicode replacement");
+    assert_eq!(commit.diagnostics.operations(), replacements.len());
+    assert_eq!(commit.diagnostics.commits(), 1);
+    assert_eq!(commit.file.to_bytes().unwrap(), oracle.to_bytes().unwrap());
+    for (path, value) in replacements {
+        assert_eq!(text(&commit.file, path), value);
+    }
+    assert_eq!(source.to_bytes().unwrap(), before);
+    assert_eq!(
+        commit
+            .patch
+            .inverse()
+            .apply(&commit.file)
+            .unwrap()
+            .to_bytes()
+            .unwrap(),
+        before
+    );
 }
 
 #[test]
