@@ -130,7 +130,7 @@ fn every_format_has_one_answer_for_its_reads() {
                 && cfg!(feature = "rtf")
                 && matches!(
                     verb,
-                    Verb::Set | Verb::Remove | Verb::Move | Verb::Edit | Verb::Batch
+                    Verb::Set | Verb::Add | Verb::Remove | Verb::Move | Verb::Edit | Verb::Batch
                 );
             let doc_edit = format == FileFormat::Doc
                 && cfg!(feature = "doc")
@@ -349,6 +349,40 @@ fn formats_without_a_variant_point_at_m6() {
         assert_eq!(refusal.code, Code::UnsupportedFormat, "{format:?}");
         assert_eq!(refusal.follow_up, "M6", "{format:?}");
     }
+}
+
+#[cfg(feature = "rtf")]
+#[test]
+fn rtf_advertises_native_paragraph_add_and_keeps_its_closure_gap() {
+    let capabilities = Capabilities::of(FileFormat::Rtf);
+    assert!(capabilities.verb(Verb::Add).is_supported());
+
+    let body = capabilities.element("body").expect("RTF body");
+    assert!(body.operations().add);
+
+    let paragraph = capabilities.element("paragraph").expect("RTF paragraph");
+    assert!(paragraph.operations().set);
+    assert!(paragraph.operations().remove);
+    assert!(!paragraph.operations().add);
+    assert!(paragraph.property("text").expect("paragraph text").add());
+
+    let add_gap = capabilities.gaps().find(|gap| {
+        gap.subject()
+            == crate::node::spec::Subject::Operation {
+                verb: "add",
+                element: "paragraph",
+                context: "native-source-closure",
+            }
+    });
+    assert!(add_gap.is_some(), "missing RTF paragraph add closure gap");
+    assert!(!capabilities.gaps().any(|gap| {
+        gap.subject()
+            == crate::node::spec::Subject::Operation {
+                verb: "add",
+                element: "body",
+                context: "paragraph-text-only",
+            }
+    }));
 }
 
 /// Every adapter's spec table agrees with the vocabulary its resolver

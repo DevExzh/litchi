@@ -792,7 +792,7 @@ impl Capabilities {
             #[cfg(feature = "rtf")]
             if matches!(
                 verb,
-                Verb::Set | Verb::Remove | Verb::Move | Verb::Edit | Verb::Batch
+                Verb::Set | Verb::Add | Verb::Remove | Verb::Move | Verb::Edit | Verb::Batch
             ) && self.adapter() == Some(Adapter::Rtf)
             {
                 return Support::Supported;
@@ -1232,8 +1232,8 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     },
 ];
 
-/// RTF's write adapter admits existing main-story paragraph text, removal and
-/// paragraph ordering.
+/// RTF's write adapter admits main-story paragraph text, paragraph insertion,
+/// removal and paragraph ordering.
 /// Keep the remaining mutation verbs visible instead of making the format-level
 /// `set`/`remove`/`move`/`edit`/`batch` support look like general CRUD.
 #[cfg(feature = "rtf")]
@@ -1261,12 +1261,12 @@ static RTF_WRITE_GAPS: [GapSpec; 4] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "add",
-            element: "body",
-            context: "paragraph-text-only",
+            element: "paragraph",
+            context: "native-source-closure",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF structural body editing",
-        reason: "the RTF write adapter replaces existing ordinary paragraph text and does not add elements",
+        follow_up: "M6 RTF rich paragraph preservation",
+        reason: "paragraph insertion requires the native editor to prove the ordinary literal body and preserve every unselected source boundary",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2712,6 +2712,9 @@ impl Element {
                 && self.retains_source != Some(false)
                 && self.data().canonical == "sheet"
                 && readable);
+        #[cfg(feature = "rtf")]
+        let add =
+            add || (self.adapter == Adapter::Rtf && self.data().canonical == "body" && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx

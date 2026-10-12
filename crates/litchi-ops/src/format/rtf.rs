@@ -109,6 +109,26 @@ impl Rtf {
         write::set_with_limits(self, target, props, limits)
     }
 
+    /// Add one paragraph directly under the main body through a bounded native
+    /// lifecycle edit.
+    pub(crate) fn add<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+    ) -> Result<(write::Commit, crate::path::Path<'static>)> {
+        self.add_with_limits(parent, node, &SemanticLimits::default())
+    }
+
+    /// Add one paragraph with the caller's transaction limits.
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+        limits: &SemanticLimits,
+    ) -> Result<(write::Commit, crate::path::Path<'static>)> {
+        write::add_with_limits(self, parent, node, limits)
+    }
+
     /// Remove one paragraph or every paragraph selected by a scoped query.
     pub(crate) fn remove<'p>(&self, target: TargetArg<'p>) -> Result<write::Commit> {
         let limits = SemanticLimits::default();

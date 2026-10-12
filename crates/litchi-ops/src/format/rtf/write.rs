@@ -5,13 +5,15 @@
 //! keeps selector fan-out atomic and preserves the native source/options
 //! policy through publication.
 
-use litchi_core::FileFormat;
+use litchi_core::selector::{Path, Predicate, Step};
+use litchi_core::{FileFormat, Position};
 use litchi_rtf::edit::{
     EditOptions, ParagraphTextReplacement, Patch, SemanticLimits as NativeLimits,
 };
 
 use super::{Nav, Node, Rtf};
 use crate::error::{Code, Error, Result};
+use crate::new_node::NewNode;
 use crate::path::PathArg;
 use crate::placement::Placement;
 use crate::props::{IntoProps, Props};
@@ -25,6 +27,138 @@ pub(crate) struct Commit {
     pub(crate) patch: Patch,
     pub(crate) operations: usize,
     pub(crate) snapshot_bytes: usize,
+}
+
+/// Add one ordinary main-story paragraph through the native lifecycle editor.
+///
+/// The parent and placement are resolved against the unchanged source
+/// snapshot.  The native edit owns the structural splice, source-closure
+/// proof, and reversible history; this adapter only admits the unified node
+/// shape and translates its final insertion position.
+pub(crate) fn add_with_limits<'p, 'n>(
+    file: &Rtf,
+    parent: PathArg<'p>,
+    node: NewNode<'n>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    file.admit_edit()?;
+    let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
+    if parent.element_kind() != super::Kind::Body {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "RTF paragraphs can only be added directly under the body",
+        )
+        .with_format(FileFormat::Rtf));
+    }
+    if !node.kind().eq_ignore_ascii_case("p") && !node.kind().eq_ignore_ascii_case("paragraph") {
+        return Err(Error::new(
+            Code::UnsupportedElement,
+            "the RTF structural verb supports paragraph nodes only",
+        )
+        .with_format(FileFormat::Rtf));
+    }
+    let text = add_paragraph_text(node.props())?;
+    let count = file.0.package.paragraph_count();
+    let position = add_position(file, count, node.placement())?;
+
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    let staged_bytes = text
+        .len()
+        .checked_add(1)
+        .and_then(|bytes| bytes.checked_add(size_of::<usize>()))
+        .and_then(|bytes| bytes.checked_add(size_of::<String>()))
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    bound(
+        LimitKind::StagedBytes,
+        staged_bytes,
+        limits.max_staged_bytes(),
+    )?;
+
+    let native_limits = NativeLimits::builder()
+        .max_operations(limits.max_operations())
+        .map_err(Error::from)?
+        .max_replacement_bytes(limits.max_staged_bytes())
+        .map_err(Error::from)?
+        .build()
+        .map_err(Error::from)?;
+    let options = EditOptions::new().semantic_limits(native_limits);
+    let mut edit = file.0.package.edit_with_options(options);
+    edit.insert_paragraph(position, text).map_err(Error::from)?;
+    let native = edit.commit().map_err(Error::from)?;
+
+    let changed = native.diagnostics().changed();
+    let operation_count = native.diagnostics().operation_count();
+    let (package, patch) = native.into_parts();
+    let snapshot_bytes = patch_snapshot_bytes(&patch);
+    if snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+    }
+    let before = file.clone();
+    let after = if changed {
+        file.with_package(package)
+    } else {
+        file.clone()
+    };
+    file.check_source()?;
+    Ok((
+        Commit {
+            before,
+            after,
+            patch,
+            operations: operation_count,
+            snapshot_bytes,
+        },
+        paragraph_path(position),
+    ))
+}
+
+fn add_paragraph_text<'a>(props: &'a Props<'_>) -> Result<&'a str> {
+    if props.is_empty() {
+        return Ok("");
+    }
+    paragraph_text(props)
+}
+
+fn add_position(file: &Rtf, count: usize, placement: Option<&Placement<'_>>) -> Result<usize> {
+    let nav = Nav::new(file);
+    let position = match placement {
+        None | Some(Placement::End) => count,
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position)) => position.get(),
+        Some(Placement::Before(path)) => {
+            paragraph_position(crate::path::resolve::get(&nav, path)?)?
+        },
+        Some(Placement::After(path)) => {
+            paragraph_position(crate::path::resolve::get(&nav, path)?)?.saturating_add(1)
+        },
+        Some(Placement::Into(path, position)) => {
+            let parent = crate::path::resolve::get(&nav, path)?;
+            if parent.element_kind() != super::Kind::Body {
+                return Err(Error::new(
+                    Code::UnsupportedType,
+                    "RTF paragraphs can only be added within the body",
+                )
+                .with_format(FileFormat::Rtf));
+            }
+            position.map_or(count, Position::get)
+        },
+    };
+    if position > count {
+        return Err(Error::new(
+            Code::OutOfRange,
+            "the RTF paragraph insertion position is outside the body",
+        )
+        .with_format(FileFormat::Rtf));
+    }
+    Ok(position)
+}
+
+fn paragraph_path(position: usize) -> Path<'static> {
+    Path::from_steps([
+        Step::new("body"),
+        Step::new("p").with(Predicate::Index(Position::new(position))),
+    ])
 }
 
 /// Admit one paragraph-text assignment and publish all selected paragraphs in

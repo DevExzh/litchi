@@ -106,7 +106,7 @@ impl Family {
 ///
 /// Tier 1 and tier 2 variants (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT) retain
 /// the leaf's editable owner. RTF retains its native package and supports
-/// paragraph text and paragraph-ordering writes; ODT, ODS and ODP remain
+/// paragraph text, insertion and paragraph-ordering writes; ODT, ODS and ODP remain
 /// read-only for now.
 /// The enum is `#[non_exhaustive]`: further formats join as variants. Each
 /// variant exists only when its cargo feature is enabled.

@@ -87,7 +87,7 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[PropSpec {
     access: Access {
         get: true,
         set: true,
-        add: false,
+        add: true,
     },
     raw: false,
 }];

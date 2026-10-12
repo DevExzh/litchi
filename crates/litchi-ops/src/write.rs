@@ -80,6 +80,14 @@ impl File {
                     path,
                 })
             },
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Rtf(commit.after),
+                    path,
+                })
+            },
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
