@@ -24,22 +24,13 @@
       "reason": "edit verbs arrive with the write kernel in milestone M2"
     },
     "remove": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "move": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "swap": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "edit": {
       "supported": true
@@ -156,7 +147,7 @@
         "set": true,
         "get": true,
         "query": true,
-        "remove": false
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1897,6 +1888,15 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended",
       "reason": "legacy PPT exposes only common geometry in the unified node view"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "slide",
+      "context": "native-slide-dependencies",
+      "code": "unsupported_capability",
+      "followUp": "M2 PPT dependency-preserving slide removal",
+      "reason": "slide removal requires native closure admission; unsupported dependent records refuse atomically"
     },
     {
       "subject": "operation",

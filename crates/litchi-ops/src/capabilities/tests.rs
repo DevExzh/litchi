@@ -141,7 +141,10 @@ fn every_format_has_one_answer_for_its_reads() {
                 );
             let ppt_edit = format == FileFormat::Ppt
                 && cfg!(feature = "ppt")
-                && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
+                && matches!(
+                    verb,
+                    Verb::Set | Verb::Remove | Verb::Move | Verb::Swap | Verb::Edit | Verb::Batch
+                );
             let pptx_edit = format == FileFormat::Pptx
                 && cfg!(feature = "pptx")
                 && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);

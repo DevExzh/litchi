@@ -15,7 +15,7 @@ A high-performance Rust library for parsing Microsoft Office file formats (OLE2 
 ## Features
 
 - **Complete CRUD Operations** - Create, read, update, and save Office documents (.docx, .xlsx, .pptx) through the per-format modules
-- **Unified API** - `litchi::open` reads legacy, OOXML, and OpenDocument files into one `File` type, detecting the format from the content, with typed errors that carry a stable code and a suggestion
+- **Unified API** - `litchi::open` reads legacy, OOXML, and OpenDocument files into one `File` type, detecting the format from the content, with typed errors that carry a stable code and a suggestion; integrated formats expose immutable edits and batches, with support reported by `capabilities()`
 - **Microsoft Office** - Full support for .doc, .docx, .xls, .xlsx, .xlsb, .ppt, .pptx files
 - **OpenDocument** - Parse .odt, .ods, .odp files (ODF format)
 - **Apple iWork** - Independently parse .pages, .numbers, and .key files through dedicated format leaves

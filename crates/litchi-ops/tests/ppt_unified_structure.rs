@@ -280,6 +280,26 @@ fn move_placements_match_native_order_and_leave_the_input_unchanged() {
         let end_bytes = end.to_bytes().expect("move bytes");
         assert_eq!(slide_texts(&end), ["B", "C", "D", "A"]);
         assert_eq!(end_bytes, native_move(&bytes, 0, 3));
+        let start = source.move_to("/slide[4]", Placement::Start).unwrap();
+        assert_eq!(slide_texts(&start), ["D", "A", "B", "C"]);
+        let inside = source
+            .move_to(
+                "/slide[4]",
+                Placement::inside_at("/", Position::new(1)).unwrap(),
+            )
+            .unwrap();
+        assert_eq!(slide_texts(&inside), ["A", "D", "B", "C"]);
+        for placement in [
+            Placement::before("/slide[2]").unwrap(),
+            Placement::after("/slide[2]").unwrap(),
+        ] {
+            let noop = source
+                .edit(|edit| edit.move_to("/slide[2]", placement))
+                .unwrap();
+            assert!(!noop.diagnostics.changed());
+            assert!(noop.patch.is_noop());
+            assert_eq!(noop.file.to_bytes().unwrap(), before);
+        }
 
         let before_anchor = source
             .move_to("/slide[4]", Placement::before("/slide[2]").unwrap())
@@ -312,6 +332,24 @@ fn swap_matches_native_two_move_order_and_exact_noops() {
         assert_eq!(slide_texts(&swapped), ["D", "B", "C", "A"]);
         assert_eq!(swapped_bytes, native_swap(&bytes, 0, 3));
         assert_eq!(native_slide_texts(&swapped_bytes), ["D", "B", "C", "A"]);
+
+        for left in 0..4 {
+            for right in 0..4 {
+                let swapped = source
+                    .swap(
+                        &format!("/slide[{}]", left + 1),
+                        &format!("/slide[{}]", right + 1),
+                    )
+                    .expect("swap either direction");
+                let mut expected = ["A", "B", "C", "D"];
+                expected.swap(left, right);
+                assert_eq!(slide_texts(&swapped), expected);
+                assert_eq!(
+                    swapped.to_bytes().unwrap(),
+                    native_swap(&bytes, left, right)
+                );
+            }
+        }
 
         let move_noop = source
             .move_to("/slide[2]", Position::new(1))
@@ -399,6 +437,19 @@ fn invalid_targets_and_native_protection_refuse_without_mutation() {
                 .is_err()
         );
         assert!(source.swap("/slide[1]", "/slide[1]/shape[1]").is_err());
+        assert!(
+            source
+                .move_to("/slide[1]", Placement::inside("/slide[2]").unwrap())
+                .is_err()
+        );
+        assert_eq!(
+            source
+                .move_to("/slide[1]", Position::new(4))
+                .unwrap_err()
+                .code(),
+            Code::OutOfRange
+        );
+
         assert_eq!(source.to_bytes().expect("unchanged source"), before);
     });
 

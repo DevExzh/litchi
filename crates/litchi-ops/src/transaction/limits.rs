@@ -11,7 +11,7 @@ pub enum LimitKind {
     Operations,
     /// Retained native snapshot and patch data.
     SnapshotBytes,
-    /// Distinct XLS/XLSX/XLSB grid or PPT/PPTX shape targets expanded by one mutation.
+    /// Distinct XLS/XLSX/XLSB grid or PPT/PPTX slide or shape targets expanded by one mutation.
     ExpandedTargets,
     /// Authored XLS/XLSX/XLSB/PPT/PPTX payload and action charge staged by one mutation.
     StagedBytes,
@@ -127,7 +127,7 @@ impl SemanticLimits {
     pub const fn max_operations(self) -> usize {
         self.operations
     }
-    /// Maximum distinct XLS/XLSX/XLSB grid or PPT/PPTX shape targets expanded by one mutation.
+    /// Maximum distinct XLS/XLSX/XLSB grid or PPT/PPTX slide or shape targets expanded by one mutation.
     /// This adapter admission bound is independent of native transfer limits.
     #[must_use]
     pub const fn max_expanded_targets(self) -> usize {

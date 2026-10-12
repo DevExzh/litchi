@@ -607,7 +607,13 @@ impl Edit {
             if self.coalesce_remove_parsed(&target, index)?.is_some() {
                 return Ok(());
             }
-            #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "xls", feature = "pptx"))]
+            #[cfg(any(
+                feature = "xlsx",
+                feature = "xlsb",
+                feature = "xls",
+                feature = "pptx",
+                feature = "ppt"
+            ))]
             let limits = self.limits;
             self.execute(|file| match file {
                 #[cfg(feature = "docx")]
@@ -626,6 +632,12 @@ impl Edit {
                 ),
                 #[cfg(feature = "xls")]
                 File::Xls(handle) => wrap_xls(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "ppt")]
+                File::Ppt(handle) => wrap_ppt(
                     handle,
                     handle.remove_with_limits(target.clone(), &limits)?,
                     (),
@@ -787,7 +799,7 @@ impl Edit {
         _path: impl IntoPath<'p>,
         _to: impl IntoPlacement<'q>,
     ) -> Result<()> {
-        #[cfg(any(feature = "pptx", feature = "xlsb"))]
+        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "ppt"))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
@@ -808,6 +820,12 @@ impl Edit {
                 handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
             ),
+            #[cfg(feature = "ppt")]
+            File::Ppt(handle) => wrap_ppt(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                (),
+            ),
             #[cfg(feature = "pptx")]
             File::Pptx(handle) => wrap_pptx(
                 handle,
@@ -823,7 +841,7 @@ impl Edit {
     /// # Errors
     /// As [`File::swap`], with the mutation's item index and transaction limits.
     pub fn swap<'p, 'q>(&mut self, _a: impl IntoPath<'p>, _b: impl IntoPath<'q>) -> Result<()> {
-        #[cfg(any(feature = "pptx", feature = "xlsb"))]
+        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "ppt"))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
@@ -834,6 +852,12 @@ impl Edit {
             },
             #[cfg(feature = "xlsb")]
             File::Xlsb(handle) => wrap_xlsb(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "ppt")]
+            File::Ppt(handle) => wrap_ppt(
                 handle,
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
                 (),

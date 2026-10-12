@@ -17,7 +17,10 @@
 #[cfg(feature = "ppt")]
 mod enabled {
     use litchi_core::Position;
-    use litchi_ops::{File, path::Position as PathPosition};
+    use litchi_ops::{
+        File,
+        path::{Path, Position as PathPosition},
+    };
     use litchi_ppt::Package;
     use serde::Serialize;
     use std::{hint::black_box, time::Instant};
@@ -57,9 +60,9 @@ mod enabled {
     }
 
     struct Targets {
-        remove: String,
-        low: String,
-        high: String,
+        remove: Path<'static>,
+        low: Path<'static>,
+        high: Path<'static>,
     }
 
     fn measure<T>(repeats: usize, mut operation: impl FnMut() -> T) -> u128 {
@@ -73,9 +76,13 @@ mod enabled {
     fn targets(slides: usize) -> Targets {
         let middle = slides / 2 + 1;
         Targets {
-            remove: format!("/slide[{middle}]"),
-            low: "/slide[1]".to_owned(),
-            high: format!("/slide[{slides}]"),
+            remove: Path::parse(&format!("/slide[{middle}]"))
+                .expect("remove path")
+                .into_owned(),
+            low: Path::parse("/slide[1]").expect("first path"),
+            high: Path::parse(&format!("/slide[{slides}]"))
+                .expect("last path")
+                .into_owned(),
         }
     }
 

@@ -88,6 +88,7 @@ impl File {
 
     /// Move an element to a sibling position or another supported parent.
     ///
+    /// Legacy PPT supports slide ordering through the native package edit.
     /// Positional destinations are measured after detaching the element.
     /// The original snapshot stays unchanged on success and failure.
     ///
@@ -121,6 +122,10 @@ impl File {
             Self::Xlsb(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Xlsb(commit.into_file())),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Ppt(commit.after)),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
@@ -142,6 +147,7 @@ impl File {
     /// cells, ranges, and cell queries; virtual cells are exact no-ops and
     /// neighboring cells never shift.  A sheet query must be homogeneous, and
     /// complete-tab removal retains at least one visible tab.
+    /// Legacy PPT supports slide removal subject to native dependency admission.
     /// XLS removes stored cell records from cells, ranges, and cell queries;
     /// virtual cells are exact no-ops and worksheet neighbors never shift.
     ///
@@ -174,6 +180,10 @@ impl File {
             Self::Xls(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Xls(commit.after)),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Ppt(commit.after)),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .remove(_target.into_target()?)
@@ -188,6 +198,7 @@ impl File {
     /// Exchange two elements while preserving their content and formatting.
     ///
     /// PPTX supports slides in created or eagerly opened presentations.
+    /// Legacy PPT supports slide swaps on retained native owners.
     /// XLSB supports complete-catalog tab ordering, including chart tabs, in
     /// retained source and eager owners.
     ///
@@ -219,6 +230,10 @@ impl File {
             Self::Xlsb(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Xlsb(commit.into_file())),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Ppt(commit.after)),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)

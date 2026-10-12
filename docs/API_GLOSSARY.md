@@ -1362,3 +1362,12 @@ the native proof in snapshot-bound history. Anchor inputs round to native master
 units; unchanged bounds preserve the original anchor encoding. Signed, encrypted,
 released and stale owners keep explicit refusals. Native visibility-record
 insertion, nested writes and consecutive-command coalescing remain open.
+
+## Unified PPT slide structure (0217)
+
+`File::{remove,move_to,swap}` and explicit edits now use the canonical native
+PPT primary transaction for slide structure. Positional destinations follow the
+shared post-detachment contract; removal selectors resolve before descending
+native staging. A swap composes at most two native slide moves in one edit.
+Exact self moves/swaps preserve snapshot identity. Slide and shape insertion,
+shape removal, and consecutive-command coalescing remain open.

@@ -778,8 +778,10 @@ impl Capabilities {
                 return Support::Supported;
             }
             #[cfg(feature = "ppt")]
-            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
-                && self.adapter() == Some(Adapter::Ppt)
+            if matches!(
+                verb,
+                Verb::Set | Verb::Remove | Verb::Move | Verb::Swap | Verb::Edit | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Ppt)
             {
                 if self.retains_source == Some(false) {
                     return RETAINED_SOURCE.support();
@@ -2637,6 +2639,12 @@ impl Element {
                 && self.retains_source != Some(false)
                 && self.data().canonical == "cell"
                 && readable);
+        #[cfg(feature = "ppt")]
+        let remove = remove
+            || (self.adapter == Adapter::Ppt
+                && self.retains_source != Some(false)
+                && self.data().canonical == "slide"
+                && readable);
         Operations {
             add,
             set: settable,
@@ -2941,6 +2949,16 @@ static PPTX_WRITE_GAPS: [GapSpec; 14] = [
 
 #[cfg(feature = "ppt")]
 const PPT_WRITE_GAPS: &[GapSpec] = &[
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "slide",
+            context: "native-slide-dependencies",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M2 PPT dependency-preserving slide removal",
+        reason: "slide removal requires native closure admission; unsupported dependent records refuse atomically",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "set",

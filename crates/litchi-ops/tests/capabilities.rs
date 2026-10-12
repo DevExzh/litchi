@@ -732,13 +732,14 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
     }
     assert!(format.verb(Verb::Save).is_supported());
     assert!(format.verb(Verb::Create).is_supported());
-    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
-        assert_eq!(
-            format.verb(verb).code(),
-            Some(Code::UnsupportedCapability),
-            "PPT {verb:?} remains a write gap"
-        );
+    for verb in [Verb::Remove, Verb::Move, Verb::Swap] {
+        assert!(format.verb(verb).is_supported());
     }
+    assert_eq!(
+        format.verb(Verb::Add).code(),
+        Some(Code::UnsupportedCapability),
+        "PPT insertion remains a write gap"
+    );
     for name in ["shape", "placeholder"] {
         let element = format.element(name).expect("shape element");
         for key in ["text", "x", "y", "width", "height"] {
@@ -770,7 +771,7 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
         assert!(operations.get, "PPT {name} is readable");
         assert_eq!(operations.set, name != "presentation", "PPT {name} setter");
         assert!(!operations.add, "PPT {name} is not addable");
-        assert!(!operations.remove, "PPT {name} is not removable");
+        assert_eq!(operations.remove, name == "slide", "PPT {name} removal");
     }
 
     let bytes = std::fs::read(concat!(
@@ -794,12 +795,27 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
         released.capabilities().verb(Verb::Save).code(),
         Some(Code::UnsupportedCapability)
     );
-    for verb in [Verb::Set, Verb::Edit, Verb::Batch] {
+    for verb in [
+        Verb::Set,
+        Verb::Remove,
+        Verb::Move,
+        Verb::Swap,
+        Verb::Edit,
+        Verb::Batch,
+    ] {
         assert_eq!(
             released.capabilities().verb(verb).code(),
             Some(Code::UnsupportedCapability)
         );
     }
+    assert!(
+        !released
+            .capabilities()
+            .element("slide")
+            .unwrap()
+            .operations()
+            .remove
+    );
     for name in ["slide", "shape", "placeholder"] {
         assert!(
             !released

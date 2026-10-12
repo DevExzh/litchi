@@ -642,10 +642,33 @@ the content in one pass and returns a `File`: an enum with one variant per
 format, plus `File::Locked` for an encrypted input and `File::Signed` for a
 signed one. The common case needs no options and no format knowledge.
 
-The unified API reads; it does not write yet. Its edit verbs (`set`, `add`,
-`remove`, batches, `save`, `create`) and path queries are planned for later
-releases. Until then, create and edit documents through the format crates
-shown in the sections above.
+The unified API provides path queries and immutable edits for integrated
+formats. Inspect `file.capabilities()` for the supported verbs, elements and
+properties; coverage differs by format and retained source state. Each write
+returns a new `File`, and the original remains readable. Explicit edits and
+atomic batches discard their candidate when any operation fails.
+
+Legacy PPT supports top-level shape text/geometry setters, existing slide
+visibility records, and slide removal/reordering. For example, with the `ppt`
+feature enabled and an input containing at least two slides with an editable
+text shape on the first:
+
+```rust
+use litchi::{Placement, props};
+
+let source = litchi::open("slides.ppt")?;
+let commit = source.edit(|edit| {
+    edit.set("/slide[1]/shape[1]", props! { "text" => "Updated title" })?;
+    edit.move_to("/slide[1]", Placement::End)?;
+    edit.remove("/slide[1]")
+})?;
+commit.file.save_as("revised.ppt")?;
+```
+
+PPT edits retain native dependency checks and reversible history. Slide/shape
+insertion, shape removal and rich-text formatting are still explicit gaps.
+Removing a slide can retain unreachable native incremental-history payloads;
+this operation does not sanitize the file.
 
 | `litchi::open` returns | For |
 |---|---|
