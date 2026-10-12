@@ -46,14 +46,16 @@ use std::{
 };
 
 use litchi::{OpenOptions as UnifiedOpenOptions, SourceMode};
-use litchi_core::{Metadata, OwnedSource, ReadAt};
+use litchi_core::{Metadata, OwnedSource, Position, ReadAt};
 use litchi_ole_common::property_set::PropertySetReader;
 use litchi_opc::{OpcPackage, SourceBackedPackage, SourceLimits};
+use litchi_ops::transaction::SemanticLimits;
 use serde::Serialize;
 
 use crate::{
-    Case, CaseResult, Corpus, DetectionMode, DetectionOdfFamily, RtfSemanticVariant, SemanticShape,
-    SourceSummary, iteration_count, record_elapsed, result_with_source, sha256_hex,
+    Case, CaseResult, Corpus, CorpusManifest, DetectionMode, DetectionOdfFamily,
+    RtfSemanticVariant, SemanticShape, SourceSummary, iteration_count, record_elapsed,
+    result_with_source, sha256_hex,
 };
 
 /// Which side of a pair a route measures.
@@ -1096,6 +1098,201 @@ pub(crate) fn entry(case: Case) -> Option<&'static Entry> {
     CATALOG.iter().find(|entry| entry.case == case)
 }
 
+/// The owner used by the opt-in legacy-PPT write pair.  `Eager` starts from
+/// owned bytes; `Positional` opens the same prepared file path and retains its
+/// source-version fence through publication.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PptTextBatchOwner {
+    Eager,
+    Positional,
+}
+
+impl PptTextBatchOwner {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Eager => "eager",
+            Self::Positional => "positional",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum PptTextBatchLeg {
+    Native,
+    Unified,
+}
+
+impl PptTextBatchLeg {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Native => "native",
+            Self::Unified => "unified",
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct PptTextBatchEntry {
+    case: Case,
+    twin: Case,
+    owner: PptTextBatchOwner,
+    leg: PptTextBatchLeg,
+    count: usize,
+}
+
+/// Opt-in, named native/unified legacy-PPT write routes.  These are kept
+/// outside the M0a read-pair catalog: their stable identities compare two
+/// write implementations rather than a deleted facade predecessor.
+const PPT_TEXT_BATCH_CATALOG: [PptTextBatchEntry; 20] = [
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerNative1,
+        twin: Case::PptTextBatchEagerUnified1,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Native,
+        count: 1,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerNative10,
+        twin: Case::PptTextBatchEagerUnified10,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Native,
+        count: 10,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerNative100,
+        twin: Case::PptTextBatchEagerUnified100,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Native,
+        count: 100,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerNative1000,
+        twin: Case::PptTextBatchEagerUnified1000,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Native,
+        count: 1_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerNative10000,
+        twin: Case::PptTextBatchEagerUnified10000,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Native,
+        count: 10_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerUnified1,
+        twin: Case::PptTextBatchEagerNative1,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Unified,
+        count: 1,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerUnified10,
+        twin: Case::PptTextBatchEagerNative10,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Unified,
+        count: 10,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerUnified100,
+        twin: Case::PptTextBatchEagerNative100,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Unified,
+        count: 100,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerUnified1000,
+        twin: Case::PptTextBatchEagerNative1000,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Unified,
+        count: 1_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerUnified10000,
+        twin: Case::PptTextBatchEagerNative10000,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Unified,
+        count: 10_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalNative1,
+        twin: Case::PptTextBatchPositionalUnified1,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Native,
+        count: 1,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalNative10,
+        twin: Case::PptTextBatchPositionalUnified10,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Native,
+        count: 10,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalNative100,
+        twin: Case::PptTextBatchPositionalUnified100,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Native,
+        count: 100,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalNative1000,
+        twin: Case::PptTextBatchPositionalUnified1000,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Native,
+        count: 1_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalNative10000,
+        twin: Case::PptTextBatchPositionalUnified10000,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Native,
+        count: 10_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalUnified1,
+        twin: Case::PptTextBatchPositionalNative1,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Unified,
+        count: 1,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalUnified10,
+        twin: Case::PptTextBatchPositionalNative10,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Unified,
+        count: 10,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalUnified100,
+        twin: Case::PptTextBatchPositionalNative100,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Unified,
+        count: 100,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalUnified1000,
+        twin: Case::PptTextBatchPositionalNative1000,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Unified,
+        count: 1_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalUnified10000,
+        twin: Case::PptTextBatchPositionalNative10000,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Unified,
+        count: 10_000,
+    },
+];
+
+fn ppt_text_batch_entry(case: Case) -> Option<PptTextBatchEntry> {
+    PPT_TEXT_BATCH_CATALOG
+        .iter()
+        .copied()
+        .find(|entry| entry.case == case)
+}
+
 const PERFORMANCE_CLAIM: &str = "none: one leg of a paired unified/leaf re-measurement (plan 0003 \
                                  §5.3); comparisons belong to the M0a S10 record";
 
@@ -1128,6 +1325,29 @@ pub(crate) struct RouteSummary {
     pub(crate) legs_agree: Option<bool>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub(crate) real_file: Option<crate::producer_shape::RealFileProvenance>,
+    /// Qualification and native rollover evidence for the opt-in legacy PPT
+    /// text-batch routes.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub(crate) ppt_text_batch: Option<PptTextBatchSummary>,
+}
+
+#[derive(Clone, Debug, Serialize)]
+pub(crate) struct PptTextBatchSummary {
+    pub(crate) leg: &'static str,
+    pub(crate) owner: &'static str,
+    pub(crate) count: usize,
+    pub(crate) native_chunk_size: usize,
+    pub(crate) native_operation_limit: usize,
+    pub(crate) native_chunk_calls: usize,
+    pub(crate) native_commits: usize,
+    pub(crate) unified_operations: usize,
+    pub(crate) unified_commits: usize,
+    pub(crate) semantic_snapshot_limit_bytes: usize,
+    pub(crate) source_sha256: String,
+    pub(crate) expected_output_sha256: String,
+    pub(crate) exact_output_verified: bool,
+    pub(crate) unchanged_source_verified: bool,
+    pub(crate) timing_scope: &'static str,
 }
 
 impl RouteSummary {
@@ -1145,6 +1365,7 @@ impl RouteSummary {
             selected_target: None,
             legs_agree: None,
             real_file: None,
+            ppt_text_batch: None,
         })
     }
 
@@ -1337,6 +1558,19 @@ pub(crate) fn run_selected(selection: &Selection<'_>) -> Result<Vec<CaseResult>,
     };
     let mut results = Vec::new();
 
+    let ppt_text_batch = selection
+        .cases
+        .iter()
+        .filter_map(|case| ppt_text_batch_entry(*case))
+        .collect::<Vec<_>>();
+    if !ppt_text_batch.is_empty() {
+        results.extend(run_ppt_text_batch_selected(
+            &ppt_text_batch,
+            warmup,
+            samples,
+        )?);
+    }
+
     let xlsx_bytes = family(|plan| matches!(plan, Plan::XlsxBytes { .. }));
     if !xlsx_bytes.is_empty() {
         let corpus = crate::build_xlsx_cell_crud_corpus(crate::XlsxCellCrudShape::Medium)?;
@@ -1468,6 +1702,410 @@ pub(crate) fn run_selected(selection: &Selection<'_>) -> Result<Vec<CaseResult>,
         }
     }
 
+    Ok(results)
+}
+
+const PPT_TEXT_BATCH_GENERATOR: &str = "litchi-ppt-text-batch-v1";
+const PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE: usize =
+    litchi_ppt::slide_order::MAX_SHAPE_TEXT_REPLACEMENTS;
+const PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT: usize = litchi_ppt::package::edit::MAX_OPERATIONS;
+const PPT_TEXT_BATCH_LARGE_SNAPSHOT_LIMIT: usize = 1 << 30;
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PptTextBatchNativeStats {
+    changed: usize,
+    chunk_calls: usize,
+    commits: usize,
+}
+
+#[derive(Clone, Copy, Debug, Default)]
+struct PptTextBatchUnifiedStats {
+    operations: usize,
+    commits: usize,
+}
+
+struct PreparedPptTextBatch {
+    native: litchi_ppt::Package,
+    unified: litchi::File,
+    replacements: Vec<litchi_ppt::slide_order::ShapeTextReplacement>,
+    paths: Vec<String>,
+    props: Vec<litchi_ops::Props<'static>>,
+    source_sha256: String,
+    expected_output: Vec<u8>,
+    limits: SemanticLimits,
+    native_stats: PptTextBatchNativeStats,
+    unified_stats: PptTextBatchUnifiedStats,
+}
+
+enum PptTextBatchOutput {
+    Native(litchi_ppt::Package),
+    Unified(litchi::File),
+}
+
+fn ppt_text_batch_source_text(count: usize, index: usize) -> String {
+    format!("litchi-ppt-text-batch-source-v1-{count}-{index:05}")
+}
+
+fn ppt_text_batch_updated_text(count: usize, index: usize) -> String {
+    format!("litchi-ppt-text-batch-updated-v1-{count}-{index:05}")
+}
+
+const fn ppt_text_batch_shape_name(count: usize) -> &'static str {
+    match count {
+        1 => "1",
+        10 => "10",
+        100 => "100",
+        1_000 => "1000",
+        10_000 => "10000",
+        _ => "custom",
+    }
+}
+
+fn build_ppt_text_batch_corpus(count: usize) -> Result<Corpus, Box<dyn Error>> {
+    if count == 0 {
+        return Err("PPT text-batch corpus count must be positive".into());
+    }
+    let mut builder = litchi_ppt::writer::Builder::new();
+    let slide = builder.add_slide()?;
+    for index in 0..count {
+        let x = 24_i32
+            .checked_add(i32::try_from(index % 16)?.saturating_mul(120))
+            .ok_or("PPT text-batch x coordinate overflows i32")?;
+        let y = 24_i32
+            .checked_add(i32::try_from(index / 16)?.saturating_mul(72))
+            .ok_or("PPT text-batch y coordinate overflows i32")?;
+        builder.add_textbox(
+            slide,
+            x,
+            y,
+            96,
+            48,
+            &ppt_text_batch_source_text(count, index),
+        )?;
+    }
+    let archive = builder.build()?.to_bytes()?;
+    let package = litchi_ppt::Package::from_bytes(&archive)?;
+    let presentation = package.presentation()?;
+    let slides = presentation.slides()?;
+    let first = slides.first().ok_or("PPT text-batch corpus has no slide")?;
+    if slides.len() != 1 || first.shape_count()? != count {
+        return Err("PPT text-batch corpus shape count differs from its fixture".into());
+    }
+    let target_payload = ppt_text_batch_source_text(count, 0).into_bytes();
+    Ok(Corpus {
+        manifest: CorpusManifest {
+            name: format!("ppt-text-batch-{count}"),
+            generator: PPT_TEXT_BATCH_GENERATOR,
+            package_format: "PPT/CFB",
+            shape: ppt_text_batch_shape_name(count),
+            payload_kind: "deterministic-text-boxes",
+            compression: "none",
+            entry_count: count,
+            archive_member_count: litchi_cfb::OleFile::open(Cursor::new(archive.as_slice()))?
+                .list_directory_entries(&[])?
+                .len(),
+            entry_bytes: target_payload.len(),
+            uncompressed_payload_bytes: (0..count)
+                .try_fold(0usize, |total, index| {
+                    total.checked_add(ppt_text_batch_source_text(count, index).len())
+                })
+                .ok_or("PPT text-batch payload size overflows usize")?,
+            archive_bytes: archive.len(),
+            archive_sha256: sha256_hex(&archive),
+            target_entry: "slide:0/shape:0".to_owned(),
+            target_payload_bytes: target_payload.len(),
+            target_payload_sha256: sha256_hex(&target_payload),
+            rtf_variant: None,
+            xlsx: None,
+        },
+        archive,
+        target_name: "slide:0/shape:0".to_owned(),
+        target_payload,
+        xlsx: None,
+    })
+}
+
+fn open_ppt_text_batch_native(
+    owner: PptTextBatchOwner,
+    corpus: &Corpus,
+    path: &Path,
+) -> Result<litchi_ppt::Package, Box<dyn Error>> {
+    Ok(match owner {
+        PptTextBatchOwner::Eager => litchi_ppt::Package::from_bytes(&corpus.archive)?,
+        PptTextBatchOwner::Positional => litchi_ppt::Package::open(path)?,
+    })
+}
+
+fn open_ppt_text_batch_unified(
+    owner: PptTextBatchOwner,
+    corpus: &Corpus,
+    path: &Path,
+) -> Result<litchi::File, Box<dyn Error>> {
+    Ok(match owner {
+        PptTextBatchOwner::Eager => litchi::open_bytes(corpus.archive.clone())?,
+        PptTextBatchOwner::Positional => litchi::open(path)?,
+    })
+}
+
+fn apply_ppt_text_batch_native(
+    package: &litchi_ppt::Package,
+    replacements: &[litchi_ppt::slide_order::ShapeTextReplacement],
+) -> Result<(litchi_ppt::Package, PptTextBatchNativeStats), Box<dyn Error>> {
+    let mut current = package.clone();
+    let mut stats = PptTextBatchNativeStats::default();
+    for operation_chunk in replacements.chunks(PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT) {
+        let mut edit = current.edit()?;
+        for text_chunk in operation_chunk.chunks(PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE) {
+            stats.changed = stats
+                .changed
+                .checked_add(edit.set_shape_texts(text_chunk)?)
+                .ok_or("PPT text-batch changed count overflows usize")?;
+            stats.chunk_calls = stats
+                .chunk_calls
+                .checked_add(1)
+                .ok_or("PPT text-batch native call count overflows usize")?;
+        }
+        current = edit.commit()?.into_package();
+        stats.commits = stats
+            .commits
+            .checked_add(1)
+            .ok_or("PPT text-batch native commit count overflows usize")?;
+    }
+    Ok((current, stats))
+}
+
+fn apply_ppt_text_batch_unified(
+    file: &litchi::File,
+    paths: &[String],
+    props: &[litchi_ops::Props<'static>],
+    limits: &SemanticLimits,
+) -> Result<(litchi::File, PptTextBatchUnifiedStats), Box<dyn Error>> {
+    if paths.len() != props.len() {
+        return Err("PPT text-batch path and property vectors differ".into());
+    }
+    let commit = file.edit_with_limits(limits, |transaction| {
+        for (path, props) in paths.iter().zip(props) {
+            transaction.set(path.as_str(), props)?;
+        }
+        Ok(())
+    })?;
+    Ok((
+        commit.file,
+        PptTextBatchUnifiedStats {
+            operations: commit.diagnostics.operations(),
+            commits: commit.diagnostics.commits(),
+        },
+    ))
+}
+
+fn prepare_ppt_text_batch(
+    entry: PptTextBatchEntry,
+    corpus: &Corpus,
+    path: &Path,
+) -> Result<PreparedPptTextBatch, Box<dyn Error>> {
+    let limits = ppt_text_batch_limits(entry.count)?;
+    prepare_ppt_text_batch_with_limits(entry, corpus, path, limits)
+}
+
+fn prepare_ppt_text_batch_with_limits(
+    entry: PptTextBatchEntry,
+    corpus: &Corpus,
+    path: &Path,
+    limits: SemanticLimits,
+) -> Result<PreparedPptTextBatch, Box<dyn Error>> {
+    let native = open_ppt_text_batch_native(entry.owner, corpus, path)?;
+    let unified = open_ppt_text_batch_unified(entry.owner, corpus, path)?;
+    if native.to_bytes()? != corpus.archive || unified.to_bytes()? != corpus.archive {
+        return Err("PPT text-batch prepared owner changed the source before timing".into());
+    }
+    let mut replacements = Vec::with_capacity(entry.count);
+    let mut paths = Vec::with_capacity(entry.count);
+    let mut props = Vec::with_capacity(entry.count);
+    for index in 0..entry.count {
+        let target = litchi_ppt::text_edit::Target::new(Position::new(0), Position::new(index));
+        let updated = ppt_text_batch_updated_text(entry.count, index);
+        replacements.push(litchi_ppt::slide_order::ShapeTextReplacement::new(
+            target, &updated,
+        ));
+        paths.push(format!("/slide[1]/shape[{}]", index + 1));
+        props.push(litchi_ops::Props::new().with("text", updated));
+    }
+    let (native_output, native_stats) = apply_ppt_text_batch_native(&native, &replacements)
+        .map_err(|error| format!("native PPT text-batch qualification failed: {error:?}"))?;
+    let (unified_output, unified_stats) =
+        apply_ppt_text_batch_unified(&unified, &paths, &props, &limits)
+            .map_err(|error| format!("unified PPT text-batch qualification failed: {error:?}"))?;
+    let native_bytes = native_output
+        .to_bytes()
+        .map_err(|error| format!("native PPT text-batch serialization failed: {error:?}"))?;
+    let unified_bytes = unified_output
+        .to_bytes()
+        .map_err(|error| format!("unified PPT text-batch serialization failed: {error:?}"))?;
+    if native_bytes != unified_bytes {
+        return Err("PPT text-batch native and unified outputs differ".into());
+    }
+    if fs::read(path)? != corpus.archive {
+        return Err("PPT text-batch qualification mutated the prepared source".into());
+    }
+    if native_stats.changed != entry.count || unified_stats.operations != entry.count {
+        return Err("PPT text-batch qualification changed an unexpected number of targets".into());
+    }
+    Ok(PreparedPptTextBatch {
+        native,
+        unified,
+        replacements,
+        paths,
+        props,
+        source_sha256: sha256_hex(&corpus.archive),
+        expected_output: native_bytes,
+        limits,
+        native_stats,
+        unified_stats,
+    })
+}
+
+fn run_ppt_text_batch(
+    entry: PptTextBatchEntry,
+    corpus: &Corpus,
+    path: &Path,
+    prepared: &PreparedPptTextBatch,
+    warmup: usize,
+    samples: usize,
+) -> Result<CaseResult, Box<dyn Error>> {
+    let mut elapsed = Vec::with_capacity(samples);
+    for iteration in 0..iteration_count(warmup, samples)? {
+        let started = Instant::now();
+        let (output, stats) = match entry.leg {
+            PptTextBatchLeg::Native => {
+                let (output, stats) =
+                    apply_ppt_text_batch_native(&prepared.native, &prepared.replacements)?;
+                (PptTextBatchOutput::Native(output), stats.changed)
+            },
+            PptTextBatchLeg::Unified => {
+                let (output, stats) = apply_ppt_text_batch_unified(
+                    &prepared.unified,
+                    &prepared.paths,
+                    &prepared.props,
+                    &prepared.limits,
+                )?;
+                (PptTextBatchOutput::Unified(output), stats.operations)
+            },
+        };
+        std::hint::black_box(&output);
+        let duration = started.elapsed();
+        let output_bytes = match output {
+            PptTextBatchOutput::Native(output) => output.to_bytes()?,
+            PptTextBatchOutput::Unified(output) => output.to_bytes()?,
+        };
+        if output_bytes != prepared.expected_output {
+            return Err(format!(
+                "{} produced output different from its qualified native output",
+                entry.case.name()
+            )
+            .into());
+        }
+        if stats != entry.count {
+            return Err(format!(
+                "{} applied {stats} targets, expected {}",
+                entry.case.name(),
+                entry.count
+            )
+            .into());
+        }
+        if fs::read(path)? != corpus.archive {
+            return Err(format!("{} mutated its prepared source", entry.case.name()).into());
+        }
+        record_elapsed(&mut elapsed, iteration, warmup, duration)?;
+    }
+    let summary = RouteSummary {
+        leg: entry.leg.name(),
+        predecessor: "ppt_text_batch_native_vs_unified_v1",
+        twin: Some(entry.twin.name()),
+        timed_calls: match entry.leg {
+            PptTextBatchLeg::Native => {
+                "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover"
+            },
+            PptTextBatchLeg::Unified => {
+                "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover"
+            },
+        },
+        performance_claim: PERFORMANCE_CLAIM,
+        projection_sha256: Some(sha256_hex(&prepared.expected_output)),
+        verified_samples: Some(samples),
+        observation: None,
+        selected_target: None,
+        legs_agree: Some(true),
+        real_file: None,
+        ppt_text_batch: Some(PptTextBatchSummary {
+            leg: entry.leg.name(),
+            owner: entry.owner.name(),
+            count: entry.count,
+            native_chunk_size: PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE,
+            native_operation_limit: PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT,
+            native_chunk_calls: prepared.native_stats.chunk_calls,
+            native_commits: prepared.native_stats.commits,
+            unified_operations: prepared.unified_stats.operations,
+            unified_commits: prepared.unified_stats.commits,
+            semantic_snapshot_limit_bytes: prepared.limits.max_snapshot_bytes(),
+            source_sha256: prepared.source_sha256.clone(),
+            expected_output_sha256: sha256_hex(&prepared.expected_output),
+            exact_output_verified: true,
+            unchanged_source_verified: true,
+            timing_scope: "one prepared native or unified text-batch publication; opening, fixture construction, command-vector preparation, output serialization, exact equivalence and source checks are outside the timer; unified string-path parsing is timed",
+        }),
+    };
+    Ok(result_with_source(
+        entry.case,
+        corpus,
+        elapsed,
+        SourceSummary {
+            unified_ops: Some(Box::new(summary)),
+            ..SourceSummary::default()
+        },
+    ))
+}
+
+fn ppt_text_batch_limits(count: usize) -> Result<SemanticLimits, Box<dyn Error>> {
+    if count <= PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT {
+        return Ok(SemanticLimits::default());
+    }
+    Ok(SemanticLimits::builder()
+        .max_snapshot_bytes(PPT_TEXT_BATCH_LARGE_SNAPSHOT_LIMIT)?
+        .build()?)
+}
+
+fn run_ppt_text_batch_selected(
+    selected: &[PptTextBatchEntry],
+    warmup: usize,
+    samples: usize,
+) -> Result<Vec<CaseResult>, Box<dyn Error>> {
+    let mut results = Vec::new();
+    let mut prepared_keys = Vec::new();
+    for entry in selected {
+        let key = (entry.owner, entry.count);
+        if prepared_keys.contains(&key) {
+            continue;
+        }
+        prepared_keys.push(key);
+        let corpus = build_ppt_text_batch_corpus(entry.count)?;
+        let source = TempSource::new("ppt", &corpus.archive)?;
+        let prepared = prepare_ppt_text_batch(*entry, &corpus, source.path())?;
+        for selected_entry in selected
+            .iter()
+            .copied()
+            .filter(|candidate| (candidate.owner, candidate.count) == key)
+        {
+            results.push(run_ppt_text_batch(
+                selected_entry,
+                &corpus,
+                source.path(),
+                &prepared,
+                warmup,
+                samples,
+            )?);
+        }
+        source.remove()?;
+    }
     Ok(results)
 }
 
@@ -2766,6 +3404,127 @@ fn run_detection(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn ppt_text_batch_routes_are_named_paired_and_opt_in() {
+        assert_eq!(PPT_TEXT_BATCH_CATALOG.len(), 20);
+        for entry in PPT_TEXT_BATCH_CATALOG {
+            assert_eq!(crate::parse_case(entry.case.name()), Some(entry.case));
+            assert_eq!(crate::parse_case(entry.twin.name()), Some(entry.twin));
+            assert!(
+                !Case::DEFAULT.contains(&entry.case),
+                "{}",
+                entry.case.name()
+            );
+            assert!(
+                !Case::DEFAULT.contains(&entry.twin),
+                "{}",
+                entry.twin.name()
+            );
+            let twin = ppt_text_batch_entry(entry.twin).expect("text-batch twin is registered");
+            assert_eq!(twin.twin, entry.case);
+            assert_eq!(twin.owner, entry.owner);
+            assert_eq!(twin.count, entry.count);
+            assert_ne!(twin.leg, entry.leg);
+            assert!(matches!(entry.count, 1 | 10 | 100 | 1_000 | 10_000));
+            assert!(entry.case.name().ends_with("_v1"));
+        }
+        for invalid in [
+            "ppt_text_batch_eager_native_0_v1",
+            "ppt_text_batch_eager_native_1",
+            "ppt_text_batch_positional_unified_10001_v1",
+            "ppt_text_batch_source_native_10_v1",
+        ] {
+            assert_eq!(crate::parse_case(invalid), None, "{invalid}");
+        }
+    }
+
+    #[test]
+    fn ppt_text_batch_qualification_covers_native_chunk_boundary_and_source_identity() {
+        let corpus = build_ppt_text_batch_corpus(PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE + 1)
+            .expect("PPT text-batch fixture");
+        let source = TempSource::new("ppt", &corpus.archive).expect("PPT text-batch source");
+        let entry = PptTextBatchEntry {
+            case: Case::PptTextBatchEagerNative100,
+            twin: Case::PptTextBatchEagerUnified100,
+            owner: PptTextBatchOwner::Eager,
+            leg: PptTextBatchLeg::Native,
+            count: PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE + 1,
+        };
+        let native =
+            open_ppt_text_batch_native(entry.owner, &corpus, source.path()).expect("native owner");
+        let replacements = (0..entry.count)
+            .map(|index| {
+                let target =
+                    litchi_ppt::text_edit::Target::new(Position::new(0), Position::new(index));
+                let updated = ppt_text_batch_updated_text(entry.count, index);
+                litchi_ppt::slide_order::ShapeTextReplacement::new(target, updated)
+            })
+            .collect::<Vec<_>>();
+        let (native_output, native_stats) =
+            apply_ppt_text_batch_native(&native, &replacements).expect("native qualification");
+        assert_eq!(native_stats.chunk_calls, 2);
+        assert_eq!(native_stats.commits, 1);
+        assert_eq!(native_stats.changed, PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE + 1);
+        assert_ne!(
+            native_output.to_bytes().expect("native output bytes"),
+            corpus.archive
+        );
+        assert_eq!(
+            fs::read(source.path()).expect("source bytes"),
+            corpus.archive
+        );
+        let small_corpus = build_ppt_text_batch_corpus(1).expect("small PPT text-batch fixture");
+        let small_source =
+            TempSource::new("ppt", &small_corpus.archive).expect("small PPT text-batch source");
+        let small_entry =
+            ppt_text_batch_entry(Case::PptTextBatchEagerNative1).expect("small native route");
+        let prepared = prepare_ppt_text_batch(small_entry, &small_corpus, small_source.path())
+            .expect("native/unified qualification");
+        assert_eq!(prepared.unified_stats.operations, 1);
+        assert_eq!(
+            prepared.limits.max_snapshot_bytes(),
+            SemanticLimits::default().max_snapshot_bytes()
+        );
+        let result = run_ppt_text_batch(
+            small_entry,
+            &small_corpus,
+            small_source.path(),
+            &prepared,
+            0,
+            1,
+        )
+        .expect("qualified native route");
+        let summary = result
+            .source
+            .expect("source envelope")
+            .unified_ops
+            .expect("text-batch summary");
+        let evidence = summary.ppt_text_batch.expect("text-batch evidence");
+        assert!(evidence.exact_output_verified);
+        assert!(evidence.unchanged_source_verified);
+        assert_eq!(result.elapsed_ns.samples.len(), 1);
+        small_source
+            .remove()
+            .expect("remove small PPT text-batch source");
+        source.remove().expect("remove PPT text-batch source");
+    }
+
+    #[test]
+    fn ppt_text_batch_snapshot_policy_expands_only_past_native_rollover() {
+        assert_eq!(
+            ppt_text_batch_limits(1_000)
+                .expect("default profile")
+                .max_snapshot_bytes(),
+            SemanticLimits::default().max_snapshot_bytes()
+        );
+        assert_eq!(
+            ppt_text_batch_limits(10_000)
+                .expect("large profile")
+                .max_snapshot_bytes(),
+            PPT_TEXT_BATCH_LARGE_SNAPSHOT_LIMIT
+        );
+    }
 
     fn fixture(relative: &str) -> PathBuf {
         Path::new(env!("CARGO_MANIFEST_DIR"))
