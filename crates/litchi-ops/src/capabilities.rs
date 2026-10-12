@@ -433,6 +433,7 @@ const CREATE_PENDING: Refusal = Refusal {
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
@@ -508,6 +509,16 @@ impl Capabilities {
                         file => file,
                     };
                     if let File::Xls(handle) = file {
+                        protected = handle.is_encrypted();
+                    }
+                }
+                #[cfg(feature = "ppt")]
+                {
+                    let file = match file {
+                        File::Signed(signed) => signed.file(),
+                        file => file,
+                    };
+                    if let File::Ppt(handle) = file {
                         protected = handle.is_encrypted();
                     }
                 }
@@ -627,6 +638,15 @@ impl Capabilities {
                     follow_up: "M2 XLS encryption-preserving publication",
                     reason: "the unlocked XLS owner refuses ordinary publication to prevent plaintext output",
                 }.support();
+            }
+            #[cfg(feature = "ppt")]
+            if self.format == Some(FileFormat::Ppt) {
+                return Refusal {
+                    code: Code::DocumentProtected,
+                    follow_up: "password-preserving PPT publication",
+                    reason: "the unlocked encrypted presentation refuses ordinary plaintext publication",
+                }
+                .support();
             }
             #[cfg(feature = "pptx")]
             if self.adapter() == Some(Adapter::Pptx) {
@@ -784,6 +804,12 @@ impl Capabilities {
 
     /// Whether this report's format has an integrated publisher.
     fn publication_support(&self) -> Support {
+        if self.format == Some(FileFormat::Ppt) && cfg!(feature = "ppt") {
+            if self.retains_source == Some(false) {
+                return RETAINED_SOURCE.support();
+            }
+            return Support::Supported;
+        }
         if self.format == Some(FileFormat::Xls) && cfg!(feature = "xls") {
             return Support::Supported;
         }
@@ -809,6 +835,9 @@ impl Capabilities {
 
     /// Whether this report's format has an integrated creator.
     fn creation_support(&self) -> Support {
+        if self.format == Some(FileFormat::Ppt) && cfg!(feature = "ppt") {
+            return Support::Supported;
+        }
         if self.format == Some(FileFormat::Xls) && cfg!(feature = "xls") {
             return Support::Supported;
         }
@@ -877,7 +906,11 @@ impl Capabilities {
     /// with a gap first, then the format's axis and property gaps, then the
     /// view modes the adapter does not render.
     pub fn gaps(&self) -> Gaps {
-        let independent: &'static [GapSpec] = &[];
+        let independent: &'static [GapSpec] = match self.format {
+            #[cfg(feature = "ppt")]
+            Some(FileFormat::Ppt) => &PPT_CREATION_OPTION_GAPS,
+            _ => &[],
+        };
         Gaps {
             independent: independent.iter(),
             adapter: self.adapter(),
@@ -1139,6 +1172,58 @@ static DOC_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         reason: "the DOC creator currently emits a blank body only and refuses initial metadata rather than dropping it",
     },
 ];
+
+/// PPT creator options that the native minimal builder intentionally refuses.
+/// These remain visible even though the legacy PPT read adapter is still a
+/// separate follow-up, because creation and publication are already exposed
+/// by the canonical package owner.
+#[cfg(feature = "ppt")]
+static PPT_CREATION_OPTION_GAPS: [GapSpec; 3] = [
+    ppt_creation_gap(
+        "template",
+        "use Flavor::Document; M2 PPT template creation",
+        "the PPT creator currently authors ordinary presentations and refuses template requests",
+    ),
+    ppt_creation_gap(
+        "strict-conformance",
+        "CreateOptions::conformance(Conformance::Transitional)",
+        "legacy PPT has one canonical binary writer and refuses an OOXML Strict conformance request",
+    ),
+    ppt_creation_gap(
+        "initial-metadata",
+        "M2 PPT metadata creation",
+        "the PPT creator refuses initial metadata until typed metadata authoring is integrated",
+    ),
+];
+
+#[cfg(feature = "ppt")]
+const fn ppt_creation_gap(
+    context: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "presentation",
+            context,
+        },
+        code: Code::UnsupportedCapability,
+        follow_up,
+        reason,
+    }
+}
+
+#[cfg(feature = "ppt")]
+const _: () = {
+    let mut index = 0;
+    while index < PPT_CREATION_OPTION_GAPS.len() {
+        assert!(crate::node::spec::gap_valid(
+            &PPT_CREATION_OPTION_GAPS[index]
+        ));
+        index += 1;
+    }
+};
 
 /// DOC structural and batch contexts outside the deliberately narrow body
 /// paragraph text setter. `batch` remains supported for atomic text sets;

@@ -5,22 +5,22 @@
 )]
 
 use litchi_ppt::writer::text_format::{Paragraph, TextRun};
-use litchi_ppt::writer::{Hyperlink, Writer};
+use litchi_ppt::writer::{Builder, Hyperlink};
 use litchi_ppt::{
     Interaction, InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
     TextInteraction, TextInteractionLimits, TextRange, raw::Reader,
 };
 use std::io::Cursor;
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
 #[test]
 fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer.add_textbox(slide, 10, 10, 240, 40, "A😀BC").unwrap();
 
@@ -116,7 +116,7 @@ fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
 
 #[test]
 fn invalid_text_ranges_references_and_limits_are_atomic() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer.add_textbox(slide, 10, 10, 240, 40, "ABCDE").unwrap();
     let existing = TextInteraction::new(

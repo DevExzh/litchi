@@ -40,7 +40,8 @@ pub(crate) fn is_isolatable_shape_error(error: &crate::package::Error) -> bool {
                 | litchi_odraw::Error::MalformedImage { .. }
                 | litchi_odraw::Error::InvalidBlipId { .. }
         ),
-        Error::Io(_)
+        Error::Authoring(_)
+        | Error::Io(_)
         | Error::Ole(_)
         | Error::Graph(_)
         | Error::StreamNotFound(_)

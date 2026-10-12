@@ -1476,9 +1476,24 @@ impl Classify for litchi_xls::SourceBackedError {
 }
 
 #[cfg(feature = "ppt")]
+impl Classify for litchi_ppt::writer::WriteError {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Io(error) => error.classify(),
+            Self::Ole(error) => error.classify(),
+            Self::InvalidData(_) => Class::of(Code::InvalidArgument),
+            #[cfg(feature = "encryption")]
+            Self::EncryptionEntropyRequired => Class::of(Code::InvalidArgument),
+            _ => Class::of(Code::UnsupportedCapability),
+        }
+    }
+}
+
+#[cfg(feature = "ppt")]
 impl Classify for litchi_ppt::Error {
     fn classify(&self) -> Class {
         match self {
+            Self::Authoring(error) => error.classify(),
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
             Self::Limit { .. } | Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),

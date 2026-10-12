@@ -7,7 +7,7 @@
 use std::io::Cursor;
 
 use litchi_ppt::raw::Reader;
-use litchi_ppt::writer::{Chart, ChartKind, Hyperlink, Table, WriteError, Writer};
+use litchi_ppt::writer::{Builder, Chart, ChartKind, Hyperlink, Table, WriteError};
 
 fn chart(kind: ChartKind) -> Chart {
     let mut chart = Chart::new(kind);
@@ -19,15 +19,15 @@ fn chart(kind: ChartKind) -> Chart {
     chart
 }
 
-fn write_to_bytes(writer: &mut Writer) -> Vec<u8> {
+fn write_to_bytes(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("write presentation");
+    litchi_ppt::raw::encode(writer, &mut output).expect("write presentation");
     output.into_inner()
 }
 
 #[test]
 fn valid_chart_requests_write_graph_objects_and_reopen() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().expect("add slide");
     writer
         .add_textbox(slide, 40, 10, 300, 30, "Sales report")
@@ -85,7 +85,7 @@ fn valid_chart_requests_write_graph_objects_and_reopen() {
 
 #[test]
 fn malformed_chart_requests_still_report_input_errors() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().expect("add slide");
 
     assert!(matches!(
@@ -121,7 +121,7 @@ fn chart_builder_rejects_invalid_series_before_authoring() {
 
 #[test]
 fn graph_cache_limit_refusal_is_atomic_before_chart_storage() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().expect("add slide");
     let mut chart = Chart::new(ChartKind::Line);
     chart.set_categories((0..127).map(|index| format!("C{index}")));

@@ -3,6 +3,7 @@
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
@@ -321,6 +322,7 @@ impl File {
         not(any(
             feature = "doc",
             feature = "docx",
+            feature = "ppt",
             feature = "xlsx",
             feature = "pptx",
             feature = "xlsb",
@@ -341,6 +343,12 @@ impl File {
             },
             #[cfg(feature = "docx")]
             Self::Docx(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => {
                 let mut counted = Counted { sink, bytes: 0 };
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
@@ -402,6 +410,7 @@ fn pending(file: &File, operation: &str) -> Error {
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
@@ -415,6 +424,7 @@ pub(crate) struct Counted<W> {
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",

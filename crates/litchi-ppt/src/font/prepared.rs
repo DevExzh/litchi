@@ -92,7 +92,7 @@ pub(crate) fn restore_staged(
 )]
 mod tests {
     use super::super::{EotIntent, EotLimits, Facet, PreparedFont, Scope, Snapshot};
-    use crate::Writer;
+    use crate::Builder;
     use litchi_fonts::{
         Charset, Family, FontProperties, License, Panose, Pitch, Signature, Style,
         embedding::powerpoint::View,
@@ -101,7 +101,7 @@ mod tests {
 
     #[test]
     fn writer_encodes_style_and_publishes_an_inert_facet() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let mut prepared = prepared_font(0, Style::Bold, false);
         let replaced = writer
             .set_prepared_font(
@@ -126,7 +126,7 @@ mod tests {
 
     #[test]
     fn license_and_intent_failure_leave_writer_and_transaction_unchanged() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let before = writer.font_collections().clone();
         let mut denied = prepared_font(0x0004, Style::Regular, false);
         let source_program = denied.data.clone();
@@ -189,7 +189,7 @@ mod tests {
 
     #[test]
     fn serialization_failure_restores_writer_catalog_and_prepared_program() {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let before = writer.font_collections().clone();
         let mut prepared = prepared_font(0, Style::Regular, false);
         prepared.data.reserve(1024);
@@ -244,9 +244,9 @@ mod tests {
     }
 
     fn snapshot() -> Snapshot {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         Snapshot::from_bytes(output.into_inner()).unwrap()
     }
 

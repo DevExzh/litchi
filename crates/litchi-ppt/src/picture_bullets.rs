@@ -1733,9 +1733,9 @@ mod tests {
     fn empty_source() -> Vec<u8> {
         use std::io::Cursor;
 
-        let mut writer = crate::Writer::new();
+        let mut writer = crate::Builder::new();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 

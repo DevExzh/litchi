@@ -25,7 +25,7 @@ use std::sync::{
 };
 
 fn generated_deck(suffix: &str) -> Vec<u8> {
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     for text in ["alpha", "beta", "gamma"] {
         let slide = writer.add_slide().expect("add generated slide");
         writer
@@ -33,7 +33,7 @@ fn generated_deck(suffix: &str) -> Vec<u8> {
             .expect("add generated textbox");
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).expect("write generated deck");
+    litchi_ppt::raw::encode(&mut writer, &mut output).expect("write generated deck");
     output.into_inner()
 }
 
@@ -413,7 +413,7 @@ fn source_changes_are_rejected_before_edit_commit_and_apply() {
 #[cfg(feature = "encryption")]
 #[test]
 fn encrypted_edit_refuses_before_capture_and_preserves_ciphertext() {
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     let slide = writer.add_slide().unwrap();
     writer.add_textbox(slide, 0, 0, 100, 100, "secret").unwrap();
     writer
@@ -423,7 +423,8 @@ fn encrypted_edit_refuses_before_capture_and_preserves_ciphertext() {
         )
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     let bytes = output.into_inner();
     let package =
         Package::from_bytes_with_options(&bytes, OpenOptions::new().password("password")).unwrap();

@@ -10,13 +10,13 @@
 //!
 //! Run with: cargo run --example `comprehensive_ppt_test`
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("=== Comprehensive PPT Writer Test ===\n");
 
     // Create a widescreen presentation (16:9)
-    let mut writer = Writer::new_widescreen();
+    let mut writer = Builder::new_widescreen();
 
     // ============================================================
     // PRESENTATION PROPERTIES
@@ -533,7 +533,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("\nTotal slides created: {slide_count}");
 
     println!("\nSaving to comprehensive_test.ppt...");
-    writer.save("comprehensive_test.ppt")?;
+    writer.build()?.save("comprehensive_test.ppt")?;
 
     println!("\n✅ SUCCESS! PPT file created with:");
     println!("   ✓ {slide_count} slides");

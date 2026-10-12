@@ -6589,7 +6589,7 @@ mod tests {
     }
 
     fn authored_fixture() -> Vec<u8> {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let first = writer.add_slide().unwrap();
         writer
             .add_textbox(first, 10, 10, 240, 40, "first slide")
@@ -6599,12 +6599,12 @@ mod tests {
             .add_textbox(second, 10, 10, 240, 40, "second slide")
             .unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
     fn authored_batch_fixture() -> Vec<u8> {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let first = writer.add_slide().unwrap();
         writer
             .add_textbox(first, 10, 10, 240, 40, "first shape")
@@ -6617,19 +6617,19 @@ mod tests {
             .add_textbox(second, 10, 10, 240, 40, "third shape")
             .unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
     fn authored_many_shapes_fixture(count: usize) -> Vec<u8> {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let slide = writer.add_slide().unwrap();
         for index in 0..count {
             let text = format!("shape {index}");
             writer.add_textbox(slide, 10, 10, 240, 40, &text).unwrap();
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
@@ -6660,14 +6660,14 @@ mod tests {
     }
 
     fn authored_table_fixture() -> Vec<u8> {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let slide = writer.add_slide().unwrap();
         let mut table = crate::writer::Table::new(2, 2).unwrap();
         table.set_cell_text(0, 0, "A1").unwrap();
         table.set_cell_text(1, 1, "B2").unwrap();
         writer.add_table(slide, 50, 60, table).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
@@ -7741,7 +7741,7 @@ mod tests {
     #[test]
     fn novel_picture_transfer_appends_bstore_and_pictures_stream_atomically() {
         let png = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4];
-        let mut donor_writer = crate::writer::Writer::new();
+        let mut donor_writer = crate::writer::Builder::new();
         let donor_slide = donor_writer.add_slide().unwrap();
         donor_writer
             .add_picture_as(
@@ -7755,10 +7755,10 @@ mod tests {
             )
             .unwrap();
         let mut donor_bytes = Cursor::new(Vec::new());
-        donor_writer.write_to(&mut donor_bytes).unwrap();
+        crate::raw::encode(&mut donor_writer, &mut donor_bytes).unwrap();
         let donor = Snapshot::from_bytes(donor_bytes.into_inner()).unwrap();
 
-        let mut target_writer = crate::writer::Writer::new();
+        let mut target_writer = crate::writer::Builder::new();
         let live = target_writer.add_slide().unwrap();
         target_writer
             .add_textbox(live, 10, 10, 100, 30, "receiver")
@@ -7770,7 +7770,7 @@ mod tests {
                 .unwrap();
         }
         let mut target_bytes = Cursor::new(Vec::new());
-        target_writer.write_to(&mut target_bytes).unwrap();
+        crate::raw::encode(&mut target_writer, &mut target_bytes).unwrap();
         let target = Snapshot::from_bytes(target_bytes.into_inner()).unwrap();
         let mut remove = target.edit().unwrap();
         remove.remove_slide(Position::new(1)).unwrap();

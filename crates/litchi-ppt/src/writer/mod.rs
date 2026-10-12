@@ -81,12 +81,19 @@ pub mod smart_tags;
 
 // Re-export public types from core
 #[cfg(feature = "encryption")]
-pub use crate::encryption::EncryptionProfile;
+pub use crate::encryption::{EncryptionEntropy, EncryptionProfile};
 pub use crate::view_info::{
     Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind, ViewOrigin,
     ZoomViewInfo,
 };
-pub use core::{ShapeProperties, ShapeType, TextAlignment, WriteError, Writer};
+pub use core::{Builder, ShapeProperties, ShapeType, TextAlignment, WriteError};
+
+pub(crate) fn core_encode<W: std::io::Write + std::io::Seek>(
+    builder: &mut Builder,
+    writer: &mut W,
+) -> Result<(), WriteError> {
+    builder.encode(writer)
+}
 
 // Re-export commonly used types from submodules
 pub use crate::shapes::geometry::{GeometryRect, ShapePathType};

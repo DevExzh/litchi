@@ -5,22 +5,22 @@
 )]
 
 use litchi_ppt::animation::AnimationInfo;
-use litchi_ppt::writer::{Hyperlink, Writer};
+use litchi_ppt::writer::{Builder, Hyperlink};
 use litchi_ppt::{
     Interaction, InteractionAction, InteractionJump, InteractionLimits, InteractionLinkTarget,
     InteractionTrigger, raw::Reader,
 };
 use std::io::Cursor;
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
 #[test]
 fn typed_click_hover_and_file_link_round_trip() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
 
     writer
@@ -113,7 +113,7 @@ fn typed_click_hover_and_file_link_round_trip() {
 
 #[test]
 fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 10, 240, 40, "Atomic interaction")

@@ -8,9 +8,9 @@
 #[cfg(feature = "encryption")]
 use litchi_ppt::OpenOptions;
 use litchi_ppt::embedded::storage::{Compression, Kind};
+use litchi_ppt::writer::Builder;
 #[cfg(feature = "encryption")]
 use litchi_ppt::writer::EncryptionProfile;
-use litchi_ppt::writer::Writer;
 use litchi_ppt::{VbaProjectCompression, VbaProjectError, VbaProjectLimits, raw::Reader};
 use litchi_vba::{
     Limits,
@@ -18,15 +18,15 @@ use litchi_vba::{
 };
 use std::io::Cursor;
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
 #[test]
 fn compressed_complete_project_round_trips_as_inert_source() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 20, 300, 40, "Macro-enabled presentation")
@@ -81,7 +81,7 @@ fn compressed_complete_project_round_trips_as_inert_source() {
 
 #[test]
 fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     let project = Project::new("EmptyPresentation")
         .finish(&Limits::default())
@@ -112,7 +112,7 @@ fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
 
 #[test]
 fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer.set_vba(Project::new("ExistingProject")).unwrap();
     let replacement =
@@ -154,7 +154,7 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
 #[test]
 #[cfg(feature = "encryption")]
 fn project_remains_available_after_presentation_decryption() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     let project = Project::new("EncryptedPresentation").module(Module::standard(
         "Module1",
@@ -164,6 +164,7 @@ fn project_remains_available_after_presentation_decryption() {
     writer
         .set_password("secret", EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();
+    writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
 
     let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package

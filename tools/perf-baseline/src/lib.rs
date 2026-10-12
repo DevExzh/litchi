@@ -15674,7 +15674,7 @@ fn write_fresh_xls(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
 fn write_fresh_ppt(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dyn Error>> {
     let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
     let payload_bytes = (shape == WriterShape::PayloadHeavy).then_some(40_000);
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     let mut content_bytes = 0;
     let mut text_box_count = 0;
     for slide_number in 0..slide_count {
@@ -15692,7 +15692,7 @@ fn write_fresh_ppt(shape: WriterShape) -> Result<(Vec<u8>, usize, usize), Box<dy
         }
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    litchi_ppt::raw::encode(&mut writer, &mut output)?;
     Ok((output.into_inner(), text_box_count, content_bytes))
 }
 
@@ -15713,7 +15713,7 @@ fn ppt_picture_payload(index: usize) -> Vec<u8> {
 }
 
 fn build_ppt_pictures_corpus() -> Result<Corpus, Box<dyn Error>> {
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     let slide_count = 8;
     let slides = (0..slide_count)
         .map(|_| writer.add_slide())
@@ -15731,7 +15731,7 @@ fn build_ppt_pictures_corpus() -> Result<Corpus, Box<dyn Error>> {
         )?;
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output)?;
+    litchi_ppt::raw::encode(&mut writer, &mut output)?;
     let archive = output.into_inner();
     let mut parsed = OleFile::open(Cursor::new(archive.as_slice()))?;
     let pictures = parsed.open_stream(&["Pictures"])?;

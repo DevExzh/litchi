@@ -13,7 +13,7 @@
 //! projection. The native owner preserves the original CFB index and source,
 //! so a text editor can be built at the first edit without reopening it.
 
-use std::io::Cursor;
+use std::io::{Cursor, Write};
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
@@ -45,6 +45,10 @@ struct PptState {
     metadata: Option<Metadata>,
     /// The source limits the reader was built under, inherited by editors.
     source_limits: SourceLimits,
+    /// Whether the opened package carries password-to-open encryption.  This
+    /// survives an explicit source release so capabilities and publication
+    /// keep the protection policy visible without retaining the source owner.
+    encrypted: bool,
     /// The source an editor is built from.
     owner: PptOwner,
 }
@@ -85,6 +89,57 @@ pub(crate) fn password_required(error: &litchi_ppt::Error) -> bool {
 }
 
 impl Ppt {
+    /// Create and adopt a blank legacy PowerPoint package directly through
+    /// the native builder. The facade does not serialize and reopen the
+    /// package, so the returned handle owns the same canonical package that
+    /// the builder produced.
+    pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
+        use crate::create::{Conformance, Flavor};
+        use crate::error::{Code, Error};
+
+        let refusal = if options.flavor_value() != Flavor::Document {
+            Some((
+                "the PPT creator does not author template presentations",
+                "use Flavor::Document; template authoring is not integrated",
+            ))
+        } else if options.conformance_value() == Conformance::Strict {
+            Some((
+                "legacy PPT does not support OOXML Strict conformance",
+                "use Conformance::Transitional; Strict authoring is not integrated",
+            ))
+        } else if options.metadata_value().is_some() {
+            Some((
+                "initial PPT metadata authoring is not integrated",
+                "omit initial metadata",
+            ))
+        } else {
+            None
+        };
+        if let Some((message, suggestion)) = refusal {
+            return Err(Error::new(Code::UnsupportedCapability, message)
+                .with_format(FileFormat::Ppt)
+                .with_suggestion(suggestion));
+        }
+
+        let package = Package::new()?;
+        Self::from_package(package)
+    }
+
+    /// Adopt a newly built canonical package as an eager, editable handle.
+    fn from_package(package: Package) -> Result<Self> {
+        let presentation = package.presentation()?;
+        let metadata = package.metadata().ok().filter(Metadata::has_data);
+        let source_limits = package.source_limits();
+        let encrypted = package.is_encrypted();
+        Ok(Self(Opened::new(PptState {
+            presentation,
+            metadata,
+            source_limits,
+            encrypted,
+            owner: PptOwner::Eager(package),
+        })))
+    }
+
     /// Whether this handle retains an edit source, without reading any payload.
     pub(crate) fn retains_source(&self) -> bool {
         !matches!(self.0.owner, PptOwner::Released)
@@ -103,6 +158,7 @@ impl Ppt {
         let presentation = package.presentation()?;
         let source_limits = package.source_limits();
         let metadata = package.metadata().ok().filter(Metadata::has_data);
+        let encrypted = package.is_encrypted();
         let owner = if options.retain_source {
             PptOwner::Source(package)
         } else {
@@ -112,6 +168,7 @@ impl Ppt {
             presentation,
             metadata,
             source_limits,
+            encrypted,
             owner,
         })))
     }
@@ -145,6 +202,7 @@ impl Ppt {
         let presentation = package.presentation()?;
         let metadata = package.metadata().ok().filter(Metadata::has_data);
         let source_limits = package.source_limits();
+        let encrypted = package.is_encrypted();
         let owner = if options.retain_source {
             PptOwner::Eager(package)
         } else {
@@ -154,6 +212,7 @@ impl Ppt {
             presentation,
             metadata,
             source_limits,
+            encrypted,
             owner,
         }))))
     }
@@ -167,6 +226,69 @@ impl Ppt {
     /// This handle's signature disposition (record 0013).
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
+    }
+
+    /// Attach the stable path used by `File::save` without changing the
+    /// immutable presentation owner.
+    pub(crate) fn with_origin(&self, origin: Option<Arc<std::path::Path>>) -> Self {
+        Self(self.0.with_origin(origin))
+    }
+
+    /// Return the stable path retained by a path-backed open.
+    pub(crate) fn origin(&self) -> Option<Arc<std::path::Path>> {
+        self.0.origin()
+    }
+
+    /// Whether ordinary publication must preserve an encryption profile.
+    pub(crate) fn is_encrypted(&self) -> bool {
+        self.0.encrypted
+    }
+
+    /// Fence a source-backed owner before publication.  Eager owners use an
+    /// immutable owned source and therefore have a stable revision too;
+    /// released read projections deliberately have no publication owner.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => {
+                package.source_version().map(drop).map_err(Into::into)
+            },
+            PptOwner::Released => Ok(()),
+        }
+    }
+
+    /// Stream the exact native package.  A signed handle preserves the
+    /// signature; only `Signed::unsign` reaches the explicit signature
+    /// removal adapter.  A released source cannot publish because its edit
+    /// owner was intentionally discarded at open.
+    pub(crate) fn write_to<W: Write>(&self, sink: &mut W) -> Result<()> {
+        let package = match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => package,
+            PptOwner::Released => {
+                return Err(crate::Error::new(
+                    crate::Code::UnsupportedCapability,
+                    "the PPT source was released before publication",
+                )
+                .with_format(FileFormat::Ppt)
+                .with_suggestion(
+                    "reopen the presentation without `OpenOptions::retain_source(false)`",
+                ));
+            },
+        };
+        self.check_source()?;
+        if self.is_encrypted() {
+            return Err(litchi_ppt::Error::EncryptionPolicy.into());
+        }
+        if self.signature() == Signature::RemovalAuthorized {
+            let bytes = signature::unsign_compound_file(
+                package.to_encrypted_bytes()?,
+                litchi_sign::cfb::Format::Ppt,
+            )?;
+            sink.write_all(&bytes)?;
+            self.check_source()?;
+        } else {
+            package.write_to(sink)?;
+        }
+        Ok(())
     }
 
     /// All text of the presentation, as the facade's `Presentation::text`
@@ -492,7 +614,7 @@ mod tests {
     /// A presentation whose text boxes the narrow source-backed editor
     /// admits; the corpus fixtures carry dependency records it refuses.
     fn editable_presentation() -> Vec<u8> {
-        let mut writer = litchi_ppt::writer::Writer::new();
+        let mut writer = litchi_ppt::writer::Builder::new();
         for slide_index in 0..2 {
             let slide = writer.add_slide().unwrap();
             for shape_index in 0..3 {
@@ -502,7 +624,7 @@ mod tests {
             }
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 

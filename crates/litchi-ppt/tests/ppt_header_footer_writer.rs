@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use litchi_ppt::writer::Writer;
+use litchi_ppt::writer::Builder;
 use litchi_ppt::{
     HeaderFooter, HeaderFooterOptions, HeaderFooterParent, HeaderFooterParentOrdinal,
     HeaderFooterScope, raw::Reader,
@@ -25,15 +25,15 @@ fn header_footer(footer: &str) -> HeaderFooter {
     }
 }
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
 #[test]
 fn writer_attaches_header_footers_to_every_supported_parent() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer.add_slide().unwrap();
 
@@ -86,7 +86,7 @@ fn writer_attaches_header_footers_to_every_supported_parent() {
 
 #[test]
 fn rejected_local_header_does_not_replace_existing_slide_value() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer.add_slide().unwrap();
     writer
         .set_slide_header_footer(0, header_footer("kept"))

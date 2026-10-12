@@ -7,7 +7,7 @@ use super::super::shape_style::{
 };
 use super::super::text_format::Paragraph;
 use super::model::{
-    ShapeProperties, ShapeType, TextAlignment, WritableShape, WritableSlide, WriteError, Writer,
+    Builder, ShapeProperties, ShapeType, TextAlignment, WritableShape, WritableSlide, WriteError,
 };
 use std::collections::{BTreeMap, HashMap};
 
@@ -486,7 +486,7 @@ pub(super) fn interaction_for_hyperlink(
 /// - Pictures/images
 /// - Hyperlinks
 /// - Speaker notes
-impl Writer {
+impl Builder {
     pub(super) fn build_docinfo_list(
         &self,
         vba_persist_id: Option<u32>,

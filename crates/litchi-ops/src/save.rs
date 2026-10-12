@@ -8,7 +8,7 @@
 use std::fmt;
 use std::path::{Path, PathBuf};
 
-#[cfg(any(feature = "doc", feature = "xls"))]
+#[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
 use litchi_cfb::atomic::{self, Overwrite as CfbOverwrite};
 
 use litchi_core::{Durability, FileFormat};
@@ -234,6 +234,7 @@ impl File {
         #[cfg(not(any(
             feature = "doc",
             feature = "docx",
+            feature = "ppt",
             feature = "xlsx",
             feature = "pptx",
             feature = "xls",
@@ -250,6 +251,7 @@ impl File {
         #[cfg(any(
             feature = "doc",
             feature = "docx",
+            feature = "ppt",
             feature = "xlsx",
             feature = "pptx",
             feature = "xls",
@@ -267,6 +269,8 @@ impl File {
                 Self::Xls(_) => {},
                 #[cfg(feature = "docx")]
                 Self::Docx(_) => {},
+                #[cfg(feature = "ppt")]
+                Self::Ppt(_) => {},
                 #[cfg(feature = "xlsx")]
                 Self::Xlsx(_) => {},
                 #[cfg(feature = "xlsb")]
@@ -295,6 +299,8 @@ impl File {
                 Self::Xls(handle) => save_xls(handle, &destination, options)?,
                 #[cfg(feature = "docx")]
                 Self::Docx(handle) => handle.save_to(&destination, options)?,
+                #[cfg(feature = "ppt")]
+                Self::Ppt(handle) => save_ppt(handle, &destination, options)?,
                 #[cfg(feature = "xlsx")]
                 Self::Xlsx(handle) => handle.save_to(&destination, options)?,
                 #[cfg(feature = "xlsb")]
@@ -316,6 +322,7 @@ impl File {
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
@@ -339,6 +346,13 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
     }
     #[cfg(feature = "docx")]
     if let File::Docx(handle) = file {
+        return handle
+            .origin()
+            .map(|origin| origin.as_ref().to_path_buf())
+            .ok_or_else(|| file_required(format));
+    }
+    #[cfg(feature = "ppt")]
+    if let File::Ppt(handle) = file {
         return handle
             .origin()
             .map(|origin| origin.as_ref().to_path_buf())
@@ -371,6 +385,7 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
@@ -473,6 +488,62 @@ fn save_xls(
     )
 }
 
+#[cfg(feature = "ppt")]
+fn save_ppt(
+    handle: &crate::format::ppt::Ppt,
+    destination: &Path,
+    options: &SaveOptions,
+) -> Result<u64> {
+    handle.check_source()?;
+    validate_ppt_destination(destination)?;
+    let overwrite = match options.overwrite {
+        Overwrite::Replace => CfbOverwrite::Replace,
+        Overwrite::Refuse => CfbOverwrite::Refuse,
+    };
+    let mut bytes = 0_u64;
+    atomic::save(
+        destination,
+        options.durability,
+        overwrite,
+        |staging| {
+            let mut counted = crate::write::Counted {
+                sink: staging,
+                bytes: 0,
+            };
+            handle.write_to(&mut counted)?;
+            bytes = counted.bytes;
+            Ok(())
+        },
+        || handle.check_source(),
+    )?;
+    Ok(bytes)
+}
+
+#[cfg(feature = "ppt")]
+fn validate_ppt_destination(destination: &Path) -> Result<()> {
+    if destination.file_name().is_none() {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "the PPT save destination must name a file",
+        )
+        .with_format(FileFormat::Ppt));
+    }
+    match std::fs::symlink_metadata(destination) {
+        Ok(metadata) => {
+            if metadata.file_type().is_symlink() || !metadata.is_file() {
+                return Err(Error::new(
+                    Code::InvalidArgument,
+                    "the PPT save destination must be a regular file",
+                )
+                .with_format(FileFormat::Ppt));
+            }
+            Ok(())
+        },
+        Err(error) if error.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(error) => Err(Error::from(error)),
+    }
+}
+
 #[cfg(feature = "xls")]
 fn validate_xls_destination(destination: &Path) -> Result<()> {
     if destination.file_name().is_none() {
@@ -504,6 +575,7 @@ fn validate_xls_destination(destination: &Path) -> Result<()> {
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
@@ -529,6 +601,7 @@ fn same_format(path: &Path, format: FileFormat) -> Result<()> {
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",

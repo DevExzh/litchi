@@ -163,6 +163,7 @@ impl Locked {
         feature = "doc",
         feature = "xls",
         feature = "docx",
+        feature = "ppt",
         feature = "xlsx",
         feature = "pptx",
         feature = "xlsb"
@@ -236,6 +237,7 @@ impl LockedState {
         feature = "doc",
         feature = "xls",
         feature = "docx",
+        feature = "ppt",
         feature = "xlsx",
         feature = "pptx",
         feature = "xlsb",

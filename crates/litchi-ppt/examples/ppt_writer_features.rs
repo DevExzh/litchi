@@ -16,8 +16,8 @@
 //! Run with: cargo run --example `ppt_writer_features`
 
 use litchi_ppt::writer::{
-    FillStyle, FontEntity, Hyperlink, LineStyleConfig, NotesPage, Paragraph, ShadowStyle,
-    ShapeColor, ShapeStyle, ShapeType, TextRun, Writer,
+    Builder, FillStyle, FontEntity, Hyperlink, LineStyleConfig, NotesPage, Paragraph, ShadowStyle,
+    ShapeColor, ShapeStyle, ShapeType, TextRun,
 };
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -45,7 +45,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 1: Basic shape types
 fn create_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating shapes demo...");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let slide = writer.add_slide()?;
 
@@ -64,7 +64,7 @@ fn create_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
     writer.add_rectangle(slide, 450, 100, 150, 100)?;
     writer.add_textbox(slide, 450, 210, 150, 30, "Rectangle 2")?;
 
-    writer.save("output/01_shapes.ppt")?;
+    writer.build()?.save("output/01_shapes.ppt")?;
     println!("  ✓ output/01_shapes.ppt");
     Ok(())
 }
@@ -72,7 +72,7 @@ fn create_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 2: Text formatting with rich text
 fn create_text_formatting_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating text formatting demo...");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let slide = writer.add_slide()?;
 
@@ -129,7 +129,7 @@ fn create_text_formatting_demo() -> Result<(), Box<dyn std::error::Error>> {
     ]);
     writer.add_rich_textbox(slide, 50, 400, 600, 40, vec![underline_para])?;
 
-    writer.save("output/02_text_formatting.ppt")?;
+    writer.build()?.save("output/02_text_formatting.ppt")?;
     println!("  ✓ output/02_text_formatting.ppt");
     Ok(())
 }
@@ -137,7 +137,7 @@ fn create_text_formatting_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 3: Shape styling (fills, lines, shadows)
 fn create_styled_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating styled shapes demo...");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let slide = writer.add_slide()?;
 
@@ -241,7 +241,7 @@ fn create_styled_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
     )?;
     writer.add_textbox(slide, 500, 310, 120, 25, "50% Opacity")?;
 
-    writer.save("output/03_styled_shapes.ppt")?;
+    writer.build()?.save("output/03_styled_shapes.ppt")?;
     println!("  ✓ output/03_styled_shapes.ppt");
     Ok(())
 }
@@ -249,7 +249,7 @@ fn create_styled_shapes_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 4: Lines and arrows
 fn create_lines_arrows_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating lines and arrows demo...");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let slide = writer.add_slide()?;
 
@@ -302,7 +302,7 @@ fn create_lines_arrows_demo() -> Result<(), Box<dyn std::error::Error>> {
     writer.add_rectangle(slide, 560, 350, 80, 50)?;
     writer.add_textbox(slide, 565, 365, 70, 20, "End")?;
 
-    writer.save("output/04_lines_arrows.ppt")?;
+    writer.build()?.save("output/04_lines_arrows.ppt")?;
     println!("  ✓ output/04_lines_arrows.ppt");
     Ok(())
 }
@@ -310,7 +310,7 @@ fn create_lines_arrows_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 5: Pictures/Images
 fn create_pictures_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating pictures demo...");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let slide = writer.add_slide()?;
     writer.add_textbox(slide, 50, 20, 600, 40, "Pictures Demo")?;
@@ -372,7 +372,7 @@ fn create_pictures_demo() -> Result<(), Box<dyn std::error::Error>> {
     }
 
     println!("  Picture count: {}", writer.picture_count());
-    writer.save("output/05_pictures.ppt")?;
+    writer.build()?.save("output/05_pictures.ppt")?;
     println!("  ✓ output/05_pictures.ppt");
     Ok(())
 }
@@ -380,7 +380,7 @@ fn create_pictures_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 6: Hyperlinks
 fn create_hyperlinks_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating hyperlinks demo...");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     // Slide 1: External links
     let slide1 = writer.add_slide()?;
@@ -447,7 +447,7 @@ fn create_hyperlinks_demo() -> Result<(), Box<dyn std::error::Error>> {
     writer.add_textbox(slide3, 270, 315, 160, 30, "Back to Slide 2")?;
     writer.set_last_shape_hyperlink(slide3, back_link_id)?;
 
-    writer.save("output/06_hyperlinks.ppt")?;
+    writer.build()?.save("output/06_hyperlinks.ppt")?;
     println!("  ✓ output/06_hyperlinks.ppt");
     Ok(())
 }
@@ -455,7 +455,7 @@ fn create_hyperlinks_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 6: Notes slides
 fn create_notes_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating notes demo...");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     // Slide 1 with simple notes
     let slide1 = writer.add_slide()?;
@@ -517,7 +517,7 @@ fn create_notes_demo() -> Result<(), Box<dyn std::error::Error>> {
          FALLBACK: If no questions, summarize key takeaways.",
     )?;
 
-    writer.save("output/07_notes.ppt")?;
+    writer.build()?.save("output/07_notes.ppt")?;
     println!("  ✓ output/07_notes.ppt");
     Ok(())
 }
@@ -525,7 +525,7 @@ fn create_notes_demo() -> Result<(), Box<dyn std::error::Error>> {
 /// Demo 7: Comprehensive demo with all features
 fn create_comprehensive_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating comprehensive demo...");
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     // Add custom font
     let _times_font = writer.add_font(FontEntity::times_new_roman());
@@ -905,7 +905,7 @@ fn create_comprehensive_demo() -> Result<(), Box<dyn std::error::Error>> {
     println!("  Hyperlinks: {}", writer.hyperlink_count());
     println!("  Fonts: {}", writer.font_count());
 
-    writer.save("output/08_comprehensive.ppt")?;
+    writer.build()?.save("output/08_comprehensive.ppt")?;
     println!("  ✓ output/08_comprehensive.ppt");
     Ok(())
 }

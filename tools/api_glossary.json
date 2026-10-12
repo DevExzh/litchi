@@ -2616,6 +2616,36 @@
           "name": "is_empty",
           "scope": "litchi_ppt::package::edit::Patch",
           "replacement": "use is_noop()"
+        },
+        {
+          "name": "Writer",
+          "scope": "litchi_ppt",
+          "replacement": "use Builder::build returning Package"
+        },
+        {
+          "name": "Writer",
+          "scope": "litchi_ppt::writer",
+          "replacement": "use Builder::build returning Package"
+        },
+        {
+          "name": "save",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "publish the built Package"
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "publish the built Package"
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "publish the built Package"
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_ppt::Builder",
+          "replacement": "publish the built Package"
         }
       ],
       "families": [

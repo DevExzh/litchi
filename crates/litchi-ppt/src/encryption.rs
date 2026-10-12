@@ -21,6 +21,55 @@ pub enum EncryptionProfile {
     },
 }
 
+/// Caller-owned entropy for one PPT CryptoAPI RC4 authoring attempt.
+///
+/// A canonical [`crate::Builder`] never obtains encryption salt or verifier
+/// bytes from an ambient random source. Supply one token for each encrypted
+/// build or low-level [`crate::raw::encode`] attempt. The token is consumed
+/// even when the attempt later fails, so a caller must provide a fresh token
+/// for the next attempt.
+///
+/// [`generate`](Self::generate) is the explicit convenience constructor for
+/// operating-system randomness. [`from_bytes`](Self::from_bytes) is useful for
+/// deterministic tests and reproducible pipelines.
+pub struct EncryptionEntropy {
+    salt: Zeroizing<[u8; 16]>,
+    verifier: Zeroizing<[u8; 16]>,
+}
+
+impl EncryptionEntropy {
+    /// Generate fresh salt and verifier bytes using the operating-system RNG.
+    pub fn generate() -> Result<Self> {
+        Ok(Self {
+            salt: random_16("PPT CryptoAPI salt")?,
+            verifier: random_16("PPT CryptoAPI verifier")?,
+        })
+    }
+
+    /// Construct deterministic entropy from caller-provided bytes.
+    ///
+    /// Reusing salt and verifier bytes with the same password is unsafe for
+    /// distinct encrypted documents. Production callers should normally use
+    /// [`Self::generate`] for every attempt.
+    #[must_use]
+    pub fn from_bytes(salt: [u8; 16], verifier: [u8; 16]) -> Self {
+        Self {
+            salt: Zeroizing::new(salt),
+            verifier: Zeroizing::new(verifier),
+        }
+    }
+}
+
+fn random_16(label: &str) -> Result<Zeroizing<[u8; 16]>> {
+    let mut bytes = Zeroizing::new([0_u8; 16]);
+    SysRng.try_fill_bytes(bytes.as_mut()).map_err(|_error| {
+        Error::Io(std::io::Error::other(format!(
+            "operating-system randomness unavailable for {label}"
+        )))
+    })?;
+    Ok(bytes)
+}
+
 impl EncryptionProfile {
     pub(crate) fn validate(self) -> std::result::Result<(), String> {
         let Self::CryptoApiRc4 { key_bits } = self;
@@ -58,24 +107,17 @@ pub(crate) fn validate_writer_password(
 pub(crate) fn prepare_writer_encryption(
     profile: EncryptionProfile,
     password: &str,
+    entropy: &EncryptionEntropy,
 ) -> std::result::Result<WriterEncryptionMaterial, String> {
     validate_writer_password(profile, password)?;
     let EncryptionProfile::CryptoApiRc4 { key_bits } = profile;
-    let mut salt = Zeroizing::new([0u8; 16]);
-    let mut verifier = Zeroizing::new([0u8; 16]);
-    SysRng.try_fill_bytes(salt.as_mut()).map_err(|_err| {
-        "operating-system randomness unavailable for PPT CryptoAPI salt".to_string()
-    })?;
-    SysRng.try_fill_bytes(verifier.as_mut()).map_err(|_err| {
-        "operating-system randomness unavailable for PPT CryptoAPI verifier".to_string()
-    })?;
     let (encryption_info, crypto) = office_rc4::build_header(
         password,
         usize::from(key_bits),
         Flags::CRYPTO_API | Flags::DOC_PROPERTIES,
         CRYPTO_API_PROVIDER,
-        &salt,
-        &verifier,
+        &entropy.salt,
+        &entropy.verifier,
     )
     .map_err(|error| map_crypto_error(error).to_string())?;
     let data_len = u32::try_from(encryption_info.len())

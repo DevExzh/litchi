@@ -489,10 +489,10 @@ fn empty_root_and_nested_protection_storages_refuse_changed_publication() {
 }
 
 fn unsigned_ppt() -> Vec<u8> {
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     writer.add_slide().unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
@@ -500,13 +500,14 @@ fn unsigned_ppt() -> Vec<u8> {
 fn encrypted_ppt(password: &str) -> Vec<u8> {
     use litchi_ppt::writer::EncryptionProfile;
 
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     writer.add_slide().unwrap();
     writer
         .set_password(password, EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 

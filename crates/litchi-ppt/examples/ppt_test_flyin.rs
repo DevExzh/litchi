@@ -5,7 +5,7 @@
 
 //! Test `FlyIn` animation with sound
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 use litchi_ppt::animation::{
     AfterEffect, AnimationEffect, AnimationInfo, AnimationSound, AnimationTrigger, BuildInfo,
     BuildLevel, BuildType, BuiltinSound, EffectDirection, EffectSpeed, IterationType,
@@ -13,7 +13,7 @@ use litchi_ppt::animation::{
 use std::error::Error;
 
 fn main() -> Result<(), Box<dyn Error>> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
 
     let slide = writer.add_slide()?;
 
@@ -38,7 +38,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     anim.build_list = Some(build);
     writer.set_shape_animation(slide, 0, anim)?;
 
-    writer.save("output/test_flyin.ppt")?;
+    writer.build()?.save("output/test_flyin.ppt")?;
 
     println!("✅ Created: output/test_flyin.ppt");
     println!("Expected: FlyIn from left with Whoosh sound");

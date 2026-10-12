@@ -3,12 +3,12 @@
 #[cfg(feature = "encryption")]
 use super::WriterEncryption;
 use super::{
-    HyperlinkCollection, Pictures, ShapeProperties, ShapeType, TextAlignment, WritableShape,
-    WritableSlide, WriteError, Writer, WriterModifyPassword,
+    Builder, HyperlinkCollection, Pictures, ShapeProperties, ShapeType, TextAlignment,
+    WritableShape, WritableSlide, WriteError, WriterModifyPassword,
 };
 use crate::animation::AnimationInfo;
 #[cfg(feature = "encryption")]
-use crate::encryption::{EncryptionProfile, validate_writer_password};
+use crate::encryption::{EncryptionEntropy, EncryptionProfile, validate_writer_password};
 use crate::font::{
     EmbeddedFont, Facet as FontFacet, Font, FontCollection, FontCollections, FontEmbeddingFlags,
     Scope as FontScope,
@@ -36,7 +36,7 @@ use std::collections::{BTreeMap, HashMap};
 use std::sync::Arc;
 use zeroize::Zeroizing;
 
-impl Writer {
+impl Builder {
     /// Create a new PPT writer with standard 4:3 slide dimensions
     #[must_use]
     pub fn new() -> Self {
@@ -76,6 +76,8 @@ impl Writer {
             main_master_header_footer: None,
             #[cfg(feature = "encryption")]
             encryption: None,
+            #[cfg(feature = "encryption")]
+            encryption_entropy: None,
             modify_password: None,
             vba_project: None,
         }
@@ -102,6 +104,17 @@ impl Writer {
             password: protected_password,
         });
         Ok(())
+    }
+
+    /// Supply one-use salt and verifier bytes for a subsequent encrypted build.
+    ///
+    /// PPT CryptoAPI RC4 authoring never consults ambient randomness. The token
+    /// is consumed by the next encrypted build attempt, including attempts
+    /// that fail during validation or package admission. Plain builds leave a
+    /// pending token untouched.
+    #[cfg(feature = "encryption")]
+    pub fn set_encryption_entropy(&mut self, entropy: EncryptionEntropy) {
+        self.encryption_entropy = Some(entropy);
     }
 
     /// Remove password-to-open protection and wipe the stored password.
@@ -281,7 +294,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Add a new blank slide
     ///
     /// # Returns
@@ -371,7 +384,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Set presentation-wide header/footer defaults for ordinary slides.
     ///
     /// # Errors
@@ -996,7 +1009,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Add a picture to a slide
     ///
     /// # Arguments
@@ -1134,7 +1147,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Set the rotation of the last shape on a slide, in degrees.
     ///
     /// # Errors
@@ -1692,7 +1705,7 @@ impl Writer {
     /// Set the slide transition effect.
     ///
     /// The transition owns the slide's `SSSlideInfoAtom` record (MS-PPT 2.6.6),
-    /// so per-slide timing set via [`Writer::set_slide_timing`] is emitted only
+    /// so per-slide timing set via [`Builder::set_slide_timing`] is emitted only
     /// for slides without a transition; a hidden-slide flag is preserved either
     /// way.
     ///
@@ -1754,7 +1767,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Set a presentation property
     ///
     /// # Arguments
@@ -1772,7 +1785,7 @@ impl Writer {
     }
 }
 
-impl Default for Writer {
+impl Default for Builder {
     fn default() -> Self {
         Self::new()
     }

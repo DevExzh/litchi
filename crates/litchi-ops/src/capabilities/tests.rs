@@ -78,7 +78,12 @@ fn every_format_has_one_answer_for_its_reads() {
             },
             Support::Unsupported { code, .. } => {
                 assert_eq!(capabilities.elements().count(), 0, "{format:?}");
-                assert_eq!(capabilities.gaps().count(), 0, "{format:?}");
+                let creation_gaps = if format == FileFormat::Ppt && cfg!(feature = "ppt") {
+                    3
+                } else {
+                    0
+                };
+                assert_eq!(capabilities.gaps().count(), creation_gaps, "{format:?}");
                 for mode in Mode::ALL {
                     assert_eq!(capabilities.view(*mode), get, "{format:?} {mode:?}");
                 }
@@ -170,11 +175,12 @@ fn every_format_has_one_answer_for_its_reads() {
             );
         }
 
-        // DOC, DOCX, XLSX, XLSB and PPTX have creators and publishers.
+        // Native creators and publishers can precede navigation integration.
         // A format without a read adapter
         // keeps its whole-format refusal as the authoritative answer.
         for verb in [Verb::Save, Verb::Create] {
-            let integrated = (format == FileFormat::Xls && cfg!(feature = "xls"))
+            let integrated = (format == FileFormat::Ppt && cfg!(feature = "ppt"))
+                || (format == FileFormat::Xls && cfg!(feature = "xls"))
                 || (format == FileFormat::Doc && cfg!(feature = "doc"))
                 || (format == FileFormat::Docx && cfg!(feature = "docx"))
                 || (format == FileFormat::Xlsx && cfg!(feature = "xlsx"))

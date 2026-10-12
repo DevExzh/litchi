@@ -10,13 +10,13 @@
 //! for implementation status.
 //!
 //! Run with: `cargo run --example ppt_write_example`
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("Creating a new PPT file...");
 
     // Create a new widescreen presentation (16:9)
-    let mut writer = Writer::new_widescreen();
+    let mut writer = Builder::new_widescreen();
 
     // Set presentation properties
     writer.set_property("Title", "Sample Presentation");
@@ -75,7 +75,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Save the file
     println!("Saving to output.ppt...");
-    writer.save("output.ppt")?;
+    writer.build()?.save("output.ppt")?;
 
     println!("✅ PPT file created successfully!");
     println!("   - 4 slides with various content");

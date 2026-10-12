@@ -6,13 +6,13 @@
 #![cfg(feature = "encryption")]
 
 use litchi_cfb::OleFile;
-use litchi_ppt::writer::{EncryptionProfile, PictureKind, Writer};
+use litchi_ppt::writer::{Builder, EncryptionProfile, PictureKind};
 use litchi_ppt::{Error, OpenOptions, raw::Reader};
 use std::collections::BTreeMap;
 use std::io::Cursor;
 
 fn write(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 10, 300, 40, "Encrypted 文本")
@@ -28,7 +28,8 @@ fn write(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
     }
     writer.set_password(password, profile).unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
@@ -178,7 +179,7 @@ fn pictures_salts_and_atomic_profile_validation_are_covered() {
         salt(&second_document, &second_current)
     );
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .set_password("kept", EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();

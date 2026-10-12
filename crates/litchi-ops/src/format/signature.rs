@@ -87,6 +87,7 @@ impl<S> Opened<S> {
     #[cfg(any(
         feature = "doc",
         feature = "docx",
+        feature = "ppt",
         feature = "xlsx",
         feature = "pptx",
         feature = "xlsb",
@@ -100,6 +101,7 @@ impl<S> Opened<S> {
     #[cfg(any(
         feature = "doc",
         feature = "docx",
+        feature = "ppt",
         feature = "xlsx",
         feature = "pptx",
         feature = "xlsb",

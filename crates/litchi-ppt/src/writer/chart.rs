@@ -15,9 +15,9 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_ppt::writer::{Chart, ChartKind, Writer};
+//! use litchi_ppt::writer::{Chart, ChartKind, Builder};
 //!
-//! let mut writer = Writer::new();
+//! let mut writer = Builder::new();
 //! let slide = writer.add_slide()?;
 //!
 //! let mut chart = Chart::new(ChartKind::Bar);

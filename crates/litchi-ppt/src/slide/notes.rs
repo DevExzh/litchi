@@ -560,7 +560,7 @@ mod tests {
 
     #[test]
     fn writer_notes_round_trip_through_reader_api() {
-        let mut writer = crate::writer::Writer::new();
+        let mut writer = crate::writer::Builder::new();
         let slide = writer.add_slide().expect("add slide");
         let notes_page = crate::writer::NotesPage::simple(0, "reader writer notes round trip")
             .with_header("excluded notes header")
@@ -571,7 +571,11 @@ mod tests {
             std::process::id(),
             slide
         ));
-        writer.save(&path).expect("write presentation");
+        writer
+            .build()
+            .expect("build presentation")
+            .save(&path)
+            .expect("write presentation");
 
         let mut package = Reader::open(&path).expect("open written presentation");
         let presentation = package.presentation().expect("parse written presentation");

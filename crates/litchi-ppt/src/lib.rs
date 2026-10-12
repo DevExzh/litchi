@@ -65,6 +65,8 @@ mod officeart_wire;
 
 pub use consts::RecordType;
 // Core modules
+/// Canonical PPT authoring and immutable-package builder.
+pub mod builder;
 pub mod package;
 pub mod presentation;
 pub mod presentation_advisor;
@@ -180,7 +182,7 @@ pub use document_comparison::{
     SlideDiffFlags, SlideListTable10, TableDiffFlags, TextDiffFlags,
 };
 #[cfg(feature = "encryption")]
-pub use encryption::EncryptionProfile;
+pub use encryption::{EncryptionEntropy, EncryptionProfile};
 pub use non_zoom_view::{
     NoZoomViewInfo, NonZoomViewKind, OutlineSorterViewInfo, OutlineSorterViewInformation,
 };
@@ -368,10 +370,10 @@ pub use view_set_info::{
 };
 
 // Re-export writer types
+pub use builder::Builder;
 pub use writer::{
     FreeformGeometry, GeometryRect, ShapePathType, ShapeProperties, ShapeType, SmartTagDefinition,
     SmartTagIndex, TabAlign, TabStop, TextAlignment, TextDirection, TextFontAlign, WriteError,
-    Writer,
 };
 
 // Animation and transition support

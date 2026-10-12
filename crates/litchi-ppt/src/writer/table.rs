@@ -11,16 +11,17 @@
 //! # Example
 //!
 //! ```rust,no_run
-//! use litchi_ppt::writer::{Writer, Table};
+//! use litchi_ppt::writer::{Builder, Table};
 //!
-//! let mut writer = Writer::new();
+//! let mut writer = Builder::new();
 //! let slide = writer.add_slide()?;
 //!
 //! let mut table = Table::new(2, 3)?;
 //! table.set_cell_text(0, 0, "A1")?;
 //! table.set_column_width(0, 120)?;
 //! writer.add_table(slide, 50, 50, table)?;
-//! writer.save("table.ppt")?;
+//! let package = writer.build()?;
+//! package.save("table.ppt")?;
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 

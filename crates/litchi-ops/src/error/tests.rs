@@ -1528,3 +1528,26 @@ fn ppt_source_limit_configuration_preserves_dimension_and_values() {
         Code::LimitExceeded,
     );
 }
+
+#[cfg(feature = "ppt")]
+#[test]
+fn ppt_authoring_errors_preserve_their_typed_cause() {
+    let error = assert_code(
+        litchi_ppt::Error::Authoring(litchi_ppt::WriteError::InvalidData(
+            "authored-secret".into(),
+        )),
+        Code::InvalidArgument,
+    );
+    assert!(matches!(
+        error.leaf(),
+        Source::Ppt(litchi_ppt::Error::Authoring(
+            litchi_ppt::WriteError::InvalidData(_)
+        ))
+    ));
+    assert!(!format!("{error:?} {error}").contains("authored-secret"));
+    #[cfg(feature = "encryption")]
+    assert_code(
+        litchi_ppt::Error::Authoring(litchi_ppt::WriteError::EncryptionEntropyRequired),
+        Code::InvalidArgument,
+    );
+}

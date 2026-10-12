@@ -1,3 +1,4 @@
+use crate::writer::WriteError;
 use litchi_cfb::{OleError, OleFile};
 use std::fs::File;
 use std::io::{self, Read, Seek};
@@ -596,9 +597,10 @@ pub enum EncryptionKind {
 }
 
 /// Error types for PPT file parsing.
-#[derive(Debug)]
 #[non_exhaustive]
 pub enum Error {
+    /// Typed native Builder authoring or codec failure.
+    Authoring(WriteError),
     /// IO error
     Io(io::Error),
     /// OLE file error
@@ -648,9 +650,83 @@ pub enum Error {
     EncryptionPolicy,
 }
 
+impl std::fmt::Debug for Error {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        // Keep native authoring diagnostics opaque at this public boundary.
+        // The typed leaf remains available through `source()`.
+        match self {
+            Self::Authoring(_) => formatter.write_str("Error::Authoring(..)"),
+            Self::Io(error) => formatter.debug_tuple("Error::Io").field(error).finish(),
+            Self::Ole(error) => formatter.debug_tuple("Error::Ole").field(error).finish(),
+            Self::OfficeArt(error) => formatter
+                .debug_tuple("Error::OfficeArt")
+                .field(error)
+                .finish(),
+            Self::Graph(error) => formatter.debug_tuple("Error::Graph").field(error).finish(),
+            Self::InvalidFormat(value) => formatter
+                .debug_tuple("Error::InvalidFormat")
+                .field(value)
+                .finish(),
+            Self::StreamNotFound(value) => formatter
+                .debug_tuple("Error::StreamNotFound")
+                .field(value)
+                .finish(),
+            Self::Corrupted(value) => formatter
+                .debug_tuple("Error::Corrupted")
+                .field(value)
+                .finish(),
+            Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => formatter
+                .debug_struct("Error::InvalidLimit")
+                .field("kind", kind)
+                .field("value", value)
+                .field("maximum", maximum)
+                .finish(),
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => formatter
+                .debug_struct("Error::Limit")
+                .field("kind", kind)
+                .field("observed", observed)
+                .field("maximum", maximum)
+                .finish(),
+            Self::ResourceLimit(value) => formatter
+                .debug_tuple("Error::ResourceLimit")
+                .field(value)
+                .finish(),
+            Self::AllocationFailed(context) => formatter
+                .debug_tuple("Error::AllocationFailed")
+                .field(context)
+                .finish(),
+            Self::PasswordRequired => formatter.write_str("Error::PasswordRequired"),
+            Self::InvalidPassword => formatter.write_str("Error::InvalidPassword"),
+            Self::UnsupportedEncryption(kind) => formatter
+                .debug_tuple("Error::UnsupportedEncryption")
+                .field(kind)
+                .finish(),
+            Self::MalformedEncryptionHeader(value) => formatter
+                .debug_tuple("Error::MalformedEncryptionHeader")
+                .field(value)
+                .finish(),
+            Self::EncryptionPolicy => formatter.write_str("Error::EncryptionPolicy"),
+        }
+    }
+}
+
 impl From<io::Error> for Error {
     fn from(err: io::Error) -> Self {
         Error::Io(err)
+    }
+}
+
+impl From<WriteError> for Error {
+    fn from(error: WriteError) -> Self {
+        Self::Authoring(error)
     }
 }
 
@@ -675,6 +751,7 @@ impl From<litchi_ograph::Error> for Error {
 impl std::fmt::Display for Error {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Error::Authoring(_) => f.write_str("PPT authoring failed"),
             Error::Io(e) => write!(f, "IO error: {e}"),
             Error::Ole(e) => write!(f, "OLE error: {e}"),
             Error::OfficeArt(e) => write!(f, "OfficeArt error: {e}"),
@@ -721,6 +798,7 @@ impl std::fmt::Display for Error {
 impl std::error::Error for Error {
     fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Authoring(error) => Some(error),
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
             Self::OfficeArt(error) => Some(error),
@@ -832,6 +910,7 @@ impl From<Error> for litchi_core::Error {
             Error::EncryptionPolicy => litchi_core::Error::Unsupported(
                 "ordinary PPT publication cannot preserve password-to-open encryption".into(),
             ),
+            Error::Authoring(_) => litchi_core::Error::Unsupported("PPT authoring failed".into()),
         }
     }
 }

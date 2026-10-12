@@ -6,7 +6,7 @@
 // Example: Generate PPT files demonstrating comments, slide timings, and custom shows.
 // Open the generated files in PowerPoint to verify each feature.
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 use litchi_ppt::writer::comments::{CommentDateTime, SlideComment};
 use litchi_ppt::writer::custom_shows::CustomShow;
 use litchi_ppt::writer::slide_timing::SlideTiming;
@@ -15,7 +15,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── 1. Comments ────────────────────────────────────────────────────
     // In PowerPoint: Review tab → Show Comments should display these.
     {
-        let mut w = Writer::new();
+        let mut w = Builder::new();
 
         let s0 = w.add_slide()?;
         w.add_textbox(s0, 50, 50, 400, 40, "Slide 1 – has two comments")?;
@@ -55,7 +55,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             SlideComment::new("Charlie Brown", "Nice chart on this slide.", 150, 200),
         )?;
 
-        w.save("ppt_comments.ppt")?;
+        w.build()?.save("ppt_comments.ppt")?;
         println!("Created ppt_comments.ppt  (2 slides, 3 comments total)");
     }
 
@@ -63,7 +63,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // In PowerPoint: Slide Show → Set Up Show / Rehearse Timings, or
     // simply run the slide show to observe auto-advance behaviour.
     {
-        let mut w = Writer::new();
+        let mut w = Builder::new();
 
         let s0 = w.add_slide()?;
         w.add_textbox(
@@ -102,7 +102,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
             SlideTiming::auto_advance(3000).with_click_advance(false),
         )?;
 
-        w.save("ppt_timings.ppt")?;
+        w.build()?.save("ppt_timings.ppt")?;
         println!(
             "Created ppt_timings.ppt   (5 slides: 2s auto, 5s auto, click-only, hidden, 3s no-click)"
         );
@@ -111,7 +111,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ── 3. Custom slide shows ──────────────────────────────────────────
     // In PowerPoint: Slide Show → Custom Slide Show should list two shows.
     {
-        let mut w = Writer::new();
+        let mut w = Builder::new();
 
         let s0 = w.add_slide()?;
         w.add_textbox(s0, 50, 50, 500, 40, "Slide 1 – Introduction")?;
@@ -134,7 +134,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         // "Full Technical" shows everything except the budget slide
         w.add_custom_show(CustomShow::new("Full Technical", &[0, 1, 3, 4]));
 
-        w.save("ppt_custom_shows.ppt")?;
+        w.build()?.save("ppt_custom_shows.ppt")?;
         println!(
             "Created ppt_custom_shows.ppt (5 slides, 2 custom shows: 'Executive Summary' [1,3,5], 'Full Technical' [1,2,4,5])"
         );
@@ -142,7 +142,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // ── 4. Combined: all three features ────────────────────────────────
     {
-        let mut w = Writer::new();
+        let mut w = Builder::new();
 
         let s0 = w.add_slide()?;
         w.add_textbox(s0, 50, 50, 500, 40, "Slide 1 – Welcome")?;
@@ -180,7 +180,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         w.add_custom_show(CustomShow::new("Quick Overview", &[0, 3]));
         w.add_custom_show(CustomShow::new("Full Presentation", &[0, 1, 2, 3]));
 
-        w.save("ppt_all_features.ppt")?;
+        w.build()?.save("ppt_all_features.ppt")?;
         println!("Created ppt_all_features.ppt (4 slides, comments + timings + 2 custom shows)");
     }
 

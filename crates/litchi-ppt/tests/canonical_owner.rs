@@ -241,7 +241,7 @@ fn complete_input_limits_apply_before_owned_or_sequential_admission() {
 #[test]
 fn encrypted_owner_retains_profile_and_requires_explicit_ciphertext_publication() {
     use litchi_ppt::EncryptionProfile;
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 0, 0, 100, 100, "encrypted text")
@@ -250,7 +250,8 @@ fn encrypted_owner_retains_profile_and_requires_explicit_ciphertext_publication(
         let profile = EncryptionProfile::CryptoApiRc4 { key_bits };
         writer.set_password("password", profile).unwrap();
         let mut buffer = Cursor::new(Vec::new());
-        writer.write_to(&mut buffer).unwrap();
+        writer.set_encryption_entropy(litchi_ppt::EncryptionEntropy::generate().unwrap());
+        litchi_ppt::raw::encode(&mut writer, &mut buffer).unwrap();
         let bytes = buffer.into_inner();
         let package =
             Package::from_bytes_with_options(&bytes, OpenOptions::new().password("password"))
@@ -284,7 +285,7 @@ fn encrypted_owner_retains_profile_and_requires_explicit_ciphertext_publication(
 
 #[test]
 fn cloned_projections_share_successful_picture_materialization() {
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     writer.add_slide().unwrap();
     let mut picture = vec![0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 1, 2, 3, 4];
     picture.resize(6012, 0);
@@ -292,7 +293,7 @@ fn cloned_projections_share_successful_picture_materialization() {
         .add_picture_data_as(picture, litchi_ppt::writer::PictureKind::Png)
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     let bytes = output.into_inner();
     let source = Arc::new(Source::new(bytes));
     let package = Package::from_read_at(source.clone()).unwrap();

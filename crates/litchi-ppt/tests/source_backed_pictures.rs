@@ -6,7 +6,7 @@
 
 use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::{ReadAt, SourceVersion};
-use litchi_ppt::writer::{PictureKind, Writer};
+use litchi_ppt::writer::{Builder, PictureKind};
 use litchi_ppt::{
     Error, Leniency, OpenOptions, SourceBackedPackage, SourceLimitKind, SourceLimits, raw::Reader,
 };
@@ -36,7 +36,7 @@ fn serialize_ole(writer: &mut OleWriter) -> Vec<u8> {
 }
 
 fn picture_fixture() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().expect("PPT picture slide");
     writer
         .add_textbox(slide, 10, 10, 300, 40, "picture")
@@ -47,9 +47,7 @@ fn picture_fixture() -> Vec<u8> {
         .add_picture_data_as(picture, PictureKind::Png)
         .expect("PPT picture payload");
     let mut output = Cursor::new(Vec::new());
-    writer
-        .write_to(&mut output)
-        .expect("PPT picture serialization");
+    litchi_ppt::raw::encode(&mut writer, &mut output).expect("PPT picture serialization");
     output.into_inner()
 }
 

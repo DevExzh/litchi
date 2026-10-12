@@ -6,18 +6,18 @@
 // Minimal PPT writer example to verify structure
 // Generates a minimal PowerPoint 97-2003 file named "minimal.ppt"
 
-use litchi_ppt::Writer;
+use litchi_ppt::Builder;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Create empty presentation (master only, no slides) to match POI's empty.ppt
-    let mut writer = Writer::new();
-    writer.save("minimal.ppt")?;
+    let mut writer = Builder::new();
+    writer.build()?.save("minimal.ppt")?;
     println!("Created minimal.ppt (empty, master only)");
 
     // Also test with a slide
-    let mut writer2 = Writer::new();
+    let mut writer2 = Builder::new();
     writer2.add_slide()?;
-    writer2.save("with_slide.ppt")?;
+    writer2.build()?.save("with_slide.ppt")?;
     println!("Created with_slide.ppt (with 1 slide)");
 
     Ok(())

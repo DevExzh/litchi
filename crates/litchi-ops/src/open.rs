@@ -371,6 +371,7 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
 #[cfg(any(
     feature = "doc",
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
@@ -384,6 +385,8 @@ pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
         File::Xls(xls) => File::Xls(xls.with_origin(Some(origin))),
         #[cfg(feature = "docx")]
         File::Docx(docx) => File::Docx(docx.with_origin(Some(origin))),
+        #[cfg(feature = "ppt")]
+        File::Ppt(ppt) => File::Ppt(ppt.with_origin(Some(origin))),
         #[cfg(feature = "xlsx")]
         File::Xlsx(xlsx) => File::Xlsx(xlsx.with_origin(Some(origin))),
         #[cfg(feature = "xlsb")]
@@ -564,7 +567,7 @@ pub(crate) fn unlock_with_origin(
         Container::Ooxml => unlock_ooxml_with_origin(bytes, password, format, options, origin),
         Container::Doc | Container::Ppt | Container::Xls => {
             let file = cfb::unlock(container, bytes, password, options)?;
-            #[cfg(any(feature = "doc", feature = "xls"))]
+            #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
             if let Some(origin) = origin {
                 return Ok(attach_origin(file, origin));
             }

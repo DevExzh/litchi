@@ -1,13 +1,13 @@
 //! Validation and atomic mutation gates for the PPT writer model.
 
-use super::{WriteError, Writer};
+use super::{Builder, WriteError};
 #[cfg(feature = "encryption")]
 use crate::encryption::validate_writer_password;
 use crate::modify_password::validate_value as validate_modify_password;
 use crate::view_info::{SlideViewInfo, ViewKind};
 use crate::writer::core::codec::{interaction_for_hyperlink, shape_text_unit_count};
 
-impl Writer {
+impl Builder {
     pub(in crate::writer::core) fn validate_encryption(&self) -> Result<(), WriteError> {
         #[cfg(feature = "encryption")]
         let missing_open_password = self.encryption.is_none();
@@ -145,7 +145,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     /// Attach a hyperlink to the last shape added on a slide
     ///
     /// # Errors
@@ -416,7 +416,7 @@ impl Writer {
     }
 }
 
-impl Writer {
+impl Builder {
     fn validate_view_info_kind(view: &SlideViewInfo, expected: ViewKind) -> Result<(), WriteError> {
         view.to_bytes()
             .map_err(|error| WriteError::InvalidData(error.to_string()))?;

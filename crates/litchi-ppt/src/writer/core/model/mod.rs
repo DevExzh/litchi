@@ -25,7 +25,7 @@ use super::super::table::PositionedTable;
 use super::super::text_format::{Paragraph, TextAlign};
 use crate::animation::AnimationInfo;
 #[cfg(feature = "encryption")]
-use crate::encryption::EncryptionProfile;
+use crate::encryption::{EncryptionEntropy, EncryptionProfile};
 use crate::header_footer::HeaderFooter;
 use crate::transition::TransitionInfo;
 use crate::view_info::SlideViewInfo;
@@ -33,7 +33,6 @@ use std::collections::{BTreeMap, HashMap};
 use zeroize::Zeroizing;
 
 /// Error type for PPT writing
-#[derive(Debug)]
 pub enum WriteError {
     /// I/O error
     Io(std::io::Error),
@@ -41,11 +40,43 @@ pub enum WriteError {
     InvalidData(String),
     /// OLE error
     Ole(litchi_cfb::OleError),
+    /// Password-to-open encryption needs one caller-supplied entropy token.
+    #[cfg(feature = "encryption")]
+    EncryptionEntropyRequired,
     /// MS-OVBA project authoring error
     #[cfg(feature = "vba-inspection")]
     Vba(litchi_vba::Error),
     /// Host-neutral Office Graph authoring error.
     Graph(litchi_ograph::Error),
+}
+
+impl std::fmt::Debug for WriteError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Io(error) => formatter
+                .debug_tuple("WriteError::Io")
+                .field(error)
+                .finish(),
+            Self::InvalidData(_) => formatter.write_str("WriteError::InvalidData(<redacted>)"),
+            Self::Ole(error) => formatter
+                .debug_tuple("WriteError::Ole")
+                .field(error)
+                .finish(),
+            #[cfg(feature = "encryption")]
+            Self::EncryptionEntropyRequired => {
+                formatter.write_str("WriteError::EncryptionEntropyRequired")
+            },
+            #[cfg(feature = "vba-inspection")]
+            Self::Vba(error) => formatter
+                .debug_tuple("WriteError::Vba")
+                .field(error)
+                .finish(),
+            Self::Graph(error) => formatter
+                .debug_tuple("WriteError::Graph")
+                .field(error)
+                .finish(),
+        }
+    }
 }
 impl From<std::io::Error> for WriteError {
     fn from(err: std::io::Error) -> Self {
@@ -78,6 +109,11 @@ impl std::fmt::Display for WriteError {
             WriteError::Io(e) => write!(f, "I/O error: {e}"),
             WriteError::InvalidData(s) => write!(f, "Invalid data: {s}"),
             WriteError::Ole(e) => write!(f, "OLE error: {e}"),
+            #[cfg(feature = "encryption")]
+            WriteError::EncryptionEntropyRequired => write!(
+                f,
+                "PPT password-to-open authoring requires one-use EncryptionEntropy"
+            ),
             #[cfg(feature = "vba-inspection")]
             WriteError::Vba(e) => write!(f, "VBA project error: {e}"),
             WriteError::Graph(e) => write!(f, "Office Graph error: {e}"),
@@ -90,6 +126,8 @@ impl std::error::Error for WriteError {
         match self {
             Self::Io(error) => Some(error),
             Self::Ole(error) => Some(error),
+            #[cfg(feature = "encryption")]
+            Self::EncryptionEntropyRequired => None,
             #[cfg(feature = "vba-inspection")]
             Self::Vba(error) => Some(error),
             Self::Graph(error) => Some(error),
@@ -276,7 +314,7 @@ impl WritableSlide {
         2 + self.shapes.len() as u32 + table_shapes + self.charts.len() as u32
     }
 }
-pub struct Writer {
+pub struct Builder {
     /// Slides in the presentation
     pub(super) slides: Vec<WritableSlide>,
     /// Presentation properties
@@ -312,6 +350,9 @@ pub struct Writer {
     /// Password-to-open settings, including a password wiped on replacement or drop.
     #[cfg(feature = "encryption")]
     encryption: Option<WriterEncryption>,
+    /// One-use caller-supplied salt and verifier for CryptoAPI RC4 authoring.
+    #[cfg(feature = "encryption")]
+    pub(super) encryption_entropy: Option<EncryptionEntropy>,
     /// Inert modify password, wiped on replacement, clear, or drop.
     modify_password: Option<WriterModifyPassword>,
     /// Standalone CFB project wrapped for a persisted `VbaProjectStg`.
@@ -326,6 +367,28 @@ struct WriterEncryption {
 
 struct WriterModifyPassword {
     password: Zeroizing<String>,
+}
+
+impl std::fmt::Debug for Builder {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut debug = formatter.debug_struct("Builder");
+        debug
+            .field("slide_count", &self.slides.len())
+            .field("picture_count", &self.blip_store.len())
+            .field("hyperlink_count", &self.hyperlinks.len())
+            .field("slide_width", &self.slide_width)
+            .field("slide_height", &self.slide_height)
+            .field("has_modify_password", &self.modify_password.is_some())
+            .field("has_vba", &self.vba_project.is_some());
+        #[cfg(feature = "encryption")]
+        debug
+            .field(
+                "encryption_profile",
+                &self.encryption.as_ref().map(|value| value.profile),
+            )
+            .field("has_encryption_entropy", &self.encryption_entropy.is_some());
+        debug.finish_non_exhaustive()
+    }
 }
 
 impl std::fmt::Debug for WriterModifyPassword {

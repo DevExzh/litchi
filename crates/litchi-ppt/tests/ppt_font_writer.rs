@@ -9,14 +9,14 @@ use std::path::PathBuf;
 use std::time::{SystemTime, UNIX_EPOCH};
 
 use litchi_ppt::odraw::ShapeExt as _;
-use litchi_ppt::writer::{FontEntity, NotesPage, Paragraph, SmartTagDefinition, TextRun, Writer};
+use litchi_ppt::writer::{Builder, FontEntity, NotesPage, Paragraph, SmartTagDefinition, TextRun};
 use litchi_ppt::{
     EscherTextboxWrapper, Font, FontEmbeddingFlags, FontFacet, FontScope, ProgBinaryTagVersion,
     ProgTag, ProgTagLimits, ProgTagScope, ProgTags, Record, RecordType, raw::Reader,
 };
 
-fn configured_writer() -> Writer {
-    let mut writer = Writer::new();
+fn configured_writer() -> Builder {
+    let mut writer = Builder::new();
     let base = writer
         .add_font_model(FontScope::Base, Font::new("Writer Embedded"))
         .unwrap();
@@ -40,9 +40,9 @@ fn minimal_eot() -> Vec<u8> {
     eot
 }
 
-fn write_to_bytes(writer: &mut Writer) -> Vec<u8> {
+fn write_to_bytes(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
@@ -84,7 +84,7 @@ fn temporary_path(label: &str) -> PathBuf {
 
 #[test]
 fn default_writer_retains_arial_without_embedding_flags() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let mut package = Reader::from_reader(Cursor::new(write_to_bytes(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     assert!(
@@ -109,7 +109,7 @@ fn custom_catalog_round_trips_through_write_to() {
 #[test]
 fn custom_catalog_round_trips_through_save() {
     let path = temporary_path("save");
-    configured_writer().save(&path).unwrap();
+    configured_writer().build().unwrap().save(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     std::fs::remove_file(&path).unwrap();
     assert_custom_catalog(bytes);
@@ -118,7 +118,7 @@ fn custom_catalog_round_trips_through_save() {
 #[test]
 fn checked_font_add_enforces_name_and_collection_limits_atomically() {
     let exact = "12345678901234567890123456789012";
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     assert_eq!(writer.add_font_checked(FontEntity::new(exact)).unwrap(), 1);
     assert_eq!(FontEntity::new(exact).try_build().unwrap().len(), 68);
 
@@ -175,25 +175,28 @@ fn every_text_font_reference_fails_before_either_destination_is_modified() {
     ];
 
     for (label, paragraph) in cases {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_rich_textbox(slide, 10, 10, 100, 40, vec![paragraph])
             .unwrap();
 
         let mut output = Cursor::new(Vec::new());
-        assert!(writer.write_to(&mut output).is_err(), "{label}");
+        assert!(
+            litchi_ppt::raw::encode(&mut writer, &mut output).is_err(),
+            "{label}"
+        );
         assert!(output.get_ref().is_empty(), "{label}");
 
         let path = temporary_path(label);
-        assert!(writer.save(&path).is_err(), "{label}");
+        assert!(writer.build().is_err(), "{label}");
         assert!(!path.exists(), "{label}");
     }
 }
 
 #[test]
 fn out_of_range_international_font_reference_is_atomic() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     writer
         .add_font_model(
             FontScope::International,
@@ -217,11 +220,11 @@ fn out_of_range_international_font_reference_is_atomic() {
         .unwrap();
 
     let mut output = Cursor::new(Vec::new());
-    assert!(writer.write_to(&mut output).is_err());
+    assert!(litchi_ppt::raw::encode(&mut writer, &mut output).is_err());
     assert!(output.get_ref().is_empty());
 
     let path = temporary_path("international-out-of-range");
-    assert!(writer.save(&path).is_err());
+    assert!(writer.build().is_err());
     assert!(!path.exists());
 }
 
@@ -362,7 +365,7 @@ fn notes_font_references_round_trip_through_the_rich_text_path() {
     writer
         .set_notes_page(slide, NotesPage::new(0).with_paragraphs(vec![paragraph]))
         .unwrap();
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
 
     let bytes = std::fs::read(&path).unwrap();
     let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes)).unwrap();
@@ -444,18 +447,21 @@ fn invalid_notes_font_references_leave_both_destinations_untouched() {
     ];
 
     for (label, paragraph) in cases {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let slide = writer.add_slide().unwrap();
         writer
             .set_notes_page(slide, NotesPage::new(0).with_paragraphs(vec![paragraph]))
             .unwrap();
 
         let mut output = Cursor::new(Vec::new());
-        assert!(writer.write_to(&mut output).is_err(), "{label}");
+        assert!(
+            litchi_ppt::raw::encode(&mut writer, &mut output).is_err(),
+            "{label}"
+        );
         assert!(output.get_ref().is_empty(), "{label}");
 
         let path = temporary_path(label);
-        assert!(writer.save(&path).is_err(), "{label}");
+        assert!(writer.build().is_err(), "{label}");
         assert!(!path.exists(), "{label}");
     }
 }

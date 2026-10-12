@@ -3402,7 +3402,7 @@ fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
 mod tests {
     use super::{Error, Position, Refusal, Snapshot, Target};
     use crate::raw::Reader;
-    use crate::writer::Writer;
+    use crate::writer::Builder;
     use litchi_cfb::{
         OleFile, OutputProgress, OverlayError, SharedOleFile, SharedOleFileLimits,
         StreamSpliceLimits,
@@ -3415,11 +3415,11 @@ mod tests {
     };
 
     fn fixture(text: &str) -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let slide = writer.add_slide().unwrap();
         writer.add_textbox(slide, 10, 10, 240, 40, text).unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 
@@ -3428,7 +3428,7 @@ mod tests {
     }
 
     fn generated_fixture(slide_count: usize, shapes_per_slide: usize) -> Vec<u8> {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         for slide_index in 0..slide_count {
             let slide = writer.add_slide().unwrap();
             for shape_index in 0..shapes_per_slide {
@@ -3438,7 +3438,7 @@ mod tests {
             }
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
     }
 

@@ -74,6 +74,14 @@ impl fmt::Debug for Package {
 }
 
 impl Package {
+    /// Build the smallest valid plaintext legacy PowerPoint package.
+    ///
+    /// The empty artifact contains zero slides and is owned by the same
+    /// immutable package type as a package opened from disk.
+    pub fn new() -> Result<Self> {
+        crate::Builder::new().build()
+    }
+
     /// Open a package from a copied byte slice under the default policies.
     ///
     /// The copy is fallibly allocated and is retained by the sealed CFB owner;
@@ -244,6 +252,13 @@ impl Package {
                 leniency,
             }),
         })
+    }
+
+    pub(crate) fn from_owned_bytes_for_builder(
+        bytes: Vec<u8>,
+        options: OpenOptions<'_>,
+    ) -> Result<Self> {
+        Self::from_owned_bytes(bytes, options)
     }
 
     fn from_owned_bytes(bytes: Vec<u8>, options: OpenOptions<'_>) -> Result<Self> {

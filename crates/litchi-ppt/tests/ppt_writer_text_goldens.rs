@@ -17,7 +17,7 @@
 
 use litchi_core::validation::EvidenceDigest;
 use litchi_ppt::writer::text_format::{Paragraph, TextRun};
-use litchi_ppt::writer::{Hyperlink, SlideComment, SlideTiming, Table, Writer};
+use litchi_ppt::writer::{Builder, Hyperlink, SlideComment, SlideTiming, Table};
 use litchi_ppt::{
     AdvanceMode, HeaderFooter, HeaderFooterOptions, HeaderFooterScope, Interaction,
     InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger, TextInteraction,
@@ -33,14 +33,14 @@ fn repeat_to(seed: &str, bytes: usize) -> String {
     text
 }
 
-fn written(mut writer: Writer) -> Vec<u8> {
+fn written(mut writer: Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
 fn ascii_text_boxes() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let first = writer.add_slide().unwrap();
     writer.add_textbox(first, 10, 10, 200, 40, "").unwrap();
     writer.add_textbox(first, 10, 60, 200, 40, "a").unwrap();
@@ -82,7 +82,7 @@ fn ascii_text_boxes() -> Vec<u8> {
 }
 
 fn unicode_text_boxes() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 10, 200, 40, "Latin-1: àéîõüçñ ß ÿ")
@@ -116,7 +116,7 @@ fn unicode_text_boxes() -> Vec<u8> {
 }
 
 fn text_interactions() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer.add_textbox(slide, 10, 10, 240, 40, "A😀BC").unwrap();
     let hyperlink_id = writer.add_hyperlink(Hyperlink::url("https://example.invalid/text"));
@@ -192,7 +192,7 @@ fn footer(text: &str) -> HeaderFooter {
 }
 
 fn mixed_slide_children() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let first = writer.add_slide().unwrap();
     writer.add_rectangle(first, 20, 20, 100, 50).unwrap();
     writer
@@ -236,7 +236,7 @@ fn mixed_slide_children() -> Vec<u8> {
 static NEXT_FILE: std::sync::atomic::AtomicUsize = std::sync::atomic::AtomicUsize::new(0);
 
 fn saved_with_notes() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let first = writer.add_slide().unwrap();
     writer
         .add_textbox(first, 10, 10, 300, 40, "Slide with notes 😀")
@@ -251,14 +251,14 @@ fn saved_with_notes() -> Vec<u8> {
         std::process::id(),
         NEXT_FILE.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
     ));
-    writer.save(&path).unwrap();
+    writer.build().unwrap().save(&path).unwrap();
     let bytes = std::fs::read(&path).unwrap();
     std::fs::remove_file(&path).unwrap();
     bytes
 }
 
 fn harness_shape(slides: usize, boxes: usize, payload: Option<usize>) -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for slide_number in 0..slides {
         let slide = writer.add_slide().unwrap();
         for box_number in 0..boxes {
@@ -336,7 +336,7 @@ fn fresh_ppt_writer_text_paths_match_the_pre_0753_goldens() {
         ),
         (
             "empty_presentation",
-            || written(Writer::new()),
+            || written(Builder::new()),
             "42248efbfd7169bb976fc1a31ef163bde3239fe4348913f8dfcd77e8f30317b0",
         ),
     ];
@@ -361,15 +361,15 @@ fn fresh_ppt_writer_text_paths_match_the_pre_0753_goldens() {
 /// assembled in place.
 #[test]
 fn a_writer_written_twice_writes_the_same_bytes_and_a_refusal_writes_nothing() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .add_textbox(slide, 10, 10, 300, 40, &repeat_to("twice ✓ ", 50_000))
         .unwrap();
     let mut first = Cursor::new(Vec::new());
-    writer.write_to(&mut first).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut first).unwrap();
     let mut second = Cursor::new(Vec::new());
-    writer.write_to(&mut second).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut second).unwrap();
     assert_eq!(first.get_ref(), second.get_ref());
 
     // A later slide is refused while it is being assembled: its drawing is
@@ -382,7 +382,7 @@ fn a_writer_written_twice_writes_the_same_bytes_and_a_refusal_writes_nothing() {
         .add_comment(refused, SlideComment::new(&"a".repeat(60), "text", 1, 1))
         .unwrap();
     let mut output = Cursor::new(vec![0xA5; 16]);
-    let error = writer.write_to(&mut output).unwrap_err();
+    let error = litchi_ppt::raw::encode(&mut writer, &mut output).unwrap_err();
     assert!(error.to_string().contains("comment"), "{error}");
     assert_eq!(output.into_inner(), vec![0xA5; 16]);
 }

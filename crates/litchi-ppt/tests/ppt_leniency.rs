@@ -17,7 +17,7 @@
 use litchi_core::OwnedSource;
 use litchi_ppt::shapes::ShapeEnum;
 use litchi_ppt::text_prop::parse_style_text_prop_atom_strict;
-use litchi_ppt::writer::Writer;
+use litchi_ppt::writer::Builder;
 use litchi_ppt::writer::text_format::Paragraph;
 use litchi_ppt::{
     Defect, DefectLocation, PersistDefect, Presentation, Shape as _, ShapeDefect, SlideListDefect,
@@ -41,13 +41,13 @@ struct Fixture {
 
 impl Fixture {
     fn new(paragraph: Paragraph, expected_payload_prefix: &[u8]) -> Self {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         let slide = writer.add_slide().unwrap();
         writer
             .add_rich_textbox(slide, 10, 10, 200, 40, vec![paragraph])
             .unwrap();
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
         let bytes = output.into_inner();
 
         let headers: Vec<usize> = bytes
@@ -502,7 +502,7 @@ const OUTLINE_TEXT_REF_ATOM: u16 = 0x0F9E;
 
 /// A slide with two plain text boxes, `first` and `second`.
 fn two_textboxes() -> Vec<u8> {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     for text in ["first", "second"] {
         writer
@@ -510,7 +510,7 @@ fn two_textboxes() -> Vec<u8> {
             .unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 
@@ -711,7 +711,7 @@ struct Deck {
 
 impl Deck {
     fn new(count: usize) -> Self {
-        let mut writer = Writer::new();
+        let mut writer = Builder::new();
         for index in 0..count {
             let slide = writer.add_slide().unwrap();
             writer
@@ -726,7 +726,7 @@ impl Deck {
                 .unwrap();
         }
         let mut output = Cursor::new(Vec::new());
-        writer.write_to(&mut output).unwrap();
+        litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
         let bytes = output.into_inner();
         let mut slides = Vec::new();
         for presentation in open_both(&bytes) {

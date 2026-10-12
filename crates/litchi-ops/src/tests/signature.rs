@@ -120,7 +120,7 @@ fn inputs() -> Vec<Input> {
 /// the `Ppt` handle's own tests author it.
 #[cfg(feature = "ppt")]
 fn editable_presentation() -> Vec<u8> {
-    let mut writer = litchi_ppt::writer::Writer::new();
+    let mut writer = litchi_ppt::writer::Builder::new();
     for slide_index in 0..2 {
         let slide = writer.add_slide().unwrap();
         for shape_index in 0..3 {
@@ -130,7 +130,7 @@ fn editable_presentation() -> Vec<u8> {
         }
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(&mut writer, &mut output).unwrap();
     output.into_inner()
 }
 

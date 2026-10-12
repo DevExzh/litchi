@@ -340,9 +340,9 @@ fn collection_mutations_keep_ordinals_stable() {
 
 #[test]
 fn whole_package_transaction_is_exact_reversible_and_refuses_reindexing() {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    crate::raw::encode(&mut writer, &mut output).unwrap();
     let source = Snapshot::from_bytes(output.into_inner()).unwrap();
     let mut transaction = source.edit().unwrap();
     let mut replacement = source.fonts().get_base(0).unwrap().clone();
@@ -364,9 +364,9 @@ fn whole_package_transaction_is_exact_reversible_and_refuses_reindexing() {
 }
 
 fn minimal_live_snapshot() -> Snapshot {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    crate::raw::encode(&mut writer, &mut output).unwrap();
     Snapshot::from_bytes(output.into_inner()).unwrap()
 }
 
@@ -594,7 +594,7 @@ fn last_facet_removal_clears_subset_state_and_missing_owner_is_unchanged() {
 
 #[test]
 fn live_transaction_appends_base_and_international_fonts_and_updates_flags() {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     writer
         .add_font_model(Scope::International, super::Font::new("Intl Zero"))
         .unwrap();
@@ -602,7 +602,7 @@ fn live_transaction_appends_base_and_international_fonts_and_updates_flags() {
         .set_font_embedding_flags(Some(FontEmbeddingFlags::new(false, false)))
         .unwrap();
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    crate::raw::encode(&mut writer, &mut output).unwrap();
     let source = Snapshot::from_bytes(output.into_inner()).unwrap();
 
     let mut transaction = source.edit().unwrap();
@@ -631,14 +631,14 @@ fn live_transaction_appends_base_and_international_fonts_and_updates_flags() {
 
 #[test]
 fn live_transaction_accepts_font_129_and_atomically_refuses_font_130() {
-    let mut writer = crate::Writer::new();
+    let mut writer = crate::Builder::new();
     for ordinal in 1..128 {
         writer
             .add_font_model(Scope::Base, super::Font::new(format!("Boundary {ordinal}")))
             .unwrap();
     }
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    crate::raw::encode(&mut writer, &mut output).unwrap();
     let source = Snapshot::from_bytes(output.into_inner()).unwrap();
     assert_eq!(source.fonts().base.as_ref().unwrap().fonts.len(), 128);
 

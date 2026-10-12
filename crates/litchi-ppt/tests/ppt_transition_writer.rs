@@ -5,21 +5,21 @@
 )]
 
 //! Round-trip tests for slide transitions authored with the create-side
-//! writer: a transition set via `Writer::set_slide_transition` must be emitted
+//! writer: a transition set via `Builder::set_slide_transition` must be emitted
 //! as an `SSSlideInfoAtom` (MS-PPT 2.6.6) and read back by the crate's own
 //! reader.
 
 use std::io::Cursor;
 
-use litchi_ppt::writer::{SlideTiming, WriteError, Writer};
+use litchi_ppt::writer::{Builder, SlideTiming, WriteError};
 use litchi_ppt::{
     AdvanceMode, Record, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed,
     TransitionType, raw::Reader,
 };
 
-fn write(writer: &mut Writer) -> Vec<u8> {
+fn write(writer: &mut Builder) -> Vec<u8> {
     let mut output = Cursor::new(Vec::new());
-    writer.write_to(&mut output).unwrap();
+    litchi_ppt::raw::encode(writer, &mut output).unwrap();
     output.into_inner()
 }
 
@@ -47,7 +47,7 @@ fn slide_info_atom_payloads(bytes: &[u8]) -> Vec<Vec<u8>> {
 
 #[test]
 fn authored_transition_round_trips_through_reader() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let wipe_slide = writer.add_slide().unwrap();
     writer
         .set_slide_transition(
@@ -96,7 +96,7 @@ fn authored_transition_round_trips_through_reader() {
 
 #[test]
 fn authored_transition_record_layout_matches_spec() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let wipe_slide = writer.add_slide().unwrap();
     writer
         .set_slide_transition(
@@ -170,7 +170,7 @@ fn directional_transitions_round_trip() {
         (TransitionType::Wheel, TransitionDirection::Spokes3),
     ];
 
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     for (transition_type, direction) in cases {
         let slide = writer.add_slide().unwrap();
         writer
@@ -201,7 +201,7 @@ fn directional_transitions_round_trip() {
 
 #[test]
 fn hidden_timing_survives_when_transition_set() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .set_slide_transition(
@@ -233,7 +233,7 @@ fn hidden_timing_survives_when_transition_set() {
 
 #[test]
 fn timing_still_emitted_for_slides_without_transition() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     writer
         .set_slide_timing(slide, SlideTiming::auto_advance(5000))
@@ -257,7 +257,7 @@ fn timing_still_emitted_for_slides_without_transition() {
 
 #[test]
 fn transition_with_sound_is_refused() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let transition = TransitionInfo {
         sound: Some(SoundAction::builtin("Applause")),
@@ -269,7 +269,7 @@ fn transition_with_sound_is_refused() {
 
 #[test]
 fn transition_without_binary_ppt_representation_is_refused() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let slide = writer.add_slide().unwrap();
     let result =
         writer.set_slide_transition(slide, TransitionInfo::with_type(TransitionType::Morph));
@@ -278,7 +278,7 @@ fn transition_without_binary_ppt_representation_is_refused() {
 
 #[test]
 fn transition_on_missing_slide_is_refused() {
-    let mut writer = Writer::new();
+    let mut writer = Builder::new();
     let result = writer.set_slide_transition(0, TransitionInfo::with_type(TransitionType::Fade));
     assert!(matches!(result, Err(WriteError::InvalidData(_))));
 }

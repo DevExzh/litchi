@@ -113,6 +113,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         #[cfg(any(
             feature = "doc",
             feature = "docx",
+            feature = "ppt",
             feature = "xlsx",
             feature = "pptx",
             feature = "xls",
@@ -124,6 +125,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                 litchi_core::FileFormat::Xls
                     | litchi_core::FileFormat::Doc
                     | litchi_core::FileFormat::Docx
+                    | litchi_core::FileFormat::Ppt
                     | litchi_core::FileFormat::Xlsx
                     | litchi_core::FileFormat::Pptx
                     | litchi_core::FileFormat::Xlsb
@@ -146,10 +148,14 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         ))]
         {
             let file = super::cfb::open_path(path, source, version, options)?;
-            #[cfg(any(feature = "doc", feature = "xls"))]
+            #[cfg(any(feature = "doc", feature = "ppt", feature = "xls"))]
             let file = if matches!(
                 file.format(),
-                Some(litchi_core::FileFormat::Doc | litchi_core::FileFormat::Xls)
+                Some(
+                    litchi_core::FileFormat::Doc
+                        | litchi_core::FileFormat::Ppt
+                        | litchi_core::FileFormat::Xls,
+                )
             ) {
                 super::attach_origin(file, stable_origin(path)?)
             } else {
@@ -208,6 +214,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
     #[cfg(any(
         feature = "doc",
         feature = "docx",
+        feature = "ppt",
         feature = "xlsx",
         feature = "pptx",
         feature = "xls",
@@ -219,6 +226,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             litchi_core::FileFormat::Xls
                 | litchi_core::FileFormat::Doc
                 | litchi_core::FileFormat::Docx
+                | litchi_core::FileFormat::Ppt
                 | litchi_core::FileFormat::Xlsx
                 | litchi_core::FileFormat::Pptx
                 | litchi_core::FileFormat::Xlsb
