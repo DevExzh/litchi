@@ -17053,7 +17053,7 @@ fn verify_rtf_logical_tail_gates(
     }
 
     let mut stale_edit = source.edit();
-    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
+    stale_edit.replace_paragraph_text(Position::new(0), "litchi-perf-baseline-rtf-stale-source")?;
     let stale = stale_edit.commit()?.into_package();
     if !matches!(
         stale.apply_tail_append(changed.patch()),
@@ -26642,10 +26642,10 @@ fn stage_semantic_rtf_lifecycle(
     let mut edit = document.edit();
     match case {
         Case::RtfSemanticRemoveParagraphSave => {
-            edit.remove_paragraph(selected)?;
+            edit.remove_paragraph(Position::new(selected))?;
         },
         Case::RtfSemanticMoveParagraphSave => {
-            edit.move_paragraph(0, paragraph_count - 1)?;
+            edit.move_paragraph(Position::new(0), Position::new(paragraph_count - 1))?;
         },
         _ => return Err("non-lifecycle RTF case reached lifecycle staging".into()),
     }
@@ -26723,7 +26723,7 @@ fn verify_semantic_rtf_lifecycle_commit(
     }
 
     let mut stale_edit = source.edit();
-    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
+    stale_edit.replace_paragraph_text(Position::new(0), "litchi-perf-baseline-rtf-stale-source")?;
     let stale = stale_edit.commit()?.into_package();
     if !matches!(
         stale.apply_durable(&decoded),
@@ -26734,7 +26734,7 @@ fn verify_semantic_rtf_lifecycle_commit(
 
     if case == Case::RtfSemanticMoveParagraphSave {
         let mut noop = source.edit();
-        noop.move_paragraph(0, 0)?;
+        noop.move_paragraph(Position::new(0), Position::new(0))?;
         let noop = noop.commit()?;
         if noop.diagnostics().changed()
             || noop.diagnostics().operation_count() != 1
@@ -31996,7 +31996,7 @@ fn run_semantic_rtf(
         .iter()
         .map(|&position| {
             litchi_rtf::edit::ParagraphTextReplacement::new(
-                position,
+                Position::new(position),
                 semantic_rtf_variant_text(variant, position, true),
             )
         })
@@ -32019,7 +32019,7 @@ fn run_semantic_rtf(
             edit.replace_body_paragraph_texts(&replacements)?;
         } else {
             edit.replace_paragraph_text(
-                selected,
+                Position::new(selected),
                 semantic_rtf_variant_text(variant, selected, true),
             )?;
         }
@@ -32190,7 +32190,7 @@ fn run_semantic_rtf(
                     Case::RtfSemanticOneEditSave => {
                         let mut edit = document.edit();
                         edit.replace_paragraph_text(
-                            selected,
+                            Position::new(selected),
                             semantic_rtf_variant_text(variant, selected, true),
                         )?;
                         let commit = edit.commit()?;
@@ -32451,14 +32451,17 @@ fn stage_rtf_paragraph_split_merge(
     match case {
         Case::RtfSemanticSplitParagraphSave => {
             edit.split_paragraph(
-                expectation.selected_position,
+                Position::new(expectation.selected_position),
                 expectation
                     .split_offset
                     .ok_or("RTF split expectation has no offset")?,
             )?;
         },
         Case::RtfSemanticMergeParagraphSave => {
-            edit.merge_paragraphs(expectation.selected_position, expectation.adjacent_position)?;
+            edit.merge_paragraphs(
+                Position::new(expectation.selected_position),
+                Position::new(expectation.adjacent_position),
+            )?;
         },
         _ => return Err("non-split/merge case reached RTF staging".into()),
     }
@@ -32550,7 +32553,7 @@ fn verify_rtf_paragraph_split_merge_gates(
             )?)
             .is_err();
     let mut stale_edit = source.edit();
-    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-stale-source")?;
+    stale_edit.replace_paragraph_text(Position::new(0), "litchi-perf-baseline-rtf-stale-source")?;
     let stale = stale_edit.commit()?.into_package();
     let stale_source_refusal_verified = stale.apply_durable(&decoded).is_err();
     let foreign = litchi_rtf::Package::parse(r"{\rtf1\ansi Foreign\par Source}")?;
@@ -32575,14 +32578,14 @@ fn verify_rtf_paragraph_split_merge_gates(
                 .ok_or("RTF split target is missing for refusal gate")?;
             let mut edit = source.edit();
             matches!(
-                edit.split_paragraph(expectation.selected_position, text.len() + 1),
+                edit.split_paragraph(Position::new(expectation.selected_position), text.len() + 1),
                 Err(litchi_rtf::edit::Error::ParagraphSplitOffsetOutOfRange { .. })
             ) && edit.operation_count() == 0
         },
         Case::RtfSemanticMergeParagraphSave => {
             let mut edit = source.edit();
             matches!(
-                edit.merge_paragraphs(0, 2),
+                edit.merge_paragraphs(Position::new(0), Position::new(2)),
                 Err(litchi_rtf::edit::Error::ParagraphMergeNonAdjacent { .. })
             ) && edit.operation_count() == 0
         },
@@ -32597,7 +32600,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     let limit_refusal_verified = match case {
         Case::RtfSemanticSplitParagraphSave => matches!(
             limited.split_paragraph(
-                expectation.selected_position,
+                Position::new(expectation.selected_position),
                 expectation
                     .split_offset
                     .ok_or("RTF split expectation has no offset")?,
@@ -32608,7 +32611,10 @@ fn verify_rtf_paragraph_split_merge_gates(
             })
         ),
         Case::RtfSemanticMergeParagraphSave => matches!(
-            limited.merge_paragraphs(expectation.selected_position, expectation.adjacent_position,),
+            limited.merge_paragraphs(
+                Position::new(expectation.selected_position),
+                Position::new(expectation.adjacent_position),
+            ),
             Err(litchi_rtf::edit::Error::Limit {
                 kind: litchi_rtf::SemanticLimitKind::Operations,
                 ..
@@ -32619,8 +32625,14 @@ fn verify_rtf_paragraph_split_merge_gates(
     let unsafe_source =
         litchi_rtf::Package::parse(r"{\rtf1\ansi First{\b nested}Second\par Third}")?;
     let unsafe_refusal_verified = match case {
-        Case::RtfSemanticSplitParagraphSave => unsafe_source.edit().split_paragraph(0, 1).is_err(),
-        Case::RtfSemanticMergeParagraphSave => unsafe_source.edit().merge_paragraphs(0, 1).is_err(),
+        Case::RtfSemanticSplitParagraphSave => unsafe_source
+            .edit()
+            .split_paragraph(Position::new(0), 1)
+            .is_err(),
+        Case::RtfSemanticMergeParagraphSave => unsafe_source
+            .edit()
+            .merge_paragraphs(Position::new(0), Position::new(1))
+            .is_err(),
         _ => false,
     };
     let protected = litchi_rtf::Package::parse(
@@ -32629,7 +32641,7 @@ fn verify_rtf_paragraph_split_merge_gates(
     let protected_refusal_verified = match case {
         Case::RtfSemanticSplitParagraphSave => {
             let mut edit = protected.edit();
-            edit.split_paragraph(0, 1)?;
+            edit.split_paragraph(Position::new(0), 1)?;
             matches!(
                 edit.commit(),
                 Err(litchi_rtf::edit::Error::ProtectedDocument { .. })
@@ -32637,7 +32649,7 @@ fn verify_rtf_paragraph_split_merge_gates(
         },
         Case::RtfSemanticMergeParagraphSave => {
             let mut edit = protected.edit();
-            edit.merge_paragraphs(0, 1)?;
+            edit.merge_paragraphs(Position::new(0), Position::new(1))?;
             matches!(
                 edit.commit(),
                 Err(litchi_rtf::edit::Error::ProtectedDocument { .. })
@@ -32728,14 +32740,15 @@ fn run_rtf_paragraph_split_merge(
         let mut edit = source.edit();
         match case {
             Case::RtfSemanticSplitParagraphSave => edit.split_paragraph(
-                expectation.selected_position,
+                Position::new(expectation.selected_position),
                 expectation
                     .split_offset
                     .ok_or("RTF split expectation has no offset")?,
             )?,
-            Case::RtfSemanticMergeParagraphSave => {
-                edit.merge_paragraphs(expectation.selected_position, expectation.adjacent_position)?
-            },
+            Case::RtfSemanticMergeParagraphSave => edit.merge_paragraphs(
+                Position::new(expectation.selected_position),
+                Position::new(expectation.adjacent_position),
+            )?,
             _ => return Err("non-split/merge case reached RTF timed staging".into()),
         };
         let stage_duration = stage_started.elapsed();
@@ -33766,7 +33779,10 @@ fn verify_rtf_tail_publication_plan_gates(
     }
 
     let mut stale_edit = source.edit();
-    stale_edit.replace_paragraph_text(0, "litchi-perf-baseline-rtf-publication-stale")?;
+    stale_edit.replace_paragraph_text(
+        Position::new(0),
+        "litchi-perf-baseline-rtf-publication-stale",
+    )?;
     let stale = stale_edit.commit()?.into_package();
     let stale_context = rtf_tail_publication_context(
         u64::try_from(expected.len())?,
@@ -67516,7 +67532,9 @@ mod tests {
         }
 
         let mut noop = source.edit();
-        noop.move_paragraph(0, 0).unwrap();
+        noop
+            .move_paragraph(Position::new(0), Position::new(0))
+            .unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
         assert!(noop.package().same_snapshot(&source));
@@ -67529,7 +67547,7 @@ mod tests {
             let selected = document.paragraph_count() / 2;
 
             let mut remove = document.edit();
-            remove.remove_paragraph(selected).unwrap();
+            remove.remove_paragraph(Position::new(selected)).unwrap();
             assert!(matches!(
                 remove.commit(),
                 Err(litchi_rtf::edit::Error::UnsupportedSource(_))
@@ -67538,7 +67556,10 @@ mod tests {
 
             let mut reorder = document.edit();
             reorder
-                .move_paragraph(0, document.paragraph_count() - 1)
+                .move_paragraph(
+                    Position::new(0),
+                    Position::new(document.paragraph_count() - 1),
+                )
                 .unwrap();
             assert!(matches!(
                 reorder.commit(),
@@ -67547,7 +67568,9 @@ mod tests {
             assert_eq!(document.to_bytes().unwrap(), exact);
 
             let mut noop = document.edit();
-            noop.move_paragraph(0, 0).unwrap();
+            noop
+                .move_paragraph(Position::new(0), Position::new(0))
+                .unwrap();
             let noop = noop.commit().unwrap();
             assert!(!noop.diagnostics().changed());
             assert!(noop.package().same_snapshot(&document));
@@ -67559,14 +67582,16 @@ mod tests {
         let watermark = litchi_rtf::Package::from_bytes(&watermark.archive).unwrap();
         let exact = watermark.to_bytes().unwrap();
         let mut remove = watermark.edit();
-        remove.remove_paragraph(0).unwrap();
+        remove.remove_paragraph(Position::new(0)).unwrap();
         assert!(matches!(
             remove.commit(),
             Err(litchi_rtf::edit::Error::UnsupportedSource(_))
         ));
         assert_eq!(watermark.to_bytes().unwrap(), exact);
         let mut noop = watermark.edit();
-        noop.move_paragraph(0, 0).unwrap();
+        noop
+            .move_paragraph(Position::new(0), Position::new(0))
+            .unwrap();
         let noop = noop.commit().unwrap();
         assert!(!noop.diagnostics().changed());
         assert!(noop.package().same_snapshot(&watermark));
@@ -67582,10 +67607,12 @@ mod tests {
             let mut edit = opaque.edit();
             match case {
                 Case::RtfSemanticRemoveParagraphSave => {
-                    edit.remove_paragraph(1).unwrap();
+                    edit.remove_paragraph(Position::new(1)).unwrap();
                 },
                 Case::RtfSemanticMoveParagraphSave => {
-                    edit.move_paragraph(0, 2).unwrap();
+                    edit
+                        .move_paragraph(Position::new(0), Position::new(2))
+                        .unwrap();
                 },
                 _ => unreachable!(),
             }
@@ -67596,7 +67623,9 @@ mod tests {
             assert_eq!(opaque.to_bytes().unwrap(), exact);
         }
         let mut opaque_noop = opaque.edit();
-        opaque_noop.move_paragraph(0, 0).unwrap();
+        opaque_noop
+            .move_paragraph(Position::new(0), Position::new(0))
+            .unwrap();
         let opaque_noop = opaque_noop.commit().unwrap();
         assert!(!opaque_noop.diagnostics().changed());
         assert!(opaque_noop.package().same_snapshot(&opaque));
@@ -67809,13 +67838,13 @@ mod tests {
             .into_iter()
             .map(|position| {
                 litchi_rtf::edit::ParagraphTextReplacement::new(
-                    position,
+                    Position::new(position),
                     super::semantic_rtf_variant_text(RtfSemanticVariant::Plain, position, true),
                 )
             })
             .collect::<Vec<_>>();
         invalid.push(litchi_rtf::edit::ParagraphTextReplacement::new(
-            source.paragraph_count(),
+            Position::new(source.paragraph_count()),
             "out-of-range",
         ));
         let mut edit = source.edit();
@@ -67840,7 +67869,7 @@ mod tests {
             .into_iter()
             .map(|position| {
                 litchi_rtf::edit::ParagraphTextReplacement::new(
-                    position,
+                    Position::new(position),
                     super::semantic_rtf_variant_text(variant, position, true),
                 )
             })
