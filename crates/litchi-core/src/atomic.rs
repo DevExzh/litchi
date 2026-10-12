@@ -11,6 +11,7 @@ use std::fmt;
 use std::fs::{self, File, OpenOptions, Permissions};
 use std::io::{self, BufWriter, ErrorKind, Write};
 use std::path::{Path, PathBuf};
+use std::result::Result;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use crate::Durability;
@@ -77,16 +78,23 @@ impl From<io::Error> for Error {
 /// so a destination created during staging wins the race without being
 /// replaced.  Existing regular-file permissions are copied to the published
 /// artifact.
+///
+/// The pathname and temporary-identity checks are best-effort checks.  A
+/// caller must provide a trusted, private parent directory: portable pathname
+/// operations cannot close every race in a hostile shared directory.
+/// If identity capture fails after a staging path has been created, the save
+/// is refused before serialization and that unauthenticated path may remain
+/// for the caller to remove.
 pub fn save<T, E, Stage, Verify>(
     destination: &Path,
     durability: Durability,
     overwrite: Overwrite,
     stage: Stage,
     verify: Verify,
-) -> std::result::Result<T, E>
+) -> Result<T, E>
 where
-    Stage: FnOnce(&mut BufWriter<File>) -> std::result::Result<T, E>,
-    Verify: FnOnce() -> std::result::Result<(), E>,
+    Stage: FnOnce(&mut BufWriter<File>) -> Result<T, E>,
+    Verify: FnOnce() -> Result<(), E>,
     E: From<Error>,
 {
     let mut steps = SystemSteps;
@@ -136,7 +144,7 @@ enum PersistFailure {
     Committed(io::Error),
 }
 
-type PersistResult = std::result::Result<(), PersistFailure>;
+type PersistResult = Result<(), PersistFailure>;
 
 fn save_with_steps<T, E, S, Stage, Verify>(
     destination: &Path,
@@ -145,13 +153,14 @@ fn save_with_steps<T, E, S, Stage, Verify>(
     steps: &mut S,
     stage: Stage,
     verify: Verify,
-) -> std::result::Result<T, E>
+) -> Result<T, E>
 where
     S: PublishSteps + ?Sized,
-    Stage: FnOnce(&mut BufWriter<File>) -> std::result::Result<T, E>,
-    Verify: FnOnce() -> std::result::Result<(), E>,
+    Stage: FnOnce(&mut BufWriter<File>) -> Result<T, E>,
+    Verify: FnOnce() -> Result<(), E>,
     E: From<Error>,
 {
+    ensure_supported_platform::<E>()?;
     // This first check gives callers an early, deterministic refusal for a
     // directory or symbolic link and avoids creating a temporary pathname for
     // an unusable destination.
@@ -162,8 +171,11 @@ where
     let identity = match file_identity(&temporary_file) {
         Ok(identity) => identity,
         Err(source) => {
+            // The pathname cannot be authenticated when native identity
+            // capture fails.  Leave it behind rather than risking removal of
+            // a different file that took its place; callers should account
+            // for a possible orphaned staging pathname in this rare case.
             drop(temporary_file);
-            drop(fs::remove_file(&temporary_path));
             return Err(E::from(Error::Io(source)));
         },
     };
@@ -178,9 +190,10 @@ where
         .into_inner()
         .map_err(|error| E::from(Error::Io(error.into_error())))?;
 
-    // Re-read the destination after serialization.  This both closes the
-    // symlink/non-file substitution window and picks up the current mode when
-    // a pre-existing regular file was replaced while staging.
+    // Re-read the destination after serialization.  This detects an observed
+    // symlink/non-file substitution and picks up the current mode when a
+    // pre-existing regular file was replaced while staging.  The final check
+    // below is still required because `verify` runs after this one.
     let permissions =
         destination_permissions(destination).map_err(|source| E::from(Error::Io(source)))?;
     if let Some(permissions) = permissions {
@@ -198,6 +211,9 @@ where
     // can replace the destination.
     drop(file);
     ensure_temp_identity(cleanup.path(), identity).map_err(|source| E::from(Error::Io(source)))?;
+    // `verify` is caller-owned and may change the destination after the
+    // preceding check.  Revalidate immediately before publication.
+    let _ = destination_permissions(destination).map_err(|source| E::from(Error::Io(source)))?;
 
     let persist = match overwrite {
         Overwrite::Replace => steps.replace(cleanup.path(), destination),
@@ -217,6 +233,25 @@ where
             .map_err(|source| E::from(Error::Committed { source }))?;
     }
     Ok(staged)
+}
+
+#[cfg(any(unix, windows))]
+fn ensure_supported_platform<E>() -> Result<(), E>
+where
+    E: From<Error>,
+{
+    Ok(())
+}
+
+#[cfg(not(any(unix, windows)))]
+fn ensure_supported_platform<E>() -> Result<(), E>
+where
+    E: From<Error>,
+{
+    Err(E::from(Error::Io(io::Error::new(
+        ErrorKind::Unsupported,
+        "atomic filesystem publication requires a platform file identity",
+    ))))
 }
 
 fn parent_directory(path: &Path) -> &Path {
@@ -289,6 +324,8 @@ enum TempIdentity {
     Unix { device: u64, inode: u64 },
     #[cfg(windows)]
     Windows { volume: u32, index: u64 },
+    // `save_with_steps` refuses this target before creating a staging file;
+    // this fallback only keeps the private type total for compilation.
     #[cfg(not(any(unix, windows)))]
     Fallback { length: u64 },
 }
@@ -388,6 +425,9 @@ impl Drop for TemporaryCleanupGuard {
             return;
         }
         // Never unlink a pathname after another file has taken its place.
+        // This remains best-effort and therefore requires a trusted/private
+        // parent directory; a portable path check and unlink cannot close
+        // every hostile-directory race.
         if path_identity(&self.path).is_ok_and(|observed| observed == self.identity) {
             drop(fs::remove_file(&self.path));
         }
@@ -472,6 +512,7 @@ mod tests {
         parent_syncs: usize,
         fail_file_sync: bool,
         fail_parent_sync: bool,
+        fail_noclobber_cleanup: bool,
     }
 
     impl PublishSteps for CountingSteps {
@@ -492,7 +533,13 @@ mod tests {
         fn replace_noclobber(&mut self, temporary: &Path, destination: &Path) -> PersistResult {
             self.replacements += 1;
             fs::hard_link(temporary, destination).map_err(PersistFailure::Before)?;
-            fs::remove_file(temporary).map_err(PersistFailure::Committed)
+            if self.fail_noclobber_cleanup {
+                Err(PersistFailure::Committed(io::Error::other(
+                    "injected no-clobber cleanup failure",
+                )))
+            } else {
+                fs::remove_file(temporary).map_err(PersistFailure::Committed)
+            }
         }
 
         fn sync_parent(&mut self, parent: &Path) -> io::Result<()> {
@@ -512,7 +559,7 @@ mod tests {
         durability: Durability,
         overwrite: Overwrite,
         steps: &mut impl PublishSteps,
-    ) -> std::result::Result<usize, Error> {
+    ) -> Result<usize, Error> {
         let destination = directory.join(name);
         save_with_steps(
             &destination,
@@ -641,7 +688,7 @@ mod tests {
         fs::write(&destination, b"old").expect("seed destination");
         let temporary_prefix = ".document.rtf.litchi-atomic-";
 
-        let result: std::result::Result<(), Error> = save_with_steps(
+        let result: Result<(), Error> = save_with_steps(
             &destination,
             Durability::NoSync,
             Overwrite::Replace,
@@ -682,12 +729,58 @@ mod tests {
         assert_eq!(fs::read(substitute).unwrap(), b"substitute");
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn destination_symlink_substitution_is_refused_and_preserved() {
+        use std::os::unix::fs::symlink;
+
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("document.rtf");
+        let target = directory.path().join("attacker-target");
+        fs::write(&destination, b"old").expect("seed destination");
+        fs::write(&target, b"target").expect("seed target");
+        let mut steps = CountingSteps::default();
+
+        let result: Result<(), Error> = save_with_steps(
+            &destination,
+            Durability::NoSync,
+            Overwrite::Replace,
+            &mut steps,
+            |staging| {
+                staging.write_all(b"new")?;
+                Ok(())
+            },
+            || {
+                fs::remove_file(&destination).expect("remove original destination");
+                symlink(&target, &destination).expect("substitute destination symlink");
+                Ok(())
+            },
+        );
+
+        assert!(matches!(
+            result,
+            Err(Error::Io(source)) if source.kind() == ErrorKind::InvalidInput
+        ));
+        assert!(
+            fs::symlink_metadata(&destination)
+                .expect("substituted destination")
+                .file_type()
+                .is_symlink()
+        );
+        assert_eq!(fs::read_link(destination).unwrap(), target);
+        assert_eq!(
+            fs::read(directory.path().join("attacker-target")).unwrap(),
+            b"target"
+        );
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+
     #[test]
     fn no_clobber_closes_the_create_race_after_the_last_destination_check() {
         let directory = tempfile::tempdir().expect("temporary directory");
         let destination = directory.path().join("document.rtf");
         let mut steps = CountingSteps::default();
-        let result: std::result::Result<usize, Error> = save_with_steps(
+        let result: Result<usize, Error> = save_with_steps(
             &destination,
             Durability::NoSync,
             Overwrite::Refuse,
@@ -710,6 +803,37 @@ mod tests {
     }
 
     #[test]
+    fn no_clobber_cleanup_failure_reports_committed_and_keeps_destination() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let mut steps = CountingSteps {
+            fail_noclobber_cleanup: true,
+            ..CountingSteps::default()
+        };
+
+        let result = save_test_file(
+            directory.path(),
+            "document.rtf",
+            b"new",
+            Durability::NoSync,
+            Overwrite::Refuse,
+            &mut steps,
+        );
+
+        assert!(matches!(
+            result,
+            Err(Error::Committed { source })
+                if source.to_string().contains("injected no-clobber cleanup failure")
+        ));
+        assert_eq!(
+            fs::read(directory.path().join("document.rtf")).unwrap(),
+            b"new"
+        );
+        // The injected cleanup failure deliberately leaves the private
+        // staging pathname for its owner to inspect or clean up.
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 2);
+    }
+
+    #[test]
     fn error_keeps_the_caller_error_type() {
         #[derive(Debug, PartialEq, Eq)]
         enum CallerError {
@@ -726,7 +850,7 @@ mod tests {
 
         let directory = tempfile::tempdir().expect("temporary directory");
         let destination = directory.path().join("document.rtf");
-        let result: std::result::Result<(), CallerError> = save(
+        let result: Result<(), CallerError> = save(
             &destination,
             Durability::NoSync,
             Overwrite::Replace,
