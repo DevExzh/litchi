@@ -460,10 +460,61 @@ impl Package {
         self.inner.model.opaque_nodes()
     }
 
+    /// Atomically save this package with full durability.
+    ///
+    /// Returns the number of serialized bytes. A failure before replacement
+    /// leaves the destination untouched; a committed error means replacement
+    /// succeeded but subsequent durability work failed.
+    ///
+    /// # Errors
+    /// Returns typed publication or serialization errors.
+    pub fn save(&self, path: impl AsRef<Path>) -> Result<u64, crate::save::Error> {
+        self.save_with_options(path, crate::save::Options::new())
+    }
+
+    /// Atomically save with explicit per-call durability.
+    ///
+    /// # Errors
+    /// Returns the same typed failures as [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<Path>,
+        durability: litchi_core::Durability,
+    ) -> Result<u64, crate::save::Error> {
+        self.save_with_options(path, crate::save::Options::new().durability(durability))
+    }
+
+    /// Atomically save with explicit durability and overwrite policies.
+    ///
+    /// Symbolic-link and non-file destinations are refused. The complete
+    /// serialized artifact is staged in a sibling temporary file before
+    /// publication. An immutable package's stored opening policy is unchanged.
+    ///
+    /// # Errors
+    /// Returns typed publication or serialization errors. A committed failure
+    /// must not be retried as though the destination were unchanged.
+    pub fn save_with_options(
+        &self,
+        path: impl AsRef<Path>,
+        options: crate::save::Options,
+    ) -> Result<u64, crate::save::Error> {
+        litchi_core::atomic::save(
+            path.as_ref(),
+            options.durability_value(),
+            options.overwrite_value(),
+            |sink| {
+                self.write_to(&mut *sink)?;
+                use std::io::Seek;
+                Ok(sink.stream_position()?)
+            },
+            || Ok(()),
+        )
+    }
+
     /// Serialize this snapshot to a sequential sink.
     ///
     /// A sink failure can leave caller-owned output incomplete. Filesystem
-    /// replacement is intentionally left to an atomic save facade.
+    /// replacement is provided by [`Self::save`].
     ///
     /// # Errors
     /// Returns an error when writing to the underlying output fails.

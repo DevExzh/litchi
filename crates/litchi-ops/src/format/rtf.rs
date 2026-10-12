@@ -4,6 +4,7 @@
 //! borrow its advanced read-only model; unified editing can use the same owner.
 
 use std::fmt;
+use std::path::Path;
 use std::sync::Arc;
 
 use litchi_core::Metadata;
@@ -16,7 +17,9 @@ use crate::{OpenOptions, Result};
 #[derive(Clone)]
 pub struct Rtf(Arc<RtfState>);
 
+#[derive(Clone)]
 struct RtfState {
+    origin: Option<Arc<Path>>,
     /// The native immutable owner, including retained open policies.
     package: Package,
 }
@@ -28,6 +31,36 @@ const _: () = {
 };
 
 impl Rtf {
+    pub(crate) fn with_origin(mut self, origin: Option<Arc<Path>>) -> Self {
+        Arc::make_mut(&mut self.0).origin = origin;
+        self
+    }
+
+    pub(crate) fn origin(&self) -> Option<&Arc<Path>> {
+        self.0.origin.as_ref()
+    }
+
+    pub(crate) fn write_to(&self, sink: impl std::io::Write) -> Result<()> {
+        self.0
+            .package
+            .write_to(sink)
+            .map_err(|error| crate::Error::from(error).with_format(litchi_core::FileFormat::Rtf))
+    }
+
+    pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
+        let overwrite = match options.overwrite {
+            crate::Overwrite::Replace => litchi_rtf::save::Overwrite::Replace,
+            crate::Overwrite::Refuse => litchi_rtf::save::Overwrite::Refuse,
+        };
+        let policy = litchi_rtf::save::Options::new()
+            .durability(options.durability)
+            .overwrite(overwrite);
+        self.0
+            .package
+            .save_with_options(path, policy)
+            .map_err(|error| crate::Error::from(error).with_format(litchi_core::FileFormat::Rtf))
+    }
+
     /// Adopt a fresh native package without a detector or serialization round trip.
     pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
         use crate::{Code, Conformance, Error, Flavor};
@@ -46,7 +79,10 @@ impl Rtf {
                 .with_suggestion("use default CreateOptions for an ordinary empty RTF document"));
         }
         let package = Package::new()?;
-        Ok(Self(Arc::new(RtfState { package })))
+        Ok(Self(Arc::new(RtfState {
+            package,
+            origin: None,
+        })))
     }
 
     /// Parses the RTF bytes detection retained (`DetectedFormat::Rtf`): plain,
@@ -58,7 +94,10 @@ impl Rtf {
     pub(crate) fn from_bytes(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
         let package =
             Package::from_owned_bytes_with_options(bytes, options.rtf_options.unwrap_or_default())?;
-        Ok(Self(Arc::new(RtfState { package })))
+        Ok(Self(Arc::new(RtfState {
+            package,
+            origin: None,
+        })))
     }
 
     /// The document's plain text.

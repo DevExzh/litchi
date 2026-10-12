@@ -7,7 +7,8 @@
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
-    feature = "xls"
+    feature = "xls",
+    feature = "rtf"
 ))]
 use std::io;
 use std::io::Write;
@@ -348,7 +349,8 @@ impl File {
             feature = "xlsx",
             feature = "pptx",
             feature = "xlsb",
-            feature = "xls"
+            feature = "xls",
+            feature = "rtf"
         )),
         allow(
             clippy::only_used_in_recursion,
@@ -357,6 +359,12 @@ impl File {
     )]
     pub fn write_to<W: Write>(&self, sink: W) -> Result<u64> {
         match self {
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
             #[cfg(feature = "xls")]
             Self::Xls(handle) => {
                 let mut counted = Counted { sink, bytes: 0 };
@@ -436,7 +444,8 @@ fn pending(file: &File, operation: &str) -> Error {
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
-    feature = "xls"
+    feature = "xls",
+    feature = "rtf"
 ))]
 pub(crate) struct Counted<W> {
     pub(crate) sink: W,
@@ -450,7 +459,8 @@ pub(crate) struct Counted<W> {
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
-    feature = "xls"
+    feature = "xls",
+    feature = "rtf"
 ))]
 impl<W: Write> Write for Counted<W> {
     fn write(&mut self, bytes: &[u8]) -> io::Result<usize> {

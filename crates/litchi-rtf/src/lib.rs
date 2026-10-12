@@ -492,3 +492,6 @@ pub(crate) use native::*;
 #[cfg(not(doc))]
 #[doc(hidden)]
 pub use native::*;
+
+/// Atomic filesystem publication policy.
+pub mod save;

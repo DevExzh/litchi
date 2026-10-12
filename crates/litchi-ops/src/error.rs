@@ -292,6 +292,8 @@ impl fmt::Display for Code {
 /// [`Source::Core`].
 #[non_exhaustive]
 pub enum Source {
+    /// A format-neutral atomic publication failure.
+    Publication(litchi_core::atomic::Error),
     /// The error was raised by the unified layer itself.
     None,
     /// A bounded batch JSON ingress error.
@@ -402,6 +404,7 @@ impl Source {
     /// The leaf error as a standard error, or `None` for [`Source::None`].
     fn as_error(&self) -> Option<&(dyn std::error::Error + 'static)> {
         match self {
+            Self::Publication(error) => Some(error),
             Self::None => None,
             Self::Batch(error) => Some(error),
             Self::Transaction(error) => Some(error),
@@ -1852,3 +1855,14 @@ from_leaf!(#[cfg(feature = "formula")] litchi_formula::FormulaError => Formula, 
 
 #[cfg(test)]
 mod tests;
+
+impl Classify for litchi_core::atomic::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Io(error) => error.classify(),
+            Self::Committed { .. } => Class::of(Code::InternalError),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+from_leaf!(litchi_core::atomic::Error => Publication, None);

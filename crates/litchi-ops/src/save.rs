@@ -238,7 +238,8 @@ impl File {
             feature = "xlsx",
             feature = "pptx",
             feature = "xls",
-            feature = "xlsb"
+            feature = "xlsb",
+            feature = "rtf"
         )))]
         {
             let _ = (to, options);
@@ -255,7 +256,8 @@ impl File {
             feature = "xlsx",
             feature = "pptx",
             feature = "xls",
-            feature = "xlsb"
+            feature = "xlsb",
+            feature = "rtf"
         ))]
         {
             // Validate the handle state before looking at caller-supplied path
@@ -265,6 +267,8 @@ impl File {
                 Self::Locked(locked) => return Err(locked.read_error()),
                 #[cfg(feature = "doc")]
                 Self::Doc(_) => {},
+                #[cfg(feature = "rtf")]
+                Self::Rtf(_) => {},
                 #[cfg(feature = "xls")]
                 Self::Xls(_) => {},
                 #[cfg(feature = "docx")]
@@ -295,6 +299,8 @@ impl File {
             let bytes = match self {
                 #[cfg(feature = "doc")]
                 Self::Doc(handle) => save_doc(handle, &destination, options)?,
+                #[cfg(feature = "rtf")]
+                Self::Rtf(handle) => handle.save_to(&destination, options)?,
                 #[cfg(feature = "xls")]
                 Self::Xls(handle) => save_xls(handle, &destination, options)?,
                 #[cfg(feature = "docx")]
@@ -326,9 +332,17 @@ impl File {
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
-    feature = "xlsb"
+    feature = "xlsb",
+    feature = "rtf"
 ))]
 fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
+    #[cfg(feature = "rtf")]
+    if let File::Rtf(handle) = file {
+        return handle
+            .origin()
+            .map(|origin| origin.as_ref().to_path_buf())
+            .ok_or_else(|| file_required(format));
+    }
     #[cfg(feature = "xls")]
     if let File::Xls(handle) = file {
         return handle
@@ -389,7 +403,8 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
-    feature = "xlsb"
+    feature = "xlsb",
+    feature = "rtf"
 ))]
 fn file_required(format: Option<FileFormat>) -> Error {
     let error = Error::new(
@@ -579,7 +594,8 @@ fn validate_xls_destination(destination: &Path) -> Result<()> {
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
-    feature = "xlsb"
+    feature = "xlsb",
+    feature = "rtf"
 ))]
 fn same_format(path: &Path, format: FileFormat) -> Result<()> {
     let Some(extension) = path.extension().and_then(|extension| extension.to_str()) else {
@@ -605,7 +621,8 @@ fn same_format(path: &Path, format: FileFormat) -> Result<()> {
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
-    feature = "xlsb"
+    feature = "xlsb",
+    feature = "rtf"
 ))]
 fn format_of_extension(extension: &str) -> Option<FileFormat> {
     const EXTENSIONS: &[(&str, FileFormat)] = &[

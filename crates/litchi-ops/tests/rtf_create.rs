@@ -15,9 +15,9 @@ fn fresh_rtf_adopts_native_empty_owner() {
             .verb(Verb::Create)
             .is_supported()
     );
-    // Filesystem publication and the element-level CRUD adapter are separate work.
+    // Publication is supported independently of the element-level CRUD adapter.
     assert!(
-        !Capabilities::of(FileFormat::Rtf)
+        Capabilities::of(FileFormat::Rtf)
             .verb(Verb::Save)
             .is_supported()
     );

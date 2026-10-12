@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0226 | [RTF atomic publication](0226-rtf-atomic-publication.md) | Format-neutral atomic publisher, native RTF save policies and unified save/origin/stream dispatch; core/native/full facade suites pass; RTF CRUD, semantic profiles and full goal remain open |
 | 0225 | [Native RTF Builder and unified creation](0225-rtf-builder.md) | Checked plain-text Builder returns Package; unified creation adopts native owner with explicit option gaps; 1,441 native and 1,613 facade tests/doctests pass; atomic save, unified CRUD and full goal remain open |
 | 0224 | [RTF primary transaction contract](0224-rtf-primary-contract.md) | Canonical commit parts, Package::apply and exact no-op introspection; replay preserves recipient policy and identity; 1,430 native and 1,610 facade tests/doctests pass; finite semantic profiles, construction/save, unified CRUD and full goal remain open |
 | 0223 | [Immutable RTF package and projection](0223-rtf-owner.md) | Concrete Package owns lifecycle; shared read-only Document and no edit::Snapshot alias; facade retains package; 1,427 native and 1,610 facade tests/doctests plus consumer/lint/docs/glossary checks pass; primary vocabulary, creation/save, unified CRUD and full goal remain open |

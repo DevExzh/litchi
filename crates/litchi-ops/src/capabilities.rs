@@ -816,6 +816,9 @@ impl Capabilities {
 
     /// Whether this report's format has an integrated publisher.
     fn publication_support(&self) -> Support {
+        if self.format == Some(FileFormat::Rtf) && cfg!(feature = "rtf") {
+            return Support::Supported;
+        }
         #[cfg(feature = "ppt")]
         if self.format == Some(FileFormat::Ppt) {
             if self.retains_source == Some(false) {

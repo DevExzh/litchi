@@ -195,7 +195,7 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Xlsx && cfg!(feature = "xlsx"))
                 || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
                 || (format == FileFormat::Xlsb && cfg!(feature = "xlsb"))
-                || (format == FileFormat::Rtf && cfg!(feature = "rtf") && verb == Verb::Create);
+                || (format == FileFormat::Rtf && cfg!(feature = "rtf"));
             let expected = if integrated {
                 Support::Supported
             } else if get.is_supported() {

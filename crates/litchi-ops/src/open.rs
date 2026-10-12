@@ -375,10 +375,13 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
     feature = "xlsx",
     feature = "pptx",
     feature = "xls",
-    feature = "xlsb"
+    feature = "xlsb",
+    feature = "rtf"
 ))]
 pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
     match file {
+        #[cfg(feature = "rtf")]
+        File::Rtf(rtf) => File::Rtf(rtf.with_origin(Some(origin))),
         #[cfg(feature = "doc")]
         File::Doc(doc) => File::Doc(doc.with_origin(Some(origin))),
         #[cfg(feature = "xls")]
@@ -393,12 +396,30 @@ pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
         File::Xlsb(xlsb) => File::Xlsb(xlsb.with_origin(Some(origin))),
         #[cfg(feature = "pptx")]
         File::Pptx(pptx) => File::Pptx(pptx.with_origin(Some(origin))),
+        #[cfg(any(
+            feature = "doc",
+            feature = "docx",
+            feature = "ppt",
+            feature = "xlsx",
+            feature = "pptx",
+            feature = "xls",
+            feature = "xlsb"
+        ))]
         File::Signed(signed) => {
             let format = signed.format();
             let signature_origin = signed.origin();
             let file = attach_origin(signed.unsign(), origin);
             File::Signed(crate::Signed::new(file, format, signature_origin))
         },
+        #[cfg(any(
+            feature = "doc",
+            feature = "docx",
+            feature = "ppt",
+            feature = "xlsx",
+            feature = "pptx",
+            feature = "xls",
+            feature = "xlsb"
+        ))]
         File::Locked(locked) => File::Locked(locked.with_origin(Some(origin))),
         #[allow(unreachable_patterns)]
         other => other,

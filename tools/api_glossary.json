@@ -2906,6 +2906,36 @@
           "scope": "litchi_rtf::builder::Builder",
           "replacement": "build returns Package; publication belongs to Package",
           "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "publication belongs to Package",
+          "recursive": false
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "publication belongs to Package",
+          "recursive": false
+        },
+        {
+          "name": "save_with_options",
+          "scope": "litchi_rtf::read::Document",
+          "replacement": "publication belongs to Package",
+          "recursive": false
+        },
+        {
+          "name": "save_with_durability",
+          "scope": "litchi_rtf::builder::Builder",
+          "replacement": "publication belongs to Package",
+          "recursive": false
+        },
+        {
+          "name": "save_with_options",
+          "scope": "litchi_rtf::builder::Builder",
+          "replacement": "publication belongs to Package",
+          "recursive": false
         }
       ],
       "families": []

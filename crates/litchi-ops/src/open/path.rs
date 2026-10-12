@@ -11,6 +11,7 @@ use std::path::Path;
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "rtf",
     feature = "xlsb",
     all(
         any(unix, windows),
@@ -37,6 +38,7 @@ use crate::{File, OpenOptions};
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "rtf",
     feature = "xlsb",
     all(
         any(unix, windows),
@@ -117,7 +119,8 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "xlsx",
             feature = "pptx",
             feature = "xls",
-            feature = "xlsb"
+            feature = "xlsb",
+            feature = "rtf"
         ))]
         let file = if matches!(
             file.format(),
@@ -128,6 +131,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                     | litchi_core::FileFormat::Ppt
                     | litchi_core::FileFormat::Xlsx
                     | litchi_core::FileFormat::Pptx
+                    | litchi_core::FileFormat::Rtf
                     | litchi_core::FileFormat::Xlsb
             )
         ) || matches!(&file, File::Locked(_))
@@ -218,7 +222,8 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "xlsx",
         feature = "pptx",
         feature = "xls",
-        feature = "xlsb"
+        feature = "xlsb",
+        feature = "rtf"
     ))]
     let opened = if matches!(
         opened.format(),
@@ -229,6 +234,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                 | litchi_core::FileFormat::Ppt
                 | litchi_core::FileFormat::Xlsx
                 | litchi_core::FileFormat::Pptx
+                | litchi_core::FileFormat::Rtf
                 | litchi_core::FileFormat::Xlsb
         )
     ) || matches!(&opened, File::Locked(_))
