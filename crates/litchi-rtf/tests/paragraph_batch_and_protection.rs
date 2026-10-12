@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Document, HeaderFooterType, ProtectionType,
+    Document, HeaderFooterType, OpenOptions, ProtectionType, SourceLimits,
     edit::{
         Error, HeaderFooterParagraph, Limits, ParagraphTextReplacement, TextSpan, TransferPlan,
     },
@@ -129,8 +129,16 @@ fn paragraph_batch_preflights_operation_and_replacement_limits_atomically() {
     ));
     assert_eq!(existing.operation_count(), 1);
 
-    let limited = litchi_rtf::read::Limits::new().with_max_source_bytes(64);
-    let limited_source = Document::parse_with_limits(r"{\rtf1 A\par B}", limited).unwrap();
+    let limited = SourceLimits::builder()
+        .max_input_bytes(64)
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    let limited_source = Document::parse_with_options(
+        r"{\rtf1 A\par B}",
+        OpenOptions::new().source_limits(limited),
+    )
+    .unwrap();
     let mut oversized = limited_source.edit();
     assert!(matches!(
         oversized.replace_body_paragraph_texts(&replacements(&[(0, &"x".repeat(65))])),

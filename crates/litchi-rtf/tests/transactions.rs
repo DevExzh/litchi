@@ -5,7 +5,8 @@
 )]
 
 use litchi_rtf::{
-    Alignment, CharacterBaseline, Document, HeaderFooterType, TableCellPath, UnderlineStyle,
+    Alignment, CharacterBaseline, Document, HeaderFooterType, OpenOptions, SourceLimits,
+    TableCellPath, UnderlineStyle,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, HeaderFooterParagraph, History,
         HistoryLimits, Limits, MergePlan, MergeResolution, TextSpan, TransferPlan,
@@ -257,9 +258,14 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
 #[test]
 fn ordinary_positioning_publication_respects_source_limit_atomically() {
     let source_bytes = br"{\rtf1\ansi First}";
-    let source = Document::from_bytes_with_limits(
+    let source_limits = SourceLimits::builder()
+        .max_input_bytes(source_bytes.len())
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    let source = Document::from_bytes_with_options(
         source_bytes,
-        litchi_rtf::read::Limits::new().with_max_source_bytes(source_bytes.len()),
+        OpenOptions::new().source_limits(source_limits),
     )
     .unwrap();
     let before = source.to_bytes().unwrap();

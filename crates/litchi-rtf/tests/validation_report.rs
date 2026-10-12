@@ -5,8 +5,8 @@
 )]
 
 use litchi_rtf::{
-    Document, ValidationDependency, ValidationStatus,
-    validation::{ValidationReport, validate_with_limits},
+    Document, OpenOptions, SourceLimits, ValidationDependency, ValidationStatus,
+    validation::{ValidationReport, validate_with_options},
 };
 
 const CLEAN: &str = r#"{\rtf1\ansi Clean text\par}"#;
@@ -176,22 +176,27 @@ fn mail_merge_fields_are_external_and_active_even_with_cached_results() {
 
 #[test]
 fn destination_binary_limits_reject_one_over_before_arena_copy() {
-    let limits = litchi_rtf::read::Limits::default()
-        .with_max_binary_bytes(3)
-        .with_max_total_binary_bytes(3);
+    let limits = SourceLimits::builder()
+        .max_binary_bytes(3)
+        .expect("binary limit is representable")
+        .max_aggregate_binary_bytes(3)
+        .expect("aggregate binary limit is representable")
+        .build()
+        .expect("binary profile is consistent");
+    let options = OpenOptions::new().source_limits(limits);
     let picture = br#"{\rtf1{\pict\pngblip\bin3 abc}}"#;
-    let picture_report = ValidationReport::from_bytes_with_limits(picture, limits).unwrap();
+    let picture_report = ValidationReport::from_bytes_with_options(picture, options).unwrap();
     assert_eq!(picture_report.counts().pictures(), 1);
 
     let over_picture = br#"{\rtf1{\pict\pngblip\bin4 abcd}}"#;
-    assert!(ValidationReport::from_bytes_with_limits(over_picture, limits).is_err());
+    assert!(ValidationReport::from_bytes_with_options(over_picture, options).is_err());
 
     let object = br#"{\rtf1{\object\objemb{\*\objdata\bin3 abc}}}"#;
-    let object_report = ValidationReport::from_bytes_with_limits(object, limits).unwrap();
+    let object_report = ValidationReport::from_bytes_with_options(object, options).unwrap();
     assert_eq!(object_report.counts().objects(), 1);
 
     let over_object = br#"{\rtf1{\object\objemb{\*\objdata\bin4 abcd}}}"#;
-    assert!(ValidationReport::from_bytes_with_limits(over_object, limits).is_err());
+    assert!(ValidationReport::from_bytes_with_options(over_object, options).is_err());
 }
 
 #[test]
@@ -329,15 +334,24 @@ fn malformed_root_and_finite_limits_are_errors_not_safe_reports() {
     assert!(ValidationReport::from_str(r#"{\rtf1 text}{\rtf1 second}"#).is_ok());
     assert!(ValidationReport::from_str("{\\rtf1 text} \t\r\n").is_ok());
 
-    let limits = litchi_rtf::read::Limits::default().with_max_source_bytes(CLEAN.len() - 1);
-    assert!(validate_with_limits(raw_bytes(CLEAN), limits).is_err());
+    let limits = SourceLimits::builder()
+        .max_input_bytes(CLEAN.len() - 1)
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    assert!(
+        validate_with_options(raw_bytes(CLEAN), OpenOptions::new().source_limits(limits)).is_err()
+    );
 
-    let report = ValidationReport::from_str_with_limits(
-        CLEAN,
-        litchi_rtf::read::Limits::default().with_max_source_bytes(CLEAN.len()),
-    )
-    .unwrap();
-    assert_eq!(report.limits().max_source_bytes(), CLEAN.len());
+    let exact = SourceLimits::builder()
+        .max_input_bytes(CLEAN.len())
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    let report =
+        ValidationReport::from_str_with_options(CLEAN, OpenOptions::new().source_limits(exact))
+            .unwrap();
+    assert_eq!(report.limits().max_input_bytes(), CLEAN.len());
     assert_eq!(report.limits().max_group_depth(), 32);
 }
 

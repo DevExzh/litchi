@@ -5,10 +5,10 @@
 )]
 
 use litchi_rtf::{
-    Alignment, CharacterBaseline, Document, MAX_PARAGRAPH_FRAME_TWIPS, ParagraphFrame,
+    Alignment, CharacterBaseline, Document, MAX_PARAGRAPH_FRAME_TWIPS, OpenOptions, ParagraphFrame,
     ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference, ParagraphFrameTextFlow,
     ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference, ParagraphFrameWrap,
-    ProtectionType, RtfDocument,
+    ProtectionType, RtfDocument, SourceLimits,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, Limits, ParagraphLayoutPatch,
         ParagraphLayoutUpdate, TextSpan,
@@ -730,8 +730,14 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     ));
 
     let source_text = r"{\rtf1 A}";
-    let limits = litchi_rtf::read::Limits::new().with_max_source_bytes(source_text.len());
-    let bounded = Document::parse_with_limits(source_text, limits).unwrap();
+    let limits = SourceLimits::builder()
+        .max_input_bytes(source_text.len())
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    let bounded =
+        Document::parse_with_options(source_text, OpenOptions::new().source_limits(limits))
+            .unwrap();
     let exact = bounded.to_bytes().unwrap();
     let mut edit = bounded.edit();
     edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))

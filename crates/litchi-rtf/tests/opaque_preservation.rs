@@ -9,7 +9,8 @@
 
 use litchi_rtf::opaque::{Anchor, Context, Kind};
 use litchi_rtf::{
-    DefaultTabWidthPolicy, Document, ParseLimits, RtfDocument, RtfError, RtfWriter, WriterOptions,
+    DefaultTabWidthPolicy, Document, OpenOptions, RtfDocument, RtfError, RtfWriter,
+    SourceLimitKind, SourceLimits, WriterOptions,
 };
 use std::io::{self, Write};
 
@@ -62,36 +63,54 @@ fn canonical_writer_reinserts_inert_nodes_at_their_body_anchor() {
 #[test]
 fn opaque_limits_are_typed_and_exact() {
     let control = r"{\rtf1\future1 x}";
-    let limits = ParseLimits::default().with_max_opaque_nodes(0);
+    let limits = SourceLimits::builder()
+        .max_opaque_nodes(0)
+        .expect("zero is a supported explicit denial")
+        .build()
+        .expect("opaque-node profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_with_limits(control, limits),
-        Err(RtfError::LimitExceeded {
-            resource: "opaque nodes",
+        RtfDocument::parse_with_options(control, OpenOptions::new().source_limits(limits)),
+        Err(RtfError::Limit {
+            kind: SourceLimitKind::OpaqueNodes,
             observed: 1,
-            limit: 0,
+            maximum: 0,
         })
     ));
 
     let destination = r"{\rtf1{\*\vendor 1234}x}";
     let node_bytes = r"{\*\vendor 1234}".len();
-    let limits = ParseLimits::default().with_max_opaque_node_bytes(node_bytes - 1);
+    let limits = SourceLimits::builder()
+        .max_opaque_node_bytes(node_bytes - 1)
+        .expect("opaque-node byte limit is representable")
+        .build()
+        .expect("opaque-node byte profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_with_limits(destination, limits),
-        Err(RtfError::LimitExceeded {
-            resource: "opaque node bytes",
+        RtfDocument::parse_with_options(
+            destination,
+            OpenOptions::new().source_limits(limits)
+        ),
+        Err(RtfError::Limit {
+            kind: SourceLimitKind::OpaqueNodeBytes,
             observed,
-            limit,
-        }) if observed == node_bytes && limit == node_bytes - 1
+            maximum,
+        }) if observed == node_bytes && maximum == node_bytes - 1
     ));
 
-    let limits = ParseLimits::default().with_max_total_opaque_bytes(node_bytes - 1);
+    let limits = SourceLimits::builder()
+        .max_aggregate_opaque_bytes(node_bytes - 1)
+        .expect("aggregate opaque-byte limit is representable")
+        .build()
+        .expect("aggregate opaque-byte profile is consistent");
     assert!(matches!(
-        RtfDocument::parse_with_limits(destination, limits),
-        Err(RtfError::LimitExceeded {
-            resource: "opaque bytes",
+        RtfDocument::parse_with_options(
+            destination,
+            OpenOptions::new().source_limits(limits)
+        ),
+        Err(RtfError::Limit {
+            kind: SourceLimitKind::AggregateOpaqueBytes,
             observed,
-            limit,
-        }) if observed == node_bytes && limit == node_bytes - 1
+            maximum,
+        }) if observed == node_bytes && maximum == node_bytes - 1
     ));
 }
 

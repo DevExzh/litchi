@@ -8,7 +8,7 @@
 )]
 
 use litchi_rtf::write::Writer;
-use litchi_rtf::{Document, read};
+use litchi_rtf::{Document, OpenOptions, SourceLimits};
 use litchi_rtf::{text, text::Inline};
 use std::io::{self, Write};
 
@@ -74,8 +74,18 @@ fn document_is_a_small_shared_snapshot() {
 
 #[test]
 fn contextual_reader_uses_checked_limits() {
-    let limits = read::Limits::new().with_max_source_bytes(8);
-    assert!(Document::parse_with_limits(r"{\rtf1 too large}", limits).is_err());
+    let limits = SourceLimits::builder()
+        .max_input_bytes(8)
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    assert!(
+        Document::parse_with_options(
+            r"{\rtf1 too large}",
+            OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
+    );
 }
 
 #[test]

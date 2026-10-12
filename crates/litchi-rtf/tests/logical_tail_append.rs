@@ -13,7 +13,7 @@ use litchi_rtf::tail_append::{
     TailAppendOutputProgress, TailAppendPublicationError, TailAppendPublicationLimits,
     TailSelector,
 };
-use litchi_rtf::{Document, ParseLimits, ProtectionType};
+use litchi_rtf::{Document, OpenOptions, ProtectionType, SourceLimits};
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 
@@ -422,9 +422,14 @@ fn durable_append_checks_source_limit_before_reserve() {
     let commit = edit.commit().unwrap();
     let durable = commit.patch().to_durable(patch_limits()).unwrap();
     let encoded = durable.to_deterministic_json().unwrap();
-    let strict_source = Document::from_bytes_with_limits(
+    let strict_limits = SourceLimits::builder()
+        .max_input_bytes(source_bytes.len())
+        .expect("source-byte limit is representable")
+        .build()
+        .expect("source profile is consistent");
+    let strict_source = Document::from_bytes_with_options(
         source_bytes,
-        ParseLimits::default().with_max_source_bytes(source_bytes.len()),
+        OpenOptions::new().source_limits(strict_limits),
     )
     .unwrap();
     let decoded =

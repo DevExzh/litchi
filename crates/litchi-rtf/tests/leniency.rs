@@ -12,8 +12,7 @@ use litchi_rtf::leniency::{
     Defect, FontDefect, Leniency, ParameterDefect, SyntaxDefect, ToleranceReport, ToleratedDefect,
     UnicodeDefect,
 };
-use litchi_rtf::read::{Limits, Options};
-use litchi_rtf::{Document, EmphasisMark, RtfDocument, compress};
+use litchi_rtf::{Document, EmphasisMark, OpenOptions, RtfDocument, SourceLimits, compress};
 
 /// A conformant document touching the main destinations.
 const CONFORMANT: &str = concat!(
@@ -36,9 +35,9 @@ fn assert_clean(report: &ToleranceReport) {
 
 #[test]
 fn conformant_input_reports_clean_through_every_entry_point() {
-    let strict = Options::new();
-    assert_eq!(strict, Options::default());
-    assert_eq!(strict.leniency(), Leniency::Strict);
+    let strict = OpenOptions::new();
+    assert_eq!(strict, OpenOptions::default());
+    assert_eq!(strict.leniency_value(), Leniency::Strict);
 
     let document = Document::parse(CONFORMANT).unwrap();
     assert_clean(document.tolerance_report());
@@ -71,9 +70,13 @@ fn conformant_non_ascii_transport_reports_clean() {
 
 #[test]
 fn options_carry_limits_into_the_parse() {
-    let limits = Limits::default().with_max_tokens(2);
-    let options = Options::new().with_limits(limits);
-    assert_eq!(options.limits(), limits);
+    let limits = SourceLimits::builder()
+        .max_events(2)
+        .expect("event limit is representable")
+        .build()
+        .expect("event profile is consistent");
+    let options = OpenOptions::new().source_limits(limits);
+    assert_eq!(options.source_limits_value(), limits);
     assert!(Document::parse_with_options(CONFORMANT, options).is_err());
 }
 
@@ -84,7 +87,7 @@ fn opening_a_file_with_options_reports_clean() {
     std::fs::create_dir_all(&directory).unwrap();
     let path = directory.join("conformant.rtf");
     std::fs::write(&path, CONFORMANT).unwrap();
-    let document = Document::open_with_options(&path, Options::new()).unwrap();
+    let document = Document::open_with_options(&path, OpenOptions::new()).unwrap();
     assert_clean(document.tolerance_report());
     std::fs::remove_dir_all(&directory).unwrap();
 }
@@ -319,7 +322,7 @@ fn unclosed_groups_are_rejected_by_default() {
     ] {
         assert!(Document::parse(source).is_err(), "accepted {source}");
         assert!(
-            Document::parse_with_options(source, Options::new().with_leniency(Leniency::Strict))
+            Document::parse_with_options(source, OpenOptions::new().leniency(Leniency::Strict))
                 .is_err()
         );
     }
@@ -327,8 +330,8 @@ fn unclosed_groups_are_rejected_by_default() {
 
 #[test]
 fn unclosed_groups_are_closed_and_recorded_under_the_opt_in() {
-    let options = Options::new().with_leniency(Leniency::TolerateUnclosedGroups);
-    assert!(options.leniency().tolerates_unclosed_groups());
+    let options = OpenOptions::new().leniency(Leniency::TolerateUnclosedGroups);
+    assert!(options.leniency_value().tolerates_unclosed_groups());
 
     let source = r"{\rtf1\ansi{\fonttbl{\f0 Arial;}}\pard plain {\b bold";
     let document = Document::parse_with_options(source, options).unwrap();
@@ -348,7 +351,7 @@ fn unclosed_groups_are_closed_and_recorded_under_the_opt_in() {
 
 #[test]
 fn the_opt_in_keeps_truncated_tokens_and_nesting_limits_fatal() {
-    let options = Options::new().with_leniency(Leniency::TolerateUnclosedGroups);
+    let options = OpenOptions::new().leniency(Leniency::TolerateUnclosedGroups);
     // A control word cut off by end of input and a truncated binary payload
     // are not group structure.
     assert!(Document::parse_with_options(r"{\rtf1 text\", options).is_err());
@@ -369,7 +372,7 @@ fn malformed_hex_escapes_are_rejected_by_default() {
         "{\\rtf1\\ansi a\\'4",
     ] {
         assert!(Document::parse(source).is_err(), "accepted {source}");
-        let groups_only = Options::new().with_leniency(Leniency::TolerateUnclosedGroups);
+        let groups_only = OpenOptions::new().leniency(Leniency::TolerateUnclosedGroups);
         assert!(
             Document::parse_with_options(source, groups_only).is_err(),
             "accepted {source} without the hex opt-in"
@@ -379,8 +382,8 @@ fn malformed_hex_escapes_are_rejected_by_default() {
 
 #[test]
 fn malformed_hex_escapes_decode_and_are_recorded_under_the_opt_in() {
-    let options = Options::new().with_leniency(Leniency::TolerateMalformedHexEscapes);
-    assert!(options.leniency().tolerates_malformed_hex_escapes());
+    let options = OpenOptions::new().leniency(Leniency::TolerateMalformedHexEscapes);
+    assert!(options.leniency_value().tolerates_malformed_hex_escapes());
     // `\'g1` keeps its one valid digit (byte 0x01, LibreOffice's
     // "`\'<number><junk>` means `\'0<number>`"), `\'zz` has none and is
     // dropped, `\'4` before a brace keeps its digit, and `\'41` is intact.
@@ -404,7 +407,7 @@ fn malformed_hex_escapes_decode_and_are_recorded_under_the_opt_in() {
 
 #[test]
 fn the_combined_opt_in_recovers_a_truncated_escape_at_end_of_input() {
-    let options = Options::new().with_leniency(Leniency::TolerateSyntaxDefects);
+    let options = OpenOptions::new().leniency(Leniency::TolerateSyntaxDefects);
     let source = "{\\rtf1\\ansi caf\\'e";
     let document = Document::parse_with_options(source, options).unwrap();
     assert_eq!(document.text(), "caf\u{e}");
@@ -427,7 +430,7 @@ fn the_combined_opt_in_recovers_a_truncated_escape_at_end_of_input() {
 // options it was opened with, so an opt-in-opened document stays editable.
 #[test]
 fn documents_opened_through_an_opt_in_stay_editable() {
-    let options = Options::new().with_leniency(Leniency::TolerateSyntaxDefects);
+    let options = OpenOptions::new().leniency(Leniency::TolerateSyntaxDefects);
     let source = r"{\rtf1\ansi First\par caf\'e9 bad\'g1\par Third";
     assert!(Document::parse(source).is_err());
     let document = Document::parse_with_options(source, options).unwrap();
