@@ -3839,10 +3839,21 @@ impl Edit {
         }
 
         let (replacement, projected_spans) = project_text(&self.source, &self.operations)?;
-        let layout_operation = self
-            .operations
-            .iter()
-            .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }));
+        // A pure alignment transaction uses the lossless paragraph-property
+        // publication path as well.  The general character-property encoder
+        // intentionally requires one uniform character baseline, which is a
+        // needless restriction when alignment is the only changed facet: the
+        // paragraph-property writer can retain every source run verbatim.
+        let alignment_only_operation = !self.operations.is_empty()
+            && self
+                .operations
+                .iter()
+                .all(|operation| matches!(operation, Operation::Alignment { .. }));
+        let layout_operation = alignment_only_operation
+            || self
+                .operations
+                .iter()
+                .any(|operation| matches!(operation, Operation::ParagraphLayout { .. }));
         let property_operation = self.operations.iter().any(|operation| {
             matches!(
                 operation,
