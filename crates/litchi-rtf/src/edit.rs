@@ -2493,11 +2493,16 @@ impl Edit {
     /// before any operation is appended, so an invalid late position leaves
     /// this edit unchanged.  Publication removes each selected paragraph and
     /// its exact source boundary while retaining every unrelated source byte.
+    /// Multiple positions require literal ASCII paragraph ranges with default
+    /// formatting; one position uses [`Self::remove_paragraph`] and retains its
+    /// support for decoded and explicitly repaired source text. Multi-removal
+    /// patches support exact process-local replay and inverse, but their
+    /// durable projection is not yet supported.
     ///
     /// # Errors
     /// Returns an error for an empty or unordered batch, an invalid selector,
-    /// incompatible staged work, or finite limits.  Changed publication keeps
-    /// the same source-closure and protection policy as [`Self::remove_paragraph`].
+    /// incompatible staged work, unsupported source ranges, or finite limits.
+    /// Changed publication preserves the source's protection and open policies.
     pub fn remove_body_paragraphs(&mut self, positions: &[usize]) -> Result<&mut Self, Error> {
         if let [position] = positions {
             return self.remove_paragraph(*position);
