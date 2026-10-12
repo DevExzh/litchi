@@ -66,9 +66,10 @@ RTF primary `edit::Commit` now exposes `package`, `patch`, `diagnostics`,
 `into_package` and `(Package, Patch)` `into_parts` (0224). Primary replay is
 `Package::apply`; `Patch::is_noop` and diagnostics use exact artifact equality.
 Replaying into an equal-byte owner preserves its retained opening policy.
-Record 0227 adds a checked primary operation-count `SemanticLimits` profile
-and `EditOptions`; focused append/redaction vocabulary and semantic payload
-profiles remain pending.
+Records 0227–0228 add checked operation-count and replacement-byte
+`SemanticLimits` through `EditOptions`. Replacement admission precedes incoming
+payload copies; text uses UTF-8 bytes and pictures use preserved wire bytes.
+Focused append/redaction vocabulary remains pending.
 
 ## 3. Open, create, save
 
@@ -94,7 +95,7 @@ profiles remain pending.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `RecordLimits` (ppt), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); ✅ PPT (0210); 🔴 ODF/iWork |
-| Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages; ✅ RTF primary operation count (0227) · 🔴 remaining dimensions and W1 |
+| Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages; ✅ RTF primary operation count and replacement bytes (0227–0228) · 🔴 remaining dimensions and W1 |
 | Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX ingress envelope (0038–0040); owning lazy-policy support and W1–W4 pending |
 | Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · 🔴 other W1 |
 | Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); other owners pending |

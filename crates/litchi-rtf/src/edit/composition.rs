@@ -190,9 +190,10 @@ impl Composition {
         let replacement_bytes = operations.iter().fold(0usize, |total, operation| {
             total.saturating_add(operation.replacement_bytes())
         });
+        let limits = SemanticLimits::for_operations(&operations, self.source.source_limits());
         Edit {
             source: self.source,
-            limits: SemanticLimits::for_operations(&operations),
+            limits,
             operations,
             replacement_bytes,
         }
@@ -2421,6 +2422,7 @@ fn commit_durable_operations(
     let operation_limit = operations.len().max(1);
     let profile = SemanticLimits::builder()
         .max_operations(operation_limit)?
+        .max_replacement_bytes(source.source_limits().max_input_bytes())?
         .build()?;
     let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(profile));
     for operation in operations {

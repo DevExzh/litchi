@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0228 | [RTF semantic replacement admission](0228-rtf-replacement-budget.md) | Checked independent payload budget, admission before incoming copies, consistent composition accounting; unified CRUD and full goal remain open |
 | 0227 | [Checked primary RTF semantic policy](0227-rtf-semantic-policy.md) | Checked operation-count profile and EditOptions replace unchecked Limits/edit_with_limits; typed construction/admission errors; 1,446 native and 1,620 facade tests/doctests plus lint/docs/glossary/harness checks pass; semantic payload budgets, unified CRUD and full goal remain open |
 | 0226 | [RTF atomic publication](0226-rtf-atomic-publication.md) | Format-neutral atomic publisher, native RTF save policies and unified save/origin/stream dispatch; core/native/full facade suites pass; RTF CRUD, semantic profiles and full goal remain open |
 | 0225 | [Native RTF Builder and unified creation](0225-rtf-builder.md) | Checked plain-text Builder returns Package; unified creation adopts native owner with explicit option gaps; 1,441 native and 1,613 facade tests/doctests pass; atomic save, unified CRUD and full goal remain open |

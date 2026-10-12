@@ -1098,6 +1098,17 @@ enum RawParagraphOperation {
     },
 }
 
+fn smart_tag_replacement_bytes(value: &crate::SmartTag<'_>) -> usize {
+    value.attributes.iter().fold(
+        value.name.len().saturating_add(value.content.len()),
+        |total, attribute| {
+            total
+                .saturating_add(attribute.name.len())
+                .saturating_add(attribute.value.len())
+        },
+    )
+}
+
 impl Operation {
     fn replacement_bytes(&self) -> usize {
         match self {
@@ -1111,18 +1122,12 @@ impl Operation {
             | Self::AnnotationText { after, .. }
             | Self::NoteText { after, .. }
             | Self::ShapeText { after, .. } => after.len(),
-            Self::SmartTag { after, .. } => after.name.len().saturating_add(
-                after
-                    .attributes
-                    .iter()
-                    .map(|attribute| attribute.name.len().saturating_add(attribute.value.len()))
-                    .sum(),
-            ),
-            Self::MoveBookmark { after, .. } => after.tag.len(),
+            Self::SmartTag { after, .. } => smart_tag_replacement_bytes(after),
+            Self::MoveBookmark { after, .. } => after.tag.len().saturating_add(after.content.len()),
             Self::InsertParagraph { text, .. } => text.len().saturating_add(1),
             Self::RestoreParagraph { text, .. } => text.len().saturating_add(1),
             Self::RemoveParagraph { .. } | Self::MoveParagraph { .. } => 0,
-            Self::PicturePayload(operation) => operation.after.len(),
+            Self::PicturePayload(operation) => operation.after_transport.len(),
             Self::PictureRemoval(_) => 0,
             Self::RootTransfer { after, .. } => after.len(),
             Self::ParagraphLayout { before, after, .. } => {
@@ -1384,6 +1389,7 @@ impl Edit {
                 "ordinary-root transfer refuses unknown target destinations",
             ));
         }
+        self.admit_replacement(after.len())?;
         let before = self
             .source
             .source_bytes()
@@ -1419,9 +1425,9 @@ impl Edit {
     ///
     /// # Errors
     /// Returns an error for invalid bounds, conflicts, or retained limits.
-    pub fn replace_body_text(
+    pub fn replace_body_text<'text>(
         &mut self,
-        replacement: impl Into<String>,
+        replacement: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         let span = TextSpan::new(0, self.source.text().len())?;
         self.replace_text(span, replacement)
@@ -1435,10 +1441,10 @@ impl Edit {
     ///
     /// # Errors
     /// Returns an error for an invalid selector, conflicts, or retained limits.
-    pub fn replace_paragraph_text(
+    pub fn replace_paragraph_text<'text>(
         &mut self,
         position: usize,
-        replacement: impl Into<String>,
+        replacement: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         let range = paragraph_range(&self.source, position)?;
         self.replace_text(TextSpan::new(range.start, range.end)?, replacement)
@@ -1482,14 +1488,8 @@ impl Edit {
         let replacement_bytes = replacements.iter().fold(0usize, |total, replacement| {
             total.saturating_add(replacement.replacement.len())
         });
-        let observed_replacement_bytes = self.replacement_bytes.saturating_add(replacement_bytes);
+        let observed_replacement_bytes = self.admit_replacement(replacement_bytes)?;
         let replacement_limit = self.source.limits().max_input_bytes();
-        if observed_replacement_bytes > replacement_limit {
-            return Err(Error::InputTooLarge {
-                observed: observed_replacement_bytes,
-                limit: replacement_limit,
-            });
-        }
 
         let has_property_operation = self.operations.iter().any(Operation::is_property);
         let mut staged = Vec::with_capacity(replacements.len());
@@ -1565,10 +1565,10 @@ impl Edit {
     ///
     /// # Errors
     /// Returns an error for invalid UTF-8 boundaries, conflicts, or limits.
-    pub fn replace_text(
+    pub fn replace_text<'text>(
         &mut self,
         span: TextSpan,
-        replacement: impl Into<String>,
+        replacement: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
@@ -1581,7 +1581,7 @@ impl Edit {
         }
         let body = self.source.text();
         validate_span(body, span)?;
-        let after = replacement.into();
+        let after = self.admit_text(replacement, 0)?;
         let before = body
             .get(span.start..span.end)
             .ok_or(Error::SpanNotOnCharacterBoundary {
@@ -2408,17 +2408,17 @@ impl Edit {
     /// # Errors
     /// Returns an error for an invalid selector, newline-bearing input,
     /// conflicts, or finite bounds.
-    pub fn insert_paragraph_after(
+    pub fn insert_paragraph_after<'text>(
         &mut self,
         position: usize,
-        input: impl Into<String>,
+        input: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
         if self.operations.iter().any(Operation::is_property) {
             return Err(Error::StructuralPropertyConflict);
         }
-        let text = input.into();
+        let text = self.admit_text(input, 1)?;
         if text.contains('\n') {
             return Err(Error::UnsupportedSource(
                 "one structural insertion authors exactly one paragraph",
@@ -2580,6 +2580,7 @@ impl Edit {
                 "ordinary paragraph split escaped its proven source range",
             ));
         }
+        self.admit_replacement(boundary.len())?;
         let before = clone_bounded_text(
             text,
             self.source.limits(),
@@ -2751,11 +2752,10 @@ impl Edit {
             return Err(Error::ParagraphOutOfRange { position, count });
         }
         self.ensure_lifecycle_room()?;
+        let text = self.admit_text(text, 1)?;
         self.charge_replacement(text.len().saturating_add(1))?;
-        self.operations.push(Operation::RestoreParagraph {
-            position,
-            text: text.to_string(),
-        });
+        self.operations
+            .push(Operation::RestoreParagraph { position, text });
         Ok(self)
     }
 
@@ -2977,14 +2977,14 @@ impl Edit {
     /// # Errors
     /// Returns an error for an invalid path, dependent story geometry,
     /// duplicate destination, mixed body work, or finite limits.
-    pub fn set_table_cell_text(
+    pub fn set_table_cell_text<'text>(
         &mut self,
         path: TableCellPath,
-        input: impl Into<String>,
+        input: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         self.ensure_destination_compatible()?;
         self.ensure_operation_room()?;
-        let after = input.into();
+        let after = self.admit_text(input, 0)?;
         let before = table_cell(&self.source, &path)?.text().to_string();
         let effect = table_cell_effect(&path);
         self.ensure_unique_destination(&effect)?;
@@ -3010,14 +3010,14 @@ impl Edit {
     /// # Errors
     /// Returns an error for an invalid selector, dependent story content,
     /// duplicate destination, mixed body work, or finite limits.
-    pub fn set_header_footer_text(
+    pub fn set_header_footer_text<'text>(
         &mut self,
         target: HeaderFooterParagraph,
-        input: impl Into<String>,
+        input: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         self.ensure_destination_compatible()?;
         self.ensure_operation_room()?;
-        let after = input.into();
+        let after = self.admit_text(input, 0)?;
         if after.contains('\n') {
             return Err(Error::UnsupportedSource(
                 "one header/footer paragraph cannot contain a paragraph break",
@@ -3058,14 +3058,14 @@ impl Edit {
     /// # Errors
     /// Returns an error for an invalid index, dependent story content,
     /// duplicate destination, mixed body work, or finite limits.
-    pub fn set_annotation_text(
+    pub fn set_annotation_text<'text>(
         &mut self,
         index: usize,
-        input: impl Into<String>,
+        input: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         self.ensure_destination_compatible()?;
         self.ensure_operation_room()?;
-        let after = input.into();
+        let after = self.admit_text(input, 0)?;
         let annotation = annotation(&self.source, index)?;
         if !annotation.shapes.is_empty()
             || !annotation.shape_groups.is_empty()
@@ -3099,14 +3099,14 @@ impl Edit {
     /// # Errors
     /// Returns an error for an invalid index, dependent story content,
     /// duplicate destination, mixed body work, or finite limits.
-    pub fn set_note_text(
+    pub fn set_note_text<'text>(
         &mut self,
         index: usize,
-        input: impl Into<String>,
+        input: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         self.ensure_destination_compatible()?;
         self.ensure_operation_room()?;
-        let after = input.into();
+        let after = self.admit_text(input, 0)?;
         let note = note(&self.source, index)?;
         if !note.shapes.is_empty() || !note.shape_groups.is_empty() || !note.story_events.is_empty()
         {
@@ -3139,14 +3139,14 @@ impl Edit {
     /// # Errors
     /// Returns an error for an invalid index, active/dependent drawing content,
     /// duplicate destination, mixed body work, or finite limits.
-    pub fn set_shape_text(
+    pub fn set_shape_text<'text>(
         &mut self,
         index: usize,
-        input: impl Into<String>,
+        input: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         self.ensure_destination_compatible()?;
         self.ensure_operation_room()?;
-        let after = input.into();
+        let after = self.admit_text(input, 0)?;
         let shape = shape(&self.source, index)?;
         if !shape.text_destination_present {
             return Err(Error::UnsupportedSource(
@@ -3196,6 +3196,8 @@ impl Edit {
     ) -> Result<&mut Self, Error> {
         self.ensure_destination_compatible()?;
         self.ensure_operation_room()?;
+        let replacement_bytes = smart_tag_replacement_bytes(&value);
+        self.admit_replacement(replacement_bytes)?;
         let before = self
             .source
             .smart_tags()
@@ -3212,19 +3214,7 @@ impl Edit {
         }
         let effect = format!("body:smart-tag:{index}");
         self.ensure_unique_destination(&effect)?;
-        self.charge_replacement(
-            after
-                .name
-                .len()
-                .saturating_add(after.content.len())
-                .saturating_add(
-                    after
-                        .attributes
-                        .iter()
-                        .map(|attribute| attribute.name.len().saturating_add(attribute.value.len()))
-                        .sum::<usize>(),
-                ),
-        )?;
+        self.charge_replacement(replacement_bytes)?;
         self.operations.push(Operation::SmartTag {
             index,
             before,
@@ -3243,6 +3233,7 @@ impl Edit {
     ) -> Result<&mut Self, Error> {
         self.ensure_destination_compatible()?;
         self.ensure_operation_room()?;
+        self.admit_replacement(value.tag.len().saturating_add(value.content.len()))?;
         let before = self
             .source
             .move_bookmarks()
@@ -3379,13 +3370,48 @@ impl Edit {
         Ok(())
     }
 
-    fn charge_replacement(&mut self, bytes: usize) -> Result<(), Error> {
+    fn admit_text<'text>(
+        &self,
+        input: impl Into<Cow<'text, str>>,
+        extra: usize,
+    ) -> Result<String, Error> {
+        let input = input.into();
+        self.admit_replacement(input.len().saturating_add(extra))?;
+        match input {
+            Cow::Owned(value) => Ok(value),
+            Cow::Borrowed(value) => {
+                let mut owned = String::new();
+                owned
+                    .try_reserve_exact(value.len())
+                    .map_err(|_| RtfError::AllocationFailed {
+                        resource: "edit replacement text",
+                        requested: value.len(),
+                    })?;
+                owned.push_str(value);
+                Ok(owned)
+            },
+        }
+    }
+
+    fn admit_replacement(&self, bytes: usize) -> Result<usize, Error> {
         let observed = self.replacement_bytes.saturating_add(bytes);
+        let maximum = self.limits.max_replacement_bytes();
+        if observed > maximum {
+            return Err(Error::Limit {
+                kind: SemanticLimitKind::ReplacementBytes,
+                observed,
+                maximum,
+            });
+        }
         let limit = self.source.limits().max_input_bytes();
         if observed > limit {
             return Err(Error::InputTooLarge { observed, limit });
         }
-        self.replacement_bytes = observed;
+        Ok(observed)
+    }
+
+    fn charge_replacement(&mut self, bytes: usize) -> Result<(), Error> {
+        self.replacement_bytes = self.admit_replacement(bytes)?;
         Ok(())
     }
 
@@ -3395,6 +3421,8 @@ impl Edit {
     /// Returns an error when the changed source is outside the supported
     /// closure or candidate validation/readback fails.
     pub fn commit(self) -> Result<Commit, Error> {
+        self.ensure_operation_room_for(0)?;
+        self.admit_replacement(0)?;
         let operation_count = self.operations.len();
         if operation_count == 0 {
             return Ok(Commit::new(self.source.clone(), self.source, 0, Vec::new()));
@@ -10620,6 +10648,7 @@ pub(crate) fn apply_durable<Mode>(
     // not fail merely because `Package::edit()` defaults to 256.
     let profile = SemanticLimits::builder()
         .max_operations(patch.operations().len())?
+        .max_replacement_bytes(source.source_limits().max_input_bytes())?
         .build()?;
     let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(profile));
     let mut expected_result_hash = None;
@@ -11752,5 +11781,19 @@ fn parse_underline(value: &str) -> Option<UnderlineStyle> {
         "heavy-wave" => Some(UnderlineStyle::HeavyWave),
         "double-wave" => Some(UnderlineStyle::DoubleWave),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod payload_admission_tests {
+    use super::*;
+
+    #[test]
+    fn admitted_owned_text_keeps_its_allocation() {
+        let source = Package::parse(r"{\rtf1 original}").expect("source");
+        let input = String::from("owned replacement");
+        let pointer = input.as_ptr();
+        let admitted = source.edit().admit_text(input, 0).expect("admitted");
+        assert_eq!(admitted.as_ptr(), pointer);
     }
 }

@@ -22,15 +22,15 @@ const MAX_EDITABLE_PICTURE_GROUP_BYTES: usize = MAX_EDITABLE_PICTURE_BYTES * 2 +
 
 /// One source-relative replacement in an atomic picture payload batch.
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct PicturePayloadReplacement {
+pub struct PicturePayloadReplacement<'payload> {
     position: usize,
-    payload: Vec<u8>,
+    payload: Cow<'payload, [u8]>,
 }
 
-impl PicturePayloadReplacement {
+impl<'payload> PicturePayloadReplacement<'payload> {
     /// Creates a replacement for one zero-based standalone body picture.
     #[must_use]
-    pub fn new(position: usize, payload: impl Into<Vec<u8>>) -> Self {
+    pub fn new(position: usize, payload: impl Into<Cow<'payload, [u8]>>) -> Self {
         Self {
             position,
             payload: payload.into(),
@@ -193,7 +193,7 @@ impl Edit {
         position: usize,
         payload: impl AsRef<[u8]>,
     ) -> Result<&mut Self, Error> {
-        let replacement = PicturePayloadReplacement::new(position, payload.as_ref().to_vec());
+        let replacement = PicturePayloadReplacement::new(position, payload.as_ref());
         self.stage_picture_payloads(&[replacement], None)
     }
 
@@ -207,14 +207,14 @@ impl Edit {
     /// Returns a typed batch, selector, size, conflict, limit, or unsupported-source error.
     pub fn replace_picture_payloads(
         &mut self,
-        replacements: &[PicturePayloadReplacement],
+        replacements: &[PicturePayloadReplacement<'_>],
     ) -> Result<&mut Self, Error> {
         self.stage_picture_payloads(replacements, None)
     }
 
     fn stage_picture_payloads(
         &mut self,
-        replacements: &[PicturePayloadReplacement],
+        replacements: &[PicturePayloadReplacement<'_>],
         exact_transports: Option<&[Vec<u8>]>,
     ) -> Result<&mut Self, Error> {
         if replacements.is_empty() {
@@ -258,11 +258,22 @@ impl Edit {
         }
 
         let located = locate_standalone_pictures(&self.source)?;
+        // Rendering preserves each source transport's exact length. Admit the
+        // aggregate before cloning payloads or allocating encoded transports.
+        let replacement_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
+            let picture = located
+                .get(replacement.position)
+                .ok_or(Error::PictureOutOfRange {
+                    position: replacement.position,
+                    count: located.len(),
+                })?;
+            Ok::<_, Error>(total.saturating_add(picture.payload_transport.len()))
+        })?;
+        let observed_replacement_bytes = self.admit_replacement(replacement_bytes)?;
         let mut staged = Vec::new();
         staged
             .try_reserve(replacements.len())
             .map_err(|_error| allocation_error("staged picture payloads", replacements.len()))?;
-        let mut replacement_bytes = 0usize;
         for (replacement_index, replacement) in replacements.iter().enumerate() {
             let picture = located
                 .get(replacement.position)
@@ -301,23 +312,14 @@ impl Edit {
             } else {
                 render_payload(&picture.payload_transport, &replacement.payload)?
             };
-            replacement_bytes = replacement_bytes.saturating_add(after_transport.len());
             staged.push(Operation::PicturePayload(StagedPicturePayload {
                 position: replacement.position,
                 image_type: picture.image_type,
                 before: picture.data.clone(),
-                after: replacement.payload.clone(),
+                after: replacement.payload.clone().into_owned(),
                 before_transport: picture.payload_transport.clone(),
                 after_transport,
             }));
-        }
-        let replacement_limit = self.source.limits().max_input_bytes();
-        let observed_replacement_bytes = self.replacement_bytes.saturating_add(replacement_bytes);
-        if observed_replacement_bytes > replacement_limit {
-            return Err(Error::InputTooLarge {
-                observed: observed_replacement_bytes,
-                limit: replacement_limit,
-            });
         }
         self.replacement_bytes = observed_replacement_bytes;
         self.operations.append(&mut staged);
@@ -836,7 +838,7 @@ pub(super) fn apply_durable_patch(
 fn decode_durable_operation(
     located: &[LocatedPicture],
     operation: &litchi_core::patch::PatchOperation,
-) -> Result<(PicturePayloadReplacement, Vec<u8>), Error> {
+) -> Result<(PicturePayloadReplacement<'static>, Vec<u8>), Error> {
     let position = parse_picture_target(&operation.target)?;
     let picture = located.get(position).ok_or(Error::PictureOutOfRange {
         position,

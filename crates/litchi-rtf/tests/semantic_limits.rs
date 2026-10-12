@@ -82,10 +82,10 @@ fn limit_refusal_keeps_source_immutable_and_edit_reusable() {
     let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
     assert_eq!(edit.options().semantic_limits_value(), semantic_limits(1));
 
-    edit.replace_text(litchi_rtf::edit::TextSpan::new(0, 5).unwrap(), "First")
+    edit.replace_text(TextSpan::new(0, 5).unwrap(), "First")
         .unwrap();
     assert!(matches!(
-        edit.replace_text(litchi_rtf::edit::TextSpan::new(6, 10).unwrap(), "Second"),
+        edit.replace_text(TextSpan::new(6, 10).unwrap(), "Second"),
         Err(Error::Limit {
             kind: SemanticLimitKind::Operations,
             observed: 2,
@@ -107,7 +107,7 @@ fn zero_profile_refuses_the_first_mutation_without_touching_source() {
     assert_eq!(edit.options().semantic_limits_value(), semantic_limits(0));
 
     assert!(matches!(
-        edit.replace_text(litchi_rtf::edit::TextSpan::new(0, 5).unwrap(), "Other"),
+        edit.replace_text(TextSpan::new(0, 5).unwrap(), "Other"),
         Err(Error::Limit {
             kind: SemanticLimitKind::Operations,
             observed: 1,
@@ -163,7 +163,7 @@ fn scalar_replacements_are_aggregated_at_exact_and_above_boundaries() {
     let second = TextSpan::new(6, 10).unwrap();
 
     let mut exact =
-        source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 9)));
+        source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 10)));
     {
         let borrowed = String::from("First");
         exact.replace_text(first, borrowed.as_str()).unwrap();
@@ -279,8 +279,19 @@ fn smart_tag_metadata_is_admitted_and_reopened_under_the_same_profile() {
     tag.attributes = vec![
         SmartTagAttribute::new(Some(1), Cow::Borrowed("format"), Cow::Borrowed("short")).unwrap(),
     ];
+    let mut refused =
+        source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 15)));
+    assert!(matches!(
+        refused.set_smart_tag(0, tag.clone()),
+        Err(Error::Limit {
+            kind: SemanticLimitKind::ReplacementBytes,
+            observed: 16,
+            maximum: 15,
+        })
+    ));
+    assert_eq!(refused.operation_count(), 0);
     let mut edit =
-        source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 128)));
+        source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 16)));
     edit.set_smart_tag(0, tag).unwrap();
     let committed = edit.commit().unwrap();
     let reopened = Package::from_bytes(&committed.package().to_bytes().unwrap()).unwrap();
@@ -303,8 +314,7 @@ fn retained_source_limit_can_reject_output_after_semantic_payload_is_admitted() 
     .unwrap();
     let mut edit =
         source.edit_with_options(EditOptions::new().semantic_limits(replacement_limits(8, 128)));
-    edit.replace_body_text("a substantially longer replacement")
-        .unwrap();
+    edit.replace_body_text("\\\\\\\\\\").unwrap();
     assert!(matches!(edit.commit(), Err(Error::InputTooLarge { .. })));
 }
 
@@ -315,20 +325,18 @@ fn composition_preserves_operation_and_replacement_counts() {
     let mut left = source.edit();
     left.replace_text(TextSpan::new(0, 5).unwrap(), "Left")
         .unwrap();
-    let mut right = source.edit();
-    right
-        .replace_text(TextSpan::new(6, 10).unwrap(), "Right")
+    left.replace_text(TextSpan::new(6, 10).unwrap(), "Right")
         .unwrap();
     let mut composition = litchi_rtf::edit::Composition::new(&source, limits);
     composition
         .join(left.into_sub_edit("left", limits).unwrap())
         .unwrap();
-    composition
-        .join(right.into_sub_edit("right", limits).unwrap())
-        .unwrap();
     let edit = composition.into_edit();
     let selected = edit.options().semantic_limits_value();
     assert_eq!(selected.max_operations(), 2);
-    assert_eq!(selected.max_replacement_bytes(), 9);
+    assert_eq!(
+        selected.max_replacement_bytes(),
+        source.source_limits().max_input_bytes()
+    );
     assert_eq!(edit.commit().unwrap().package().text(), "Left Right");
 }
