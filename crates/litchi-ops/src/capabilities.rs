@@ -3263,18 +3263,6 @@ impl Iterator for Properties {
             .map(|spec| Property {
                 spec,
                 retains_source: self.retains_source,
-                rtf_set: {
-                    #[cfg(feature = "rtf")]
-                    {
-                        self.element.adapter == Adapter::Rtf
-                            && self.element.data().canonical == "p"
-                            && spec.name.eq_ignore_ascii_case("text")
-                    }
-                    #[cfg(not(feature = "rtf"))]
-                    {
-                        false
-                    }
-                },
                 structural_add_supported: {
                     #[cfg(feature = "pptx")]
                     {
@@ -3311,7 +3299,6 @@ impl Iterator for Properties {
 pub struct Property {
     spec: &'static PropSpec,
     retains_source: Option<bool>,
-    rtf_set: bool,
     structural_add_supported: Option<bool>,
 }
 
@@ -3338,9 +3325,6 @@ impl Property {
     /// Whether `set` writes the key (M2).
     #[must_use]
     pub const fn set(&self) -> bool {
-        if self.rtf_set {
-            return true;
-        }
         match self.retains_source {
             Some(false) => false,
             Some(true) | None => self.spec.access.set,

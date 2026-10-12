@@ -383,6 +383,9 @@ pub enum Source {
     /// A native RTF authoring error.
     #[cfg(feature = "rtf")]
     RtfBuild(litchi_rtf::builder::Error),
+    /// A native RTF transaction or patch error.
+    #[cfg(feature = "rtf")]
+    RtfEdit(litchi_rtf::edit::Error),
     /// An OOXML package-encryption error.
     #[cfg(feature = "encryption")]
     Crypto(litchi_crypto::ooxml::Error),
@@ -463,6 +466,8 @@ impl Source {
             Self::Rtf(error) => Some(error),
             #[cfg(feature = "rtf")]
             Self::RtfBuild(error) => Some(error),
+            #[cfg(feature = "rtf")]
+            Self::RtfEdit(error) => Some(error),
             #[cfg(feature = "encryption")]
             Self::Crypto(error) => Some(error),
             #[cfg(feature = "formula")]
@@ -1603,6 +1608,49 @@ impl Classify for litchi_rtf::Error {
     }
 }
 
+#[cfg(feature = "rtf")]
+impl Classify for litchi_rtf::edit::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::UnsupportedSource(_)
+            | Self::OperationAlreadyStaged
+            | Self::BodyDestinationConflict
+            | Self::StructuralPropertyConflict
+            | Self::ParagraphLayoutTextConflict => Class::of(Code::UnsupportedCapability),
+            Self::Limit { .. } | Self::InputTooLarge { .. } => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
+            Self::EmptyParagraphBatch
+            | Self::ParagraphBatchOutOfOrder { .. }
+            | Self::EmptyParagraphLayoutBatch
+            | Self::EmptyParagraphLayoutPatch { .. }
+            | Self::ParagraphLayoutBatchOutOfOrder { .. }
+            | Self::Conflict { .. }
+            | Self::ReversedSpan { .. }
+            | Self::ParagraphSplitOffsetOutOfRange { .. }
+            | Self::ParagraphSplitAtEndRequiresBoundary { .. }
+            | Self::ParagraphMergeNonAdjacent { .. }
+            | Self::PicturePayloadSizeMismatch { .. }
+            | Self::EmptyPicturePayloadBatch
+            | Self::PicturePayloadBatchOutOfOrder { .. }
+            | Self::EmptyPictureRemovalBatch
+            | Self::PictureRemovalBatchOutOfOrder { .. }
+            | Self::DurablePatch(_) => Class::of(Code::InvalidArgument),
+            Self::SpanOutOfRange { .. }
+            | Self::SpanNotOnCharacterBoundary { .. }
+            | Self::ParagraphOutOfRange { .. }
+            | Self::DestinationOutOfRange(_)
+            | Self::PictureOutOfRange { .. } => Class::of(Code::OutOfRange),
+            Self::StalePrecondition(_) => Class::of(Code::InvalidArgument),
+            Self::HistorySourceMismatch | Self::PatchConflict => Class::of(Code::InvalidInput),
+            Self::History(_) => Class::of(Code::InvalidInput),
+            Self::Rtf(error) => error.classify(),
+            Self::Write(_) => Class::of(Code::InternalError),
+            Self::ProtectedDocument { .. } => Class::of(Code::DocumentProtected),
+            _ => Class::of(Code::CorruptFile),
+        }
+    }
+}
+
 #[cfg(feature = "encryption")]
 impl Classify for litchi_crypto::ooxml::Error {
     fn classify(&self) -> Class {
@@ -1847,6 +1895,7 @@ from_leaf!(
 );
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::Error => Rtf, Some(FileFormat::Rtf));
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::builder::Error => RtfBuild, Some(FileFormat::Rtf));
+from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::edit::Error => RtfEdit, Some(FileFormat::Rtf));
 from_leaf!(
     #[cfg(feature = "encryption")]
     litchi_crypto::ooxml::Error => Crypto, None

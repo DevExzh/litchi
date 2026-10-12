@@ -1,7 +1,9 @@
 //! The small, source-backed RTF vocabulary currently exposed by the unified
 //! adapter.
 
-use crate::node::spec::{ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec};
+use crate::node::spec::{
+    Access, ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec,
+};
 use crate::path::navigate::ElementKind;
 use crate::path::vocabulary::{self, Vocabulary};
 
@@ -79,8 +81,16 @@ const BODY: ElementSpec<Kind> = ElementSpec {
     gap: None,
 };
 
-pub(crate) const PARAGRAPH_PROPS: &[PropSpec] =
-    &[PropSpec::new("text", crate::value::ValueType::Text)];
+pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[PropSpec {
+    name: "text",
+    ty: crate::value::ValueType::Text,
+    access: Access {
+        get: true,
+        set: true,
+        add: false,
+    },
+    raw: false,
+}];
 
 const PARAGRAPH: ElementSpec<Kind> = ElementSpec {
     kind: Kind::Paragraph,

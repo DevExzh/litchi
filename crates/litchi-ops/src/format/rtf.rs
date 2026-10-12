@@ -8,6 +8,7 @@ mod nav;
 mod node;
 mod spec;
 pub(crate) mod views;
+pub(crate) mod write;
 
 pub(crate) use nav::Nav;
 pub use node::Node;
@@ -22,7 +23,8 @@ use litchi_core::Metadata;
 use litchi_rtf::leniency::ToleranceReport;
 use litchi_rtf::{Package, RtfDocument};
 
-use crate::{OpenOptions, Result};
+use crate::transaction::SemanticLimits;
+use crate::{IntoProps, OpenOptions, Result, TargetArg};
 
 /// An opened RTF document. Cheap to clone (one `Arc` bump); `Send + Sync`.
 #[derive(Clone)]
@@ -49,6 +51,63 @@ impl Rtf {
 
     pub(crate) fn origin(&self) -> Option<&Arc<Path>> {
         self.0.origin.as_ref()
+    }
+
+    /// Adopt the immutable native endpoint produced by one checked edit.
+    ///
+    /// The package carries the native open options and source retention policy
+    /// through the edit.  The facade sidecar is copied separately so an edit
+    /// keeps saving to the same origin as its input.
+    pub(crate) fn with_package(&self, package: Package) -> Self {
+        Self(Arc::new(RtfState {
+            origin: self.0.origin.clone(),
+            package,
+        }))
+    }
+
+    /// Whether two handles retain the same immutable native snapshot.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        self.0.package.same_snapshot(&other.0.package)
+    }
+
+    /// Whether two handles serialize to the same exact RTF artifact.
+    pub(crate) fn same_content(&self, other: &Self) -> bool {
+        self.same_snapshot(other)
+            || matches!(
+                (self.0.package.to_bytes(), other.0.package.to_bytes()),
+                (Ok(left), Ok(right)) if left == right
+            )
+    }
+
+    /// RTF packages retain their immutable source and native edit options.
+    /// There is no external source revision to fence at this layer.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        Ok(())
+    }
+
+    /// Admit a native RTF edit before a unified transaction starts.
+    pub(crate) fn admit_edit(&self) -> Result<()> {
+        self.check_source()
+    }
+
+    /// Set paragraph properties using the default unified limits.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: TargetArg<'p>,
+        props: impl IntoProps<'v>,
+    ) -> Result<write::Commit> {
+        let limits = SemanticLimits::default();
+        self.set_with_limits(target, props, &limits)
+    }
+
+    /// Set paragraph properties through one bounded native RTF transaction.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: TargetArg<'p>,
+        props: impl IntoProps<'v>,
+        limits: &SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::set_with_limits(self, target, props, limits)
     }
 
     pub(crate) fn write_to(&self, sink: impl std::io::Write) -> Result<()> {

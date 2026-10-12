@@ -9545,6 +9545,128 @@ impl Change {
     }
 }
 
+impl Change {
+    /// Dynamic semantic data retained by this reversible change.
+    ///
+    /// The enum's discriminant and inline fields are charged by
+    /// `Patch::history_weight`; this method accounts for every heap-backed
+    /// string or byte/vector payload owned by the change.  Keeping the
+    /// accounting beside the private enum means callers cannot accidentally
+    /// substitute the smaller public replacement DTO for the actual patch
+    /// storage.
+    fn dynamic_weight(&self) -> u64 {
+        match self {
+            Self::Text { before, after, .. }
+            | Self::HeaderFooterText { before, after, .. }
+            | Self::AnnotationText { before, after, .. }
+            | Self::NoteText { before, after, .. }
+            | Self::ShapeText { before, after, .. } => {
+                weight_str(before).saturating_add(weight_str(after))
+            },
+            Self::TableCellText {
+                path,
+                before,
+                after,
+            } => weight_str(before)
+                .saturating_add(weight_str(after))
+                .saturating_add(weight_usize(
+                    path.nested
+                        .len()
+                        .saturating_mul(size_of::<crate::TableCellCoordinate>()),
+                )),
+            Self::Alignment { .. }
+            | Self::ParagraphLayout { .. }
+            | Self::Bold { .. }
+            | Self::Italic { .. }
+            | Self::Underline { .. }
+            | Self::FontSize { .. }
+            | Self::Baseline { .. }
+            | Self::Expansion { .. }
+            | Self::HorizontalScale { .. }
+            | Self::Kerning { .. }
+            | Self::Strike { .. }
+            | Self::DoubleStrike { .. }
+            | Self::Hidden { .. }
+            | Self::SmallCaps { .. }
+            | Self::AllCaps { .. }
+            | Self::Outline { .. } => 0,
+            Self::InsertParagraph { text, .. }
+            | Self::RemoveParagraph { text, .. }
+            | Self::MoveParagraph { text, .. } => weight_str(text),
+            Self::SplitParagraph {
+                before,
+                boundary,
+                left,
+                right,
+                ..
+            } => weight_str(before)
+                .saturating_add(weight_bytes(boundary))
+                .saturating_add(weight_str(left))
+                .saturating_add(weight_str(right)),
+            Self::MergeParagraph {
+                boundary,
+                left,
+                right,
+                ..
+            } => weight_bytes(boundary)
+                .saturating_add(weight_str(left))
+                .saturating_add(weight_str(right)),
+            Self::SmartTag { before, after, .. } => {
+                smart_tag_weight(before).saturating_add(smart_tag_weight(after))
+            },
+            Self::MoveBookmark { before, after, .. } => {
+                move_bookmark_weight(before).saturating_add(move_bookmark_weight(after))
+            },
+            Self::PicturePayload(operation) => weight_bytes(&operation.before)
+                .saturating_add(weight_bytes(&operation.after))
+                .saturating_add(weight_bytes(&operation.before_transport))
+                .saturating_add(weight_bytes(&operation.after_transport)),
+            Self::PictureRemoval { group, .. } => weight_bytes(group),
+            Self::RootTransfer {
+                effect,
+                before,
+                after,
+                ..
+            } => weight_str(effect)
+                .saturating_add(weight_bytes(before))
+                .saturating_add(weight_bytes(after)),
+        }
+    }
+}
+
+fn weight_str(value: &str) -> u64 {
+    u64::try_from(value.len()).unwrap_or(u64::MAX)
+}
+
+fn weight_bytes(value: &[u8]) -> u64 {
+    u64::try_from(value.len()).unwrap_or(u64::MAX)
+}
+
+fn smart_tag_weight(value: &crate::SmartTag<'_>) -> u64 {
+    let attributes = value.attributes.iter().fold(0_u64, |weight, attribute| {
+        weight
+            .saturating_add(weight_str(attribute.name.as_ref()))
+            .saturating_add(weight_str(attribute.value.as_ref()))
+    });
+    weight_str(value.name.as_ref())
+        .saturating_add(weight_str(value.content.as_ref()))
+        .saturating_add(attributes)
+        .saturating_add(weight_usize(
+            value
+                .attributes
+                .len()
+                .saturating_mul(size_of::<crate::SmartTagAttribute<'static>>()),
+        ))
+}
+
+fn move_bookmark_weight(value: &crate::MoveBookmark<'_>) -> u64 {
+    weight_str(value.tag.as_ref()).saturating_add(weight_str(value.content.as_ref()))
+}
+
+fn weight_usize(value: usize) -> u64 {
+    u64::try_from(value).unwrap_or(u64::MAX)
+}
+
 fn semantic_changes(
     operations: &[Operation],
     projected_spans: &[(usize, TextSpan)],
@@ -9983,9 +10105,15 @@ impl Patch {
     pub fn history_weight(&self) -> u64 {
         let before = self.before.source_bytes().map_or(0, <[u8]>::len);
         let after = self.after.source_bytes().map_or(0, <[u8]>::len);
+        let change_descriptors = self.changes.len().saturating_mul(size_of::<Change>());
+        let semantic = self.changes.iter().fold(0_u64, |weight, change| {
+            weight.saturating_add(change.dynamic_weight())
+        });
         u64::try_from(before)
             .unwrap_or(u64::MAX)
             .saturating_add(u64::try_from(after).unwrap_or(u64::MAX))
+            .saturating_add(weight_usize(change_descriptors))
+            .saturating_add(semantic)
     }
 
     /// Converts this patch to the shared versioned deterministic-JSON patch.
