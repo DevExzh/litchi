@@ -1246,7 +1246,17 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// available for the ten local character-format facets; the remaining run
 /// structural verbs stay explicit gaps until their native editors exist.
 #[cfg(feature = "rtf")]
-static RTF_WRITE_GAPS: [GapSpec; 8] = [
+static RTF_WRITE_GAPS: [GapSpec; 9] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "set",
+            element: "run",
+            context: "native-source-closure",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF rich run preservation",
+        reason: "changed run formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; native mixed-operation composition and durable replay remain unsupported",
+    },
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
