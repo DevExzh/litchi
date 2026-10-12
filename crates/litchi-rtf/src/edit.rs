@@ -17,6 +17,7 @@ use crate::{
     RtfError, RtfWriter, TableCellPath, UnderlineStyle,
 };
 use bumpalo::Bump;
+use litchi_core::Position;
 use serde_json::Value;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
@@ -133,6 +134,41 @@ pub struct TextSpan {
 pub struct ParagraphTextReplacement {
     position: usize,
     replacement: String,
+}
+
+/// One immutable-source selector and paragraph alignment update.
+///
+/// The selector is a zero-based [`Position`] resolved against the complete
+/// source paragraph list when the batch is staged.  Batch selectors must be
+/// strictly increasing so a late invalid or duplicate selector cannot change
+/// the meaning of an earlier update.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ParagraphAlignmentUpdate {
+    position: Position,
+    alignment: Alignment,
+}
+
+impl ParagraphAlignmentUpdate {
+    /// Creates one source-relative paragraph alignment update.
+    #[must_use]
+    pub const fn new(position: Position, alignment: Alignment) -> Self {
+        Self {
+            position,
+            alignment,
+        }
+    }
+
+    /// Returns the zero-based source paragraph position.
+    #[must_use]
+    pub const fn position(self) -> Position {
+        self.position
+    }
+
+    /// Returns the requested paragraph alignment.
+    #[must_use]
+    pub const fn alignment(self) -> Alignment {
+        self.alignment
+    }
 }
 
 /// The dependency-free local layout facets of one ordinary body paragraph.
@@ -693,6 +729,10 @@ pub enum Error {
     EmptyParagraphRemovalBatch,
     /// Paragraph-removal selectors must be strictly increasing and unique.
     ParagraphRemovalBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A paragraph-alignment batch must contain at least one update.
+    EmptyParagraphAlignmentBatch,
+    /// Paragraph-alignment selectors must be strictly increasing and unique.
+    ParagraphAlignmentBatchOutOfOrder { previous: usize, incoming: usize },
     /// A paragraph-layout batch must contain at least one update.
     EmptyParagraphLayoutBatch,
     /// A paragraph-layout delta must name at least one field.
@@ -803,6 +843,13 @@ impl fmt::Display for Error {
             Self::ParagraphRemovalBatchOutOfOrder { previous, incoming } => write!(
                 formatter,
                 "RTF paragraph removal positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::EmptyParagraphAlignmentBatch => {
+                formatter.write_str("RTF paragraph-alignment update batch must not be empty")
+            },
+            Self::ParagraphAlignmentBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF paragraph-alignment positions must be strictly increasing: {incoming} follows {previous}"
             ),
             Self::EmptyParagraphLayoutBatch => {
                 formatter.write_str("RTF paragraph-layout update batch must not be empty")
@@ -3021,8 +3068,45 @@ impl Edit {
         position: usize,
         alignment: Alignment,
     ) -> Result<&mut Self, Error> {
+        self.set_body_paragraph_alignments(&[ParagraphAlignmentUpdate::new(
+            Position::new(position),
+            alignment,
+        )])
+    }
+
+    /// Atomically stages source-ordered alignment updates for ordinary body
+    /// paragraphs.
+    ///
+    /// Every selector, conflict, and operation bound is preflighted before
+    /// any operation is appended.  The source paragraph story is traversed
+    /// once to resolve all before-values, so callers updating many paragraphs
+    /// do not pay the scalar setter's repeated traversal cost.  Updates are
+    /// interpreted against the immutable source snapshot and must be strictly
+    /// increasing by zero-based [`Position`].  Alignment composes with
+    /// ordinary non-structural text and other paragraph-property updates, as
+    /// the scalar setter does.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an invalid selector,
+    /// a duplicate alignment facet, structural text changes, or retained
+    /// operation limits.  Changed publication retains the scalar alignment
+    /// source-closure and readback policy.
+    pub fn set_body_paragraph_alignments(
+        &mut self,
+        updates: &[ParagraphAlignmentUpdate],
+    ) -> Result<&mut Self, Error> {
         self.ensure_body_compatible()?;
-        self.ensure_operation_room()?;
+        if updates.is_empty() {
+            return Err(Error::EmptyParagraphAlignmentBatch);
+        }
+        for (previous, incoming) in updates.iter().zip(updates.iter().skip(1)) {
+            let previous = previous.position.get();
+            let incoming = incoming.position.get();
+            if incoming <= previous {
+                return Err(Error::ParagraphAlignmentBatchOutOfOrder { previous, incoming });
+            }
+        }
+        self.ensure_operation_room_for(updates.len())?;
         if self.operations.iter().any(|operation| {
             matches!(
                 operation,
@@ -3038,28 +3122,46 @@ impl Edit {
         }) {
             return Err(Error::StructuralPropertyConflict);
         }
-        let paragraphs = self.source.body().paragraphs().collect::<Vec<_>>();
-        let count = paragraphs.len();
-        let paragraph = paragraphs
-            .get(position)
-            .ok_or(Error::ParagraphOutOfRange { position, count })?;
-        let incoming = self.operations.len();
-        if let Some(existing) = self.operations.iter().position(|operation| {
-            matches!(
-                operation,
-                Operation::Alignment {
-                    position: existing_position,
-                    ..
-                } if *existing_position == position
-            )
-        }) {
-            return Err(Error::Conflict { existing, incoming });
+
+        let mut staged = Vec::new();
+        staged.try_reserve_exact(updates.len()).map_err(|_error| {
+            Error::Write("could not reserve paragraph-alignment batch".to_string())
+        })?;
+        let mut updates = updates.iter().peekable();
+        for (position, paragraph) in self.source.body().paragraphs().enumerate() {
+            if updates
+                .peek()
+                .is_some_and(|update| update.position.get() == position)
+            {
+                let update = updates.next().ok_or(Error::UnsupportedSource(
+                    "paragraph-alignment selector cursor became inconsistent",
+                ))?;
+                let incoming = self.operations.len().saturating_add(staged.len());
+                if let Some(existing) = self.operations.iter().position(|operation| {
+                    matches!(
+                        operation,
+                        Operation::Alignment {
+                            position: existing_position,
+                            ..
+                        } if *existing_position == position
+                    )
+                }) {
+                    return Err(Error::Conflict { existing, incoming });
+                }
+                staged.push(Operation::Alignment {
+                    position,
+                    before: paragraph.format().alignment(),
+                    after: update.alignment,
+                });
+            }
         }
-        self.operations.push(Operation::Alignment {
-            position,
-            before: paragraph.format().alignment(),
-            after: alignment,
-        });
+        if let Some(update) = updates.next() {
+            return Err(Error::ParagraphOutOfRange {
+                position: update.position.get(),
+                count: self.source.paragraph_count(),
+            });
+        }
+        self.operations.append(&mut staged);
         Ok(self)
     }
 
