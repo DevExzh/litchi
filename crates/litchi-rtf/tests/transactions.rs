@@ -36,7 +36,7 @@ fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
     let commit = edit.commit().unwrap();
 
     let first = commit
-        .snapshot()
+        .package()
         .body()
         .runs()
         .find(|run| run.text().contains("First"))
@@ -50,7 +50,7 @@ fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
     assert_eq!(first.format().kerning_half_points(), 8);
 
     let second = commit
-        .snapshot()
+        .package()
         .body()
         .runs()
         .find(|run| run.text().contains("Second"))
@@ -106,7 +106,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
     );
     assert_eq!(
         quarter
-            .snapshot()
+            .package()
             .body()
             .runs()
             .next()
@@ -135,7 +135,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
     );
     assert_eq!(
         twips
-            .snapshot()
+            .package()
             .body()
             .runs()
             .next()
@@ -164,7 +164,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
     );
     assert_eq!(
         reset
-            .snapshot()
+            .package()
             .body()
             .runs()
             .next()
@@ -308,14 +308,14 @@ fn ordinary_positioning_crud_enforces_bounds_and_exact_noops() {
         .unwrap();
     let max_commit = max_edit.commit().unwrap();
     let max_scale_run = max_commit
-        .snapshot()
+        .package()
         .body()
         .runs()
         .find(|run| run.text().contains("First"))
         .unwrap();
     assert_eq!(max_scale_run.format().horizontal_scale_percent(), 600);
     let max_kerning_run = max_commit
-        .snapshot()
+        .package()
         .body()
         .runs()
         .find(|run| run.text().contains("Second"))
@@ -426,7 +426,7 @@ fn transaction_composes_disjoint_spans_and_a_property() {
     assert_eq!(commit.package().text(), "A Beta G");
     assert_eq!(
         commit
-            .snapshot()
+            .package()
             .body()
             .paragraphs()
             .next()
@@ -511,7 +511,7 @@ fn body_splice_preserves_unknown_metadata_group_and_surrounding_writer_bytes() {
     let mut edit = document.edit();
     edit.replace_text(TextSpan::new(0, 8).unwrap(), "Changed")
         .unwrap();
-    let output = edit.commit().unwrap().snapshot().to_bytes().unwrap();
+    let output = edit.commit().unwrap().package().to_bytes().unwrap();
 
     assert_eq!(&output[..prefix.len()], prefix);
     assert_eq!(&output[prefix.len()..], b"Changed}\r\n");
@@ -549,7 +549,7 @@ fn paragraph_text_edit_rejects_out_of_range_before_staging() {
         })
     ));
     edit.replace_paragraph_text(0, "Changed").unwrap();
-    assert_eq!(edit.commit().unwrap().snapshot().text(), "Changed");
+    assert_eq!(edit.commit().unwrap().package().text(), "Changed");
 }
 
 #[test]
@@ -811,7 +811,7 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
     let enveloped_bytes = enveloped_edit
         .commit()
         .unwrap()
-        .snapshot()
+        .package()
         .to_bytes()
         .unwrap();
     assert!(enveloped_bytes.starts_with(prefix));
@@ -1076,7 +1076,7 @@ fn underline_property_supports_exact_styles_and_inverse() {
         }
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .body()
                 .runs()
                 .next()
@@ -2091,7 +2091,7 @@ fn core_subedits_compose_and_report_typed_conflicts() {
     assert_eq!(committed.package().text(), "A Beta");
     assert_eq!(
         committed
-            .snapshot()
+            .package()
             .body()
             .paragraphs()
             .next()
@@ -2406,7 +2406,7 @@ fn transfer_is_dependency_free_and_uses_checked_ordinary_transactions() {
         TransferPlan::plain_paragraph(&paragraph_source, 0, &paragraph_target, 0).unwrap();
     assert!(paragraph.is_dependency_free());
     assert_eq!(
-        paragraph.commit().unwrap().snapshot().text(),
+        paragraph.commit().unwrap().package().text(),
         "Existing\nImported"
     );
 
@@ -2423,7 +2423,7 @@ fn transfer_is_dependency_free_and_uses_checked_ordinary_transactions() {
     .unwrap();
     assert!(transfer.is_dependency_free());
     assert_eq!(
-        transfer.commit().unwrap().snapshot().tables()[0].rows()[0].cells()[0].text(),
+        transfer.commit().unwrap().package().tables()[0].rows()[0].cells()[0].text(),
         "Source cell"
     );
 }
@@ -2576,7 +2576,7 @@ fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
         )
         .unwrap();
     let maximum =
-        Package::from_bytes(&maximum.commit().unwrap().snapshot().to_bytes().unwrap()).unwrap();
+        Package::from_bytes(&maximum.commit().unwrap().package().to_bytes().unwrap()).unwrap();
     assert!(
         maximum
             .body()
@@ -2743,7 +2743,7 @@ fn baseline_property_covers_all_states_reopen_noop_and_inverse() {
         let commit = edit.commit().unwrap();
         assert_eq!(
             commit
-                .snapshot()
+                .package()
                 .body()
                 .runs()
                 .next()

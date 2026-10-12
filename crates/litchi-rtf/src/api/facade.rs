@@ -537,6 +537,14 @@ impl Package {
         crate::tail_append::TailAppendEdit::with_limits(self, selector, limits)
     }
 
+    /// Apply an exact-source primary patch under this package's open policy.
+    ///
+    /// # Errors
+    /// Returns an error for a source conflict or candidate admission failure.
+    pub fn apply(&self, patch: &crate::edit::Patch) -> Result<Self, crate::edit::Error> {
+        patch.apply(self)
+    }
+
     /// Applies a shared durable RTF semantic patch to this exact snapshot.
     ///
     /// # Errors

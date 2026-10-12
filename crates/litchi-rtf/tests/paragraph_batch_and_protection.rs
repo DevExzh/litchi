@@ -77,7 +77,7 @@ fn paragraph_batch_rejects_bad_shape_and_late_selector_atomically() {
             Err(Error::ParagraphBatchOutOfOrder { .. })
         ));
         assert_eq!(edit.operation_count(), 0);
-        assert!(edit.commit().unwrap().snapshot().same_snapshot(&source));
+        assert!(edit.commit().unwrap().package().same_snapshot(&source));
     }
 
     let mut late = source.edit();
@@ -91,7 +91,7 @@ fn paragraph_batch_rejects_bad_shape_and_late_selector_atomically() {
     assert_eq!(late.operation_count(), 0);
     late.replace_paragraph_text(1, "Changed").unwrap();
     assert_eq!(
-        late.commit().unwrap().snapshot().text(),
+        late.commit().unwrap().package().text(),
         "First\nChanged\nThird"
     );
 }
@@ -307,7 +307,7 @@ fn paragraph_batch_preserves_transport_encoding_and_opaque_guards() {
     assert_eq!(cp1252_commit.package().text(), "Changed\nSuite");
     assert!(
         cp1252_commit
-            .snapshot()
+            .package()
             .to_bytes()
             .unwrap()
             .starts_with(br"{\rtf1\ansi\ansicpg1252 ")

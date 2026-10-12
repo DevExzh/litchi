@@ -782,24 +782,24 @@ impl fmt::Display for Error {
         match self {
             Self::UnsupportedSource(reason) => {
                 write!(formatter, "unsupported RTF edit source: {reason}")
-            }
+            },
             Self::OperationAlreadyStaged => {
                 formatter.write_str("RTF edit already has a staged operation")
-            }
+            },
             Self::OperationLimit { observed, limit } => write!(
                 formatter,
                 "RTF edit operation limit exceeded: observed {observed}, limit {limit}"
             ),
             Self::EmptyParagraphBatch => {
                 formatter.write_str("RTF paragraph replacement batch must not be empty")
-            }
+            },
             Self::ParagraphBatchOutOfOrder { previous, incoming } => write!(
                 formatter,
                 "RTF paragraph replacement positions must be strictly increasing: {incoming} follows {previous}"
             ),
             Self::EmptyParagraphLayoutBatch => {
                 formatter.write_str("RTF paragraph-layout update batch must not be empty")
-            }
+            },
             Self::EmptyParagraphLayoutPatch { position } => write!(
                 formatter,
                 "RTF paragraph-layout update at position {position} has no fields"
@@ -826,7 +826,7 @@ impl fmt::Display for Error {
             ),
             Self::ReversedSpan { start, end } => {
                 write!(formatter, "RTF text span {start}..{end} is reversed")
-            }
+            },
             Self::SpanOutOfRange { end, length } => write!(
                 formatter,
                 "RTF text span ends at {end}, beyond body length {length}"
@@ -860,7 +860,7 @@ impl fmt::Display for Error {
                     formatter,
                     "RTF retained destination does not exist: {destination}"
                 )
-            }
+            },
             Self::PictureOutOfRange { position, count } => write!(
                 formatter,
                 "RTF standalone picture position {position} is outside 0..{count}"
@@ -875,25 +875,25 @@ impl fmt::Display for Error {
             ),
             Self::EmptyPicturePayloadBatch => {
                 formatter.write_str("RTF picture payload replacement batch must not be empty")
-            }
+            },
             Self::PicturePayloadBatchOutOfOrder { previous, incoming } => write!(
                 formatter,
                 "RTF picture positions must be strictly increasing: {incoming} follows {previous}"
             ),
             Self::EmptyPictureRemovalBatch => {
                 formatter.write_str("RTF picture removal batch must not be empty")
-            }
+            },
             Self::PictureRemovalBatchOutOfOrder { previous, incoming } => write!(
                 formatter,
                 "RTF picture removal positions must be strictly increasing: {incoming} follows {previous}"
             ),
             Self::StalePrecondition(reason) => {
                 write!(formatter, "stale RTF patch precondition: {reason}")
-            }
+            },
             Self::DurablePatch(reason) => write!(formatter, "invalid durable RTF patch: {reason}"),
             Self::HistorySourceMismatch => {
                 formatter.write_str("RTF history source is not its current snapshot")
-            }
+            },
             Self::History(reason) => write!(formatter, "RTF history refused commit: {reason}"),
             Self::Rtf(error) => error.fmt(formatter),
             Self::Write(error) => write!(formatter, "RTF candidate construction failed: {error}"),
@@ -904,7 +904,7 @@ impl fmt::Display for Error {
             ),
             Self::PatchConflict => {
                 formatter.write_str("RTF patch source does not match its expected snapshot")
-            }
+            },
         }
     }
 }
@@ -1132,7 +1132,7 @@ impl Operation {
             Self::ParagraphLayout { before, after, .. } => {
                 let _ = (before, after);
                 0
-            }
+            },
             Self::Alignment { .. }
             | Self::Bold { .. }
             | Self::Italic { .. }
@@ -1155,26 +1155,26 @@ impl Operation {
         match self {
             Self::Text { structural, .. } if *structural => {
                 vec!["body:structure".to_string()]
-            }
+            },
             Self::Text { .. } => vec!["body:text".to_string()],
             Self::Alignment { position, .. } => {
                 vec![format!("body:paragraph:{position}:alignment")]
-            }
+            },
             Self::ParagraphLayout {
                 position, fields, ..
             } => layout_effect_keys(*position, *fields),
             Self::Bold { span, .. } => {
                 vec![format!("body:character:{}-{}:bold", span.start, span.end)]
-            }
+            },
             Self::Italic { span, .. } => {
                 vec![format!("body:character:{}-{}:italic", span.start, span.end)]
-            }
+            },
             Self::Underline { span, .. } => {
                 vec![format!(
                     "body:character:{}-{}:underline",
                     span.start, span.end
                 )]
-            }
+            },
             Self::FontSize { span, .. } => vec![format!(
                 "body:character:{}-{}:font-size",
                 span.start, span.end
@@ -1197,32 +1197,32 @@ impl Operation {
             )],
             Self::Strike { span, .. } => {
                 vec![format!("body:character:{}-{}:strike", span.start, span.end)]
-            }
+            },
             Self::DoubleStrike { span, .. } => vec![format!(
                 "body:character:{}-{}:double-strike",
                 span.start, span.end
             )],
             Self::Hidden { span, .. } => {
                 vec![format!("body:character:{}-{}:hidden", span.start, span.end)]
-            }
+            },
             Self::SmallCaps { span, .. } => {
                 vec![format!(
                     "body:character:{}-{}:small-caps",
                     span.start, span.end
                 )]
-            }
+            },
             Self::AllCaps { span, .. } => {
                 vec![format!(
                     "body:character:{}-{}:all-caps",
                     span.start, span.end
                 )]
-            }
+            },
             Self::Outline { span, .. } => {
                 vec![format!(
                     "body:character:{}-{}:outline",
                     span.start, span.end
                 )]
-            }
+            },
             Self::InsertParagraph { .. }
             | Self::RemoveParagraph { .. }
             | Self::RestoreParagraph { .. }
@@ -1236,10 +1236,10 @@ impl Operation {
             Self::MoveBookmark { index, .. } => vec![format!("body:move-bookmark:{index}")],
             Self::PicturePayload(operation) => {
                 vec![format!("body:picture:{}:payload", operation.position)]
-            }
+            },
             Self::PictureRemoval(operation) => {
                 vec![format!("body:picture:{}", operation.position)]
-            }
+            },
             Self::RootTransfer { effect, .. } => vec![effect.clone()],
         }
     }
@@ -3330,7 +3330,7 @@ impl Edit {
                 "expansion" => "expansion edits require non-empty text within one paragraph",
                 "horizontal scale" => {
                     "horizontal-scale edits require non-empty text within one paragraph"
-                }
+                },
                 "kerning" => "kerning edits require non-empty text within one paragraph",
                 _ => "character-property edits require non-empty text within one paragraph",
             }));
@@ -3394,13 +3394,7 @@ impl Edit {
     pub fn commit(self) -> Result<Commit, Error> {
         let operation_count = self.operations.len();
         if operation_count == 0 {
-            return Ok(Commit::new(
-                self.source.clone(),
-                self.source,
-                false,
-                0,
-                Vec::new(),
-            ));
+            return Ok(Commit::new(self.source.clone(), self.source, 0, Vec::new()));
         }
 
         if self
@@ -3594,7 +3588,7 @@ impl Edit {
             CharacterExpansion::None => 0,
             CharacterExpansion::QuarterPoints(value) | CharacterExpansion::Twips(value) => {
                 i32::from(value)
-            }
+            },
         };
         baseline.character_positioning.horizontal_scale_percent = base_horizontal_scale;
         baseline.char_scale = i32::from(base_horizontal_scale);
@@ -3651,7 +3645,7 @@ impl Edit {
                         )?;
                         paragraph.alignment = *after;
                     }
-                }
+                },
                 Operation::ParagraphLayout {
                     position,
                     fields,
@@ -3666,68 +3660,68 @@ impl Edit {
                         },
                     )?;
                     apply_layout_to_raw(paragraph, *after, *fields);
-                }
+                },
                 Operation::Bold { span, after, .. } => {
                     projected_bold_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Italic { span, after, .. } => {
                     projected_italic_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Underline { span, after, .. } => {
                     projected_underline_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::FontSize { span, after, .. } => {
                     projected_font_size_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Expansion { span, after, .. } => {
                     projected_expansion_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::HorizontalScale { span, after, .. } => {
                     projected_horizontal_scale_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Kerning { span, after, .. } => {
                     projected_kerning_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Strike { span, after, .. } => {
                     projected_strike_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::DoubleStrike { span, after, .. } => {
                     projected_double_strike_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Hidden { span, after, .. } => {
                     projected_hidden_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::SmallCaps { span, after, .. } => {
                     projected_small_caps_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::AllCaps { span, after, .. } => {
                     projected_all_caps_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Outline { span, after, .. } => {
                     projected_outline_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Baseline { span, after, .. } => {
                     projected_baseline_ranges
                         .push((project_base_span(*span, &self.operations)?, *after));
-                }
+                },
                 Operation::Text { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
-                | Operation::MoveParagraph { .. } => {}
+                | Operation::MoveParagraph { .. } => {},
                 Operation::TableCellText { .. }
                 | Operation::HeaderFooterText { .. }
                 | Operation::AnnotationText { .. }
@@ -3738,7 +3732,7 @@ impl Edit {
                 | Operation::PicturePayload(_)
                 | Operation::PictureRemoval(_) => {
                     return Err(Error::BodyDestinationConflict);
-                }
+                },
                 Operation::RootTransfer { .. } => return Err(Error::BodyDestinationConflict),
             }
         }
@@ -3818,7 +3812,6 @@ impl Edit {
             return Ok(Commit::new(
                 self.source.clone(),
                 self.source,
-                false,
                 operation_count,
                 semantic_delta,
             ));
@@ -4219,7 +4212,6 @@ impl Edit {
         Ok(Commit::new(
             self.source,
             snapshot,
-            true,
             operation_count,
             semantic_delta,
         ))
@@ -4311,7 +4303,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                     right: right.to_string(),
                 }];
                 (snapshot, semantic_delta)
-            }
+            },
             Operation::Text {
                 raw_structure:
                     Some(RawParagraphOperation::Merge {
@@ -4366,14 +4358,13 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                     right: right.clone(),
                 }];
                 (snapshot, semantic_delta)
-            }
+            },
             Operation::Text { .. } => return Err(Error::BodyDestinationConflict),
             _ => return Err(Error::BodyDestinationConflict),
         };
     Ok(Commit::new(
         edit.source,
         snapshot,
-        true,
         operation_count,
         semantic_delta,
     ))
@@ -4451,7 +4442,7 @@ fn validate_paragraph_boundary_bytes(boundary: &[u8]) -> Result<(), Error> {
                 && p.eq_ignore_ascii_case(&b'p')
                 && a.eq_ignore_ascii_case(&b'a')
                 && r.eq_ignore_ascii_case(&b'r')
-        }
+        },
         _ => false,
     };
     let valid_delimiter = matches!(boundary.get(4..), Some([]) | Some([b' ']));
@@ -4469,7 +4460,6 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
         return Ok(Commit::new(
             edit.source.clone(),
             edit.source,
-            false,
             operation_count,
             semantic_delta,
         ));
@@ -4500,26 +4490,26 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
                 model
                     .table_cell_mut(path)?
                     .set_text(Cow::Owned(after.clone()))?;
-            }
+            },
             Operation::HeaderFooterText { target, after, .. } => {
                 let paragraph = model_header_footer_paragraph_mut(&mut model, *target)?;
                 paragraph.text = Cow::Owned(after.clone());
-            }
+            },
             Operation::AnnotationText { index, after, .. } => {
                 model.set_annotation_text(*index, Cow::Owned(after.clone()))?;
-            }
+            },
             Operation::NoteText { index, after, .. } => {
                 model.set_note_content(*index, Cow::Owned(after.clone()))?;
-            }
+            },
             Operation::ShapeText { index, after, .. } => {
                 model.set_body_shape_text(*index, Cow::Owned(after.clone()))?;
-            }
+            },
             Operation::SmartTag { index, after, .. } => {
                 model.replace_smart_tag(*index, after.clone().into_owned())?;
-            }
+            },
             Operation::MoveBookmark { index, after, .. } => {
                 model.replace_move_bookmark(*index, after.clone().into_owned())?;
-            }
+            },
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
@@ -4572,7 +4562,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
                         "table-cell text did not survive RTF validation",
                     ));
                 }
-            }
+            },
             Operation::HeaderFooterText { target, after, .. } => {
                 let actual = header_footer(&snapshot, *target)?
                     .paragraphs
@@ -4585,42 +4575,42 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
                         "header/footer text did not survive RTF validation",
                     ));
                 }
-            }
+            },
             Operation::AnnotationText { index, after, .. } => {
                 if annotation(&snapshot, *index)?.text != after.as_str() {
                     return Err(Error::UnsupportedSource(
                         "annotation text did not survive RTF validation",
                     ));
                 }
-            }
+            },
             Operation::NoteText { index, after, .. } => {
                 if note(&snapshot, *index)?.content != after.as_str() {
                     return Err(Error::UnsupportedSource(
                         "note text did not survive RTF validation",
                     ));
                 }
-            }
+            },
             Operation::ShapeText { index, after, .. } => {
                 if shape(&snapshot, *index)?.text != after.as_str() {
                     return Err(Error::UnsupportedSource(
                         "shape text did not survive RTF validation",
                     ));
                 }
-            }
+            },
             Operation::SmartTag { index, after, .. } => {
                 if snapshot.smart_tags().get(*index) != Some(after) {
                     return Err(Error::UnsupportedSource(
                         "SmartTag metadata did not survive RTF validation",
                     ));
                 }
-            }
+            },
             Operation::MoveBookmark { index, after, .. } => {
                 if snapshot.move_bookmarks().get(*index) != Some(after) {
                     return Err(Error::UnsupportedSource(
                         "move-bookmark metadata did not survive RTF validation",
                     ));
                 }
-            }
+            },
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
@@ -4650,7 +4640,6 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
     Ok(Commit::new(
         edit.source,
         snapshot,
-        true,
         operation_count,
         semantic_delta,
     ))
@@ -4682,7 +4671,6 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
         return Ok(Commit::new(
             edit.source.clone(),
             edit.source,
-            false,
             operation_count,
             semantic_delta,
         ));
@@ -4707,7 +4695,6 @@ fn commit_root_transfer(edit: Edit, operation_count: usize) -> Result<Commit, Er
     Ok(Commit::new(
         edit.source,
         snapshot,
-        true,
         operation_count,
         semantic_delta,
     ))
@@ -5090,7 +5077,7 @@ fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSo
                             observed: usize::MAX,
                             limit: source.limits().max_input_bytes(),
                         })?;
-            }
+            },
             crate::lexer::Token::Control(crate::lexer::ControlWord::Par) => {
                 let source_start = source_text_start.unwrap_or(absolute_span.start);
                 let source_end = absolute_span.start;
@@ -5119,7 +5106,7 @@ fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSo
                 paragraph_start = semantic_position;
                 source_text_start = None;
                 previous_boundary_end = absolute_span.end;
-            }
+            },
             crate::lexer::Token::OpenBrace
             | crate::lexer::Token::CloseBrace
             | crate::lexer::Token::Control(_)
@@ -5127,7 +5114,7 @@ fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSo
                 return Err(Error::UnsupportedSource(
                     "ordinary paragraph source contains a group, binary payload, or non-paragraph control",
                 ));
-            }
+            },
         }
     }
 
@@ -5193,7 +5180,7 @@ fn ordinary_paragraph_body_source_span(
                 depth = depth.checked_add(1).ok_or(Error::UnsupportedSource(
                     "RTF group nesting overflowed while locating the ordinary body",
                 ))?;
-            }
+            },
             crate::lexer::Token::CloseBrace => {
                 if depth == 1 {
                     end = Some(span.start);
@@ -5202,21 +5189,21 @@ fn ordinary_paragraph_body_source_span(
                 depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
                     "RTF group nesting underflowed while locating the ordinary body",
                 ))?;
-            }
+            },
             crate::lexer::Token::Text(_)
             | crate::lexer::Token::Control(crate::lexer::ControlWord::Par)
                 if depth == 1 && start.is_none() =>
             {
                 start = Some(span.start);
-            }
+            },
             crate::lexer::Token::Binary(_) if depth == 1 && start.is_some() => {
                 return Err(Error::UnsupportedSource(
                     "the ordinary paragraph body contains binary data",
                 ));
-            }
+            },
             crate::lexer::Token::Control(_)
             | crate::lexer::Token::Text(_)
-            | crate::lexer::Token::Binary(_) => {}
+            | crate::lexer::Token::Binary(_) => {},
         }
     }
     let root_end = end.ok_or(Error::UnsupportedSource(
@@ -5288,7 +5275,7 @@ fn project_text(
             } => None,
             Operation::InsertParagraph { span, text, .. } => {
                 Some((operation_index, *span, text.as_str(), true))
-            }
+            },
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
@@ -5401,7 +5388,7 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
                 return Err(Error::StalePrecondition("paragraph text differs"));
             }
             paragraphs.remove(*position);
-        }
+        },
         Operation::RestoreParagraph { position, text } => {
             if *position > paragraphs.len() {
                 return Err(Error::ParagraphOutOfRange {
@@ -5410,7 +5397,7 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
                 });
             }
             paragraphs.insert(*position, text.clone());
-        }
+        },
         Operation::MoveParagraph {
             position,
             final_position,
@@ -5440,7 +5427,7 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
             }
             let paragraph = paragraphs.remove(*position);
             paragraphs.insert(*final_position, paragraph);
-        }
+        },
         Operation::Text { .. }
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }
@@ -5472,7 +5459,7 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
             return Err(Error::UnsupportedSource(
                 "non-lifecycle operation entered lifecycle projection",
             ));
-        }
+        },
     }
     Ok(paragraphs.join("\n"))
 }
@@ -5551,7 +5538,7 @@ fn same_source_runs(left: &Package, right: &Package) -> bool {
     loop {
         match (left.next(), right.next()) {
             (Some(left), Some(right))
-                if left.text() == right.text() && left.format().raw() == right.format().raw() => {}
+                if left.text() == right.text() && left.format().raw() == right.format().raw() => {},
             (None, None) => return true,
             _ => return false,
         }
@@ -6177,7 +6164,7 @@ fn validate_character_baseline(baseline: CharacterBaseline) -> Result<(), Error>
             Err(Error::UnsupportedSource(
                 "character baseline is out of range",
             ))
-        }
+        },
         CharacterBaseline::Normal
         | CharacterBaseline::Superscript
         | CharacterBaseline::Subscript
@@ -6199,13 +6186,13 @@ fn map_positioning_error(error: RtfError, fallback: &'static str) -> Error {
         RtfError::MalformedDocument(message) => match message.as_str() {
             "RTF legacy character spacing is out of range" => {
                 Error::UnsupportedSource("legacy character spacing is out of range")
-            }
+            },
             "RTF legacy character scale is out of range" => {
                 Error::UnsupportedSource("legacy character scale is out of range")
-            }
+            },
             "RTF legacy character kerning is out of range" => {
                 Error::UnsupportedSource("legacy character kerning is out of range")
-            }
+            },
             _ => Error::UnsupportedSource(fallback),
         },
         _ => Error::UnsupportedSource(fallback),
@@ -7719,7 +7706,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             Operation::Text { span, after, .. } => Some((*span, after.len())),
             Operation::InsertParagraph { span, text, .. } => {
                 Some((*span, text.len().saturating_add(1)))
-            }
+            },
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::Bold { .. }
@@ -7792,10 +7779,10 @@ fn retained_or_located_body_source_span(
                 && span.end <= source_bytes.len() =>
         {
             Ok(span)
-        }
+        },
         Some(_) | None => {
             ordinary_body_source_span(source_bytes, source.text(), source.options(), false)
-        }
+        },
     }
 }
 
@@ -7810,10 +7797,10 @@ fn retained_or_located_layout_body_source_span(
                 && span.end <= source_bytes.len() =>
         {
             Ok(span)
-        }
+        },
         Some(_) | None => {
             ordinary_body_source_span(source_bytes, source.text(), source.options(), true)
-        }
+        },
     }
 }
 
@@ -7849,7 +7836,7 @@ fn ordinary_body_source_span(
                 depth = depth.checked_add(1).ok_or(Error::UnsupportedSource(
                     "RTF group nesting overflowed while locating the body",
                 ))?;
-            }
+            },
             crate::lexer::Token::CloseBrace => {
                 if depth == 1 {
                     end = Some(span.start);
@@ -7858,18 +7845,18 @@ fn ordinary_body_source_span(
                 depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
                     "RTF group nesting underflowed while locating the body",
                 ))?;
-            }
+            },
             crate::lexer::Token::Text(_) if depth == 1 && start.is_none() => {
                 start = Some(span.start);
-            }
+            },
             crate::lexer::Token::Binary(_) if start.is_some() => {
                 return Err(Error::UnsupportedSource(
                     "the body source contains binary data",
                 ));
-            }
+            },
             crate::lexer::Token::Control(_)
             | crate::lexer::Token::Text(_)
-            | crate::lexer::Token::Binary(_) => {}
+            | crate::lexer::Token::Binary(_) => {},
         }
     }
     let root_end = end.ok_or(Error::UnsupportedSource(
@@ -8145,7 +8132,7 @@ fn encoded_body_with_properties(
                     write_bold(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
-                }
+                },
                 CharacterPropertyChange::Italic(value) => {
                     // The parser flushes body text at bold controls but not at
                     // italic controls. Reasserting the current bold state around
@@ -8156,7 +8143,7 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_italic(&mut output, overlays.base_italic)?;
-                }
+                },
                 CharacterPropertyChange::Underline(value) => {
                     // Underline controls do not by themselves flush all parser
                     // run state. Bold controls force the same safe boundary as
@@ -8166,7 +8153,7 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_underline(&mut output, overlays.base_underline)?;
-                }
+                },
                 CharacterPropertyChange::FontSize(value) => {
                     // Font-size controls are local character state. Reassert
                     // bold around the fragment to force a stable run boundary
@@ -8177,35 +8164,35 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_font_size(&mut output, overlays.base_font_size)?;
-                }
+                },
                 CharacterPropertyChange::Expansion(value) => {
                     write_bold(&mut output, overlays.base_bold)?;
                     write_expansion(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_expansion(&mut output, overlays.base_expansion)?;
-                }
+                },
                 CharacterPropertyChange::HorizontalScale(value) => {
                     write_bold(&mut output, overlays.base_bold)?;
                     write_horizontal_scale(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_horizontal_scale(&mut output, overlays.base_horizontal_scale)?;
-                }
+                },
                 CharacterPropertyChange::Kerning(value) => {
                     write_bold(&mut output, overlays.base_bold)?;
                     write_kerning(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_kerning(&mut output, overlays.base_kerning)?;
-                }
+                },
                 CharacterPropertyChange::Baseline(value) => {
                     write_bold(&mut output, overlays.base_bold)?;
                     write_baseline(&mut output, value)?;
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_baseline(&mut output, overlays.base_baseline)?;
-                }
+                },
                 CharacterPropertyChange::Strike(value) => {
                     // Strike controls do not by themselves flush all parser
                     // run state. Bold controls force the same safe boundary
@@ -8215,7 +8202,7 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_strike(&mut output, overlays.base_strike)?;
-                }
+                },
                 CharacterPropertyChange::DoubleStrike(value) => {
                     // Double-strike controls are local character state. Keep
                     // single strike untouched and reassert bold for a stable
@@ -8225,7 +8212,7 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_double_strike(&mut output, overlays.base_double_strike)?;
-                }
+                },
                 CharacterPropertyChange::Hidden(value) => {
                     // Hidden controls are local character state. Reasserting
                     // bold around the fragment forces the same run boundary
@@ -8235,7 +8222,7 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_hidden(&mut output, overlays.base_hidden)?;
-                }
+                },
                 CharacterPropertyChange::SmallCaps(value) => {
                     // Small-caps controls are local character state. Reassert
                     // bold around the fragment to force a stable run boundary
@@ -8245,7 +8232,7 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_small_caps(&mut output, overlays.base_small_caps)?;
-                }
+                },
                 CharacterPropertyChange::AllCaps(value) => {
                     // All-caps controls are local character state. Reassert
                     // bold around the fragment to force a stable run boundary
@@ -8255,7 +8242,7 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_all_caps(&mut output, overlays.base_all_caps)?;
-                }
+                },
                 CharacterPropertyChange::Outline(value) => {
                     // Outline controls are local character state. Reassert
                     // bold around the fragment to force a stable run boundary
@@ -8265,7 +8252,7 @@ fn encoded_body_with_properties(
                     write_encoded_fragment(&mut output, text, span.start..span.end)?;
                     write_bold(&mut output, overlays.base_bold)?;
                     write_outline(&mut output, overlays.base_outline)?;
-                }
+                },
             }
             cursor = span.end;
         }
@@ -8501,7 +8488,7 @@ fn body_layout_events(source: &Package) -> Result<Vec<BodyLayoutEvent>, Error> {
                     "bookmark metadata references a missing body bookmark",
                 ))?;
                 (bookmark.position, BodyLayoutEventKind::BookmarkStart(index))
-            }
+            },
             crate::BodyStoryEvent::BookmarkEnd(index) => {
                 let bookmark = bookmarks.get(index).ok_or(Error::UnsupportedSource(
                     "bookmark metadata references a missing body bookmark",
@@ -8513,13 +8500,13 @@ fn body_layout_events(source: &Package) -> Result<Vec<BodyLayoutEvent>, Error> {
                         .ok_or(Error::UnsupportedSource("bookmark body range overflow"))?,
                     BodyLayoutEventKind::BookmarkEnd(index),
                 )
-            }
+            },
             crate::BodyStoryEvent::PageBreak(page_break) => {
                 (page_break.position, BodyLayoutEventKind::PageBreak)
-            }
+            },
             crate::BodyStoryEvent::ColumnBreak(column_break) => {
                 (column_break.position, BodyLayoutEventKind::ColumnBreak)
-            }
+            },
             crate::BodyStoryEvent::SoftBreak(soft_break) => (
                 soft_break.position,
                 BodyLayoutEventKind::SoftBreak(soft_break),
@@ -8528,7 +8515,7 @@ fn body_layout_events(source: &Package) -> Result<Vec<BodyLayoutEvent>, Error> {
                 return Err(Error::UnsupportedSource(
                     "body contains unsupported positioned structure",
                 ));
-            }
+            },
         };
         // The retained ordinary-body source span begins at the first literal
         // body token.  A zero-width event at body offset zero is therefore
@@ -8611,7 +8598,7 @@ fn write_text_with_body_opaque(
                             ))?;
                     let mut writer = RtfWriter::new(&mut *output);
                     writer.write_bookmark_start(bookmark)
-                }
+                },
                 BodyLayoutEventKind::BookmarkEnd(index) => {
                     let bookmark =
                         bookmarks
@@ -8622,15 +8609,15 @@ fn write_text_with_body_opaque(
                             ))?;
                     let mut writer = RtfWriter::new(&mut *output);
                     writer.write_bookmark_end(bookmark.name.as_ref())
-                }
+                },
                 BodyLayoutEventKind::PageBreak => {
                     let mut writer = RtfWriter::new(&mut *output);
                     writer.write_str("\\page ")
-                }
+                },
                 BodyLayoutEventKind::ColumnBreak => {
                     let mut writer = RtfWriter::new(&mut *output);
                     writer.write_str("\\column ")
-                }
+                },
                 BodyLayoutEventKind::SoftBreak(soft_break) => {
                     let mut writer = RtfWriter::new(&mut *output);
                     match soft_break.kind {
@@ -8641,7 +8628,7 @@ fn write_text_with_body_opaque(
                             .write_control_word("softlheight", Some(height))
                             .and_then(|()| writer.write_str(" ")),
                     }
-                }
+                },
             };
             if let Err(error) = result {
                 return Err(output.map_io_error(error));
@@ -8708,7 +8695,7 @@ impl io::Write for BoundedVec {
                 return Err(io::Error::other(
                     "RTF paragraph-layout output size overflow",
                 ));
-            }
+            },
         };
         if observed > self.limit {
             self.overflow_observed = Some(observed);
@@ -8850,7 +8837,7 @@ impl Diagnostics {
         self.operation_count
     }
 
-    /// Whether the transaction published a distinct snapshot.
+    /// Whether the transaction changed the exact source artifact.
     #[must_use]
     pub const fn changed(self) -> bool {
         self.changed
@@ -8870,12 +8857,12 @@ fn write_expansion(output: &mut BoundedVec, expansion: CharacterExpansion) -> Re
             output.append(br"\expnd")?;
             output.append(value.to_string().as_bytes())?;
             output.append(b" ")
-        }
+        },
         CharacterExpansion::Twips(value) => {
             output.append(br"\expndtw")?;
             output.append(value.to_string().as_bytes())?;
             output.append(b" ")
-        }
+        },
     }
 }
 
@@ -8932,12 +8919,12 @@ fn write_baseline(output: &mut BoundedVec, baseline: CharacterBaseline) -> Resul
             output.append(br"\up")?;
             output.append(value.to_string().as_bytes())?;
             output.append(b" ")
-        }
+        },
         CharacterBaseline::LoweredHalfPoints(value) => {
             output.append(br"\dn")?;
             output.append(value.to_string().as_bytes())?;
             output.append(b" ")
-        }
+        },
     }
 }
 
@@ -8952,10 +8939,10 @@ impl Commit {
     fn new(
         before: Package,
         snapshot: Package,
-        did_change: bool,
         operation_count: usize,
         semantic_delta: Vec<Change>,
     ) -> Self {
+        let changed = !same_artifact(&before, &snapshot);
         Self {
             patch: Patch {
                 before,
@@ -8965,14 +8952,14 @@ impl Commit {
             snapshot,
             diagnostics: Diagnostics {
                 operation_count,
-                changed: did_change,
+                changed,
             },
         }
     }
 
     /// Returns the published immutable snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Package {
+    pub const fn package(&self) -> &Package {
         &self.snapshot
     }
 
@@ -8990,8 +8977,14 @@ impl Commit {
 
     /// Consumes the commit and returns its immutable snapshot.
     #[must_use]
-    pub fn into_snapshot(self) -> Package {
+    pub fn into_package(self) -> Package {
         self.snapshot
+    }
+
+    /// Consume the commit into its published package and reversible patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
     }
 }
 
@@ -9554,7 +9547,7 @@ fn semantic_changes_with_replacement(
                             after: after.clone(),
                         })
                     })
-            }
+            },
             Operation::Alignment {
                 position,
                 before,
@@ -9778,7 +9771,7 @@ fn semantic_changes_with_replacement(
                     left: left.to_string(),
                     right: right.to_string(),
                 })
-            }
+            },
             Operation::Text {
                 raw_structure:
                     Some(RawParagraphOperation::Merge {
@@ -9860,7 +9853,7 @@ fn semantic_changes_with_replacement(
             }),
             Operation::PicturePayload(operation) if operation.before != operation.after => {
                 Some(Change::PicturePayload(operation.clone()))
-            }
+            },
             Operation::PictureRemoval(operation) => Some(operation.inverse_change().inverse()),
             Operation::RootTransfer {
                 vocabulary,
@@ -9904,6 +9897,11 @@ fn semantic_changes_with_replacement(
         .collect()
 }
 
+fn same_artifact(left: &Package, right: &Package) -> bool {
+    left.same_snapshot(right)
+        || matches!((left.source_bytes(), right.source_bytes()), (Some(a), Some(b)) if a == b)
+}
+
 /// In-memory exact-source patch with a durable shared semantic projection.
 #[derive(Clone)]
 pub struct Patch {
@@ -9917,11 +9915,26 @@ impl Patch {
     ///
     /// # Errors
     /// Returns [`Error::PatchConflict`] when the supplied source bytes differ.
-    pub fn apply(&self, source: &Package) -> Result<Package, Error> {
-        if source.source_bytes() != self.before.source_bytes() {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package, Error> {
+        if !same_artifact(source, &self.before) {
             return Err(Error::PatchConflict);
         }
-        Ok(self.after.clone())
+        if self.is_noop() {
+            return Ok(source.clone());
+        }
+        if source.options() == self.after.options() {
+            return Ok(self.after.clone());
+        }
+        let bytes = self.after.source_bytes().ok_or(Error::UnsupportedSource(
+            "patch target has no retained source artifact",
+        ))?;
+        Ok(Package::from_bytes_with_options(bytes, source.options())?)
+    }
+
+    /// Whether this patch preserves the exact source artifact.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        same_artifact(&self.before, &self.after)
     }
 
     /// Returns the patch that restores the accepted source bytes.
@@ -10030,7 +10043,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(after.clone()),
             )
-        }
+        },
         Change::Alignment {
             position,
             before,
@@ -10047,7 +10060,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(alignment_name(*after).to_string()),
             )
-        }
+        },
         Change::ParagraphLayout {
             position: _,
             fields: _,
@@ -10070,7 +10083,7 @@ fn durable_operation(
                 preconditions,
                 Value::Bool(*after),
             )
-        }
+        },
         Change::Italic {
             span,
             before,
@@ -10085,7 +10098,7 @@ fn durable_operation(
                 preconditions,
                 Value::Bool(*after),
             )
-        }
+        },
         Change::Underline {
             span,
             before,
@@ -10103,7 +10116,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(underline_name(*after).to_string()),
             )
-        }
+        },
         Change::FontSize {
             span,
             before,
@@ -10121,7 +10134,7 @@ fn durable_operation(
                 preconditions,
                 Value::Number(serde_json::Number::from(u64::from(after.get()))),
             )
-        }
+        },
         Change::Baseline {
             span,
             before,
@@ -10139,7 +10152,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(baseline_name(*after)),
             )
-        }
+        },
         Change::Expansion {
             span,
             before,
@@ -10157,7 +10170,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(expansion_name(*after)),
             )
-        }
+        },
         Change::HorizontalScale {
             span,
             before,
@@ -10175,7 +10188,7 @@ fn durable_operation(
                 preconditions,
                 Value::Number(serde_json::Number::from(u64::from(*after))),
             )
-        }
+        },
         Change::Kerning {
             span,
             before,
@@ -10193,7 +10206,7 @@ fn durable_operation(
                 preconditions,
                 Value::Number(serde_json::Number::from(u64::from(*after))),
             )
-        }
+        },
         Change::Strike {
             span,
             before,
@@ -10208,7 +10221,7 @@ fn durable_operation(
                 preconditions,
                 Value::Bool(*after),
             )
-        }
+        },
         Change::DoubleStrike {
             span,
             before,
@@ -10223,7 +10236,7 @@ fn durable_operation(
                 preconditions,
                 Value::Bool(*after),
             )
-        }
+        },
         Change::Hidden {
             span,
             before,
@@ -10238,7 +10251,7 @@ fn durable_operation(
                 preconditions,
                 Value::Bool(*after),
             )
-        }
+        },
         Change::SmallCaps {
             span,
             before,
@@ -10253,7 +10266,7 @@ fn durable_operation(
                 preconditions,
                 Value::Bool(*after),
             )
-        }
+        },
         Change::AllCaps {
             span,
             before,
@@ -10268,7 +10281,7 @@ fn durable_operation(
                 preconditions,
                 Value::Bool(*after),
             )
-        }
+        },
         Change::Outline {
             span,
             before,
@@ -10283,7 +10296,7 @@ fn durable_operation(
                 preconditions,
                 Value::Bool(*after),
             )
-        }
+        },
         Change::InsertParagraph {
             position,
             after_position: _,
@@ -10315,7 +10328,7 @@ fn durable_operation(
                     Value::String(text.clone())
                 },
             )
-        }
+        },
         Change::RemoveParagraph {
             position,
             text,
@@ -10344,7 +10357,7 @@ fn durable_operation(
                     Value::Null
                 },
             )
-        }
+        },
         Change::MoveParagraph {
             position,
             final_position,
@@ -10358,7 +10371,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(final_position.to_string()),
             )
-        }
+        },
         Change::SplitParagraph {
             position,
             offset,
@@ -10392,7 +10405,7 @@ fn durable_operation(
                 preconditions,
                 Value::Null,
             )
-        }
+        },
         Change::MergeParagraph {
             position,
             boundary,
@@ -10413,7 +10426,7 @@ fn durable_operation(
                 preconditions,
                 Value::Null,
             )
-        }
+        },
         Change::TableCellText {
             path,
             before,
@@ -10427,7 +10440,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(after.clone()),
             )
-        }
+        },
         Change::HeaderFooterText {
             target,
             before,
@@ -10441,7 +10454,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(after.clone()),
             )
-        }
+        },
         Change::AnnotationText {
             index,
             before,
@@ -10455,7 +10468,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(after.clone()),
             )
-        }
+        },
         Change::NoteText {
             index,
             before,
@@ -10469,7 +10482,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(after.clone()),
             )
-        }
+        },
         Change::ShapeText {
             index,
             before,
@@ -10483,7 +10496,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(after.clone()),
             )
-        }
+        },
         Change::SmartTag { .. } => Err(litchi_core::patch::PatchError::InvalidText {
             field: "RTF SmartTag durable patches are not supported",
         }),
@@ -10492,7 +10505,7 @@ fn durable_operation(
         }),
         Change::PicturePayload(operation) => {
             picture_payload::durable_operation(limits, operation, source)
-        }
+        },
         Change::PictureRemoval {
             position,
             group_start,
@@ -10520,7 +10533,7 @@ fn durable_operation(
                 preconditions,
                 Value::String(hex_encode(after)),
             )
-        }
+        },
     }
 }
 
@@ -10644,7 +10657,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("text value must be a string".to_string())
                 })?;
                 edit.replace_text(span, replacement)?;
-            }
+            },
             "paragraph-alignment.set" => {
                 let position = parse_paragraph_target(&operation.target)?;
                 let expected = operation
@@ -10670,12 +10683,12 @@ pub(crate) fn apply_durable<Mode>(
                     .and_then(parse_alignment)
                     .ok_or_else(|| Error::DurablePatch("invalid alignment value".to_string()))?;
                 edit.set_paragraph_alignment(position, replacement)?;
-            }
+            },
             "paragraph-layout.patch" => {
                 return Err(Error::DurablePatch(
                     "paragraph-layout durable patches are not supported".to_string(),
                 ));
-            }
+            },
             "character-bold.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10691,7 +10704,7 @@ pub(crate) fn apply_durable<Mode>(
                     .as_bool()
                     .ok_or_else(|| Error::DurablePatch("bold value must be Boolean".to_string()))?;
                 edit.set_text_bold(span, replacement)?;
-            }
+            },
             "character-italic.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10708,7 +10721,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("italic value must be Boolean".to_string())
                 })?;
                 edit.set_text_italic(span, replacement)?;
-            }
+            },
             "character-underline.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10731,7 +10744,7 @@ pub(crate) fn apply_durable<Mode>(
                         Error::DurablePatch("underline value must be a string".to_string())
                     })?;
                 edit.set_text_underline(span, replacement)?;
-            }
+            },
             "character-font-size.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10761,7 +10774,7 @@ pub(crate) fn apply_durable<Mode>(
                         )
                     })?;
                 edit.set_text_font_size(span, replacement)?;
-            }
+            },
             "character-baseline.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10785,7 +10798,7 @@ pub(crate) fn apply_durable<Mode>(
                         Error::DurablePatch("baseline value must be a canonical string".to_string())
                     })?;
                 edit.set_text_baseline(span, replacement)?;
-            }
+            },
             "character-expansion.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10813,7 +10826,7 @@ pub(crate) fn apply_durable<Mode>(
                         )
                     })?;
                 edit.set_text_expansion(span, replacement)?;
-            }
+            },
             "character-horizontal-scale.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10844,7 +10857,7 @@ pub(crate) fn apply_durable<Mode>(
                         )
                     })?;
                 edit.set_text_horizontal_scale_percent(span, replacement)?;
-            }
+            },
             "character-kerning.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10872,7 +10885,7 @@ pub(crate) fn apply_durable<Mode>(
                         )
                     })?;
                 edit.set_text_kerning(span, replacement)?;
-            }
+            },
             "character-strike.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10889,7 +10902,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("strike value must be Boolean".to_string())
                 })?;
                 edit.set_text_strike(span, replacement)?;
-            }
+            },
             "character-double-strike.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10908,7 +10921,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("double-strike value must be Boolean".to_string())
                 })?;
                 edit.set_text_double_strike(span, replacement)?;
-            }
+            },
             "character-hidden.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10925,7 +10938,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("hidden value must be Boolean".to_string())
                 })?;
                 edit.set_text_hidden(span, replacement)?;
-            }
+            },
             "character-small-caps.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10944,7 +10957,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("small-caps value must be Boolean".to_string())
                 })?;
                 edit.set_text_small_caps(span, replacement)?;
-            }
+            },
             "character-all-caps.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10961,7 +10974,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("all-caps value must be Boolean".to_string())
                 })?;
                 edit.set_text_all_caps(span, replacement)?;
-            }
+            },
             "character-outline.set" => {
                 let span = parse_text_target(&operation.target)?;
                 let expected = operation
@@ -10978,14 +10991,14 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("outline value must be Boolean".to_string())
                 })?;
                 edit.set_text_outline(span, replacement)?;
-            }
+            },
             "paragraph.insert-after" => {
                 let position = parse_paragraph_target(&operation.target)?;
                 let replacement = operation.value.as_str().ok_or_else(|| {
                     Error::DurablePatch("inserted paragraph text must be a string".to_string())
                 })?;
                 edit.insert_paragraph_after(position, replacement)?;
-            }
+            },
             "paragraph.remove-after" => {
                 let position = parse_paragraph_target(&operation.target)?;
                 let expected = operation
@@ -11001,7 +11014,7 @@ pub(crate) fn apply_durable<Mode>(
                     ));
                 }
                 edit.remove_paragraph_after(position, expected)?;
-            }
+            },
             "paragraph.remove" => {
                 let position = parse_paragraph_target(&operation.target)?;
                 let expected = operation
@@ -11020,7 +11033,7 @@ pub(crate) fn apply_durable<Mode>(
                     ));
                 }
                 edit.remove_paragraph(position)?;
-            }
+            },
             "paragraph.insert" => {
                 let position = parse_paragraph_target(&operation.target)?;
                 if !operation
@@ -11036,7 +11049,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("inserted paragraph text must be a string".to_string())
                 })?;
                 edit.restore_paragraph(position, text)?;
-            }
+            },
             "paragraph.move" => {
                 let position = parse_paragraph_target(&operation.target)?;
                 let expected = operation
@@ -11060,7 +11073,7 @@ pub(crate) fn apply_durable<Mode>(
                         Error::DurablePatch("invalid paragraph final position".to_string())
                     })?;
                 edit.move_paragraph(position, final_position)?;
-            }
+            },
             "paragraph.split" => {
                 let position = parse_paragraph_target(&operation.target)?;
                 if !operation.value.is_null() {
@@ -11148,7 +11161,7 @@ pub(crate) fn apply_durable<Mode>(
                                 ..
                             } if *generated_position == position && *generated_offset == offset => {
                                 Some(generated_boundary.as_slice())
-                            }
+                            },
                             _ => None,
                         });
                 if generated_boundary != Some(boundary.as_slice()) {
@@ -11156,7 +11169,7 @@ pub(crate) fn apply_durable<Mode>(
                         "ordinary paragraph split boundary differs",
                     ));
                 }
-            }
+            },
             "paragraph.merge" => {
                 let position = parse_paragraph_target(&operation.target)?;
                 if !operation.value.is_null() {
@@ -11229,7 +11242,7 @@ pub(crate) fn apply_durable<Mode>(
                     ));
                 }
                 edit.merge_paragraphs(position, second)?;
-            }
+            },
             "table-cell-text.replace" => {
                 let cell_path = parse_table_cell_target(&operation.target)?;
                 let expected = operation
@@ -11246,7 +11259,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("table-cell text value must be a string".to_string())
                 })?;
                 edit.set_table_cell_text(cell_path, replacement)?;
-            }
+            },
             "header-footer-text.replace" => {
                 let target = parse_header_footer_target(&operation.target)?;
                 let expected = operation
@@ -11269,7 +11282,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("header/footer text value must be a string".to_string())
                 })?;
                 edit.set_header_footer_text(target, replacement)?;
-            }
+            },
             "annotation-text.replace" => {
                 let index = parse_annotation_target(&operation.target)?;
                 let expected = operation
@@ -11286,7 +11299,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("annotation text value must be a string".to_string())
                 })?;
                 edit.set_annotation_text(index, replacement)?;
-            }
+            },
             "note-text.replace" => {
                 let index = parse_note_target(&operation.target)?;
                 let expected = operation
@@ -11303,7 +11316,7 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("note text value must be a string".to_string())
                 })?;
                 edit.set_note_text(index, replacement)?;
-            }
+            },
             "shape-text.replace" => {
                 let index = parse_shape_target(&operation.target)?;
                 let expected = operation
@@ -11320,15 +11333,15 @@ pub(crate) fn apply_durable<Mode>(
                     Error::DurablePatch("shape text value must be a string".to_string())
                 })?;
                 edit.set_shape_text(index, replacement)?;
-            }
+            },
             "picture-payload.replace" => {
                 picture_payload::apply_durable_operation(source, &mut edit, operation)?;
-            }
+            },
             "picture.remove" | "picture.insert-exact" => {
                 return Err(Error::DurablePatch(
                     "picture lifecycle operation escaped its atomic batch".to_string(),
                 ));
-            }
+            },
             vocabulary if is_root_transfer_vocabulary(vocabulary) => {
                 let expected_feature = operation
                     .preconditions
@@ -11349,15 +11362,15 @@ pub(crate) fn apply_durable<Mode>(
                     operation.target.clone(),
                     after,
                 )?;
-            }
+            },
             _ => {
                 return Err(Error::DurablePatch(
                     "unsupported operation vocabulary".to_string(),
                 ));
-            }
+            },
         }
     }
-    let snapshot = edit.commit()?.into_snapshot();
+    let snapshot = edit.commit()?.into_package();
     if let Some(expected_hash) = expected_result_hash {
         let result_bytes = snapshot
             .source_bytes()
@@ -11503,13 +11516,13 @@ fn parse_table_cell_target(target: &str) -> Result<TableCellPath, Error> {
                     row_index: nested_row,
                     cell_index: nested_cell,
                 });
-            }
+            },
             Some("text") if parts.next().is_none() => return Ok(path),
             _ => {
                 return Err(Error::DurablePatch(
                     "invalid nested table-cell target".to_string(),
                 ));
-            }
+            },
         }
     }
 }
@@ -11645,7 +11658,7 @@ fn parse_baseline(value: &str) -> Option<CharacterBaseline> {
             } else {
                 CharacterBaseline::LoweredHalfPoints(half_points)
             })
-        }
+        },
     }
 }
 

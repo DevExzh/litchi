@@ -62,6 +62,12 @@ transaction is the bare `Package::edit()`.
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
 composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 
+RTF primary `edit::Commit` now exposes `package`, `patch`, `diagnostics`,
+`into_package` and `(Package, Patch)` `into_parts` (0224). Primary replay is
+`Package::apply`; `Patch::is_noop` and diagnostics use exact artifact equality.
+Replaying into an equal-byte owner preserves its retained opening policy.
+Focused append/redaction vocabulary and finite semantic profiles remain pending.
+
 ## 3. Open, create, save
 
 | Concept | Canonical | Banned | Notes / status |
