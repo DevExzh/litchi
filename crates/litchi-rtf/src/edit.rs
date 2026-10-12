@@ -10697,6 +10697,13 @@ fn ordinary_run_text_spans(
     if requested.is_empty() {
         return Ok(spans);
     }
+    let preserve_terminal_empty = terminal_paragraph_becomes_empty(source, operations);
+    let terminal_paragraph = source.paragraph_count().saturating_sub(1);
+    let terminal_run = source
+        .body()
+        .paragraphs()
+        .nth(terminal_paragraph)
+        .map_or(0, |paragraph| paragraph.runs().count().saturating_sub(1));
     let mut body_position = 0usize;
     let mut requested_index = 0usize;
     for (paragraph_index, paragraph) in source.body().paragraphs().enumerate() {
@@ -10720,12 +10727,18 @@ fn ordinary_run_text_spans(
                     *paragraph == paragraph_index && *run == run_index
                 })
             {
-                let (_, _, replacement_len) = requested
+                let (requested_paragraph, requested_run, replacement_len) = requested
                     .get(requested_index)
                     .copied()
                     .ok_or(Error::UnsupportedSource(
                         "run-text selector cursor disappeared",
                     ))?;
+                let replacement_len = replacement_len.saturating_add(usize::from(
+                    preserve_terminal_empty
+                        && replacement_len == 0
+                        && requested_paragraph == terminal_paragraph
+                        && requested_run == terminal_run,
+                ));
                 spans.push((
                     TextSpan {
                         start: run_start,

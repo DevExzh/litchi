@@ -414,7 +414,7 @@ fn native_run_text_removal_projects_opaque_anchors_through_terminal_empty_paragr
                 Anchor::Structural { .. } => None,
             })
             .collect::<Vec<_>>(),
-        [0, 0, 0]
+        [0, 0, 1]
     );
     assert_eq!(
         commit
