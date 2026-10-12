@@ -10641,19 +10641,20 @@ impl Patch {
             .changes
             .iter()
             .any(|change| matches!(change, Change::MoveParagraph { .. }));
-        let has_empty_or_terminal_boundary = self.before.text().ends_with('\n')
-            || self.after.text().ends_with('\n')
-            || self
-                .before
-                .body()
-                .paragraphs()
-                .any(|paragraph| paragraph.is_empty())
-            || self
-                .after
-                .body()
-                .paragraphs()
-                .any(|paragraph| paragraph.is_empty());
-        if has_move && has_empty_or_terminal_boundary {
+        let has_empty_or_terminal_boundary = has_move
+            && (self.before.text().ends_with('\n')
+                || self.after.text().ends_with('\n')
+                || self
+                    .before
+                    .body()
+                    .paragraphs()
+                    .any(|paragraph| paragraph.is_empty())
+                || self
+                    .after
+                    .body()
+                    .paragraphs()
+                    .any(|paragraph| paragraph.is_empty()));
+        if has_empty_or_terminal_boundary {
             return Err(litchi_core::patch::PatchError::InvalidText {
                 field: "RTF paragraph moves involving empty or terminal-boundary paragraphs are source-bound",
             });
