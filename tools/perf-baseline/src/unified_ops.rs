@@ -1950,6 +1950,10 @@ fn prepare_ppt_text_batch_with_limits(
     if native_stats.changed != entry.count || unified_stats.operations != entry.count {
         return Err("PPT text-batch qualification changed an unexpected number of targets".into());
     }
+    let expected_commits = entry.count.div_ceil(PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT);
+    if native_stats.commits != expected_commits || unified_stats.commits != expected_commits {
+        return Err("PPT text-batch qualification did not coalesce at the native capacity".into());
+    }
     Ok(PreparedPptTextBatch {
         native,
         unified,
@@ -3466,6 +3470,10 @@ mod tests {
         assert_eq!(native_stats.chunk_calls, 2);
         assert_eq!(native_stats.commits, 1);
         assert_eq!(native_stats.changed, PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE + 1);
+        let prepared = prepare_ppt_text_batch(entry, &corpus, source.path())
+            .expect("coalesced native/unified qualification across chunk boundary");
+        assert_eq!(prepared.unified_stats.commits, 1);
+        assert_eq!(prepared.unified_stats.operations, entry.count);
         assert_ne!(
             native_output.to_bytes().expect("native output bytes"),
             corpus.archive
