@@ -8,7 +8,7 @@
 //! bookmark, metacharacter, and special-information records with UTF-16
 //! positions; their presence remains a typed dependency-closure refusal.
 
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::{BTreeMap, BTreeSet, btree_map::Entry};
 use std::fmt;
 use std::io::{Cursor, Write};
 use std::sync::Arc;
@@ -2472,31 +2472,41 @@ pub(crate) fn replace_shape_texts_batch(
     let mut targets = Vec::with_capacity(replacements.len());
     let mut original_slides = BTreeMap::<u32, Arc<[u8]>>::new();
     let mut requested_shapes = BTreeMap::<u32, BTreeSet<u32>>::new();
+    let mut deferred_resolution_error = None;
     // Resolve the semantic slide and shape positions once per request, but
     // defer text inspection until each persisted slide's drawing has been
     // indexed.  This keeps the public positional/error order while avoiding a
     // complete drawing walk for every target on a large slide.
     for (target, replacement) in replacements {
-        let slide =
-            slides
-                .get(target.slide.get())
-                .ok_or(Error::Refused(Refusal::SlideNotFound {
-                    position: target.slide,
-                }))?;
-        let shape = slide
-            .shapes()?
-            .get(target.shape.get())
-            .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+        let Some(slide) = slides.get(target.slide.get()) else {
+            deferred_resolution_error = Some(Error::Refused(Refusal::SlideNotFound {
+                position: target.slide,
+            }));
+            break;
+        };
+        let shapes = match slide.shapes() {
+            Ok(shapes) => shapes,
+            Err(error) => {
+                deferred_resolution_error = Some(error.into());
+                break;
+            },
+        };
+        let Some(shape) = shapes.get(target.shape.get()) else {
+            deferred_resolution_error = Some(Error::Refused(Refusal::ShapeNotFound));
+            break;
+        };
         let slide_persist_id = slide.persist_id();
         let native_shape_id = native_shape_id(shape);
         let slide_record = match original_slides.get(&slide_persist_id) {
             Some(record) => record.clone(),
             None => {
-                let record: Arc<[u8]> = Arc::from(
-                    editor
-                        .persisted_record(slide_persist_id)?
-                        .into_boxed_slice(),
-                );
+                let record: Arc<[u8]> = match editor.persisted_record(slide_persist_id) {
+                    Ok(record) => Arc::from(record.into_boxed_slice()),
+                    Err(error) => {
+                        deferred_resolution_error = Some(error.into());
+                        break;
+                    },
+                };
                 original_slides.insert(slide_persist_id, record.clone());
                 record
             },
@@ -2517,6 +2527,7 @@ pub(crate) fn replace_shape_texts_batch(
     drop(presentation);
 
     let mut indexed_shapes = BTreeMap::new();
+    let mut index_failures = BTreeSet::new();
     let mut prepared = Vec::with_capacity(targets.len());
     let mut encoded_bytes = 0usize;
     let mut inspected_shapes = BTreeMap::<(u32, u32), TextAtom>::new();
@@ -2526,37 +2537,55 @@ pub(crate) fn replace_shape_texts_batch(
     // one framing walk per drawing; this loop retains the caller's request
     // order for all typed shape/text errors.
     for target in targets {
-        if !indexed_shapes.contains_key(&target.slide_persist_id) {
-            let shape_ids = requested_shapes
-                .get(&target.slide_persist_id)
-                .ok_or_else(|| {
-                    PackageError::Corrupted(
-                        "PPT batch shape-text indexing lost its requested identities".into(),
-                    )
-                })?;
-            let slide_record = original_slides
-                .get(&target.slide_persist_id)
-                .ok_or_else(|| {
-                    PackageError::Corrupted(
-                        "PPT batch shape-text indexing lost its original slide record".into(),
-                    )
-                })?;
-            indexed_shapes.insert(
-                target.slide_persist_id,
-                index_slide_text_targets(slide_record, shape_ids)?,
-            );
+        if !index_failures.contains(&target.slide_persist_id) {
+            if let Entry::Vacant(entry) = indexed_shapes.entry(target.slide_persist_id) {
+                let shape_ids =
+                    requested_shapes
+                        .get(&target.slide_persist_id)
+                        .ok_or_else(|| {
+                            PackageError::Corrupted(
+                                "PPT batch shape-text indexing lost its requested identities"
+                                    .into(),
+                            )
+                        })?;
+                let slide_record =
+                    original_slides
+                        .get(&target.slide_persist_id)
+                        .ok_or_else(|| {
+                            PackageError::Corrupted(
+                                "PPT batch shape-text indexing lost its original slide record"
+                                    .into(),
+                            )
+                        })?;
+                match index_slide_text_targets(slide_record, shape_ids) {
+                    Ok(index) => {
+                        entry.insert(index);
+                    },
+                    Err(_error) => {
+                        // A malformed OfficeArt subtree takes the slow error
+                        // path below, which replays the old one-target
+                        // inspector in caller order and therefore preserves
+                        // its exact first-error precedence.
+                        index_failures.insert(target.slide_persist_id);
+                    },
+                }
+            }
         }
-        let index = indexed_shapes
-            .get(&target.slide_persist_id)
-            .ok_or_else(|| {
-                PackageError::Corrupted(
-                    "PPT batch shape-text validation lost its drawing index".into(),
-                )
-            })?;
         let text = match inspected_shapes.get(&(target.slide_persist_id, target.native_shape_id)) {
             Some(text) => text.clone(),
             None => {
-                let text = inspect_indexed_shape_text(index, target.native_shape_id)?;
+                let text = if index_failures.contains(&target.slide_persist_id) {
+                    inspect_slide(&target.slide_record, target.native_shape_id)?
+                } else {
+                    let index = indexed_shapes
+                        .get(&target.slide_persist_id)
+                        .ok_or_else(|| {
+                            PackageError::Corrupted(
+                                "PPT batch shape-text validation lost its drawing index".into(),
+                            )
+                        })?;
+                    inspect_indexed_shape_text(index, target.native_shape_id)?
+                };
                 inspected_shapes.insert(
                     (target.slide_persist_id, target.native_shape_id),
                     text.clone(),
@@ -2596,6 +2625,10 @@ pub(crate) fn replace_shape_texts_batch(
                 encoded,
             });
         }
+    }
+
+    if let Some(error) = deferred_resolution_error {
+        return Err(error);
     }
 
     if prepared.is_empty() {
@@ -2918,7 +2951,7 @@ fn index_slide_text_targets<'a>(
 
 fn index_officeart_shape_targets<'a>(
     record: &'a [u8],
-    requested_shape_ids: &BTreeSet<u32>,
+    active_shape_ids: &BTreeSet<u32>,
     depth: usize,
     index: &mut BTreeMap<u32, IndexedShapeText<'a>>,
 ) -> Result<()> {
@@ -2930,7 +2963,7 @@ fn index_officeart_shape_targets<'a>(
     }
     if record_type(record)? == OFFICEART_SP_CONTAINER {
         if let Some(shape_id) = shape_id_of(record)?
-            && requested_shape_ids.contains(&shape_id)
+            && active_shape_ids.contains(&shape_id)
         {
             index
                 .entry(shape_id)
@@ -2939,12 +2972,33 @@ fn index_officeart_shape_targets<'a>(
                 })
                 .containers
                 .push(record);
+            // A single-target visit stops at its matching SP container.  If
+            // this drawing has other requested identities, those target
+            // visits continue through the selected container and therefore
+            // still require its nested OfficeArt framing to be checked.  The
+            // active set models those independent visits without rescanning
+            // the drawing once per target.  Removing the matched identity
+            // also prevents nested containers with that identity from being
+            // misclassified as additional semantic matches.
+            if active_shape_ids.len() == 1 {
+                return Ok(());
+            }
+            let mut remaining = active_shape_ids.clone();
+            remaining.remove(&shape_id);
+            if remaining.is_empty() {
+                return Ok(());
+            }
+            if record_version(record)? == 0xF {
+                for child_result in children(record)? {
+                    index_officeart_shape_targets(child_result?, &remaining, depth + 1, index)?;
+                }
+            }
             return Ok(());
         }
     }
     if record_version(record)? == 0xF {
         for child_result in children(record)? {
-            index_officeart_shape_targets(child_result?, requested_shape_ids, depth + 1, index)?;
+            index_officeart_shape_targets(child_result?, active_shape_ids, depth + 1, index)?;
         }
     }
     Ok(())
@@ -4461,6 +4515,22 @@ mod tests {
             super::require_batch_text_budget(usize::MAX, 1, usize::MAX),
             Err(Error::Package(crate::package::Error::ResourceLimit(message)))
                 if message.contains("overflow")
+        ));
+    }
+
+    #[test]
+    fn batch_preserves_early_text_error_before_later_shape_resolution_error() {
+        let source = Arc::from(fixture("abc").into_boxed_slice());
+        let missing_shape = Target::new(Position::new(0), Position::new(1));
+        let error = super::replace_shape_texts_batch(
+            source,
+            &[(target(), "\0"), (missing_shape, "replacement")],
+            usize::MAX,
+        )
+        .unwrap_err();
+        assert!(matches!(
+            error,
+            Error::Refused(Refusal::IncompatibleEncoding)
         ));
     }
 
