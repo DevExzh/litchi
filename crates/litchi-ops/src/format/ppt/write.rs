@@ -192,9 +192,9 @@ pub(crate) fn swap_with_limits<'p, 'q>(
             return Ok(());
         }
         edit.move_slide(Position::new(left), Position::new(right))?;
-        if left < right {
+        if left < right && left + 1 != right {
             edit.move_slide(Position::new(right - 1), Position::new(left))?;
-        } else if right + 1 != left {
+        } else if left > right && right + 1 != left {
             edit.move_slide(Position::new(right + 1), Position::new(left))?;
         }
         Ok(())
