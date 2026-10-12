@@ -1238,8 +1238,8 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     },
 ];
 
-/// RTF's write adapter admits main-story paragraph text, paragraph insertion,
-/// removal, paragraph ordering and paragraph swapping.
+/// RTF's write adapter admits main-story paragraph text and alignment,
+/// paragraph insertion, removal, paragraph ordering and paragraph swapping.
 /// Keep the remaining mutation verbs visible instead of making the format-level
 /// `set`/`remove`/`move`/`swap`/`edit`/`batch` support look like general CRUD.
 #[cfg(feature = "rtf")]
@@ -1252,7 +1252,7 @@ static RTF_WRITE_GAPS: [GapSpec; 4] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph text replacement requires the native editor to prove the source formatting and destination closure",
+        reason: "paragraph text and alignment updates require the native editor to prove the source formatting and destination closure",
     },
     GapSpec {
         subject: Subject::Operation {

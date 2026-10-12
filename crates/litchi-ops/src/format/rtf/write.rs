@@ -1,4 +1,4 @@
-//! Unified paragraph-text writes over the native immutable RTF editor.
+//! Unified paragraph-property writes over the native immutable RTF editor.
 //!
 //! Target resolution is performed against one retained `Rtf` snapshot.  The
 //! complete selection is then staged as one native paragraph batch, which
@@ -8,17 +8,20 @@
 use litchi_core::selector::{Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
 use litchi_rtf::edit::{
-    EditOptions, ParagraphTextReplacement, Patch, SemanticLimits as NativeLimits,
+    EditOptions, ParagraphAlignmentUpdate, ParagraphTextReplacement, Patch,
+    SemanticLimits as NativeLimits,
 };
+use litchi_rtf::raw::Alignment;
 
 use super::{Nav, Node, Rtf};
 use crate::error::{Code, Error, Result};
 use crate::new_node::NewNode;
 use crate::path::PathArg;
 use crate::placement::Placement;
-use crate::props::{IntoProps, Props};
+use crate::props::{IntoProps, PropValue, Props};
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
+use crate::value::{Scalar, ValueType};
 
 /// The native proof and immutable endpoints of one RTF write.
 pub(crate) struct Commit {
@@ -118,7 +121,32 @@ fn add_paragraph_text<'a>(props: &'a Props<'_>) -> Result<&'a str> {
     if props.is_empty() {
         return Ok("");
     }
-    paragraph_text(props)
+    if props.len() != 1 {
+        return Err(Error::new(
+            Code::UnsupportedCapability,
+            "RTF paragraph additions accept exactly one `text` property",
+        )
+        .with_format(FileFormat::Rtf));
+    }
+    let Some((key, value)) = props.iter().next() else {
+        unreachable!("the length check above admits one property")
+    };
+    if !key.eq_ignore_ascii_case("text") {
+        return Err(Error::new(
+            Code::UnsupportedCapability,
+            "the requested RTF add property is not supported",
+        )
+        .with_property(key.as_str().to_owned())
+        .with_format(FileFormat::Rtf));
+    }
+    value.as_text().ok_or_else(|| {
+        Error::new(
+            Code::InvalidValue,
+            "RTF paragraph text requires a text property value",
+        )
+        .with_property(key.as_str().to_owned())
+        .with_format(FileFormat::Rtf)
+    })
 }
 
 fn add_position(file: &Rtf, count: usize, placement: Option<&Placement<'_>>) -> Result<usize> {
@@ -172,11 +200,17 @@ pub(crate) fn set_with_limits<'p, 'v>(
 ) -> Result<Commit> {
     file.admit_edit()?;
     let props = Props::from_props(props)?;
-    let text = paragraph_text(&props)?;
+    let (text, alignment) = paragraph_properties(&props)?;
     let positions =
         resolve_paragraph_targets(file, &target, limits.max_expanded_targets(), |_| {})?;
 
-    let operations = positions.len();
+    let property_count = usize::from(text.is_some())
+        .checked_add(usize::from(alignment.is_some()))
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    let operations = positions
+        .len()
+        .checked_mul(property_count)
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
     if operations > limits.max_operations() {
         return Err(TransactionError::Limit {
             kind: LimitKind::Operations,
@@ -188,11 +222,29 @@ pub(crate) fn set_with_limits<'p, 'v>(
 
     // Count the borrowed source text for every selected paragraph before
     // allocating any owned native replacement strings.
-    let replacement_bytes = operations
-        .checked_mul(text.len())
-        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
-    let action_bytes = operations
-        .checked_mul(size_of::<ParagraphTextReplacement>())
+    let replacement_bytes = text
+        .map(|text| {
+            positions
+                .len()
+                .checked_mul(text.len())
+                .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))
+        })
+        .transpose()?
+        .unwrap_or(0);
+    let text_action_bytes = text.map_or(Ok(0), |_| {
+        positions
+            .len()
+            .checked_mul(size_of::<ParagraphTextReplacement>())
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))
+    })?;
+    let alignment_action_bytes = alignment.map_or(Ok(0), |_| {
+        positions
+            .len()
+            .checked_mul(size_of::<ParagraphAlignmentUpdate>())
+            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))
+    })?;
+    let action_bytes = text_action_bytes
+        .checked_add(alignment_action_bytes)
         .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
     let staged_bytes = replacement_bytes
         .checked_add(action_bytes)
@@ -202,16 +254,31 @@ pub(crate) fn set_with_limits<'p, 'v>(
     }
 
     let mut replacements = Vec::new();
-    replacements
-        .try_reserve_exact(operations)
-        .map_err(|source| TransactionError::Allocation { source })?;
-    for position in positions {
-        let mut replacement = String::new();
-        replacement
-            .try_reserve_exact(text.len())
+    if let Some(text) = text {
+        replacements
+            .try_reserve_exact(positions.len())
             .map_err(|source| TransactionError::Allocation { source })?;
-        replacement.push_str(text);
-        replacements.push(ParagraphTextReplacement::new(position, replacement));
+        for position in &positions {
+            let mut replacement = String::new();
+            replacement
+                .try_reserve_exact(text.len())
+                .map_err(|source| TransactionError::Allocation { source })?;
+            replacement.push_str(text);
+            replacements.push(ParagraphTextReplacement::new(*position, replacement));
+        }
+    }
+
+    let mut alignments = Vec::new();
+    if let Some(alignment) = alignment {
+        alignments
+            .try_reserve_exact(positions.len())
+            .map_err(|source| TransactionError::Allocation { source })?;
+        for position in &positions {
+            alignments.push(ParagraphAlignmentUpdate::new(
+                Position::new(*position),
+                alignment,
+            ));
+        }
     }
 
     let native_limits = NativeLimits::builder()
@@ -223,8 +290,14 @@ pub(crate) fn set_with_limits<'p, 'v>(
         .map_err(Error::from)?;
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
-    edit.replace_body_paragraph_texts(&replacements)
-        .map_err(Error::from)?;
+    if !replacements.is_empty() {
+        edit.replace_body_paragraph_texts(&replacements)
+            .map_err(Error::from)?;
+    }
+    if !alignments.is_empty() {
+        edit.set_body_paragraph_alignments(&alignments)
+            .map_err(Error::from)?;
+    }
     let native = edit.commit().map_err(Error::from)?;
 
     let changed = native.diagnostics().changed();
@@ -581,33 +654,66 @@ fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
     Ok(())
 }
 
-fn paragraph_text<'a>(props: &'a Props<'_>) -> Result<&'a str> {
-    if props.len() != 1 {
+fn paragraph_properties<'a>(props: &'a Props<'_>) -> Result<(Option<&'a str>, Option<Alignment>)> {
+    for (key, _) in props.iter() {
+        if !key.eq_ignore_ascii_case("text") && !key.eq_ignore_ascii_case("align") {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "the requested RTF property is not writable",
+            )
+            .with_property(key.as_str().to_owned())
+            .with_format(FileFormat::Rtf));
+        }
+    }
+
+    let text = props.get("text").map(|value| {
+        value.as_text().ok_or_else(|| {
+            Error::new(
+                Code::InvalidValue,
+                "RTF paragraph text requires a text property value",
+            )
+            .with_property("text")
+            .with_format(FileFormat::Rtf)
+        })
+    });
+    let text = text.transpose()?;
+    let alignment = props.get("align").map(|value| paragraph_alignment(value));
+    let alignment = alignment.transpose()?;
+    if text.is_none() && alignment.is_none() {
         return Err(Error::new(
             Code::UnsupportedCapability,
-            "RTF paragraph writes accept exactly one `text` property",
+            "RTF paragraph writes require a `text` or `align` property",
         )
         .with_format(FileFormat::Rtf));
     }
-    let Some((key, value)) = props.iter().next() else {
-        unreachable!("the length check above admits one property")
-    };
-    if !key.eq_ignore_ascii_case("text") {
-        return Err(Error::new(
-            Code::UnsupportedCapability,
-            "the requested RTF property is not writable",
-        )
-        .with_property(key.as_str().to_owned())
-        .with_format(FileFormat::Rtf));
-    }
-    value.as_text().ok_or_else(|| {
-        Error::new(
-            Code::InvalidValue,
-            "RTF paragraph text requires a text property value",
-        )
-        .with_property(key.as_str().to_owned())
-        .with_format(FileFormat::Rtf)
-    })
+    Ok((text, alignment))
+}
+
+fn paragraph_alignment(value: &PropValue<'_>) -> Result<Alignment> {
+    value
+        .with_coerced(ValueType::Token(&super::spec::ALIGNMENT), |value| {
+            let Some(Scalar::Token(value)) = value else {
+                return Err(Error::new(
+                    Code::InvalidValue,
+                    "RTF paragraph alignment requires a token value",
+                )
+                .with_property("align")
+                .with_format(FileFormat::Rtf));
+            };
+            match value {
+                "left" => Ok(Alignment::Left),
+                "right" => Ok(Alignment::Right),
+                "center" => Ok(Alignment::Center),
+                "justify" => Ok(Alignment::Justify),
+                _ => Err(Error::new(
+                    Code::InvalidValue,
+                    "RTF paragraph alignment has an unknown token",
+                )
+                .with_property("align")
+                .with_format(FileFormat::Rtf)),
+            }
+        })
+        .map_err(|error| error.with_property("align").with_format(FileFormat::Rtf))
 }
 
 fn resolve_paragraph_targets(

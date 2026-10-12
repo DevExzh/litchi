@@ -6,6 +6,7 @@ use crate::node::spec::{
 };
 use crate::path::navigate::ElementKind;
 use crate::path::vocabulary::{self, Vocabulary};
+use crate::value::Tokens;
 
 /// A RTF node kind.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -81,16 +82,40 @@ const BODY: ElementSpec<Kind> = ElementSpec {
     gap: None,
 };
 
-pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[PropSpec {
-    name: "text",
-    ty: crate::value::ValueType::Text,
-    access: Access {
-        get: true,
-        set: true,
-        add: true,
+pub(crate) static ALIGNMENT: Tokens =
+    Tokens::new("alignment", &["left", "right", "center", "justify"], &[]);
+
+pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
+    PropSpec {
+        name: "text",
+        ty: crate::value::ValueType::Text,
+        access: Access {
+            get: true,
+            set: true,
+            add: true,
+        },
+        raw: false,
     },
-    raw: false,
-}];
+    PropSpec {
+        name: "align",
+        ty: crate::value::ValueType::Token(&ALIGNMENT),
+        access: Access {
+            get: true,
+            set: true,
+            add: false,
+        },
+        raw: false,
+    },
+];
+
+pub(crate) const fn alignment_name(alignment: litchi_rtf::raw::Alignment) -> &'static str {
+    match alignment {
+        litchi_rtf::raw::Alignment::Left => "left",
+        litchi_rtf::raw::Alignment::Right => "right",
+        litchi_rtf::raw::Alignment::Center => "center",
+        litchi_rtf::raw::Alignment::Justify => "justify",
+    }
+}
 
 const PARAGRAPH: ElementSpec<Kind> = ElementSpec {
     kind: Kind::Paragraph,

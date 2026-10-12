@@ -400,9 +400,17 @@ impl<'a> Source<'a> {
             #[cfg(any(test, feature = "test-support"))]
             Self::Fake(values) => values.get(index)?.as_ref().map(Value::borrowed),
             #[cfg(feature = "rtf")]
-            Self::Rtf(paragraph) => (index == 0).then(|| Value::Text(
-                paragraph.as_str().map_or_else(|| Cow::Owned(paragraph.to_text()), Cow::Borrowed)
-            )),
+            Self::Rtf(paragraph) => match index {
+                0 => Some(Value::Text(
+                    paragraph
+                        .as_str()
+                        .map_or_else(|| Cow::Owned(paragraph.to_text()), Cow::Borrowed),
+                )),
+                1 => Some(Value::Token(crate::format::rtf::alignment_name(
+                    paragraph.format().alignment(),
+                ))),
+                _ => None,
+            },
             #[cfg(feature = "docx")]
             Self::Docx(ref props) => props.get(index),
             #[cfg(feature = "xlsx")]
@@ -690,9 +698,7 @@ impl<'n, 'f> Children<'n, 'f> {
 
     /// An RTF node's children.
     #[cfg(feature = "rtf")]
-    pub(crate) const fn rtf(
-        children: crate::format::rtf::children::Children<'f>,
-    ) -> Self {
+    pub(crate) const fn rtf(children: crate::format::rtf::children::Children<'f>) -> Self {
         Self {
             inner: Inner::Rtf(children),
         }
