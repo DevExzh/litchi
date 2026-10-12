@@ -2841,22 +2841,47 @@ impl Edit {
         self.merge_paragraphs(position, second)
     }
 
-    fn restore_paragraph(&mut self, position: usize, text: &str) -> Result<&mut Self, Error> {
-        if text.contains('\n') {
+    /// Inserts one ordinary body paragraph at a checked zero-based position.
+    ///
+    /// The position is resolved against the immutable source snapshot and may
+    /// equal the source paragraph count to append.  An empty input is a
+    /// real paragraph, including when the source story itself is empty; it is
+    /// not collapsed into a no-op.  The operation retains the existing
+    /// `paragraph.insert` durable vocabulary so its inverse remains a source
+    /// checked paragraph removal.
+    ///
+    /// # Errors
+    /// Returns an error for an invalid position, newline-bearing input,
+    /// conflicting staged work, or finite semantic limits.  Changed
+    /// publication additionally refuses protected, opaque, formatted, or
+    /// otherwise ambiguous body sources through the established lifecycle
+    /// policy.
+    pub fn insert_paragraph<'text>(
+        &mut self,
+        position: litchi_core::Position,
+        input: impl Into<Cow<'text, str>>,
+    ) -> Result<&mut Self, Error> {
+        let input = input.into();
+        if input.contains('\n') {
             return Err(Error::UnsupportedSource(
                 "one restored paragraph cannot contain an ambiguous newline",
             ));
         }
+        let position = position.get();
         let count = self.source.paragraph_count();
         if position > count {
             return Err(Error::ParagraphOutOfRange { position, count });
         }
         self.ensure_lifecycle_room()?;
-        let text = self.admit_text(text, 1)?;
+        let text = self.admit_text(input, 1)?;
         self.charge_replacement(text.len().saturating_add(1))?;
         self.operations
             .push(Operation::RestoreParagraph { position, text });
         Ok(self)
+    }
+
+    fn restore_paragraph(&mut self, position: usize, text: &str) -> Result<&mut Self, Error> {
+        self.insert_paragraph(litchi_core::Position::new(position), text)
     }
 
     fn ensure_lifecycle_room(&self) -> Result<(), Error> {
@@ -3530,6 +3555,25 @@ impl Edit {
         let operation_count = self.operations.len();
         if operation_count == 0 {
             return Ok(Commit::new(self.source.clone(), self.source, 0, Vec::new()));
+        }
+
+        if matches!(
+            self.operations.as_slice(),
+            [Operation::RestoreParagraph { .. }]
+        ) {
+            // Positioned insertion has a source-splice implementation for the
+            // ordinary paragraph closure.  It is needed for an empty input:
+            // the semantic text can remain unchanged while the paragraph
+            // count still grows, so the generic text projection cannot prove
+            // the structural result.
+            if let Some((snapshot, semantic_delta)) = commit_body_paragraph_insertion(&self)? {
+                return Ok(Commit::new(
+                    self.source,
+                    snapshot,
+                    operation_count,
+                    semantic_delta,
+                ));
+            }
         }
 
         if self.operations.iter().all(Operation::is_paragraph_removal) {
@@ -4232,6 +4276,16 @@ impl Edit {
         if self
             .operations
             .iter()
+            .any(|operation| matches!(operation, Operation::RestoreParagraph { .. }))
+            && snapshot.paragraph_count() != self.source.paragraph_count().saturating_add(1)
+        {
+            return Err(Error::UnsupportedSource(
+                "candidate paragraph insertion did not preserve the new paragraph boundary",
+            ));
+        }
+        if self
+            .operations
+            .iter()
             .any(|operation| matches!(operation, Operation::MoveParagraph { .. }))
             && snapshot.paragraph_count() != self.source.paragraph_count()
         {
@@ -4529,6 +4583,149 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
         operation_count,
         semantic_delta,
     ))
+}
+
+/// Publishes a positioned paragraph insertion by splicing the proven ordinary
+/// body source range.  Returning `Ok(None)` leaves decoded, formatted, or
+/// otherwise non-literal sources to the established lifecycle projection,
+/// which reports its existing typed refusal when it cannot preserve them.
+fn commit_body_paragraph_insertion(edit: &Edit) -> Result<Option<(Package, Vec<Change>)>, Error> {
+    let map = match ordinary_paragraph_source_map(&edit.source) {
+        Ok(map) => map,
+        Err(Error::UnsupportedSource(_)) => return Ok(None),
+        Err(error) => return Err(error),
+    };
+    let Operation::RestoreParagraph { position, text } = edit
+        .operations
+        .first()
+        .ok_or(Error::BodyDestinationConflict)?
+    else {
+        return Err(Error::BodyDestinationConflict);
+    };
+    if *position > map.paragraphs.len() {
+        return Err(Error::ParagraphOutOfRange {
+            position: *position,
+            count: map.paragraphs.len(),
+        });
+    }
+    ensure_default_body_formatting(&edit.source)?;
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let body_span = ordinary_paragraph_body_source_span(
+        source_bytes,
+        edit.source.text(),
+        edit.source.options(),
+    )?;
+    let encoded = encoded_body_text(text, edit.source.limits())?;
+    let (offset, replacement) =
+        paragraph_insertion_source_bytes(&map, &body_span, *position, text, encoded)?;
+    let bytes = splice_body(
+        source_bytes,
+        offset..offset,
+        &replacement,
+        edit.source.limits(),
+    )?;
+    if bytes == source_bytes {
+        return Ok(Some((
+            edit.source.clone(),
+            semantic_changes(&edit.operations, &[]),
+        )));
+    }
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    let mut expected = edit
+        .source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect::<Vec<_>>();
+    expected.insert(*position, text.clone());
+    let actual = snapshot
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect::<Vec<_>>();
+    if actual != expected || snapshot.paragraph_count() != expected.len() {
+        return Err(Error::UnsupportedSource(
+            "candidate paragraph insertion failed ordinary-story readback",
+        ));
+    }
+    Ok(Some((snapshot, semantic_changes(&edit.operations, &[]))))
+}
+
+fn paragraph_insertion_source_bytes(
+    map: &OrdinaryParagraphSourceMap,
+    body_span: &Range<usize>,
+    position: usize,
+    text: &str,
+    encoded: Vec<u8>,
+) -> Result<(usize, Vec<u8>), Error> {
+    let mut replacement = Vec::new();
+    if map.paragraphs.is_empty() {
+        if position != 0 || body_span.start != body_span.end {
+            return Err(Error::UnsupportedSource(
+                "empty ordinary paragraph body has no contiguous source span",
+            ));
+        }
+        let boundary_bytes = usize::from(text.is_empty()).saturating_mul(5);
+        replacement
+            .try_reserve_exact(encoded.len().saturating_add(boundary_bytes))
+            .map_err(|_error| Error::Write("could not reserve paragraph insertion".to_string()))?;
+        replacement.extend_from_slice(&encoded);
+        if text.is_empty() {
+            replacement.extend_from_slice(br"\par ");
+        }
+        return Ok((body_span.start, replacement));
+    }
+
+    if position < map.paragraphs.len() {
+        let paragraph = map
+            .paragraphs
+            .get(position)
+            .ok_or(Error::ParagraphOutOfRange {
+                position,
+                count: map.paragraphs.len(),
+            })?;
+        replacement
+            .try_reserve_exact(encoded.len().saturating_add(5))
+            .map_err(|_error| Error::Write("could not reserve paragraph insertion".to_string()))?;
+        replacement.extend_from_slice(&encoded);
+        replacement.extend_from_slice(br"\par ");
+        return Ok((paragraph.source.start, replacement));
+    }
+
+    let last = map
+        .paragraphs
+        .last()
+        .ok_or(Error::UnsupportedSource("ordinary paragraph map is empty"))?;
+    let terminal_boundary_end = last.boundary_after.as_ref().map(|boundary| boundary.end);
+    let has_terminal_boundary = terminal_boundary_end.is_some();
+    let insertion_prefix = if text.is_empty() {
+        if has_terminal_boundary {
+            br"\par ".as_slice()
+        } else {
+            br"\par\par ".as_slice()
+        }
+    } else if has_terminal_boundary {
+        // The existing terminal \par is the separator before the appended
+        // paragraph.  Preserve an already-retained control-word delimiter;
+        // adding another one after it would become visible paragraph text.
+        if terminal_boundary_end == Some(body_span.end) {
+            br" ".as_slice()
+        } else {
+            br"".as_slice()
+        }
+    } else {
+        br"\par ".as_slice()
+    };
+    replacement
+        .try_reserve_exact(insertion_prefix.len().saturating_add(encoded.len()))
+        .map_err(|_error| Error::Write("could not reserve paragraph insertion".to_string()))?;
+    replacement.extend_from_slice(insertion_prefix);
+    replacement.extend_from_slice(&encoded);
+    Ok((body_span.end, replacement))
 }
 
 fn commit_body_paragraph_removals(
@@ -5374,7 +5571,9 @@ fn ordinary_paragraph_source_map_inner(
         .model()
         .plain_body_text_editability()
         .map_err(Error::UnsupportedSource)?;
-    let body_span = if !source.text().starts_with('\n') {
+    let body_span = if source.text().is_empty() && source.paragraph_count() == 0 {
+        ordinary_paragraph_body_source_span(source_bytes, source.text(), source.options())?
+    } else if !source.text().starts_with('\n') {
         source
             .model()
             .ordinary_body_source_span()
@@ -5384,7 +5583,13 @@ fn ordinary_paragraph_source_map_inner(
     } else {
         ordinary_paragraph_body_source_span(source_bytes, source.text(), source.options())?
     };
-    if body_span.start >= body_span.end || body_span.end > source_bytes.len() {
+    let empty_body_span = body_span.start == body_span.end
+        && source.paragraph_count() == 0
+        && source.text().is_empty();
+    if body_span.start > body_span.end
+        || body_span.end > source_bytes.len()
+        || (body_span.start == body_span.end && !empty_body_span)
+    {
         return Err(Error::UnsupportedSource(
             "ordinary paragraph source span is malformed",
         ));
@@ -5394,30 +5599,6 @@ fn ordinary_paragraph_source_map_inner(
         .ok_or(Error::UnsupportedSource(
             "ordinary paragraph source span is outside the source",
         ))?;
-    let starts_with_par = body_bytes.get(..4).is_some_and(|prefix| {
-        prefix.first() == Some(&b'\\')
-            && prefix
-                .get(1)
-                .is_some_and(|byte| byte.eq_ignore_ascii_case(&b'p'))
-            && prefix
-                .get(2)
-                .is_some_and(|byte| byte.eq_ignore_ascii_case(&b'a'))
-            && prefix
-                .get(3)
-                .is_some_and(|byte| byte.eq_ignore_ascii_case(&b'r'))
-    });
-    let has_preceding_delimiter = body_span.start == 0
-        || source_bytes
-            .get(body_span.start.saturating_sub(1))
-            .is_some_and(|byte| byte.is_ascii_whitespace());
-    if semantic_text_starts_with_empty_paragraph(source.text())
-        && starts_with_par
-        && !has_preceding_delimiter
-    {
-        return Err(Error::UnsupportedSource(
-            "leading empty paragraph has no safe control-word delimiter",
-        ));
-    }
     let body_input = std::str::from_utf8(body_bytes)
         .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
     let arena = Bump::new();
@@ -5570,17 +5751,13 @@ fn ordinary_paragraph_source_map_inner(
     }
     if semantic_position != semantic_text.len()
         || paragraphs.len() != source.paragraph_count()
-        || paragraphs.is_empty()
+        || (paragraphs.is_empty() && source.paragraph_count() != 0)
     {
         return Err(Error::UnsupportedSource(
             "ordinary paragraph source map does not cover the complete body story",
         ));
     }
     Ok(OrdinaryParagraphSourceMap { paragraphs })
-}
-
-fn semantic_text_starts_with_empty_paragraph(text: &str) -> bool {
-    text.starts_with('\n')
 }
 
 /// Locates the contiguous root-level ordinary body span, including leading
@@ -10605,6 +10782,9 @@ impl Patch {
     /// also source-bound: the current durable move vocabulary carries only
     /// paragraph text and positions, so it cannot encode their exact boundary
     /// spelling for inverse replay.
+    /// Appending an empty paragraph to a non-terminal ordinary story is
+    /// source-bound for the same reason: its two control boundaries are not
+    /// represented by the shared `paragraph.insert` payload.
     ///
     /// # Errors
     /// Returns an error when caller-selected wire limits cannot represent the
@@ -10635,6 +10815,24 @@ impl Patch {
         {
             return Err(litchi_core::patch::PatchError::InvalidText {
                 field: "RTF multi-paragraph removal durable patches require source-bound batch preconditions",
+            });
+        }
+        if self.changes.iter().any(|change| {
+            matches!(
+                change,
+                Change::RemoveParagraph {
+                    restoring: true,
+                    position,
+                    text,
+                    ..
+                } if text.is_empty()
+                    && *position == self.before.paragraph_count()
+                    && self.before.paragraph_count() != 0
+                    && !self.before.text().ends_with('\n')
+            )
+        }) {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF empty-paragraph insertions are source-bound",
             });
         }
         let has_move = self

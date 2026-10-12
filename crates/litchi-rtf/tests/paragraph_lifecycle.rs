@@ -54,6 +54,86 @@ fn assert_complete_reopen(document: &Package, expected: &[&str]) {
 }
 
 #[test]
+fn positioned_insert_preserves_empty_paragraphs_and_terminal_boundaries() {
+    let cases = [
+        (
+            Package::parse(r"{\rtf1\ansi A\par B}").unwrap(),
+            ["", "Hello", "café 水 🦀"].as_slice(),
+        ),
+        (
+            Package::parse(r"{\rtf1\ansi A\par\par B}").unwrap(),
+            ["", "Inserted", "", "Tail"].as_slice(),
+        ),
+        (
+            Package::parse(r"{\rtf1\ansi A\par B\par}").unwrap(),
+            ["", "Inserted", "Tail"].as_slice(),
+        ),
+        (
+            Package::parse(r"{\rtf1\ansi }").unwrap(),
+            ["", "Hello", ""].as_slice(),
+        ),
+    ];
+    for (source, values) in cases {
+        let count = source.paragraph_count();
+        for (position, value) in values.iter().enumerate().take(count.saturating_add(1)) {
+            let mut edit = source.edit();
+            edit.insert_paragraph(litchi_core::Position::new(position), *value)
+                .unwrap();
+            let commit = edit.commit().unwrap();
+            let mut expected = paragraph_texts(&source);
+            expected.insert(position, (*value).to_string());
+            assert_eq!(paragraph_texts(commit.package()), expected);
+            assert_eq!(commit.package().paragraph_count(), count + 1);
+            assert_complete_reopen(
+                commit.package(),
+                &expected.iter().map(String::as_str).collect::<Vec<_>>(),
+            );
+            let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+            assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+            if !value.is_empty() {
+                let durable = commit.patch().to_durable(durable_limits()).unwrap();
+                let applied = source.apply_durable(&durable).unwrap();
+                assert_eq!(applied.to_bytes().unwrap(), commit.package().to_bytes().unwrap());
+                let restored = applied.apply_durable(&durable.inverse()).unwrap();
+                assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+            }
+        }
+    }
+}
+
+#[test]
+fn positioned_insert_into_an_empty_story_creates_a_real_empty_paragraph() {
+    let source = Package::parse(r"{\rtf1\ansi }").unwrap();
+    assert_eq!(source.paragraph_count(), 0);
+    let mut edit = source.edit();
+    edit.insert_paragraph(litchi_core::Position::new(0), "")
+        .unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(paragraph_texts(commit.package()), [""]);
+    assert_eq!(commit.package().paragraph_count(), 1);
+    assert_complete_reopen(commit.package(), &[""]);
+    let durable = commit.patch().to_durable(durable_limits()).unwrap();
+    let applied = source.apply_durable(&durable).unwrap();
+    assert_eq!(applied.to_bytes().unwrap(), commit.package().to_bytes().unwrap());
+    let restored = applied.apply_durable(&durable.inverse()).unwrap();
+    assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
+}
+
+#[test]
+fn positioned_insert_rejects_protected_sources_after_staging() {
+    let source = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
+    let mut edit = source.edit();
+    edit.insert_paragraph(litchi_core::Position::new(1), "")
+        .unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::ProtectedDocument {
+            protection_type: litchi_rtf::ProtectionType::ReadOnly
+        })
+    ));
+}
+
+#[test]
 fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
     for (position, expected) in [
         (0, vec!["Second", "Third", "Fourth"]),
