@@ -4734,6 +4734,10 @@ fn paragraph_insertion_source_bytes(
         .ok_or(Error::UnsupportedSource("ordinary paragraph map is empty"))?;
     let terminal_boundary_end = last.boundary_after.as_ref().map(|boundary| boundary.end);
     let has_terminal_boundary = terminal_boundary_end.is_some();
+    let terminal_boundary_needs_delimiter = terminal_boundary_end
+        .and_then(|end| end.checked_sub(1))
+        .and_then(|index| source_bytes.get(index))
+        .is_some_and(u8::is_ascii_alphanumeric);
     let insertion_prefix = if text.is_empty() {
         if has_terminal_boundary {
             br"\par ".as_slice()
@@ -4742,9 +4746,10 @@ fn paragraph_insertion_source_bytes(
         }
     } else if has_terminal_boundary {
         // The existing terminal \par is the separator before the appended
-        // paragraph.  Preserve an already-retained control-word delimiter;
-        // adding another one after it would become visible paragraph text.
-        if terminal_boundary_end == Some(body_span.end) {
+        // paragraph.  A trailing source space was already consumed as its
+        // control-word delimiter; add one only when the control word ends at
+        // the insertion point without that delimiter.
+        if terminal_boundary_needs_delimiter {
             br" ".as_slice()
         } else {
             br"".as_slice()
@@ -10850,6 +10855,8 @@ impl Patch {
     /// Appending an empty paragraph to a non-terminal ordinary story is
     /// source-bound for the same reason: its two control boundaries are not
     /// represented by the shared `paragraph.insert` payload.
+    /// Other positioned paragraph insertions are admitted only when a forward
+    /// and inverse durable replay both reproduce the exact source artifacts.
     ///
     /// # Errors
     /// Returns an error when caller-selected wire limits cannot represent the
@@ -10935,6 +10942,15 @@ impl Patch {
                 .ok_or(litchi_core::patch::PatchError::InvalidText {
                     field: "RTF target artifact",
                 })?;
+        let has_paragraph_insertion = self.changes.iter().any(|change| {
+            matches!(
+                change,
+                Change::RemoveParagraph {
+                    restoring: true,
+                    ..
+                }
+            )
+        });
         let operations = self
             .changes
             .iter()
@@ -10945,13 +10961,29 @@ impl Patch {
                 Ok(ReversibleOperation::new(forward, inverse))
             })
             .collect::<Result<Vec<_>, litchi_core::patch::PatchError>>()?;
-        litchi_core::patch::Patch::<litchi_core::patch::Reversible>::new(
+        let durable = litchi_core::patch::Patch::<litchi_core::patch::Reversible>::new(
             limits,
             "litchi-rtf",
             operations,
             BlobBundle::new(limits.blobs()),
             BlobBundle::new(limits.blobs()),
-        )
+        )?;
+        if has_paragraph_insertion {
+            let exact_replay_error = || litchi_core::patch::PatchError::InvalidText {
+                field: "RTF paragraph insertion durable replay is not byte-exact",
+            };
+            let applied =
+                apply_durable(&self.before, &durable).map_err(|_error| exact_replay_error())?;
+            if applied.source_bytes() != Some(after) {
+                return Err(exact_replay_error());
+            }
+            let restored = apply_durable(&applied, &durable.inverse())
+                .map_err(|_error| exact_replay_error())?;
+            if restored.source_bytes() != Some(before) {
+                return Err(exact_replay_error());
+            }
+        }
+        Ok(durable)
     }
 }
 
