@@ -839,3 +839,45 @@ fn first_cell_in_empty_sheet_repairs_later_sheet_offsets() {
         *bytes.get_ref()
     );
 }
+
+#[test]
+fn transformed_byte_handoff_retains_native_policies_and_source_fences() {
+    let bytes = authored_package();
+    let limits = exact_source_limits(&bytes);
+    let source =
+        Package::from_bytes_with_options(&bytes, OpenOptions::new().source_limits(limits)).unwrap();
+    let target = litchi_xls::raw::package_from_replacement_bytes(&source, bytes.clone()).unwrap();
+    assert_eq!(target.source_limits(), source.source_limits());
+    assert_eq!(target.leniency(), source.leniency());
+    assert_eq!(
+        target.compatibility_profile(),
+        source.compatibility_profile()
+    );
+    assert!(!target.is_source_backed());
+    assert_eq!(target.to_bytes().unwrap(), bytes);
+    let mut oversized = bytes.clone();
+    oversized.resize(bytes.len() + 512, 0);
+    assert!(litchi_xls::raw::package_from_replacement_bytes(&source, oversized).is_err());
+
+    let changing = Arc::new(CountingReadAt::new(bytes.clone()));
+    let cfb = Arc::new(SharedOleFile::open(changing.clone()).unwrap());
+    let read_limits = SourceBackedLimits {
+        max_text_cells: 3,
+        max_query_index_bytes: 0,
+        ..Default::default()
+    };
+    let workbook =
+        litchi_xls::raw::source_backed_workbook_from_shared_ole_file(cfb, read_limits).unwrap();
+    let source = Package::from_source(workbook).unwrap();
+    let target = litchi_xls::raw::package_from_replacement_bytes(&source, bytes.clone()).unwrap();
+    assert!(target.is_source_backed());
+    assert_eq!(target.source_backed_limits(), source.source_backed_limits());
+    assert_eq!(target.to_bytes().unwrap(), bytes);
+    changing.bump();
+    assert!(matches!(
+        litchi_xls::raw::package_from_replacement_bytes(&source, bytes),
+        Err(litchi_xls::EditError::Package(PackageError::Source(
+            SourceBackedError::SourceChanged { .. }
+        )))
+    ));
+}

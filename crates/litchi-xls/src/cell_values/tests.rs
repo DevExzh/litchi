@@ -470,6 +470,26 @@ fn retained_limits_survive_noop_changed_and_inverse_publication() {
 }
 
 #[test]
+fn retained_patch_bytes_charge_artifacts_and_semantic_data() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let mut edit = source.edit();
+    edit.set_value(
+        "Sheet1".into(),
+        Reference::new(6, 0).unwrap(),
+        Value::Text("retained semantic payload λ".to_owned()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let patch = commit.patch();
+
+    assert!(patch.semantic().retained_bytes() > 0);
+    assert!(patch.retained_bytes() >= patch.before().len() + patch.after().len());
+
+    let inverse = patch.inverse();
+    assert!(inverse.retained_bytes() >= inverse.before().len() + inverse.after().len());
+}
+
+#[test]
 fn retained_limits_survive_source_backed_and_plan_publication() {
     let bytes = package();
     let (limits, cfb_limits) = retained_edit_limits(&bytes);
@@ -1932,6 +1952,49 @@ fn new_sst_and_xf_resources_round_trip_with_cells() {
 }
 
 #[test]
+fn semantic_inverse_reinterns_a_pruned_removed_text_cell() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(6, 1).unwrap();
+    let mut transaction = source.edit();
+    transaction.remove_cell("Sheet1".into(), reference).unwrap();
+    let commit = transaction.commit().unwrap();
+    assert!(
+        commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .is_none()
+    );
+    assert!(
+        !commit
+            .snapshot()
+            .inner
+            .shared_strings
+            .iter()
+            .any(|text| text == "beta")
+    );
+
+    let restored = commit
+        .patch()
+        .semantic()
+        .inverse()
+        .apply(commit.snapshot())
+        .unwrap();
+    let cell = restored
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(reference)
+        .unwrap()
+        .unwrap();
+    assert_eq!(cell.value(), &Value::Text("beta".to_string()));
+}
+
+#[test]
 fn rich_sst_resource_round_trips_and_semantically_inverts() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let font_index = binary::read_u16_le_at(&source.inner.xf_records[0], 0).unwrap();
@@ -2054,6 +2117,132 @@ fn converts_fixed_width_labelsst_and_rk_with_sst_accounting() {
         .unwrap();
     assert_eq!(cell.storage(), Storage::LabelSst);
     assert_eq!(cell.value(), &Value::Text("beta".to_string()));
+}
+
+#[test]
+fn structural_scalar_replacements_keep_style_and_inverse() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(4, 0).unwrap();
+    let style = source
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(reference)
+        .unwrap()
+        .unwrap()
+        .style();
+    let cases = [
+        (
+            Value::Text("structural text".to_string()),
+            Value::Text("structural text".to_string()),
+        ),
+        (Value::Boolean(false), Value::Boolean(false)),
+        (Value::Blank, Value::Blank),
+    ];
+
+    for (replacement, expected) in cases {
+        let mut edit = source.edit();
+        edit.set_value("Sheet1".into(), reference, replacement)
+            .unwrap();
+        let commit = edit.commit().unwrap();
+        let cell = commit
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap();
+        assert_eq!(cell.style(), style);
+        assert_eq!(cell.value(), &expected);
+        let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+        assert_eq!(restored.bytes(), source.bytes());
+        let restored_semantic = commit
+            .patch()
+            .semantic()
+            .inverse()
+            .apply(commit.snapshot())
+            .unwrap();
+        let restored_cell = restored_semantic
+            .snapshot()
+            .worksheet("Sheet1".into())
+            .unwrap()
+            .unwrap()
+            .cell(reference)
+            .unwrap()
+            .unwrap();
+        assert_eq!(restored_cell.style(), style);
+        assert_eq!(restored_cell.value(), &Value::Number(1.0));
+    }
+}
+
+#[test]
+fn structural_scalar_replacement_splits_packed_numeric_cells() {
+    let (bytes, reference) = fixed_numeric_family_package(Storage::MulRk);
+    let source = Snapshot::from_bytes(bytes).unwrap();
+    let neighbor = Reference::new(
+        u32::from(reference.row()),
+        u32::from(reference.column()).saturating_add(1),
+    )
+    .unwrap();
+    let mut edit = source.edit();
+    edit.set_value(
+        "Sheet1".into(),
+        reference,
+        Value::Text("packed replacement".to_string()),
+    )
+    .unwrap();
+    let commit = edit.commit().unwrap();
+    let sheet = commit
+        .snapshot()
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap();
+    let replaced = sheet.cell(reference).unwrap().unwrap();
+    assert_eq!(replaced.storage(), Storage::LabelSst);
+    assert_eq!(
+        replaced.value(),
+        &Value::Text("packed replacement".to_string())
+    );
+    let remaining = sheet.cell(neighbor).unwrap().unwrap();
+    assert_eq!(remaining.storage(), Storage::Rk);
+    assert!(matches!(remaining.value(), Value::Number(_)));
+    let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
+    assert_eq!(restored.bytes(), source.bytes());
+}
+
+#[test]
+fn failed_scalar_replacement_does_not_retain_a_staged_sst_resource() {
+    let source = Snapshot::from_bytes(package()).unwrap();
+    let reference = Reference::new(4, 0).unwrap();
+    let style = source
+        .worksheet("Sheet1".into())
+        .unwrap()
+        .unwrap()
+        .cell(reference)
+        .unwrap()
+        .unwrap()
+        .style();
+    let mut edit = source.edit();
+    edit.set_style("Sheet1".into(), reference, style).unwrap();
+    assert!(
+        edit.set_value(
+            "Sheet1".into(),
+            reference,
+            Value::Text("staged-only".to_string()),
+        )
+        .is_err()
+    );
+    assert!(edit.resource_changes.is_empty());
+    assert_eq!(edit.structural_changes.len(), 1);
+
+    let mut expected = source.edit();
+    expected
+        .set_style("Sheet1".into(), reference, style)
+        .unwrap();
+    let expected = expected.commit().unwrap();
+    let actual = edit.commit().unwrap();
+    assert_eq!(actual.snapshot().bytes(), expected.snapshot().bytes());
 }
 
 #[test]

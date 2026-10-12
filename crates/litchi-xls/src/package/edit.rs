@@ -293,6 +293,17 @@ impl Patch {
         self.inner.semantic().len()
     }
 
+    /// Returns the saturating byte charge for this exact patch.
+    ///
+    /// The charge includes both complete artifact endpoints and the forward
+    /// and inverse semantic data retained by the native cell-values patch.
+    /// It walks retained data directly without serializing or cloning the
+    /// inverse patch.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        self.inner.retained_bytes()
+    }
+
     /// Return the exact inverse patch.
     #[must_use]
     pub fn inverse(&self) -> Self {
@@ -795,6 +806,17 @@ fn check_source_guard(guard: Option<&SourceGuard>) -> Result<()> {
         )));
     }
     Ok(())
+}
+
+pub(crate) fn package_from_replacement_bytes(source: &Package, bytes: Vec<u8>) -> Result<Package> {
+    super::ensure_publication_allowed(&source.inner).map_err(Error::Package)?;
+    let guard = capture_source_guard(source)?;
+    let result = (|| {
+        let snapshot = crate::raw::cell_values_snapshot_from_bytes(source, bytes)?;
+        package_from_snapshot(source, snapshot)
+    })();
+    check_source_guard(guard.as_ref())?;
+    result
 }
 
 fn package_from_snapshot(source: &Package, snapshot: cell_values::Snapshot) -> Result<Package> {

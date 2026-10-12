@@ -23,13 +23,15 @@ mod node;
 pub(crate) mod owner;
 mod spec;
 pub(crate) mod views;
+pub(crate) mod write;
 
 pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
-pub(crate) use spec::SPEC;
+pub(crate) use spec::{CELL_CAPABILITY_PROPS, SHEET_CAPABILITY_PROPS, SPEC};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
+pub(crate) use write::WriteCommit;
 
 /// An immutable legacy Excel workbook. Cloning shares its native package.
 #[derive(Clone)]
@@ -44,6 +46,84 @@ const _: () = {
 };
 
 impl Xls {
+    /// Whether two handles retain the same immutable owner snapshot.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// Admit a primary package edit under signature and source guards.
+    pub(crate) fn admit_edit(&self) -> Result<()> {
+        self.check_source()?;
+        if self.is_encrypted() {
+            return Err(litchi_xls::package::Error::EncryptionPolicy.into());
+        }
+        if self.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Xls));
+        }
+        Ok(())
+    }
+
+    /// Return the native package that may receive one immutable edit.
+    ///
+    /// An explicitly authorized signature removal starts from an unsigned
+    /// copy of the exact source. Ordinary unsigned handles retain the native
+    /// owner and therefore retain its source policy and lazy route.
+    pub(crate) fn editable_package(&self) -> Result<Package> {
+        self.admit_edit()?;
+        if self.signature() == Signature::RemovalAuthorized {
+            let bytes = signature::unsign_compound_file(
+                self.owner().source_bytes()?,
+                litchi_sign::cfb::Format::Xls,
+            )?;
+            return Ok(litchi_xls::raw::package_from_replacement_bytes(
+                self.owner(),
+                bytes,
+            )?);
+        }
+        Ok(self.owner().clone())
+    }
+
+    /// Carry one native package publication back into the immutable facade
+    /// while retaining origin and the explicit signature disposition.
+    pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
+        let signature = match self.signature() {
+            Signature::RemovalAuthorized => Signature::Unsigned,
+            signature => signature,
+        };
+        Ok(Self(
+            Opened::new(package)
+                .with_origin(self.origin())
+                .with_signature(signature),
+        ))
+    }
+
+    /// The one-shot unified worksheet and scalar-cell setter.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        props: impl crate::props::IntoProps<'v>,
+    ) -> Result<WriteCommit> {
+        self.set_with_limits(
+            target,
+            props,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Set scalar cell values, clear cells, or rename one worksheet under an
+    /// explicit semantic budget.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        props: impl crate::props::IntoProps<'v>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<WriteCommit> {
+        self.check_source()?;
+        let result = write::set_with_limits(self, target, props, limits);
+        self.check_source()?;
+        result
+    }
+
     pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
         use crate::create::{Conformance, Flavor};
         use crate::error::{Code, Error};

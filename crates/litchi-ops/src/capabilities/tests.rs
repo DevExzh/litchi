@@ -137,12 +137,16 @@ fn every_format_has_one_answer_for_its_reads() {
             let pptx_edit = format == FileFormat::Pptx
                 && cfg!(feature = "pptx")
                 && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
+            let xls_edit = format == FileFormat::Xls
+                && cfg!(feature = "xls")
+                && matches!(verb, Verb::Set | Verb::Edit | Verb::Batch);
             assert_eq!(
                 capabilities.verb(verb),
                 if doc_edit
                     || docx_edit
                     || xlsx_edit
                     || pptx_edit
+                    || xls_edit
                     || (format == FileFormat::Xlsb
                         && cfg!(feature = "xlsb")
                         && matches!(
@@ -201,7 +205,7 @@ fn publication_and_creation_are_not_existing_document_edits() {
 
 #[cfg(feature = "xls")]
 #[test]
-fn xls_read_adapter_advertises_m1_reads_and_keeps_mutations_pending() {
+fn xls_adapter_advertises_initial_scalar_writes_and_keeps_other_edits_pending() {
     let capabilities = Capabilities::of(FileFormat::Xls);
     assert!(capabilities.verb(Verb::Get).is_supported());
     assert!(capabilities.verb(Verb::Find).is_supported());
@@ -211,13 +215,31 @@ fn xls_read_adapter_advertises_m1_reads_and_keeps_mutations_pending() {
     assert!(capabilities.verb(Verb::Create).is_supported());
     assert!(capabilities.elements().next().is_some());
 
-    for verb in Verb::ALL.into_iter().filter(|verb| verb.is_edit()) {
+    for verb in [Verb::Set, Verb::Edit, Verb::Batch] {
+        assert!(
+            capabilities.verb(verb).is_supported(),
+            "XLS {verb:?} is supported for scalar writes"
+        );
+    }
+    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
         assert_eq!(
             capabilities.verb(verb).code(),
             Some(Code::UnsupportedCapability),
-            "XLS {verb:?} remains a pending mutation"
+            "XLS {verb:?} remains a granular structural gap"
         );
     }
+
+    let cell = capabilities.element("cell").unwrap();
+    assert!(cell.operations().set);
+    assert!(cell.property("value").unwrap().set());
+    assert!(cell.property("clear").unwrap().set());
+    assert!(!cell.property("value").unwrap().get());
+    assert!(!cell.property("clear").unwrap().get());
+    let sheet = capabilities.element("sheet").unwrap();
+    assert!(sheet.operations().set);
+    assert!(sheet.property("name").unwrap().set());
+    assert!(!sheet.property("hidden").unwrap().set());
+    assert!(!sheet.property("visibility").unwrap().set());
 
     for mode in [Mode::Text, Mode::Annotated, Mode::Outline, Mode::Stats] {
         assert!(capabilities.view(mode).is_supported(), "XLS {mode:?}");
@@ -259,6 +281,30 @@ fn xls_read_adapter_advertises_m1_reads_and_keeps_mutations_pending() {
         })
         .count();
     assert_eq!(creation_gaps, 3);
+
+    for (verb, element, context) in [
+        ("set", "cell", "non-scalar-properties"),
+        ("set", "cell", "existing-formula-cells"),
+        ("set", "cell", "native-dependency-closure"),
+        ("set", "sheet", "tab-state"),
+        ("add", "workbook", "structural-elements"),
+        ("remove", "workbook", "structural-elements"),
+        ("move", "workbook", "structural-elements"),
+        ("swap", "workbook", "structural-elements"),
+        ("batch", "workbook", "extended-commands"),
+    ] {
+        assert!(
+            capabilities.gaps().any(|gap| {
+                gap.subject()
+                    == crate::node::spec::Subject::Operation {
+                        verb,
+                        element,
+                        context,
+                    }
+            }),
+            "missing XLS operation gap {verb} {element} {context}"
+        );
+    }
 }
 
 #[test]

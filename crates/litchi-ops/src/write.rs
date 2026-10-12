@@ -229,10 +229,12 @@ impl File {
     /// failure. All assignments belong to one isolated leaf edit. Available
     /// properties and format support are described by [`Self::capabilities`].
     ///
-    /// XLSX cells, rectangle ranges and scoped cell selectors share one native
-    /// commit. Ranges include blank coordinates; formulas broadcast literally.
-    /// Sheet and row/column layout assignments also use one native commit
-    /// per call, including bounded selectors of one target family.
+    /// XLS and XLSX cells, rectangle ranges and scoped cell selectors share one
+    /// native commit. Ranges include blank coordinates. XLS admits scalar values,
+    /// clears and sheet names; formula cells require a separate write handler.
+    /// XLSX formulas broadcast literally. Its sheet and row/column layout
+    /// assignments also use one native commit per call, including bounded
+    /// selectors of one target family.
     /// PPTX slide shapes and placeholders accept text replacement or clearing;
     /// scoped selectors share one native commit.
     /// Default [`crate::transaction::SemanticLimits`] bound expanded targets
@@ -266,6 +268,10 @@ impl File {
             Self::Xlsb(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Xlsb(commit.into_file())),
+            #[cfg(feature = "xls")]
+            Self::Xls(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Xls(commit.after)),
             #[cfg(feature = "xlsx")]
             Self::Xlsx(handle) => handle
                 .set(_target.into_target()?, _props)

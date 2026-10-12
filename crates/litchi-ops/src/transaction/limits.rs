@@ -84,7 +84,7 @@ impl std::error::Error for Error {
 }
 
 /// Bounds on an explicit transaction: 10,000 mutation calls and 256 MiB of
-/// retained native snapshots by default. XLSX, XLSB and PPTX mutations additionally default
+/// retained native snapshots by default. XLSX, XLSB, XLS and PPTX mutations additionally default
 /// to 65,536 expanded targets and a 16 MiB staged payload/action charge.
 /// Coalesced XLSX/XLSB cell and PPTX shape runs close before their summed charge
 /// exceeds the staged-byte bound; an individual oversized mutation is refused.

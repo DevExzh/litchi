@@ -72,3 +72,19 @@ pub fn cell_values_snapshot_from_bytes(
     crate::cell_values::Snapshot::from_bytes_with_limits_and_cfb(bytes, limits, cfb_limits)
         .map_err(crate::package::Error::Reader)
 }
+
+/// Reopen explicitly transformed bytes as a primary package under the source's
+/// retained read and edit policies. The caller must authorize and validate the
+/// transformation, such as removing a compound signature after explicit consent.
+///
+/// This handoff preserves eager versus positional read policy and checks source
+/// freshness around admission. It does not authorize decryption or re-encryption.
+///
+/// # Errors
+/// Returns typed encryption-policy, source, admission or projection failures.
+pub fn package_from_replacement_bytes(
+    source: &crate::Package,
+    bytes: Vec<u8>,
+) -> crate::package::edit::Result<crate::Package> {
+    crate::package::edit::package_from_replacement_bytes(source, bytes)
+}

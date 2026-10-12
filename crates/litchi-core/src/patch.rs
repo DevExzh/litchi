@@ -10,6 +10,7 @@ use std::{
     collections::{BTreeMap, BTreeSet, VecDeque},
     fmt,
     marker::PhantomData,
+    mem::size_of,
     sync::Arc,
 };
 
@@ -687,6 +688,90 @@ impl<Mode> Patch<Mode> {
     pub const fn blobs(&self) -> &BlobBundle {
         &self.forward_blobs
     }
+
+    /// Returns the saturating byte charge for the patch-owned semantic data.
+    ///
+    /// This accounts for both operation directions and both blob bundles. It
+    /// walks the already retained strings and JSON values directly; it does
+    /// not serialize the patch or construct an inverse clone. The result is
+    /// an owned-data accounting value, so allocator metadata and sharing
+    /// outside the patch are intentionally not inferred.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        let mut bytes = self.format.capacity();
+        bytes = bytes.saturating_add(retained_operations_bytes(
+            &self.forward,
+            self.forward.capacity(),
+        ));
+        bytes = bytes.saturating_add(retained_operations_bytes(
+            &self.reverse,
+            self.reverse.capacity(),
+        ));
+        bytes = bytes.saturating_add(retained_blob_bundle_bytes(&self.forward_blobs));
+        bytes = bytes.saturating_add(retained_blob_bundle_bytes(&self.reverse_blobs));
+        bytes
+    }
+}
+
+fn retained_operations_bytes(operations: &[PatchOperation], capacity: usize) -> usize {
+    let mut bytes = capacity.saturating_mul(size_of::<PatchOperation>());
+    for operation in operations {
+        bytes = bytes.saturating_add(operation.op.capacity());
+        bytes = bytes.saturating_add(operation.target.capacity());
+        bytes = bytes.saturating_add(retained_precondition_bytes(&operation.preconditions));
+        bytes = bytes.saturating_add(retained_json_value_bytes(&operation.value));
+    }
+    bytes
+}
+
+fn retained_json_object_bytes(object: &serde_json::Map<String, Value>) -> usize {
+    retained_string_value_pairs(object.len(), object.iter())
+}
+
+fn retained_precondition_bytes(object: &BTreeMap<String, Value>) -> usize {
+    retained_string_value_pairs(object.len(), object.iter())
+}
+
+fn retained_string_value_pairs<'a, I>(length: usize, pairs: I) -> usize
+where
+    I: IntoIterator<Item = (&'a String, &'a Value)>,
+{
+    let mut bytes = length.saturating_mul(size_of::<(String, Value)>());
+    for (key, value) in pairs {
+        bytes = bytes.saturating_add(key.capacity());
+        bytes = bytes.saturating_add(retained_json_value_bytes(value));
+    }
+    bytes
+}
+
+fn retained_json_value_bytes(value: &Value) -> usize {
+    match value {
+        Value::Array(values) => {
+            let mut bytes = values.capacity().saturating_mul(size_of::<Value>());
+            for value in values {
+                bytes = bytes.saturating_add(retained_json_value_bytes(value));
+            }
+            bytes
+        },
+        Value::Object(object) => retained_json_object_bytes(object),
+        Value::String(value) => value.capacity(),
+        Value::Null | Value::Bool(_) | Value::Number(_) => 0,
+    }
+}
+
+fn retained_blob_bundle_bytes(bundle: &BlobBundle) -> usize {
+    let mut bytes = bundle
+        .entries
+        .len()
+        .saturating_mul(size_of::<(BlobId, Arc<[u8]>)>());
+    for payload in bundle.entries.values() {
+        // An Arc slice owns two counters alongside its payload. This is a
+        // stable conservative charge for the patch-owned blob allocation.
+        bytes = bytes
+            .saturating_add(2usize.saturating_mul(size_of::<usize>()))
+            .saturating_add(payload.len());
+    }
+    bytes
 }
 
 impl<Mode> fmt::Debug for Patch<Mode> {
@@ -2613,6 +2698,38 @@ mod tests {
             decoded.operations()[0].value,
             json!({"a": 1, "blob": forward_id.as_hex(), "z": 2})
         );
+    }
+
+    #[test]
+    fn retained_bytes_counts_reverse_semantic_payloads() {
+        let small = Patch::<Reversible>::new(
+            patch_limits(),
+            "org.litchi.xlsx",
+            [ReversibleOperation::new(
+                operation("cell.set", "sheet:Summary!A1", json!("x")),
+                operation("cell.set", "sheet:Summary!A1", json!("y")),
+            )],
+            BlobBundle::new(limits()),
+            BlobBundle::new(limits()),
+        )
+        .expect("small patch");
+        let large = Patch::<Reversible>::new(
+            patch_limits(),
+            "org.litchi.xlsx",
+            [ReversibleOperation::new(
+                operation("cell.set", "sheet:Summary!A1", json!("x")),
+                operation(
+                    "cell.set",
+                    "sheet:Summary!A1",
+                    json!("reverse payload ".to_owned() + &"x".repeat(80)),
+                ),
+            )],
+            BlobBundle::new(limits()),
+            BlobBundle::new(limits()),
+        )
+        .expect("large patch");
+
+        assert!(large.retained_bytes() > small.retained_bytes());
     }
 
     #[test]

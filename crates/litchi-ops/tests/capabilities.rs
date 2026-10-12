@@ -1,11 +1,17 @@
 //! Reports are generated from the same tables as production reads.
 use litchi_core::FileFormat;
-#[cfg(any(feature = "docx", feature = "pptx"))]
+#[cfg(any(feature = "docx", feature = "pptx", feature = "xls"))]
 use litchi_ops::Code;
 use litchi_ops::capabilities::Capabilities;
 #[cfg(all(feature = "docx", feature = "xlsx"))]
 use litchi_ops::capabilities::Support;
-#[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "xlsb"))]
+#[cfg(any(
+    feature = "docx",
+    feature = "xlsx",
+    feature = "pptx",
+    feature = "xlsb",
+    feature = "xls"
+))]
 use litchi_ops::capabilities::Verb;
 
 #[test]
@@ -41,6 +47,62 @@ fn capability_goldens_follow_enabled_formats() {
             std::fs::read_to_string(path).unwrap(),
             actual,
             "{golden_name}"
+        );
+    }
+}
+
+#[cfg(feature = "xls")]
+#[test]
+fn xls_capabilities_expose_initial_scalar_write_surface() {
+    use litchi_ops::capabilities::Subject;
+
+    let caps = Capabilities::of(FileFormat::Xls);
+    for verb in [Verb::Set, Verb::Edit, Verb::Batch] {
+        assert!(caps.verb(verb).is_supported(), "XLS {verb:?}");
+    }
+    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
+        assert_eq!(
+            caps.verb(verb).code(),
+            Some(Code::UnsupportedCapability),
+            "XLS {verb:?} remains a granular gap"
+        );
+    }
+
+    let cell = caps.element("cell").expect("XLS cell capability");
+    assert!(cell.operations().set);
+    for key in ["value", "clear"] {
+        let property = cell.property(key).unwrap_or_else(|| panic!("{key}"));
+        assert!(!property.get(), "XLS {key} is write-only");
+        assert!(property.set(), "XLS {key} is settable");
+        assert!(!property.add(), "XLS {key} is not an add payload");
+    }
+    let sheet = caps.element("sheet").expect("XLS sheet capability");
+    assert!(sheet.operations().set);
+    assert!(sheet.property("name").unwrap().set());
+    assert!(!sheet.property("hidden").unwrap().set());
+    assert!(!sheet.property("visibility").unwrap().set());
+
+    for (verb, element, context) in [
+        ("set", "cell", "non-scalar-properties"),
+        ("set", "cell", "existing-formula-cells"),
+        ("set", "cell", "native-dependency-closure"),
+        ("set", "sheet", "tab-state"),
+        ("add", "workbook", "structural-elements"),
+        ("remove", "workbook", "structural-elements"),
+        ("move", "workbook", "structural-elements"),
+        ("swap", "workbook", "structural-elements"),
+        ("batch", "workbook", "extended-commands"),
+    ] {
+        assert!(
+            caps.gaps().any(|gap| {
+                gap.subject()
+                    == Subject::Operation {
+                        verb,
+                        element,
+                        context,
+                    }
+            }),
+            "missing XLS operation gap {verb} {element} {context}"
         );
     }
 }

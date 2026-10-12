@@ -8,7 +8,11 @@
 
 use crate::error::Code;
 use crate::format::workbook::spec as workbook;
-use crate::node::spec::{ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec};
+use crate::node::spec::{
+    Access as ReadAccess, ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec,
+};
+use crate::registry::{Access, Constraint, Entry, Table};
+use crate::value::ValueType;
 pub(crate) use workbook::{
     CELL_PROPS as SHARED_CELL_PROPS, ColumnKey, Kind, RowKey, SHEET_PROPS, SheetKey,
     WORKBOOK_PROPS as SHARED_WORKBOOK_PROPS, WorkbookKey,
@@ -16,7 +20,9 @@ pub(crate) use workbook::{
 
 /// The cell properties projected by the native BIFF reader. Formula text is
 /// intentionally absent: the common Package projection retains values and a
-/// formula bit, while source-backed cells do not retain formula tokens.
+/// formula bit, while source-backed cells do not retain formula tokens. The
+/// initial scalar writer therefore excludes existing formula cells until it
+/// can update formula tokens and their cached results together.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CellKey {
     Type,
@@ -32,6 +38,142 @@ impl CellKey {
 }
 
 pub(crate) static CELL_PROPS: &[PropSpec] = &[SHARED_CELL_PROPS[0], SHARED_CELL_PROPS[6]];
+
+/// The scalar cell payloads admitted by the initial unified XLS writer.
+///
+/// `value` accepts the common scalar union and treats `null` as a clear for
+/// non-formula cells. The explicit `clear` flag accepts only `true`; its
+/// `null` form is deliberately refused by the registry rather than being
+/// confused with a value clear. Existing formula cells are a separate
+/// operation gap until formula-token and formula-cache writes are integrated.
+/// Admission also depends on the native storage and dependency closure:
+/// packed `MulBlank` cells and non-adjacent `ExtSST` records remain refused.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum CellSetter {
+    Value,
+    Clear,
+}
+
+const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access = ReadAccess {
+        get: false,
+        set: false,
+        add: false,
+    };
+    spec
+}
+
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 2, 0> = Table::new(
+    [
+        Entry {
+            spec: write_only("value", ValueType::Scalar),
+            access: Access::Set(CellSetter::Value),
+            constraint: Constraint::None,
+            clear: true,
+        },
+        Entry {
+            spec: write_only("clear", ValueType::Bool),
+            access: Access::Set(CellSetter::Clear),
+            constraint: Constraint::None,
+            clear: false,
+        },
+    ],
+    [],
+);
+
+/// Read-schema projection of the cell write registry.  The native node keeps
+/// using [`CELL_PROPS`]; this slice is for mutation admission and capability
+/// introspection only.
+pub(crate) const CELL_WRITE_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
+
+/// Sheet properties supported by the initial unified XLS writer.  Legacy XLS
+/// can rename a worksheet while preserving its catalog identity; visibility
+/// changes remain a separate capability gap.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum SheetSetter {
+    Name,
+}
+
+pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 1, 0> = Table::new(
+    [Entry {
+        spec: PropSpec::new("name", ValueType::Text),
+        access: Access::Set(SheetSetter::Name),
+        constraint: Constraint::None,
+        clear: false,
+    }],
+    [],
+);
+
+pub(crate) const SHEET_WRITE_PROPS: &[PropSpec] = &SHEET_WRITE_TABLE.readable();
+
+const fn same_name(left: &str, right: &str) -> bool {
+    let left = left.as_bytes();
+    let right = right.as_bytes();
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < left.len() {
+        if left[index] != right[index] {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+/// Capability projection for cells: readable native properties followed by
+/// the write-only scalar payload keys.  Keeping this separate from
+/// [`CELL_PROPS`] prevents a write-only key from becoming queryable or being
+/// emitted by the read node view.
+const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
+    let mut props = [PropSpec::new("", ValueType::Text); CELL_PROPS.len() + 2];
+    let mut index = 0;
+    while index < CELL_PROPS.len() {
+        let mut prop = CELL_PROPS[index];
+        let mut write_index = 0;
+        while write_index < CELL_WRITE_PROPS.len() {
+            let write = CELL_WRITE_PROPS[write_index];
+            if same_name(prop.name, write.name) {
+                prop.access.set = write.access.set;
+                prop.access.add = write.access.add;
+            }
+            write_index += 1;
+        }
+        props[index] = prop;
+        index += 1;
+    }
+    props[CELL_PROPS.len()] = CELL_WRITE_PROPS[0];
+    props[CELL_PROPS.len() + 1] = CELL_WRITE_PROPS[1];
+    props
+}
+
+pub(crate) static CELL_CAPABILITY_PROPS: &[PropSpec] = &cell_capability_array();
+
+/// Capability projection for sheets: only `name` gains a set flag; `hidden`
+/// and `visibility` remain read-only until the native tab-state policy lands.
+const fn sheet_capability_array() -> [PropSpec; SHEET_PROPS.len()] {
+    let mut props = [PropSpec::new("", ValueType::Text); SHEET_PROPS.len()];
+    let mut index = 0;
+    while index < SHEET_PROPS.len() {
+        let mut prop = SHEET_PROPS[index];
+        let mut write_index = 0;
+        while write_index < SHEET_WRITE_PROPS.len() {
+            let write = SHEET_WRITE_PROPS[write_index];
+            if same_name(prop.name, write.name) {
+                prop.access.set = write.access.set;
+                prop.access.add = write.access.add;
+            }
+            write_index += 1;
+        }
+        props[index] = prop;
+        index += 1;
+    }
+    props
+}
+
+pub(crate) static SHEET_CAPABILITY_PROPS: &[PropSpec] = &sheet_capability_array();
 
 /// The source-backed owner does not project the workbook window's active tab.
 pub(crate) static WORKBOOK_PROPS: &[PropSpec] = &[

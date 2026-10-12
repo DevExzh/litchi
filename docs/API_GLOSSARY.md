@@ -1303,3 +1303,11 @@ Record [0204](unified-ops/0204-xls-eager-query-cursors.md) adds complete-catalog
 ordinary worksheet ordinals. Eager cell-only queries now consume the native
 iterator without a facade grid. Source-backed and axis projections still need
 bounded cursor work before full read-performance acceptance.
+
+Record [0205](unified-ops/0205-xls-unified-writes.md) connects unified XLS scalar
+`set`, clear/null, sheet names and generic edit/batch/history to the same
+canonical native `Package::edit` family. Scalar record replacements preserve
+XF styles; native SST closure owns string-table publication. Formula-cell
+replacement and unrepresented dependency/inverse closures remain explicit
+element-level gaps. No parallel mutable workbook model or transaction family
+is introduced.

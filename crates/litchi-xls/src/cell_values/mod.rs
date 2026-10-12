@@ -1818,21 +1818,52 @@ impl Edit {
             .ok_or_else(|| Error::UnsafeEdit("target worksheet inventory is stale".into()))
     }
 
-    /// Sets an existing cell through a storage-aware, dependency-checked path.
+    /// Sets an existing scalar cell through a storage-aware,
+    /// dependency-checked path.
     ///
     /// Numeric `Number`, `RK`, and `MulRk` cells, `BoolErr`, SST
-    /// references, and non-string Formula caches are editable in place.
-    /// A standalone `RK` and `LabelSst` can be converted into each other
-    /// because both have the same ten-byte payload; the SST reference count is
-    /// updated atomically. Missing simple text is interned into a bounded SST
-    /// tail resource when an absent or canonical adjacent `ExtSST` can be
-    /// updated without changing its bucket size.
+    /// references, and non-string Formula caches use their fixed-width fast
+    /// paths. Scalar type changes that do not fit those record families use a
+    /// structural cell replacement that retains the existing XF/style and
+    /// row-block closure. A standalone `RK` and `LabelSst` can be converted
+    /// into each other because both have the same ten-byte payload; the SST
+    /// reference count is updated atomically. Missing simple text is interned
+    /// into a bounded SST tail resource when an absent or canonical adjacent
+    /// `ExtSST` can be updated without changing its bucket size. Formula
+    /// records accept cached-result edits only and are never converted into
+    /// ordinary scalar cells.
     ///
     /// # Errors
     ///
     /// Returns an error for a missing or duplicate cell, an unrepresentable
     /// storage conversion, an invalid numeric/cache value, or a finite bound.
+    /// Failed validation leaves this edit unchanged.
     pub fn set_value(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        value: Value,
+    ) -> Result<()> {
+        // A missing text stages an SST resource before the cell operation;
+        // use a candidate only for that multi-stage path so a later overlap
+        // refusal cannot leave the resource behind. Fixed-width and
+        // structural-only edits are already failure-atomic and keep their
+        // fast path allocation-free.
+        let needs_candidate = match &value {
+            Value::Text(text) => !self.has_shared_string(text),
+            _ => false,
+        };
+        if needs_candidate {
+            let mut staged = self.clone();
+            staged.set_value_in_place(selector, reference, value)?;
+            *self = staged;
+            Ok(())
+        } else {
+            self.set_value_in_place(selector, reference, value)
+        }
+    }
+
+    fn set_value_in_place(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -1853,9 +1884,9 @@ impl Edit {
         let source_cell = entries[entry_index].cell.clone();
         if source_cell.storage == Storage::Formula
             && (matches!(
-                source_cell.value,
+                &source_cell.value,
                 Value::FormulaCache(FormulaCache::String(_))
-            ) || matches!(value, Value::FormulaCache(FormulaCache::String(_))))
+            ) || matches!(&value, Value::FormulaCache(FormulaCache::String(_))))
         {
             let Value::FormulaCache(cache) = &value else {
                 return Err(Error::UnsafeEdit(
@@ -1886,11 +1917,41 @@ impl Edit {
         if let Some(text) = &missing_text {
             shared_strings.push(text.clone());
         }
-        let target = target_storage(source_cell.storage, &value, &shared_strings)?;
-        if let Some(text) = missing_text {
-            self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
+        match target_storage(source_cell.storage, &value, &shared_strings) {
+            Ok(target) => {
+                if let Some(text) = missing_text {
+                    self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
+                }
+                self.stage(sheet_index, entry_index, target, value)
+            },
+            Err(error)
+                if source_cell.storage != Storage::Formula
+                    && !matches!(&value, Value::FormulaCache(_)) =>
+            {
+                // Fixed-width replacement is the common fast path above.  A
+                // scalar whose BIFF record family cannot be converted in
+                // place is still representable through the native structural
+                // cell rewrite; retain the existing XF/style while replacing
+                // the record and row-block closure atomically.  Formula
+                // records stay on the dependency-checked cache path and are
+                // never silently converted into ordinary scalar cells.
+                let target = storage_for_new_value(&value, &shared_strings).map_err(|_| error)?;
+                if let Some(text) = missing_text {
+                    self.stage_resource(ResourceChange::SharedString { text, insert: true })?;
+                }
+                self.stage_structural(StructuralChange::Cell {
+                    sheet: sheet_index,
+                    reference,
+                    before: Some((
+                        source_cell.storage,
+                        source_cell.value.clone(),
+                        source_cell.style,
+                    )),
+                    after: Some((target, value, source_cell.style)),
+                })
+            },
+            Err(error) => Err(error),
         }
-        self.stage(sheet_index, entry_index, target, value)
     }
 
     /// Clears a cell only when its existing storage is already semantically blank.
@@ -2053,7 +2114,29 @@ impl Edit {
     ///
     /// Returns a typed refusal for an occupied location, unsupported value,
     /// stale style resource, dependency closure, or finite transaction bound.
+    /// Failed validation leaves this edit unchanged.
     pub fn insert_cell_with_style(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        value: Value,
+        style: StyleIndex,
+    ) -> Result<()> {
+        let needs_candidate = match &value {
+            Value::Text(text) => !self.has_shared_string(text),
+            _ => false,
+        };
+        if needs_candidate {
+            let mut staged = self.clone();
+            staged.insert_cell_with_style_in_place(selector, reference, value, style)?;
+            *self = staged;
+            Ok(())
+        } else {
+            self.insert_cell_with_style_in_place(selector, reference, value, style)
+        }
+    }
+
+    fn insert_cell_with_style_in_place(
         &mut self,
         selector: Selector<'_>,
         reference: Reference,
@@ -2905,19 +2988,40 @@ impl Edit {
                     - i64::from(matches!(before, Some((Storage::LabelSst, _, _))));
             }
         }
-        if sst_delta != 0 {
-            update_sst_total(
-                &mut workbook_bytes,
-                self.source.inner.sst_total_offset,
-                sst_delta,
-            )?;
+        if sst_delta != 0
+            && let Some(offset) = self.source.inner.sst_total_offset
+        {
+            // A structural LabelSst replacement can synthesize the first SST
+            // for a workbook that previously had no shared-string table. In
+            // that case there is no source cstTotal field to patch; the
+            // structural compactor writes the complete header after the
+            // worksheet record has been rewritten.
+            update_sst_total(&mut workbook_bytes, Some(offset), sst_delta)?;
         }
 
-        if !self.structural_changes.is_empty() || !self.resource_changes.is_empty() {
+        let fixed_sst_change = self
+            .changes
+            .iter()
+            .filter(|change| change_is_effective(&self.source, change))
+            .any(|change| {
+                let before = self
+                    .source
+                    .inner
+                    .sheets
+                    .get(change.sheet)
+                    .and_then(|sheet| sheet.entries.get(change.entry))
+                    .map(|entry| entry.cell.storage);
+                before == Some(Storage::LabelSst) || change.storage == Storage::LabelSst
+            });
+        if !self.structural_changes.is_empty()
+            || !self.resource_changes.is_empty()
+            || fixed_sst_change
+        {
             workbook_bytes = structural::apply(
                 workbook_bytes,
                 &self.source,
                 &self.structural_changes,
+                &self.changes,
                 &self.resource_changes,
                 &shared_strings,
             )?;
@@ -3923,6 +4027,17 @@ impl SemanticPatch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.inner.operations().is_empty()
+    }
+
+    /// Returns the saturating byte charge for retained semantic operations.
+    ///
+    /// Both forward and inverse operation data are included by the shared
+    /// patch owner. The calculation walks retained strings, JSON values, and
+    /// blobs directly; it does not serialize the patch or construct an
+    /// inverse clone.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        self.inner.retained_bytes()
     }
 
     /// Exact semantic inverse.
@@ -5068,6 +5183,16 @@ fn apply_fixed_semantic(
     }
     verify_formula_dependency(source, &sheet.entries[entry_index], operation)?;
     let (storage, value) = parse_cell_state(&operation.value)?;
+    // A durable inverse may remove the forward-only SST resource before it
+    // restores the original text. Let the native setter re-intern that text
+    // atomically, rather than requiring the compacted target to retain a dead
+    // shared-string entry solely for semantic replay.
+    if matches!(cell.storage, Storage::LabelSst | Storage::Rk)
+        && storage == Storage::LabelSst
+        && matches!(&value, Value::Text(_))
+    {
+        return transaction.set_value(Selector::Position(sheet_position), reference, value);
+    }
     let shared_strings = transaction.effective_shared_strings();
     let represented = target_storage(cell.storage, &value, &shared_strings)?;
     if represented != storage {
@@ -5151,6 +5276,15 @@ fn apply_structural_cell_semantic(
                     after: Some((Storage::MulRk, Value::Number(number), style)),
                 });
             }
+            if storage == Storage::LabelSst
+                && let Value::Text(text) = &value
+                && !transaction.has_shared_string(text)
+            {
+                transaction.stage_resource(ResourceChange::SharedString {
+                    text: text.clone(),
+                    insert: true,
+                })?;
+            }
             let shared_strings = transaction.effective_shared_strings();
             if storage_for_new_value(&value, &shared_strings)? != storage {
                 return Err(Error::InvalidData(
@@ -5186,6 +5320,37 @@ fn apply_structural_cell_semantic(
                 reference,
                 before: Some(before),
                 after: Some(after),
+            })
+        },
+        (Some(before), Some(after)) => {
+            let (storage, value, style) = after;
+            if storage == Storage::LabelSst
+                && let Value::Text(text) = &value
+                && !transaction.has_shared_string(text)
+            {
+                transaction.stage_resource(ResourceChange::SharedString {
+                    text: text.clone(),
+                    insert: true,
+                })?;
+            }
+            let shared_strings = transaction.effective_shared_strings();
+            let represented = if storage == Storage::MulRk {
+                matches!(&value, Value::Number(number) if encode_rk(*number).is_some())
+            } else {
+                storage_for_new_value(&value, &shared_strings)
+                    .map(|candidate| candidate == storage)
+                    .unwrap_or(false)
+            };
+            if !represented {
+                return Err(Error::InvalidData(
+                    "structural cell storage disagrees with its value".into(),
+                ));
+            }
+            transaction.stage_structural(StructuralChange::Cell {
+                sheet: sheet_index,
+                reference,
+                before: Some(before),
+                after: Some((storage, value, style)),
             })
         },
         _ => Err(Error::InvalidData(
@@ -5368,6 +5533,19 @@ impl Patch {
     #[must_use]
     pub const fn semantic(&self) -> &SemanticPatch {
         &self.semantic
+    }
+
+    /// Returns the saturating byte charge for this exact patch.
+    ///
+    /// The exact before and after artifact buffers are charged in addition to
+    /// the forward and inverse semantic data retained by [`Self::semantic`].
+    /// No serialization or inverse cloning is performed.
+    #[must_use]
+    pub fn retained_bytes(&self) -> usize {
+        self.before
+            .len()
+            .saturating_add(self.after.len())
+            .saturating_add(self.semantic.retained_bytes())
     }
 
     /// Applies this patch only to its exact immutable source artifact.

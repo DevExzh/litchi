@@ -15,10 +15,7 @@
       "supported": true
     },
     "set": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "add": {
       "supported": false,
@@ -45,16 +42,10 @@
       "reason": "edit verbs arrive with the write kernel in milestone M2"
     },
     "edit": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "batch": {
-      "supported": false,
-      "code": "unsupported_capability",
-      "followUp": "M2",
-      "reason": "edit verbs arrive with the write kernel in milestone M2"
+      "supported": true
     },
     "save": {
       "supported": true
@@ -214,7 +205,7 @@
       "parent": "workbook",
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -310,7 +301,7 @@
         "name": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "hidden": {
@@ -348,7 +339,7 @@
       ],
       "operations": {
         "add": false,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": false
@@ -386,6 +377,18 @@
           "add": false,
           "set": false,
           "get": true
+        },
+        "value": {
+          "type": "scalar",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "clear": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -1316,6 +1319,87 @@
       "code": "unsupported_capability",
       "followUp": "M2 XLS metadata creation",
       "reason": "the XLS creator refuses initial metadata until typed metadata authoring is integrated"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "non-scalar-properties",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS formatting and formula setters",
+      "reason": "the initial XLS writer accepts only scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "existing-formula-cells",
+      "code": "unsupported_capability",
+      "followUp": "M4 XLS formula-token and formula-cache writes",
+      "reason": "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the initial writer refuses the operation"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "cell",
+      "context": "native-dependency-closure",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS dependency-complete scalar replacement",
+      "reason": "admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "sheet",
+      "context": "tab-state",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS worksheet visibility setters",
+      "reason": "the initial XLS writer renames worksheets but does not yet change hidden or very-hidden tab state"
+    },
+    {
+      "subject": "operation",
+      "verb": "add",
+      "element": "workbook",
+      "context": "structural-elements",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS structural add handlers",
+      "reason": "worksheet and other structural additions are not integrated into the initial XLS write adapter"
+    },
+    {
+      "subject": "operation",
+      "verb": "remove",
+      "element": "workbook",
+      "context": "structural-elements",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS structural remove handlers",
+      "reason": "cell, worksheet and other structural removals require native dependency-aware handlers beyond scalar clearing"
+    },
+    {
+      "subject": "operation",
+      "verb": "move",
+      "element": "workbook",
+      "context": "structural-elements",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS structural move handlers",
+      "reason": "worksheet and cell movement is not integrated into the initial XLS write adapter"
+    },
+    {
+      "subject": "operation",
+      "verb": "swap",
+      "element": "workbook",
+      "context": "structural-elements",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS structural swap handlers",
+      "reason": "worksheet and cell swapping is not integrated into the initial XLS write adapter"
+    },
+    {
+      "subject": "operation",
+      "verb": "batch",
+      "element": "workbook",
+      "context": "extended-commands",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS extended batch commands",
+      "reason": "XLS batches currently compose admitted scalar cell and worksheet-name sets; structural, formatting and read commands remain pending"
     },
     {
       "subject": "view",

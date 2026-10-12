@@ -7,6 +7,8 @@ use litchi_biff::Records;
 use litchi_core::binary;
 use std::collections::BTreeMap;
 
+const MAX_SST_PAYLOAD: usize = 8_224;
+
 const BOUND_SHEET: u16 = 0x0085;
 const XF: u16 = 0x00e0;
 const EXT_SST: u16 = 0x00ff;
@@ -66,12 +68,22 @@ pub(super) fn apply(
     mut workbook: Vec<u8>,
     source: &super::Snapshot,
     changes: &[StructuralChange],
+    fixed_changes: &[super::Change],
     resources: &[super::ResourceChange],
     shared_strings: &[String],
 ) -> Result<Vec<u8>> {
+    let rebuild_sst = needs_sst_rebuild(source, changes, fixed_changes, resources);
     let mut inserted_resources: Vec<_> = resources
         .iter()
-        .filter(|resource| resource_insert(resource))
+        .filter(|resource| {
+            resource_insert(resource)
+                && !(rebuild_sst
+                    && matches!(
+                        resource,
+                        super::ResourceChange::SharedString { .. }
+                            | super::ResourceChange::RichSharedString { .. }
+                    ))
+        })
         .collect();
     inserted_resources.sort_by_key(|resource| super::resource_target(resource));
     for resource in inserted_resources {
@@ -115,13 +127,772 @@ pub(super) fn apply(
     }
     let mut removed_resources: Vec<_> = resources
         .iter()
-        .filter(|resource| !resource_insert(resource))
+        .filter(|resource| {
+            !resource_insert(resource)
+                && !(rebuild_sst
+                    && matches!(
+                        resource,
+                        super::ResourceChange::SharedString { .. }
+                            | super::ResourceChange::RichSharedString { .. }
+                    ))
+        })
         .collect();
     removed_resources.sort_by_key(|resource| std::cmp::Reverse(super::resource_target(resource)));
     for resource in removed_resources {
         apply_resource(&mut workbook, resource)?;
     }
+    if rebuild_sst {
+        compact_shared_strings(&mut workbook, source, resources, shared_strings)?;
+    }
     Ok(workbook)
+}
+
+fn needs_sst_rebuild(
+    source: &super::Snapshot,
+    changes: &[StructuralChange],
+    fixed_changes: &[super::Change],
+    resources: &[super::ResourceChange],
+) -> bool {
+    fixed_changes
+        .iter()
+        .filter(|change| super::change_is_effective(source, change))
+        .any(|change| {
+            let before = source
+                .inner
+                .sheets
+                .get(change.sheet)
+                .and_then(|sheet| sheet.entries.get(change.entry))
+                .map(|entry| entry.cell.storage);
+            before == Some(Storage::LabelSst) || change.storage == Storage::LabelSst
+        })
+        || resources.iter().any(|resource| {
+            matches!(
+                resource,
+                super::ResourceChange::SharedString { .. }
+                    | super::ResourceChange::RichSharedString { .. }
+            )
+        })
+        || changes.iter().any(|change| {
+            matches!(
+                change,
+                StructuralChange::Cell {
+                    before: Some((Storage::LabelSst, ..)),
+                    ..
+                } | StructuralChange::Cell {
+                    after: Some((Storage::LabelSst, ..)),
+                    ..
+                }
+            )
+        })
+}
+
+/// Rebuilds the BIFF8 shared-string closure from the final LabelSst records.
+///
+/// SST resources are an implementation detail of the transaction planner. A
+/// text replacement can leave the old unique string unreferenced, while a
+/// text-to-number or clear operation can leave no reference at all. Keeping
+/// that dead entry would require inflating `cstTotal`, which would no longer
+/// describe the workbook. This closure therefore removes dead entries,
+/// remaps every final LabelSst index, and regenerates ExtSST when the source
+/// carried that optional accelerator.
+pub(super) fn compact_shared_strings(
+    workbook: &mut Vec<u8>,
+    source: &super::Snapshot,
+    resources: &[super::ResourceChange],
+    shared_strings: &[String],
+) -> Result<()> {
+    let globals = workbook_globals(workbook)?;
+    let sst = globals.iter().find(|record| record.kind == super::SST);
+    let (sst_start, family_end) = if let Some(sst) = sst {
+        if sst.end - sst.start < 12 {
+            return Err(Error::InvalidData("SST header is truncated".into()));
+        }
+        let sst_index = globals
+            .iter()
+            .position(|record| record.start == sst.start)
+            .ok_or_else(|| Error::UnsafeEdit("SST record disappeared from globals".into()))?;
+        let mut family_end = sst.end;
+        for record in &globals[sst_index + 1..] {
+            if record.kind != CONTINUE {
+                break;
+            }
+            family_end = record.end;
+        }
+        (sst.start, family_end)
+    } else {
+        if !source.inner.shared_strings.is_empty() {
+            return Err(Error::InvalidData(
+                "source shared strings have no SST owner".into(),
+            ));
+        }
+        let eof = globals
+            .last()
+            .filter(|record| record.kind == 0x000a)
+            .ok_or_else(|| Error::UnsafeEdit("workbook globals have no EOF owner".into()))?;
+        (eof.start, eof.start)
+    };
+    let ext_sst = globals
+        .iter()
+        .filter(|record| record.kind == EXT_SST)
+        .try_fold(None, |found, record| {
+            if found.is_some() {
+                Err(Error::InvalidData("duplicate ExtSST record".into()))
+            } else {
+                Ok(Some(record.clone()))
+            }
+        })?;
+    if let Some(ext_sst) = &ext_sst
+        && ext_sst.start != family_end
+    {
+        return Err(Error::UnsafeEdit(
+            "ExtSST is not adjacent to its SST record family".into(),
+        ));
+    }
+
+    let effective = effective_sst_entries(source, resources)?;
+    if effective.len() != shared_strings.len()
+        || effective
+            .iter()
+            .zip(shared_strings)
+            .any(|(entry, text)| entry.text != *text)
+    {
+        return Err(Error::UnsafeEdit(
+            "effective shared-string resource order is stale".into(),
+        ));
+    }
+
+    let mut references: Vec<u32> = Vec::new();
+    references
+        .try_reserve_exact(effective.len())
+        .map_err(|_error| Error::Allocation("retaining SST reference counts"))?;
+    references.resize(effective.len(), 0);
+    let records = raw_records(workbook)?;
+    for record in records.iter().filter(|record| record.kind == LABEL_SST) {
+        let index = binary::read_u32_le_at(workbook, record.start + 10)?;
+        let index = usize::try_from(index)
+            .map_err(|_error| Error::InvalidData("LabelSst index exceeds usize".into()))?;
+        let count = references
+            .get_mut(index)
+            .ok_or_else(|| Error::InvalidRecord {
+                record_type: LABEL_SST,
+                message: format!("LabelSst index {index} is outside the effective SST"),
+            })?;
+        *count = (*count)
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidData("SST total reference count overflow".into()))?;
+    }
+
+    let mut remap: Vec<Option<u32>> = Vec::new();
+    remap
+        .try_reserve_exact(effective.len())
+        .map_err(|_error| Error::Allocation("retaining SST index remapping"))?;
+    remap.resize(effective.len(), None);
+    let mut retained = Vec::new();
+    retained
+        .try_reserve_exact(references.iter().filter(|count| **count != 0).count())
+        .map_err(|_error| Error::Allocation("retaining referenced SST entries"))?;
+    for (index, (entry, count)) in effective.iter().zip(references.iter()).enumerate() {
+        if *count == 0 {
+            if entry.source_index.is_some() && !semantic_sst_entry_is_reversible(entry)? {
+                return Err(Error::UnsafeEdit(
+                    "compacting an unreferenced rich or repaired SST entry would lose semantic inverse metadata".into(),
+                ));
+            }
+            continue;
+        }
+        let target = u32::try_from(retained.len())
+            .map_err(|_error| Error::InvalidData("SST unique count exceeds u32".into()))?;
+        remap[index] = Some(target);
+        retained.push(entry.clone());
+    }
+    let total = references.iter().try_fold(0_u32, |total, count| {
+        total
+            .checked_add(*count)
+            .ok_or_else(|| Error::InvalidData("SST total reference count overflow".into()))
+    })?;
+    let unique = u32::try_from(retained.len())
+        .map_err(|_error| Error::InvalidData("SST unique count exceeds u32".into()))?;
+    if total > i32::MAX as u32 || unique > i32::MAX as u32 {
+        return Err(Error::InvalidData(
+            "SST counts exceed the BIFF8 signed count range".into(),
+        ));
+    }
+
+    for record in raw_records(workbook)?
+        .into_iter()
+        .filter(|record| record.kind == LABEL_SST)
+    {
+        let old = usize::try_from(binary::read_u32_le_at(workbook, record.start + 10)?)
+            .map_err(|_error| Error::InvalidData("LabelSst index exceeds usize".into()))?;
+        let target = remap
+            .get(old)
+            .and_then(|value| *value)
+            .ok_or_else(|| Error::UnsafeEdit("final LabelSst points to a dead SST entry".into()))?;
+        super::write_field(workbook, record.start + 10, &target.to_le_bytes())?;
+    }
+
+    let encoded = encode_sst_records(&retained, total)?;
+    let mut replacement = Vec::new();
+    replacement
+        .try_reserve_exact(encoded.bytes_len())
+        .map_err(|_error| Error::Allocation("retaining compacted SST records"))?;
+    for record in &encoded.records {
+        replacement.extend_from_slice(record);
+    }
+    if ext_sst.is_some() {
+        let index = encoded.ext_sst_index(sst_start, unique)?;
+        replacement.extend_from_slice(&index.to_record_bytes()?);
+    }
+    let old_end = ext_sst.as_ref().map_or(family_end, |record| record.end);
+    replace_range_and_adjust_bounds(workbook, sst_start, old_end, &replacement)
+}
+
+#[derive(Clone)]
+struct SstEntry {
+    text: String,
+    properties: Option<Box<crate::records::SharedStringProperties>>,
+    source_index: Option<usize>,
+    /// The source wire entry, when one was present. The public semantic model
+    /// repairs malformed UTF-16 and drops invalid runs, so a semantic
+    /// re-encode would silently change accepted source bytes. Retaining this
+    /// opaque body preserves the source flags, code units, rich runs and
+    /// ExtRst fields while still allowing the entry to move in the SST.
+    raw: Option<RawSstEntry>,
+}
+
+fn semantic_sst_entry_is_reversible(entry: &SstEntry) -> Result<bool> {
+    if entry.properties.as_deref().is_some_and(|properties| {
+        !properties.formatting_runs.is_empty() || properties.phonetic.is_some()
+    }) {
+        return Ok(false);
+    }
+    let Some(raw) = entry.raw.as_ref() else {
+        return Ok(true);
+    };
+    let flags = raw.prefix.get(2).copied().unwrap_or_default();
+    if flags & 0x0c != 0 || !raw.formatting_runs.is_empty() || raw.extension.is_some() {
+        return Ok(false);
+    }
+    let unit_count = raw.characters.iter().try_fold(0_usize, |count, segment| {
+        let width = if segment.wide { 2 } else { 1 };
+        if segment.bytes.len() % width != 0 {
+            return Err(Error::InvalidData(
+                "source SST character segment is not aligned to its encoding width".into(),
+            ));
+        }
+        count
+            .checked_add(segment.bytes.len() / width)
+            .ok_or_else(|| Error::InvalidData("source SST character count overflows".into()))
+    })?;
+    if unit_count != entry.text.encode_utf16().count() {
+        return Ok(false);
+    }
+    let mut units = Vec::new();
+    units
+        .try_reserve_exact(unit_count)
+        .map_err(|_error| Error::Allocation("checking source SST character fidelity"))?;
+    for segment in &raw.characters {
+        if segment.wide {
+            for pair in segment.bytes.chunks_exact(2) {
+                units.push(u16::from_le_bytes([pair[0], pair[1]]));
+            }
+        } else {
+            units.extend(segment.bytes.iter().copied().map(u16::from));
+        }
+    }
+    Ok(String::from_utf16(&units).is_ok_and(|text| text == entry.text))
+}
+
+#[derive(Clone)]
+struct RawSstEntry {
+    prefix: Vec<u8>,
+    characters: Vec<RawSstCharacters>,
+    formatting_runs: Vec<u8>,
+    extension: Option<Vec<u8>>,
+}
+
+#[derive(Clone)]
+struct RawSstCharacters {
+    wide: bool,
+    bytes: Vec<u8>,
+}
+
+struct RawSstCursor<'a> {
+    segments: Vec<&'a [u8]>,
+    segment: usize,
+    offset: usize,
+}
+
+impl<'a> RawSstCursor<'a> {
+    fn new(segments: Vec<&'a [u8]>) -> Self {
+        Self {
+            segments,
+            segment: 0,
+            offset: 0,
+        }
+    }
+
+    fn current(&self) -> &'a [u8] {
+        self.segments.get(self.segment).copied().unwrap_or_default()
+    }
+
+    fn remaining(&self) -> usize {
+        self.current().len().saturating_sub(self.offset)
+    }
+
+    fn advance(&mut self, context: &str) -> Result<()> {
+        self.segment = self
+            .segment
+            .checked_add(1)
+            .ok_or_else(|| Error::InvalidData(format!("{context} segment overflow")))?;
+        self.offset = 0;
+        if self.segment >= self.segments.len() {
+            return Err(Error::UnexpectedEndOfStream(context.into()));
+        }
+        Ok(())
+    }
+
+    fn read_u8(&mut self, context: &str) -> Result<u8> {
+        if self.remaining() == 0 {
+            self.advance(context)?;
+        }
+        let value = *self
+            .current()
+            .get(self.offset)
+            .ok_or_else(|| Error::UnexpectedEndOfStream(context.into()))?;
+        self.offset += 1;
+        Ok(value)
+    }
+
+    fn read_exact(&mut self, output: &mut [u8], context: &str) -> Result<()> {
+        let mut written = 0_usize;
+        while written < output.len() {
+            if self.remaining() == 0 {
+                self.advance(context)?;
+            }
+            let count = self.remaining().min(output.len() - written);
+            output[written..written + count]
+                .copy_from_slice(&self.current()[self.offset..self.offset + count]);
+            self.offset += count;
+            written += count;
+        }
+        Ok(())
+    }
+
+    fn read_u32(&mut self, context: &str) -> Result<u32> {
+        let mut bytes = [0_u8; 4];
+        self.read_exact(&mut bytes, context)?;
+        Ok(u32::from_le_bytes(bytes))
+    }
+
+    fn read_bytes(&mut self, length: usize, context: &str) -> Result<Vec<u8>> {
+        let mut bytes = Vec::new();
+        bytes
+            .try_reserve_exact(length)
+            .map_err(|_error| Error::Allocation("retaining source ExtRst"))?;
+        bytes.resize(length, 0);
+        self.read_exact(&mut bytes, context)?;
+        Ok(bytes)
+    }
+
+    fn read_character_segments(
+        &mut self,
+        count: u16,
+        mut wide: bool,
+    ) -> Result<Vec<RawSstCharacters>> {
+        let count = usize::from(count);
+        let mut consumed = 0_usize;
+        let mut segments = Vec::new();
+        segments
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("retaining source SST character segments"))?;
+        while consumed < count {
+            let width = if wide { 2 } else { 1 };
+            let available = self.remaining();
+            let chunk = (available / width).min(count - consumed);
+            if wide && !available.is_multiple_of(2) && chunk < count - consumed {
+                return Err(Error::InvalidData(
+                    "source SST UTF-16 data is split inside a code unit".into(),
+                ));
+            }
+            let byte_count = chunk.saturating_mul(width);
+            let end = self.offset.checked_add(byte_count).ok_or_else(|| {
+                Error::InvalidData("source SST character offset overflows".into())
+            })?;
+            let mut bytes = Vec::new();
+            bytes
+                .try_reserve_exact(byte_count)
+                .map_err(|_error| Error::Allocation("retaining source SST character bytes"))?;
+            bytes.extend_from_slice(&self.current()[self.offset..end]);
+            segments.push(RawSstCharacters { wide, bytes });
+            self.offset = end;
+            consumed += chunk;
+            if consumed == count {
+                break;
+            }
+            if self.remaining() != 0 {
+                return Err(Error::InvalidData(
+                    "source SST character data does not end at a record boundary".into(),
+                ));
+            }
+            self.advance("continued source SST character data")?;
+            let flags = self.read_u8("source SST continuation flags")?;
+            if flags > 1 {
+                return Err(Error::InvalidData(
+                    "source SST continuation flags are invalid".into(),
+                ));
+            }
+            wide = flags == 1;
+            segments
+                .try_reserve(1)
+                .map_err(|_error| Error::Allocation("retaining source SST character segments"))?;
+        }
+        Ok(segments)
+    }
+}
+
+fn source_sst_entries(source: &super::Snapshot) -> Result<Vec<Option<RawSstEntry>>> {
+    let mut segments = Vec::new();
+    segments
+        .try_reserve(1)
+        .map_err(|_error| Error::Allocation("retaining source SST records"))?;
+    let mut found = false;
+    for item in Records::new(&source.inner.workbook_stream) {
+        let record = item?;
+        if !found {
+            if record.kind().get() == super::SST {
+                found = true;
+                segments.push(record.payload());
+            }
+        } else if record.kind().get() == CONTINUE {
+            segments
+                .try_reserve(1)
+                .map_err(|_error| Error::Allocation("retaining source SST records"))?;
+            segments.push(record.payload());
+        } else {
+            break;
+        }
+    }
+    if !found {
+        if source.inner.shared_strings.is_empty() {
+            return Ok(Vec::new());
+        }
+        return Err(Error::UnsafeEdit(
+            "source shared strings have no SST owner".into(),
+        ));
+    }
+    let mut cursor = RawSstCursor::new(segments);
+    let total = cursor.read_u32("source SST total count")?;
+    let unique = cursor.read_u32("source SST unique count")?;
+    if total < unique || total > i32::MAX as u32 || unique > i32::MAX as u32 {
+        return Err(Error::InvalidData(
+            "source SST counts are outside the BIFF8 range".into(),
+        ));
+    }
+    let unique = usize::try_from(unique)
+        .map_err(|_error| Error::InvalidData("source SST unique count exceeds usize".into()))?;
+    if unique > source.inner.workbook_stream.len().saturating_sub(8) / 3 {
+        return Err(Error::InvalidData(
+            "source SST declares more entries than its stream can contain".into(),
+        ));
+    }
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(unique)
+        .map_err(|_error| Error::Allocation("retaining source SST entries"))?;
+    for _ in 0..unique {
+        let character_count_bytes = cursor.read_bytes(2, "source SST character count")?;
+        let character_count =
+            u16::from_le_bytes(character_count_bytes[..2].try_into().map_err(|_error| {
+                Error::InvalidData("source SST character count is truncated".into())
+            })?);
+        let flags_bytes = cursor.read_bytes(1, "source SST flags")?;
+        let flags = flags_bytes[0];
+        let prefix_length = 3_usize
+            .checked_add(if flags & 0x08 != 0 { 2 } else { 0 })
+            .and_then(|length| length.checked_add(if flags & 0x04 != 0 { 4 } else { 0 }))
+            .ok_or_else(|| Error::InvalidData("source SST entry header length overflows".into()))?;
+        let mut prefix = Vec::new();
+        prefix
+            .try_reserve_exact(prefix_length)
+            .map_err(|_error| Error::Allocation("retaining source SST entry header"))?;
+        prefix.extend_from_slice(&character_count_bytes);
+        prefix.extend_from_slice(&flags_bytes);
+        let run_count = if flags & 0x08 != 0 {
+            let bytes = cursor.read_bytes(2, "source SST rich-run count")?;
+            prefix.extend_from_slice(&bytes);
+            u16::from_le_bytes(bytes[..2].try_into().map_err(|_error| {
+                Error::InvalidData("source SST rich-run count is truncated".into())
+            })?)
+        } else {
+            0
+        };
+        let extension_length = if flags & 0x04 != 0 {
+            let bytes = cursor.read_bytes(4, "source SST extension length")?;
+            prefix.extend_from_slice(&bytes);
+            usize::try_from(u32::from_le_bytes(bytes[..4].try_into().map_err(
+                |_error| Error::InvalidData("source SST extension length is truncated".into()),
+            )?))
+            .map_err(|_error| Error::InvalidData("source SST extension length overflows".into()))?
+        } else {
+            0
+        };
+        let characters = cursor.read_character_segments(character_count, flags & 0x01 != 0)?;
+        let run_bytes = usize::from(run_count)
+            .checked_mul(4)
+            .ok_or_else(|| Error::InvalidData("source SST rich-run length overflows".into()))?;
+        let formatting_runs = cursor.read_bytes(run_bytes, "source SST rich runs")?;
+        let extension = if flags & 0x04 != 0 {
+            Some(cursor.read_bytes(extension_length, "source SST ExtRst")?)
+        } else {
+            None
+        };
+        entries.push(Some(RawSstEntry {
+            prefix,
+            characters,
+            formatting_runs,
+            extension,
+        }));
+    }
+    Ok(entries)
+}
+
+#[cfg(test)]
+fn source_sst_extensions(source: &super::Snapshot) -> Result<Vec<Option<Vec<u8>>>> {
+    Ok(source_sst_entries(source)?
+        .into_iter()
+        .map(|entry| entry.and_then(|entry| entry.extension))
+        .collect())
+}
+
+fn effective_sst_entries(
+    source: &super::Snapshot,
+    resources: &[super::ResourceChange],
+) -> Result<Vec<SstEntry>> {
+    let insert_count = resources
+        .iter()
+        .filter(|resource| {
+            matches!(
+                resource,
+                super::ResourceChange::SharedString { insert: true, .. }
+                    | super::ResourceChange::RichSharedString { insert: true, .. }
+            )
+        })
+        .count();
+    let capacity = source
+        .inner
+        .shared_strings
+        .len()
+        .checked_add(insert_count)
+        .ok_or_else(|| Error::InvalidData("effective SST entry count overflows".into()))?;
+    let mut raw_entries = source_sst_entries(source)?;
+    let mut entries = Vec::new();
+    entries
+        .try_reserve_exact(capacity)
+        .map_err(|_error| Error::Allocation("retaining source SST entries"))?;
+    for (index, text) in source.inner.shared_strings.iter().enumerate() {
+        entries.push(SstEntry {
+            text: text.clone(),
+            properties: source
+                .inner
+                .shared_string_properties
+                .get(index)
+                .cloned()
+                .flatten(),
+            source_index: Some(index),
+            raw: raw_entries.get_mut(index).and_then(Option::take),
+        });
+    }
+    let removal_count = resources
+        .iter()
+        .filter(|resource| {
+            matches!(
+                resource,
+                super::ResourceChange::SharedString { insert: false, .. }
+                    | super::ResourceChange::RichSharedString { insert: false, .. }
+            )
+        })
+        .count();
+    let mut removed_source_indices = Vec::new();
+    removed_source_indices
+        .try_reserve_exact(removal_count)
+        .map_err(|_error| Error::Allocation("retaining removed SST resource indices"))?;
+    for resource in resources.iter().filter(|resource| {
+        matches!(
+            resource,
+            super::ResourceChange::SharedString { insert: false, .. }
+                | super::ResourceChange::RichSharedString { insert: false, .. }
+        )
+    }) {
+        let text = resource_text(resource)
+            .ok_or_else(|| Error::InvalidData("SST resource has no text".into()))?;
+        let index = entries
+            .iter()
+            .position(|entry| entry.text == text)
+            .ok_or_else(|| Error::UnsafeEdit("SST resource removal identity is stale".into()))?;
+        if !sst_resource_removal_matches(&entries[index], resource)? {
+            return Err(Error::UnsafeEdit(
+                "SST resource removal identity is stale".into(),
+            ));
+        }
+        if let Some(source_index) = entries[index].source_index {
+            removed_source_indices.push(source_index);
+        }
+        entries.remove(index);
+    }
+    removed_source_indices.sort_unstable();
+    if let Some(&first) = removed_source_indices.first() {
+        let expected = source.inner.shared_strings.len().saturating_sub(first);
+        if removed_source_indices.len() != expected
+            || removed_source_indices
+                .iter()
+                .enumerate()
+                .any(|(offset, index)| *index != first.saturating_add(offset))
+        {
+            return Err(Error::UnsafeEdit(
+                "SST resource removals must form a source-table suffix".into(),
+            ));
+        }
+    }
+    let mut inserted = Vec::new();
+    inserted
+        .try_reserve_exact(insert_count)
+        .map_err(|_error| Error::Allocation("retaining inserted SST resources"))?;
+    inserted.extend(resources.iter().filter(|resource| {
+        matches!(
+            resource,
+            super::ResourceChange::SharedString { insert: true, .. }
+                | super::ResourceChange::RichSharedString { insert: true, .. }
+        )
+    }));
+    inserted.sort_by_key(|resource| super::resource_target(resource));
+    for resource in inserted {
+        let (text, properties) = match resource {
+            super::ResourceChange::SharedString { text, .. } => (text, None),
+            super::ResourceChange::RichSharedString {
+                text,
+                formatting_runs,
+                ..
+            } => (
+                text,
+                Some(Box::new(crate::records::SharedStringProperties {
+                    formatting_runs: formatting_runs.clone(),
+                    phonetic: None,
+                })),
+            ),
+            _ => unreachable!("filtered SST resource"),
+        };
+        entries.push(SstEntry {
+            text: text.clone(),
+            properties,
+            source_index: None,
+            raw: None,
+        });
+    }
+    Ok(entries)
+}
+
+fn resource_text(resource: &super::ResourceChange) -> Option<&str> {
+    match resource {
+        super::ResourceChange::SharedString { text, .. }
+        | super::ResourceChange::RichSharedString { text, .. } => Some(text),
+        super::ResourceChange::ExtendedFormat { .. }
+        | super::ResourceChange::FormulaCell { .. } => None,
+    }
+}
+
+fn sst_resource_removal_matches(
+    entry: &SstEntry,
+    resource: &super::ResourceChange,
+) -> Result<bool> {
+    match resource {
+        super::ResourceChange::SharedString { .. } => {
+            Ok(entry.properties.is_none() && semantic_sst_entry_is_reversible(entry)?)
+        },
+        super::ResourceChange::RichSharedString {
+            formatting_runs, ..
+        } => canonical_rich_sst_entry_matches(entry, formatting_runs),
+        super::ResourceChange::ExtendedFormat { .. }
+        | super::ResourceChange::FormulaCell { .. } => Ok(false),
+    }
+}
+
+fn canonical_rich_sst_entry_matches(
+    entry: &SstEntry,
+    formatting_runs: &[crate::records::SharedStringFormatRun],
+) -> Result<bool> {
+    let Some(properties) = entry.properties.as_deref() else {
+        return Ok(entry.source_index.is_none() && entry.raw.is_none());
+    };
+    if properties.phonetic.is_some() || properties.formatting_runs != formatting_runs {
+        return Ok(false);
+    }
+    let unit_count = entry.text.encode_utf16().count();
+    let character_count = match u16::try_from(unit_count) {
+        Ok(count) => count,
+        Err(_) => return Ok(false),
+    };
+    let compressed = entry.text.encode_utf16().all(|unit| unit <= 0xff);
+    let flags = u8::from(!compressed) | (1 << 3);
+    let run_count = match u16::try_from(formatting_runs.len()) {
+        Ok(count) => count,
+        Err(_) => return Ok(false),
+    };
+    let mut prefix = Vec::new();
+    prefix
+        .try_reserve_exact(5)
+        .map_err(|_error| Error::Allocation("checking rich SST resource identity"))?;
+    prefix.extend_from_slice(&character_count.to_le_bytes());
+    prefix.push(flags);
+    prefix.extend_from_slice(&run_count.to_le_bytes());
+    let Some(raw) = entry.raw.as_ref() else {
+        return Ok(entry.source_index.is_none());
+    };
+    if raw.prefix != prefix || raw.extension.is_some() {
+        return Ok(false);
+    }
+
+    let mut characters = Vec::new();
+    characters
+        .try_reserve_exact(if compressed {
+            unit_count
+        } else {
+            unit_count.saturating_mul(2)
+        })
+        .map_err(|_error| Error::Allocation("checking rich SST characters"))?;
+    for unit in entry.text.encode_utf16() {
+        if compressed {
+            characters.push(u8::try_from(unit).map_err(|_error| {
+                Error::InvalidData("compressed rich SST character exceeds u8".into())
+            })?);
+        } else {
+            characters.extend_from_slice(&unit.to_le_bytes());
+        }
+    }
+    let mut offset = 0_usize;
+    for segment in &raw.characters {
+        if segment.wide != !compressed
+            || characters.get(offset..offset.saturating_add(segment.bytes.len()))
+                != Some(segment.bytes.as_slice())
+        {
+            return Ok(false);
+        }
+        offset = offset
+            .checked_add(segment.bytes.len())
+            .ok_or_else(|| Error::InvalidData("rich SST character offset overflows".into()))?;
+    }
+    if offset != characters.len() {
+        return Ok(false);
+    }
+
+    let mut runs = Vec::new();
+    runs.try_reserve_exact(formatting_runs.len().saturating_mul(4))
+        .map_err(|_error| Error::Allocation("checking rich SST formatting runs"))?;
+    for run in formatting_runs {
+        runs.extend_from_slice(&run.character_index.to_le_bytes());
+        runs.extend_from_slice(&run.font_index.to_le_bytes());
+    }
+    Ok(raw.formatting_runs == runs)
 }
 
 /// The worksheet-name rule of [MS-XLS] 2.4.28, which the reader enforces
@@ -154,7 +925,7 @@ pub(super) fn certify_sst_insertion(
         .try_reserve_exact(source.inner.workbook_stream.len())
         .map_err(|_error| Error::Allocation("certifying SST resource insertion"))?;
     workbook.extend_from_slice(&source.inner.workbook_stream);
-    let mut resources: Vec<_> = staged
+    let insertion_count = staged
         .iter()
         .chain(std::iter::once(candidate))
         .filter(|resource| {
@@ -164,8 +935,42 @@ pub(super) fn certify_sst_insertion(
                     | super::ResourceChange::RichSharedString { insert: true, .. }
             )
         })
-        .collect();
+        .count();
+    let mut resources = Vec::new();
+    resources
+        .try_reserve_exact(insertion_count)
+        .map_err(|_error| Error::Allocation("certifying SST resource insertion"))?;
+    resources.extend(
+        staged
+            .iter()
+            .chain(std::iter::once(candidate))
+            .filter(|resource| {
+                matches!(
+                    resource,
+                    super::ResourceChange::SharedString { insert: true, .. }
+                        | super::ResourceChange::RichSharedString { insert: true, .. }
+                )
+            }),
+    );
     resources.sort_by_key(|resource| super::resource_target(resource));
+    if !workbook_globals(&workbook)?
+        .iter()
+        .any(|record| record.kind == super::SST)
+    {
+        for resource in resources {
+            let (text, formatting_runs) = match resource {
+                super::ResourceChange::SharedString { text, .. } => (text.as_str(), &[][..]),
+                super::ResourceChange::RichSharedString {
+                    text,
+                    formatting_runs,
+                    ..
+                } => (text.as_str(), formatting_runs.as_slice()),
+                _ => continue,
+            };
+            encode_sst_tail_records(text, formatting_runs)?;
+        }
+        return Ok(());
+    }
     for resource in resources {
         apply_resource(&mut workbook, resource)?;
     }
@@ -493,7 +1298,13 @@ fn encode_sst_tail_records(
         {
             end -= 1;
         }
-        let mut payload = Vec::with_capacity(prefix + (end - offset) * width);
+        let payload_len = prefix
+            .checked_add((end - offset).saturating_mul(width))
+            .ok_or_else(|| Error::InvalidData("continued SST payload size overflows".into()))?;
+        let mut payload = Vec::new();
+        payload
+            .try_reserve_exact(payload_len)
+            .map_err(|_error| Error::Allocation("retaining continued SST payload"))?;
         if first {
             payload.extend_from_slice(&count.to_le_bytes());
         }
@@ -521,7 +1332,13 @@ fn encode_sst_tail_records(
                 payload.extend_from_slice(&unit.to_le_bytes());
             }
         }
-        let mut record = Vec::with_capacity(4 + payload.len());
+        let record_len = 4usize
+            .checked_add(payload.len())
+            .ok_or_else(|| Error::InvalidData("continued SST record size overflows".into()))?;
+        let mut record = Vec::new();
+        record
+            .try_reserve_exact(record_len)
+            .map_err(|_error| Error::Allocation("retaining continued SST record"))?;
         record.extend_from_slice(&CONTINUE.to_le_bytes());
         record.extend_from_slice(
             &u16::try_from(payload.len())
@@ -556,7 +1373,17 @@ fn encode_sst_tail_records(
             let available = 8_228_usize.saturating_sub(last.len());
             let aligned = available - available % 4;
             if aligned == 0 {
-                let mut record = Vec::with_capacity(8_228.min(4 + run_bytes.len() - offset));
+                let record_len = 8_228.min(
+                    4usize
+                        .checked_add(run_bytes.len() - offset)
+                        .ok_or_else(|| {
+                            Error::InvalidData("SST formatting record size overflows".into())
+                        })?,
+                );
+                let mut record = Vec::new();
+                record
+                    .try_reserve_exact(record_len)
+                    .map_err(|_error| Error::Allocation("retaining SST formatting record"))?;
                 record.extend_from_slice(&CONTINUE.to_le_bytes());
                 record.extend_from_slice(&0_u16.to_le_bytes());
                 records.push(record);
@@ -571,6 +1398,417 @@ fn encode_sst_tail_records(
         }
     }
     Ok(records)
+}
+
+struct EncodedSst {
+    records: Vec<Vec<u8>>,
+    locations: Vec<(usize, u16)>,
+}
+
+impl EncodedSst {
+    fn bytes_len(&self) -> usize {
+        self.records.iter().map(Vec::len).sum()
+    }
+
+    fn ext_sst_index(
+        &self,
+        sst_start: usize,
+        unique: u32,
+    ) -> Result<crate::shared_string_index::SharedStringIndex> {
+        let bucket_size = ext_sst_bucket_size(unique)?;
+        let mut buckets = Vec::new();
+        buckets
+            .try_reserve((self.locations.len() / usize::from(bucket_size)).saturating_add(1))
+            .map_err(|_error| Error::Allocation("retaining ExtSST buckets"))?;
+        let mut index = 0_usize;
+        while index < self.locations.len() {
+            let (relative, record_offset) = self.locations[index];
+            let absolute = sst_start
+                .checked_add(relative)
+                .and_then(|value| u32::try_from(value).ok())
+                .ok_or_else(|| Error::InvalidData("ExtSST string position exceeds u32".into()))?;
+            buckets.push(crate::shared_string_index::SharedStringBucket::try_new(
+                absolute,
+                record_offset,
+            )?);
+            index = index.saturating_add(usize::from(bucket_size));
+        }
+        crate::shared_string_index::SharedStringIndex::try_new(unique, buckets)
+    }
+}
+
+fn encode_sst_records(entries: &[SstEntry], total: u32) -> Result<EncodedSst> {
+    let unique = u32::try_from(entries.len())
+        .map_err(|_error| Error::InvalidData("SST unique count exceeds u32".into()))?;
+    let mut records = Vec::new();
+    records
+        .try_reserve(entries.len().saturating_div(2).saturating_add(1))
+        .map_err(|_error| Error::Allocation("retaining compacted SST frames"))?;
+    let mut locations = Vec::new();
+    locations
+        .try_reserve_exact(entries.len())
+        .map_err(|_error| Error::Allocation("retaining compacted SST locations"))?;
+    let mut payload = Vec::new();
+    payload
+        .try_reserve_exact(MAX_SST_PAYLOAD)
+        .map_err(|_error| Error::Allocation("retaining compacted SST payload"))?;
+    payload.extend_from_slice(&total.to_le_bytes());
+    payload.extend_from_slice(&unique.to_le_bytes());
+    let mut first_record = true;
+    let mut record_start = 0_usize;
+
+    for entry in entries {
+        if let Some(raw) = entry.raw.as_ref() {
+            append_raw_sst_entry(
+                raw,
+                &mut records,
+                &mut locations,
+                &mut payload,
+                &mut first_record,
+                &mut record_start,
+            )?;
+            continue;
+        }
+        let unit_count = entry.text.encode_utf16().count();
+        let mut units = Vec::new();
+        units
+            .try_reserve_exact(unit_count)
+            .map_err(|_error| Error::Allocation("retaining compacted SST UTF-16 units"))?;
+        units.extend(entry.text.encode_utf16());
+        let character_count = u16::try_from(units.len())
+            .map_err(|_error| Error::UnsafeEdit("shared string exceeds u16 characters".into()))?;
+        let compressed = units.iter().all(|unit| *unit <= 0xff);
+        let runs = entry
+            .properties
+            .as_deref()
+            .map_or(&[][..], |properties| properties.formatting_runs.as_slice());
+        let ext = entry
+            .properties
+            .as_deref()
+            .and_then(|properties| properties.phonetic.as_ref())
+            .map(encode_phonetic_extension)
+            .transpose()?;
+        let run_count = u16::try_from(runs.len())
+            .map_err(|_error| Error::UnsafeEdit("SST rich-run count exceeds u16".into()))?;
+        let ext_len = ext.as_ref().map_or(0, Vec::len);
+        let ext_len_u32 = u32::try_from(ext_len)
+            .map_err(|_error| Error::InvalidData("SST ExtRst length exceeds u32".into()))?;
+        let header_len = 3_usize
+            .checked_add(if runs.is_empty() { 0 } else { 2 })
+            .and_then(|length| length.checked_add(if ext.is_some() { 4 } else { 0 }))
+            .ok_or_else(|| Error::InvalidData("SST string header length overflow".into()))?;
+        if payload.len().saturating_add(header_len) > MAX_SST_PAYLOAD {
+            flush_sst_record(
+                &mut records,
+                &mut payload,
+                &mut first_record,
+                &mut record_start,
+            )?;
+        }
+        if payload.len().saturating_add(header_len) > MAX_SST_PAYLOAD {
+            return Err(Error::InvalidData(
+                "SST string header exceeds record payload".into(),
+            ));
+        }
+        let string_start = record_start
+            .checked_add(4)
+            .and_then(|value| value.checked_add(payload.len()))
+            .ok_or_else(|| Error::InvalidData("SST string position overflows".into()))?;
+        let record_offset = u16::try_from(4usize.saturating_add(payload.len()))
+            .map_err(|_error| Error::InvalidData("SST record offset exceeds u16".into()))?;
+        locations.push((string_start, record_offset));
+        payload.extend_from_slice(&character_count.to_le_bytes());
+        let flags = u8::from(!compressed)
+            | if !runs.is_empty() { 1 << 3 } else { 0 }
+            | if ext.is_some() { 1 << 2 } else { 0 };
+        payload.push(flags);
+        if !runs.is_empty() {
+            payload.extend_from_slice(&run_count.to_le_bytes());
+        }
+        if ext.is_some() {
+            payload.extend_from_slice(&ext_len_u32.to_le_bytes());
+        }
+
+        let width = if compressed { 1 } else { 2 };
+        let mut offset = 0_usize;
+        while offset < units.len() {
+            let available = MAX_SST_PAYLOAD.saturating_sub(payload.len());
+            let mut count = available / width;
+            count = count.min(units.len().saturating_sub(offset));
+            if count == 0 {
+                flush_sst_record(
+                    &mut records,
+                    &mut payload,
+                    &mut first_record,
+                    &mut record_start,
+                )?;
+                payload.push(u8::from(!compressed));
+                continue;
+            }
+            if !compressed && count < units.len() - offset && count > 0 {
+                let end = offset + count;
+                if end < units.len()
+                    && (0xd800..=0xdbff).contains(&units[end - 1])
+                    && (0xdc00..=0xdfff).contains(&units[end])
+                {
+                    count -= 1;
+                }
+                if count == 0 {
+                    flush_sst_record(
+                        &mut records,
+                        &mut payload,
+                        &mut first_record,
+                        &mut record_start,
+                    )?;
+                    payload.push(1);
+                    continue;
+                }
+            }
+            if compressed {
+                for unit in &units[offset..offset + count] {
+                    payload.push(u8::try_from(*unit).map_err(|_error| {
+                        Error::InvalidData("compressed SST unit exceeds u8".into())
+                    })?);
+                }
+            } else {
+                for unit in &units[offset..offset + count] {
+                    payload.extend_from_slice(&unit.to_le_bytes());
+                }
+            }
+            offset += count;
+            if offset < units.len() {
+                flush_sst_record(
+                    &mut records,
+                    &mut payload,
+                    &mut first_record,
+                    &mut record_start,
+                )?;
+                payload.push(u8::from(!compressed));
+            }
+        }
+        if !runs.is_empty() {
+            let mut bytes = Vec::new();
+            bytes
+                .try_reserve_exact(runs.len().saturating_mul(4))
+                .map_err(|_error| Error::Allocation("retaining SST formatting runs"))?;
+            for run in runs {
+                bytes.extend_from_slice(&run.character_index.to_le_bytes());
+                bytes.extend_from_slice(&run.font_index.to_le_bytes());
+            }
+            append_sst_bytes(
+                &mut records,
+                &mut payload,
+                &mut first_record,
+                &mut record_start,
+                &bytes,
+            )?;
+        }
+        if let Some(ext) = ext {
+            append_sst_bytes(
+                &mut records,
+                &mut payload,
+                &mut first_record,
+                &mut record_start,
+                &ext,
+            )?;
+        }
+    }
+    flush_sst_record(
+        &mut records,
+        &mut payload,
+        &mut first_record,
+        &mut record_start,
+    )?;
+    Ok(EncodedSst { records, locations })
+}
+
+fn append_raw_sst_entry(
+    entry: &RawSstEntry,
+    records: &mut Vec<Vec<u8>>,
+    locations: &mut Vec<(usize, u16)>,
+    payload: &mut Vec<u8>,
+    first_record: &mut bool,
+    record_start: &mut usize,
+) -> Result<()> {
+    if entry.prefix.len() > MAX_SST_PAYLOAD {
+        return Err(Error::InvalidData(
+            "source SST entry header exceeds record payload".into(),
+        ));
+    }
+    if payload.len().saturating_add(entry.prefix.len()) > MAX_SST_PAYLOAD {
+        flush_sst_record(records, payload, first_record, record_start)?;
+    }
+    let string_start = record_start
+        .checked_add(4)
+        .and_then(|value| value.checked_add(payload.len()))
+        .ok_or_else(|| Error::InvalidData("SST string position overflows".into()))?;
+    let record_offset = u16::try_from(4usize.saturating_add(payload.len()))
+        .map_err(|_error| Error::InvalidData("SST record offset exceeds u16".into()))?;
+    locations.push((string_start, record_offset));
+    payload.extend_from_slice(&entry.prefix);
+    append_raw_sst_characters(
+        records,
+        payload,
+        first_record,
+        record_start,
+        &entry.characters,
+    )?;
+    append_sst_bytes(
+        records,
+        payload,
+        first_record,
+        record_start,
+        &entry.formatting_runs,
+    )?;
+    if let Some(extension) = &entry.extension {
+        append_sst_bytes(records, payload, first_record, record_start, extension)?;
+    }
+    Ok(())
+}
+
+fn append_raw_sst_characters(
+    records: &mut Vec<Vec<u8>>,
+    payload: &mut Vec<u8>,
+    first_record: &mut bool,
+    record_start: &mut usize,
+    segments: &[RawSstCharacters],
+) -> Result<()> {
+    for (segment_index, segment) in segments.iter().enumerate() {
+        if segment_index != 0 {
+            flush_sst_record(records, payload, first_record, record_start)?;
+            payload.push(u8::from(segment.wide));
+        }
+        let mut offset = 0_usize;
+        while offset < segment.bytes.len() {
+            if payload.len() == MAX_SST_PAYLOAD {
+                flush_sst_record(records, payload, first_record, record_start)?;
+                payload.push(u8::from(segment.wide));
+            }
+            let mut count = (MAX_SST_PAYLOAD - payload.len()).min(segment.bytes.len() - offset);
+            if segment.wide {
+                count -= count % 2;
+            }
+            if count == 0 {
+                flush_sst_record(records, payload, first_record, record_start)?;
+                payload.push(u8::from(segment.wide));
+                continue;
+            }
+            payload.extend_from_slice(&segment.bytes[offset..offset + count]);
+            offset += count;
+        }
+    }
+    Ok(())
+}
+
+fn flush_sst_record(
+    records: &mut Vec<Vec<u8>>,
+    payload: &mut Vec<u8>,
+    first_record: &mut bool,
+    record_start: &mut usize,
+) -> Result<()> {
+    if payload.is_empty() {
+        return Ok(());
+    }
+    let length = u16::try_from(payload.len())
+        .map_err(|_error| Error::InvalidData("SST record payload exceeds u16".into()))?;
+    let kind = if *first_record { super::SST } else { CONTINUE };
+    let record_len = 4usize
+        .checked_add(payload.len())
+        .ok_or_else(|| Error::InvalidData("SST record size overflows".into()))?;
+    let mut record = Vec::new();
+    record
+        .try_reserve_exact(record_len)
+        .map_err(|_error| Error::Allocation("retaining SST record"))?;
+    record.extend_from_slice(&kind.to_le_bytes());
+    record.extend_from_slice(&length.to_le_bytes());
+    record.extend_from_slice(payload);
+    *record_start = record_start
+        .checked_add(record.len())
+        .ok_or_else(|| Error::InvalidData("SST record position overflows".into()))?;
+    records
+        .try_reserve(1)
+        .map_err(|_error| Error::Allocation("retaining SST records"))?;
+    records.push(record);
+    payload.clear();
+    *first_record = false;
+    Ok(())
+}
+
+fn append_sst_bytes(
+    records: &mut Vec<Vec<u8>>,
+    payload: &mut Vec<u8>,
+    first_record: &mut bool,
+    record_start: &mut usize,
+    bytes: &[u8],
+) -> Result<()> {
+    let mut offset = 0_usize;
+    while offset < bytes.len() {
+        if payload.len() == MAX_SST_PAYLOAD {
+            flush_sst_record(records, payload, first_record, record_start)?;
+        }
+        let count = (MAX_SST_PAYLOAD - payload.len()).min(bytes.len() - offset);
+        payload.extend_from_slice(&bytes[offset..offset + count]);
+        offset += count;
+    }
+    Ok(())
+}
+
+fn encode_phonetic_extension(phonetic: &crate::records::PhoneticString) -> Result<Vec<u8>> {
+    let text_units: Vec<u16> = phonetic.text.encode_utf16().collect();
+    let text_count = u16::try_from(text_units.len())
+        .map_err(|_error| Error::InvalidData("ExtRst text exceeds u16 characters".into()))?;
+    if text_count > 32_767 {
+        return Err(Error::UnsafeEdit(
+            "ExtRst text exceeds signed character limit".into(),
+        ));
+    }
+    let run_count = u16::try_from(phonetic.runs.len())
+        .map_err(|_error| Error::InvalidData("ExtRst run count exceeds u16".into()))?;
+    if run_count > 32_767 {
+        return Err(Error::UnsafeEdit(
+            "ExtRst run count exceeds signed limit".into(),
+        ));
+    }
+    let mut data = Vec::new();
+    data.try_reserve(
+        14usize
+            .saturating_add(text_units.len().saturating_mul(2))
+            .saturating_add(phonetic.runs.len().saturating_mul(6))
+            .saturating_add(phonetic.extra_data.len()),
+    )
+    .map_err(|_error| Error::Allocation("retaining SST ExtRst"))?;
+    data.extend_from_slice(&0_u16.to_le_bytes());
+    data.extend_from_slice(&0_u16.to_le_bytes());
+    data.extend_from_slice(&phonetic.font_index.to_le_bytes());
+    let kind: u16 = match phonetic.phonetic_type {
+        crate::records::PhoneticType::NarrowKatakana => 0,
+        crate::records::PhoneticType::WideKatakana => 1,
+        crate::records::PhoneticType::Hiragana => 2,
+        crate::records::PhoneticType::Any => 3,
+    };
+    let alignment: u16 = match phonetic.alignment {
+        crate::records::PhoneticAlignment::General => 0,
+        crate::records::PhoneticAlignment::Left => 1,
+        crate::records::PhoneticAlignment::Center => 2,
+        crate::records::PhoneticAlignment::Distributed => 3,
+    };
+    data.extend_from_slice(&(kind | (alignment << 2)).to_le_bytes());
+    data.extend_from_slice(&run_count.to_le_bytes());
+    data.extend_from_slice(&text_count.to_le_bytes());
+    data.extend_from_slice(&text_count.to_le_bytes());
+    for unit in text_units {
+        data.extend_from_slice(&unit.to_le_bytes());
+    }
+    for run in &phonetic.runs {
+        data.extend_from_slice(&run.phonetic_text_index.to_le_bytes());
+        data.extend_from_slice(&run.base_text_index.to_le_bytes());
+        data.extend_from_slice(&run.base_text_length.to_le_bytes());
+    }
+    data.extend_from_slice(&phonetic.extra_data);
+    let payload_length = u16::try_from(data.len())
+        .map_err(|_error| Error::InvalidData("ExtRst payload exceeds u16".into()))?;
+    data[2..4].copy_from_slice(&payload_length.to_le_bytes());
+    Ok(data)
 }
 
 fn label_sst_reference_exists(workbook: &[u8], index: u32) -> Result<bool> {
@@ -1479,11 +2717,38 @@ fn apply_cell_change(
             {
                 replace_formula_cache(&mut row.cell_records, index, &after.1)?;
             } else if expected.0 != after.0 || !super::values_equal(&expected.1, &after.1) {
-                return Err(Error::UnsafeEdit(
-                    "structural replacement may only change an existing cell style".into(),
-                ));
+                // A scalar family change cannot reuse the fixed-width field.
+                // Re-encode one standalone BIFF8 cell with the requested XF,
+                // replacing the source record in the existing row block. A
+                // packed MulRk member is split around the target first so
+                // its neighbouring numeric cells remain intact.
+                let replacement = encode_cell(reference, after, source, resources, shared_strings)?;
+                let kind = record_kind(&row.cell_records[index])?;
+                if kind == MUL_BLANK {
+                    return Err(Error::UnsafeEdit(
+                        "scalar replacement of a packed blank record is unsupported".into(),
+                    ));
+                }
+                if kind == MUL_RK {
+                    remove_cell_record(&mut row.cell_records, index, reference)?;
+                    let column = u16::from(reference.column());
+                    let mut insertion = row.cell_records.len();
+                    for (position, record) in row.cell_records.iter().enumerate() {
+                        if u16::from(cell_column(record)?) > column {
+                            insertion = position;
+                            break;
+                        }
+                    }
+                    row.cell_records
+                        .try_reserve(1)
+                        .map_err(|_error| Error::Allocation("retaining scalar replacement"))?;
+                    row.cell_records.insert(insertion, replacement);
+                } else {
+                    row.cell_records[index] = replacement;
+                }
+            } else {
+                patch_record_style(&mut row.cell_records[index], reference, after.2)?;
             }
-            patch_record_style(&mut row.cell_records[index], reference, after.2)?;
         },
         (None, Some(_), Some(_)) => {
             return Err(Error::UnsafeEdit(
@@ -3131,3 +4396,7 @@ mod tests {
         assert_eq!(payload, vec![3, 3, 0, 2, 0, 0, 0, 1, 0, 3, 0, 4, 0, 2, 5]);
     }
 }
+
+#[cfg(test)]
+#[path = "structural_sst_tests.rs"]
+mod structural_sst_tests;

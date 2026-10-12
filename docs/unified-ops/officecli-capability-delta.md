@@ -22,7 +22,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `6b275d274a890fbc57f4ec07b8f6e61990df6daf2d351cd4e790f0cd79c7adcf` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `7ab2e2c43210ed0f7f01df58c9833a5c0507efef18e037ee273de0fb1c704183` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `e86dbe68184af7a34030c993912e62deadbce3e380ddd40771531e96d991da44` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
@@ -61,7 +61,7 @@ Properties:
 | docx | 164 | 4 | 428 | 0 | 68 | 2 | 295 | 27 |
 | xlsx | 89 | 16 | 489 | 0 | 18 | 1 | 78 | 62 |
 | xlsb | 56 | 45 | 489 | 0 | 22 | 1 | 78 | 2 |
-| xls | 17 | 17 | 509 | 0 | 23 | 1 | 124 | 0 |
+| xls | 18 | 17 | 509 | 0 | 22 | 1 | 124 | 0 |
 | pptx | 153 | 31 | 113 | 0 | 110 | 0 | 280 | 156 |
 
 ## docx
@@ -2835,7 +2835,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | aboveaverage | `dxfId` | number | --g | element gap | M1-extended (R6b) |
 | autofilter | `range` | string | asg | element gap | M1-extended (R6b) |
 | autofilter | `criteria0` | string | a-- | element gap | M1-extended (R6b) |
-| cell | `value` | string | asg | supported | the node's text |
+| cell | `value` | string | asg | supported |  |
 | cell | `formula` | string | asg | gap | M1-extended (R6b) |
 | cell | `numberformat` | string | asg | missing |  |
 | cell | `font.bold` | bool | asg | missing |  |
@@ -2865,7 +2865,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `display` | string | asg | missing |  |
 | cell | `type` | enum | asg | supported |  |
 | cell | `runs` | string | a-- | write-only | M2 |
-| cell | `clear` | bool | as- | write-only | M2 |
+| cell | `clear` | bool | as- | supported |  |
 | cell | `shift` | string | a-- | write-only | M2 |
 | cell | `arrayformula` | string | as- | gap | M1-extended (R6b) |
 | cell | `cachedValue` | string | --g | gap | M1-extended (R6b) |
@@ -3527,6 +3527,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `create` | `workbook` | `template` | the XLS creator currently authors ordinary workbooks and refuses template requests | use Flavor::Document; M2 XLS template creation |
 | `create` | `workbook` | `strict-conformance` | the XLS creator emits binary BIFF8 workbooks and refuses Strict requests | CreateOptions::conformance(Conformance::Transitional) |
 | `create` | `workbook` | `initial-metadata` | the XLS creator refuses initial metadata until typed metadata authoring is integrated | M2 XLS metadata creation |
+| `set` | `cell` | `non-scalar-properties` | the initial XLS writer accepts only scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only | M2 XLS formatting and formula setters |
+| `set` | `cell` | `existing-formula-cells` | scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the initial writer refuses the operation | M4 XLS formula-token and formula-cache writes |
+| `set` | `cell` | `native-dependency-closure` | admitted scalar storage-family replacements preserve the XF and use native row-block and SST rewrites; packed MulBlank cells, unsupported formula ownership, non-adjacent ExtSST records and removal of the last rich or opaque string identity remain typed refusals until their dependency closures and semantic inverses are represented | M2 XLS dependency-complete scalar replacement |
+| `set` | `sheet` | `tab-state` | the initial XLS writer renames worksheets but does not yet change hidden or very-hidden tab state | M2 XLS worksheet visibility setters |
+| `add` | `workbook` | `structural-elements` | worksheet and other structural additions are not integrated into the initial XLS write adapter | M2 XLS structural add handlers |
+| `remove` | `workbook` | `structural-elements` | cell, worksheet and other structural removals require native dependency-aware handlers beyond scalar clearing | M2 XLS structural remove handlers |
+| `move` | `workbook` | `structural-elements` | worksheet and cell movement is not integrated into the initial XLS write adapter | M2 XLS structural move handlers |
+| `swap` | `workbook` | `structural-elements` | worksheet and cell swapping is not integrated into the initial XLS write adapter | M2 XLS structural swap handlers |
+| `batch` | `workbook` | `extended-commands` | XLS batches currently compose admitted scalar cell and worksheet-name sets; structural, formatting and read commands remain pending | M2 XLS extended batch commands |
 
 ## pptx
 
