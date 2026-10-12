@@ -114,3 +114,55 @@ fn malformed_input_is_a_typed_rtf_error() {
     assert!(matches!(error.leaf(), crate::error::Source::Rtf(_)));
     assert_eq!(error.format(), Some(FileFormat::Rtf));
 }
+
+#[test]
+fn paragraph_move_matches_the_native_final_position_contract() {
+    let input = br"{\rtf1\ansi First\par Second\par Third\par Fourth}".to_vec();
+    let source = open_detected(input.clone());
+
+    let native = Package::from_bytes(&input).expect("native RTF");
+    let mut native_edit = native.edit();
+    native_edit.move_paragraph(0, 2).expect("native move");
+    let expected = native_edit
+        .commit()
+        .expect("native commit")
+        .into_package()
+        .to_bytes()
+        .expect("native bytes");
+
+    let actual = source
+        .move_to(
+            crate::path::PathArg::parse("/body/p[1]").expect("source path"),
+            crate::Placement::Position(litchi_core::Position::new(2)),
+        )
+        .expect("unified move");
+    let mut actual_bytes = Vec::new();
+    actual
+        .after
+        .write_to(&mut actual_bytes)
+        .expect("unified bytes");
+    assert_eq!(actual_bytes, expected);
+    let mut source_bytes = Vec::new();
+    source.write_to(&mut source_bytes).expect("source bytes");
+    assert_eq!(source_bytes, input);
+}
+
+#[test]
+fn paragraph_move_resolves_before_and_after_after_detach() {
+    let source = open_detected(br"{\rtf1\ansi First\par Second\par Third}".to_vec());
+    let before = source
+        .move_to(
+            crate::path::PathArg::parse("/body/p[1]").expect("source path"),
+            crate::Placement::before("/body/p[3]").expect("before path"),
+        )
+        .expect("before move");
+    assert_eq!(before.after.text().expect("text"), "Second\nFirst\nThird");
+
+    let after = source
+        .move_to(
+            crate::path::PathArg::parse("/body/p[3]").expect("source path"),
+            crate::Placement::after("/body/p[1]").expect("after path"),
+        )
+        .expect("after move");
+    assert_eq!(after.after.text().expect("text"), "First\nThird\nSecond");
+}

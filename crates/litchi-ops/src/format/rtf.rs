@@ -124,6 +124,26 @@ impl Rtf {
         write::remove_with_limits(self, target, limits)
     }
 
+    /// Move one ordinary main-story paragraph to a final body position.
+    pub(crate) fn move_to<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::Placement<'q>,
+    ) -> Result<write::Commit> {
+        let limits = SemanticLimits::default();
+        self.move_to_with_limits(path, placement, &limits)
+    }
+
+    /// Move one paragraph with the caller's target, staging and snapshot limits.
+    pub(crate) fn move_to_with_limits<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::Placement<'q>,
+        limits: &SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::move_to_with_limits(self, path, placement, limits)
+    }
+
     pub(crate) fn write_to(&self, sink: impl std::io::Write) -> Result<()> {
         self.0
             .package

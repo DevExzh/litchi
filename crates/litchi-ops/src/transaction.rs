@@ -817,7 +817,7 @@ impl Edit {
         _path: impl IntoPath<'p>,
         _to: impl IntoPlacement<'q>,
     ) -> Result<()> {
-        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "ppt"))]
+        #[cfg(any(feature = "pptx", feature = "xlsb", feature = "ppt", feature = "rtf"))]
         let limits = self.limits;
         self.execute(|file| match file {
             #[cfg(feature = "docx")]
@@ -846,6 +846,12 @@ impl Edit {
             ),
             #[cfg(feature = "pptx")]
             File::Pptx(handle) => wrap_pptx(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "rtf")]
+            File::Rtf(handle) => wrap_rtf(
                 handle,
                 handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),

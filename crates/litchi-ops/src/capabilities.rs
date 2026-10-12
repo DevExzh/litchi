@@ -790,8 +790,10 @@ impl Capabilities {
                 return Support::Supported;
             }
             #[cfg(feature = "rtf")]
-            if matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch)
-                && self.adapter() == Some(Adapter::Rtf)
+            if matches!(
+                verb,
+                Verb::Set | Verb::Remove | Verb::Move | Verb::Edit | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Rtf)
             {
                 return Support::Supported;
             }
@@ -1230,11 +1232,12 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     },
 ];
 
-/// RTF's write adapter admits existing main-story paragraph text and removal.
+/// RTF's write adapter admits existing main-story paragraph text, removal and
+/// paragraph ordering.
 /// Keep the remaining mutation verbs visible instead of making the format-level
-/// `set`/`remove`/`edit`/`batch` support look like general CRUD.
+/// `set`/`remove`/`move`/`edit`/`batch` support look like general CRUD.
 #[cfg(feature = "rtf")]
-static RTF_WRITE_GAPS: [GapSpec; 5] = [
+static RTF_WRITE_GAPS: [GapSpec; 4] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
@@ -1264,16 +1267,6 @@ static RTF_WRITE_GAPS: [GapSpec; 5] = [
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF structural body editing",
         reason: "the RTF write adapter replaces existing ordinary paragraph text and does not add elements",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "move",
-            element: "body",
-            context: "paragraph-text-only",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF structural body editing",
-        reason: "the RTF write adapter does not expose element moves",
     },
     GapSpec {
         subject: Subject::Operation {

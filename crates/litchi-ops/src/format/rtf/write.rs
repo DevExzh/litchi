@@ -12,6 +12,8 @@ use litchi_rtf::edit::{
 
 use super::{Nav, Node, Rtf};
 use crate::error::{Code, Error, Result};
+use crate::path::PathArg;
+use crate::placement::Placement;
 use crate::props::{IntoProps, Props};
 use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
@@ -189,6 +191,174 @@ pub(crate) fn remove_with_limits<'p>(
         operations: operation_count,
         snapshot_bytes,
     })
+}
+
+/// Move one ordinary main-story paragraph to a final zero-based position.
+///
+/// The placement is resolved against the unchanged source snapshot and the
+/// resulting final position is passed directly to the native lifecycle edit.
+/// Native validation therefore remains responsible for source closure,
+/// protection, and exact byte publication.
+pub(crate) fn move_to_with_limits<'p, 'q>(
+    file: &Rtf,
+    path: PathArg<'p>,
+    placement: Placement<'q>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    file.admit_edit()?;
+    let nav = Nav::new(file);
+    let selected = crate::path::resolve::get(&nav, &path)?;
+    let Some(from) = selected.paragraph_position() else {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "RTF moves target ordinary body paragraphs",
+        )
+        .with_format(FileFormat::Rtf));
+    };
+    let count = file.0.package.paragraph_count();
+    if count == 0 {
+        return Err(
+            Error::new(Code::PathNotFound, "the RTF body has no paragraphs")
+                .with_format(FileFormat::Rtf),
+        );
+    }
+    let to = move_destination(&nav, from.get(), count, &placement)?;
+
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    let text_bytes = selected.paragraph.map_or(0, |paragraph| paragraph.len());
+    let staged_bytes = text_bytes
+        .saturating_add(size_of::<usize>().saturating_mul(2))
+        .saturating_add(size_of::<String>());
+    bound(
+        LimitKind::StagedBytes,
+        staged_bytes,
+        limits.max_staged_bytes(),
+    )?;
+    if limits.max_operations() == 0 {
+        return Err(TransactionError::Limit {
+            kind: LimitKind::Operations,
+            observed: 1,
+            maximum: limits.max_operations(),
+        }
+        .into());
+    }
+
+    let native_limits = NativeLimits::builder()
+        .max_operations(limits.max_operations())
+        .map_err(Error::from)?
+        .max_replacement_bytes(limits.max_staged_bytes())
+        .map_err(Error::from)?
+        .build()
+        .map_err(Error::from)?;
+    let options = EditOptions::new().semantic_limits(native_limits);
+    let mut edit = file.0.package.edit_with_options(options);
+    edit.move_paragraph(from.get(), to).map_err(Error::from)?;
+    let native = edit.commit().map_err(Error::from)?;
+
+    let changed = native.diagnostics().changed();
+    let operation_count = native.diagnostics().operation_count();
+    let (package, patch) = native.into_parts();
+    let snapshot_bytes = patch_snapshot_bytes(&patch);
+    if snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+    }
+    let before = file.clone();
+    let after = if changed {
+        file.with_package(package)
+    } else {
+        // Equal source and destination is a native exact no-op. Preserve the
+        // original Arc identity and origin sidecar for the caller.
+        file.clone()
+    };
+    file.check_source()?;
+    Ok(Commit {
+        before,
+        after,
+        patch,
+        operations: operation_count,
+        snapshot_bytes,
+    })
+}
+
+fn move_destination(
+    nav: &Nav<'_>,
+    from: usize,
+    count: usize,
+    placement: &Placement<'_>,
+) -> Result<usize> {
+    let last = count.checked_sub(1).ok_or_else(|| {
+        Error::new(Code::PathNotFound, "the RTF body has no paragraphs")
+            .with_format(FileFormat::Rtf)
+    })?;
+    let destination = match placement {
+        Placement::Start => 0,
+        Placement::End => last,
+        Placement::Position(position) => position.get(),
+        Placement::Before(path) => {
+            let anchor = paragraph_position(crate::path::resolve::get(nav, path)?)?;
+            if from == anchor {
+                from
+            } else if from < anchor {
+                anchor.saturating_sub(1)
+            } else {
+                anchor
+            }
+        },
+        Placement::After(path) => {
+            let anchor = paragraph_position(crate::path::resolve::get(nav, path)?)?;
+            if from == anchor {
+                from
+            } else if from < anchor {
+                anchor
+            } else {
+                anchor.saturating_add(1)
+            }
+        },
+        Placement::Into(path, position) => {
+            let parent = crate::path::resolve::get(nav, path)?;
+            if parent.element_kind() != super::Kind::Body {
+                return Err(Error::new(
+                    Code::UnsupportedType,
+                    "RTF paragraphs can only be moved within the body",
+                )
+                .with_format(FileFormat::Rtf));
+            }
+            position.map_or(last, litchi_core::Position::get)
+        },
+    };
+    if destination >= count {
+        return Err(Error::new(
+            Code::OutOfRange,
+            "the RTF paragraph move position is outside the body",
+        )
+        .with_format(FileFormat::Rtf));
+    }
+    Ok(destination)
+}
+
+fn paragraph_position(node: Node<'_>) -> Result<usize> {
+    node.paragraph_position().map_or_else(
+        || {
+            Err(Error::new(
+                Code::UnsupportedType,
+                "RTF move destinations must select body paragraphs",
+            )
+            .with_format(FileFormat::Rtf))
+        },
+        |position| Ok(position.get()),
+    )
+}
+
+fn bound(kind: LimitKind, observed: usize, maximum: usize) -> Result<()> {
+    if observed > maximum {
+        return Err(TransactionError::Limit {
+            kind,
+            observed,
+            maximum,
+        }
+        .into());
+    }
+    Ok(())
 }
 
 fn paragraph_text<'a>(props: &'a Props<'_>) -> Result<&'a str> {
