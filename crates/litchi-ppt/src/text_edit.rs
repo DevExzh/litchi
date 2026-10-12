@@ -3882,6 +3882,7 @@ mod tests {
         StreamSpliceLimits,
     };
     use litchi_core::{OwnedSource, ReadAt, SourceVersion};
+    use std::collections::BTreeSet;
     use std::io::{self, Cursor, Write};
     use std::sync::{
         Arc, Mutex,
@@ -4480,6 +4481,162 @@ mod tests {
         )
     }
 
+    fn find_officeart_shape_offset(
+        data: &[u8],
+        record_offset: usize,
+        shape_id: u32,
+    ) -> Option<usize> {
+        fn find(data: &[u8], record_offset: usize, shape_id: u32, depth: usize) -> Option<usize> {
+            assert!(depth < 128, "test OfficeArt fixture exceeded its bound");
+            if record_type_at(data, record_offset) == super::OFFICEART_SP_CONTAINER {
+                let shape = record_children_offsets(data, record_offset)
+                    .into_iter()
+                    .find(|&child| record_type_at(data, child) == super::OFFICEART_SP)
+                    .and_then(|child| {
+                        let payload_len =
+                            u32::from_le_bytes(data[child + 4..child + 8].try_into().unwrap())
+                                as usize;
+                        let payload = &data[child + 8..child + 8 + payload_len];
+                        payload
+                            .get(..4)
+                            .and_then(|value| value.try_into().ok())
+                            .map(u32::from_le_bytes)
+                    });
+                if shape == Some(shape_id) {
+                    return Some(record_offset);
+                }
+            }
+            let version =
+                u16::from_le_bytes(data[record_offset..record_offset + 2].try_into().unwrap())
+                    & 0x000F;
+            if version != 0x000F {
+                return None;
+            }
+            record_children_offsets(data, record_offset)
+                .into_iter()
+                .find_map(|child| find(data, child, shape_id, depth + 1))
+        }
+
+        find(data, record_offset, shape_id, 0)
+    }
+
+    fn malformed_officeart_child() -> Vec<u8> {
+        // The unknown version-15 container has one child header whose
+        // declared payload is longer than the bounded container payload.
+        let mut malformed_inner = Vec::with_capacity(8);
+        malformed_inner.extend_from_slice(&0x000F_u16.to_le_bytes());
+        malformed_inner.extend_from_slice(&0x7FFD_u16.to_le_bytes());
+        malformed_inner.extend_from_slice(&1_u32.to_le_bytes());
+        raw_record(0x0F, 0, 0x7FFE, &malformed_inner)
+    }
+
+    fn mutate_batch_corruption_slide(
+        slide: &[u8],
+        early_shape_id: Option<u32>,
+        malformed_shape_id: u32,
+    ) -> super::Result<Vec<u8>> {
+        fn rewrite_textbox_header(textbox: &[u8]) -> super::Result<Vec<u8>> {
+            let mut data = Vec::with_capacity(super::drawing_payload(textbox)?.len());
+            for child_result in super::children(textbox)? {
+                let child = child_result?;
+                if super::record_type(child)? == crate::RecordType::TextHeaderAtom as u16 {
+                    let mut changed = child.to_vec();
+                    changed[2..4]
+                        .copy_from_slice(&(crate::RecordType::TextBytesAtom as u16).to_le_bytes());
+                    data.extend_from_slice(&changed);
+                } else {
+                    data.extend_from_slice(child);
+                }
+            }
+            super::rebuild(textbox, &data).map_err(Into::into)
+        }
+
+        fn rewrite_officeart(
+            record: &[u8],
+            early_shape_id: Option<u32>,
+            malformed_shape_id: u32,
+            malformed_child: &[u8],
+            depth: usize,
+        ) -> super::Result<Vec<u8>> {
+            assert!(depth < 128, "test OfficeArt fixture exceeded its bound");
+            if super::record_type(record)? == super::OFFICEART_SP_CONTAINER {
+                let shape_id = super::shape_id_of(record)?;
+                let mut data = Vec::with_capacity(
+                    super::drawing_payload(record)?.len() + malformed_child.len(),
+                );
+                for child_result in super::children(record)? {
+                    let child = child_result?;
+                    if shape_id == early_shape_id
+                        && super::record_type(child)? == super::OFFICEART_CLIENT_TEXTBOX
+                    {
+                        data.extend_from_slice(&rewrite_textbox_header(child)?);
+                    } else {
+                        data.extend_from_slice(child);
+                    }
+                }
+                if shape_id == Some(malformed_shape_id) {
+                    data.extend_from_slice(malformed_child);
+                }
+                return super::rebuild(record, &data).map_err(Into::into);
+            }
+            if super::record_version(record)? != 0xF {
+                return Ok(record.to_vec());
+            }
+            let mut data = Vec::with_capacity(super::drawing_payload(record)?.len());
+            for child_result in super::children(record)? {
+                data.extend_from_slice(&rewrite_officeart(
+                    child_result?,
+                    early_shape_id,
+                    malformed_shape_id,
+                    malformed_child,
+                    depth + 1,
+                )?);
+            }
+            super::rebuild(record, &data).map_err(Into::into)
+        }
+
+        let malformed_child = malformed_officeart_child();
+        let mut drawings = 0usize;
+        let rewritten = super::rewrite_ppt_record(slide, 0, &mut |record| {
+            if super::record_type(record)? != crate::RecordType::PPDrawing as u16 {
+                return Ok(None);
+            }
+            drawings += 1;
+            let data = rewrite_officeart(
+                super::drawing_payload(record)?,
+                early_shape_id,
+                malformed_shape_id,
+                &malformed_child,
+                0,
+            )?;
+            super::rebuild(record, &data).map(Some).map_err(Into::into)
+        })?;
+        assert_eq!(drawings, 1);
+        rewritten.ok_or(Error::Refused(Refusal::ShapeNotFound))
+    }
+
+    fn batch_corruption_fixture(early_shape_error: bool) -> (Vec<u8>, u32, u32) {
+        let source = generated_fixture(1, 2);
+        let first =
+            super::resolve(&source, Target::new(Position::new(0), Position::new(0))).unwrap();
+        let second =
+            super::resolve(&source, Target::new(Position::new(0), Position::new(1))).unwrap();
+        let drawing =
+            find_nested_record_offset(&first.slide_record, 0, crate::RecordType::PPDrawing as u16)
+                .unwrap();
+        assert!(find_officeart_shape_offset(&first.slide_record, drawing, first.native_shape_id)
+            .is_some());
+        assert!(find_officeart_shape_offset(&first.slide_record, drawing, second.native_shape_id)
+            .is_some());
+        let slide = mutate_batch_corruption_slide(
+            &first.slide_record,
+            early_shape_error.then_some(first.native_shape_id),
+            second.native_shape_id,
+        )
+        .unwrap();
+        (slide, first.native_shape_id, second.native_shape_id)
+    }
+
     struct PartialSink {
         bytes: Vec<u8>,
         limit: usize,
@@ -4535,11 +4692,70 @@ mod tests {
             &[(target(), "\0"), (missing_shape, "replacement")],
             usize::MAX,
         )
-        .unwrap_err();
+        .err()
+        .expect("a missing later shape must leave the earlier text error observable");
         assert!(matches!(
             error,
             Error::Refused(Refusal::IncompatibleEncoding)
         ));
+    }
+
+    #[test]
+    fn batch_index_replays_legacy_error_for_malformed_requested_sibling() {
+        let (slide, first_shape_id, second_shape_id) = batch_corruption_fixture(false);
+        let requested = [first_shape_id, second_shape_id]
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+
+        let legacy = super::inspect_slide(&slide, first_shape_id)
+            .err()
+            .expect("legacy first-target inspection must reject malformed sibling framing");
+        assert!(matches!(
+            &legacy,
+            Error::Package(crate::package::Error::Corrupted(message))
+                if message.contains("truncated")
+        ));
+
+        let indexed = super::index_slide_text_targets(&slide, &requested);
+        assert!(matches!(
+            &indexed,
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("truncated")
+        ));
+        let batch = match indexed {
+            Err(_index_error) => super::inspect_slide(&slide, first_shape_id),
+            Ok(index) => super::inspect_indexed_shape_text(&index, first_shape_id),
+        }
+        .err()
+        .expect("the batch admission path must reject");
+        assert_eq!(format!("{batch:?}"), format!("{legacy:?}"));
+    }
+
+    #[test]
+    fn batch_index_preserves_earlier_target_error_before_sibling_framing_error() {
+        let (slide, first_shape_id, second_shape_id) = batch_corruption_fixture(true);
+        let requested = [first_shape_id, second_shape_id]
+            .into_iter()
+            .collect::<BTreeSet<_>>();
+
+        let legacy = super::inspect_slide(&slide, first_shape_id)
+            .err()
+            .expect("legacy first-target inspection must reject the malformed textbox");
+        assert!(matches!(legacy, Error::Refused(Refusal::MultipleTextAtoms)));
+
+        let indexed = super::index_slide_text_targets(&slide, &requested);
+        assert!(matches!(
+            &indexed,
+            Err(Error::Package(crate::package::Error::Corrupted(message)))
+                if message.contains("truncated")
+        ));
+        let batch = match indexed {
+            Err(_index_error) => super::inspect_slide(&slide, first_shape_id),
+            Ok(index) => super::inspect_indexed_shape_text(&index, first_shape_id),
+        }
+        .err()
+        .expect("the batch admission path must reject");
+        assert!(matches!(batch, Error::Refused(Refusal::MultipleTextAtoms)));
     }
 
     #[test]
