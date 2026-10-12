@@ -292,13 +292,18 @@ pub(crate) fn shape_plan(
         limits.max_staged_bytes(),
     )?;
 
-    let current_text = node.text_member()?.map(std::borrow::Cow::into_owned);
     let has_geometry = values.has_geometry();
     let geometry = values.geometry;
-    let text_changed = values
-        .text
-        .as_deref()
-        .is_some_and(|text| current_text.as_deref() != Some(text));
+    // Geometry-only and empty payloads follow the one-shot writer's admission
+    // path without decoding a text body. A requested text value still reads
+    // the native aggregate exactly, including `None` for shapes with no
+    // editable body, so equal text is retained for native validation.
+    let text_changed = if let Some(text) = values.text.as_deref() {
+        let current_text = node.text_member()?.map(std::borrow::Cow::into_owned);
+        current_text.as_deref() != Some(text)
+    } else {
+        false
+    };
     let text = values.text;
     let anchor = if has_geometry {
         super::build_anchor(&node, &geometry)?
