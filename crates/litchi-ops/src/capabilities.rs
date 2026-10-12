@@ -95,7 +95,8 @@
         feature = "xlsx",
         feature = "pptx",
         feature = "xlsb",
-        feature = "xls"
+        feature = "xls",
+        feature = "rtf"
     )),
     allow(
         dead_code,
@@ -986,10 +987,6 @@ fn refused(format: FileFormat) -> Refusal {
         FileFormat::Doc if cfg!(feature = "doc") => pending(
             "M1 R6a",
             "the DOC adapter of record 0010 §4.8 has not landed",
-        ),
-        FileFormat::Rtf if cfg!(feature = "rtf") => pending(
-            "M1 R7",
-            "the RTF adapter of record 0010 §4.9 has not landed",
         ),
         FileFormat::Odt if cfg!(feature = "odt") => pending(
             "M1 R7",
@@ -2215,6 +2212,8 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Pptx => m1_view_gap(mode),
         #[cfg(feature = "ppt")]
         Adapter::Ppt => m1_view_gap(mode),
+        #[cfg(feature = "rtf")]
+        Adapter::Rtf => m1_view_gap(mode),
     }
 }
 
@@ -2347,6 +2346,9 @@ check_capabilities!(crate::format::pptx::SPEC);
 
 #[cfg(feature = "ppt")]
 check_capabilities!(crate::format::ppt::SPEC);
+
+#[cfg(feature = "rtf")]
+check_capabilities!(crate::format::rtf::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {

@@ -353,7 +353,8 @@ fn formats_without_a_variant_point_at_m6() {
     feature = "docx",
     feature = "xlsx",
     feature = "xlsb",
-    feature = "xls"
+    feature = "xls",
+    feature = "rtf"
 ))]
 #[test]
 fn spec_tables_agree_with_their_vocabularies() {
@@ -410,6 +411,8 @@ fn spec_tables_agree_with_their_vocabularies() {
     check(&crate::format::xls::SPEC, FileFormat::Xls);
     #[cfg(feature = "pptx")]
     check(&crate::format::pptx::SPEC, FileFormat::Pptx);
+    #[cfg(feature = "rtf")]
+    check(&crate::format::rtf::SPEC, FileFormat::Rtf);
 }
 
 #[test]

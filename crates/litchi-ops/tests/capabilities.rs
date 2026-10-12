@@ -1174,11 +1174,15 @@ fn available_and_pending_reads_have_distinct_reports() {
             .verb(Verb::Get)
             .is_supported()
     );
-    // Keep this check on a tier-3 format whose adapter remains pending; its
-    // feature may be disabled in a focused build, so the report's declared
-    // refusal is authoritative.
-    let pending = Capabilities::of(FileFormat::Rtf);
-    assert!(!pending.verb(Verb::Get).is_supported());
+    // RTF is a read adapter when its feature is enabled. Focused builds keep
+    // the whole-format refusal as the authoritative answer.
+    let rtf = Capabilities::of(FileFormat::Rtf);
+    if cfg!(feature = "rtf") {
+        assert!(rtf.verb(Verb::Get).is_supported());
+        assert_eq!(rtf.element("document").unwrap().operations().get, true);
+    } else {
+        assert!(!rtf.verb(Verb::Get).is_supported());
+    }
     #[cfg(feature = "pptx")]
     {
         let file = litchi_ops::open(concat!(
@@ -1188,13 +1192,6 @@ fn available_and_pending_reads_have_distinct_reports() {
         .unwrap();
         assert_eq!(file.root().unwrap().kind(), "presentation");
     }
-    assert!(matches!(
-        pending.verb(Verb::Get),
-        Support::Unsupported {
-            code: Code::UnsupportedCapability | Code::UnsupportedFormat,
-            ..
-        }
-    ));
 }
 
 #[cfg(feature = "docx")]

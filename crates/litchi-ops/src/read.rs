@@ -15,7 +15,8 @@ use litchi_core::FileFormat;
         feature = "pptx",
         feature = "ppt",
         feature = "xlsb",
-        feature = "xls"
+        feature = "xls",
+        feature = "rtf"
     )),
     allow(
         clippy::only_used_in_recursion,
@@ -108,6 +109,12 @@ impl File {
                 crate::path::resolve::get(&crate::format::xls::Nav::new(handle), &path)
                     .map(Node::Xls)
             },
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::get(&crate::format::rtf::Nav::new(handle), &path)
+                    .map(Node::Rtf)
+            },
             Self::Signed(signed) => signed.file().get(path),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -162,6 +169,12 @@ impl File {
                 let path = path.into_path()?;
                 crate::path::resolve::find(&crate::format::xls::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Xls))
+            },
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::find(&crate::format::rtf::Nav::new(handle), &path)
+                    .map(|node| node.map(Node::Rtf))
             },
             Self::Signed(signed) => signed.file().find(path),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -219,6 +232,10 @@ impl File {
             #[cfg(feature = "xls")]
             Self::Xls(handle) => {
                 crate::query::run(crate::format::xls::Nav::new(handle), selector).map(Matches::xls)
+            },
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => {
+                crate::query::run(crate::format::rtf::Nav::new(handle), selector).map(Matches::rtf)
             },
             Self::Signed(signed) => signed.file().query(selector),
             Self::Locked(locked) => Err(locked.read_error()),
@@ -280,6 +297,10 @@ impl File {
                 crate::format::xls::view_json(handle, mode, &crate::view::mode::Options::default())
                     .map(crate::view::Json::xls)
             },
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => {
+                crate::format::rtf::views::view_json(handle, mode).map(crate::view::Json::rtf)
+            },
             Self::Signed(signed) => signed.file().view_json(mode),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -337,6 +358,8 @@ impl File {
                 &crate::view::mode::Options::default(),
                 output,
             ),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => crate::format::rtf::views::view_to(handle, mode, output),
             Self::Signed(signed) => signed.file().view_to(mode, output),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]
@@ -372,6 +395,9 @@ pub(crate) enum Adapter {
     Xlsb,
     #[cfg(feature = "xls")]
     Xls,
+    /// Rich Text Format (`.rtf`, tier-3 read adapter).
+    #[cfg(feature = "rtf")]
+    Rtf,
 }
 
 impl Adapter {
@@ -393,6 +419,8 @@ impl Adapter {
             FileFormat::Xlsb => Some(Self::Xlsb),
             #[cfg(feature = "xls")]
             FileFormat::Xls => Some(Self::Xls),
+            #[cfg(feature = "rtf")]
+            FileFormat::Rtf => Some(Self::Rtf),
             _ => None,
         }
     }
@@ -414,6 +442,8 @@ impl Adapter {
             Self::Xlsb => FileFormat::Xlsb,
             #[cfg(feature = "xls")]
             Self::Xls => FileFormat::Xls,
+            #[cfg(feature = "rtf")]
+            Self::Rtf => FileFormat::Rtf,
         }
     }
 
@@ -463,6 +493,11 @@ macro_rules! with_spec {
             #[cfg(feature = "xls")]
             $crate::read::Adapter::Xls => {
                 let $spec = &$crate::format::xls::SPEC;
+                $body
+            },
+            #[cfg(feature = "rtf")]
+            $crate::read::Adapter::Rtf => {
+                let $spec = &$crate::format::rtf::SPEC;
                 $body
             },
         }

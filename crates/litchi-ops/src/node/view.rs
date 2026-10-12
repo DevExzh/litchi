@@ -601,6 +601,9 @@ enum Inner<'n, 'f> {
     Xlsb(crate::format::xlsb::Children<'f>),
     #[cfg(feature = "xls")]
     Xls(crate::format::xls::Children<'f>),
+    /// The RTF iterator carries the native RTF handle through its nodes.
+    #[cfg(feature = "rtf")]
+    Rtf(crate::format::rtf::children::Children<'f>),
 }
 
 impl<'n, 'f> Children<'n, 'f> {
@@ -677,6 +680,16 @@ impl<'n, 'f> Children<'n, 'f> {
             inner: Inner::Xls(children),
         }
     }
+
+    /// An RTF node's children.
+    #[cfg(feature = "rtf")]
+    pub(crate) const fn rtf(
+        children: crate::format::rtf::children::Children<'f>,
+    ) -> Self {
+        Self {
+            inner: Inner::Rtf(children),
+        }
+    }
 }
 
 impl<'f> Iterator for Children<'_, 'f> {
@@ -702,6 +715,8 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Xlsb(children) => children.next().map(|child| child.map(Node::Xlsb)),
             #[cfg(feature = "xls")]
             Inner::Xls(children) => children.next().map(|child| child.map(Node::Xls)),
+            #[cfg(feature = "rtf")]
+            Inner::Rtf(children) => children.next().map(|child| child.map(Node::Rtf)),
         };
         if matches!(item, Some(Err(_)) | None) {
             self.inner = Inner::Empty(PhantomData);

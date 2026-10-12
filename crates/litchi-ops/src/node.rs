@@ -25,9 +25,10 @@
 //!
 //! # Status
 //!
-//! DOC, DOCX, XLSX, XLSB, XLS, PPT and PPTX carry concrete leaf-backed nodes. Other formats retain the
-//! uninhabited [`Pending`] placeholder until their adapters land. These nodes
-//! are available through File navigation and lazy queries.
+//! DOC, DOCX, XLSX, XLSB, XLS, PPT, PPTX and RTF carry concrete leaf-backed
+//! nodes. Other formats retain the uninhabited [`Pending`] placeholder until
+//! their adapters land. These nodes are available through File navigation and
+//! lazy queries.
 
 use std::borrow::Cow;
 use std::convert::Infallible;
@@ -191,7 +192,7 @@ pub enum Node<'f> {
     Ppt(crate::format::ppt::Node<'f>),
     /// A Rich Text Format node (tier-3 adapter, step R7).
     #[cfg(feature = "rtf")]
-    Rtf(Pending<'f, crate::format::rtf::Rtf>),
+    Rtf(crate::format::rtf::Node<'f>),
     /// An OpenDocument text node (tier-3 adapter, step R7).
     #[cfg(feature = "odt")]
     Odt(Pending<'f, crate::format::odt::Odt>),
@@ -363,6 +364,17 @@ impl<'f> Node<'f> {
     pub fn as_ppt(&self) -> Option<&crate::format::ppt::Node<'f>> {
         match self {
             Self::Ppt(node) => Some(node),
+            #[allow(unreachable_patterns, reason = "format variants depend on features")]
+            _ => None,
+        }
+    }
+
+    /// Borrow the typed RTF node.
+    #[cfg(feature = "rtf")]
+    #[must_use]
+    pub fn as_rtf(&self) -> Option<&crate::format::rtf::Node<'f>> {
+        match self {
+            Self::Rtf(node) => Some(node),
             #[allow(unreachable_patterns, reason = "format variants depend on features")]
             _ => None,
         }

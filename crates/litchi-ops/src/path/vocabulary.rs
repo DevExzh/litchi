@@ -563,19 +563,32 @@ pub(crate) static WORD: Vocabulary = Vocabulary {
             /comments/comment[N], /styles/<style id>, /numbering or /section[N]",
 };
 
-/// Legacy Word shares the semantic path spelling but has no OOXML paragraph
-/// wire identities. Keep the known unsupported concepts for typed refusals.
+/// Legacy Word and RTF share the semantic path spelling but have no OOXML
+/// paragraph wire identities. Keep the known unsupported concepts for typed
+/// refusals.
 #[cfg(feature = "doc")]
 pub(crate) static DOC: Vocabulary = Vocabulary {
     family: WORD.family,
     root: WORD.root,
     aliases: WORD.aliases,
-    elements: &doc_elements(),
+    elements: &word_elements_without_paragraph_identity(),
     roots: WORD.roots,
 };
 
-#[cfg(feature = "doc")]
-const fn doc_elements() -> [ElementRule; WORD.elements.len()] {
+/// RTF uses the same Word family aliases and the same absence of OOXML
+/// paragraph identities as legacy DOC. Keeping a distinct static lets the
+/// adapter's vocabulary remain an explicit format-level registry entry.
+#[cfg(feature = "rtf")]
+pub(crate) static RTF: Vocabulary = Vocabulary {
+    family: WORD.family,
+    root: WORD.root,
+    aliases: WORD.aliases,
+    elements: &word_elements_without_paragraph_identity(),
+    roots: WORD.roots,
+};
+
+#[cfg(any(feature = "doc", feature = "rtf"))]
+const fn word_elements_without_paragraph_identity() -> [ElementRule; WORD.elements.len()] {
     let mut rules = [ElementRule::new(""); WORD.elements.len()];
     let mut index = 0;
     while index < rules.len() {
