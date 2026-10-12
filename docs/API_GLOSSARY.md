@@ -1494,3 +1494,12 @@ source-relative batch boundaries are nondecreasing and equal positions preserve
 input order. The unified `add` verb supplies placement and property coercion,
 returning the canonical path of the whole inserted run. Formatting inherits the
 right neighbor, last left neighbor at append, or the empty paragraph delimiter.
+
+### RTF direct-set batching (0247)
+
+Consecutive compatible facade setters use existing native ordered batch methods
+and the canonical native `Edit`/`Commit`/`Patch` family. No public alias or second
+editable document model is introduced. Temporary source indexes are bounded;
+staging windows close at their limits, while scalar admission stays available
+when the optimization index cannot fit. Source-changing boundaries publish
+before resolving later positional paths.
