@@ -418,8 +418,8 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
 /// Exchange two ordinary main-story paragraphs in one native lifecycle edit.
 ///
 /// Both paths are resolved against the same immutable source snapshot.  The
-/// native editor retains the selected paragraph payloads and owns the exact
-/// source splice, candidate validation, and reversible history; this adapter
+/// native editor retains the selected paragraph payloads and owns candidate
+/// publication, validation, and reversible history; this adapter
 /// only charges the unified target and staging budgets and adopts the checked
 /// endpoint.
 pub(crate) fn swap_with_limits<'p, 'q>(
@@ -432,6 +432,8 @@ pub(crate) fn swap_with_limits<'p, 'q>(
     let nav = Nav::new(file);
     let left = crate::path::resolve::get(&nav, &left)?;
     let right = crate::path::resolve::get(&nav, &right)?;
+    let left_bytes = left.paragraph.map_or(0, |paragraph| paragraph.len());
+    let right_bytes = right.paragraph.map_or(0, |paragraph| paragraph.len());
     let left = paragraph_position(left)?;
     let right = paragraph_position(right)?;
 
@@ -442,24 +444,14 @@ pub(crate) fn swap_with_limits<'p, 'q>(
         limits.max_expanded_targets(),
     )?;
 
-    // Native swap history retains both selected paragraph payloads and two
-    // position/string descriptors, including for the exact same-target no-op.
-    let left_bytes = file
-        .0
-        .package
-        .body()
-        .paragraphs()
-        .nth(left)
-        .map_or(0, |paragraph| paragraph.len());
-    let right_bytes = file
-        .0
-        .package
-        .body()
-        .paragraphs()
-        .nth(right)
-        .map_or(0, |paragraph| paragraph.len());
-    let payload_bytes = left_bytes
-        .checked_add(right_bytes)
+    // Changed-position staging retains both paragraph payloads. Equal positions
+    // retain only the operation descriptors because the native edit skips copies.
+    let retained_bytes = if left == right {
+        Some(0)
+    } else {
+        left_bytes.checked_add(right_bytes)
+    };
+    let payload_bytes = retained_bytes
         .and_then(|bytes| bytes.checked_add(size_of::<usize>().saturating_mul(2)))
         .and_then(|bytes| bytes.checked_add(size_of::<String>().saturating_mul(2)))
         .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;

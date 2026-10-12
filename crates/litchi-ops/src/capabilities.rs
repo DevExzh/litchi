@@ -1282,7 +1282,7 @@ static RTF_WRITE_GAPS: [GapSpec; 4] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph swapping requires the native editor to prove an ordinary literal body and retain both selected source boundaries",
+        reason: "paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries",
     },
 ];
 

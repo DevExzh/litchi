@@ -320,7 +320,7 @@ fn swap_preserves_empty_terminal_and_decoded_unicode_paragraphs() {
         let commit = edit.commit().unwrap();
         let mut reordered = expected.clone();
         reordered.swap(0, 2);
-        assert_eq!(paragraph_texts(&commit.package()), reordered);
+        assert_eq!(paragraph_texts(commit.package()), reordered);
         assert_complete_reopen(
             commit.package(),
             &reordered.iter().map(String::as_str).collect::<Vec<_>>(),
@@ -584,6 +584,45 @@ fn positioned_insertion_admits_bounds_before_retaining_payload_and_stays_reusabl
         source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
     assert!(matches!(
         denied.insert_paragraph(litchi_core::Position::new(0), ""),
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
+            ..
+        })
+    ));
+    assert!(!denied.commit().unwrap().diagnostics().changed());
+}
+
+#[test]
+fn swap_admission_failures_leave_the_edit_reusable() {
+    use litchi_core::Position;
+    let source = source();
+    let mut edit = source.edit();
+    for (first, second) in [(4, 0), (0, 4), (usize::MAX, usize::MAX)] {
+        assert!(matches!(
+            edit.swap_paragraphs(Position::new(first), Position::new(second)),
+            Err(Error::ParagraphOutOfRange { .. })
+        ));
+    }
+    edit.swap_paragraphs(Position::new(0), Position::new(1))
+        .unwrap();
+    assert!(matches!(
+        edit.swap_paragraphs(Position::new(1), Position::new(2)),
+        Err(Error::Conflict { .. })
+    ));
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        paragraph_texts(commit.package()),
+        ["Second", "First", "Third", "Fourth"]
+    );
+    assert_eq!(commit.diagnostics().operation_count(), 1);
+    assert!(matches!(
+        commit.patch().inverse().to_durable(durable_limits()),
+        Err(litchi_core::patch::PatchError::InvalidText { .. })
+    ));
+    let mut denied =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
+    assert!(matches!(
+        denied.swap_paragraphs(Position::new(0), Position::new(0)),
         Err(Error::Limit {
             kind: SemanticLimitKind::Operations,
             ..

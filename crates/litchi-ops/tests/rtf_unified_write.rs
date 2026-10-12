@@ -335,12 +335,12 @@ fn capabilities_publish_text_writes_and_structural_gaps() {
         Verb::Remove,
         Verb::Move,
         Verb::Add,
+        Verb::Swap,
         Verb::Edit,
         Verb::Batch,
     ] {
         assert!(capabilities.verb(verb).is_supported());
     }
-    assert!(!capabilities.verb(Verb::Swap).is_supported());
     assert!(
         capabilities
             .element("p")

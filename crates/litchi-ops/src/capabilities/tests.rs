@@ -130,7 +130,13 @@ fn every_format_has_one_answer_for_its_reads() {
                 && cfg!(feature = "rtf")
                 && matches!(
                     verb,
-                    Verb::Set | Verb::Add | Verb::Remove | Verb::Move | Verb::Edit | Verb::Batch
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
                 );
             let doc_edit = format == FileFormat::Doc
                 && cfg!(feature = "doc")
