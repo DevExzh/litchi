@@ -1468,3 +1468,12 @@ replay remains an explicit gap. Unicode may change native run fragmentation,
 while text and local formatting coverage remain invariant outside selected text.
 The unified run registry now advertises `text` as writable alongside the ten
 character facets; resource and structural run gaps remain explicit.
+
+### Unified RTF run removal (0244)
+
+Run `remove` uses typed paragraph/run positions and the existing native
+`Edit::replace_body_run_texts` transaction with empty replacements. No parallel
+public native transaction family is introduced. Removing all runs preserves
+paragraphs; paragraph removal remains a distinct structural action. The shared
+facade admission pass now charges source text retained by both run replacement
+and removal before native staging, with native patch weight governing history.

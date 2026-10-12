@@ -203,10 +203,27 @@ pub(crate) fn set_with_limits<'p, 'v>(
 ) -> Result<Commit> {
     file.admit_edit()?;
     let props = Props::from_props(props)?;
-    let resolved = resolve_mutation_targets(file, &target, limits.max_expanded_targets())?;
+    let mut before_text_bytes = 0usize;
+    let resolved = resolve_mutation_targets(
+        file,
+        &target,
+        limits.max_expanded_targets(),
+        Code::UnsupportedType,
+        |node| {
+            before_text_bytes =
+                before_text_bytes.saturating_add(node.run.map_or(0, |run| run.text().len()));
+        },
+    )?;
     let positions = match resolved {
         MutationTargets::Run(targets) => {
-            return set_runs_with_limits(file, targets, &props, limits);
+            return publish_run_updates(
+                file,
+                targets,
+                run_format_patch(&props)?,
+                run_text(&props)?,
+                before_text_bytes,
+                limits,
+            );
         },
         MutationTargets::Paragraph(positions) => positions,
     };
@@ -379,6 +396,8 @@ fn resolve_mutation_targets(
     file: &Rtf,
     target: &TargetArg<'_>,
     maximum: usize,
+    unsupported_kind: Code,
+    mut selected: impl FnMut(Node<'_>),
 ) -> Result<MutationTargets> {
     let mut kind = None;
     let mut paragraphs = Vec::new();
@@ -390,7 +409,7 @@ fn resolve_mutation_targets(
             super::Kind::Run => MutationKind::Run,
             _ => {
                 return Err(Error::new(
-                    Code::UnsupportedType,
+                    unsupported_kind,
                     "RTF mutations target paragraph or run nodes",
                 )
                 .with_format(FileFormat::Rtf));
@@ -408,9 +427,11 @@ fn resolve_mutation_targets(
             kind = Some(current);
         }
         match current {
-            MutationKind::Paragraph => append_paragraph(&mut paragraphs, node, maximum),
-            MutationKind::Run => append_run(&mut runs, node, maximum),
+            MutationKind::Paragraph => append_paragraph(&mut paragraphs, node, maximum)?,
+            MutationKind::Run => append_run(&mut runs, node, maximum)?,
         }
+        selected(node);
+        Ok(())
     };
 
     if let Some(path) = target.path() {
@@ -464,15 +485,14 @@ fn resolve_mutation_targets(
 /// transaction.  `RunFormatPatch` is omission-preserving, so one compound
 /// setter keeps every unselected character facet and every unrelated source
 /// destination intact.
-fn set_runs_with_limits(
+fn publish_run_updates(
     file: &Rtf,
     targets: Vec<(Position, Position)>,
-    props: &Props<'_>,
+    patch: RunFormatPatch,
+    text: Option<&str>,
+    before_text_bytes: usize,
     limits: &SemanticLimits,
 ) -> Result<Commit> {
-    let patch = run_format_patch(props)?;
-    let text = run_text(props)?;
-
     let native_limits = NativeLimits::builder()
         .max_operations(limits.max_operations())
         .map_err(Error::from)?
@@ -506,6 +526,7 @@ fn set_runs_with_limits(
         .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
         let staged_bytes = operations
             .checked_mul(per_target)
+            .and_then(|bytes| bytes.checked_add(if text.is_some() { before_text_bytes } else { 0 }))
             .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
         if staged_bytes > limits.max_staged_bytes() {
             return Err(staged_limit(staged_bytes, limits.max_staged_bytes()));
@@ -761,7 +782,7 @@ fn run_underline(value: &PropValue<'_>) -> Result<UnderlineStyle> {
         })
 }
 
-/// Remove every selected ordinary body paragraph in one native transaction.
+/// Remove selected ordinary body paragraphs or text runs in one native transaction.
 pub(crate) fn remove_with_limits<'p>(
     file: &Rtf,
     target: TargetArg<'p>,
@@ -769,11 +790,35 @@ pub(crate) fn remove_with_limits<'p>(
 ) -> Result<Commit> {
     file.admit_edit()?;
     let mut removed_bytes = 0usize;
-    let positions =
-        resolve_paragraph_targets(file, &target, limits.max_expanded_targets(), |node| {
-            removed_bytes =
-                removed_bytes.saturating_add(node.paragraph.map_or(0, |paragraph| paragraph.len()));
-        })?;
+    let targets = resolve_mutation_targets(
+        file,
+        &target,
+        limits.max_expanded_targets(),
+        Code::UnsupportedCapability,
+        |node| {
+            let bytes = node.run.map_or_else(
+                || node.paragraph.map_or(0, |paragraph| paragraph.len()),
+                |run| run.text().len(),
+            );
+            removed_bytes = removed_bytes.saturating_add(bytes);
+        },
+    )?;
+    let positions = match targets {
+        MutationTargets::Run(targets) => {
+            // Removing text runs preserves their containing paragraphs and all
+            // unselected native formatting. The native empty replacement path
+            // owns terminal-empty delimiters and exact inverse/history proofs.
+            return publish_run_updates(
+                file,
+                targets,
+                RunFormatPatch::new(),
+                Some(""),
+                removed_bytes,
+                limits,
+            );
+        },
+        MutationTargets::Paragraph(positions) => positions,
+    };
     let operations = positions.len();
     if operations > limits.max_operations() {
         return Err(TransactionError::Limit {
@@ -1253,53 +1298,6 @@ fn paragraph_alignment(value: &PropValue<'_>) -> Result<Alignment> {
             }
         })
         .map_err(|error| error.with_property("align").with_format(FileFormat::Rtf))
-}
-
-fn resolve_paragraph_targets(
-    file: &Rtf,
-    target: &TargetArg<'_>,
-    maximum: usize,
-    mut selected: impl FnMut(Node<'_>),
-) -> Result<Vec<Position>> {
-    let mut positions = Vec::new();
-    if let Some(path) = target.path() {
-        let node = crate::path::resolve::get(&Nav::new(file), path)?;
-        append_paragraph(&mut positions, node, maximum)?;
-        selected(node);
-    } else if let Some(query) = target.query() {
-        let walk = crate::query::run(Nav::new(file), query.clone())?;
-        if !walk.plan().diagnostics().is_empty() {
-            return Err(Error::new(
-                Code::InvalidSelector,
-                "the RTF mutation selector contains an unsupported predicate",
-            )
-            .with_format(FileFormat::Rtf));
-        }
-        for node in walk {
-            let node = node?;
-            append_paragraph(&mut positions, node, maximum)?;
-            selected(node);
-        }
-    } else {
-        return Err(
-            Error::new(Code::InvalidArgument, "the RTF mutation target is empty")
-                .with_format(FileFormat::Rtf),
-        );
-    }
-    file.check_source()?;
-    if positions.is_empty() {
-        return Err(Error::new(
-            Code::ZeroMatches,
-            "the RTF mutation selector matched no paragraph",
-        )
-        .with_format(FileFormat::Rtf));
-    }
-    // Query unions are already document ordered, but normalizing here keeps
-    // the native batch contract true even if a future walk source changes its
-    // duplicate policy.
-    positions.sort_unstable();
-    positions.dedup();
-    Ok(positions)
 }
 
 fn append_paragraph(positions: &mut Vec<Position>, node: Node<'_>, maximum: usize) -> Result<()> {

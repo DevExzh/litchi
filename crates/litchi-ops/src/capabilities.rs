@@ -1243,8 +1243,8 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// paragraph ordering and paragraph swapping. Keep the remaining mutation
 /// verbs visible instead of making the format-level `set`/`remove`/`move`/
 /// `swap`/`edit`/`batch` support look like general CRUD.  Run `set` is
-/// available for text and ten local character-format facets; the remaining run
-/// structural verbs stay explicit gaps until their native editors exist.
+/// available for text and ten local character-format facets; run removal uses
+/// native empty replacements. Insertion, move and swap remain explicit gaps.
 #[cfg(feature = "rtf")]
 static RTF_WRITE_GAPS: [GapSpec; 9] = [
     GapSpec {
@@ -1311,11 +1311,11 @@ static RTF_WRITE_GAPS: [GapSpec; 9] = [
         subject: Subject::Operation {
             verb: "remove",
             element: "run",
-            context: "native-run-edit",
+            context: "native-source-closure",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF atomic native run edits",
-        reason: "run removal requires an atomic native character-run editor that preserves unselected source boundaries and formatting controls",
+        follow_up: "M6 RTF rich run preservation",
+        reason: "run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and unprojectable opaque body anchors remain unsupported",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2815,8 +2815,10 @@ impl Element {
                 && self.data().canonical == "slide"
                 && readable);
         #[cfg(feature = "rtf")]
-        let remove =
-            remove || (self.adapter == Adapter::Rtf && self.data().canonical == "p" && readable);
+        let remove = remove
+            || (self.adapter == Adapter::Rtf
+                && matches!(self.data().canonical, "p" | "r")
+                && readable);
         Operations {
             add,
             set: settable,

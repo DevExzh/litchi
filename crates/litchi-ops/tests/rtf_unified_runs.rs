@@ -154,14 +154,14 @@ fn compiled_run_queries_are_reusable_and_bound_to_current_immutable_owner() {
 }
 
 #[test]
-fn run_capabilities_admit_format_sets_but_keep_structural_gaps() {
+fn run_capabilities_admit_sets_and_removal_with_other_structural_gaps() {
     let file = open_bytes(br"{\rtf1\ansi First\par Second}").unwrap();
     let before = file.to_bytes().unwrap();
     let run = file.capabilities().element("r").unwrap();
     assert!(run.gap().is_none());
     let ops = run.operations();
     assert!(ops.get && ops.query);
-    assert!(ops.set && !ops.add && !ops.remove);
+    assert!(ops.set && !ops.add && ops.remove);
     let writable = [
         "text",
         "size",
@@ -189,12 +189,11 @@ fn run_capabilities_admit_format_sets_but_keep_structural_gaps() {
         file.set("/body/p[1]/r[1]", props! {"font"=>"Other"})
             .is_err()
     );
-    assert!(file.remove("/body/p[1]/r[1]").is_err());
     assert!(
         file.set(Query::parse("p, r").unwrap(), props! {"text"=>"bad"})
             .is_err()
     );
-    assert!(file.remove(Query::parse("r").unwrap()).is_err());
+    assert!(file.remove(Query::parse("r").unwrap()).is_err()); // unscoped mutation
     assert!(file.move_to("/body/p[1]/r[1]", Placement::End).is_err());
     assert!(file.swap("/body/p[1]/r[1]", "/body/p[2]").is_err());
     assert!(
