@@ -180,9 +180,9 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
 
 #[test]
 fn moving_empty_paragraphs_preserves_tail_and_terminal_boundaries() {
-    for (input, check_durable_inverse) in [
-        (br"{\rtf1\ansi First\par\par Third}".as_slice(), true),
-        (br"{\rtf1\ansi First\par\par Third\par}".as_slice(), false),
+    for input in [
+        br"{\rtf1\ansi First\par\par Third}".as_slice(),
+        br"{\rtf1\ansi First\par\par Third\par}".as_slice(),
     ] {
         let source = Package::from_bytes(input).unwrap();
         assert_eq!(paragraph_texts(&source), ["First", "", "Third"]);
@@ -197,15 +197,34 @@ fn moving_empty_paragraphs_preserves_tail_and_terminal_boundaries() {
             assert_eq!(commit.package().paragraph_count(), expected.len());
             assert_eq!(paragraph_texts(commit.package()), expected);
             assert_complete_reopen(commit.package(), &expected);
-            if check_durable_inverse {
-                let durable = commit.patch().to_durable(durable_limits()).unwrap();
-                let moved = source.apply_durable(&durable).unwrap();
-                assert_eq!(paragraph_texts(&moved), expected);
-                let restored = moved.apply_durable(&durable.inverse()).unwrap();
-                assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
-            }
+            assert!(matches!(
+                commit.patch().to_durable(durable_limits()),
+                Err(litchi_core::patch::PatchError::InvalidText {
+                    field: "RTF paragraph moves involving empty or terminal-boundary paragraphs are source-bound"
+                })
+            ));
+            let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
+            assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
         }
     }
+}
+
+#[test]
+fn terminal_boundary_moves_are_source_bound_even_without_empty_paragraphs() {
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third\par}").unwrap();
+    let mut edit = source.edit();
+    edit.move_paragraph(0, 2).unwrap();
+    let commit = edit.commit().unwrap();
+    assert_eq!(
+        paragraph_texts(&commit.package()),
+        ["Second", "Third", "First"]
+    );
+    assert!(matches!(
+        commit.patch().to_durable(durable_limits()),
+        Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF paragraph moves involving empty or terminal-boundary paragraphs are source-bound"
+        })
+    ));
 }
 
 #[test]

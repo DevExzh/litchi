@@ -10601,6 +10601,10 @@ impl Patch {
     /// Paragraph-layout changes remain source-bound because canonical RTF
     /// rewrites cannot yet prove an imported exact artifact byte-for-byte;
     /// callers retain exact undo through [`Self::inverse`] instead.
+    /// Moves involving explicit empty paragraphs or a terminal body break are
+    /// also source-bound: the current durable move vocabulary carries only
+    /// paragraph text and positions, so it cannot encode their exact boundary
+    /// spelling for inverse replay.
     ///
     /// # Errors
     /// Returns an error when caller-selected wire limits cannot represent the
@@ -10631,6 +10635,27 @@ impl Patch {
         {
             return Err(litchi_core::patch::PatchError::InvalidText {
                 field: "RTF multi-paragraph removal durable patches require source-bound batch preconditions",
+            });
+        }
+        let has_move = self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::MoveParagraph { .. }));
+        let has_empty_or_terminal_boundary = self.before.text().ends_with('\n')
+            || self.after.text().ends_with('\n')
+            || self
+                .before
+                .body()
+                .paragraphs()
+                .any(|paragraph| paragraph.is_empty())
+            || self
+                .after
+                .body()
+                .paragraphs()
+                .any(|paragraph| paragraph.is_empty());
+        if has_move && has_empty_or_terminal_boundary {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF paragraph moves involving empty or terminal-boundary paragraphs are source-bound",
             });
         }
 
