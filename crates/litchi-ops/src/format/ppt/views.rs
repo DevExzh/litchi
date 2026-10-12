@@ -98,6 +98,30 @@ fn sink(_: fmt::Error) -> Error {
         .with_format(litchi_core::FileFormat::Ppt)
 }
 
+// Keep recursive walks finite even when a legacy shape tree is deeply nested
+// or contains an unexpectedly large group. The budget is per slide, so a
+// large presentation remains inspectable without allowing one slide to
+// monopolize the view operation.
+const MAX_VIEW_SHAPES: usize = 1_000_000;
+const MAX_VIEW_DEPTH: usize = 256;
+
+fn enter_shape(depth: usize, seen: &mut usize) -> Result<()> {
+    if depth > MAX_VIEW_DEPTH {
+        return Err(view_limit("PPT view shape nesting exceeded"));
+    }
+    *seen = seen
+        .checked_add(1)
+        .ok_or_else(|| view_limit("PPT view shape count overflowed"))?;
+    if *seen > MAX_VIEW_SHAPES {
+        return Err(view_limit("PPT view contains too many shapes"));
+    }
+    Ok(())
+}
+
+fn view_limit(message: &'static str) -> Error {
+    Error::new(Code::LimitExceeded, message).with_format(litchi_core::FileFormat::Ppt)
+}
+
 /// Visit selected slides without materializing the complete slide catalog.
 fn each_slide<W: fmt::Write>(
     file: &Ppt,
@@ -173,7 +197,13 @@ fn table_cells(table: &litchi_ppt::shapes::shape_enum::TableShape) -> impl Itera
 /// Emit the text-bearing leaves in the same order as the native shape tree.
 /// Groups are containers, so their aggregate text is not emitted a second
 /// time after their children.
-fn emit_text_shape<W: fmt::Write>(shape: &ShapeEnum<'static>, out: &mut W) -> Result<()> {
+fn emit_text_shape<W: fmt::Write>(
+    shape: &ShapeEnum<'static>,
+    depth: usize,
+    seen: &mut usize,
+    out: &mut W,
+) -> Result<()> {
+    enter_shape(depth, seen)?;
     match shape {
         shape if is_text_shape(shape) => {
             let text = shape_text(shape)?;
@@ -190,7 +220,7 @@ fn emit_text_shape<W: fmt::Write>(shape: &ShapeEnum<'static>, out: &mut W) -> Re
         },
         ShapeEnum::Group(group) => {
             for child in group.children() {
-                emit_text_shape(child, out)?;
+                emit_text_shape(child, depth + 1, seen, out)?;
             }
         },
         ShapeEnum::Picture(_) | ShapeEnum::Line(_) => {},
@@ -205,8 +235,9 @@ fn emit_text_shape<W: fmt::Write>(shape: &ShapeEnum<'static>, out: &mut W) -> Re
 fn text_view(file: &Ppt, options: &Options, out: &mut impl fmt::Write) -> Result<()> {
     each_slide(file, options, out, |number, shapes, out| {
         writeln!(out, "=== /slide[{number}] ===").map_err(sink)?;
+        let mut seen = 0;
         for shape in shapes {
-            emit_text_shape(shape, out)?;
+            emit_text_shape(shape, 0, &mut seen, out)?;
         }
         writeln!(out).map_err(sink)
     })
@@ -227,7 +258,13 @@ struct SlideTexts {
     texts: Vec<String>,
 }
 
-fn collect_texts(shape: &ShapeEnum<'static>, texts: &mut Vec<String>) -> Result<()> {
+fn collect_texts(
+    shape: &ShapeEnum<'static>,
+    depth: usize,
+    seen: &mut usize,
+    texts: &mut Vec<String>,
+) -> Result<()> {
+    enter_shape(depth, seen)?;
     match shape {
         shape if is_text_shape(shape) => {
             let text = shape_text(shape)?;
@@ -244,7 +281,7 @@ fn collect_texts(shape: &ShapeEnum<'static>, texts: &mut Vec<String>) -> Result<
         },
         ShapeEnum::Group(group) => {
             for child in group.children() {
-                collect_texts(child, texts)?;
+                collect_texts(child, depth + 1, seen, texts)?;
             }
         },
         ShapeEnum::Picture(_) | ShapeEnum::Line(_) => {},
@@ -276,8 +313,9 @@ fn text_json(file: &Ppt, options: &Options) -> Result<TextJson> {
             .slide_at(position)?
             .ok_or_else(|| missing_slide(position))?;
         let mut texts = Vec::new();
+        let mut seen = 0;
         for shape in slide.shapes()? {
-            collect_texts(shape, &mut texts)?;
+            collect_texts(shape, 0, &mut seen, &mut texts)?;
         }
         slides.push(SlideTexts {
             index: number,
@@ -299,7 +337,8 @@ fn text_json(file: &Ppt, options: &Options) -> Result<TextJson> {
 fn annotated(file: &Ppt, options: &Options, out: &mut impl fmt::Write) -> Result<()> {
     each_slide(file, options, out, |number, shapes, out| {
         writeln!(out, "[/slide[{number}]]").map_err(sink)?;
-        annotate(shapes, 1, out)?;
+        let mut seen = 0;
+        annotate(shapes, 1, &mut seen, out)?;
         writeln!(out).map_err(sink)
     })
 }
@@ -318,11 +357,12 @@ fn text_style(shape: &ShapeEnum<'_>) -> (Option<String>, Option<u16>) {
 fn annotate<W: fmt::Write>(
     shapes: &[ShapeEnum<'static>],
     indent: usize,
+    seen: &mut usize,
     out: &mut W,
 ) -> Result<()> {
     let pad = "  ".repeat(indent);
     for shape in shapes {
-        annotate_shape(shape, indent, &pad, out)?;
+        annotate_shape(shape, indent, 0, seen, &pad, out)?;
     }
     Ok(())
 }
@@ -330,9 +370,12 @@ fn annotate<W: fmt::Write>(
 fn annotate_shape<W: fmt::Write>(
     shape: &ShapeEnum<'static>,
     indent: usize,
+    depth: usize,
+    seen: &mut usize,
     pad: &str,
     out: &mut W,
 ) -> Result<()> {
+    enter_shape(depth, seen)?;
     match shape {
         shape if is_text_shape(shape) => {
             let text = shape_text(shape)?;
@@ -372,7 +415,7 @@ fn annotate_shape<W: fmt::Write>(
             writeln!(out, "{pad}[Group] \"Group\" ← {items} item(s)").map_err(sink)?;
             let child_pad = "  ".repeat(indent + 1);
             for child in group.children() {
-                annotate_shape(child, indent + 1, &child_pad, out)?;
+                annotate_shape(child, indent + 1, depth + 1, seen, &child_pad, out)?;
             }
         },
         ShapeEnum::Line(_) => {},
@@ -395,6 +438,49 @@ struct SlideOutline {
     ole_objects: usize,
 }
 
+fn outline_shape(
+    shape: &ShapeEnum<'static>,
+    depth: usize,
+    seen: &mut usize,
+    title: &mut Option<String>,
+    text_boxes: &mut usize,
+    pictures: &mut usize,
+    ole_objects: &mut usize,
+) -> Result<()> {
+    enter_shape(depth, seen)?;
+    match shape {
+        shape if is_text_shape(shape) => {
+            let text = shape_text(shape)?;
+            if is_title(shape) {
+                if title.is_none() && !is_blank(&text) {
+                    *title = Some(text);
+                }
+            } else if !is_blank(&text) {
+                *text_boxes += 1;
+            }
+        },
+        ShapeEnum::Picture(picture) => match picture.frame_kind() {
+            PictureFrameKind::Picture | PictureFrameKind::Media => *pictures += 1,
+            PictureFrameKind::OleObject => *ole_objects += 1,
+        },
+        ShapeEnum::Group(group) => {
+            for child in group.children() {
+                outline_shape(
+                    child,
+                    depth + 1,
+                    seen,
+                    title,
+                    text_boxes,
+                    pictures,
+                    ole_objects,
+                )?;
+            }
+        },
+        ShapeEnum::Table(_) | ShapeEnum::Line(_) => {},
+    }
+    Ok(())
+}
+
 fn slide_outlines(file: &Ppt) -> Result<Vec<SlideOutline>> {
     file.check_source()?;
     let total = file.reader().slide_count();
@@ -406,24 +492,17 @@ fn slide_outlines(file: &Ppt) -> Result<Vec<SlideOutline>> {
             .ok_or_else(|| missing_slide(position))?;
         let mut title = None;
         let (mut text_boxes, mut pictures, mut ole_objects) = (0, 0, 0);
+        let mut seen = 0;
         for shape in slide.shapes()? {
-            match shape {
-                shape if is_text_shape(shape) => {
-                    let text = shape_text(shape)?;
-                    if is_title(shape) {
-                        if title.is_none() && !is_blank(&text) {
-                            title = Some(text);
-                        }
-                    } else if !is_blank(&text) {
-                        text_boxes += 1;
-                    }
-                },
-                ShapeEnum::Picture(picture) => match picture.frame_kind() {
-                    PictureFrameKind::Picture | PictureFrameKind::Media => pictures += 1,
-                    PictureFrameKind::OleObject => ole_objects += 1,
-                },
-                _ => {},
-            }
+            outline_shape(
+                shape,
+                0,
+                &mut seen,
+                &mut title,
+                &mut text_boxes,
+                &mut pictures,
+                &mut ole_objects,
+            )?;
         }
         slides.push(SlideOutline {
             index: u32::try_from(position + 1).unwrap_or(u32::MAX),
@@ -487,20 +566,19 @@ fn outline_json(file: &Ppt) -> Result<OutlineJson> {
 // stats
 // ---------------------------------------------------------------------------
 
-/// Counts exposed by the stats view.  `charts` remains zero because the PPT
-/// adapter has no chart-shape projection; that gap is advertised by its
-/// format specification rather than inferred from a generic frame.
+/// Counts exposed by the stats view. Chart and alternate-text counts are
+/// omitted because the PPT adapter has no typed chart or picture-description
+/// projection; those gaps are advertised by its format specification rather
+/// than inferred from a generic frame.
 #[derive(Debug, Clone, Default)]
 struct Stats {
     slides: usize,
     shapes: usize,
     text_boxes: usize,
     pictures: usize,
-    charts: usize,
     ole_objects: usize,
     words: usize,
     slides_without_title: usize,
-    pictures_without_alt: usize,
     fonts: Vec<(String, usize)>,
 }
 
@@ -520,7 +598,14 @@ fn record_font(stats: &mut Stats, textbox: &TextBox<'_>) {
     }
 }
 
-fn walk_shape(shape: &ShapeEnum<'static>, stats: &mut Stats, titled: &mut bool) -> Result<()> {
+fn walk_shape(
+    shape: &ShapeEnum<'static>,
+    depth: usize,
+    seen: &mut usize,
+    stats: &mut Stats,
+    titled: &mut bool,
+) -> Result<()> {
+    enter_shape(depth, seen)?;
     stats.shapes += 1;
     match shape {
         shape if is_text_shape(shape) => {
@@ -540,17 +625,12 @@ fn walk_shape(shape: &ShapeEnum<'static>, stats: &mut Stats, titled: &mut bool) 
             }
         },
         ShapeEnum::Picture(picture) => match picture.frame_kind() {
-            PictureFrameKind::Picture => {
-                stats.pictures += 1;
-                // PPT's native shape model has no alternate-text property.
-                stats.pictures_without_alt += 1;
-            },
+            PictureFrameKind::Picture | PictureFrameKind::Media => stats.pictures += 1,
             PictureFrameKind::OleObject => stats.ole_objects += 1,
-            PictureFrameKind::Media => {},
         },
         ShapeEnum::Group(group) => {
             for child in group.children() {
-                walk_shape(child, stats, titled)?;
+                walk_shape(child, depth + 1, seen, stats, titled)?;
             }
         },
         ShapeEnum::Line(_) => {},
@@ -570,8 +650,9 @@ fn stats(file: &Ppt) -> Result<Stats> {
             .slide_at(position)?
             .ok_or_else(|| missing_slide(position))?;
         let mut titled = false;
+        let mut seen = 0;
         for shape in slide.shapes()? {
-            walk_shape(shape, &mut stats, &mut titled)?;
+            walk_shape(shape, 0, &mut seen, &mut stats, &mut titled)?;
         }
         if !titled {
             stats.slides_without_title += 1;
@@ -590,19 +671,11 @@ impl Stats {
         writeln!(out, "Total shapes: {}", self.shapes)?;
         writeln!(out, "Text boxes: {}", self.text_boxes)?;
         writeln!(out, "Pictures: {}", self.pictures)?;
-        if self.charts > 0 {
-            writeln!(out, "Charts: {}", self.charts)?;
-        }
         if self.ole_objects > 0 {
             writeln!(out, "OLE Objects: {}", self.ole_objects)?;
         }
         writeln!(out, "Words: {}", self.words)?;
         writeln!(out, "Slides without title: {}", self.slides_without_title)?;
-        writeln!(
-            out,
-            "Pictures without alt text: {}",
-            self.pictures_without_alt
-        )?;
         if !self.fonts.is_empty() {
             writeln!(out)?;
             writeln!(out, "Font usage:")?;
@@ -619,17 +692,15 @@ impl Stats {
             total_shapes: self.shapes,
             text_boxes: self.text_boxes,
             pictures: self.pictures,
-            charts: self.charts,
             ole_objects: self.ole_objects,
             words: self.words,
             slides_without_title: self.slides_without_title,
-            pictures_without_alt: self.pictures_without_alt,
             font_usage: (!self.fonts.is_empty()).then_some(FontUsage(self.fonts)),
         }
     }
 }
 
-/// `{"slides","totalShapes","textBoxes","pictures","charts","oleObjects","words","slidesWithoutTitle","picturesWithoutAlt","fontUsage"}`.
+/// `{"slides","totalShapes","textBoxes","pictures","oleObjects","words","slidesWithoutTitle","fontUsage"}`.
 #[derive(Debug, Clone, Serialize)]
 #[serde(rename_all = "camelCase")]
 pub(crate) struct StatsJson {
@@ -637,11 +708,9 @@ pub(crate) struct StatsJson {
     total_shapes: usize,
     text_boxes: usize,
     pictures: usize,
-    charts: usize,
     ole_objects: usize,
     words: usize,
     slides_without_title: usize,
-    pictures_without_alt: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     font_usage: Option<FontUsage>,
 }
