@@ -216,6 +216,12 @@ pub(crate) fn shape_plan(
     let Some(path) = target.path() else {
         return Ok(None);
     };
+    // Raw paths are an explicit barrier. Their native identity semantics must
+    // be handled by the ordinary writer, even when the visible path happens
+    // to have the same direct slide/shape ordinal form.
+    if path.raw {
+        return Ok(None);
+    }
     let Some((slide, kind, ordinal)) = direct_path(path.path()) else {
         return Ok(None);
     };
