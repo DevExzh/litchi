@@ -3923,27 +3923,12 @@ impl Edit {
                     limit: self.source.limits().max_input_bytes(),
                 })?;
         }
-        let mut empty_paragraph_formats = vec![None; paragraphs.len()];
-        if paragraph_runs.iter().any(Vec::is_empty) {
-            let boundaries = ordinary_run_paragraph_source_boundaries(&self.source)?;
-            for (paragraph_index, runs) in paragraph_runs.iter().enumerate() {
-                if runs.is_empty() {
-                    let boundary = *boundaries.get(paragraph_index).ok_or(
-                        Error::ParagraphOutOfRange {
-                            position: paragraph_index,
-                            count: boundaries.len(),
-                        },
-                    )?;
-                    empty_paragraph_formats[paragraph_index] = Some(
-                        empty_paragraph_effective_formatting(
-                            &self.source,
-                            paragraph_index,
-                            boundary,
-                        )?,
-                    );
-                }
-            }
-        }
+        let empty_paragraphs = paragraph_runs.iter().map(Vec::is_empty).collect::<Vec<_>>();
+        let empty_paragraph_formats = if empty_paragraphs.iter().any(|empty| *empty) {
+            empty_paragraph_boundary_formats(&self.source, &paragraph_starts, &empty_paragraphs)?
+        } else {
+            vec![None; paragraphs.len()]
+        };
         let mut staged = Vec::new();
         staged.try_reserve_exact(insertions.len()).map_err(|_error| {
             Error::Write("could not reserve run-insertion operations".to_string())
@@ -8199,36 +8184,71 @@ fn ordinary_run_body_source_span(
     }
 }
 
-fn empty_paragraph_effective_formatting(
+fn empty_paragraph_boundary_formats(
     source: &Package,
-    paragraph_index: usize,
-    source_offset: usize,
-) -> Result<crate::types::Formatting, Error> {
-    let source_bytes = source
-        .source_bytes()
-        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
-    let probe = encoded_run_insertion("X", RunFormatPatch::new(), source.limits())?;
-    let bytes = splice_body_ranges(
-        source_bytes,
-        &[(source_offset..source_offset, probe)],
-        source.limits(),
-    )?;
-    let candidate = Package::from_bytes_with_options(&bytes, source.options())?;
-    let paragraph = candidate
-        .body()
-        .paragraphs()
-        .nth(paragraph_index)
-        .ok_or(Error::ParagraphOutOfRange {
-            position: paragraph_index,
-            count: candidate.paragraph_count(),
-        })?;
-    let run = paragraph
-        .runs()
-        .find(|run| run.text() == "X")
-        .ok_or(Error::UnsupportedSource(
-            "empty paragraph boundary has no readable character state",
-        ))?;
-    Ok(*run.format().raw())
+    paragraph_starts: &[usize],
+    empty_paragraphs: &[bool],
+) -> Result<Vec<Option<crate::types::Formatting>>, Error> {
+    if paragraph_starts.len() != empty_paragraphs.len() {
+        return Err(Error::UnsupportedSource(
+            "empty paragraph formatting map has inconsistent paragraph axes",
+        ));
+    }
+    let mut formats = vec![None; paragraph_starts.len()];
+    let mut next_empty = 0usize;
+    while next_empty < empty_paragraphs.len() && !empty_paragraphs[next_empty] {
+        next_empty = next_empty.saturating_add(1);
+    }
+    let mut block_start = 0usize;
+    for block in source.model().blocks() {
+        let block_text = block.text();
+        let block_end = block_start
+            .checked_add(block_text.len())
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+        while next_empty < empty_paragraphs.len() {
+            let paragraph_index = next_empty;
+            let paragraph_start = *paragraph_starts.get(paragraph_index).ok_or(
+                Error::ParagraphOutOfRange {
+                    position: paragraph_index,
+                    count: paragraph_starts.len(),
+                },
+            )?;
+            if paragraph_start >= block_end {
+                break;
+            }
+            if paragraph_start < block_start {
+                return Err(Error::UnsupportedSource(
+                    "empty paragraph formatting map crossed a native block boundary",
+                ));
+            }
+            let offset = paragraph_start.saturating_sub(block_start);
+            if block_text.as_bytes().get(offset) != Some(&b'\n') {
+                return Err(Error::UnsupportedSource(
+                    "empty paragraph has no retained native newline block",
+                ));
+            }
+            formats[paragraph_index] = Some(block.formatting);
+            next_empty = paragraph_index.saturating_add(1);
+            while next_empty < empty_paragraphs.len() && !empty_paragraphs[next_empty] {
+                next_empty = next_empty.saturating_add(1);
+            }
+        }
+        block_start = block_end;
+    }
+    if next_empty < empty_paragraphs.len() {
+        return Err(Error::UnsupportedSource(
+            "empty paragraph formatting map did not cover a native newline block",
+        ));
+    }
+    if block_start != source.text().len() {
+        return Err(Error::UnsupportedSource(
+            "native style blocks do not cover the complete body text",
+        ));
+    }
+    Ok(formats)
 }
 
 fn ordinary_run_group_is_destination(
