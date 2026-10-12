@@ -129,13 +129,15 @@ This migration does not rename the separate semantic edit limits or structural
 `Document` projection. Record 0224 aligns primary transaction vocabulary, and
 0225 adds native `Builder`, `Package::new()` and unified RTF creation. Record
 0226 adds native atomic publication and unified save/stream dispatch. Records
-0227–0231 migrate the focused transaction families. Records 0232–0239 add
+0227–0231 migrate the focused transaction families. Records 0232–0240 add
 native-backed paragraph reads, text replacement, removal, move, insertion, swap,
-alignment and layout through the unified API. Native layout updates now take
-`Position`, including `ParagraphLayoutUpdate::{new, position}` and
-`Edit::patch_paragraph_layout`; remaining raw ordinal entry points and semantic
-limit vocabulary still need migration. Richer element/property coverage and
-performance qualification remain pending.
+alignment and layout through the unified API. Native primary body paragraph edit
+selectors now consistently use `Position`, including
+`ParagraphTextReplacement`, `ParagraphAlignmentUpdate`,
+`ParagraphLayoutUpdate`, and the paragraph lifecycle/text-property methods;
+the duplicate `split_paragraph_at` spelling is removed. Other retained-story
+selectors and semantic limit vocabulary still need migration. Richer
+element/property coverage and performance qualification remain pending.
 
 ### PPT source dimensions
 

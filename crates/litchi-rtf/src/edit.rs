@@ -128,11 +128,17 @@ pub struct TextSpan {
 
 /// One checked replacement in a bounded body-paragraph batch.
 ///
-/// The zero-based paragraph position is resolved against the immutable source
-/// snapshot when the complete batch is staged.
+/// The zero-based paragraph [`Position`] is resolved against the immutable
+/// source snapshot when the complete batch is staged.
+///
+/// ```compile_fail
+/// use litchi_rtf::edit::ParagraphTextReplacement;
+///
+/// let _ = ParagraphTextReplacement::new(0, "replacement");
+/// ```
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ParagraphTextReplacement {
-    position: usize,
+    position: Position,
     replacement: String,
 }
 
@@ -609,7 +615,7 @@ fn ensure_paragraph_layout_source(source: &Package) -> Result<(), Error> {
 impl ParagraphTextReplacement {
     /// Creates one source-relative paragraph replacement.
     #[must_use]
-    pub fn new(position: usize, replacement: impl Into<String>) -> Self {
+    pub fn new(position: Position, replacement: impl Into<String>) -> Self {
         Self {
             position,
             replacement: replacement.into(),
@@ -618,7 +624,7 @@ impl ParagraphTextReplacement {
 
     /// Zero-based source paragraph position.
     #[must_use]
-    pub const fn position(&self) -> usize {
+    pub const fn position(&self) -> Position {
         self.position
     }
 
@@ -1516,9 +1522,10 @@ impl Edit {
     /// Returns an error for an invalid selector, conflicts, or retained limits.
     pub fn replace_paragraph_text<'text>(
         &mut self,
-        position: usize,
+        position: Position,
         replacement: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
+        let position = position.get();
         let range = paragraph_range(&self.source, position)?;
         self.replace_text(TextSpan::new(range.start, range.end)?, replacement)
     }
@@ -1553,7 +1560,10 @@ impl Edit {
             let previous = previous.position;
             let incoming = incoming.position;
             if incoming <= previous {
-                return Err(Error::ParagraphBatchOutOfOrder { previous, incoming });
+                return Err(Error::ParagraphBatchOutOfOrder {
+                    previous: previous.get(),
+                    incoming: incoming.get(),
+                });
             }
         }
 
@@ -1579,7 +1589,7 @@ impl Edit {
                     })?;
             if replacements
                 .peek()
-                .is_some_and(|replacement| replacement.position == position)
+                .is_some_and(|replacement| replacement.position.get() == position)
             {
                 let replacement = replacements.next().ok_or(Error::UnsupportedSource(
                     "paragraph replacement cursor became inconsistent",
@@ -1621,7 +1631,7 @@ impl Edit {
         }
         if let Some(replacement) = replacements.next() {
             return Err(Error::ParagraphOutOfRange {
-                position: replacement.position,
+                position: replacement.position.get(),
                 count: self.source.paragraph_count(),
             });
         }
@@ -2499,9 +2509,10 @@ impl Edit {
     /// conflicts, or finite bounds.
     pub fn insert_paragraph_after<'text>(
         &mut self,
-        position: usize,
+        position: Position,
         input: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
+        let position = position.get();
         self.ensure_body_compatible()?;
         self.ensure_operation_room()?;
         if self.operations.iter().any(Operation::is_property) {
@@ -2545,7 +2556,8 @@ impl Edit {
     /// Returns an error for an invalid selector, conflicting staged work, or
     /// the finite operation bound. Changed publication additionally refuses
     /// non-plain, ambiguous, compressed, opaque, or protected sources.
-    pub fn remove_paragraph(&mut self, position: usize) -> Result<&mut Self, Error> {
+    pub fn remove_paragraph(&mut self, position: Position) -> Result<&mut Self, Error> {
+        let position = position.get();
         let text = paragraph_text_at(&self.source, position)?.to_string();
         self.ensure_lifecycle_room()?;
         self.operations
@@ -2570,7 +2582,15 @@ impl Edit {
     /// Returns an error for an empty or unordered batch, an invalid selector,
     /// incompatible staged work, unsupported source ranges, or finite limits.
     /// Changed publication preserves the source's protection and open policies.
-    pub fn remove_body_paragraphs(&mut self, positions: &[usize]) -> Result<&mut Self, Error> {
+    ///
+    /// ```compile_fail
+    /// use litchi_rtf::Package;
+    ///
+    /// let package = Package::parse(r#"{\rtf1 First\par Second}"#).unwrap();
+    /// let mut edit = package.edit();
+    /// let _ = edit.remove_body_paragraphs(&[0]);
+    /// ```
+    pub fn remove_body_paragraphs(&mut self, positions: &[Position]) -> Result<&mut Self, Error> {
         if let [position] = positions {
             return self.remove_paragraph(*position);
         }
@@ -2580,18 +2600,16 @@ impl Edit {
         for (previous, incoming) in positions.iter().zip(positions.iter().skip(1)) {
             if incoming <= previous {
                 return Err(Error::ParagraphRemovalBatchOutOfOrder {
-                    previous: *previous,
-                    incoming: *incoming,
+                    previous: previous.get(),
+                    incoming: incoming.get(),
                 });
             }
         }
         let count = self.source.paragraph_count();
         for position in positions {
-            if *position >= count {
-                return Err(Error::ParagraphOutOfRange {
-                    position: *position,
-                    count,
-                });
+            let position = position.get();
+            if position >= count {
+                return Err(Error::ParagraphOutOfRange { position, count });
             }
         }
         self.ensure_lifecycle_room_for(positions.len())?;
@@ -2602,13 +2620,11 @@ impl Edit {
             .try_reserve_exact(positions.len())
             .map_err(|_| Error::Write("could not reserve paragraph removals".to_string()))?;
         for position in positions {
+            let position = position.get();
             let paragraph = map
                 .paragraphs
-                .get(*position)
-                .ok_or(Error::ParagraphOutOfRange {
-                    position: *position,
-                    count,
-                })?;
+                .get(position)
+                .ok_or(Error::ParagraphOutOfRange { position, count })?;
             let text =
                 semantic_text
                     .get(paragraph.text.clone())
@@ -2625,6 +2641,7 @@ impl Edit {
             .try_reserve(positions.len())
             .map_err(|_| Error::Write("could not reserve paragraph operations".to_string()))?;
         for (position, text) in positions.iter().copied().zip(texts) {
+            let position = position.get();
             self.operations
                 .push(Operation::RemoveParagraph { position, text });
         }
@@ -2646,9 +2663,11 @@ impl Edit {
     /// compressed, opaque, or protected sources.
     pub fn move_paragraph(
         &mut self,
-        position: usize,
-        final_position: usize,
+        position: Position,
+        final_position: Position,
     ) -> Result<&mut Self, Error> {
+        let position = position.get();
+        let final_position = final_position.get();
         let count = self.source.paragraph_count();
         let text = paragraph_text_at(&self.source, position)?.to_string();
         if final_position >= count {
@@ -2739,10 +2758,31 @@ impl Edit {
     /// control sequence at the proven source boundary and preserves every
     /// unrelated source byte.
     ///
+    /// ```rust,no_run
+    /// use litchi_core::Position;
+    /// use litchi_rtf::Package;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::parse(r#"{\rtf1\ansi Caf\u233? au\par}"#)?;
+    /// let mut edit = package.edit();
+    /// // The selector is typed, while the split offset remains a UTF-8 byte
+    /// // offset: "Café" is five bytes even though it has four characters.
+    /// let café_end = "Café".len();
+    /// assert_eq!(café_end, 5);
+    /// edit.split_paragraph(Position::new(0), café_end)?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
     /// # Errors
     /// Returns an error for an invalid selector or offset, unsupported body
     /// syntax, incompatible formatting, a protected source, or finite limits.
-    pub fn split_paragraph(&mut self, position: usize, offset: usize) -> Result<&mut Self, Error> {
+    pub fn split_paragraph(
+        &mut self,
+        position: Position,
+        offset: usize,
+    ) -> Result<&mut Self, Error> {
+        let position = position.get();
         self.split_paragraph_with_boundary(position, offset, PARAGRAPH_SPLIT_BYTES)
     }
 
@@ -2850,15 +2890,6 @@ impl Edit {
         Ok(self)
     }
 
-    /// Alias for [`Self::split_paragraph`] emphasizing the checked offset.
-    pub fn split_paragraph_at(
-        &mut self,
-        position: usize,
-        offset: usize,
-    ) -> Result<&mut Self, Error> {
-        self.split_paragraph(position, offset)
-    }
-
     /// Merges two adjacent ordinary body paragraphs.
     ///
     /// `first` and `second` are zero-based positions in the immutable source
@@ -2870,7 +2901,13 @@ impl Edit {
     /// Returns an error for invalid selectors, non-adjacent positions,
     /// unsupported body syntax, incompatible formatting, a protected source,
     /// or finite limits.
-    pub fn merge_paragraphs(&mut self, first: usize, second: usize) -> Result<&mut Self, Error> {
+    pub fn merge_paragraphs(
+        &mut self,
+        first: Position,
+        second: Position,
+    ) -> Result<&mut Self, Error> {
+        let first = first.get();
+        let second = second.get();
         self.ensure_lifecycle_room()?;
         let map = ordinary_paragraph_source_map(&self.source)?;
         let left = map
@@ -2964,12 +3001,13 @@ impl Edit {
     }
 
     /// Merges one ordinary paragraph with its immediate successor.
-    pub fn merge_paragraph_with_next(&mut self, position: usize) -> Result<&mut Self, Error> {
+    pub fn merge_paragraph_with_next(&mut self, position: Position) -> Result<&mut Self, Error> {
+        let position = position.get();
         let second = position.checked_add(1).ok_or(Error::ParagraphOutOfRange {
             position,
             count: self.source.paragraph_count(),
         })?;
-        self.merge_paragraphs(position, second)
+        self.merge_paragraphs(Position::new(position), Position::new(second))
     }
 
     /// Inserts one ordinary body paragraph at a checked zero-based position.
@@ -3063,13 +3101,10 @@ impl Edit {
     /// text changes in the same transaction, or retained limits.
     pub fn set_paragraph_alignment(
         &mut self,
-        position: usize,
+        position: Position,
         alignment: Alignment,
     ) -> Result<&mut Self, Error> {
-        self.set_body_paragraph_alignments(&[ParagraphAlignmentUpdate::new(
-            Position::new(position),
-            alignment,
-        )])
+        self.set_body_paragraph_alignments(&[ParagraphAlignmentUpdate::new(position, alignment)])
     }
 
     /// Atomically stages source-ordered alignment updates for ordinary body
@@ -11959,6 +11994,7 @@ pub(crate) fn apply_durable<Mode>(
             },
             "paragraph-alignment.set" => {
                 let position = parse_paragraph_target(&operation.target)?;
+                let raw_position = position.get();
                 let expected = operation
                     .preconditions
                     .get("alignment")
@@ -11969,8 +12005,11 @@ pub(crate) fn apply_durable<Mode>(
                 let paragraphs = source.body().paragraphs().collect::<Vec<_>>();
                 let count = paragraphs.len();
                 let actual = paragraphs
-                    .get(position)
-                    .ok_or(Error::ParagraphOutOfRange { position, count })?
+                    .get(raw_position)
+                    .ok_or(Error::ParagraphOutOfRange {
+                        position: raw_position,
+                        count,
+                    })?
                     .format()
                     .alignment();
                 if alignment_name(actual) != expected {
@@ -12312,7 +12351,7 @@ pub(crate) fn apply_durable<Mode>(
                         "paragraph removal value must be null".to_string(),
                     ));
                 }
-                edit.remove_paragraph_after(position, expected)?;
+                edit.remove_paragraph_after(position.get(), expected)?;
             },
             "paragraph.remove" => {
                 let position = parse_paragraph_target(&operation.target)?;
@@ -12323,7 +12362,7 @@ pub(crate) fn apply_durable<Mode>(
                     .ok_or_else(|| {
                         Error::DurablePatch("missing removed paragraph precondition".to_string())
                     })?;
-                if paragraph_text_at(source, position)? != expected {
+                if paragraph_text_at(source, position.get())? != expected {
                     return Err(Error::StalePrecondition("paragraph text differs"));
                 }
                 if !operation.value.is_null() {
@@ -12347,7 +12386,7 @@ pub(crate) fn apply_durable<Mode>(
                 let text = operation.value.as_str().ok_or_else(|| {
                     Error::DurablePatch("inserted paragraph text must be a string".to_string())
                 })?;
-                edit.restore_paragraph(position, text)?;
+                edit.restore_paragraph(position.get(), text)?;
             },
             "paragraph.move" => {
                 let position = parse_paragraph_target(&operation.target)?;
@@ -12358,7 +12397,7 @@ pub(crate) fn apply_durable<Mode>(
                     .ok_or_else(|| {
                         Error::DurablePatch("missing moved paragraph precondition".to_string())
                     })?;
-                if paragraph_text_at(source, position)? != expected {
+                if paragraph_text_at(source, position.get())? != expected {
                     return Err(Error::StalePrecondition("moved paragraph text differs"));
                 }
                 let final_position = operation
@@ -12371,7 +12410,7 @@ pub(crate) fn apply_durable<Mode>(
                     .map_err(|_error| {
                         Error::DurablePatch("invalid paragraph final position".to_string())
                     })?;
-                edit.move_paragraph(position, final_position)?;
+                edit.move_paragraph(position, Position::new(final_position))?;
             },
             "paragraph.split" => {
                 let position = parse_paragraph_target(&operation.target)?;
@@ -12435,7 +12474,7 @@ pub(crate) fn apply_durable<Mode>(
                         "ordinary paragraph split boundary mode differs",
                     ));
                 }
-                if paragraph_text_at(source, position)? != expected {
+                if paragraph_text_at(source, position.get())? != expected {
                     return Err(Error::StalePrecondition(
                         "ordinary paragraph split text differs",
                     ));
@@ -12443,7 +12482,7 @@ pub(crate) fn apply_durable<Mode>(
                 if boundary_mode == "canonical" {
                     edit.split_paragraph(position, offset)?;
                 } else {
-                    edit.split_paragraph_with_boundary(position, offset, &boundary)?;
+                    edit.split_paragraph_with_boundary(position.get(), offset, &boundary)?;
                 }
                 let generated_boundary =
                     edit.operations
@@ -12458,7 +12497,9 @@ pub(crate) fn apply_durable<Mode>(
                                         ..
                                     }),
                                 ..
-                            } if *generated_position == position && *generated_offset == offset => {
+                            } if *generated_position == position.get()
+                                && *generated_offset == offset =>
+                            {
                                 Some(generated_boundary.as_slice())
                             },
                             _ => None,
@@ -12515,11 +12556,14 @@ pub(crate) fn apply_durable<Mode>(
                     ));
                 }
                 expected_result_hash = Some(result_hash);
-                let second = position.checked_add(1).ok_or(Error::ParagraphOutOfRange {
-                    position,
-                    count: source.paragraph_count(),
-                })?;
-                if paragraph_text_at(source, position)? != expected_left
+                let raw_position = position.get();
+                let second = raw_position
+                    .checked_add(1)
+                    .ok_or(Error::ParagraphOutOfRange {
+                        position: raw_position,
+                        count: source.paragraph_count(),
+                    })?;
+                if paragraph_text_at(source, raw_position)? != expected_left
                     || paragraph_text_at(source, second)? != expected_right
                 {
                     return Err(Error::StalePrecondition(
@@ -12529,7 +12573,7 @@ pub(crate) fn apply_durable<Mode>(
                 let map = ordinary_paragraph_source_map(source)?;
                 let actual_boundary = map
                     .paragraphs
-                    .get(position)
+                    .get(raw_position)
                     .and_then(|paragraph| paragraph.boundary_after.as_ref())
                     .and_then(|span| source.source_bytes()?.get(span.clone()))
                     .ok_or(Error::UnsupportedSource(
@@ -12540,7 +12584,7 @@ pub(crate) fn apply_durable<Mode>(
                         "ordinary paragraph merge boundary bytes differ",
                     ));
                 }
-                edit.merge_paragraphs(position, second)?;
+                edit.merge_paragraphs(position, Position::new(second))?;
             },
             "table-cell-text.replace" => {
                 let cell_path = parse_table_cell_target(&operation.target)?;
@@ -12777,11 +12821,12 @@ fn parse_text_target(target: &str) -> Result<TextSpan, Error> {
     TextSpan::new(start, end)
 }
 
-fn parse_paragraph_target(target: &str) -> Result<usize, Error> {
+fn parse_paragraph_target(target: &str) -> Result<Position, Error> {
     target
         .strip_prefix("body:paragraph:")
         .ok_or_else(|| Error::DurablePatch("invalid paragraph target".to_string()))?
         .parse::<usize>()
+        .map(Position::new)
         .map_err(|_error| Error::DurablePatch("invalid paragraph position".to_string()))
 }
 
