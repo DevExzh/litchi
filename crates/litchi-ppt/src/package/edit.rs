@@ -487,10 +487,15 @@ impl Edit {
     /// the aggregate charge exceeds this edit's selected budget. Native
     /// chunk, replacement-byte, duplicate-target, encoding, dependency,
     /// signed-source, and publication refusals leave this edit unchanged.
-    pub fn set_shape_text_chunks<'a>(
-        &mut self,
-        chunks: &[&'a [ShapeTextReplacement]],
-    ) -> Result<usize> {
+    pub fn set_shape_text_chunks(&mut self, chunks: &[&[ShapeTextReplacement]]) -> Result<usize> {
+        ensure_source_version(&self.package, self.expected_source)?;
+        if chunks.len() > slide_order::MAX_SHAPE_TEXT_CHUNKS {
+            return Err(Error::Package(PackageError::ResourceLimit(format!(
+                "PPT shape-text chunk count {} exceeds limit {}",
+                chunks.len(),
+                slide_order::MAX_SHAPE_TEXT_CHUNKS
+            ))));
+        }
         let charge = chunks.iter().try_fold(0usize, |total, chunk| {
             total.checked_add(chunk.len()).ok_or_else(|| {
                 Error::Package(PackageError::ResourceLimit(

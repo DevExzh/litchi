@@ -2024,9 +2024,9 @@ impl Transaction {
         self.set_shape_texts_mapped(&mapped)
     }
 
-    fn set_shape_texts_mapped<'a>(
+    fn set_shape_texts_mapped(
         &mut self,
-        replacements: &[(crate::text_edit::Target, &'a str)],
+        replacements: &[(crate::text_edit::Target, &str)],
     ) -> Result<usize> {
         if replacements.is_empty() {
             return Ok(0);
@@ -2138,11 +2138,15 @@ impl Transaction {
     /// replacement-byte limit; duplicate semantic targets, missing targets,
     /// incompatible encodings, unsafe dependency closures, signed changes,
     /// and publication failures are returned without partial state.
-    pub fn set_shape_text_chunks<'a>(
-        &mut self,
-        chunks: &[&'a [ShapeTextReplacement]],
-    ) -> Result<usize> {
-        let (flattened, _replacement_bytes) = flatten_shape_text_chunks(chunks)?;
+    pub fn set_shape_text_chunks(&mut self, chunks: &[&[ShapeTextReplacement]]) -> Result<usize> {
+        let (flattened, replacement_bytes) = flatten_shape_text_chunks(chunks)?;
+        if replacement_bytes > self.source.limits.max_package_bytes {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT shape-text aggregate replacement bytes {} exceeds limit {}",
+                replacement_bytes, self.source.limits.max_package_bytes
+            ))
+            .into());
+        }
         if flattened.is_empty() {
             return Ok(0);
         }
