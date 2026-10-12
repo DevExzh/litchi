@@ -3984,6 +3984,10 @@ impl Edit {
         let has_layout_delta = self.operations.iter().any(|operation| {
             matches!(operation, Operation::ParagraphLayout { before, after, .. } if before != after)
         });
+        let has_restore_paragraph = self
+            .operations
+            .iter()
+            .any(|operation| matches!(operation, Operation::RestoreParagraph { .. }));
         let did_change = replacement != self.source.text()
             || alignments != original_alignments
             || has_layout_delta
@@ -4000,7 +4004,8 @@ impl Edit {
             || has_baseline_delta
             || has_expansion_delta
             || has_horizontal_scale_delta
-            || has_kerning_delta;
+            || has_kerning_delta
+            || has_restore_paragraph;
         let semantic_delta =
             semantic_changes_with_replacement(&self.operations, &projected_spans, &replacement);
         if !did_change {
@@ -4621,7 +4626,7 @@ fn commit_body_paragraph_insertion(edit: &Edit) -> Result<Option<(Package, Vec<C
     )?;
     let encoded = encoded_body_text(text, edit.source.limits())?;
     let (offset, replacement) =
-        paragraph_insertion_source_bytes(&map, &body_span, *position, text, encoded)?;
+        paragraph_insertion_source_bytes(source_bytes, &map, &body_span, *position, text, encoded)?;
     let bytes = splice_body(
         source_bytes,
         offset..offset,
@@ -4656,6 +4661,7 @@ fn commit_body_paragraph_insertion(edit: &Edit) -> Result<Option<(Package, Vec<C
 }
 
 fn paragraph_insertion_source_bytes(
+    source_bytes: &[u8],
     map: &OrdinaryParagraphSourceMap,
     body_span: &Range<usize>,
     position: usize,
@@ -4669,10 +4675,23 @@ fn paragraph_insertion_source_bytes(
                 "empty ordinary paragraph body has no contiguous source span",
             ));
         }
+        let needs_delimiter = !encoded.is_empty()
+            && body_span.start != 0
+            && source_bytes
+                .get(body_span.start.saturating_sub(1))
+                .is_some_and(u8::is_ascii_alphanumeric);
         let boundary_bytes = usize::from(text.is_empty()).saturating_mul(5);
         replacement
-            .try_reserve_exact(encoded.len().saturating_add(boundary_bytes))
+            .try_reserve_exact(
+                encoded
+                    .len()
+                    .saturating_add(boundary_bytes)
+                    .saturating_add(usize::from(needs_delimiter)),
+            )
             .map_err(|_error| Error::Write("could not reserve paragraph insertion".to_string()))?;
+        if needs_delimiter {
+            replacement.push(b' ');
+        }
         replacement.extend_from_slice(&encoded);
         if text.is_empty() {
             replacement.extend_from_slice(br"\par ");
@@ -4688,9 +4707,22 @@ fn paragraph_insertion_source_bytes(
                 position,
                 count: map.paragraphs.len(),
             })?;
+        let needs_delimiter = !encoded.is_empty()
+            && paragraph.source.start != 0
+            && source_bytes
+                .get(paragraph.source.start.saturating_sub(1))
+                .is_some_and(u8::is_ascii_alphanumeric);
         replacement
-            .try_reserve_exact(encoded.len().saturating_add(5))
+            .try_reserve_exact(
+                encoded
+                    .len()
+                    .saturating_add(5)
+                    .saturating_add(usize::from(needs_delimiter)),
+            )
             .map_err(|_error| Error::Write("could not reserve paragraph insertion".to_string()))?;
+        if needs_delimiter {
+            replacement.push(b' ');
+        }
         replacement.extend_from_slice(&encoded);
         replacement.extend_from_slice(br"\par ");
         return Ok((paragraph.source.start, replacement));
@@ -8559,12 +8591,12 @@ fn encoded_body_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>,
     }
 }
 
-/// Write text using the signed UTF-16 code units required by RTF `\uN`.
+/// Write insertion text with RTF's signed UTF-16 `\uN` representation.
 ///
-/// [`RtfWriter::write_text`] handles BMP characters correctly, but an astral
-/// scalar value must be represented by its high and low surrogate units. The
-/// parser consequently treats a direct `\u` value for an astral code point as
-/// an unrelated BMP character after truncating it to `u16`.
+/// The general writer preserves its established wire spelling, including its
+/// historical scalar-value encoding. Paragraph insertion needs a stricter
+/// local encoding because the candidate is immediately parsed for exact
+/// semantic readback, and astral scalars must be emitted as surrogate units.
 fn write_body_text_with_utf16<W: io::Write>(
     writer: &mut RtfWriter<W>,
     text: &str,
