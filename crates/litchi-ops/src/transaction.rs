@@ -218,6 +218,8 @@ pub struct Edit {
     doc: Option<crate::format::doc::write::Run>,
     #[cfg(feature = "docx")]
     formatting: Option<crate::format::docx::write::coalesce::Run>,
+    #[cfg(feature = "rtf")]
+    rtf: Option<crate::format::rtf::write::coalesce::Run>,
     #[cfg(feature = "xlsx")]
     cells: Option<crate::format::xlsx::write::coalesce::Run>,
     #[cfg(feature = "xlsb")]
@@ -299,6 +301,8 @@ impl File {
                 doc: None,
                 #[cfg(feature = "docx")]
                 formatting: None,
+                #[cfg(feature = "rtf")]
+                rtf: None,
                 #[cfg(feature = "xlsx")]
                 cells: None,
                 #[cfg(feature = "xlsb")]
@@ -426,6 +430,9 @@ impl Edit {
         let index = self.operations;
         let result = (|| {
             if index >= self.limits.max_operations() {
+                // A deferred native coalescer failure belongs to the earlier
+                // wire item and must surface before this admission error.
+                self.flush_pending()?;
                 return Err(Error::Limit {
                     kind: LimitKind::Operations,
                     observed: index.saturating_add(1),
@@ -1060,6 +1067,90 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "rtf")]
+        if let File::Rtf(handle) = self.current.clone() {
+            if _props.is_empty() {
+                // Preserve the direct adapter's exact no-op path without
+                // constructing a whole-document coalescer index.
+                if self.rtf.is_some() {
+                    self.flush_pending()?;
+                }
+                return Ok(None);
+            }
+            let mut planned = if let Some(run) = self.rtf.as_ref() {
+                run.plan(_target, _props)
+            } else if crate::format::rtf::write::coalesce::direct_candidate(_target, _props)? {
+                let run = crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?;
+                let plan = run.plan(_target, _props)?;
+                self.rtf = Some(run);
+                Ok(plan)
+            } else {
+                Ok(None)
+            };
+            if planned.is_err() {
+                // Resolve admission errors only after publishing an earlier
+                // deferred native failure, preserving wire attribution.
+                self.flush_pending()?;
+                let File::Rtf(handle) = self.current.clone() else {
+                    return Err(pending());
+                };
+                planned = if crate::format::rtf::write::coalesce::direct_candidate(_target, _props)?
+                {
+                    let run = crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?;
+                    let plan = run.plan(_target, _props)?;
+                    self.rtf = Some(run);
+                    Ok(plan)
+                } else {
+                    Ok(None)
+                };
+            }
+            let Some(mut plan) = planned? else {
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .rtf
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan))
+            {
+                self.flush_pending()?;
+                let File::Rtf(handle) = self.current.clone() else {
+                    return Err(pending());
+                };
+                if !crate::format::rtf::write::coalesce::direct_candidate(_target, _props)? {
+                    return Ok(None);
+                }
+                let run = crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?;
+                plan = run
+                    .plan(_target, _props)?
+                    .ok_or_else(|| Error::new(Code::InternalError, "RTF set plan disappeared"))?;
+                self.rtf = Some(run);
+            }
+            if self.rtf.is_none() {
+                let File::Rtf(handle) = self.current.clone() else {
+                    return Err(pending());
+                };
+                let run = crate::format::rtf::write::coalesce::Run::new(&handle, &self.limits)?;
+                plan = run
+                    .plan(_target, _props)?
+                    .ok_or_else(|| Error::new(Code::InternalError, "RTF set plan disappeared"))?;
+                self.rtf = Some(run);
+            }
+            let run = self
+                .rtf
+                .as_mut()
+                .ok_or_else(|| Error::new(Code::InternalError, "RTF run missing"))?;
+            let changed = run.stage(plan, _index)?;
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
         #[cfg(feature = "xlsb")]
         if let File::Xlsb(_) = &self.current {
             let sheet_shape = crate::format::xlsb::write::sheet_state_shape(_target, _props);
@@ -1512,6 +1603,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "rtf")]
+        if let Some(run) = self.rtf.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_rtf(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "xlsb")]
         if let Some(run) = self.xlsb_sheets.take() {
             let index = run.first_index();
@@ -1696,6 +1812,10 @@ impl Edit {
                 #[cfg(feature = "docx")]
                 {
                     self.formatting = None;
+                }
+                #[cfg(feature = "rtf")]
+                {
+                    self.rtf = None;
                 }
                 #[cfg(feature = "xlsx")]
                 {

@@ -26,6 +26,8 @@ use crate::target::TargetArg;
 use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::{LengthSpec, Scalar, ValueType};
 
+pub(crate) mod coalesce;
+
 /// The native proof and immutable endpoints of one RTF write.
 pub(crate) struct Commit {
     pub(crate) before: Rtf,
