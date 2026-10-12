@@ -314,6 +314,10 @@ impl File {
             Self::Doc(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Rtf(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]

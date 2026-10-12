@@ -105,7 +105,8 @@ impl Family {
 /// which its content hides until it is unlocked.
 ///
 /// Tier 1 and tier 2 variants (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT) retain
-/// the leaf's editable owner; RTF, ODT, ODS and ODP are read-only for now.
+/// the leaf's editable owner. RTF retains its native package and supports the
+/// paragraph-text write subset; ODT, ODS and ODP remain read-only for now.
 /// The enum is `#[non_exhaustive]`: further formats join as variants. Each
 /// variant exists only when its cargo feature is enabled.
 ///
@@ -155,7 +156,7 @@ pub enum File {
     /// A legacy PowerPoint (`.ppt`) presentation.
     #[cfg(feature = "ppt")]
     Ppt(Ppt),
-    /// A Rich Text Format (`.rtf`) document; read-only.
+    /// A Rich Text Format (`.rtf`) document with paragraph-text writes.
     #[cfg(feature = "rtf")]
     Rtf(Rtf),
     /// An OpenDocument Text (`.odt`) document; read-only.

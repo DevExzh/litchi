@@ -121,6 +121,8 @@ enum Leaf {
     },
     #[cfg(feature = "docx")]
     Docx(Box<litchi_docx::document::Patch>),
+    #[cfg(feature = "rtf")]
+    Rtf(Box<litchi_rtf::edit::Patch>),
     #[cfg(feature = "xlsx")]
     Xlsx {
         source: litchi_xlsx::Workbook,
@@ -457,7 +459,8 @@ impl Edit {
                 feature = "xlsx",
                 feature = "pptx",
                 feature = "xlsb",
-                feature = "xls"
+                feature = "xls",
+                feature = "rtf"
             ))]
             let limits = self.limits;
             self.execute(|file| match file {
@@ -493,6 +496,10 @@ impl Edit {
                 #[cfg(feature = "pptx")]
                 File::Pptx(handle) => {
                     wrap_pptx(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
+                #[cfg(feature = "rtf")]
+                File::Rtf(handle) => {
+                    wrap_rtf(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
                 #[allow(unreachable_patterns)]
                 _ => Err(pending()),
@@ -1911,10 +1918,39 @@ fn wrap_pptx<T>(
     ))
 }
 
+#[cfg(feature = "rtf")]
+fn wrap_rtf<T>(
+    _before: &crate::format::rtf::Rtf,
+    commit: crate::format::rtf::write::Commit,
+    value: T,
+) -> Result<(Step, T)> {
+    let crate::format::rtf::write::Commit {
+        before,
+        after,
+        patch,
+        operations,
+        snapshot_bytes,
+    } = commit;
+    Ok((
+        Step {
+            before: File::Rtf(before),
+            after: File::Rtf(after),
+            leaf: Leaf::Rtf(Box::new(patch)),
+            leaf_operations: operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
 fn changed(steps: &[Step]) -> Result<bool> {
     let (Some(first), Some(last)) = (steps.first(), steps.last()) else {
         return Ok(false);
     };
+    #[cfg(feature = "rtf")]
+    if let (File::Rtf(before), File::Rtf(after)) = (&first.before, &last.after) {
+        return Ok(!before.same_content(after));
+    }
     match (&first.leaf, &last.leaf) {
         #[cfg(feature = "doc")]
         (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before_bytes() != last.after_bytes()),
@@ -1953,6 +1989,8 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         (File::Docx(left), File::Docx(right)) => left.same_snapshot(right),
         #[cfg(feature = "xlsx")]
         (File::Xlsx(left), File::Xlsx(right)) => left.same_snapshot(right),
+        #[cfg(feature = "rtf")]
+        (File::Rtf(left), File::Rtf(right)) => left.same_snapshot(right),
         _ => false,
     }
 }
@@ -1993,6 +2031,8 @@ fn admit(file: &File) -> Result<()> {
         File::Xls(handle) => handle.admit_edit(),
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => handle.admit_edit(),
+        #[cfg(feature = "rtf")]
+        File::Rtf(handle) => handle.admit_edit(),
         _ => check_source(file),
     }
 }
@@ -2024,6 +2064,8 @@ fn check_source(file: &File) -> Result<()> {
         File::Xls(handle) => handle.check_source(),
         #[cfg(feature = "ppt")]
         File::Ppt(handle) => handle.check_source(),
+        #[cfg(feature = "rtf")]
+        File::Rtf(_) => Ok(()),
         File::Signed(signed) => Err(crate::Error::signed(signed.format())),
         File::Locked(locked) => Err(locked.read_error()),
         #[allow(unreachable_patterns)]

@@ -789,6 +789,12 @@ impl Capabilities {
                 }
                 return Support::Supported;
             }
+            #[cfg(feature = "rtf")]
+            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
+                && self.adapter() == Some(Adapter::Rtf)
+            {
+                return Support::Supported;
+            }
             return EDITS.support();
         }
         match verb {
@@ -1221,6 +1227,53 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         code: Code::UnsupportedCapability,
         follow_up: "RTF typed metadata creation",
         reason: "initial RTF metadata authoring is not integrated",
+    },
+];
+
+/// RTF's first write adapter intentionally admits only existing main-story
+/// paragraph text.  Keep the remaining mutation verbs visible instead of
+/// making the format-level `set`/`edit`/`batch` support look like general CRUD.
+#[cfg(feature = "rtf")]
+static RTF_WRITE_GAPS: [GapSpec; 4] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "add",
+            element: "body",
+            context: "paragraph-text-only",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF structural body editing",
+        reason: "the RTF write adapter replaces existing ordinary paragraph text and does not add elements",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "remove",
+            element: "body",
+            context: "paragraph-text-only",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF structural body editing",
+        reason: "the RTF write adapter preserves the existing paragraph structure and does not remove elements",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "move",
+            element: "body",
+            context: "paragraph-text-only",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF structural body editing",
+        reason: "the RTF write adapter preserves paragraph order and does not move elements",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "swap",
+            element: "body",
+            context: "paragraph-text-only",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF structural body editing",
+        reason: "the RTF write adapter preserves paragraph order and does not reorder elements",
     },
 ];
 
@@ -2616,6 +2669,9 @@ impl Element {
                 && self.retains_source != Some(false)
                 && matches!(self.data().canonical, "slide" | "shape" | "placeholder")
                 && readable);
+        #[cfg(feature = "rtf")]
+        let settable =
+            settable || (self.adapter == Adapter::Rtf && self.data().canonical == "p" && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
@@ -3105,6 +3161,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
             .get(index.saturating_sub(XLS_CREATION_OPTION_GAPS.len()))
             .map(Some);
     }
+    #[cfg(feature = "rtf")]
+    if adapter == Adapter::Rtf {
+        return RTF_WRITE_GAPS.get(index).map(Some);
+    }
     let _ = (adapter, index);
     None
 }
@@ -3203,6 +3263,18 @@ impl Iterator for Properties {
             .map(|spec| Property {
                 spec,
                 retains_source: self.retains_source,
+                rtf_set: {
+                    #[cfg(feature = "rtf")]
+                    {
+                        self.element.adapter == Adapter::Rtf
+                            && self.element.data().canonical == "p"
+                            && spec.name.eq_ignore_ascii_case("text")
+                    }
+                    #[cfg(not(feature = "rtf"))]
+                    {
+                        false
+                    }
+                },
                 structural_add_supported: {
                     #[cfg(feature = "pptx")]
                     {
@@ -3239,6 +3311,7 @@ impl Iterator for Properties {
 pub struct Property {
     spec: &'static PropSpec,
     retains_source: Option<bool>,
+    rtf_set: bool,
     structural_add_supported: Option<bool>,
 }
 
@@ -3265,6 +3338,9 @@ impl Property {
     /// Whether `set` writes the key (M2).
     #[must_use]
     pub const fn set(&self) -> bool {
+        if self.rtf_set {
+            return true;
+        }
         match self.retains_source {
             Some(false) => false,
             Some(true) | None => self.spec.access.set,
