@@ -218,6 +218,8 @@ pub struct Edit {
     cells: Option<crate::format::xlsx::write::coalesce::Run>,
     #[cfg(feature = "xlsb")]
     xlsb_cells: Option<crate::format::xlsb::write::coalesce::Run>,
+    #[cfg(feature = "xls")]
+    xls_cells: Option<crate::format::xls::write::coalesce::Run>,
     #[cfg(feature = "xlsb")]
     xlsb_sheets: Option<crate::format::xlsb::write::sheet_coalesce::Run>,
     #[cfg(feature = "pptx")]
@@ -294,6 +296,8 @@ impl File {
                 cells: None,
                 #[cfg(feature = "xlsb")]
                 xlsb_cells: None,
+                #[cfg(feature = "xls")]
+                xls_cells: None,
                 #[cfg(feature = "xlsb")]
                 xlsb_sheets: None,
                 #[cfg(feature = "pptx")]
@@ -369,6 +373,8 @@ impl Edit {
     /// exact reversible patch in the transaction history.
     /// Distinct direct XLSX cell payload assignments also share a native edit.
     /// Distinct direct XLSB cell scalar assignments also share a native edit.
+    /// Distinct direct XLS scalar sets, clears and removals share one native
+    /// package edit. Repeated coordinates close that run and resolve again.
     /// Consecutive direct XLSB sheet visibility assignments to distinct tabs
     /// with one exact state also share one native structural edit. Hiding the
     /// active tab closes its run before the next command so intermediate view
@@ -558,6 +564,9 @@ impl Edit {
 
     /// Remove selected elements from the current candidate.
     ///
+    /// Distinct direct XLS removals share a native package edit with scalar
+    /// setters. Repeated coordinates, ranges, queries and reads close the run.
+    ///
     /// Consecutive direct XLSB cell removals on one worksheet share one
     /// native cell-values edit.  Complete-catalog sheet paths and homogeneous
     /// sheet queries use one native structural edit after any pending direct
@@ -624,7 +633,7 @@ impl Edit {
         result.map_err(|error| self.poison(error, index))
     }
 
-    /// Try to stage a direct XLSB cell removal in the pending native cell
+    /// Try to stage a direct XLS or XLSB cell removal in the pending native cell
     /// edit.  Range and query removals close the run and use the full
     /// worksheet-grouping path, while consecutive direct removals on one
     /// worksheet share one native transaction.
@@ -680,6 +689,79 @@ impl Edit {
                 .as_mut()
                 .ok_or_else(|| crate::Error::new(Code::InternalError, "XLSB cell run missing"))?;
             let changed = run.stage(plan, index)?;
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
+        #[cfg(feature = "xls")]
+        if let File::Xls(_) = &self.current {
+            let planned = match &self.xls_cells {
+                Some(run) => run.remove_plan(target, &self.limits),
+                None => {
+                    let File::Xls(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    handle.remove_plan(target, &self.limits)
+                },
+            };
+            if planned.is_err() {
+                // An earlier deferred native failure takes precedence over
+                // admission failure in the following command.
+                self.flush_pending()?;
+            }
+            let Some(mut plan) = planned? else {
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .xls_cells
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
+            {
+                self.flush_pending()?;
+                let File::Xls(handle) = &self.current else {
+                    return Err(pending());
+                };
+                let Some(replanned) = handle.remove_plan(target, &self.limits)? else {
+                    return Ok(None);
+                };
+                plan = replanned;
+            }
+            if self.xls_cells.is_none() {
+                let File::Xls(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.xls_cells = Some(crate::format::xls::write::coalesce::Run::new(
+                    handle,
+                    &self.limits,
+                )?);
+            }
+            let (had_prior, staged) = {
+                let run = self.xls_cells.as_mut().ok_or_else(|| {
+                    crate::Error::new(Code::InternalError, "XLS cell run missing")
+                })?;
+                (run.first_index().is_some(), run.stage(plan, index))
+            };
+            let changed = match staged {
+                Ok(changed) => changed,
+                Err(error) => {
+                    // Native staging is failure-atomic. Publish the earlier
+                    // prefix first so its deferred error keeps wire precedence.
+                    if had_prior {
+                        self.flush_pending()?;
+                        if xls_staging_full(&error) {
+                            return self.coalesce_remove_parsed(target, index);
+                        }
+                    }
+                    return Err(error);
+                },
+            };
             self.operations += 1;
             return Ok(Some(changed));
         }
@@ -1073,6 +1155,79 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "xls")]
+        if let File::Xls(_) = &self.current {
+            let planned = match &self.xls_cells {
+                Some(run) => run.cell_plan(_target, _props, &self.limits),
+                None => {
+                    let File::Xls(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    handle.cell_plan(_target, _props, &self.limits)
+                },
+            };
+            if planned.is_err() {
+                // An earlier deferred native failure takes precedence over
+                // admission failure in the following command.
+                self.flush_pending()?;
+            }
+            let Some(mut plan) = planned? else {
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .xls_cells
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
+            {
+                self.flush_pending()?;
+                let File::Xls(handle) = &self.current else {
+                    return Err(pending());
+                };
+                let Some(replanned) = handle.cell_plan(_target, _props, &self.limits)? else {
+                    return Ok(None);
+                };
+                plan = replanned;
+            }
+            if self.xls_cells.is_none() {
+                let File::Xls(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.xls_cells = Some(crate::format::xls::write::coalesce::Run::new(
+                    handle,
+                    &self.limits,
+                )?);
+            }
+            let (had_prior, staged) = {
+                let run = self.xls_cells.as_mut().ok_or_else(|| {
+                    crate::Error::new(Code::InternalError, "XLS cell run missing")
+                })?;
+                (run.first_index().is_some(), run.stage(plan, _index))
+            };
+            let changed = match staged {
+                Ok(changed) => changed,
+                Err(error) => {
+                    // Native staging is failure-atomic. Publish the earlier
+                    // prefix first so its deferred error keeps wire precedence.
+                    if had_prior {
+                        self.flush_pending()?;
+                        if xls_staging_full(&error) {
+                            return self.coalesce_parsed(_target, _props, _index, _spelling);
+                        }
+                    }
+                    return Err(error);
+                },
+            };
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
         #[cfg(feature = "xlsx")]
         if let File::Xlsx(handle) = &self.current {
             let planned = match &self.cells {
@@ -1277,6 +1432,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "xls")]
+        if let Some(run) = self.xls_cells.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_xls(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "xlsx")]
         if let Some(run) = self.cells.take() {
             let index = run.first_index();
@@ -1370,6 +1550,10 @@ impl Edit {
                 {
                     self.xlsb_cells = None;
                     self.xlsb_sheets = None;
+                }
+                #[cfg(feature = "xls")]
+                {
+                    self.xls_cells = None;
                 }
                 #[cfg(feature = "pptx")]
                 {
@@ -1696,5 +1880,18 @@ fn pending() -> crate::Error {
     crate::Error::new(
         Code::UnsupportedCapability,
         "explicit transactions for this format are not integrated",
+    )
+}
+
+// A native staging boundary closes a run; caller limits and other native
+// errors remain failures. Retrying on an empty run is deliberately excluded.
+#[cfg(feature = "xls")]
+fn xls_staging_full(error: &crate::Error) -> bool {
+    matches!(
+        error.leaf(),
+        crate::error::Source::XlsEdit(litchi_xls::package::edit::Error::Limit {
+            kind: litchi_xls::package::edit::LimitKind::Operations,
+            ..
+        })
     )
 }

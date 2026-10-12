@@ -127,13 +127,13 @@ impl SemanticLimits {
     pub const fn max_operations(self) -> usize {
         self.operations
     }
-    /// Maximum distinct XLSX/XLSB grid or PPTX shape targets expanded by one mutation.
+    /// Maximum distinct XLS/XLSX/XLSB grid or PPTX shape targets expanded by one mutation.
     /// This adapter admission bound is independent of native transfer limits.
     #[must_use]
     pub const fn max_expanded_targets(self) -> usize {
         self.expanded_targets
     }
-    /// Maximum authored payload/action charge staged by one XLSX/XLSB or PPTX mutation.
+    /// Maximum authored payload/action charge staged by one XLS/XLSX/XLSB or PPTX mutation.
     /// Counts repeated scalar payloads before native staging. Coalesced cell
     /// runs also close at this bound. This is separate from retained snapshots
     /// and does not measure total allocator use.
@@ -146,6 +146,7 @@ impl SemanticLimits {
     /// DOCX charges before/after main-document XML lengths. XLSX charges
     /// retained package data and native patch buffers, including no-op steps.
     /// XLSB charges package and worksheet patch images plus semantic cell deltas.
+    /// XLS charges native before/after artifacts and semantic patch payloads.
     /// PPTX charges the retained native patch wire size.
     /// Shared endpoints are charged repeatedly; this is a semantic retention
     /// budget, not a complete bound on allocator or derived-cache memory.

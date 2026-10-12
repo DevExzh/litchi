@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0207 | [XLS cell transaction coalescing](0207-xls-cell-coalescing.md) | Distinct direct scalar sets/removals share native transactions, with semantic barriers and bounded native-limit rollover; 1k operations use one commit; native indexing and full performance/CRUD goal remain open |
 | 0206 | [Unified XLS cell removal](0206-xls-cell-removal.md) | Native-backed path/range/query removal, edit/batch/history, packed numeric/blank closure and corrected filesystem write coverage; 3,318 tests/doctests plus lint/docs/checks pass; paired removal exact, small-source timing qualification remains open; broader CRUD, streaming, coalescing and full goal remain open |
 | 0205 | [Unified XLS scalar writes](0205-xls-unified-writes.md) | Native-backed scalar/clear/name setters, edit/batch/history, lossless SST closure and explicit inverse gaps; 3,595 tests/doctests plus final capability/write checks, lint/docs/glossary/boundaries/parity pass; paired eager numeric write overhead below 0.7%; broader CRUD, coalescing, source streaming and full goal remain open |
 | 0204 | [Eager XLS query cursors](0204-xls-eager-query-cursors.md) | Direct native eager cell iteration and selected-tab metadata remove sheet/catalog-sized setup; bounded-allocation regressions pass; source-backed and axis streaming, unified XLS mutations and full goal remain open |

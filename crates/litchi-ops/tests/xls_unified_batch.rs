@@ -88,9 +88,17 @@ fn formula_fixture() -> Vec<u8> {
     builder
         .write_formula(sheet, 0, 3, "A1*2")
         .expect("formula cell");
-    builder
-        .build()
-        .expect("build formula fixture")
+    let package = builder.build().expect("build formula fixture");
+    let mut edit = package.edit().expect("formula cache edit");
+    edit.set_value(
+        "Data",
+        Reference::new(0, 3).expect("formula coordinate"),
+        Value::FormulaCache(FormulaCache::Number(6.0)),
+    )
+    .expect("set formula cache");
+    edit.commit()
+        .expect("commit formula cache")
+        .into_package()
         .to_bytes()
         .expect("serialize formula fixture")
 }
@@ -791,5 +799,78 @@ fn signed_and_encrypted_security_wrappers_survive_batch_admission() {
             )
             .expect_err("unlocked encrypted batch must refuse plaintext editing");
         assert_eq!(error.code(), Code::DocumentProtected);
+    }
+}
+
+#[test]
+fn native_staging_limit_closes_runs_without_limiting_the_public_batch() {
+    const COUNT: usize = 4_100;
+    let bytes = many_cells(COUNT);
+    for eager in [false, true] {
+        let original = open_owner(&bytes, eager);
+        for remove in [false, true] {
+            let commit = original
+                .edit(|transaction| {
+                    for row in 1..=COUNT {
+                        let path = format!("/sheet[1]/A{row}");
+                        if remove {
+                            transaction.remove(path.as_str())?;
+                        } else {
+                            transaction.set(path.as_str(), props! { "value" => -1.0 })?;
+                        }
+                    }
+                    Ok::<_, litchi_ops::Error>(())
+                })
+                .expect("bounded native runs cover the complete public batch");
+            assert_eq!(commit.diagnostics.operations(), COUNT);
+            assert_eq!(commit.diagnostics.commits(), 2);
+            let expected = if remove { "" } else { "-1" };
+            assert_eq!(cell_text(&commit.file, A1).as_deref(), Some(expected));
+            assert_eq!(
+                cell_text(&commit.file, "/sheet[1]/A4100").as_deref(),
+                Some(expected)
+            );
+            assert_eq!(
+                commit
+                    .patch
+                    .inverse()
+                    .apply(&commit.file)
+                    .unwrap()
+                    .to_bytes()
+                    .unwrap(),
+                bytes
+            );
+            assert_eq!(original.to_bytes().unwrap(), bytes);
+        }
+    }
+}
+
+#[test]
+fn mutation_budget_does_not_count_native_string_resource_operations() {
+    let bytes = many_cells(3);
+    let limits = SemanticLimits::builder()
+        .max_operations(2)
+        .unwrap()
+        .build()
+        .unwrap();
+    for eager in [false, true] {
+        let original = open_owner(&bytes, eager);
+        let commit = original
+            .edit_with_limits(&limits, |transaction| {
+                transaction.set("/sheet[1]/A1", props! { "value" => "first new string" })?;
+                transaction.set("/sheet[1]/A2", props! { "value" => "second new string" })?;
+                Ok::<_, litchi_ops::Error>(())
+            })
+            .expect("two calls may stage multiple native resource operations");
+        assert_eq!(commit.diagnostics.operations(), 2);
+        assert_eq!(commit.diagnostics.commits(), 1);
+        assert_eq!(
+            cell_text(&commit.file, A1).as_deref(),
+            Some("first new string")
+        );
+        assert_eq!(
+            cell_text(&commit.file, A2).as_deref(),
+            Some("second new string")
+        );
     }
 }

@@ -656,8 +656,13 @@ fn finish_commit(
             .operation_count()
             .max(if changed { fallback_operations } else { 0 });
     let (package, patch) = native.into_parts();
-    if operations > limits.max_operations() {
-        return Err(operation_limit(operations, limits.max_operations()));
+    // The public operation bound counts mutation calls, not the native
+    // resource/cell operations needed to implement each call.
+    if fallback_operations > limits.max_operations() {
+        return Err(operation_limit(
+            fallback_operations,
+            limits.max_operations(),
+        ));
     }
     let snapshot_bytes = patch.retained_bytes();
     if snapshot_bytes > limits.max_snapshot_bytes() {
@@ -782,4 +787,456 @@ fn invalid_query() -> Error {
         "the mutation selector contains an unsupported predicate",
     )
     .with_format(FileFormat::Xls)
+}
+
+/// Native-package coalescing for direct XLS cell mutations.
+///
+/// The unified target resolver remains the admission authority.  Once a
+/// mutation has been proven to be one direct cell path, the run owns one
+/// `Package::Edit` and appends disjoint cell operations to it.  A repeated
+/// coordinate is a barrier: the following command is re-resolved only after
+/// the preceding native edit has been published, which preserves insert,
+/// remove, and missing-cell semantics.
+pub(crate) mod coalesce {
+    use super::{
+        CellAssignment, CellTarget, FileFormat, Kind, NativeValue, Result, TargetArg,
+        WRITE_ENTRY_OVERHEAD, Xls, admit_cell_property, cell_state_facts, finish_commit,
+        native_edit_error, native_value_error, staged_limit,
+    };
+    use crate::error::{Code, Error};
+    use crate::props::Props;
+    use crate::transaction::{Error as TransactionError, SemanticLimits};
+    use litchi_core::sheet::CellValue;
+    use litchi_xls::Package;
+    use litchi_xls::cell_values::{Reference, Selector};
+    use std::collections::HashSet;
+
+    #[derive(Debug, Clone)]
+    pub(crate) enum Action {
+        Set(NativeValue),
+        Clear,
+        Remove,
+        Noop,
+    }
+
+    #[derive(Debug, Clone)]
+    pub(crate) struct Plan {
+        target: CellTarget,
+        action: Action,
+        staged_bytes: usize,
+        changed: bool,
+    }
+
+    impl Plan {
+        fn key(&self) -> CellTarget {
+            self.target
+        }
+
+        fn charge(&self) -> usize {
+            self.staged_bytes
+        }
+    }
+
+    struct Item {
+        plan: Plan,
+        index: usize,
+    }
+
+    /// One native primary XLS package edit for a run of distinct direct cells.
+    pub(crate) struct Run {
+        base: Xls,
+        source: Package,
+        edit: litchi_xls::package::edit::Edit,
+        items: Vec<Item>,
+        seen: HashSet<CellTarget>,
+        staged_bytes: usize,
+        max_staged_bytes: usize,
+        limits: SemanticLimits,
+    }
+
+    impl Xls {
+        /// Admit a direct scalar cell assignment.  Ranges, queries, sheet
+        /// targets, formulas, and empty property sets remain on the ordinary
+        /// format handler so their existing resolution and refusal policy is
+        /// unchanged.
+        pub(crate) fn cell_plan(
+            &self,
+            target: &TargetArg<'_>,
+            props: &Props<'_>,
+            limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.check_source()?;
+            let result = (|| {
+                let Some(path) = target.path() else {
+                    return Ok(None);
+                };
+                let Some(step) = path.path().steps().last() else {
+                    return Ok(None);
+                };
+                if step.cell_ref().is_none() {
+                    return Ok(None);
+                }
+                // `name` is the worksheet setter's discriminator.  Leave
+                // it to the ordinary dispatcher so a malformed sheet-cell
+                // combination keeps the existing sheet-property error.
+                if super::is_sheet_property(props) {
+                    return Ok(None);
+                }
+                let admitted = admit_cell_property(props, limits)?;
+                if matches!(admitted.assignment, CellAssignment::Noop) {
+                    return Ok(None);
+                }
+                let Some((target, current)) = direct_target(self, target, limits)? else {
+                    return Ok(None);
+                };
+                // Formula cells are deliberately left to the ordinary setter,
+                // which reports the dependency-aware unsupported capability.
+                if target.formula {
+                    return Ok(None);
+                }
+                if limits.max_operations() < 1 {
+                    return Err(operation_limit(1, limits.max_operations()));
+                }
+                if admitted.staged_bytes > limits.max_staged_bytes() {
+                    return Err(staged_limit(
+                        admitted.staged_bytes,
+                        limits.max_staged_bytes(),
+                    ));
+                }
+                let changed = match &admitted.assignment {
+                    CellAssignment::Value(value) => {
+                        !target.present || current.as_ref() != Some(value)
+                    },
+                    CellAssignment::Clear => {
+                        target.present && current.as_ref() != Some(&NativeValue::Blank)
+                    },
+                    CellAssignment::Noop => false,
+                };
+                let action = match admitted.assignment {
+                    CellAssignment::Value(value) => Action::Set(value),
+                    CellAssignment::Clear => Action::Clear,
+                    CellAssignment::Noop => return Ok(None),
+                };
+                Ok(Some(Plan {
+                    target,
+                    action,
+                    staged_bytes: admitted.staged_bytes,
+                    changed,
+                }))
+            })();
+            self.check_source().and(result)
+        }
+
+        /// Admit a direct cell removal.  An absent coordinate is retained as
+        /// an explicit no-op so it still consumes one unified mutation item;
+        /// the native edit never receives an invalid absent-cell removal.
+        pub(crate) fn remove_plan(
+            &self,
+            target: &TargetArg<'_>,
+            limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.check_source()?;
+            let result = (|| {
+                let Some(path) = target.path() else {
+                    return Ok(None);
+                };
+                let Some(step) = path.path().steps().last() else {
+                    return Ok(None);
+                };
+                if step.cell_ref().is_none() {
+                    return Ok(None);
+                }
+                let Some((target, _)) = direct_target(self, target, limits)? else {
+                    return Ok(None);
+                };
+                if target.formula {
+                    return Ok(None);
+                }
+                if limits.max_operations() < 1 {
+                    return Err(operation_limit(1, limits.max_operations()));
+                }
+                if WRITE_ENTRY_OVERHEAD > limits.max_staged_bytes() {
+                    return Err(staged_limit(
+                        WRITE_ENTRY_OVERHEAD,
+                        limits.max_staged_bytes(),
+                    ));
+                }
+                Ok(Some(Plan {
+                    action: if target.present {
+                        Action::Remove
+                    } else {
+                        Action::Noop
+                    },
+                    target,
+                    staged_bytes: WRITE_ENTRY_OVERHEAD,
+                    changed: target.present,
+                }))
+            })();
+            self.check_source().and(result)
+        }
+    }
+
+    impl Run {
+        pub(crate) fn new(base: &Xls, limits: &SemanticLimits) -> Result<Self> {
+            base.check_source()?;
+            let source = base.editable_package()?;
+            let edit = source.edit().map_err(native_edit_error)?;
+            base.check_source()?;
+            Ok(Self {
+                base: base.clone(),
+                source,
+                edit,
+                items: Vec::new(),
+                seen: HashSet::new(),
+                staged_bytes: 0,
+                max_staged_bytes: limits.max_staged_bytes(),
+                limits: *limits,
+            })
+        }
+
+        pub(crate) fn cell_plan(
+            &self,
+            target: &TargetArg<'_>,
+            props: &Props<'_>,
+            limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.base.cell_plan(target, props, limits)
+        }
+
+        pub(crate) fn remove_plan(
+            &self,
+            target: &TargetArg<'_>,
+            limits: &SemanticLimits,
+        ) -> Result<Option<Plan>> {
+            self.base.remove_plan(target, limits)
+        }
+
+        pub(crate) fn first_index(&self) -> Option<usize> {
+            self.items.first().map(|item| item.index)
+        }
+
+        pub(crate) fn requires_barrier(&self, plan: &Plan, limits: &SemanticLimits) -> bool {
+            self.seen.contains(&plan.key())
+                || self
+                    .staged_bytes
+                    .checked_add(plan.charge())
+                    .is_none_or(|bytes| bytes > limits.max_staged_bytes())
+        }
+
+        pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
+            if self.seen.contains(&plan.key())
+                || self
+                    .staged_bytes
+                    .checked_add(plan.charge())
+                    .is_none_or(|bytes| bytes > self.max_staged_bytes)
+            {
+                return Err(Error::new(
+                    Code::InternalError,
+                    "XLS cell coalescing barrier was not flushed",
+                )
+                .with_format(FileFormat::Xls));
+            }
+            self.base.check_source()?;
+            self.items
+                .try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            self.seen
+                .try_reserve(1)
+                .map_err(|source| TransactionError::Allocation { source })?;
+            match &plan.action {
+                Action::Set(value) => {
+                    let selector = Selector::Position(plan.target.sheet);
+                    if plan.target.present {
+                        self.edit
+                            .set_value(selector, plan.target.reference, value.clone())
+                            .map_err(native_edit_error)?;
+                    } else {
+                        self.edit
+                            .insert_cell(selector, plan.target.reference, value.clone())
+                            .map_err(native_edit_error)?;
+                    }
+                },
+                Action::Clear => {
+                    if plan.target.present {
+                        self.edit
+                            .set_value(
+                                Selector::Position(plan.target.sheet),
+                                plan.target.reference,
+                                NativeValue::Blank,
+                            )
+                            .map_err(native_edit_error)?;
+                    }
+                },
+                Action::Remove => {
+                    self.edit
+                        .remove_cell(Selector::Position(plan.target.sheet), plan.target.reference)
+                        .map_err(native_edit_error)?;
+                },
+                Action::Noop => {},
+            }
+            self.seen.insert(plan.key());
+            self.staged_bytes = self.staged_bytes.saturating_add(plan.charge());
+            let changed = plan.changed;
+            self.items.push(Item { plan, index });
+            self.base.check_source()?;
+            Ok(changed)
+        }
+
+        pub(crate) fn commit(self) -> Result<(Xls, super::WriteCommit)> {
+            let Self {
+                base,
+                source,
+                edit,
+                items,
+                limits,
+                ..
+            } = self;
+            base.check_source()?;
+            let result = edit
+                .commit()
+                .map_err(native_edit_error)
+                .and_then(|native| finish_commit(&base, native, items.len(), &limits));
+            let freshness = base.check_source();
+            match freshness.and(result) {
+                Ok(commit) => Ok((base, commit)),
+                Err(error) => Err(locate_failure(&base, &source, &items, error)),
+            }
+        }
+    }
+
+    fn apply_item(edit: &mut litchi_xls::package::edit::Edit, item: &Item) -> Result<()> {
+        match &item.plan.action {
+            Action::Set(value) => {
+                let selector = Selector::Position(item.plan.target.sheet);
+                if item.plan.target.present {
+                    edit.set_value(selector, item.plan.target.reference, value.clone())
+                        .map_err(native_edit_error)?;
+                } else {
+                    edit.insert_cell(selector, item.plan.target.reference, value.clone())
+                        .map_err(native_edit_error)?;
+                }
+            },
+            Action::Clear if item.plan.target.present => edit
+                .set_value(
+                    Selector::Position(item.plan.target.sheet),
+                    item.plan.target.reference,
+                    NativeValue::Blank,
+                )
+                .map_err(native_edit_error)?,
+            Action::Remove if item.plan.target.present => edit
+                .remove_cell(
+                    Selector::Position(item.plan.target.sheet),
+                    item.plan.target.reference,
+                )
+                .map_err(native_edit_error)?,
+            Action::Clear | Action::Remove | Action::Noop => {},
+        }
+        Ok(())
+    }
+
+    fn replay(base: &Xls, source: &Package, items: &[Item]) -> Result<Package> {
+        base.check_source()?;
+        let mut edit = source.edit().map_err(native_edit_error)?;
+        for item in items {
+            apply_item(&mut edit, item).map_err(|error| error.with_item(item.index))?;
+        }
+        let package = edit.commit().map_err(native_edit_error)?.into_package();
+        base.check_source()?;
+        Ok(package)
+    }
+
+    fn locate_failure(base: &Xls, source: &Package, items: &[Item], error: Error) -> Error {
+        let Some(first) = items.first() else {
+            return error;
+        };
+        if items.len() == 1
+            || matches!(
+                error.code(),
+                Code::IoError
+                    | Code::Cancelled
+                    | Code::LimitExceeded
+                    | Code::InternalError
+                    | Code::DocumentProtected
+            )
+        {
+            return error.with_item(first.index);
+        }
+        let middle = items.len() / 2;
+        let prefix = match replay(base, source, &items[..middle]) {
+            Ok(package) => package,
+            Err(error) => return locate_failure(base, source, &items[..middle], error),
+        };
+        match replay(base, &prefix, &items[middle..]) {
+            Err(error) => locate_failure(base, &prefix, &items[middle..], error),
+            Ok(_) => error.with_item(first.index),
+        }
+    }
+
+    fn operation_limit(observed: usize, maximum: usize) -> Error {
+        Error::from(TransactionError::Limit {
+            kind: crate::transaction::LimitKind::Operations,
+            observed,
+            maximum,
+        })
+        .with_format(FileFormat::Xls)
+    }
+
+    fn direct_target(
+        file: &Xls,
+        target: &TargetArg<'_>,
+        limits: &SemanticLimits,
+    ) -> Result<Option<(CellTarget, Option<NativeValue>)>> {
+        let Some(path) = target.path() else {
+            return Ok(None);
+        };
+        let Some(step) = path.path().steps().last() else {
+            return Ok(None);
+        };
+        if step.cell_ref().is_none() {
+            return Ok(None);
+        }
+        if limits.max_expanded_targets() == 0 {
+            return Err(super::expanded_limit(1, limits.max_expanded_targets()));
+        }
+        let node = crate::path::resolve::get(&super::Nav::new(file), path)?;
+        if node.element() != Kind::Cell {
+            return Ok(None);
+        }
+        let Some((column, row)) = node.cell() else {
+            return Err(
+                Error::new(Code::InvalidPath, "the XLS cell reference is invalid")
+                    .with_format(FileFormat::Xls),
+            );
+        };
+        let reference = Reference::new(row, column).map_err(native_value_error)?;
+        let state = node.cell_state()?;
+        let (present, formula) = cell_state_facts(state);
+        let current = match state {
+            super::CellState::Stored(cell) => native_value(&cell.value),
+            super::CellState::Missing | super::CellState::Stub => None,
+        };
+        file.check_source()?;
+        Ok(Some((
+            CellTarget {
+                sheet: node.sheet_position(),
+                reference,
+                present,
+                formula,
+            },
+            current,
+        )))
+    }
+
+    fn native_value(value: &CellValue) -> Option<NativeValue> {
+        match value {
+            CellValue::Empty => Some(NativeValue::Blank),
+            CellValue::Bool(value) => Some(NativeValue::Boolean(*value)),
+            CellValue::Int(value) => Some(NativeValue::Number(*value as f64)),
+            CellValue::Float(value) | CellValue::DateTime(value) => {
+                Some(NativeValue::Number(*value))
+            },
+            CellValue::String(value) => Some(NativeValue::Text(value.clone())),
+            CellValue::Error(_) | CellValue::Formula { .. } => None,
+        }
+    }
 }

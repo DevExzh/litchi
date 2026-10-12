@@ -1,12 +1,14 @@
 //! Paired native and unified XLS batch timings for scalar sets and removals.
 //!
 //! Each case creates one numeric worksheet and prepares all paths, native
-//! references, and batch payloads before timing.  The native leg uses one
-//! `Package::edit`; its whole, staging, and commit portions are reported
-//! separately.  The unified legs use one `File::edit` and one atomic
-//! `File::batch`, whose diagnostics must report one native commit for every
-//! distinct-target case.  Eager and genuine filesystem positional owners are
-//! measured with the same input bytes.
+//! references, and batch payloads before timing.  Native and unified legs are
+//! bounded at the XLS leaf's 4096 staged-operation limit: a larger case
+//! flushes the current edit, starts a new one, and retries the item that hit
+//! the limit.  Whole, staging, and commit portions of the native leg are
+//! reported separately, including every bounded commit.  The unified legs use
+//! one `File::edit` and one atomic `File::batch`, and their diagnostics must
+//! report the same bounded commit count.  Eager and genuine filesystem
+//! positional owners are measured with the same input bytes.
 //!
 //! Fixture creation, opening, path and payload construction, serialization,
 //! and verification are outside timed regions.  Every output is checked by a
@@ -37,6 +39,7 @@ mod enabled {
 
     const CASES: &[usize] = &[1, 10, 100, 1_000, 10_000];
     const DEFAULT_SAMPLES: usize = 5;
+    const NATIVE_STAGE_LIMIT: usize = 4_096;
     const FNV_OFFSET: u64 = 14_695_981_039_346_656_037;
     const FNV_PRIME: u64 = 1_099_511_628_211;
 
@@ -52,6 +55,7 @@ mod enabled {
         schema: &'static str,
         samples: usize,
         warmup_passes: usize,
+        native_stage_limit: usize,
         generation_included: bool,
         opening_included: bool,
         path_construction_included: bool,
@@ -111,6 +115,7 @@ mod enabled {
         whole_ns: u128,
         stage_ns: u128,
         commit_ns: u128,
+        commits: usize,
     }
 
     struct UnifiedRun {
@@ -144,6 +149,7 @@ mod enabled {
                     let batch_warmup = verify_unified(&fixture, &warmup_batch);
                     assert_warmup(
                         &fixture,
+                        &warmup_native,
                         &native_warmup,
                         &warmup_edit,
                         &edit_warmup,
@@ -158,6 +164,7 @@ mod enabled {
                     let mut unified_edit_ns = Vec::with_capacity(samples);
                     let mut unified_batch_ns = Vec::with_capacity(samples);
                     let mut native_checksum = 0;
+                    let mut native_commit_count = 0;
                     let mut unified_edit_checksum = 0;
                     let mut unified_batch_checksum = 0;
                     let mut native_output_bytes = 0;
@@ -176,6 +183,7 @@ mod enabled {
                         native_edit_ns.push(native.whole_ns);
                         native_stage_ns.push(native.stage_ns);
                         native_commit_ns.push(native.commit_ns);
+                        native_commit_count = native.commits;
                         let native_sample = verify_native(&fixture, &native);
                         native_checksum = native_sample.checksum;
                         native_output_bytes = native_sample.bytes.len();
@@ -213,8 +221,10 @@ mod enabled {
                     assert_eq!(native_checksum, fixture.expected_checksum);
                     assert_eq!(unified_edit_checksum, fixture.expected_checksum);
                     assert_eq!(unified_batch_checksum, fixture.expected_checksum);
-                    assert_eq!(unified_edit_commit_count, 1);
-                    assert_eq!(unified_batch_commit_count, 1);
+                    let expected_commits = expected_native_commit_count(cells);
+                    assert_eq!(native_commit_count, expected_commits);
+                    assert_eq!(unified_edit_commit_count, expected_commits);
+                    assert_eq!(unified_batch_commit_count, expected_commits);
                     assert_eq!(unified_edit_operations, cells);
                     assert_eq!(unified_batch_operations, cells);
                     assert!(
@@ -251,7 +261,7 @@ mod enabled {
                             || fixture.source_path.as_ref().is_some_and(|path| {
                                 std::fs::read(path).expect("read source") == fixture.original_bytes
                             }),
-                        native_commit_count: 1,
+                        native_commit_count,
                         unified_edit_commit_count,
                         unified_batch_commit_count,
                         unified_edit_operations,
@@ -270,6 +280,7 @@ mod enabled {
             schema: "litchi.xls_batch_bench.v1",
             samples,
             warmup_passes: 1,
+            native_stage_limit: NATIVE_STAGE_LIMIT,
             generation_included: false,
             opening_included: false,
             path_construction_included: false,
@@ -361,32 +372,65 @@ mod enabled {
     }
 
     fn native_edit(fixture: &Fixture) -> NativeRun {
+        let mut package = fixture.native.clone();
         let whole_start = Instant::now();
-        let stage_start = Instant::now();
-        let mut edit = fixture.native.edit().expect("start native XLS edit");
-        for reference in fixture.references.iter().copied() {
-            match fixture.operation {
-                Operation::Set => edit
-                    .set_value(Selector::Position(0), reference, Value::Number(-1.0))
-                    .expect("stage native numeric set"),
-                Operation::Remove => edit
-                    .remove_cell(Selector::Position(0), reference)
-                    .expect("stage native cell removal"),
+        let mut stage_ns = 0;
+        let mut commit_ns = 0;
+        let mut commits = 0;
+        let mut index = 0;
+
+        while index < fixture.references.len() {
+            let stage_start = Instant::now();
+            let mut edit = package.edit().expect("start native XLS edit");
+            let mut staged = 0;
+            let mut hit_limit = false;
+            while index < fixture.references.len() {
+                let reference = fixture.references[index];
+                let result = match fixture.operation {
+                    Operation::Set => {
+                        edit.set_value(Selector::Position(0), reference, Value::Number(-1.0))
+                    },
+                    Operation::Remove => edit.remove_cell(Selector::Position(0), reference),
+                };
+                match result {
+                    Ok(()) => {
+                        staged += 1;
+                        index += 1;
+                    },
+                    Err(error) if error.limit_kind() == Some(litchi_xls::LimitKind::Operations) => {
+                        assert!(
+                            staged > 0,
+                            "native XLS operation limit was reached before any item was staged"
+                        );
+                        hit_limit = true;
+                        break;
+                    },
+                    Err(error) => panic!("stage native XLS operation: {error}"),
+                }
+            }
+
+            if hit_limit || index == fixture.references.len() {
+                stage_ns += stage_start.elapsed().as_nanos();
+                let commit_start = Instant::now();
+                package = edit
+                    .commit()
+                    .expect(if hit_limit {
+                        "flush native XLS edit at operation limit"
+                    } else {
+                        "commit native XLS edit"
+                    })
+                    .into_package();
+                commit_ns += commit_start.elapsed().as_nanos();
+                commits += 1;
             }
         }
-        let stage_ns = stage_start.elapsed().as_nanos();
-        let commit_start = Instant::now();
-        let package = edit
-            .commit()
-            .expect("commit native XLS edit")
-            .into_package();
-        let commit_ns = commit_start.elapsed().as_nanos();
         let whole_ns = whole_start.elapsed().as_nanos();
         NativeRun {
             package,
             whole_ns,
             stage_ns,
             commit_ns,
+            commits,
         }
     }
 
@@ -480,6 +524,7 @@ mod enabled {
 
     fn assert_warmup(
         fixture: &Fixture,
+        native_run: &NativeRun,
         native: &Verified,
         edit_run: &UnifiedRun,
         edit: &Verified,
@@ -494,8 +539,10 @@ mod enabled {
             native.bytes, batch.bytes,
             "native/batch warmup bytes differ"
         );
-        assert_eq!(edit_run.commits, 1);
-        assert_eq!(batch_run.commits, 1);
+        let expected_commits = expected_native_commit_count(fixture.cells);
+        assert_eq!(native_run.commits, expected_commits);
+        assert_eq!(edit_run.commits, expected_commits);
+        assert_eq!(batch_run.commits, expected_commits);
         assert_eq!(edit_run.operations, fixture.cells);
         assert_eq!(batch_run.operations, fixture.cells);
     }
@@ -528,6 +575,10 @@ mod enabled {
             Operation::Set => fixture.cells,
             Operation::Remove => 0,
         }
+    }
+
+    fn expected_native_commit_count(cells: usize) -> usize {
+        cells.div_ceil(NATIVE_STAGE_LIMIT)
     }
 
     fn expected_checksum(references: &[Reference], operation: Operation) -> u64 {
