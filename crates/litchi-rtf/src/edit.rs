@@ -931,7 +931,6 @@ pub struct Edit {
     operations: Vec<Operation>,
     replacement_bytes: usize,
     paragraph_batch_len: Option<usize>,
-    paragraph_removal_batch_len: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -1389,7 +1388,6 @@ impl Edit {
             operations: Vec::new(),
             replacement_bytes: 0,
             paragraph_batch_len: None,
-            paragraph_removal_batch_len: None,
         }
     }
 
@@ -2555,7 +2553,6 @@ impl Edit {
             self.operations
                 .push(Operation::RemoveParagraph { position, text });
         }
-        self.paragraph_removal_batch_len = Some(positions.len());
         Ok(self)
     }
 
@@ -3528,12 +3525,7 @@ impl Edit {
         }
 
         if self.operations.iter().all(Operation::is_paragraph_removal) {
-            let preserve_batch_boundaries = self.paragraph_removal_batch_len.is_some();
-            return commit_body_paragraph_removals(
-                self,
-                operation_count,
-                preserve_batch_boundaries,
-            );
+            return commit_body_paragraph_removals(self, operation_count);
         }
         if self
             .operations
@@ -4515,11 +4507,8 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
     ))
 }
 
-fn commit_body_paragraph_removals(
-    edit: Edit,
-    operation_count: usize,
-    preserve_batch_boundaries: bool,
-) -> Result<Commit, Error> {
+fn commit_body_paragraph_removals(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    ensure_default_body_formatting(&edit.source)?;
     let source_bytes = edit
         .source
         .source_bytes()
@@ -4544,13 +4533,7 @@ fn commit_body_paragraph_removals(
         if edit.source.text().get(paragraph.text.clone()) != Some(text.as_str()) {
             return Err(Error::StalePrecondition("paragraph text differs"));
         }
-        let range = if preserve_batch_boundaries {
-            let end = paragraph
-                .boundary_after
-                .as_ref()
-                .map_or(paragraph.source.end, |boundary| boundary.end);
-            paragraph.source.start..end
-        } else if let Some(boundary) = &paragraph.boundary_after {
+        let range = if let Some(boundary) = &paragraph.boundary_after {
             paragraph.source.start..boundary.end
         } else if *position == 0 {
             paragraph.source.clone()
@@ -4561,31 +4544,37 @@ fn commit_body_paragraph_removals(
                     count: map.paragraphs.len(),
                 },
             )?;
-            let boundary = previous
-                .boundary_after
-                .as_ref()
-                .ok_or(Error::UnsupportedSource(
-                    "ordinary paragraph has no exact source boundary",
-                ))?;
-            boundary.start..paragraph.source.end
+            let previous_text =
+                edit.source
+                    .text()
+                    .get(previous.text.clone())
+                    .ok_or(Error::UnsupportedSource(
+                        "ordinary paragraph source map has an invalid semantic range",
+                    ))?;
+            if previous_text.is_empty() {
+                paragraph.source.clone()
+            } else {
+                let boundary = previous
+                    .boundary_after
+                    .as_ref()
+                    .ok_or(Error::UnsupportedSource(
+                        "ordinary paragraph has no exact source boundary",
+                    ))?;
+                boundary.start..paragraph.source.end
+            }
         };
         ranges.push((range, Vec::new()));
     }
 
-    // Scalar lifecycle removal owns the preceding boundary of a final
-    // paragraph.  Batch removal owns each selected paragraph's following
-    // boundary instead, which leaves controls belonging to unselected empty
-    // paragraphs intact.  Merge only overlapping batch ranges so an empty
-    // survivor between two selections is never consumed.
+    // A selected paragraph owns its following boundary when one exists.  A
+    // final paragraph normally owns its preceding boundary, except when that
+    // predecessor is empty: its boundary is the only source representation of
+    // the unselected empty survivor and must remain intact.
     ranges.sort_unstable_by_key(|(range, _)| (range.start, range.end));
-    let mut merged = Vec::with_capacity(ranges.len());
+    let mut merged: Vec<(Range<usize>, Vec<u8>)> = Vec::with_capacity(ranges.len());
     for (range, replacement) in ranges {
         if let Some((previous, _)) = merged.last_mut()
-            && if preserve_batch_boundaries {
-                range.start < previous.end
-            } else {
-                range.start <= previous.end
-            }
+            && range.start <= previous.end
         {
             previous.end = previous.end.max(range.end);
             continue;
@@ -5076,6 +5065,18 @@ fn ensure_changed_publication_allowed(source: &Package) -> Result<(), Error> {
     Ok(())
 }
 
+fn ensure_default_body_formatting(source: &Package) -> Result<(), Error> {
+    if source.model().retained_blocks().iter().any(|block| {
+        block.formatting != crate::types::Formatting::default()
+            || block.paragraph != crate::types::Paragraph::default()
+    }) {
+        return Err(Error::UnsupportedSource(
+            "paragraph lifecycle editing requires default body formatting",
+        ));
+    }
+    Ok(())
+}
+
 const fn protection_type_name(protection_type: crate::ProtectionType) -> &'static str {
     match protection_type {
         crate::ProtectionType::None => "none",
@@ -5489,13 +5490,19 @@ fn ordinary_paragraph_source_map_inner(
                     source: source_range,
                     boundary_after: Some(absolute_span.clone()),
                 });
-                semantic_position =
-                    semantic_position
-                        .checked_add(1)
-                        .ok_or(Error::InputTooLarge {
-                            observed: usize::MAX,
-                            limit: source.limits().max_input_bytes(),
-                        })?;
+                // The final `\\par` terminates the last paragraph but does
+                // not add a semantic newline to the native body text.  A
+                // trailing terminator is common in RTF and must remain an
+                // addressable source boundary for lossless removal.
+                if semantic_position < semantic_text.len() {
+                    semantic_position =
+                        semantic_position
+                            .checked_add(1)
+                            .ok_or(Error::InputTooLarge {
+                                observed: usize::MAX,
+                                limit: source.limits().max_input_bytes(),
+                            })?;
+                }
                 paragraph_start = semantic_position;
                 source_text_start = None;
                 paragraph_has_inline_line = false;
@@ -5881,14 +5888,7 @@ fn plain_lifecycle_paragraphs(source: &Package) -> Result<Vec<String>, Error> {
         .model()
         .plain_body_text_editability()
         .map_err(Error::UnsupportedSource)?;
-    if source.model().retained_blocks().iter().any(|block| {
-        block.formatting != crate::types::Formatting::default()
-            || block.paragraph != crate::types::Paragraph::default()
-    }) {
-        return Err(Error::UnsupportedSource(
-            "paragraph lifecycle editing requires default body formatting",
-        ));
-    }
+    ensure_default_body_formatting(source)?;
     let paragraphs = source
         .body()
         .paragraphs()

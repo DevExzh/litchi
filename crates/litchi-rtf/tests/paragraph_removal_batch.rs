@@ -73,6 +73,25 @@ fn first_middle_last_and_all_removals_preserve_the_unselected_story() {
 }
 
 #[test]
+fn scalar_and_single_batch_removal_share_source_boundaries() {
+    let source = source();
+
+    let mut scalar = source.edit();
+    scalar.remove_paragraph(3).unwrap();
+    let scalar = scalar.commit().unwrap();
+
+    let mut batch = source.edit();
+    batch.remove_body_paragraphs(&[3]).unwrap();
+    let batch = batch.commit().unwrap();
+
+    assert_eq!(
+        scalar.package().to_bytes().unwrap(),
+        batch.package().to_bytes().unwrap()
+    );
+    assert_paragraphs(scalar.package(), &["First", "Second", "Third"]);
+}
+
+#[test]
 fn adjacent_empty_paragraph_removal_is_one_atomic_source_splice() {
     let source = Package::parse(r"{\rtf1\ansi First\par\par Third}").unwrap();
     let mut edit = source.edit();
@@ -83,6 +102,20 @@ fn adjacent_empty_paragraph_removal_is_one_atomic_source_splice() {
     assert_eq!(
         commit.package().to_bytes().unwrap(),
         br"{\rtf1\ansi First\par Third}"
+    );
+}
+
+#[test]
+fn trailing_paragraph_boundary_supports_empty_middle_removal() {
+    let source = Package::parse(r"{\rtf1\ansi First\par\par Third\par}").unwrap();
+    let mut edit = source.edit();
+    edit.remove_body_paragraphs(&[1]).unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_paragraphs(commit.package(), &["First", "Third"]);
+    assert_eq!(
+        commit.package().to_bytes().unwrap(),
+        br"{\rtf1\ansi First\par Third\par}"
     );
 }
 
