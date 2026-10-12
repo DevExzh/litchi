@@ -266,10 +266,10 @@ fn replacement_chunks(
 fn assert_replaced_texts(package: &Package, slide_count: usize, textboxes_per_slide: usize) {
     let texts = shape_texts(package);
     assert_eq!(texts.len(), slide_count);
-    for slide in 0..slide_count {
-        assert_eq!(texts[slide].len(), textboxes_per_slide + 1);
-        for shape in 0..textboxes_per_slide {
-            assert_eq!(texts[slide][shape], format!("target-{slide:02}-{shape:04}"));
+    for (slide, shapes) in texts.iter().enumerate() {
+        assert_eq!(shapes.len(), textboxes_per_slide + 1);
+        for (shape, text) in shapes.iter().enumerate().take(textboxes_per_slide) {
+            assert_eq!(*text, format!("target-{slide:02}-{shape:04}"));
         }
     }
 }
@@ -369,7 +369,7 @@ fn aggregate_replacement_byte_limit_precedes_target_and_signed_checks() {
         .expect_err("aggregate replacement bytes must be bounded");
     assert!(matches!(
         error,
-        Error::Package(litchi_ppt::Error::ResourceLimit(message))
+        Error::Native(litchi_ppt::slide_order::Error::Package(litchi_ppt::Error::ResourceLimit(message)))
             if message.contains("aggregate replacement bytes")
     ));
     assert_eq!(unsigned_edit.operation_count(), 0);
@@ -411,7 +411,7 @@ fn aggregate_replacement_byte_limit_precedes_target_and_signed_checks() {
         .expect_err("signed aggregate byte bound must precede signature policy");
     assert!(matches!(
         error,
-        Error::Package(litchi_ppt::Error::ResourceLimit(message))
+        Error::Native(litchi_ppt::slide_order::Error::Package(litchi_ppt::Error::ResourceLimit(message)))
             if message.contains("aggregate replacement bytes")
     ));
     assert_eq!(signed_edit.operation_count(), 0);

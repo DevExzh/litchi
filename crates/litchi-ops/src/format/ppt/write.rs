@@ -855,9 +855,11 @@ fn stage_plans(
                 ));
             }
         }
-        for chunk in replacements.chunks(litchi_ppt::slide_order::MAX_SHAPE_TEXT_REPLACEMENTS) {
-            edit.set_shape_texts(chunk).map_err(native_edit_error)?;
-        }
+        let chunks = replacements
+            .chunks(litchi_ppt::slide_order::MAX_SHAPE_TEXT_REPLACEMENTS)
+            .collect::<Vec<_>>();
+        edit.set_shape_text_chunks(&chunks)
+            .map_err(native_edit_error)?;
         return edit.commit().map_err(native_edit_error);
     }
     for plan in plans {

@@ -488,8 +488,8 @@ impl Edit {
     /// chunk, replacement-byte, duplicate-target, encoding, dependency,
     /// signed-source, and publication refusals leave this edit unchanged.
     pub fn set_shape_text_chunks(&mut self, chunks: &[&[ShapeTextReplacement]]) -> Result<usize> {
-        ensure_source_version(&self.package, self.expected_source)?;
         if chunks.len() > slide_order::MAX_SHAPE_TEXT_CHUNKS {
+            ensure_source_version(&self.package, self.expected_source)?;
             return Err(Error::Package(PackageError::ResourceLimit(format!(
                 "PPT shape-text chunk count {} exceeds limit {}",
                 chunks.len(),

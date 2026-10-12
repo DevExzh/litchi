@@ -1145,197 +1145,197 @@ struct PptTextBatchEntry {
 /// write implementations rather than a deleted facade predecessor.
 const PPT_TEXT_BATCH_CATALOG: [PptTextBatchEntry; 28] = [
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerNative1,
-        twin: Case::PptTextBatchEagerUnified1,
+        case: Case::PptTextAggregateEagerNative1,
+        twin: Case::PptTextAggregateEagerUnified1,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Native,
         count: 1,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerNative10,
-        twin: Case::PptTextBatchEagerUnified10,
+        case: Case::PptTextAggregateEagerNative10,
+        twin: Case::PptTextAggregateEagerUnified10,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Native,
         count: 10,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerNative100,
-        twin: Case::PptTextBatchEagerUnified100,
+        case: Case::PptTextAggregateEagerNative100,
+        twin: Case::PptTextAggregateEagerUnified100,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Native,
         count: 100,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerNative256,
-        twin: Case::PptTextBatchEagerUnified256,
+        case: Case::PptTextAggregateEagerNative256,
+        twin: Case::PptTextAggregateEagerUnified256,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Native,
         count: 256,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerNative1000,
-        twin: Case::PptTextBatchEagerUnified1000,
+        case: Case::PptTextAggregateEagerNative1000,
+        twin: Case::PptTextAggregateEagerUnified1000,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Native,
         count: 1_000,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerNative4096,
-        twin: Case::PptTextBatchEagerUnified4096,
+        case: Case::PptTextAggregateEagerNative4096,
+        twin: Case::PptTextAggregateEagerUnified4096,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Native,
         count: 4_096,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerNative10000,
-        twin: Case::PptTextBatchEagerUnified10000,
+        case: Case::PptTextAggregateEagerNative10000,
+        twin: Case::PptTextAggregateEagerUnified10000,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Native,
         count: 10_000,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerUnified1,
-        twin: Case::PptTextBatchEagerNative1,
+        case: Case::PptTextAggregateEagerUnified1,
+        twin: Case::PptTextAggregateEagerNative1,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Unified,
         count: 1,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerUnified10,
-        twin: Case::PptTextBatchEagerNative10,
+        case: Case::PptTextAggregateEagerUnified10,
+        twin: Case::PptTextAggregateEagerNative10,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Unified,
         count: 10,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerUnified100,
-        twin: Case::PptTextBatchEagerNative100,
+        case: Case::PptTextAggregateEagerUnified100,
+        twin: Case::PptTextAggregateEagerNative100,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Unified,
         count: 100,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerUnified256,
-        twin: Case::PptTextBatchEagerNative256,
+        case: Case::PptTextAggregateEagerUnified256,
+        twin: Case::PptTextAggregateEagerNative256,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Unified,
         count: 256,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerUnified1000,
-        twin: Case::PptTextBatchEagerNative1000,
+        case: Case::PptTextAggregateEagerUnified1000,
+        twin: Case::PptTextAggregateEagerNative1000,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Unified,
         count: 1_000,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerUnified4096,
-        twin: Case::PptTextBatchEagerNative4096,
+        case: Case::PptTextAggregateEagerUnified4096,
+        twin: Case::PptTextAggregateEagerNative4096,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Unified,
         count: 4_096,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchEagerUnified10000,
-        twin: Case::PptTextBatchEagerNative10000,
+        case: Case::PptTextAggregateEagerUnified10000,
+        twin: Case::PptTextAggregateEagerNative10000,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Unified,
         count: 10_000,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalNative1,
-        twin: Case::PptTextBatchPositionalUnified1,
+        case: Case::PptTextAggregatePositionalNative1,
+        twin: Case::PptTextAggregatePositionalUnified1,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Native,
         count: 1,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalNative10,
-        twin: Case::PptTextBatchPositionalUnified10,
+        case: Case::PptTextAggregatePositionalNative10,
+        twin: Case::PptTextAggregatePositionalUnified10,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Native,
         count: 10,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalNative100,
-        twin: Case::PptTextBatchPositionalUnified100,
+        case: Case::PptTextAggregatePositionalNative100,
+        twin: Case::PptTextAggregatePositionalUnified100,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Native,
         count: 100,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalNative256,
-        twin: Case::PptTextBatchPositionalUnified256,
+        case: Case::PptTextAggregatePositionalNative256,
+        twin: Case::PptTextAggregatePositionalUnified256,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Native,
         count: 256,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalNative1000,
-        twin: Case::PptTextBatchPositionalUnified1000,
+        case: Case::PptTextAggregatePositionalNative1000,
+        twin: Case::PptTextAggregatePositionalUnified1000,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Native,
         count: 1_000,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalNative4096,
-        twin: Case::PptTextBatchPositionalUnified4096,
+        case: Case::PptTextAggregatePositionalNative4096,
+        twin: Case::PptTextAggregatePositionalUnified4096,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Native,
         count: 4_096,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalNative10000,
-        twin: Case::PptTextBatchPositionalUnified10000,
+        case: Case::PptTextAggregatePositionalNative10000,
+        twin: Case::PptTextAggregatePositionalUnified10000,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Native,
         count: 10_000,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalUnified1,
-        twin: Case::PptTextBatchPositionalNative1,
+        case: Case::PptTextAggregatePositionalUnified1,
+        twin: Case::PptTextAggregatePositionalNative1,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Unified,
         count: 1,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalUnified10,
-        twin: Case::PptTextBatchPositionalNative10,
+        case: Case::PptTextAggregatePositionalUnified10,
+        twin: Case::PptTextAggregatePositionalNative10,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Unified,
         count: 10,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalUnified100,
-        twin: Case::PptTextBatchPositionalNative100,
+        case: Case::PptTextAggregatePositionalUnified100,
+        twin: Case::PptTextAggregatePositionalNative100,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Unified,
         count: 100,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalUnified256,
-        twin: Case::PptTextBatchPositionalNative256,
+        case: Case::PptTextAggregatePositionalUnified256,
+        twin: Case::PptTextAggregatePositionalNative256,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Unified,
         count: 256,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalUnified1000,
-        twin: Case::PptTextBatchPositionalNative1000,
+        case: Case::PptTextAggregatePositionalUnified1000,
+        twin: Case::PptTextAggregatePositionalNative1000,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Unified,
         count: 1_000,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalUnified4096,
-        twin: Case::PptTextBatchPositionalNative4096,
+        case: Case::PptTextAggregatePositionalUnified4096,
+        twin: Case::PptTextAggregatePositionalNative4096,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Unified,
         count: 4_096,
     },
     PptTextBatchEntry {
-        case: Case::PptTextBatchPositionalUnified10000,
-        twin: Case::PptTextBatchPositionalNative10000,
+        case: Case::PptTextAggregatePositionalUnified10000,
+        twin: Case::PptTextAggregatePositionalNative10000,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Unified,
         count: 10_000,
@@ -1394,7 +1394,9 @@ pub(crate) struct PptTextBatchSummary {
     pub(crate) count: usize,
     pub(crate) native_chunk_size: usize,
     pub(crate) native_operation_limit: usize,
-    pub(crate) native_chunk_calls: usize,
+    pub(crate) native_inner_chunks: usize,
+    pub(crate) native_aggregate_calls: usize,
+    pub(crate) native_publications: usize,
     pub(crate) native_commits: usize,
     pub(crate) unified_operations: usize,
     pub(crate) unified_commits: usize,
@@ -1770,7 +1772,8 @@ const PPT_TEXT_BATCH_LARGE_SNAPSHOT_LIMIT: usize = 1 << 30;
 #[derive(Clone, Copy, Debug, Default)]
 struct PptTextBatchNativeStats {
     changed: usize,
-    chunk_calls: usize,
+    inner_chunks: usize,
+    aggregate_calls: usize,
     commits: usize,
 }
 
@@ -1913,16 +1916,18 @@ fn apply_ppt_text_batch_native(
     let mut stats = PptTextBatchNativeStats::default();
     for operation_chunk in replacements.chunks(PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT) {
         let mut edit = current.edit()?;
-        for text_chunk in operation_chunk.chunks(PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE) {
-            stats.changed = stats
-                .changed
-                .checked_add(edit.set_shape_texts(text_chunk)?)
-                .ok_or("PPT text-batch changed count overflows usize")?;
-            stats.chunk_calls = stats
-                .chunk_calls
-                .checked_add(1)
-                .ok_or("PPT text-batch native call count overflows usize")?;
-        }
+        let chunks = operation_chunk
+            .chunks(PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE)
+            .collect::<Vec<_>>();
+        stats.changed = stats
+            .changed
+            .checked_add(edit.set_shape_text_chunks(&chunks)?)
+            .ok_or("PPT text-batch changed count overflows usize")?;
+        stats.inner_chunks = stats
+            .inner_chunks
+            .checked_add(chunks.len())
+            .ok_or("PPT text-batch native chunk count overflows usize")?;
+        stats.aggregate_calls += 1;
         current = edit.commit()?.into_package();
         stats.commits = stats
             .commits
@@ -2009,9 +2014,19 @@ fn prepare_ppt_text_batch_with_limits(
         return Err("PPT text-batch qualification changed an unexpected number of targets".into());
     }
     let expected_commits = entry.count.div_ceil(PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT);
-    if native_stats.commits != expected_commits || unified_stats.commits != expected_commits {
+    if native_stats.commits != expected_commits
+        || native_stats.aggregate_calls != expected_commits
+        || native_stats.inner_chunks != entry.count.div_ceil(PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE)
+        || unified_stats.commits != expected_commits
+    {
         return Err("PPT text-batch qualification did not coalesce at the native capacity".into());
     }
+    let source_history = ppt_text_batch_history_length(&corpus.archive)?;
+    let output_history = ppt_text_batch_history_length(&native_bytes)?;
+    if output_history.checked_sub(source_history) != Some(expected_commits) {
+        return Err("PPT aggregate publication history differs from native edit count".into());
+    }
+    verify_ppt_text_batch_texts(&native_bytes, entry.count)?;
     Ok(PreparedPptTextBatch {
         native,
         unified,
@@ -2024,6 +2039,54 @@ fn prepare_ppt_text_batch_with_limits(
         native_stats,
         unified_stats,
     })
+}
+
+// Frozen v1 evidence retains the old repeated-publication contract. Aggregate
+// routes have new names because the source corpus is identical but edit history
+// and output bytes differ above one inner chunk.
+fn ppt_text_batch_history_length(bytes: &[u8]) -> Result<usize, Box<dyn Error>> {
+    let mut ole = litchi_cfb::OleFile::open(Cursor::new(bytes))?;
+    let current = ole.open_stream(&["Current User"])?;
+    let document = ole.open_stream(&["PowerPoint Document"])?;
+    let mut offset = litchi_ppt::CurrentUser::parse(&current)?.current_edit_offset() as usize;
+    let mut count = 0usize;
+    let mut visited = std::collections::BTreeSet::new();
+    while offset != 0 {
+        if !visited.insert(offset) {
+            return Err("PPT qualification found cyclic edit history".into());
+        }
+        let end = offset
+            .checked_add(36)
+            .ok_or("PPT history offset overflow")?;
+        let record = document
+            .get(offset..end)
+            .ok_or("truncated PPT edit history")?;
+        if u16::from_le_bytes(record[2..4].try_into()?) != 4085
+            || u32::from_le_bytes(record[4..8].try_into()?) < 28
+        {
+            return Err("PPT qualification found invalid UserEditAtom".into());
+        }
+        offset = u32::from_le_bytes(record[16..20].try_into()?) as usize;
+        count += 1;
+    }
+    Ok(count)
+}
+
+fn verify_ppt_text_batch_texts(bytes: &[u8], count: usize) -> Result<(), Box<dyn Error>> {
+    let package = litchi_ppt::Package::from_bytes(bytes)?;
+    let presentation = package.presentation()?;
+    let slides = presentation.slides()?;
+    let slide = slides.first().ok_or("PPT aggregate output lacks slide")?;
+    let shapes = slide.shapes()?;
+    if slides.len() != 1 || shapes.len() != count {
+        return Err("PPT aggregate output has unexpected shape topology".into());
+    }
+    for (index, shape) in shapes.iter().enumerate() {
+        if shape.text()? != ppt_text_batch_updated_text(count, index) {
+            return Err("PPT aggregate output text differs from requested value".into());
+        }
+    }
+    Ok(())
 }
 
 fn run_ppt_text_batch(
@@ -2085,7 +2148,7 @@ fn run_ppt_text_batch(
         twin: Some(entry.twin.name()),
         timed_calls: match entry.leg {
             PptTextBatchLeg::Native => {
-                "prepared litchi_ppt::Package::edit with 256-target set_shape_texts chunks and 4096-operation commit rollover"
+                "prepared litchi_ppt::Package::edit with one set_shape_text_chunks publication per 4096-operation edit, inner chunks bounded at 256"
             },
             PptTextBatchLeg::Unified => {
                 "prepared litchi::File::edit shape text sets from string paths (path parsing included) in one facade transaction with 4096-operation native rollover"
@@ -2104,7 +2167,9 @@ fn run_ppt_text_batch(
             count: entry.count,
             native_chunk_size: PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE,
             native_operation_limit: PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT,
-            native_chunk_calls: prepared.native_stats.chunk_calls,
+            native_inner_chunks: prepared.native_stats.inner_chunks,
+            native_aggregate_calls: prepared.native_stats.aggregate_calls,
+            native_publications: prepared.native_stats.commits,
             native_commits: prepared.native_stats.commits,
             unified_operations: prepared.unified_stats.operations,
             unified_commits: prepared.unified_stats.commits,
@@ -3492,12 +3557,14 @@ mod tests {
                 entry.count,
                 1 | 10 | 100 | 256 | 1_000 | 4_096 | 10_000
             ));
-            assert!(entry.case.name().ends_with("_v1"));
+            assert!(entry.case.name().ends_with("_aggregate_v2"));
+            let retired = entry.case.name().replace("_aggregate_v2", "_v1");
+            assert_eq!(crate::parse_case(&retired), None, "frozen v1 is historical");
         }
         for invalid in [
-            "ppt_text_batch_eager_native_0_v1",
+            "ppt_text_batch_eager_native_0_aggregate_v2",
             "ppt_text_batch_eager_native_1",
-            "ppt_text_batch_positional_unified_10001_v1",
+            "ppt_text_batch_positional_unified_10001_aggregate_v2",
             "ppt_text_batch_source_native_10_v1",
         ] {
             assert_eq!(crate::parse_case(invalid), None, "{invalid}");
@@ -3510,8 +3577,8 @@ mod tests {
             .expect("PPT text-batch fixture");
         let source = TempSource::new("ppt", &corpus.archive).expect("PPT text-batch source");
         let entry = PptTextBatchEntry {
-            case: Case::PptTextBatchEagerNative100,
-            twin: Case::PptTextBatchEagerUnified100,
+            case: Case::PptTextAggregateEagerNative100,
+            twin: Case::PptTextAggregateEagerUnified100,
             owner: PptTextBatchOwner::Eager,
             leg: PptTextBatchLeg::Native,
             count: PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE + 1,
@@ -3528,7 +3595,8 @@ mod tests {
             .collect::<Vec<_>>();
         let (native_output, native_stats) =
             apply_ppt_text_batch_native(&native, &replacements).expect("native qualification");
-        assert_eq!(native_stats.chunk_calls, 2);
+        assert_eq!(native_stats.inner_chunks, 2);
+        assert_eq!(native_stats.aggregate_calls, 1);
         assert_eq!(native_stats.commits, 1);
         assert_eq!(native_stats.changed, PPT_TEXT_BATCH_NATIVE_CHUNK_SIZE + 1);
         let prepared = prepare_ppt_text_batch(entry, &corpus, source.path())
@@ -3547,7 +3615,7 @@ mod tests {
         let small_source =
             TempSource::new("ppt", &small_corpus.archive).expect("small PPT text-batch source");
         let small_entry =
-            ppt_text_batch_entry(Case::PptTextBatchEagerNative1).expect("small native route");
+            ppt_text_batch_entry(Case::PptTextAggregateEagerNative1).expect("small native route");
         let prepared = prepare_ppt_text_batch(small_entry, &small_corpus, small_source.path())
             .expect("native/unified qualification");
         assert_eq!(prepared.unified_stats.operations, 1);

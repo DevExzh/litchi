@@ -178,7 +178,7 @@ impl Run {
     }
 
     /// Publish all retained plans through one native primary edit. Text-only
-    /// runs use the native 256-item batch in chunks; mixed text/geometry runs
+    /// runs publish bounded native text chunks together; mixed text/geometry runs
     /// keep wire order so a late refusal can be attributed exactly.
     pub(crate) fn commit(self) -> Result<(Ppt, super::WriteCommit)> {
         let Self {
@@ -383,9 +383,11 @@ fn stage_all(edit: &mut litchi_ppt::package::edit::Edit, items: &[Item]) -> Resu
                 ));
             }
         }
-        for chunk in replacements.chunks(litchi_ppt::slide_order::MAX_SHAPE_TEXT_REPLACEMENTS) {
-            edit.set_shape_texts(chunk).map_err(native_edit_error)?;
-        }
+        let chunks = replacements
+            .chunks(litchi_ppt::slide_order::MAX_SHAPE_TEXT_REPLACEMENTS)
+            .collect::<Vec<_>>();
+        edit.set_shape_text_chunks(&chunks)
+            .map_err(native_edit_error)?;
         return Ok(());
     }
 

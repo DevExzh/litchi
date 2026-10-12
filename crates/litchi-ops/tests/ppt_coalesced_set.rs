@@ -148,6 +148,34 @@ fn direct_items(count: usize) -> Vec<BatchItem<'static>> {
 #[test]
 fn edit_and_batch_coalesce_one_thousand_distinct_direct_text_sets_for_both_owners() {
     let bytes = many_shapes(DIRECT_COUNT);
+    let native = litchi_ppt::Package::from_bytes(&bytes).expect("native source");
+    let replacements = (0..DIRECT_COUNT)
+        .map(|index| {
+            litchi_ppt::slide_order::ShapeTextReplacement::new(
+                litchi_ppt::text_edit::Target::new(
+                    litchi_core::Position::new(0),
+                    litchi_core::Position::new(index),
+                ),
+                format!("after-{}", index + 1),
+            )
+        })
+        .collect::<Vec<_>>();
+    let chunks = replacements
+        .chunks(litchi_ppt::slide_order::MAX_SHAPE_TEXT_REPLACEMENTS)
+        .collect::<Vec<_>>();
+    let mut native_edit = native.edit().expect("native edit");
+    assert_eq!(
+        native_edit
+            .set_shape_text_chunks(&chunks)
+            .expect("one native publication"),
+        DIRECT_COUNT
+    );
+    let native_output = native_edit
+        .commit()
+        .expect("native commit")
+        .package()
+        .to_bytes()
+        .expect("native bytes");
 
     let run_edit = |source: File| {
         let before = source.to_bytes().expect("source bytes");
@@ -171,6 +199,26 @@ fn edit_and_batch_coalesce_one_thousand_distinct_direct_text_sets_for_both_owner
             format!("after-{DIRECT_COUNT}")
         );
         assert_eq!(source.to_bytes().expect("immutable source"), before);
+        assert_eq!(commit.file.to_bytes().expect("facade bytes"), native_output);
+        assert_eq!(
+            commit
+                .patch
+                .apply(&source)
+                .expect("forward replay")
+                .to_bytes()
+                .expect("replayed bytes"),
+            native_output
+        );
+        assert_eq!(
+            commit
+                .patch
+                .inverse()
+                .apply(&commit.file)
+                .expect("inverse replay")
+                .to_bytes()
+                .expect("restored bytes"),
+            before
+        );
         commit.file
     };
 
