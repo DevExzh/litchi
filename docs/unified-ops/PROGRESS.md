@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0245 | [Opaque body anchors through RTF run edits](0245-rtf-run-opaque-anchors.md) | Native UTF-8 anchor projection, terminal-empty delimiter handling and exact history; 1,515 native / 1,738 full-facade / 603 RTF-only tests pass; six paired trials cover 10k opaque anchors, with query/scaling and full-goal gaps still open |
 | 0244 | [Native-backed RTF run removal](0244-rtf-run-remove.md) | Atomic path/query removal, retained empty paragraphs and exact history; before-text staging admission fixed; 1,513 native and 1,735 facade tests/doctests pass plus late opaque-anchor regression; three paired trials retain query/scaling gaps; broader CRUD, Python and full goal remain open |
 | 0243 | [Atomic RTF run text replacement](0243-rtf-run-text.md) | Native-backed text plus compound formatting, typed fan-out, Unicode coverage and empty-paragraph preservation; 1,513 native and 1,727 facade tests/doctests pass; three paired trials retain query/scaling gaps; broader CRUD, Python and full goal remain open |
 | 0242 | [Atomic RTF run character formatting](0242-rtf-run-format.md) | Ten compound native-backed run setters, typed atomic fan-out, exact history and Unicode preservation; 1,504 native and 1,718 facade tests/doctests pass; three paired trials expose query overhead and scaling gaps; broader CRUD, Python and full goal remain open |
