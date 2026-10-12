@@ -1,0 +1,1197 @@
+{
+  "schema": "litchi.xls_batch_bench.v1",
+  "samples": 5,
+  "warmup_passes": 1,
+  "native_stage_limit": 4096,
+  "generation_included": false,
+  "opening_included": false,
+  "path_construction_included": false,
+  "serialization_included": false,
+  "verification_included": false,
+  "python_required": false,
+  "cases": [
+    {
+      "cells": 1,
+      "operation": "set",
+      "source_backed": false,
+      "xls_bytes": 4096,
+      "expected_checksum": 13241295421104156653,
+      "native_checksum": 13241295421104156653,
+      "unified_edit_checksum": 13241295421104156653,
+      "unified_batch_checksum": 13241295421104156653,
+      "native_output_bytes": 4096,
+      "unified_edit_output_bytes": 4096,
+      "unified_batch_output_bytes": 4096,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 1,
+      "unified_batch_operations": 1,
+      "native_edit_ns": [
+        81881,
+        54661,
+        50760,
+        50270,
+        49180
+      ],
+      "native_stage_ns": [
+        11820,
+        12710,
+        12270,
+        11800,
+        11600
+      ],
+      "native_commit_ns": [
+        69971,
+        41871,
+        38410,
+        38410,
+        37490
+      ],
+      "unified_edit_ns": [
+        65130,
+        52760,
+        51621,
+        51121,
+        50870
+      ],
+      "unified_batch_ns": [
+        60170,
+        53500,
+        53080,
+        53900,
+        52701
+      ]
+    },
+    {
+      "cells": 10,
+      "operation": "set",
+      "source_backed": false,
+      "xls_bytes": 4096,
+      "expected_checksum": 7556152429887963189,
+      "native_checksum": 7556152429887963189,
+      "unified_edit_checksum": 7556152429887963189,
+      "unified_batch_checksum": 7556152429887963189,
+      "native_output_bytes": 4096,
+      "unified_edit_output_bytes": 4096,
+      "unified_batch_output_bytes": 4096,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 10,
+      "unified_batch_operations": 10,
+      "native_edit_ns": [
+        104730,
+        97151,
+        97340,
+        96360,
+        100631
+      ],
+      "native_stage_ns": [
+        14520,
+        14930,
+        15040,
+        14530,
+        18040
+      ],
+      "native_commit_ns": [
+        90130,
+        82141,
+        82210,
+        81760,
+        82521
+      ],
+      "unified_edit_ns": [
+        119631,
+        104550,
+        101870,
+        101611,
+        104660
+      ],
+      "unified_batch_ns": [
+        116760,
+        125291,
+        108091,
+        118270,
+        118661
+      ]
+    },
+    {
+      "cells": 100,
+      "operation": "set",
+      "source_backed": false,
+      "xls_bytes": 7168,
+      "expected_checksum": 14406665459391564485,
+      "native_checksum": 14406665459391564485,
+      "unified_edit_checksum": 14406665459391564485,
+      "unified_batch_checksum": 14406665459391564485,
+      "native_output_bytes": 7168,
+      "unified_edit_output_bytes": 7168,
+      "unified_batch_output_bytes": 7168,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 100,
+      "unified_batch_operations": 100,
+      "native_edit_ns": [
+        557392,
+        538352,
+        526312,
+        527303,
+        524942
+      ],
+      "native_stage_ns": [
+        37000,
+        41970,
+        42090,
+        42491,
+        42360
+      ],
+      "native_commit_ns": [
+        520282,
+        496172,
+        484132,
+        484732,
+        482502
+      ],
+      "unified_edit_ns": [
+        620052,
+        600712,
+        614293,
+        607443,
+        611992
+      ],
+      "unified_batch_ns": [
+        653363,
+        635452,
+        628243,
+        622003,
+        630812
+      ]
+    },
+    {
+      "cells": 1000,
+      "operation": "set",
+      "source_backed": false,
+      "xls_bytes": 43520,
+      "expected_checksum": 8797525403524424549,
+      "native_checksum": 8797525403524424549,
+      "unified_edit_checksum": 8797525403524424549,
+      "unified_batch_checksum": 8797525403524424549,
+      "native_output_bytes": 43520,
+      "unified_edit_output_bytes": 43520,
+      "unified_batch_output_bytes": 43520,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 1000,
+      "unified_batch_operations": 1000,
+      "native_edit_ns": [
+        5880137,
+        5786457,
+        5859657,
+        5742637,
+        5760017
+      ],
+      "native_stage_ns": [
+        743964,
+        793394,
+        793374,
+        745014,
+        737324
+      ],
+      "native_commit_ns": [
+        5135993,
+        4992833,
+        5066173,
+        4997513,
+        5022593
+      ],
+      "unified_edit_ns": [
+        6666671,
+        6545880,
+        6521120,
+        6758711,
+        6637540
+      ],
+      "unified_batch_ns": [
+        6698660,
+        6572980,
+        6672660,
+        6667081,
+        6625430
+      ]
+    },
+    {
+      "cells": 10000,
+      "operation": "set",
+      "source_backed": false,
+      "xls_bytes": 410112,
+      "expected_checksum": 3540245267310638501,
+      "native_checksum": 3540245267310638501,
+      "unified_edit_checksum": 3540245267310638501,
+      "unified_batch_checksum": 3540245267310638501,
+      "native_output_bytes": 410112,
+      "unified_edit_output_bytes": 410112,
+      "unified_batch_output_bytes": 410112,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 3,
+      "unified_edit_commit_count": 3,
+      "unified_batch_commit_count": 3,
+      "unified_edit_operations": 10000,
+      "unified_batch_operations": 10000,
+      "native_edit_ns": [
+        178630528,
+        165962260,
+        174978281,
+        173698076,
+        167219456
+      ],
+      "native_stage_ns": [
+        44601043,
+        41006888,
+        42525976,
+        50440931,
+        44218863
+      ],
+      "native_commit_ns": [
+        134028865,
+        124954832,
+        132451495,
+        123256475,
+        122999843
+      ],
+      "unified_edit_ns": [
+        188277523,
+        188737464,
+        191476327,
+        192478172,
+        191688308
+      ],
+      "unified_batch_ns": [
+        194475041,
+        195294304,
+        185880701,
+        195628516,
+        202996889
+      ]
+    },
+    {
+      "cells": 1,
+      "operation": "remove",
+      "source_backed": false,
+      "xls_bytes": 4096,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 4096,
+      "unified_edit_output_bytes": 4096,
+      "unified_batch_output_bytes": 4096,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 1,
+      "unified_batch_operations": 1,
+      "native_edit_ns": [
+        50130,
+        48550,
+        44870,
+        44640,
+        45270
+      ],
+      "native_stage_ns": [
+        12420,
+        13040,
+        11520,
+        11540,
+        11710
+      ],
+      "native_commit_ns": [
+        37620,
+        35430,
+        33280,
+        33020,
+        33490
+      ],
+      "unified_edit_ns": [
+        74470,
+        47450,
+        45560,
+        45331,
+        45100
+      ],
+      "unified_batch_ns": [
+        54041,
+        47870,
+        47180,
+        46090,
+        46011
+      ]
+    },
+    {
+      "cells": 10,
+      "operation": "remove",
+      "source_backed": false,
+      "xls_bytes": 4096,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 4096,
+      "unified_edit_output_bytes": 4096,
+      "unified_batch_output_bytes": 4096,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 10,
+      "unified_batch_operations": 10,
+      "native_edit_ns": [
+        88680,
+        85560,
+        84161,
+        83530,
+        82680
+      ],
+      "native_stage_ns": [
+        13740,
+        14740,
+        14480,
+        14980,
+        14670
+      ],
+      "native_commit_ns": [
+        74870,
+        70750,
+        69621,
+        68460,
+        67940
+      ],
+      "unified_edit_ns": [
+        94971,
+        91001,
+        90080,
+        88811,
+        87530
+      ],
+      "unified_batch_ns": [
+        96090,
+        93290,
+        105511,
+        90870,
+        91010
+      ]
+    },
+    {
+      "cells": 100,
+      "operation": "remove",
+      "source_backed": false,
+      "xls_bytes": 7168,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 7168,
+      "unified_edit_output_bytes": 7168,
+      "unified_batch_output_bytes": 7168,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 100,
+      "unified_batch_operations": 100,
+      "native_edit_ns": [
+        437452,
+        432452,
+        452842,
+        425622,
+        439742
+      ],
+      "native_stage_ns": [
+        38670,
+        42740,
+        41890,
+        42260,
+        40770
+      ],
+      "native_commit_ns": [
+        398692,
+        389642,
+        410862,
+        383272,
+        398882
+      ],
+      "unified_edit_ns": [
+        509122,
+        504053,
+        490273,
+        491583,
+        483743
+      ],
+      "unified_batch_ns": [
+        524712,
+        505802,
+        515892,
+        500372,
+        516022
+      ]
+    },
+    {
+      "cells": 1000,
+      "operation": "remove",
+      "source_backed": false,
+      "xls_bytes": 43520,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 43520,
+      "unified_edit_output_bytes": 43520,
+      "unified_batch_output_bytes": 43520,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 1000,
+      "unified_batch_operations": 1000,
+      "native_edit_ns": [
+        4522691,
+        4530251,
+        4556591,
+        4535131,
+        4530651
+      ],
+      "native_stage_ns": [
+        791554,
+        799334,
+        790264,
+        804404,
+        802594
+      ],
+      "native_commit_ns": [
+        3730907,
+        3730817,
+        3766227,
+        3730627,
+        3727937
+      ],
+      "unified_edit_ns": [
+        5157944,
+        5179804,
+        5160844,
+        5131673,
+        5113474
+      ],
+      "unified_batch_ns": [
+        5283574,
+        5274765,
+        5272794,
+        5241455,
+        5276754
+      ]
+    },
+    {
+      "cells": 10000,
+      "operation": "remove",
+      "source_backed": false,
+      "xls_bytes": 410112,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 410112,
+      "unified_edit_output_bytes": 410112,
+      "unified_batch_output_bytes": 410112,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 3,
+      "unified_edit_commit_count": 3,
+      "unified_batch_commit_count": 3,
+      "unified_edit_operations": 10000,
+      "unified_batch_operations": 10000,
+      "native_edit_ns": [
+        129231412,
+        132062275,
+        131251951,
+        134010254,
+        132102014
+      ],
+      "native_stage_ns": [
+        34878201,
+        35832964,
+        35287982,
+        35233402,
+        38927458
+      ],
+      "native_commit_ns": [
+        94352251,
+        96228971,
+        95963259,
+        98776282,
+        93174026
+      ],
+      "unified_edit_ns": [
+        141657439,
+        142971555,
+        141412998,
+        142905285,
+        143144825
+      ],
+      "unified_batch_ns": [
+        143444607,
+        145893528,
+        146651472,
+        144878663,
+        146278950
+      ]
+    },
+    {
+      "cells": 1,
+      "operation": "set",
+      "source_backed": true,
+      "xls_bytes": 4096,
+      "expected_checksum": 13241295421104156653,
+      "native_checksum": 13241295421104156653,
+      "unified_edit_checksum": 13241295421104156653,
+      "unified_batch_checksum": 13241295421104156653,
+      "native_output_bytes": 4096,
+      "unified_edit_output_bytes": 4096,
+      "unified_batch_output_bytes": 4096,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 1,
+      "unified_batch_operations": 1,
+      "native_edit_ns": [
+        53930,
+        52700,
+        48420,
+        63590,
+        49320
+      ],
+      "native_stage_ns": [
+        13940,
+        13780,
+        13160,
+        13830,
+        13240
+      ],
+      "native_commit_ns": [
+        39900,
+        38830,
+        35180,
+        49680,
+        36010
+      ],
+      "unified_edit_ns": [
+        61631,
+        56451,
+        55400,
+        56630,
+        53800
+      ],
+      "unified_batch_ns": [
+        59690,
+        56790,
+        55931,
+        56831,
+        55410
+      ]
+    },
+    {
+      "cells": 10,
+      "operation": "set",
+      "source_backed": true,
+      "xls_bytes": 4096,
+      "expected_checksum": 7556152429887963189,
+      "native_checksum": 7556152429887963189,
+      "unified_edit_checksum": 7556152429887963189,
+      "unified_batch_checksum": 7556152429887963189,
+      "native_output_bytes": 4096,
+      "unified_edit_output_bytes": 4096,
+      "unified_batch_output_bytes": 4096,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 10,
+      "unified_batch_operations": 10,
+      "native_edit_ns": [
+        103220,
+        97030,
+        107640,
+        94810,
+        98181
+      ],
+      "native_stage_ns": [
+        17220,
+        17280,
+        16110,
+        16310,
+        18241
+      ],
+      "native_commit_ns": [
+        85880,
+        79670,
+        91430,
+        78390,
+        79850
+      ],
+      "unified_edit_ns": [
+        144981,
+        141571,
+        144141,
+        139581,
+        153291
+      ],
+      "unified_batch_ns": [
+        147421,
+        143661,
+        143410,
+        148870,
+        143310
+      ]
+    },
+    {
+      "cells": 100,
+      "operation": "set",
+      "source_backed": true,
+      "xls_bytes": 7168,
+      "expected_checksum": 14406665459391564485,
+      "native_checksum": 14406665459391564485,
+      "unified_edit_checksum": 14406665459391564485,
+      "unified_batch_checksum": 14406665459391564485,
+      "native_output_bytes": 7168,
+      "unified_edit_output_bytes": 7168,
+      "unified_batch_output_bytes": 7168,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 100,
+      "unified_batch_operations": 100,
+      "native_edit_ns": [
+        517743,
+        528352,
+        523043,
+        516663,
+        511282
+      ],
+      "native_stage_ns": [
+        39421,
+        43600,
+        44510,
+        42201,
+        43030
+      ],
+      "native_commit_ns": [
+        478212,
+        484662,
+        478433,
+        474372,
+        468172
+      ],
+      "unified_edit_ns": [
+        971894,
+        971805,
+        953654,
+        962134,
+        960924
+      ],
+      "unified_batch_ns": [
+        984364,
+        991005,
+        962934,
+        978284,
+        980834
+      ]
+    },
+    {
+      "cells": 1000,
+      "operation": "set",
+      "source_backed": true,
+      "xls_bytes": 43520,
+      "expected_checksum": 8797525403524424549,
+      "native_checksum": 8797525403524424549,
+      "unified_edit_checksum": 8797525403524424549,
+      "unified_batch_checksum": 8797525403524424549,
+      "native_output_bytes": 43520,
+      "unified_edit_output_bytes": 43520,
+      "unified_batch_output_bytes": 43520,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 1000,
+      "unified_batch_operations": 1000,
+      "native_edit_ns": [
+        5529026,
+        5516255,
+        5478536,
+        5521565,
+        5532015
+      ],
+      "native_stage_ns": [
+        786464,
+        791544,
+        754664,
+        797683,
+        806523
+      ],
+      "native_commit_ns": [
+        4742272,
+        4724591,
+        4723742,
+        4723782,
+        4725292
+      ],
+      "unified_edit_ns": [
+        9943465,
+        9939126,
+        9950776,
+        10008766,
+        9988966
+      ],
+      "unified_batch_ns": [
+        10049886,
+        10036546,
+        10041056,
+        10085076,
+        10020465
+      ]
+    },
+    {
+      "cells": 10000,
+      "operation": "set",
+      "source_backed": true,
+      "xls_bytes": 410112,
+      "expected_checksum": 3540245267310638501,
+      "native_checksum": 3540245267310638501,
+      "unified_edit_checksum": 3540245267310638501,
+      "unified_batch_checksum": 3540245267310638501,
+      "native_output_bytes": 410112,
+      "unified_edit_output_bytes": 410112,
+      "unified_batch_output_bytes": 410112,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 3,
+      "unified_edit_commit_count": 3,
+      "unified_batch_commit_count": 3,
+      "unified_edit_operations": 10000,
+      "unified_batch_operations": 10000,
+      "native_edit_ns": [
+        172217409,
+        163950311,
+        162694775,
+        163799740,
+        159194359
+      ],
+      "native_stage_ns": [
+        44371623,
+        44465863,
+        46233682,
+        46581353,
+        41176068
+      ],
+      "native_commit_ns": [
+        127844816,
+        119483548,
+        116460593,
+        117217517,
+        118017551
+      ],
+      "unified_edit_ns": [
+        209181388,
+        198192788,
+        196938352,
+        200563269,
+        200559238
+      ],
+      "unified_batch_ns": [
+        215727347,
+        208416264,
+        201913584,
+        200956431,
+        202940430
+      ]
+    },
+    {
+      "cells": 1,
+      "operation": "remove",
+      "source_backed": true,
+      "xls_bytes": 4096,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 4096,
+      "unified_edit_output_bytes": 4096,
+      "unified_batch_output_bytes": 4096,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 1,
+      "unified_batch_operations": 1,
+      "native_edit_ns": [
+        56231,
+        47801,
+        47020,
+        45330,
+        44970
+      ],
+      "native_stage_ns": [
+        12641,
+        15100,
+        13120,
+        13010,
+        12840
+      ],
+      "native_commit_ns": [
+        43480,
+        32641,
+        33800,
+        32230,
+        32050
+      ],
+      "unified_edit_ns": [
+        58690,
+        73460,
+        51220,
+        50951,
+        49920
+      ],
+      "unified_batch_ns": [
+        55060,
+        58390,
+        51650,
+        50730,
+        51351
+      ]
+    },
+    {
+      "cells": 10,
+      "operation": "remove",
+      "source_backed": true,
+      "xls_bytes": 4096,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 4096,
+      "unified_edit_output_bytes": 4096,
+      "unified_batch_output_bytes": 4096,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 10,
+      "unified_batch_operations": 10,
+      "native_edit_ns": [
+        86761,
+        84601,
+        99000,
+        82270,
+        81661
+      ],
+      "native_stage_ns": [
+        15460,
+        16110,
+        16160,
+        16060,
+        15860
+      ],
+      "native_commit_ns": [
+        71211,
+        68401,
+        82760,
+        66120,
+        65721
+      ],
+      "unified_edit_ns": [
+        132420,
+        127660,
+        129801,
+        126271,
+        124880
+      ],
+      "unified_batch_ns": [
+        132961,
+        128241,
+        129151,
+        128130,
+        142951
+      ]
+    },
+    {
+      "cells": 100,
+      "operation": "remove",
+      "source_backed": true,
+      "xls_bytes": 7168,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 7168,
+      "unified_edit_output_bytes": 7168,
+      "unified_batch_output_bytes": 7168,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 100,
+      "unified_batch_operations": 100,
+      "native_edit_ns": [
+        444822,
+        425272,
+        417342,
+        432422,
+        427912
+      ],
+      "native_stage_ns": [
+        40730,
+        44940,
+        42980,
+        43680,
+        52141
+      ],
+      "native_commit_ns": [
+        403992,
+        380252,
+        374262,
+        388602,
+        375651
+      ],
+      "unified_edit_ns": [
+        862264,
+        861384,
+        875064,
+        840894,
+        854904
+      ],
+      "unified_batch_ns": [
+        880414,
+        868084,
+        876874,
+        851484,
+        860443
+      ]
+    },
+    {
+      "cells": 1000,
+      "operation": "remove",
+      "source_backed": true,
+      "xls_bytes": 43520,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 43520,
+      "unified_edit_output_bytes": 43520,
+      "unified_batch_output_bytes": 43520,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 1,
+      "unified_edit_commit_count": 1,
+      "unified_batch_commit_count": 1,
+      "unified_edit_operations": 1000,
+      "unified_batch_operations": 1000,
+      "native_edit_ns": [
+        4411790,
+        4439790,
+        4449841,
+        4430400,
+        4444081
+      ],
+      "native_stage_ns": [
+        778473,
+        797064,
+        789234,
+        778963,
+        796674
+      ],
+      "native_commit_ns": [
+        3633177,
+        3642626,
+        3660487,
+        3651307,
+        3647277
+      ],
+      "unified_edit_ns": [
+        8822881,
+        8808850,
+        8855541,
+        8845080,
+        8786090
+      ],
+      "unified_batch_ns": [
+        8933371,
+        8873711,
+        8898720,
+        8882951,
+        8871721
+      ]
+    },
+    {
+      "cells": 10000,
+      "operation": "remove",
+      "source_backed": true,
+      "xls_bytes": 410112,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_edit_checksum": 14695981039346656037,
+      "unified_batch_checksum": 14695981039346656037,
+      "native_output_bytes": 410112,
+      "unified_edit_output_bytes": 410112,
+      "unified_batch_output_bytes": 410112,
+      "native_edit_output_bytes_equal": true,
+      "unified_edit_output_bytes_equal": true,
+      "unified_batch_output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_commit_count": 3,
+      "unified_edit_commit_count": 3,
+      "unified_batch_commit_count": 3,
+      "unified_edit_operations": 10000,
+      "unified_batch_operations": 10000,
+      "native_edit_ns": [
+        122742822,
+        130544998,
+        123727307,
+        123010823,
+        127141932
+      ],
+      "native_stage_ns": [
+        34753350,
+        37219460,
+        34514780,
+        34615628,
+        37650863
+      ],
+      "native_commit_ns": [
+        87988702,
+        93324808,
+        89212077,
+        88394455,
+        89490399
+      ],
+      "unified_edit_ns": [
+        157874453,
+        162253543,
+        158928438,
+        155259531,
+        156584098
+      ],
+      "unified_batch_ns": [
+        159829472,
+        161186419,
+        163933971,
+        159129348,
+        161382879
+      ]
+    }
+  ],
+  "source_commit": "0ebc78408e4a3246095e374a902e80263da6f2e0",
+  "build_command": "cargo build --release -p litchi-ops --features xls --example xls_batch_bench",
+  "binary_sha256": "2160c91fc08c731fc58d63d088b0d5bf8dee62ca9087e0acb130b470935d35ed"
+}

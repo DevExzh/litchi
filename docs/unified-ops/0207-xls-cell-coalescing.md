@@ -74,6 +74,48 @@ timing. Native whole, staging (including edit admission), and commit costs
 are reported separately. Every output checks complete coordinates/values,
 byte equality and source immutability.
 
+## Paired results
+
+All 20 scenarios in the [five-sample run](results/0207-xls-batch.json) and
+[nine-sample repeat](results/0207-xls-batch-repeat.json) pass byte equality,
+complete coordinate/value checks, source immutability and native/unified
+commit-count equivalence. Repeat medians in milliseconds:
+
+| Owner | Operation | Calls | Native | Closure | Atomic batch | Batch/native |
+|---|---|---:|---:|---:|---:|---:|
+| Eager | set | 1,000 | 5.766 | 6.482 | 6.626 | 1.1491× |
+| Eager | set | 10,000 | 170.429 | 187.554 | 188.899 | 1.1084× |
+| Eager | remove | 1,000 | 4.507 | 5.129 | 5.242 | 1.1631× |
+| Eager | remove | 10,000 | 130.046 | 140.304 | 143.784 | 1.1056× |
+| Filesystem | set | 1,000 | 5.582 | 9.956 | 10.037 | 1.7981× |
+| Filesystem | set | 10,000 | 157.941 | 200.945 | 204.910 | 1.2974× |
+| Filesystem | remove | 1,000 | 4.413 | 8.732 | 8.795 | 1.9931× |
+| Filesystem | remove | 10,000 | 126.820 | 158.485 | 163.534 | 1.2895× |
+
+The 1,000-operation atomic batch ratios are 1.15–1.16× for eager owners and
+1.80–1.99× for filesystem owners in the repeat. The initial filesystem
+removal ratio was 2.001×, just above the 2× review threshold. That small
+margin is not stable qualification: source-path/freshness overhead remains
+a follow-up. Smaller source removal batches also exceeded 2× in the initial
+100-operation case; all samples remain in the evidence.
+
+The 10,000-operation measurements do not establish linear scaling: native
+eager sets grew from about 5.8 ms at 1,000 to 170 ms at 10,000, and the facade
+followed that growth. Native inventory lookups and staging overlap searches
+are known per-command linear scans, while the larger case also requires
+three native publications. Indexing those paths while preserving source
+order and duplicate refusal is the next performance work; these samples do
+not isolate the cost of each cause. Single-cell closure/batch timings are
+not a replacement for the one-shot write benchmark, and no text, repeated
+coordinate or peak-allocation performance claim is made.
+
+Source commit: `0ebc78408e4a3246095e374a902e80263da6f2e0`.
+Build with `cargo build --release -p litchi-ops --features xls --example
+xls_batch_bench`; run `target/release/examples/xls_batch_bench` with
+`LITCHI_XLS_BENCH_SAMPLES=5` or `9`. Binary SHA-256:
+`2160c91fc08c731fc58d63d088b0d5bf8dee62ca9087e0acb130b470935d35ed`.
+No binary is committed.
+
 ## Remaining scope
 
 The native inventory lookup and staged-change overlap/search paths still
