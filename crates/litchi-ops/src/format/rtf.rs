@@ -28,6 +28,27 @@ const _: () = {
 };
 
 impl Rtf {
+    /// Adopt a fresh native package without a detector or serialization round trip.
+    pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
+        use crate::{Code, Conformance, Error, Flavor};
+        let reason = if options.flavor_value() != Flavor::Document {
+            Some("RTF template creation is not supported")
+        } else if options.conformance_value() == Conformance::Strict {
+            Some("RTF does not support OOXML Strict conformance")
+        } else if options.metadata_value().is_some() {
+            Some("initial RTF metadata authoring is not integrated")
+        } else {
+            None
+        };
+        if let Some(reason) = reason {
+            return Err(Error::new(Code::UnsupportedCapability, reason)
+                .with_format(litchi_core::FileFormat::Rtf)
+                .with_suggestion("use default CreateOptions for an ordinary empty RTF document"));
+        }
+        let package = Package::new()?;
+        Ok(Self(Arc::new(RtfState { package })))
+    }
+
     /// Parses the RTF bytes detection retained (`DetectedFormat::Rtf`): plain,
     /// literal code-page, and compressed (LZFu/MELA) transports alike.
     ///

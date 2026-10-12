@@ -378,6 +378,9 @@ pub enum Source {
     /// A Rich Text Format error.
     #[cfg(feature = "rtf")]
     Rtf(litchi_rtf::Error),
+    /// A native RTF authoring error.
+    #[cfg(feature = "rtf")]
+    RtfBuild(litchi_rtf::builder::Error),
     /// An OOXML package-encryption error.
     #[cfg(feature = "encryption")]
     Crypto(litchi_crypto::ooxml::Error),
@@ -455,6 +458,8 @@ impl Source {
             Self::Sign(error) => Some(error),
             #[cfg(feature = "rtf")]
             Self::Rtf(error) => Some(error),
+            #[cfg(feature = "rtf")]
+            Self::RtfBuild(error) => Some(error),
             #[cfg(feature = "encryption")]
             Self::Crypto(error) => Some(error),
             #[cfg(feature = "formula")]
@@ -1573,6 +1578,17 @@ impl Classify for litchi_ppt::Error {
 }
 
 #[cfg(feature = "rtf")]
+impl Classify for litchi_rtf::builder::Error {
+    fn classify(&self) -> Class {
+        match self {
+            Self::Source(error) => error.classify(),
+            Self::Io(error) => error.classify(),
+            _ => Class::of(Code::InternalError),
+        }
+    }
+}
+
+#[cfg(feature = "rtf")]
 impl Classify for litchi_rtf::Error {
     fn classify(&self) -> Class {
         match self {
@@ -1827,6 +1843,7 @@ from_leaf!(
     litchi_sign::Error => Sign, None
 );
 from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::Error => Rtf, Some(FileFormat::Rtf));
+from_leaf!(#[cfg(feature = "rtf")] litchi_rtf::builder::Error => RtfBuild, Some(FileFormat::Rtf));
 from_leaf!(
     #[cfg(feature = "encryption")]
     litchi_crypto::ooxml::Error => Crypto, None

@@ -138,7 +138,7 @@ impl CreateOptions {
 
 /// Create a new package with the default options.
 ///
-/// DOC, DOCX, PPT, XLS, XLSX, XLSB and PPTX have native-backed unified creators.
+/// DOC, DOCX, PPT, RTF, XLS, XLSX, XLSB and PPTX have native-backed unified creators.
 /// The DOC creator emits one ordinary blank document paragraph; template,
 /// Strict and initial metadata options are refused explicitly. Other formats
 /// return a typed capability or format refusal according to the features and
@@ -158,7 +158,7 @@ pub fn create(format: FileFormat) -> Result<File> {
 /// The selected creator validates every option before publication. DOC
 /// supports an ordinary Transitional document without initial metadata.
 /// DOCX supports ordinary documents, templates, Transitional conformance, and
-/// the core metadata fields its leaf stores. PPT, XLS, XLSX, XLSB and PPTX
+/// the core metadata fields its leaf stores. PPT, RTF, XLS, XLSX, XLSB and PPTX
 /// support ordinary Transitional documents; template, Strict and initial
 /// metadata requests are refused explicitly by those creators.
 ///
@@ -199,6 +199,11 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
     #[cfg(feature = "xlsb")]
     if format == FileFormat::Xlsb {
         return crate::format::xlsb::create::create(options).map(File::Xlsb);
+    }
+
+    #[cfg(feature = "rtf")]
+    if format == FileFormat::Rtf {
+        return crate::format::rtf::Rtf::create(options).map(File::Rtf);
     }
 
     let _ = options;

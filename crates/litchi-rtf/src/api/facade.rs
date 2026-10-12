@@ -58,7 +58,7 @@ impl Package {
     ///
     /// # Errors
     /// Returns a typed authoring or strict-reopen error.
-    pub fn new() -> std::result::Result<Self, crate::builder::Error> {
+    pub fn new() -> crate::builder::Result<Self> {
         crate::Builder::default().build()
     }
 

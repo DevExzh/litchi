@@ -78,7 +78,9 @@ fn every_format_has_one_answer_for_its_reads() {
             },
             Support::Unsupported { code, .. } => {
                 assert_eq!(capabilities.elements().count(), 0, "{format:?}");
-                let creation_gaps = if format == FileFormat::Ppt && cfg!(feature = "ppt") {
+                let creation_gaps = if (format == FileFormat::Ppt && cfg!(feature = "ppt"))
+                    || (format == FileFormat::Rtf && cfg!(feature = "rtf"))
+                {
                     3
                 } else {
                     0
@@ -192,7 +194,8 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Docx && cfg!(feature = "docx"))
                 || (format == FileFormat::Xlsx && cfg!(feature = "xlsx"))
                 || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
-                || (format == FileFormat::Xlsb && cfg!(feature = "xlsb"));
+                || (format == FileFormat::Xlsb && cfg!(feature = "xlsb"))
+                || (format == FileFormat::Rtf && cfg!(feature = "rtf") && verb == Verb::Create);
             let expected = if integrated {
                 Support::Supported
             } else if get.is_supported() {

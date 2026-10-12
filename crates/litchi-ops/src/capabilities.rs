@@ -848,6 +848,10 @@ impl Capabilities {
 
     /// Whether this report's format has an integrated creator.
     fn creation_support(&self) -> Support {
+        if self.format == Some(FileFormat::Rtf) && cfg!(feature = "rtf") {
+            return Support::Supported;
+        }
+
         #[cfg(feature = "ppt")]
         if self.format == Some(FileFormat::Ppt) {
             return Support::Supported;
@@ -923,6 +927,8 @@ impl Capabilities {
         let independent: &'static [GapSpec] = match self.format {
             #[cfg(feature = "ppt")]
             Some(FileFormat::Ppt) => &PPT_CREATION_OPTION_GAPS,
+            #[cfg(feature = "rtf")]
+            Some(FileFormat::Rtf) => &RTF_CREATION_OPTION_GAPS,
             _ => &[],
         };
         Gaps {
@@ -1180,6 +1186,41 @@ static DOC_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         code: Code::UnsupportedCapability,
         follow_up: "M2 DOC initial metadata authoring",
         reason: "the DOC creator currently emits a blank body only and refuses initial metadata rather than dropping it",
+    },
+];
+
+/// RTF creator options refused by the minimal native builder.
+#[cfg(feature = "rtf")]
+static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "document",
+            context: "template",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "use Flavor::Document",
+        reason: "RTF template creation is not supported",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "document",
+            context: "strict-conformance",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "use Conformance::Transitional",
+        reason: "RTF does not support OOXML Strict conformance",
+    },
+    GapSpec {
+        subject: Subject::Operation {
+            verb: "create",
+            element: "document",
+            context: "initial-metadata",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "RTF typed metadata creation",
+        reason: "initial RTF metadata authoring is not integrated",
     },
 ];
 

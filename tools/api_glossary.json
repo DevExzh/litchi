@@ -2888,6 +2888,24 @@
           "scope": "litchi_rtf::read::Document",
           "replacement": "lifecycle and publication belong to Package",
           "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_rtf::builder::Builder",
+          "replacement": "build returns Package; publication belongs to Package",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_rtf::builder::Builder",
+          "replacement": "build returns Package; publication belongs to Package",
+          "recursive": false
+        },
+        {
+          "name": "write_to",
+          "scope": "litchi_rtf::builder::Builder",
+          "replacement": "build returns Package; publication belongs to Package",
+          "recursive": false
         }
       ],
       "families": []

@@ -25,12 +25,12 @@ Rules of reading:
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ RTF owner split (0223; creation/save policy pending) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
+| Immutable owner snapshot (physical + semantic, all state verbs) | `Package` | — | ✅ numbers/pages/keynote/doc/ods · ✅ RTF owner split (0223; save policy pending) · ✅ XLS (0197–0198) · ✅ PPT immutable owner/publication and primary edit (0211–0212) · 🔴 pptx remaining direct mutators (0127 removes the package writer) · 🔴 docx immutable public owner (0019 shares the physical graph; mutable APIs remain) · 🔴 odt/odp (split out of the merged type, W3) · 🔴 xlsb (W2) |
 | Read-only semantic projection, word processing | `Document` | — | ✅ pages · ✅ RTF shared owned projection (0223) · ✅ docx owned `Package::document()` projection (0019) |
 | Read-only semantic projection, spreadsheets | `Workbook` | `Spreadsheet` | 🔴 numbers `Document`→`Workbook` (W1) · 🔴 xlsx `Workbook` demoted to projection (W2) · 🔴 ods `Spreadsheet`→`Workbook` (W3) · ✅ XLS (0197) |
 | Read-only semantic projection, decks | `Presentation` | — | 🔴 keynote `Document`→`Presentation` (W1) · ✅ pptx view / odp name (shape changes W2/W3) · ✅ PPT shared owned projection (0211) |
 | Projection accessor | `Package::{document, workbook, presentation}()` | — | owned projections primary; borrowed `*_ref()` views secondary |
-| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200) and PPT (0213) `Builder::build()` return `Package`; 🔴 remaining W2–W4 |
+| Option-bearing fresh authoring | per-format `Builder` in a focused module | `WorkbookWriter` (xlsb), `Writer` (doc), `*DocumentBuilder` prefixes (litchi-iwa) | ✅ XLSB (0175), XLS (0200), PPT (0213) and RTF (0225) `Builder::build()` return `Package`; 🔴 remaining W2–W4 |
 | iWork document identity (explicit, required) | `Identity` with `Identity::generate()` / fixed bytes | implicit random identity inside builders | 🔴 W1; `build()` without identity is a typed error |
 
 ## 2. Transaction vocabulary (iWork canonical form)
@@ -77,7 +77,7 @@ Focused append/redaction vocabulary and finite semantic profiles remain pending.
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
 | Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 |
-| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199) · 🔴 xlsx (W2); all formats gain it |
+| Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225) · 🔴 xlsx (W2); all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML; extended everywhere |
 | Bytes output | `to_bytes()` | `Builder::build() -> Vec<u8>` as output (ODF) | ✅ owning DOCX (0044); lazy managed DOCX bytes pending. `build()` returns `Package`; output lives on `Package` |
@@ -114,8 +114,10 @@ policy, including through unified `OpenOptions::rtf_options`.
 
 This migration does not rename the separate semantic edit limits or structural
 `LimitExceeded` errors. Record 0223 adds the concrete immutable `Package` and owned read-only
-`Document` projection. Transaction vocabulary, construction/publication policy
-and the unified read/write adapter remain pending.
+`Document` projection. Record 0224 aligns primary transaction vocabulary, and
+0225 adds native `Builder`, `Package::new()` and unified RTF creation. Atomic
+publication, focused transaction vocabulary and the unified CRUD adapter remain
+pending.
 
 ### PPT source dimensions
 

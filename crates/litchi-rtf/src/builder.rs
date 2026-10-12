@@ -244,21 +244,24 @@ impl Write for BoundedSink {
                 maximum: self.maximum,
             };
             self.source_error = Some(error);
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "RTF source limit exceeded",
-            ));
+            return Err(io::Error::other("RTF source limit exceeded"));
         }
 
-        if self.bytes.try_reserve_exact(bytes.len()).is_err() {
+        let capacity = observed
+            .max(self.bytes.capacity().saturating_mul(2))
+            .max(64)
+            .min(self.maximum);
+        if observed > self.bytes.capacity()
+            && self
+                .bytes
+                .try_reserve_exact(capacity - self.bytes.len())
+                .is_err()
+        {
             self.source_error = Some(crate::Error::AllocationFailed {
                 resource: "builder output",
                 requested: observed,
             });
-            return Err(io::Error::new(
-                io::ErrorKind::Other,
-                "RTF builder output allocation failed",
-            ));
+            return Err(io::Error::other("RTF builder output allocation failed"));
         }
         self.bytes.extend_from_slice(bytes);
         Ok(bytes.len())
@@ -273,6 +276,22 @@ impl Write for BoundedSink {
 mod tests {
     use super::{Builder, Error};
     use crate::{Package, SourceLimitKind, SourceLimits, write};
+
+    #[test]
+    fn output_growth_is_amortized_and_bounded() {
+        use std::io::Write;
+        let mut sink = super::BoundedSink::new(1000);
+        let mut growths = 0;
+        for _ in 0..1000 {
+            let before = sink.bytes.capacity();
+            sink.write_all(b"x").expect("bounded write");
+            growths += usize::from(sink.bytes.capacity() != before);
+            assert!(sink.bytes.capacity() <= 1000);
+        }
+        assert!(growths <= 5);
+        assert!(sink.write_all(b"x").is_err());
+        assert_eq!(sink.bytes.len(), 1000);
+    }
 
     #[test]
     fn empty_builder_round_trips_through_package_owner() {
@@ -354,20 +373,36 @@ mod tests {
     }
 
     #[test]
+    fn strict_reopen_enforces_non_byte_source_limits() {
+        let limits = SourceLimits::builder()
+            .max_events(0)
+            .expect("event limit")
+            .build()
+            .expect("profile");
+        let error = Builder::new()
+            .source_limits(limits)
+            .build()
+            .expect_err("events denied");
+        assert!(matches!(
+            error,
+            Error::Source(crate::Error::Limit {
+                kind: SourceLimitKind::Events,
+                maximum: 0,
+                ..
+            })
+        ));
+    }
+
+    #[test]
     fn built_package_is_immutable_and_still_editable() {
         let package = Builder::new()
             .text("before")
             .expect("text")
             .build()
             .expect("package");
-        let changed = package
-            .edit()
-            .replace_paragraph_text(0, "after")
-            .expect("replace")
-            .commit()
-            .expect("commit")
-            .package()
-            .clone();
+        let mut edit = package.edit();
+        edit.replace_paragraph_text(0, "after").expect("replace");
+        let changed = edit.commit().expect("commit").package().clone();
         assert_eq!(package.text(), "before");
         assert_eq!(changed.text(), "after");
     }
