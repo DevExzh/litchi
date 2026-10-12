@@ -388,6 +388,14 @@ fn rtf_advertises_native_paragraph_structural_writes_and_keeps_closure_gaps() {
     assert!(!capabilities.gaps().any(|gap| {
         gap.subject()
             == crate::node::spec::Subject::Operation {
+                verb: "swap",
+                element: "body",
+                context: "paragraph-text-only",
+            }
+    }));
+    assert!(!capabilities.gaps().any(|gap| {
+        gap.subject()
+            == crate::node::spec::Subject::Operation {
                 verb: "add",
                 element: "body",
                 context: "paragraph-text-only",
