@@ -235,8 +235,8 @@ pub(crate) const PARAGRAPH_PROPS: &[PropSpec] = &[
 /// Local character properties for a native RTF run.  The scalar types follow
 /// the common word-processing run registry, while the native RTF projection
 /// keeps its own exact underline token vocabulary.  The ten format facets are
-/// writable through the native omission-preserving run patch; text, font and
-/// foreground colour remain read-only until their source-preserving editors
+/// writable through the native omission-preserving run patch; font and
+/// foreground colour remain read-only until their resource-preserving editors
 /// exist.
 pub(crate) const RUN_PROPS: &[PropSpec] = &[
     PropSpec {
@@ -245,7 +245,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -261,7 +261,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -271,7 +271,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -281,7 +281,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -297,7 +297,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -307,7 +307,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -317,7 +317,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -327,7 +327,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -337,7 +337,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -347,7 +347,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },
@@ -357,7 +357,7 @@ pub(crate) const RUN_PROPS: &[PropSpec] = &[
         access: Access {
             get: true,
             set: true,
-            add: false,
+            add: true,
         },
         raw: false,
     },

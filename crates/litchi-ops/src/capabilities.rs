@@ -1242,11 +1242,12 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
 /// dependency-free paragraph layout facets, paragraph insertion, removal,
 /// paragraph ordering and paragraph swapping. Keep the remaining mutation
 /// verbs visible instead of making the format-level `set`/`remove`/`move`/
-/// `swap`/`edit`/`batch` support look like general CRUD.  Run `set` is
-/// available for text and ten local character-format facets; run removal uses
-/// native empty replacements. Insertion, move and swap remain explicit gaps.
+/// `swap`/`edit`/`batch` support look like general CRUD. Run `set`, `add` and
+/// removal cover text and ten local character-format facets; insertion and
+/// removal use native source-preserving run transactions. Run move and swap
+/// remain explicit gaps.
 #[cfg(feature = "rtf")]
-static RTF_WRITE_GAPS: [GapSpec; 9] = [
+static RTF_WRITE_GAPS: [GapSpec; 8] = [
     GapSpec {
         subject: Subject::Operation {
             verb: "set",
@@ -1296,16 +1297,6 @@ static RTF_WRITE_GAPS: [GapSpec; 9] = [
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF rich paragraph preservation",
         reason: "paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "add",
-            element: "run",
-            context: "native-run-edit",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF atomic native run edits",
-        reason: "run insertion requires an atomic native character-run editor that preserves neighboring source boundaries and formatting controls",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2774,8 +2765,10 @@ impl Element {
                 && self.data().canonical == "sheet"
                 && readable);
         #[cfg(feature = "rtf")]
-        let add =
-            add || (self.adapter == Adapter::Rtf && self.data().canonical == "body" && readable);
+        let add = add
+            || (self.adapter == Adapter::Rtf
+                && matches!(self.data().canonical, "body" | "p" | "r")
+                && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx

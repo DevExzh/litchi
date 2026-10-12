@@ -11,8 +11,8 @@ use litchi_rtf::Alignment;
 use litchi_rtf::UnderlineStyle;
 use litchi_rtf::edit::{
     EditOptions, ParagraphAlignmentUpdate, ParagraphLayoutPatch, ParagraphLayoutUpdate,
-    ParagraphTextReplacement, Patch, RunFormatPatch, RunFormatUpdate, RunTextReplacement,
-    SemanticLimits as NativeLimits,
+    ParagraphTextReplacement, Patch, RunFormatPatch, RunFormatUpdate, RunTextInsertion,
+    RunTextReplacement, SemanticLimits as NativeLimits,
 };
 use std::num::NonZeroU16;
 
@@ -49,6 +49,16 @@ pub(crate) fn add_with_limits<'p, 'n>(
 ) -> Result<(Commit, Path<'static>)> {
     file.admit_edit()?;
     let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
+    if node.kind().eq_ignore_ascii_case("r") || node.kind().eq_ignore_ascii_case("run") {
+        if parent.element_kind() != super::Kind::Paragraph {
+            return Err(Error::new(
+                Code::UnsupportedType,
+                "RTF runs can only be added directly under a paragraph",
+            )
+            .with_format(FileFormat::Rtf));
+        }
+        return add_run_with_limits(file, parent, node, limits);
+    }
     if parent.element_kind() != super::Kind::Body {
         return Err(Error::new(
             Code::UnsupportedType,
@@ -118,6 +128,155 @@ pub(crate) fn add_with_limits<'p, 'n>(
         },
         paragraph_path(position),
     ))
+}
+
+/// Add one ordinary character run under a body paragraph through the native
+/// source-preserving insertion transaction.
+fn add_run_with_limits<'n>(
+    file: &Rtf,
+    parent: Node<'_>,
+    node: NewNode<'n>,
+    limits: &SemanticLimits,
+) -> Result<(Commit, Path<'static>)> {
+    let Some(paragraph) = parent.paragraph_position() else {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "RTF run additions require a body paragraph",
+        )
+        .with_format(FileFormat::Rtf));
+    };
+    let Some(source_paragraph) = parent.paragraph else {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "RTF run additions require a body paragraph",
+        )
+        .with_format(FileFormat::Rtf));
+    };
+    let (text, patch) = run_add_properties(node.props())?;
+    let count = source_paragraph.runs().count();
+    let run = run_add_position(file, paragraph, count, node.placement())?;
+
+    bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
+    bound(LimitKind::Operations, 1, limits.max_operations())?;
+    let staged_bytes = text
+        .len()
+        .checked_add(size_of::<RunTextInsertion>())
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    bound(
+        LimitKind::StagedBytes,
+        staged_bytes,
+        limits.max_staged_bytes(),
+    )?;
+
+    let native_limits = NativeLimits::builder()
+        .max_operations(limits.max_operations())
+        .map_err(Error::from)?
+        .max_replacement_bytes(limits.max_staged_bytes())
+        .map_err(Error::from)?
+        .build()
+        .map_err(Error::from)?;
+    let options = EditOptions::new().semantic_limits(native_limits);
+    let mut edit = file.0.package.edit_with_options(options);
+    edit.insert_run(paragraph, Position::new(run), text, patch)
+        .map_err(Error::from)?;
+    let native = edit.commit().map_err(Error::from)?;
+
+    let changed = native.diagnostics().changed();
+    let operation_count = native.diagnostics().operation_count();
+    let (package, patch) = native.into_parts();
+    let snapshot_bytes = patch_snapshot_bytes(&patch);
+    if snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+    }
+    let before = file.clone();
+    let after = if changed {
+        file.with_package(package)
+    } else {
+        file.clone()
+    };
+    file.check_source()?;
+    Ok((
+        Commit {
+            before,
+            after,
+            patch,
+            operations: operation_count,
+            snapshot_bytes,
+        },
+        run_path(paragraph, run),
+    ))
+}
+
+fn run_add_properties<'a>(props: &'a Props<'_>) -> Result<(&'a str, RunFormatPatch)> {
+    let text = run_text(props)?.ok_or_else(|| {
+        Error::new(
+            Code::MissingProperty,
+            "RTF run additions require a `text` property",
+        )
+        .with_property("text")
+        .with_format(FileFormat::Rtf)
+    })?;
+    Ok((text, run_format_patch(props)?))
+}
+
+fn run_add_position(
+    file: &Rtf,
+    paragraph: Position,
+    count: usize,
+    placement: Option<&Placement<'_>>,
+) -> Result<usize> {
+    let nav = Nav::new(file);
+    let position = match placement {
+        None | Some(Placement::End) => count,
+        Some(Placement::Start) => 0,
+        Some(Placement::Position(position)) => position.get(),
+        Some(Placement::Before(path)) => {
+            let node = crate::path::resolve::get(&nav, path)?;
+            run_sibling_position(node, paragraph)?
+        },
+        Some(Placement::After(path)) => {
+            run_sibling_position(crate::path::resolve::get(&nav, path)?, paragraph)?
+                .saturating_add(1)
+        },
+        Some(Placement::Into(path, position)) => {
+            let node = crate::path::resolve::get(&nav, path)?;
+            if node.element_kind() != super::Kind::Paragraph
+                || node.paragraph_position() != Some(paragraph)
+            {
+                return Err(Error::new(
+                    Code::UnsupportedType,
+                    "RTF run placements must stay within the supplied paragraph",
+                )
+                .with_format(FileFormat::Rtf));
+            }
+            position.map_or(count, Position::get)
+        },
+    };
+    if position > count {
+        return Err(Error::new(
+            Code::OutOfRange,
+            "the RTF run insertion position is outside the paragraph",
+        )
+        .with_format(FileFormat::Rtf));
+    }
+    Ok(position)
+}
+
+fn run_sibling_position(node: Node<'_>, paragraph: Position) -> Result<usize> {
+    if node.element_kind() != super::Kind::Run || node.paragraph_position() != Some(paragraph) {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "RTF run placements require a run in the supplied paragraph",
+        )
+        .with_format(FileFormat::Rtf));
+    }
+    node.run_position().map(Position::get).ok_or_else(|| {
+        Error::new(
+            Code::UnsupportedType,
+            "RTF run placement target has no source position",
+        )
+        .with_format(FileFormat::Rtf)
+    })
 }
 
 fn add_text<'a>(props: &'a Props<'_>) -> Result<&'a str> {
@@ -190,6 +349,14 @@ fn paragraph_path(position: usize) -> Path<'static> {
     Path::from_steps([
         Step::new("body"),
         Step::new("p").with(Predicate::Index(Position::new(position))),
+    ])
+}
+
+fn run_path(paragraph: Position, run: usize) -> Path<'static> {
+    Path::from_steps([
+        Step::new("body"),
+        Step::new("p").with(Predicate::Index(paragraph)),
+        Step::new("r").with(Predicate::Index(Position::new(run))),
     ])
 }
 

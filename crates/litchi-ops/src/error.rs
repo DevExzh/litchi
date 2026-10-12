@@ -1644,9 +1644,11 @@ impl Classify for litchi_rtf::edit::Error {
             | Self::EmptyPictureRemovalBatch
             | Self::PictureRemovalBatchOutOfOrder { .. }
             | Self::DurablePatch(_) => Class::of(Code::InvalidArgument),
+            Self::EmptyRunTextInsertion { .. } => Class::of(Code::InvalidValue),
             Self::SpanOutOfRange { .. }
             | Self::SpanNotOnCharacterBoundary { .. }
             | Self::ParagraphOutOfRange { .. }
+            | Self::RunInsertionOutOfRange { .. }
             | Self::RunOutOfRange { .. }
             | Self::DestinationOutOfRange(_)
             | Self::PictureOutOfRange { .. } => Class::of(Code::OutOfRange),
