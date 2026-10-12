@@ -266,6 +266,7 @@ impl Ppt {
     ) -> Result<Option<write::coalesce::Plan>> {
         let mut scene = None;
         self.shape_plan_cached(target, props, limits, &mut scene)
+            .map(|plan| plan.map(|plan| plan.with_scene(scene)))
     }
 
     /// Resolve one direct shape path using a caller-owned slide scene cache.
@@ -452,12 +453,15 @@ impl Ppt {
     /// immutable owned source and therefore have a stable revision too;
     /// released read projections deliberately have no publication owner.
     pub(crate) fn check_source(&self) -> Result<()> {
-        self.0.presentation.check_source()?;
+        // Every constructor obtains this presentation from the retained
+        // package. They share one source identity; checking both would probe
+        // the same positional source twice. A released handle retains only
+        // the presentation, which remains responsible for its lazy reads.
         match &self.0.owner {
             PptOwner::Source(package) | PptOwner::Eager(package) => {
                 package.source_version().map(drop).map_err(Into::into)
             },
-            PptOwner::Released => Ok(()),
+            PptOwner::Released => self.0.presentation.check_source().map_err(Into::into),
         }
     }
 
@@ -872,6 +876,66 @@ mod tests {
             let released =
                 open_file(file.path(), &OpenOptions::default().retain_source(false)).unwrap();
             assert!(released.text_editor().unwrap().is_none());
+        }
+    }
+
+    #[test]
+    fn one_source_probe_fences_retained_and_released_presentations() {
+        use litchi_core::{ReadAt, SourceVersion};
+        use std::io;
+        use std::sync::atomic::{AtomicUsize, Ordering};
+
+        struct Source {
+            bytes: Vec<u8>,
+            probes: AtomicUsize,
+            revision: AtomicUsize,
+        }
+        impl ReadAt for Source {
+            fn len(&self) -> io::Result<u64> {
+                u64::try_from(self.bytes.len()).map_err(io::Error::other)
+            }
+            fn version(&self) -> io::Result<SourceVersion> {
+                self.probes.fetch_add(1, Ordering::Relaxed);
+                Ok(SourceVersion::new(
+                    221,
+                    self.revision.load(Ordering::Relaxed) as u64,
+                ))
+            }
+            fn read_at(&self, offset: u64, output: &mut [u8]) -> io::Result<usize> {
+                let offset = usize::try_from(offset).map_err(io::Error::other)?;
+                let input = self.bytes.get(offset..).unwrap_or_default();
+                let count = input.len().min(output.len());
+                output[..count].copy_from_slice(&input[..count]);
+                Ok(count)
+            }
+        }
+        let source = Arc::new(Source {
+            bytes: Package::new().unwrap().to_bytes().unwrap(),
+            probes: AtomicUsize::new(0),
+            revision: AtomicUsize::new(0),
+        });
+        let package = Package::from_read_at(source.clone()).unwrap();
+        let retained = Ppt::from_package(package.clone()).unwrap();
+        let released = Ppt(Opened::new(PptState {
+            presentation: package.presentation().unwrap(),
+            metadata: None,
+            source_limits: package.source_limits(),
+            encrypted: false,
+            owner: PptOwner::Released,
+        }));
+        for handle in [&retained, &released] {
+            source.probes.store(0, Ordering::Relaxed);
+            handle.check_source().unwrap();
+            assert_eq!(source.probes.load(Ordering::Relaxed), 1);
+        }
+        source.revision.store(1, Ordering::Relaxed);
+        for handle in [&retained, &released] {
+            source.probes.store(0, Ordering::Relaxed);
+            assert_eq!(
+                handle.check_source().unwrap_err().code(),
+                crate::Code::IoError
+            );
+            assert_eq!(source.probes.load(Ordering::Relaxed), 1);
         }
     }
 

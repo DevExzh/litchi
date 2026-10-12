@@ -41,6 +41,9 @@ pub(crate) struct SceneCache {
 
 /// One direct shape or placeholder assignment admitted for a coalesced run.
 pub(crate) struct Plan {
+    // Only the first plan carries a cache; staging moves it into the run.
+    // A box keeps this one-time transfer small in subsequent retained plans.
+    scene: Option<Box<SceneCache>>,
     target: NativeTarget,
     text: Option<String>,
     anchor: Option<litchi_ppt::Anchor>,
@@ -49,6 +52,11 @@ pub(crate) struct Plan {
 }
 
 impl Plan {
+    pub(crate) fn with_scene(mut self, scene: Option<SceneCache>) -> Self {
+        self.scene = scene.map(Box::new);
+        self
+    }
+
     fn key(&self) -> (usize, usize) {
         (self.target.slide().get(), self.target.shape().get())
     }
@@ -150,7 +158,7 @@ impl Run {
     }
 
     /// Retain a plan and its exact per-item changed/no-op result.
-    pub(crate) fn stage(&mut self, plan: Plan, index: usize) -> Result<bool> {
+    pub(crate) fn stage(&mut self, mut plan: Plan, index: usize) -> Result<bool> {
         if self.requires_barrier(&plan, &self.limits) {
             return Err(Error::new(
                 Code::InternalError,
@@ -166,6 +174,9 @@ impl Run {
             .try_reserve(1)
             .map_err(|source| TransactionError::Allocation { source })?;
         let changed = plan.changed;
+        if let Some(scene) = plan.scene.take() {
+            self.scene = Some(*scene);
+        }
         self.seen.insert(plan.key());
         self.staged_bytes = self.staged_bytes.saturating_add(plan.charge());
         self.target_count = self.target_count.saturating_add(1);
@@ -269,13 +280,12 @@ pub(crate) fn shape_plan(
         return Ok(None);
     };
 
-    let source = Arc::clone(&cached.source);
-    let path = Arc::from(vec![position].into_boxed_slice());
-    let node = Node::shape_node(file, &[], slide, Kind::Shape, ordinal, source, path);
-    let property_kind = node.property_kind();
-    if !matches!(property_kind, Kind::Shape | Kind::Placeholder) {
-        return Ok(None);
-    }
+    let shape = &cached.source[position];
+    let property_kind = if matches!(shape, ShapeEnum::Placeholder(_)) {
+        Kind::Placeholder
+    } else {
+        Kind::Shape
+    };
     let values = if props.is_empty() {
         ShapeValues {
             text: None,
@@ -296,29 +306,37 @@ pub(crate) fn shape_plan(
     let geometry = values.geometry;
     // Geometry-only and empty payloads follow the one-shot writer's admission
     // path without decoding a text body. A requested text value still reads
-    // the native aggregate exactly, including `None` for shapes with no
-    // editable body, so equal text is retained for native validation.
+    // the same native aggregate as the node projection, so equal text is
+    // retained for native validation of the editable body.
     let text_changed = if let Some(text) = values.text.as_deref() {
-        let current_text = node.text_member()?.map(std::borrow::Cow::into_owned);
-        current_text.as_deref() != Some(text)
+        // These native accessors expose the same text as ShapeEnum::text,
+        // without cloning an already-owned body solely for comparison.
+        match shape {
+            ShapeEnum::TextBox(textbox) => textbox.text() != text,
+            ShapeEnum::AutoShape(autoshape) => autoshape.text() != text,
+            _ => shape.text().map_err(Error::from)? != text,
+        }
     } else {
         false
     };
     let text = values.text;
     let anchor = if has_geometry {
+        let source = Arc::clone(&cached.source);
+        let path = Arc::from(vec![position].into_boxed_slice());
+        let node = Node::shape_node(file, &[], slide, Kind::Shape, ordinal, source, path);
         super::build_anchor(&node, &geometry)?
     } else {
         None
     };
-    let target = node.native_shape_target().ok_or_else(|| {
-        Error::new(
-            Code::UnsupportedCapability,
-            "nested PPT group shape writes are not integrated",
-        )
-        .with_format(FileFormat::Ppt)
-    })?;
+    // direct_path admits only top-level ordinal shapes. The cache maps the
+    // kind-specific ordinal to its physical index in the native array.
+    let target = NativeTarget::new(
+        litchi_core::Position::new(slide),
+        litchi_core::Position::new(position),
+    );
     let changed = text_changed || anchor.is_some();
     Ok(Some(Plan {
+        scene: None,
         target,
         text,
         anchor,

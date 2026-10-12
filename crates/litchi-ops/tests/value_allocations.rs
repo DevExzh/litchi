@@ -591,3 +591,58 @@ fn ppt_selected_reads_add_constant_allocations_over_native_slide_reads() {
         "facade first-match overhead must not scale with unselected slides"
     );
 }
+
+#[cfg(feature = "ppt")]
+#[test]
+fn ppt_coalesced_text_planning_does_not_copy_the_existing_body() {
+    fn measure(body: &str) -> (usize, usize) {
+        let mut builder = litchi_ppt::writer::Builder::new();
+        let slide = builder.add_slide().expect("slide");
+        for text in ["warmup", body] {
+            builder
+                .add_textbox(slide, 10, 10, 240, 40, text)
+                .expect("textbox");
+        }
+        let file =
+            litchi_ops::open_bytes(builder.build().expect("package").to_bytes().expect("bytes"))
+                .expect("PPT");
+        let mut measured = (0, 0);
+        let commit = file
+            .edit(|edit| {
+                edit.set(
+                    "/slide[1]/shape[1]",
+                    litchi_ops::props! { "text" => "prepared" },
+                )?;
+                // Opening, decoding the shared scene and publishing are outside
+                // this boundary. Only admission into an existing run is measured.
+                measured = allocation_measure(|| {
+                    edit.set(
+                        "/slide[1]/shape[2]",
+                        litchi_ops::props! { "text" => "replacement" },
+                    )
+                    .expect("stage replacement");
+                });
+                Ok::<_, litchi_ops::Error>(())
+            })
+            .expect("commit");
+        assert_eq!(commit.diagnostics.operations(), 2);
+        assert_eq!(
+            commit
+                .file
+                .get("/slide[1]/shape[2]")
+                .expect("shape")
+                .view()
+                .text()
+                .expect("text")
+                .as_deref(),
+            Some("replacement")
+        );
+        measured
+    }
+    let small = measure("old");
+    let large = measure(&"old ".repeat(4096));
+    assert_eq!(
+        large, small,
+        "planning must borrow the existing native text body"
+    );
+}
