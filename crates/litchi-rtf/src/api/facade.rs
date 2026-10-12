@@ -592,12 +592,12 @@ impl Package {
 
     /// Starts a bounded preservation-first append with explicit limits.
     #[must_use]
-    pub fn edit_tail_append_with_limits(
+    pub fn edit_tail_append_with_options(
         &self,
         selector: crate::tail_append::TailSelector,
-        limits: crate::tail_append::TailAppendLimits,
+        options: crate::tail_append::EditOptions,
     ) -> crate::tail_append::Edit {
-        crate::tail_append::Edit::with_limits(self, selector, limits)
+        crate::tail_append::Edit::new_with_options(self, selector, options)
     }
 
     /// Apply an exact-source primary patch under this package's open policy.

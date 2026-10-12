@@ -16896,7 +16896,7 @@ fn rtf_logical_tail_limits(
     source_bytes: usize,
     input_bytes: usize,
     paragraph_count: usize,
-) -> Result<litchi_rtf::TailAppendLimits, Box<dyn Error>> {
+) -> Result<litchi_rtf::tail_append::SemanticLimits, Box<dyn Error>> {
     let paragraph_overhead = paragraph_count
         .checked_mul(32)
         .ok_or("RTF logical-tail paragraph bound overflows usize")?;
@@ -16911,22 +16911,25 @@ fn rtf_logical_tail_limits(
         .checked_mul(2)
         .and_then(|value| value.checked_add(4096))
         .ok_or("RTF logical-tail patch bound overflows usize")?;
-    Ok(litchi_rtf::TailAppendLimits::new(
-        paragraph_count,
-        paragraph_count,
-        input_bytes,
-        inserted_bound,
-        output_bound,
-        patch_bound,
-    ))
+    Ok(litchi_rtf::tail_append::SemanticLimits::builder()
+        .max_paragraphs(paragraph_count)?
+        .max_runs(paragraph_count)?
+        .max_input_bytes(input_bytes)?
+        .max_inserted_bytes(inserted_bound)?
+        .max_output_bytes(output_bound)?
+        .max_patch_bytes(patch_bound)?
+        .build()?)
 }
 
 fn stage_rtf_logical_tail(
     source: &litchi_rtf::Package,
     paragraphs: &[&str],
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
 ) -> Result<litchi_rtf::tail_append::Commit, Box<dyn Error>> {
-    let mut edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    let mut edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
     edit.append_text_paragraphs(paragraphs)?;
     Ok(edit.commit()?)
 }
@@ -16972,7 +16975,7 @@ fn verify_rtf_logical_tail_gates(
     changed: &litchi_rtf::tail_append::Commit,
     noop: &litchi_rtf::tail_append::Commit,
     appended: &[String],
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     expected: &[u8],
 ) -> Result<(), Box<dyn Error>> {
     if !changed.diagnostics().changed()
@@ -33436,7 +33439,10 @@ fn run_rtf_logical_tail_append(
     let limits = rtf_logical_tail_limits(corpus.archive.len(), input_bytes, appended.len())?;
     let changed = stage_rtf_logical_tail(&source, &paragraph_inputs, limits)?;
     let noop = {
-        let edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
         edit.commit()?
     };
     let expected = changed.package().to_bytes()?;
@@ -33459,7 +33465,10 @@ fn run_rtf_logical_tail_append(
                 commit.write_to(&mut sink, limits)?
             },
             Case::RtfLogicalTailNoopSave => {
-                let edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+                let edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
                 let commit = edit.commit()?;
                 commit.write_to(&mut sink, limits)?
             },
@@ -33643,14 +33652,17 @@ fn rtf_tail_publication_context_with_token(
 fn stage_rtf_tail_prepared(
     source: &litchi_rtf::Package,
     paragraphs: &[&str],
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     publication_limits: litchi_rtf::TailAppendPublicationLimits,
     plan_based: bool,
     expected_output_bytes: u64,
     inserted_bytes: u64,
 ) -> Result<(RtfTailPrepared, u64), Box<dyn Error>> {
     let started = Instant::now();
-    let mut edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    let mut edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
     edit.append_text_paragraphs(paragraphs)?;
     let prepared = if plan_based {
         let context = rtf_tail_publication_context(expected_output_bytes, inserted_bytes)?;
@@ -33665,7 +33677,7 @@ fn stage_rtf_tail_prepared(
 fn publish_rtf_tail_prepared<W: Write>(
     prepared: &RtfTailPrepared,
     sink: &mut W,
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
 ) -> Result<usize, Box<dyn Error>> {
     match prepared {
         RtfTailPrepared::Commit(commit) => Ok(commit.write_to(sink, limits)?),
@@ -33676,7 +33688,7 @@ fn publish_rtf_tail_prepared<W: Write>(
 fn digest_rtf_tail_prepared(
     prepared: &RtfTailPrepared,
     sink: &mut WindowedHashingSink,
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     output_bytes: u64,
     inserted_bytes: u64,
 ) -> Result<usize, Box<dyn Error>> {
@@ -33708,7 +33720,7 @@ fn verify_rtf_tail_publication_plan_gates(
     plan: &litchi_rtf::TailAppendPublicationPlan,
     expected: &[u8],
     expected_digest: &str,
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     publication_limits: litchi_rtf::TailAppendPublicationLimits,
     appended: &[String],
 ) -> Result<(), Box<dyn Error>> {
@@ -33812,10 +33824,13 @@ fn verify_rtf_tail_publication_plan_gates(
         return Err("RTF publication plan did not honor pre-publication cancellation".into());
     }
 
-    let mut bounded_limits = limits;
-    bounded_limits.max_output_bytes = expected.len().saturating_sub(1);
+    let bounded_limits = limits.into_builder()
+        .max_output_bytes(expected.len().saturating_sub(1))?.build()?;
     let mut bounded_edit =
-        source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, bounded_limits);
+        source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(bounded_limits),
+    );
     bounded_edit
         .append_text_paragraphs(&appended.iter().map(String::as_str).collect::<Vec<_>>())?;
     let bounded_context = rtf_tail_publication_context(
@@ -33835,7 +33850,10 @@ fn verify_rtf_tail_publication_plan_gates(
         return Err("RTF publication plan did not enforce the output limit gate".into());
     }
 
-    let mut invalid_edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    let mut invalid_edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
     invalid_edit
         .append_text_paragraphs(&appended.iter().map(String::as_str).collect::<Vec<_>>())?;
     let invalid_context = rtf_tail_publication_context(
@@ -33861,7 +33879,7 @@ fn verify_rtf_tail_publication_lifecycle(
     plan: &litchi_rtf::TailAppendPublicationPlan,
     changed_appended: &[String],
     plan_appended: &[String],
-    limits: litchi_rtf::TailAppendLimits,
+    limits: litchi_rtf::tail_append::SemanticLimits,
     publication_limits: litchi_rtf::TailAppendPublicationLimits,
     changed_expected: &[u8],
     expected: &[u8],
@@ -33936,7 +33954,10 @@ fn run_rtf_logical_tail_publication(
     );
     let changed = stage_rtf_logical_tail(&source, &changed_inputs, limits)?;
     let noop = {
-        let edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
         edit.commit()?
     };
     let expected_changed = changed.package().to_bytes()?;
@@ -33953,7 +33974,10 @@ fn run_rtf_logical_tail_publication(
         .ok_or("RTF publication output is smaller than its source")?;
 
     let correctness_plan = {
-        let mut edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let mut edit = source.edit_tail_append_with_options(
+        litchi_rtf::TailSelector::Body,
+        litchi_rtf::tail_append::EditOptions::new().semantic_limits(limits),
+    );
         edit.append_text_paragraphs(&paragraph_inputs)?;
         edit.publication_plan_with_limits(publication_limits)?
     };

@@ -10,7 +10,7 @@ use litchi_core::{
 };
 use litchi_rtf::Package;
 use litchi_rtf::tail_append::{
-    Error, PlainParagraph, PlainRun, TailAppendLimits, TailAppendOutputProgress,
+    EditOptions, Error, PlainParagraph, PlainRun, SemanticLimits, TailAppendOutputProgress,
     TailAppendPublicationError, TailAppendPublicationLimits, TailAppendSourceEdit,
     TailAppendSourceProof, TailSelector,
 };
@@ -145,8 +145,22 @@ fn context(
     )
 }
 
-fn limits() -> TailAppendLimits {
-    TailAppendLimits::new(8, 32, 128, 1024, 4096, 16 * 1024)
+fn limits() -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap()
 }
 
 fn publication_limits() -> TailAppendPublicationLimits {
@@ -170,7 +184,12 @@ fn make_plan(
         source.as_ref(),
     )
     .unwrap();
-    let mut edit = TailAppendSourceEdit::with_limits(source, proof, TailSelector::Body, limits());
+    let mut edit = TailAppendSourceEdit::new_with_options(
+        source,
+        proof,
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits()),
+    );
     edit.append_text_paragraphs(&[text]).unwrap();
     edit.publication_plan_with_limits(publication_limits())
         .unwrap()
@@ -203,7 +222,12 @@ fn source_plan_noop_preserves_exact_bytes() {
         source.as_ref(),
     )
     .unwrap();
-    let edit = TailAppendSourceEdit::with_limits(source, proof, TailSelector::Body, limits());
+    let edit = TailAppendSourceEdit::new_with_options(
+        source,
+        proof,
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits()),
+    );
     let plan = edit
         .publication_plan_with_limits(publication_limits())
         .unwrap();
@@ -226,11 +250,11 @@ fn source_proof_uses_parser_break_tokens_not_raw_suffixes() {
     )
     .unwrap();
     assert!(!escaped_proof.ends_with_par());
-    let mut escaped_edit = TailAppendSourceEdit::with_limits(
+    let mut escaped_edit = TailAppendSourceEdit::new_with_options(
         escaped_source,
         escaped_proof,
         TailSelector::Body,
-        limits(),
+        EditOptions::new().semantic_limits(limits()),
     );
     escaped_edit.append_text_paragraphs(&["C"]).unwrap();
     let escaped_plan = escaped_edit
@@ -256,8 +280,12 @@ fn source_proof_uses_parser_break_tokens_not_raw_suffixes() {
     )
     .unwrap();
     assert!(real_proof.ends_with_par());
-    let mut real_edit =
-        TailAppendSourceEdit::with_limits(real_source, real_proof, TailSelector::Body, limits());
+    let mut real_edit = TailAppendSourceEdit::new_with_options(
+        real_source,
+        real_proof,
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits()),
+    );
     real_edit.append_text_paragraphs(&["C"]).unwrap();
     let real_plan = real_edit
         .publication_plan_with_limits(publication_limits())
@@ -308,7 +336,12 @@ fn context_aware_source_planning_charges_digest_scan() {
         source.as_ref(),
     )
     .unwrap();
-    let mut edit = TailAppendSourceEdit::with_limits(source, proof, TailSelector::Body, limits());
+    let mut edit = TailAppendSourceEdit::new_with_options(
+        source,
+        proof,
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits()),
+    );
     edit.append_text_paragraphs(&["C"]).unwrap();
     let (budget, _cancel, execution) = context(4096, 4096, 4096, 4096);
     let plan = edit
@@ -330,7 +363,12 @@ fn source_publication_charges_three_passes_and_exact_window_memory() {
         source.clone().as_ref(),
     )
     .unwrap();
-    let mut edit = TailAppendSourceEdit::with_limits(source, proof, TailSelector::Body, limits());
+    let mut edit = TailAppendSourceEdit::new_with_options(
+        source,
+        proof,
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits()),
+    );
     edit.append_text_paragraphs(&["C"]).unwrap();
     let publication = TailAppendPublicationLimits::new(2, 2);
     let plan = edit.publication_plan_with_limits(publication).unwrap();
@@ -430,7 +468,12 @@ fn concurrent_source_publications_reserve_independent_windows() {
         source.clone().as_ref(),
     )
     .unwrap();
-    let mut edit = TailAppendSourceEdit::with_limits(source, proof, TailSelector::Body, limits());
+    let mut edit = TailAppendSourceEdit::new_with_options(
+        source,
+        proof,
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits()),
+    );
     edit.append_text_paragraphs(&["C"]).unwrap();
     let publication = TailAppendPublicationLimits::new(2, 2);
     let plan = Arc::new(edit.publication_plan_with_limits(publication).unwrap());
@@ -502,7 +545,12 @@ fn source_mutation_before_planning_is_refused() {
     )
     .unwrap();
     source.mutate();
-    let mut edit = TailAppendSourceEdit::with_limits(source, proof, TailSelector::Body, limits());
+    let mut edit = TailAppendSourceEdit::new_with_options(
+        source,
+        proof,
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits()),
+    );
     edit.append_text_paragraphs(&["C"]).unwrap();
     let error = edit
         .publication_plan_with_limits(publication_limits())
@@ -752,10 +800,7 @@ fn durable_source_plan_round_trips_and_forged_source_never_grants_proof() {
     assert_eq!(restored.text(), document.text());
 
     let foreign = Package::from_bytes(br#"{\rtf1\ansi Foreign}"#).unwrap();
-    assert!(matches!(
-        parsed.apply(&foreign),
-        Err(Error::PatchConflict)
-    ));
+    assert!(matches!(parsed.apply(&foreign), Err(Error::PatchConflict)));
 }
 
 #[test]
@@ -768,7 +813,12 @@ fn source_proof_is_private_capability_and_plain_staging_is_atomic() {
         source.as_ref(),
     )
     .unwrap();
-    let mut edit = TailAppendSourceEdit::with_limits(source, proof, TailSelector::Body, limits());
+    let mut edit = TailAppendSourceEdit::new_with_options(
+        source,
+        proof,
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits()),
+    );
     let invalid_runs = [PlainRun::new("bad\ntext")];
     let invalid = [PlainParagraph::new(&invalid_runs)];
     assert!(matches!(

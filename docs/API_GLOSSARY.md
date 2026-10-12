@@ -75,7 +75,9 @@ replay is `Package::apply_tail_append`, preserves recipient policy, and exposes
 `tail_append::{Edit, Commit, Patch, Diagnostics, Error, LimitKind}` and
 `Package::edit_tail_append`; old prefixed names and duplicate forwarding
 methods are removed. Transaction limit errors carry a typed dimension and
-observed/maximum counts. Checked scoped profiles, source-publication naming
+observed/maximum counts. Record 0231 replaces unchecked `TailAppendLimits`
+with checked `tail_append::SemanticLimits` and `EditOptions` for retained and
+source-backed edits. Publication-window policies, source-publication naming
 and redaction vocabulary remain pending.
 
 ## 3. Open, create, save

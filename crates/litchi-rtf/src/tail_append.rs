@@ -6,6 +6,9 @@
 //! whose inserted bytes are placed immediately before the exact root closing
 //! group.  The source is never normalized or mutated.
 
+mod limits;
+pub use limits::{EditOptions, SemanticLimits, SemanticLimitsBuilder};
+
 use crate::{Package, RtfError};
 use litchi_core::{
     ExecutionContext, ExecutionError, ReadAt, Reservation, Resource, SourceVersion, patch::BlobId,
@@ -99,58 +102,6 @@ impl<'a> PlainParagraph<'a> {
     #[must_use]
     pub const fn runs(self) -> &'a [PlainRun<'a>] {
         self.runs
-    }
-}
-
-/// Finite bounds for one logical-tail transaction.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TailAppendLimits {
-    /// Maximum paragraphs in one append operation.
-    pub max_paragraphs: usize,
-    /// Maximum plain runs in one append operation.
-    pub max_runs: usize,
-    /// Maximum UTF-8 source bytes copied from submitted runs.
-    pub max_input_bytes: usize,
-    /// Maximum encoded bytes inserted before the root close.
-    pub max_inserted_bytes: usize,
-    /// Maximum output bytes accepted by [`Commit::write_to`].
-    pub max_output_bytes: usize,
-    /// Maximum durable JSON envelope bytes.
-    pub max_patch_bytes: usize,
-}
-
-impl TailAppendLimits {
-    /// Creates explicit finite limits.
-    #[must_use]
-    pub const fn new(
-        max_paragraphs: usize,
-        max_runs: usize,
-        max_input_bytes: usize,
-        max_inserted_bytes: usize,
-        max_output_bytes: usize,
-        max_patch_bytes: usize,
-    ) -> Self {
-        Self {
-            max_paragraphs,
-            max_runs,
-            max_input_bytes,
-            max_inserted_bytes,
-            max_output_bytes,
-            max_patch_bytes,
-        }
-    }
-}
-
-impl Default for TailAppendLimits {
-    fn default() -> Self {
-        Self::new(
-            256,
-            4_096,
-            256 * 1024,
-            512 * 1024,
-            64 * 1024 * 1024,
-            2 * 1024 * 1024,
-        )
     }
 }
 
@@ -508,6 +459,12 @@ pub enum Error {
     EmptyInput,
     /// A transaction already owns one staged bounded batch.
     AlreadyStaged,
+    /// A configured bound exceeds the supported addressable maximum.
+    InvalidLimit {
+        kind: LimitKind,
+        value: usize,
+        maximum: usize,
+    },
     /// A finite owner count was exceeded.
     Limit {
         kind: LimitKind,
@@ -553,6 +510,9 @@ impl fmt::Display for Error {
             Self::AlreadyStaged => {
                 formatter.write_str("RTF logical-tail edit already has a staged batch")
             }
+            Self::InvalidLimit { kind, value, maximum } => write!(
+                formatter, "invalid RTF tail {kind:?} limit: {value}, maximum {maximum}"
+            ),
             Self::Limit { kind, observed, maximum } => write!(
                 formatter,
                 "RTF logical-tail {kind:?} limit exceeded: observed {observed}, maximum {maximum}"
@@ -614,7 +574,7 @@ struct OwnedParagraph {
 pub struct Edit {
     source: Package,
     selector: TailSelector,
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
     paragraphs: Vec<OwnedParagraph>,
     run_count: usize,
     input_bytes: usize,
@@ -627,7 +587,7 @@ impl Edit {
         Self {
             source: source.clone(),
             selector,
-            limits: TailAppendLimits::default(),
+            limits: SemanticLimits::default(),
             paragraphs: Vec::new(),
             run_count: 0,
             input_bytes: 0,
@@ -636,10 +596,16 @@ impl Edit {
 
     /// Starts a transaction with explicit append and wire bounds.
     #[must_use]
-    pub fn with_limits(source: &Package, selector: TailSelector, limits: TailAppendLimits) -> Self {
+    pub fn new_with_options(source: &Package, selector: TailSelector, options: EditOptions) -> Self {
         let mut edit = Self::new(source, selector);
-        edit.limits = limits;
+        edit.limits = options.semantic_limits_value();
         edit
+    }
+
+    /// The policy admitted for this edit.
+    #[must_use]
+    pub fn options(&self) -> EditOptions {
+        EditOptions::new().semantic_limits(self.limits)
     }
 
     /// Immutable snapshot against which selectors and source bytes resolve.
@@ -789,7 +755,7 @@ impl Edit {
     /// Converts this staged transaction into a publication-only plan with an
     /// explicit hard source/write window.
     ///
-    /// This constructor uses the transaction's finite [`TailAppendLimits`]
+    /// This constructor uses the transaction's finite [`SemanticLimits`]
     /// as its allocation boundary.  Call
     /// [`Self::publication_plan_with_limits_and_context`] when planning must
     /// also reserve execution-budget memory before the encoded insertion is
@@ -1110,7 +1076,7 @@ impl Edit {
 pub struct TailAppendPublicationPlan {
     source: Package,
     selector: TailSelector,
-    append_limits: TailAppendLimits,
+    append_limits: SemanticLimits,
     publication_limits: TailAppendPublicationLimits,
     root_close: usize,
     inserted: Box<[u8]>,
@@ -1757,7 +1723,7 @@ pub struct TailAppendSourceEdit {
     source: Arc<dyn ReadAt>,
     proof: TailAppendSourceProof,
     selector: TailSelector,
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
     paragraphs: Vec<OwnedParagraph>,
     run_count: usize,
     input_bytes: usize,
@@ -1789,7 +1755,7 @@ impl TailAppendSourceEdit {
             source,
             proof,
             selector,
-            limits: TailAppendLimits::default(),
+            limits: SemanticLimits::default(),
             paragraphs: Vec::new(),
             run_count: 0,
             input_bytes: 0,
@@ -1798,15 +1764,21 @@ impl TailAppendSourceEdit {
 
     /// Starts a source-backed append with explicit finite append bounds.
     #[must_use]
-    pub fn with_limits(
+    pub fn new_with_options(
         source: Arc<dyn ReadAt>,
         proof: TailAppendSourceProof,
         selector: TailSelector,
-        limits: TailAppendLimits,
+        options: EditOptions,
     ) -> Self {
         let mut edit = Self::new(source, proof, selector);
-        edit.limits = limits;
+        edit.limits = options.semantic_limits_value();
         edit
+    }
+
+    /// The policy admitted for this edit.
+    #[must_use]
+    pub fn options(&self) -> EditOptions {
+        EditOptions::new().semantic_limits(self.limits)
     }
 
     /// Returns the retained positional source handle.
@@ -2210,7 +2182,7 @@ pub struct TailAppendSourcePublicationPlan {
     source: Arc<dyn ReadAt>,
     proof: TailAppendSourceProof,
     selector: TailSelector,
-    append_limits: TailAppendLimits,
+    append_limits: SemanticLimits,
     publication_limits: TailAppendPublicationLimits,
     root_close: usize,
     inserted: Box<[u8]>,
@@ -3039,7 +3011,7 @@ impl TailAppendSourcePublicationPlan {
 
 fn preflight_plain_paragraphs(
     paragraphs: &[PlainParagraph<'_>],
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
 ) -> Result<(usize, usize, usize), Error> {
     let observed_paragraphs = paragraphs.len();
     if observed_paragraphs > limits.max_paragraphs {
@@ -3089,7 +3061,7 @@ fn preflight_plain_paragraphs(
 
 fn preflight_plain_text_paragraphs(
     paragraphs: &[&str],
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
 ) -> Result<(), Error> {
     let observed_paragraphs = paragraphs.len();
     if observed_paragraphs > limits.max_paragraphs {
@@ -3130,7 +3102,7 @@ fn preflight_plain_text_paragraphs(
 
 fn stage_plain_paragraphs(
     paragraphs: &[PlainParagraph<'_>],
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
 ) -> Result<(Vec<OwnedParagraph>, usize, usize), Error> {
     let (observed_paragraphs, observed_runs, observed_input_bytes) =
         preflight_plain_paragraphs(paragraphs, limits)?;
@@ -3689,7 +3661,7 @@ impl Commit {
     pub fn write_to<W: Write>(
         &self,
         sink: &mut W,
-        limits: TailAppendLimits,
+        limits: SemanticLimits,
     ) -> Result<usize, Error> {
         let bytes = self
             .snapshot
@@ -3786,7 +3758,7 @@ impl Patch {
     /// Converts this patch to a deterministic bounded JSON envelope.
     pub fn to_durable(
         &self,
-        limits: TailAppendLimits,
+        limits: SemanticLimits,
     ) -> Result<DurableTailAppendPatch, Error> {
         let before = self
             .before
@@ -3838,7 +3810,7 @@ pub struct DurableTailAppendPatch {
     after_bytes: usize,
     root_close: usize,
     inserted: Box<[u8]>,
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
 }
 
 impl DurableTailAppendPatch {
@@ -3905,7 +3877,7 @@ impl DurableTailAppendPatch {
     /// Parses a canonical deterministic JSON envelope under explicit bounds.
     pub fn from_deterministic_json(
         bytes: &[u8],
-        limits: TailAppendLimits,
+        limits: SemanticLimits,
     ) -> Result<Self, Error> {
         if bytes.len() > limits.max_patch_bytes {
             return Err(Error::Limit {
@@ -4209,7 +4181,7 @@ fn validate_wire_bounds(
     after_bytes: usize,
     root_close: usize,
     inserted_len: usize,
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
 ) -> Result<(), Error> {
     if inserted_len > limits.max_inserted_bytes {
         return Err(Error::Limit {
@@ -4304,7 +4276,7 @@ fn validate_artifact_splice(
     after_bytes: usize,
     root_close: usize,
     inserted: &[u8],
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
 ) -> Result<(), Error> {
     validate_wire_bounds(
         direction,

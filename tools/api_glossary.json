@@ -3030,13 +3030,13 @@
         {
           "name": "tail_append",
           "scope": "litchi_rtf::read::Package",
-          "replacement": "use edit_tail_append or edit_tail_append_with_limits",
+          "replacement": "use edit_tail_append or edit_tail_append_with_options",
           "recursive": false
         },
         {
           "name": "tail_append_with_limits",
           "scope": "litchi_rtf::read::Package",
-          "replacement": "use edit_tail_append or edit_tail_append_with_limits",
+          "replacement": "use edit_tail_append or edit_tail_append_with_options",
           "recursive": false
         },
         {
@@ -3115,6 +3115,42 @@
           "name": "plan_publication_with_limits_and_context",
           "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
           "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendLimits",
+          "scope": "litchi_rtf",
+          "replacement": "use checked tail_append::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendLimits",
+          "scope": "litchi_rtf::tail_append",
+          "replacement": "use checked tail_append::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "edit_tail_append_with_limits",
+          "scope": "litchi_rtf::read::Package",
+          "replacement": "use checked SemanticLimits and EditOptions",
+          "recursive": false
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_rtf::tail_append::Edit",
+          "replacement": "use checked SemanticLimits and EditOptions",
+          "recursive": false
+        },
+        {
+          "name": "with_limits",
+          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
+          "replacement": "use checked SemanticLimits and EditOptions",
+          "recursive": false
+        },
+        {
+          "name": "new",
+          "scope": "litchi_rtf::tail_append::SemanticLimits",
+          "replacement": "use checked SemanticLimits and EditOptions",
           "recursive": false
         }
       ],

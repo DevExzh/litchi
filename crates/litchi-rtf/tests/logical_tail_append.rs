@@ -9,16 +9,30 @@ use litchi_core::{
     Limits as CoreLimits, Resource,
 };
 use litchi_rtf::tail_append::{
-    DurableTailAppendPatch, Error, LimitKind, PlainParagraph, PlainRun, TailAppendLimits,
-    TailAppendOutputProgress, TailAppendPublicationError, TailAppendPublicationLimits,
-    TailSelector,
+    DurableTailAppendPatch, EditOptions, Error, LimitKind, PlainParagraph, PlainRun,
+    SemanticLimits, TailAppendOutputProgress, TailAppendPublicationError,
+    TailAppendPublicationLimits, TailSelector,
 };
 use litchi_rtf::{OpenOptions, Package, ProtectionType, SourceLimits};
 use std::io::{self, Write};
 use std::num::{NonZeroU64, NonZeroUsize};
 
-fn patch_limits() -> TailAppendLimits {
-    TailAppendLimits::new(8, 32, 128, 1024, 4096, 16 * 1024)
+fn patch_limits() -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap()
 }
 
 fn retained_bytes(document: &Package) -> Vec<u8> {
@@ -125,10 +139,13 @@ impl Write for PublicationSink {
 fn changed_publication_plan(
     source: &Package,
     text: &str,
-    limits: TailAppendLimits,
+    limits: SemanticLimits,
     publication_limits: TailAppendPublicationLimits,
 ) -> litchi_rtf::tail_append::TailAppendPublicationPlan {
-    let mut edit = source.edit_tail_append_with_limits(TailSelector::Body, limits);
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits),
+    );
     edit.append_text_paragraphs(&[text]).unwrap();
     edit.publication_plan_with_limits(publication_limits)
         .unwrap()
@@ -228,7 +245,10 @@ fn appends_plain_paragraphs_before_the_exact_root_close() {
     let second = [PlainRun::new("F{G}\\H\tI")];
     let paragraphs = [PlainParagraph::new(&first), PlainParagraph::new(&second)];
 
-    let mut edit = source.edit_tail_append_with_limits(TailSelector::Body, patch_limits());
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(patch_limits()),
+    );
     edit.append_paragraphs(&paragraphs).unwrap();
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
@@ -348,7 +368,21 @@ fn durable_wire_rejects_noncanonical_digests_forged_noops_and_bounds() {
         Err(Error::DurablePatch(_))
     ));
 
-    let tiny_output = TailAppendLimits::new(8, 32, 128, 1024, 1, 16 * 1024);
+    let tiny_output = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(1)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(&encoded, tiny_output),
         Err(Error::Limit {
@@ -357,7 +391,21 @@ fn durable_wire_rejects_noncanonical_digests_forged_noops_and_bounds() {
         })
     ));
 
-    let too_small_patch = TailAppendLimits::new(8, 32, 128, 1024, 4096, encoded.len() - 1);
+    let too_small_patch = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(encoded.len() - 1)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
         patch.to_durable(too_small_patch),
         Err(Error::Limit {
@@ -379,14 +427,21 @@ fn durable_remove_checks_output_bound_before_publish_and_noop_proof() {
         .unwrap()
         .to_deterministic_json()
         .unwrap();
-    let low_output = TailAppendLimits::new(
-        8,
-        32,
-        128,
-        1024,
-        retained_bytes(&source).len() - 1,
-        16 * 1024,
-    );
+    let low_output = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(retained_bytes(&source).len() - 1)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(&encoded, low_output),
         Err(Error::Limit {
@@ -446,8 +501,25 @@ fn durable_append_checks_source_limit_before_reserve() {
 #[test]
 fn staging_and_commit_limits_fail_atomically() {
     let source = Package::parse(r"{\rtf1\ansi A}").unwrap();
-    let limits = TailAppendLimits::new(1, 1, 2, 4, 128, 256);
-    let mut edit = source.edit_tail_append_with_limits(TailSelector::Body, limits);
+    let limits = SemanticLimits::builder()
+        .max_paragraphs(1)
+        .unwrap()
+        .max_runs(1)
+        .unwrap()
+        .max_input_bytes(2)
+        .unwrap()
+        .max_inserted_bytes(4)
+        .unwrap()
+        .max_output_bytes(128)
+        .unwrap()
+        .max_patch_bytes(256)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(limits),
+    );
     let runs = [PlainRun::new("a"), PlainRun::new("b")];
     let paragraphs = [PlainParagraph::new(&runs)];
     assert!(matches!(
@@ -539,7 +611,21 @@ fn malformed_durable_envelopes_and_plain_text_controls_refuse() {
         DurableTailAppendPatch::from_deterministic_json(b"{}", patch_limits()),
         Err(Error::DurablePatch(_))
     ));
-    let limits = TailAppendLimits::new(8, 32, 128, 1024, 4096, 4);
+    let limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(4096)
+        .unwrap()
+        .max_patch_bytes(4)
+        .unwrap()
+        .build()
+        .unwrap();
     assert!(matches!(
         DurableTailAppendPatch::from_deterministic_json(br#"{"x":1}"#, limits),
         Err(Error::Limit {
@@ -597,7 +683,10 @@ fn publication_plan_emits_exact_reopenable_bytes_with_hard_windows() {
     let publication_limits = TailAppendPublicationLimits::new(5, 3);
     let plan = changed_publication_plan(&source, "C{D}\\E", patch_limits(), publication_limits);
 
-    let mut semantic_edit = source.edit_tail_append_with_limits(TailSelector::Body, patch_limits());
+    let mut semantic_edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(patch_limits()),
+    );
     semantic_edit.append_text_paragraphs(&["C{D}\\E"]).unwrap();
     let semantic_commit = semantic_edit.commit().unwrap();
     let mut expected = Vec::new();
@@ -893,7 +982,21 @@ fn publication_plan_enforces_exact_and_over_output_bounds() {
         TailAppendPublicationLimits::new(8, 4),
     );
     let exact_output = broad.output_bytes();
-    let exact_limits = TailAppendLimits::new(8, 32, 128, 1024, exact_output, 16 * 1024);
+    let exact_limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(exact_output)
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
     let exact = changed_publication_plan(
         &source,
         "B",
@@ -912,9 +1015,25 @@ fn publication_plan_enforces_exact_and_over_output_bounds() {
         exact_output
     );
 
-    let over_limits =
-        TailAppendLimits::new(8, 32, 128, 1024, exact_output.saturating_sub(1), 16 * 1024);
-    let mut edit = source.edit_tail_append_with_limits(TailSelector::Body, over_limits);
+    let over_limits = SemanticLimits::builder()
+        .max_paragraphs(8)
+        .unwrap()
+        .max_runs(32)
+        .unwrap()
+        .max_input_bytes(128)
+        .unwrap()
+        .max_inserted_bytes(1024)
+        .unwrap()
+        .max_output_bytes(exact_output.saturating_sub(1))
+        .unwrap()
+        .max_patch_bytes(16 * 1024)
+        .unwrap()
+        .build()
+        .unwrap();
+    let mut edit = source.edit_tail_append_with_options(
+        TailSelector::Body,
+        EditOptions::new().semantic_limits(over_limits),
+    );
     edit.append_text_paragraphs(&["B"]).unwrap();
     assert!(matches!(
         edit.publication_plan_with_limits(TailAppendPublicationLimits::new(8, 4)),
@@ -958,7 +1077,10 @@ fn native_replay_preserves_recipient_policy_and_noop_identity() {
             .unwrap(),
     );
     let recipient = Package::from_bytes_with_options(bytes, options).unwrap();
-    let noop = source.edit_tail_append(TailSelector::Body).commit().unwrap();
+    let noop = source
+        .edit_tail_append(TailSelector::Body)
+        .commit()
+        .unwrap();
     assert!(noop.patch().is_noop());
     assert!(
         recipient
@@ -972,7 +1094,10 @@ fn native_replay_preserves_recipient_policy_and_noop_identity() {
     assert!(!commit.patch().is_noop());
     assert!(matches!(
         recipient.apply_tail_append(commit.patch()),
-        Err(Error::Rtf(litchi_rtf::RtfError::Limit { kind: litchi_rtf::SourceLimitKind::InputBytes, .. }))
+        Err(Error::Rtf(litchi_rtf::RtfError::Limit {
+            kind: litchi_rtf::SourceLimitKind::InputBytes,
+            ..
+        }))
     ));
     assert_eq!(recipient.open_options(), options);
     assert_eq!(recipient.to_bytes().unwrap(), bytes);
