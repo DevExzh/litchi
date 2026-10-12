@@ -6994,18 +6994,11 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
             "run-format editing refuses inline line breaks",
         ));
     }
-    // The model's compact span cache intentionally excludes nested root
-    // groups, since the older uniform-body writer cannot preserve them. A
-    // run splice can preserve such groups byte-for-byte, so locate the body
-    // with the nested-group-capable scanner when the cache is absent.
-    let body_span = match source.model().ordinary_body_source_span() {
-        Some(span) if span.start <= span.end && span.end <= source_bytes.len() => span,
-        Some(_) | None => ordinary_run_body_source_span(
-            source_bytes,
-            source.text(),
-            source.options(),
-        )?,
-    };
+    // The model's compact span cache starts at the first literal token. It
+    // cannot cover a leading Unicode control or a grouped run, so always use
+    // the destination-aware scanner here; it keeps root defaults in scope and
+    // skips header/opaque groups while retaining every body source byte.
+    let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
     if body_span.start > body_span.end || body_span.end > source_bytes.len() {
         return Err(Error::UnsupportedSource(
             "ordinary run source span is malformed",
