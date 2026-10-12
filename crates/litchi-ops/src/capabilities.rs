@@ -1255,7 +1255,7 @@ static RTF_WRITE_GAPS: [GapSpec; 9] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF rich run preservation",
-        reason: "changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported",
+        reason: "changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported; opaque body syntax is preserved when outside changed source spans with projectable UTF-8 anchors",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -1315,7 +1315,7 @@ static RTF_WRITE_GAPS: [GapSpec; 9] = [
         },
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF rich run preservation",
-        reason: "run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and unprojectable opaque body anchors remain unsupported",
+        reason: "run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and opaque syntax overlapping changed source spans remain unsupported; opaque boundary anchors are projected through text edits",
     },
     GapSpec {
         subject: Subject::Operation {

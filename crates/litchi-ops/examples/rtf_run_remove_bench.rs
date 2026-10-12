@@ -10,11 +10,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     use std::hint::black_box;
     use std::time::Instant;
 
+    let opaque = std::env::var_os("LITCHI_RTF_BENCH_OPAQUE").is_some();
     let mut cases = Vec::new();
     for shape in ["paragraphs", "dense_runs"] {
         for count in [1usize, 10, 100, 1_000, 10_000] {
             let texts: Vec<_> = (0..count)
-                .map(|i| format!(r"{{\b0 plain{i:05}}}{{\i italic{i:05}}}{{\b0 tail{i:05}}}"))
+                .map(|i| {
+                    let anchor = if opaque {
+                        format!(r"{{\*\vendor anchor{i:05}}}")
+                    } else {
+                        String::new()
+                    };
+                    format!(r"{{\b0 plain{i:05}}}{{\i italic{i:05}}}{anchor}{{\b0 tail{i:05}}}")
+                })
                 .collect();
             let bytes = format!(
                 r"{{\rtf1\ansi {}}}",
@@ -119,6 +127,21 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                                 assert_eq!(format.underline(), litchi_rtf::text::Underline::None);
                             }
                         }
+                        if opaque {
+                            let nodes: Vec<_> = reopened.opaque().iter().collect();
+                            assert_eq!(nodes.len(), count);
+                            let mut offset = 0;
+                            for (unit, node) in nodes.iter().enumerate() {
+                                let middle_len = if all || unit == count - 1 { 0 } else { 11 };
+                                offset += 10 + middle_len;
+                                assert_eq!(node.anchor(), litchi_rtf::opaque::Anchor::Body(offset));
+                                assert_eq!(
+                                    node.source(),
+                                    format!(r"{{\*\vendor anchor{unit:05}}}").as_bytes()
+                                );
+                                offset += 9 + usize::from(shape == "paragraphs");
+                            }
+                        }
                         if round >= 2 {
                             if route {
                                 unified_ns.push(elapsed);
@@ -149,7 +172,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         serde_json::to_string_pretty(&serde_json::json!({
             "schema":"rtf_run_remove_benchmark.v1","rounds":9,"warmup_rounds":2,"order":"ABBA",
             "timing":"warmed immutable owners; native updates and facade selectors prepared outside timing; staging and commit timed; serialization, readback and output drop excluded",
-            "cases":cases
+            "opaque_body_anchors":opaque,"cases":cases
         }))?
     );
     Ok(())

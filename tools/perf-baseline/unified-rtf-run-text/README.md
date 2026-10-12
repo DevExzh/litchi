@@ -14,3 +14,8 @@ Run three CPU-pinned trials and retain raw samples, compiler/CPU, source
 commit/tree, binary size/SHA-256 and regeneration commands. Never commit binaries.
 Unicode correctness is covered separately by integration tests. This does not
 qualify repeated-command coalescing, allocation counts or all source closures.
+
+Set `LITCHI_RTF_BENCH_OPAQUE=1` to insert an unknown destination after every
+middle run. This variant also checks every retained opaque byte span and its
+independently calculated body anchor outside timing. It covers up to 10,000
+opaque anchors and edits in the same publication.

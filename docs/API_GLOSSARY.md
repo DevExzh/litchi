@@ -1477,3 +1477,11 @@ public native transaction family is introduced. Removing all runs preserves
 paragraphs; paragraph removal remains a distinct structural action. The shared
 facade admission pass now charges source text retained by both run replacement
 and removal before native staging, with native patch weight governing history.
+
+### RTF opaque run-edit anchors (0245)
+
+The existing native run transaction now projects retained opaque body anchors
+through text replacements and removals using semantic UTF-8 byte positions.
+The emitted terminal paragraph delimiter participates in projection. No public
+transaction alias or facade-specific rewrite API is introduced; exact source
+bytes, candidate validation and source-bound inverse history remain native-owned.

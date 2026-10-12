@@ -387,3 +387,79 @@ fn exact_noops_bypass_changed_source_closure_after_target_validation() {
         );
     }
 }
+
+#[test]
+fn run_text_fanout_projects_opaque_anchors_and_preserves_exact_history() {
+    let input = br"{\rtf1{\*\vendor before}{\i First}{\*\vendor middle}{\b Second}{\*\vendor after}\par Tail{\*\vendor tail}}";
+    for replacement in ["x", "expanded text", "é雪", ""] {
+        let source = open_bytes(input).unwrap();
+        let commit = source
+            .edit(|edit| {
+                edit.set(
+                    query("r[italic=true], r[bold=true]"),
+                    props! {"text"=>replacement},
+                )
+            })
+            .unwrap();
+        let bytes = commit.file.to_bytes().unwrap();
+        let reopened = open_bytes(bytes.as_slice()).unwrap();
+        assert_eq!(text(&reopened, "/body/p[1]"), replacement.repeat(2));
+        assert_eq!(text(&reopened, "/body/p[2]"), "Tail");
+        let native = litchi_rtf::Package::from_bytes(&bytes).unwrap();
+        let original = litchi_rtf::Package::from_bytes(input).unwrap();
+        assert_eq!(
+            native
+                .opaque()
+                .iter()
+                .map(|node| node.source())
+                .collect::<Vec<_>>(),
+            original
+                .opaque()
+                .iter()
+                .map(|node| node.source())
+                .collect::<Vec<_>>()
+        );
+        assert_eq!(
+            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+            bytes
+        );
+        assert_eq!(
+            commit
+                .patch
+                .inverse()
+                .apply(&commit.file)
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            input
+        );
+        assert_eq!(source.to_bytes().unwrap(), input);
+    }
+}
+
+#[test]
+fn opaque_prefix_anchors_stay_fixed_when_later_run_changes() {
+    let input = br"{\rtf1{\*\vendor zero}Prefix{\i Target}{\*\vendor end}\par{\*\vendor next}Tail}";
+    let source = open_bytes(input).unwrap();
+    let changed = source
+        .set("/body/p[1]/r[2]", props! {"text"=>"é雪"})
+        .unwrap();
+    let bytes = changed.to_bytes().unwrap();
+    let native = litchi_rtf::Package::from_bytes(&bytes).unwrap();
+    let anchors = native
+        .opaque()
+        .iter()
+        .map(|node| node.anchor())
+        .collect::<Vec<_>>();
+    assert_eq!(
+        anchors,
+        [
+            litchi_rtf::opaque::Anchor::Body(0),
+            litchi_rtf::opaque::Anchor::Body(11),
+            litchi_rtf::opaque::Anchor::Body(12),
+        ]
+    );
+    assert_eq!(text(&changed, "/body/p[1]"), "Prefixé雪");
+    assert_eq!(text(&changed, "/body/p[2]"), "Tail");
+    assert_eq!(source.to_bytes().unwrap(), input);
+}

@@ -10682,9 +10682,7 @@ fn ordinary_run_text_spans(
         }
     }
     if requested.windows(2).any(|pair| {
-        let left = pair[0];
-        let right = pair[1];
-        (right.0, right.1) <= (left.0, left.1)
+        matches!(pair, [left, right] if (right.0, right.1) <= (left.0, left.1))
     }) {
         return Err(Error::UnsupportedSource(
             "run-text operations are not source ordered",
@@ -11033,6 +11031,9 @@ fn validate_opaque_preservation(
         return Err(Error::UnsupportedSource(
             "body-anchored opaque syntax changed during publication",
         ));
+    }
+    if source_nodes.is_empty() {
+        return Ok(());
     }
     let position_changes = base_position_changes(Some(source), operations)?;
     for (source_node, target_node) in source_nodes.iter().zip(&target_nodes) {

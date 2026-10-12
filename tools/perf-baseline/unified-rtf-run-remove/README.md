@@ -13,3 +13,8 @@ binary size/SHA-256 metadata; never commit the benchmark executable.
 
 The matrix measures selector fan-out, not repeated-command coalescing,
 allocation counts, or every admitted source shape.
+
+Set `LITCHI_RTF_BENCH_OPAQUE=1` to insert an unknown destination after every
+middle run. This variant also checks every retained opaque byte span and its
+independently calculated body anchor outside timing. It covers up to 10,000
+opaque anchors and edits in the same publication.

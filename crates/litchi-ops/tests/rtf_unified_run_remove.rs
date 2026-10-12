@@ -350,24 +350,42 @@ fn run_removal_advertises_native_source_gap_and_preserves_atomic_save_origin() {
 }
 
 #[test]
-fn opaque_bytes_are_preserved_when_anchored_before_removed_text_and_shifts_refuse() {
-    let input = br"{\rtf1{\*\vendor opaque}Text}";
-    let source = open_bytes(input).unwrap();
-    let changed = source.remove("/body/p[1]/r[1]").unwrap();
-    assert_eq!(changed.query("p").unwrap().count(), 1);
-    assert_eq!(changed.query("r").unwrap().count(), 0);
-    assert!(
-        changed
-            .to_bytes()
-            .unwrap()
-            .windows(b"{\\*\\vendor opaque}".len())
-            .any(|window| window == b"{\\*\\vendor opaque}")
-    );
-    assert_eq!(source.to_bytes().unwrap(), input);
-    let input = br"{\rtf1 Text{\*\vendor opaque}}";
-    let source = open_bytes(input).unwrap();
-    let error = source.remove("/body/p[1]/r[1]").unwrap_err();
-    assert_eq!(error.code(), Code::UnsupportedCapability);
-    assert!(matches!(error.leaf(), Source::RtfEdit(_)));
-    assert_eq!(source.to_bytes().unwrap(), input);
+fn opaque_bytes_and_shifted_anchors_survive_run_removal() {
+    for input in [
+        br"{\rtf1{\*\vendor opaque}Text}".as_slice(),
+        br"{\rtf1 Text{\*\vendor opaque}}".as_slice(),
+        br"{\rtf1{\*\vendor before}{\i One}{\*\vendor between}{\b Two}{\*\vendor after}}"
+            .as_slice(),
+    ] {
+        let source = open_bytes(input).unwrap();
+        let commit = source.edit(|edit| edit.remove(query("r"))).unwrap();
+        assert_eq!(commit.file.query("p").unwrap().count(), 1);
+        assert_eq!(commit.file.query("r").unwrap().count(), 0);
+        let bytes = commit.file.to_bytes().unwrap();
+        let native_source = litchi_rtf::Package::from_bytes(input).unwrap();
+        let native_target = litchi_rtf::Package::from_bytes(&bytes).unwrap();
+        let opaque = |package: &litchi_rtf::Package| {
+            package
+                .opaque()
+                .iter()
+                .map(|node| node.source().to_vec())
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(opaque(&native_source), opaque(&native_target));
+        assert_eq!(
+            commit.patch.apply(&source).unwrap().to_bytes().unwrap(),
+            bytes
+        );
+        assert_eq!(
+            commit
+                .patch
+                .inverse()
+                .apply(&commit.file)
+                .unwrap()
+                .to_bytes()
+                .unwrap(),
+            input
+        );
+        assert_eq!(source.to_bytes().unwrap(), input);
+    }
 }
