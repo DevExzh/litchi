@@ -10,7 +10,7 @@ use litchi_rtf::edit::{Error, History, HistoryLimits, RunFormatPatch, RunFormatU
 
 const SOURCE: &[u8] = br"{\rtf1\ansi One\par Two}";
 
-const MIXED_SOURCE: &[u8] = br"{\rtf1\ansi{\fonttbl{\f0\fnil Example Sans;}}{\colortbl;\red255\green0\blue0;}{\info{\title Keep title}}{\header Keep header}\f0\cf1\i\fs24\uldb\strike\dstrike\vanish\caps\scaps\outl\up6\expndtw24\charscalex150\kerning28 Plain{\b Bold}\par Tail}";
+const MIXED_SOURCE: &[u8] = br"{\rtf1\ansi{\fonttbl{\f0\fnil Example Sans;}}{\colortbl;\red255\green0\blue0;}{\info{\title Keep title}}{\header Keep header}\f0\cf1\i\fs24\uldb\strike\striked\vanish\caps\scaps\outl\up6\expndtw24\charscalex150\kerning28 Plain{\b Bold}\par Tail}";
 
 fn bold_patch(value: bool) -> RunFormatPatch {
     RunFormatPatch::new().with_bold(value)
@@ -134,7 +134,7 @@ fn native_run_format_omitted_facets_preserve_mixed_run_properties() {
     assert!(before.double_strike());
     assert_eq!(
         before.baseline(),
-        litchi_rtf::CharacterBaseline::Superscript
+        litchi_rtf::CharacterBaseline::RaisedHalfPoints(6)
     );
     assert_eq!(before.horizontal_scale_percent(), 150);
     assert_eq!(before.kerning_half_points(), 28);

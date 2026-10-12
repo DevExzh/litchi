@@ -1442,3 +1442,17 @@ read-only local text, font, size, character flags, foreground color, and each
 native underline variant as a distinct token. Run properties and the run
 element support `get` and `query`; `set`, `add`, `remove`, `move`, and `swap`
 remain explicit capability gaps until the native atomic run editor exists.
+
+## RTF run character transactions (0242)
+
+`edit::RunFormatPatch` carries omitted or explicit local character facets;
+`RunFormatUpdate` pairs it with typed source paragraph/run `Position` selectors.
+`Edit::patch_body_run_formats` admits one ordered batch atomically, and
+`patch_run_format` is the single-target entry point. Compound facets share one
+native operation per run. These operations use the canonical primary
+`Edit`/`Commit`/`Patch` lifecycle and immutable `Package` endpoints.
+
+The unified run registry now marks the ten integrated character properties as
+settable. Run text, font/color resource edits and structural run verbs retain
+explicit gaps. No facade-owned parallel run model or property-by-property
+publication is introduced.

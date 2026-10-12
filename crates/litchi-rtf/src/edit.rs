@@ -399,9 +399,7 @@ impl RunFormatPatch {
             underline: requested.underline.map(|_| formatting.underline),
             size: requested.size.map(|_| formatting.font_size),
             strike: requested.strike.map(|_| formatting.strike),
-            double_strike: requested
-                .double_strike
-                .map(|_| formatting.double_strike),
+            double_strike: requested.double_strike.map(|_| formatting.double_strike),
             hidden: requested.hidden.map(|_| formatting.hidden),
             all_caps: requested.all_caps.map(|_| formatting.all_caps),
             small_caps: requested.small_caps.map(|_| formatting.smallcaps),
@@ -412,7 +410,9 @@ impl RunFormatPatch {
     fn changed_from(before: Self, after: Self) -> Self {
         Self {
             bold: (before.bold != after.bold).then_some(after.bold).flatten(),
-            italic: (before.italic != after.italic).then_some(after.italic).flatten(),
+            italic: (before.italic != after.italic)
+                .then_some(after.italic)
+                .flatten(),
             underline: (before.underline != after.underline)
                 .then_some(after.underline)
                 .flatten(),
@@ -1617,9 +1617,9 @@ impl Operation {
             Self::ParagraphLayout {
                 position, fields, ..
             } => layout_effect_keys(*position, *fields),
-            Self::RunFormat {
-                paragraph, run, ..
-            } => vec![format!("body:paragraph:{paragraph}:run:{run}:format")],
+            Self::RunFormat { paragraph, run, .. } => {
+                vec![format!("body:paragraph:{paragraph}:run:{run}:format")]
+            },
             Self::Bold { span, .. } => {
                 vec![format!("body:character:{}-{}:bold", span.start, span.end)]
             },
@@ -3531,12 +3531,7 @@ impl Edit {
                 });
             }
         }
-        if let Some(Operation::RunFormat {
-            paragraph,
-            run,
-            ..
-        }) = self.operations.last()
-        {
+        if let Some(Operation::RunFormat { paragraph, run, .. }) = self.operations.last() {
             let first = updates
                 .first()
                 .map(|update| (update.paragraph.get(), update.run.get()))
@@ -5278,9 +5273,7 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
         };
         while source_runs
             .get(source_run_index)
-            .is_some_and(|candidate| {
-                (candidate.paragraph, candidate.run) < (*paragraph, *run)
-            })
+            .is_some_and(|candidate| (candidate.paragraph, candidate.run) < (*paragraph, *run))
         {
             source_run_index = source_run_index.saturating_add(1);
         }
@@ -5298,22 +5291,14 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
         let target_bold = after.bold.unwrap_or(source_run.bold);
         replacements.push((
             source_run.source.start..source_run.source.start,
-            encoded_run_format_boundary_controls(
-                source_run.bold,
-                changed,
-                edit.source.limits(),
-            )?,
+            encoded_run_format_boundary_controls(source_run.bold, changed, edit.source.limits())?,
         ));
         replacements.push((
             source_run.source.end..source_run.source.end,
-            encoded_run_format_boundary_controls(
-                target_bold,
-                restore,
-                edit.source.limits(),
-            )?,
+            encoded_run_format_boundary_controls(target_bold, restore, edit.source.limits())?,
         ));
     }
-    replacements.sort_by(|left, right| left.0.start.cmp(&right.0.start));
+    replacements.sort_by_key(|replacement| replacement.0.start);
     let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
     let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
     validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
@@ -5389,10 +5374,8 @@ fn validate_run_format_candidate(
         ));
     }
     let mut operation_index = 0usize;
-    for (paragraph_index, (source_paragraph, target_paragraph)) in source_paragraphs
-        .iter()
-        .zip(&target_paragraphs)
-        .enumerate()
+    for (paragraph_index, (source_paragraph, target_paragraph)) in
+        source_paragraphs.iter().zip(&target_paragraphs).enumerate()
     {
         if source_paragraph.format().raw() != target_paragraph.format().raw() {
             return Err(Error::UnsupportedSource(
@@ -5414,7 +5397,9 @@ fn validate_run_format_candidate(
         }) {
             operation_index = operation_index.saturating_add(1);
         }
-        for (run_index, (source_run, target_run)) in source_runs.iter().zip(&target_runs).enumerate() {
+        for (run_index, (source_run, target_run)) in
+            source_runs.iter().zip(&target_runs).enumerate()
+        {
             if source_run.text() != target_run.text() {
                 return Err(Error::UnsupportedSource(
                     "candidate run-format publication changed run text",
@@ -5433,8 +5418,12 @@ fn validate_run_format_candidate(
             }) {
                 operation_index = operation_index.saturating_add(1);
             }
-            if let Some(Operation::RunFormat { paragraph, run, after, .. }) =
-                operations.get(operation_index)
+            if let Some(Operation::RunFormat {
+                paragraph,
+                run,
+                after,
+                ..
+            }) = operations.get(operation_index)
             {
                 if *paragraph == paragraph_index && *run == run_index {
                     after.apply_to(&mut expected);
@@ -5598,7 +5587,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                 (snapshot, semantic_delta)
             },
             Operation::Text { .. } | Operation::RunFormat { .. } => {
-                return Err(Error::BodyDestinationConflict)
+                return Err(Error::BodyDestinationConflict);
             },
             _ => return Err(Error::BodyDestinationConflict),
         };
@@ -6854,12 +6843,9 @@ fn ordinary_run_body_source_span(
     let lexical = std::str::from_utf8(source)
         .map_err(|_error| Error::UnsupportedSource("ordinary run source is not UTF-8"))?;
     let arena = Bump::new();
-    let mut lexer = crate::lexer::Lexer::new_with_limits(
-        lexical,
-        &arena,
-        options.source_limits_value(),
-    )
-    .for_document(options.leniency_value());
+    let mut lexer =
+        crate::lexer::Lexer::new_with_limits(lexical, &arena, options.source_limits_value())
+            .for_document(options.leniency_value());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut depth = 0usize;
     let mut start = None;
@@ -7012,6 +6998,18 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
     let body_input = std::str::from_utf8(body_bytes)
         .map_err(|_error| Error::UnsupportedSource("ordinary run source is not UTF-8"))?;
     let paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    for paragraph in &paragraphs {
+        let raw = paragraph.format().raw();
+        if raw.paragraph_style.is_some()
+            || raw.list_override.is_some()
+            || raw.list_level.is_some()
+            || raw.legacy_numbering.is_some()
+        {
+            return Err(Error::UnsupportedSource(
+                "run-format editing refuses dependent style or list references",
+            ));
+        }
+    }
     let paragraph_runs = paragraphs
         .iter()
         .map(|paragraph| paragraph.runs().collect::<Vec<_>>())
@@ -7043,9 +7041,9 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
         let token = tokens
             .get(token_index)
             .ok_or(Error::UnsupportedSource("ordinary run token disappeared"))?;
-        let relative_span = spans
-            .get(token_index)
-            .ok_or(Error::UnsupportedSource("ordinary run token span disappeared"))?;
+        let relative_span = spans.get(token_index).ok_or(Error::UnsupportedSource(
+            "ordinary run token span disappeared",
+        ))?;
         let absolute_span = relative_span
             .start
             .checked_add(body_span.start)
@@ -7065,16 +7063,14 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
         match token {
             crate::lexer::Token::OpenBrace => {
                 unicode_skip_stack.push(unicode_skip);
-                if ignored_before != 0
-                    || ordinary_run_group_is_destination(&tokens, token_index)
-                {
+                if ignored_before != 0 || ordinary_run_group_is_destination(&tokens, token_index) {
                     ignored_group_depth = ignored_group_depth.saturating_add(1);
                 }
             },
             crate::lexer::Token::CloseBrace => {
-                unicode_skip = unicode_skip_stack.pop().ok_or(
-                    Error::UnsupportedSource("ordinary run source has an unmatched closing group"),
-                )?;
+                unicode_skip = unicode_skip_stack.pop().ok_or(Error::UnsupportedSource(
+                    "ordinary run source has an unmatched closing group",
+                ))?;
                 if ignored_before != 0 {
                     ignored_group_depth = ignored_group_depth.saturating_sub(1);
                 }
@@ -7082,8 +7078,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
             _ => {},
         }
         if ignored_before != 0
-            || (matches!(token, crate::lexer::Token::OpenBrace)
-                && ignored_group_depth != 0)
+            || (matches!(token, crate::lexer::Token::OpenBrace) && ignored_group_depth != 0)
         {
             token_index = token_index.saturating_add(1);
             continue;
@@ -7093,17 +7088,20 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
         match token {
             crate::lexer::Token::OpenBrace | crate::lexer::Token::CloseBrace => {},
             crate::lexer::Token::Text(value) => {
-                let value = value.as_ref().get(current_text_offset..).ok_or(
-                    Error::UnsupportedSource("ordinary run text suffix is not a character boundary"),
-                )?;
+                let value =
+                    value
+                        .as_ref()
+                        .get(current_text_offset..)
+                        .ok_or(Error::UnsupportedSource(
+                            "ordinary run text suffix is not a character boundary",
+                        ))?;
                 if !value.is_empty() {
-                    let start = absolute_span
-                        .start
-                        .checked_add(current_text_offset)
-                        .ok_or(Error::InputTooLarge {
+                    let start = absolute_span.start.checked_add(current_text_offset).ok_or(
+                        Error::InputTooLarge {
                             observed: usize::MAX,
                             limit: source.limits().max_input_bytes(),
-                        })?;
+                        },
+                    )?;
                     visible_span = start..absolute_span.end;
                     visible = Some(value.to_owned());
                 }
@@ -7111,16 +7109,18 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
             crate::lexer::Token::Control(crate::lexer::ControlWord::Unicode(_)) => {
                 let mut end = token_index;
                 let mut units = Vec::new();
+                let mut awaiting_fallback = 0usize;
                 loop {
-                    let Some(crate::lexer::Token::Control(
-                        crate::lexer::ControlWord::Unicode(value),
-                    )) = tokens.get(end)
+                    let Some(crate::lexer::Token::Control(crate::lexer::ControlWord::Unicode(
+                        value,
+                    ))) = tokens.get(end)
                     else {
                         return Err(Error::UnsupportedSource(
                             "ordinary Unicode run lost its control token",
                         ));
                     };
                     units.push(*value as u16);
+                    awaiting_fallback = awaiting_fallback.saturating_add(1);
                     end = end.saturating_add(1);
                     if matches!(
                         tokens.get(end),
@@ -7133,7 +7133,7 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                     let high = units
                         .last()
                         .is_some_and(|unit| (0xd800..=0xdbff).contains(unit));
-                    let owed = unicode_skip.saturating_mul(units.len());
+                    let owed = unicode_skip.saturating_mul(awaiting_fallback);
                     if high {
                         let mut candidate = end;
                         let mut remaining = owed;
@@ -7150,9 +7150,10 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                                     remaining = remaining.saturating_sub(count);
                                 },
                                 crate::lexer::Token::Control(control)
-                                    if run_control_symbol_text(control).is_some() => {
-                                        remaining = remaining.saturating_sub(1);
-                                    },
+                                    if run_control_symbol_text(control).is_some() =>
+                                {
+                                    remaining = remaining.saturating_sub(1);
+                                },
                                 _ => break,
                             }
                             candidate = candidate.saturating_add(1);
@@ -7166,12 +7167,13 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                             )
                         {
                             end = candidate;
+                            awaiting_fallback = 0;
                             continue;
                         }
                     }
                     break;
                 }
-                let fallback_count = unicode_skip.saturating_mul(units.len());
+                let fallback_count = unicode_skip.saturating_mul(awaiting_fallback);
                 let mut remaining_fallback = fallback_count;
                 let mut fallback_cursor = end;
                 let mut partial_fallback_end = None;
@@ -7187,11 +7189,10 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                                     .char_indices()
                                     .nth(remaining_fallback)
                                     .map_or(value.len(), |(offset, _)| offset);
-                                let fallback_span = spans.get(fallback_cursor).ok_or(
-                                    Error::UnsupportedSource(
+                                let fallback_span =
+                                    spans.get(fallback_cursor).ok_or(Error::UnsupportedSource(
                                         "ordinary Unicode fallback span disappeared",
-                                    ),
-                                )?;
+                                    ))?;
                                 partial_fallback_end = Some(
                                     fallback_span
                                         .start
@@ -7202,19 +7203,19 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                                             limit: source.limits().max_input_bytes(),
                                         })?,
                                 );
-                                remaining_fallback = 0;
                                 text_offset = prefix_bytes;
                                 break;
                             }
                             remaining_fallback = remaining_fallback.saturating_sub(count);
                         },
                         crate::lexer::Token::Control(control)
-                            if run_control_symbol_text(control).is_some() => {
-                                remaining_fallback = remaining_fallback.saturating_sub(1);
-                            },
-                        crate::lexer::Token::Control(
-                            crate::lexer::ControlWord::Unicode(_),
-                        ) => break,
+                            if run_control_symbol_text(control).is_some() =>
+                        {
+                            remaining_fallback = remaining_fallback.saturating_sub(1);
+                        },
+                        crate::lexer::Token::Control(crate::lexer::ControlWord::Unicode(_)) => {
+                            break;
+                        },
                         _ => {
                             return Err(Error::UnsupportedSource(
                                 "ordinary Unicode fallback contains structure",
@@ -7223,16 +7224,14 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                     }
                     fallback_cursor = fallback_cursor.saturating_add(1);
                 }
-                let end_index = fallback_cursor
-                    .saturating_sub(1)
-                    .max(end.saturating_sub(1));
-                let end_span = spans
-                    .get(end_index)
-                    .ok_or(Error::UnsupportedSource("ordinary Unicode span disappeared"))?;
-                let end = partial_fallback_end.unwrap_or_else(|| {
-                    end_span.end.saturating_add(body_span.start)
-                });
-                visible_span = relative_span.start
+                let end_index = fallback_cursor.saturating_sub(1).max(end.saturating_sub(1));
+                let end_span = spans.get(end_index).ok_or(Error::UnsupportedSource(
+                    "ordinary Unicode span disappeared",
+                ))?;
+                let end = partial_fallback_end
+                    .unwrap_or_else(|| end_span.end.saturating_add(body_span.start));
+                visible_span = relative_span
+                    .start
                     .checked_add(body_span.start)
                     .map(|start| start..end)
                     .ok_or(Error::InputTooLarge {
@@ -7248,9 +7247,12 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                 };
             },
             crate::lexer::Token::Control(crate::lexer::ControlWord::Par) => {
-                let selected_paragraph = paragraph_runs.get(paragraph).ok_or(
-                    Error::UnsupportedSource("ordinary run source has excess paragraph breaks"),
-                )?;
+                let selected_paragraph =
+                    paragraph_runs
+                        .get(paragraph)
+                        .ok_or(Error::UnsupportedSource(
+                            "ordinary run source has excess paragraph breaks",
+                        ))?;
                 if run < selected_paragraph.len() || run_offset != 0 {
                     return Err(Error::UnsupportedSource(
                         "ordinary run source paragraph ended inside a run",
@@ -7279,28 +7281,30 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
             },
             crate::lexer::Token::Control(control) => {
                 visible = run_control_symbol_text(control).map(str::to_owned);
-                if visible.is_none() && matches!(
-                    control,
-                    crate::lexer::ControlWord::NonBreakingSpace
-                        | crate::lexer::ControlWord::OptionalHyphen
-                        | crate::lexer::ControlWord::NonBreakingHyphen
-                        | crate::lexer::ControlWord::EmDash
-                        | crate::lexer::ControlWord::EnDash
-                        | crate::lexer::ControlWord::EmSpace
-                        | crate::lexer::ControlWord::EnSpace
-                        | crate::lexer::ControlWord::QuarterEmSpace
-                        | crate::lexer::ControlWord::Bullet
-                        | crate::lexer::ControlWord::LeftSingleQuote
-                        | crate::lexer::ControlWord::RightSingleQuote
-                        | crate::lexer::ControlWord::LeftDoubleQuote
-                        | crate::lexer::ControlWord::RightDoubleQuote
-                        | crate::lexer::ControlWord::LeftToRightMark
-                        | crate::lexer::ControlWord::RightToLeftMark
-                        | crate::lexer::ControlWord::ZeroWidthJoiner
-                        | crate::lexer::ControlWord::ZeroWidthNonJoiner
-                        | crate::lexer::ControlWord::ZeroWidthBreakOpportunity
-                        | crate::lexer::ControlWord::ZeroWidthNoBreakOpportunity
-                ) {
+                if visible.is_none()
+                    && matches!(
+                        control,
+                        crate::lexer::ControlWord::NonBreakingSpace
+                            | crate::lexer::ControlWord::OptionalHyphen
+                            | crate::lexer::ControlWord::NonBreakingHyphen
+                            | crate::lexer::ControlWord::EmDash
+                            | crate::lexer::ControlWord::EnDash
+                            | crate::lexer::ControlWord::EmSpace
+                            | crate::lexer::ControlWord::EnSpace
+                            | crate::lexer::ControlWord::QuarterEmSpace
+                            | crate::lexer::ControlWord::Bullet
+                            | crate::lexer::ControlWord::LeftSingleQuote
+                            | crate::lexer::ControlWord::RightSingleQuote
+                            | crate::lexer::ControlWord::LeftDoubleQuote
+                            | crate::lexer::ControlWord::RightDoubleQuote
+                            | crate::lexer::ControlWord::LeftToRightMark
+                            | crate::lexer::ControlWord::RightToLeftMark
+                            | crate::lexer::ControlWord::ZeroWidthJoiner
+                            | crate::lexer::ControlWord::ZeroWidthNonJoiner
+                            | crate::lexer::ControlWord::ZeroWidthBreakOpportunity
+                            | crate::lexer::ControlWord::ZeroWidthNoBreakOpportunity
+                    )
+                {
                     return Err(Error::UnsupportedSource(
                         "ordinary run source control symbol has no semantic mapping",
                     ));
@@ -7318,12 +7322,19 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                 token_index = token_index.saturating_add(1);
                 continue;
             }
-            let selected_paragraph = paragraph_runs.get(paragraph).ok_or(
-                Error::UnsupportedSource("ordinary run source has excess visible text"),
-            )?;
-            let selected_run = selected_paragraph.get(run).copied().ok_or(
-                Error::UnsupportedSource("ordinary run source has excess visible text"),
-            )?;
+            let selected_paragraph =
+                paragraph_runs
+                    .get(paragraph)
+                    .ok_or(Error::UnsupportedSource(
+                        "ordinary run source has excess visible text",
+                    ))?;
+            let selected_run =
+                selected_paragraph
+                    .get(run)
+                    .copied()
+                    .ok_or(Error::UnsupportedSource(
+                        "ordinary run source has excess visible text",
+                    ))?;
             let expected = selected_run.text();
             let remaining = expected.get(run_offset..).ok_or(Error::UnsupportedSource(
                 "ordinary run source text offset is invalid",
