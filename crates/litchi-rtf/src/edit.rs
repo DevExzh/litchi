@@ -407,6 +407,21 @@ impl RunFormatPatch {
         }
     }
 
+    fn all_from_format(formatting: &crate::types::Formatting) -> Self {
+        Self {
+            bold: Some(formatting.bold),
+            italic: Some(formatting.italic),
+            underline: Some(formatting.underline),
+            size: Some(formatting.font_size),
+            strike: Some(formatting.strike),
+            double_strike: Some(formatting.double_strike),
+            hidden: Some(formatting.hidden),
+            all_caps: Some(formatting.all_caps),
+            small_caps: Some(formatting.smallcaps),
+            outline: Some(formatting.outline),
+        }
+    }
+
     fn changed_from(before: Self, after: Self) -> Self {
         Self {
             bold: (before.bold != after.bold).then_some(after.bold).flatten(),
@@ -508,6 +523,88 @@ impl RunFormatUpdate {
     #[must_use]
     pub const fn patch(self) -> RunFormatPatch {
         self.patch
+    }
+}
+
+/// One immutable-source body paragraph/run selector and text replacement.
+///
+/// The replacement is resolved against the source run axis when the complete
+/// batch is staged.  An optional [`RunFormatPatch`] is applied to the new text
+/// in the same native operation; omitted character facets inherit the selected
+/// run.  Newline-bearing values are refused because they would change the
+/// paragraph axis selected by this API. Tabs, escaped RTF characters, and
+/// Unicode scalars are encoded through the ordinary native text writer.
+///
+/// ```rust,no_run
+/// use litchi_core::Position;
+/// use litchi_rtf::edit::RunTextReplacement;
+/// use litchi_rtf::Package;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let package = Package::parse(r#"{\rtf1\ansi First\par Second}"#)?;
+/// let mut edit = package.edit();
+/// edit.replace_body_run_texts(&[RunTextReplacement::new(
+///     Position::new(0), Position::new(0), "Changed",
+/// )])?;
+/// let _commit = edit.commit()?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use litchi_rtf::edit::RunTextReplacement;
+///
+/// let _ = RunTextReplacement::new(0, 0, "text");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunTextReplacement {
+    paragraph: Position,
+    run: Position,
+    text: String,
+    format: Option<RunFormatPatch>,
+}
+
+impl RunTextReplacement {
+    /// Creates one source-relative run text replacement.
+    #[must_use]
+    pub fn new(paragraph: Position, run: Position, text: impl Into<String>) -> Self {
+        Self {
+            paragraph,
+            run,
+            text: text.into(),
+            format: None,
+        }
+    }
+
+    /// Applies an omission-preserving character-format patch to the new text.
+    #[must_use]
+    pub const fn with_format(mut self, format: RunFormatPatch) -> Self {
+        self.format = Some(format);
+        self
+    }
+
+    /// Returns the zero-based source paragraph position.
+    #[must_use]
+    pub const fn paragraph(&self) -> Position {
+        self.paragraph
+    }
+
+    /// Returns the zero-based source run position within the paragraph.
+    #[must_use]
+    pub const fn run(&self) -> Position {
+        self.run
+    }
+
+    /// Returns the replacement text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Returns the optional character-format patch.
+    #[must_use]
+    pub const fn format(&self) -> Option<RunFormatPatch> {
+        self.format
     }
 }
 
@@ -1088,6 +1185,15 @@ pub enum Error {
         incoming_paragraph: usize,
         incoming_run: usize,
     },
+    /// A run-text replacement batch must contain at least one replacement.
+    EmptyRunTextBatch,
+    /// Run-text selectors must be strictly increasing and unique.
+    RunTextBatchOutOfOrder {
+        previous_paragraph: usize,
+        previous_run: usize,
+        incoming_paragraph: usize,
+        incoming_run: usize,
+    },
     /// A checked body paragraph/run selector does not exist.
     RunOutOfRange {
         paragraph: usize,
@@ -1232,6 +1338,18 @@ impl fmt::Display for Error {
             } => write!(
                 formatter,
                 "RTF run-format selectors must be strictly increasing: ({incoming_paragraph}, {incoming_run}) follows ({previous_paragraph}, {previous_run})"
+            ),
+            Self::EmptyRunTextBatch => {
+                formatter.write_str("RTF run-text replacement batch must not be empty")
+            },
+            Self::RunTextBatchOutOfOrder {
+                previous_paragraph,
+                previous_run,
+                incoming_paragraph,
+                incoming_run,
+            } => write!(
+                formatter,
+                "RTF run-text selectors must be strictly increasing: ({incoming_paragraph}, {incoming_run}) follows ({previous_paragraph}, {previous_run})"
             ),
             Self::RunOutOfRange {
                 paragraph,
@@ -1384,6 +1502,8 @@ enum Operation {
         run: usize,
         before: RunFormatPatch,
         after: RunFormatPatch,
+        text_before: Option<String>,
+        text_after: Option<String>,
     },
     Bold {
         span: TextSpan,
@@ -1586,7 +1706,7 @@ impl Operation {
                 let _ = (before, after);
                 0
             },
-            Self::RunFormat { .. } => 0,
+            Self::RunFormat { text_after, .. } => text_after.as_deref().map_or(0, str::len),
             Self::Alignment { .. }
             | Self::Bold { .. }
             | Self::Italic { .. }
@@ -3596,6 +3716,8 @@ impl Edit {
                             run: requested_run,
                             before,
                             after: update.patch,
+                            text_before: None,
+                            text_after: None,
                         });
                     }
                     run_index = run_index.saturating_add(1);
@@ -3609,6 +3731,143 @@ impl Edit {
                 count: paragraphs.len(),
             });
         }
+        self.operations.extend(staged);
+        Ok(self)
+    }
+
+    /// Stages one source-ordered batch of ordinary body run text replacements.
+    ///
+    /// Selectors resolve against the immutable source paragraph/run axis and
+    /// must be strictly increasing. Each target contributes one native
+    /// operation; an optional character-format patch is published together
+    /// with the replacement text. Omitted facets inherit the selected run's
+    /// effective format. Newline-bearing text is rejected because this API
+    /// addresses a run inside one source paragraph; tabs, escaped characters,
+    /// and Unicode are emitted through the ordinary RTF text writer.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an invalid selector,
+    /// structural replacement text, unsupported source syntax, conflicting
+    /// staged work, or finite operation/replacement limits.
+    pub fn replace_body_run_texts(
+        &mut self,
+        replacements: &[RunTextReplacement],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if replacements.is_empty() {
+            return Err(Error::EmptyRunTextBatch);
+        }
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::RunFormat { .. }))
+        {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        for (previous, incoming) in replacements.iter().zip(replacements.iter().skip(1)) {
+            let previous_key = (previous.paragraph.get(), previous.run.get());
+            let incoming_key = (incoming.paragraph.get(), incoming.run.get());
+            if incoming_key <= previous_key {
+                return Err(Error::RunTextBatchOutOfOrder {
+                    previous_paragraph: previous_key.0,
+                    previous_run: previous_key.1,
+                    incoming_paragraph: incoming_key.0,
+                    incoming_run: incoming_key.1,
+                });
+            }
+        }
+        if let Some(Operation::RunFormat { paragraph, run, .. }) = self.operations.last() {
+            let first = replacements
+                .first()
+                .map(|replacement| (replacement.paragraph.get(), replacement.run.get()))
+                .ok_or(Error::EmptyRunTextBatch)?;
+            if first <= (*paragraph, *run) {
+                return Err(Error::RunTextBatchOutOfOrder {
+                    previous_paragraph: *paragraph,
+                    previous_run: *run,
+                    incoming_paragraph: first.0,
+                    incoming_run: first.1,
+                });
+            }
+        }
+        self.ensure_operation_room_for(replacements.len())?;
+        let replacement_bytes = replacements.iter().try_fold(0usize, |total, replacement| {
+            if replacement.text.contains('\n') {
+                return Err(Error::UnsupportedSource(
+                    "run-text replacements cannot contain paragraph breaks",
+                ));
+            }
+            total
+                .checked_add(replacement.text.len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })
+        })?;
+        let observed_replacement_bytes = self.admit_replacement(replacement_bytes)?;
+
+        let paragraphs = self.source.body().paragraphs().collect::<Vec<_>>();
+        let mut staged = Vec::new();
+        staged
+            .try_reserve_exact(replacements.len())
+            .map_err(|_error| Error::Write("could not reserve run-text operations".to_string()))?;
+        let mut replacement_index = 0usize;
+        for (paragraph, selected_paragraph) in paragraphs.iter().enumerate() {
+            let Some(first) = replacements.get(replacement_index) else {
+                break;
+            };
+            if first.paragraph.get() > paragraph {
+                continue;
+            }
+            if first.paragraph.get() < paragraph {
+                return Err(Error::UnsupportedSource(
+                    "run-text selector cursor became inconsistent",
+                ));
+            }
+            let mut runs = selected_paragraph.runs();
+            let mut run_index = 0usize;
+            while let Some(replacement) = replacements.get(replacement_index) {
+                if replacement.paragraph.get() != paragraph {
+                    break;
+                }
+                let requested_run = replacement.run.get();
+                while run_index <= requested_run {
+                    let Some(selected_run) = runs.next() else {
+                        return Err(Error::RunOutOfRange {
+                            paragraph,
+                            run: requested_run,
+                            count: run_index,
+                        });
+                    };
+                    if run_index == requested_run {
+                        let before_format =
+                            RunFormatPatch::all_from_format(selected_run.format().raw());
+                        let mut target_format = *selected_run.format().raw();
+                        if let Some(patch) = replacement.format {
+                            patch.apply_to(&mut target_format);
+                        }
+                        let after_format = RunFormatPatch::all_from_format(&target_format);
+                        staged.push(Operation::RunFormat {
+                            paragraph,
+                            run: requested_run,
+                            before: before_format,
+                            after: after_format,
+                            text_before: Some(selected_run.text().to_owned()),
+                            text_after: Some(replacement.text.clone()),
+                        });
+                    }
+                    run_index = run_index.saturating_add(1);
+                }
+                replacement_index = replacement_index.saturating_add(1);
+            }
+        }
+        if let Some(replacement) = replacements.get(replacement_index) {
+            return Err(Error::ParagraphOutOfRange {
+                position: replacement.paragraph.get(),
+                count: paragraphs.len(),
+            });
+        }
+        self.replacement_bytes = observed_replacement_bytes;
         self.operations.extend(staged);
         Ok(self)
     }
@@ -3852,9 +4111,7 @@ impl Edit {
                 let mut after = before;
                 update.patch.apply(&mut after);
                 let incoming = self.operations.len().saturating_add(staged.len());
-                if let Some(existing) =
-                    first_layout_conflict(&existing_layouts, position, fields)
-                {
+                if let Some(existing) = first_layout_conflict(&existing_layouts, position, fields) {
                     return Err(Error::Conflict { existing, incoming });
                 }
                 staged.push(Operation::ParagraphLayout {
@@ -4341,6 +4598,17 @@ impl Edit {
             .iter()
             .all(|operation| matches!(operation, Operation::RunFormat { .. }))
         {
+            if self.operations.iter().any(|operation| {
+                matches!(
+                    operation,
+                    Operation::RunFormat {
+                        text_after: Some(_),
+                        ..
+                    }
+                )
+            }) {
+                return commit_body_run_texts(self, operation_count);
+            }
             return commit_body_run_formats(self, operation_count);
         }
 
@@ -5267,6 +5535,8 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
             run,
             before,
             after,
+            text_before: None,
+            text_after: None,
         } = operation
         else {
             return Err(Error::StructuralPropertyConflict);
@@ -5309,6 +5579,239 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
         operation_count,
         semantic_delta,
     ))
+}
+
+fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_runs = ordinary_run_source_map(&edit.source)?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(edit.operations.len().saturating_mul(2))
+        .map_err(|_error| Error::Write("could not reserve run-text replacements".to_string()))?;
+    let mut source_run_index = 0usize;
+    for operation in &edit.operations {
+        let Operation::RunFormat {
+            paragraph,
+            run,
+            before,
+            after,
+            text_before,
+            text_after,
+        } = operation
+        else {
+            return Err(Error::StructuralPropertyConflict);
+        };
+        while source_runs
+            .get(source_run_index)
+            .is_some_and(|candidate| (candidate.paragraph, candidate.run) < (*paragraph, *run))
+        {
+            source_run_index = source_run_index.saturating_add(1);
+        }
+        let source_run = source_runs
+            .get(source_run_index)
+            .filter(|candidate| candidate.paragraph == *paragraph && candidate.run == *run)
+            .ok_or(Error::RunOutOfRange {
+                paragraph: *paragraph,
+                run: *run,
+                count: 0,
+            })?;
+        source_run_index = source_run_index.saturating_add(1);
+        let changed = RunFormatPatch::changed_from(*before, *after);
+        if let Some(text_after) = text_after {
+            let _text_before = text_before.as_deref().ok_or(Error::UnsupportedSource(
+                "run-text operation has no source text precondition",
+            ))?;
+            let encoded = encoded_run_text_replacement(text_after, changed, edit.source.limits())?;
+            replacements.push((source_run.source.clone(), encoded));
+        } else {
+            replacements.push((
+                source_run.source.start..source_run.source.start,
+                encoded_run_format_boundary_controls(
+                    source_run.bold,
+                    changed,
+                    edit.source.limits(),
+                )?,
+            ));
+            replacements.push((
+                source_run.source.end..source_run.source.end,
+                encoded_run_format_boundary_controls(
+                    after.bold.unwrap_or(source_run.bold),
+                    RunFormatPatch::changed_from(*after, *before),
+                    edit.source.limits(),
+                )?,
+            ));
+        }
+    }
+    replacements.sort_by_key(|replacement| replacement.0.start);
+    let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
+    validate_run_text_candidate(&edit.source, &snapshot, &edit.operations)?;
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn encoded_run_text_replacement(
+    text: &str,
+    format: RunFormatPatch,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    if text.is_empty() {
+        return Ok(Vec::new());
+    }
+    let encoded = encoded_body_text(text, limits)?;
+    let controls = encoded_run_format_controls(format, limits)?;
+    let total = 7usize
+        .saturating_add(controls.len())
+        .saturating_add(encoded.len());
+    if total > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: total,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    // Scope the fallback width so a source \uc0 or \uc2 state cannot change
+    // the meaning of the writer's one-character `?` fallbacks.
+    output.append(br"{\uc1 ")?;
+    output.append(&controls)?;
+    output.append(&encoded)?;
+    output.append(b"}")?;
+    Ok(output.into_inner())
+}
+
+fn validate_run_text_candidate(
+    source: &Package,
+    target: &Package,
+    operations: &[Operation],
+) -> Result<(), Error> {
+    let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
+    if source_paragraphs.len() != target_paragraphs.len() {
+        return Err(Error::UnsupportedSource(
+            "candidate run-text publication changed paragraph boundaries",
+        ));
+    }
+    let mut operation_index = 0usize;
+    for (paragraph_index, (source_paragraph, target_paragraph)) in
+        source_paragraphs.iter().zip(&target_paragraphs).enumerate()
+    {
+        if source_paragraph.format().raw() != target_paragraph.format().raw() {
+            return Err(Error::UnsupportedSource(
+                "candidate run-text publication changed paragraph properties",
+            ));
+        }
+        let mut expected = Vec::new();
+        for (run_index, source_run) in source_paragraph.runs().enumerate() {
+            while operations.get(operation_index).is_some_and(|operation| {
+                matches!(
+                    operation,
+                    Operation::RunFormat { paragraph, run, .. }
+                        if *paragraph == paragraph_index && *run < run_index
+                )
+            }) {
+                operation_index = operation_index.saturating_add(1);
+            }
+            let mut formatting = *source_run.format().raw();
+            let mut text = source_run.text().to_owned();
+            if let Some(Operation::RunFormat {
+                paragraph,
+                run,
+                after,
+                text_after,
+                ..
+            }) = operations.get(operation_index)
+                && *paragraph == paragraph_index
+                && *run == run_index
+            {
+                after.apply_to(&mut formatting);
+                if let Some(text_after) = text_after {
+                    text = text_after.clone();
+                }
+                operation_index = operation_index.saturating_add(1);
+            }
+            if !text.is_empty() {
+                expected.push((text, formatting));
+            }
+        }
+        let target_runs = target_paragraph.runs().collect::<Vec<_>>();
+        let mut expected_index = 0usize;
+        let mut expected_offset = 0usize;
+        for target_run in target_runs {
+            let mut remaining = target_run.text();
+            if remaining.is_empty() {
+                continue;
+            }
+            while !remaining.is_empty() {
+                let (expected_text, expected_format) =
+                    expected
+                        .get(expected_index)
+                        .ok_or(Error::UnsupportedSource(
+                            "candidate run-text publication has excess text",
+                        ))?;
+                if *expected_format != *target_run.format().raw() {
+                    return Err(Error::UnsupportedSource(
+                        "candidate run-text publication changed character formatting",
+                    ));
+                }
+                let expected_remaining =
+                    expected_text
+                        .get(expected_offset..)
+                        .ok_or(Error::UnsupportedSource(
+                            "candidate run-text expected text boundary is invalid",
+                        ))?;
+                let common_limit = expected_remaining.len().min(remaining.len());
+                let common = expected_remaining
+                    .char_indices()
+                    .map(|(offset, _)| offset)
+                    .chain(std::iter::once(expected_remaining.len()))
+                    .take_while(|offset| *offset <= common_limit)
+                    .last()
+                    .unwrap_or(0);
+                if common == 0 || !remaining.starts_with(&expected_remaining[..common]) {
+                    return Err(Error::UnsupportedSource(
+                        "candidate run-text publication changed run text",
+                    ));
+                }
+                expected_offset = expected_offset.saturating_add(common);
+                remaining = remaining.get(common..).ok_or(Error::UnsupportedSource(
+                    "candidate run-text suffix is not a character boundary",
+                ))?;
+                if expected_offset == expected_text.len() {
+                    expected_index = expected_index.saturating_add(1);
+                    expected_offset = 0;
+                }
+            }
+        }
+        if expected_index != expected.len() || expected_offset != 0 {
+            return Err(Error::UnsupportedSource(
+                "candidate run-text publication dropped expected text",
+            ));
+        }
+    }
+    if operation_index != operations.len() {
+        return Err(Error::UnsupportedSource(
+            "candidate run-text publication left an unapplied operation",
+        ));
+    }
+    Ok(())
 }
 
 fn encoded_run_format_controls(
@@ -7272,12 +7775,14 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
                 unicode_skip = (*value).max(0) as usize;
             },
             crate::lexer::Token::Control(crate::lexer::ControlWord::Line)
-            | crate::lexer::Token::Control(crate::lexer::ControlWord::Tab)
             | crate::lexer::Token::Control(crate::lexer::ControlWord::SoftLineBreak(_))
             | crate::lexer::Token::Control(crate::lexer::ControlWord::SoftLineHeight(_)) => {
                 return Err(Error::UnsupportedSource(
                     "ordinary run source contains a visible or structural control",
                 ));
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Tab) => {
+                visible = Some("\t".to_owned());
             },
             crate::lexer::Token::Control(control) => {
                 visible = run_control_symbol_text(control).map(str::to_owned);
@@ -9531,7 +10036,13 @@ fn operation_changes_semantics(operation: &Operation) -> bool {
         | Operation::ShapeText { before, after, .. } => before != after,
         Operation::Alignment { before, after, .. } => before != after,
         Operation::ParagraphLayout { before, after, .. } => before != after,
-        Operation::RunFormat { before, after, .. } => before != after,
+        Operation::RunFormat {
+            before,
+            after,
+            text_before,
+            text_after,
+            ..
+        } => before != after || text_before != text_after,
         Operation::Bold { before, after, .. }
         | Operation::Italic { before, after, .. }
         | Operation::Strike { before, after, .. }
@@ -11449,6 +11960,14 @@ enum Change {
         before: RunFormatPatch,
         after: RunFormatPatch,
     },
+    RunText {
+        paragraph: usize,
+        run: usize,
+        before: String,
+        after: String,
+        before_format: RunFormatPatch,
+        after_format: RunFormatPatch,
+    },
     Bold {
         span: TextSpan,
         after_span: TextSpan,
@@ -11665,6 +12184,21 @@ impl Change {
                 run: *run,
                 before: *after,
                 after: *before,
+            },
+            Self::RunText {
+                paragraph,
+                run,
+                before,
+                after,
+                before_format,
+                after_format,
+            } => Self::RunText {
+                paragraph: *paragraph,
+                run: *run,
+                before: after.clone(),
+                after: before.clone(),
+                before_format: *after_format,
+                after_format: *before_format,
             },
             Self::Bold {
                 span,
@@ -11999,7 +12533,8 @@ impl Change {
             | Self::HeaderFooterText { before, after, .. }
             | Self::AnnotationText { before, after, .. }
             | Self::NoteText { before, after, .. }
-            | Self::ShapeText { before, after, .. } => {
+            | Self::ShapeText { before, after, .. }
+            | Self::RunText { before, after, .. } => {
                 weight_str(before).saturating_add(weight_str(after))
             },
             Self::TableCellText {
@@ -12171,6 +12706,23 @@ fn semantic_changes_with_replacement(
                 run,
                 before,
                 after,
+                text_before: Some(text_before),
+                text_after: Some(text_after),
+            } if before != after || text_before != text_after => Some(Change::RunText {
+                paragraph: *paragraph,
+                run: *run,
+                before: text_before.clone(),
+                after: text_after.clone(),
+                before_format: *before,
+                after_format: *after,
+            }),
+            Operation::RunFormat {
+                paragraph,
+                run,
+                before,
+                after,
+                text_before: None,
+                text_after: None,
             } if before != after => Some(Change::RunFormat {
                 paragraph: *paragraph,
                 run: *run,
@@ -12624,10 +13176,10 @@ impl Patch {
         if self
             .changes
             .iter()
-            .any(|change| matches!(change, Change::RunFormat { .. }))
+            .any(|change| matches!(change, Change::RunFormat { .. } | Change::RunText { .. }))
         {
             return Err(litchi_core::patch::PatchError::InvalidText {
-                field: "RTF run-format patches are source-bound",
+                field: "RTF run-format and run-text patches are source-bound",
             });
         }
         if self
@@ -12798,6 +13350,9 @@ fn durable_operation(
         }),
         Change::RunFormat { .. } => Err(litchi_core::patch::PatchError::InvalidText {
             field: "RTF run-format patches are source-bound",
+        }),
+        Change::RunText { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF run-text patches are source-bound",
         }),
         Change::Bold {
             span,
