@@ -47,7 +47,7 @@ taskset -c 0 "$BIN" --warmup 2 --rounds 9 > /tmp/unified-rtf-remove.json
 
 The JSON receipt records the source and binary fingerprints, corpus and
 output hashes, exact-byte equivalence, raw nanosecond samples, medians and
-upper medians, and the fixed ABBA protocol.  A failed semantic or byte oracle
+75th percentiles, and the fixed ABBA protocol.  A failed semantic or byte oracle
 causes a nonzero exit status.  Timing summaries are descriptive; they do not
 establish a speedup, allocation result, or production ranking.  Never commit
 the compiled binary or a large raw capture.

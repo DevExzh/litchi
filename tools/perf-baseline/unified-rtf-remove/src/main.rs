@@ -127,13 +127,13 @@ fn native_texts(owner: &Package) -> Vec<String> {
 }
 
 fn unified_texts(owner: &File) -> Result<Vec<String>> {
-    Ok(owner
+    owner
         .query("p")?
         .map(|node| {
             let node = node?;
             Ok(node.view().text()?.unwrap_or_default().into_owned())
         })
-        .collect::<Result<Vec<_>>>()?)
+        .collect::<Result<Vec<_>>>()
 }
 
 fn sha256(bytes: &[u8]) -> String {
@@ -149,7 +149,7 @@ fn median(values: &[u128]) -> u128 {
     sorted[sorted.len() / 2]
 }
 
-fn upper_median(values: &[u128]) -> u128 {
+fn p75(values: &[u128]) -> u128 {
     let mut sorted = values.to_vec();
     sorted.sort_unstable();
     sorted[(sorted.len() * 3) / 4]
@@ -159,7 +159,7 @@ fn timing_summary(samples: &[u128]) -> Value {
     json!({
         "samples_ns": samples,
         "median_ns": median(samples),
-        "upper_median_ns": upper_median(samples),
+        "p75_ns": p75(samples),
         "sample_count": samples.len(),
     })
 }
@@ -289,16 +289,13 @@ fn measure_case(
     // `File::remove` consumes an owned parsed query.  Clone all query values
     // before the timed region so neither query parsing nor target cloning is
     // charged to the unified route.
-    let mut query_pool = match query {
-        Some(query) => Some(
-            (0..warmup
-                .saturating_add(1)
-                .saturating_add(rounds.saturating_mul(2)))
-                .map(|_| query.clone())
-                .collect::<Vec<_>>(),
-        ),
-        None => None,
-    };
+    let mut query_pool = query.map(|query| {
+        (0..warmup
+            .saturating_add(1)
+            .saturating_add(rounds.saturating_mul(2)))
+            .map(|_| query.clone())
+            .collect::<Vec<_>>()
+    });
 
     let warm_count = warmup;
     for _ in 0..warm_count {
