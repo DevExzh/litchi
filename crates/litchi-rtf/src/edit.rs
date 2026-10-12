@@ -177,6 +177,340 @@ impl ParagraphAlignmentUpdate {
     }
 }
 
+/// An omission-preserving character-format delta for one ordinary body run.
+///
+/// Every `None` facet keeps the value already stored by the selected run. The
+/// patch is deliberately limited to the local character properties that the
+/// unified operations API can address without rewriting the run's text,
+/// paragraph properties, resources, or retained source syntax.
+///
+/// A patch is resolved against the immutable native paragraph/run axis and
+/// published as one atomic source transaction. The native closure preserves
+/// omitted facets, unrelated run and paragraph properties, and retained
+/// metadata; sources with inline breaks or dependent destinations are refused
+/// before changed publication.
+///
+/// ```rust,no_run
+/// use litchi_core::Position;
+/// use litchi_rtf::edit::{RunFormatPatch, RunFormatUpdate};
+/// use litchi_rtf::Package;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let package = Package::parse(r#"{\rtf1\ansi First\par Second}"#)?;
+/// let patch = RunFormatPatch::new().with_bold(true).with_italic(true);
+/// let mut edit = package.edit();
+/// edit.patch_body_run_formats(&[RunFormatUpdate::new(
+///     Position::new(0),
+///     Position::new(0),
+///     patch,
+/// )])?;
+/// let commit = edit.commit()?;
+/// assert!(commit.diagnostics().changed());
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use litchi_rtf::edit::{RunFormatPatch, RunFormatUpdate};
+///
+/// let _ = RunFormatUpdate::new(0, 0, RunFormatPatch::new());
+/// ```
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RunFormatPatch {
+    bold: Option<bool>,
+    italic: Option<bool>,
+    underline: Option<UnderlineStyle>,
+    size: Option<NonZeroU16>,
+    strike: Option<bool>,
+    double_strike: Option<bool>,
+    hidden: Option<bool>,
+    all_caps: Option<bool>,
+    small_caps: Option<bool>,
+    outline: Option<bool>,
+}
+
+impl RunFormatPatch {
+    /// Creates an empty patch whose omitted facets preserve the source run.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            bold: None,
+            italic: None,
+            underline: None,
+            size: None,
+            strike: None,
+            double_strike: None,
+            hidden: None,
+            all_caps: None,
+            small_caps: None,
+            outline: None,
+        }
+    }
+
+    /// Sets the bold facet.
+    #[must_use]
+    pub const fn with_bold(mut self, value: bool) -> Self {
+        self.bold = Some(value);
+        self
+    }
+
+    /// Sets the italic facet.
+    #[must_use]
+    pub const fn with_italic(mut self, value: bool) -> Self {
+        self.italic = Some(value);
+        self
+    }
+
+    /// Sets the exact underline style.
+    #[must_use]
+    pub const fn with_underline(mut self, value: UnderlineStyle) -> Self {
+        self.underline = Some(value);
+        self
+    }
+
+    /// Sets the font size in half-points.
+    #[must_use]
+    pub const fn with_size(mut self, value: NonZeroU16) -> Self {
+        self.size = Some(value);
+        self
+    }
+
+    /// Sets the single-strike facet.
+    #[must_use]
+    pub const fn with_strike(mut self, value: bool) -> Self {
+        self.strike = Some(value);
+        self
+    }
+
+    /// Sets the double-strike facet.
+    #[must_use]
+    pub const fn with_double_strike(mut self, value: bool) -> Self {
+        self.double_strike = Some(value);
+        self
+    }
+
+    /// Sets the hidden-text facet.
+    #[must_use]
+    pub const fn with_hidden(mut self, value: bool) -> Self {
+        self.hidden = Some(value);
+        self
+    }
+
+    /// Sets the all-capitals facet.
+    #[must_use]
+    pub const fn with_all_caps(mut self, value: bool) -> Self {
+        self.all_caps = Some(value);
+        self
+    }
+
+    /// Sets the small-capitals facet.
+    #[must_use]
+    pub const fn with_small_caps(mut self, value: bool) -> Self {
+        self.small_caps = Some(value);
+        self
+    }
+
+    /// Sets the outline facet.
+    #[must_use]
+    pub const fn with_outline(mut self, value: bool) -> Self {
+        self.outline = Some(value);
+        self
+    }
+
+    /// Returns whether this patch names no character facet.
+    #[must_use]
+    pub const fn is_empty(self) -> bool {
+        self.bold.is_none()
+            && self.italic.is_none()
+            && self.underline.is_none()
+            && self.size.is_none()
+            && self.strike.is_none()
+            && self.double_strike.is_none()
+            && self.hidden.is_none()
+            && self.all_caps.is_none()
+            && self.small_caps.is_none()
+            && self.outline.is_none()
+    }
+
+    /// Returns the requested bold value, if present.
+    #[must_use]
+    pub const fn bold(self) -> Option<bool> {
+        self.bold
+    }
+
+    /// Returns the requested italic value, if present.
+    #[must_use]
+    pub const fn italic(self) -> Option<bool> {
+        self.italic
+    }
+
+    /// Returns the requested underline style, if present.
+    #[must_use]
+    pub const fn underline(self) -> Option<UnderlineStyle> {
+        self.underline
+    }
+
+    /// Returns the requested font size, if present.
+    #[must_use]
+    pub const fn size(self) -> Option<NonZeroU16> {
+        self.size
+    }
+
+    /// Returns the requested single-strike value, if present.
+    #[must_use]
+    pub const fn strike(self) -> Option<bool> {
+        self.strike
+    }
+
+    /// Returns the requested double-strike value, if present.
+    #[must_use]
+    pub const fn double_strike(self) -> Option<bool> {
+        self.double_strike
+    }
+
+    /// Returns the requested hidden-text value, if present.
+    #[must_use]
+    pub const fn hidden(self) -> Option<bool> {
+        self.hidden
+    }
+
+    /// Returns the requested all-capitals value, if present.
+    #[must_use]
+    pub const fn all_caps(self) -> Option<bool> {
+        self.all_caps
+    }
+
+    /// Returns the requested small-capitals value, if present.
+    #[must_use]
+    pub const fn small_caps(self) -> Option<bool> {
+        self.small_caps
+    }
+
+    /// Returns the requested outline value, if present.
+    #[must_use]
+    pub const fn outline(self) -> Option<bool> {
+        self.outline
+    }
+
+    fn from_format(formatting: &crate::types::Formatting, requested: Self) -> Self {
+        Self {
+            bold: requested.bold.map(|_| formatting.bold),
+            italic: requested.italic.map(|_| formatting.italic),
+            underline: requested.underline.map(|_| formatting.underline),
+            size: requested.size.map(|_| formatting.font_size),
+            strike: requested.strike.map(|_| formatting.strike),
+            double_strike: requested
+                .double_strike
+                .map(|_| formatting.double_strike),
+            hidden: requested.hidden.map(|_| formatting.hidden),
+            all_caps: requested.all_caps.map(|_| formatting.all_caps),
+            small_caps: requested.small_caps.map(|_| formatting.smallcaps),
+            outline: requested.outline.map(|_| formatting.outline),
+        }
+    }
+
+    fn changed_from(before: Self, after: Self) -> Self {
+        Self {
+            bold: (before.bold != after.bold).then_some(after.bold).flatten(),
+            italic: (before.italic != after.italic).then_some(after.italic).flatten(),
+            underline: (before.underline != after.underline)
+                .then_some(after.underline)
+                .flatten(),
+            size: (before.size != after.size).then_some(after.size).flatten(),
+            strike: (before.strike != after.strike)
+                .then_some(after.strike)
+                .flatten(),
+            double_strike: (before.double_strike != after.double_strike)
+                .then_some(after.double_strike)
+                .flatten(),
+            hidden: (before.hidden != after.hidden)
+                .then_some(after.hidden)
+                .flatten(),
+            all_caps: (before.all_caps != after.all_caps)
+                .then_some(after.all_caps)
+                .flatten(),
+            small_caps: (before.small_caps != after.small_caps)
+                .then_some(after.small_caps)
+                .flatten(),
+            outline: (before.outline != after.outline)
+                .then_some(after.outline)
+                .flatten(),
+        }
+    }
+
+    fn apply_to(self, formatting: &mut crate::types::Formatting) {
+        if let Some(value) = self.bold {
+            formatting.bold = value;
+        }
+        if let Some(value) = self.italic {
+            formatting.italic = value;
+        }
+        if let Some(value) = self.underline {
+            formatting.underline = value;
+        }
+        if let Some(value) = self.size {
+            formatting.font_size = value;
+        }
+        if let Some(value) = self.strike {
+            formatting.strike = value;
+        }
+        if let Some(value) = self.double_strike {
+            formatting.double_strike = value;
+        }
+        if let Some(value) = self.hidden {
+            formatting.hidden = value;
+        }
+        if let Some(value) = self.all_caps {
+            formatting.all_caps = value;
+        }
+        if let Some(value) = self.small_caps {
+            formatting.smallcaps = value;
+        }
+        if let Some(value) = self.outline {
+            formatting.outline = value;
+        }
+    }
+}
+
+/// One immutable-source body paragraph/run selector and character-format
+/// update.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct RunFormatUpdate {
+    paragraph: Position,
+    run: Position,
+    patch: RunFormatPatch,
+}
+
+impl RunFormatUpdate {
+    /// Creates one source-relative run-format update.
+    #[must_use]
+    pub const fn new(paragraph: Position, run: Position, patch: RunFormatPatch) -> Self {
+        Self {
+            paragraph,
+            run,
+            patch,
+        }
+    }
+
+    /// Returns the zero-based source paragraph position.
+    #[must_use]
+    pub const fn paragraph(self) -> Position {
+        self.paragraph
+    }
+
+    /// Returns the zero-based source run position within the paragraph.
+    #[must_use]
+    pub const fn run(self) -> Position {
+        self.run
+    }
+
+    /// Returns the requested omission-preserving patch.
+    #[must_use]
+    pub const fn patch(self) -> RunFormatPatch {
+        self.patch
+    }
+}
+
 /// The dependency-free local layout facets of one ordinary body paragraph.
 ///
 /// Values are the paragraph's directly stored RTF properties. Style-sheet
@@ -743,6 +1077,23 @@ pub enum Error {
     EmptyParagraphLayoutPatch { position: usize },
     /// Paragraph-layout batch selectors must be strictly increasing and unique.
     ParagraphLayoutBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A run-format batch must contain at least one update.
+    EmptyRunFormatBatch,
+    /// A run-format delta must name at least one facet.
+    EmptyRunFormatPatch { paragraph: usize, run: usize },
+    /// Run-format batch selectors must be strictly increasing and unique.
+    RunFormatBatchOutOfOrder {
+        previous_paragraph: usize,
+        previous_run: usize,
+        incoming_paragraph: usize,
+        incoming_run: usize,
+    },
+    /// A checked body paragraph/run selector does not exist.
+    RunOutOfRange {
+        paragraph: usize,
+        run: usize,
+        count: usize,
+    },
     /// Two staged operations have overlapping effects.
     Conflict { existing: usize, incoming: usize },
     /// Paragraph-structure and property changes cannot be proven independent.
@@ -865,6 +1216,30 @@ impl fmt::Display for Error {
             Self::ParagraphLayoutBatchOutOfOrder { previous, incoming } => write!(
                 formatter,
                 "RTF paragraph-layout positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::EmptyRunFormatBatch => {
+                formatter.write_str("RTF run-format batch must not be empty")
+            },
+            Self::EmptyRunFormatPatch { paragraph, run } => write!(
+                formatter,
+                "RTF run-format patch at paragraph {paragraph}, run {run} has no facets"
+            ),
+            Self::RunFormatBatchOutOfOrder {
+                previous_paragraph,
+                previous_run,
+                incoming_paragraph,
+                incoming_run,
+            } => write!(
+                formatter,
+                "RTF run-format selectors must be strictly increasing: ({incoming_paragraph}, {incoming_run}) follows ({previous_paragraph}, {previous_run})"
+            ),
+            Self::RunOutOfRange {
+                paragraph,
+                run,
+                count,
+            } => write!(
+                formatter,
+                "RTF body paragraph {paragraph} run {run} is outside 0..{count}"
             ),
             Self::Conflict { existing, incoming } => write!(
                 formatter,
@@ -1003,6 +1378,12 @@ enum Operation {
         fields: LayoutFields,
         before: ParagraphLayout,
         after: ParagraphLayout,
+    },
+    RunFormat {
+        paragraph: usize,
+        run: usize,
+        before: RunFormatPatch,
+        after: RunFormatPatch,
     },
     Bold {
         span: TextSpan,
@@ -1205,6 +1586,7 @@ impl Operation {
                 let _ = (before, after);
                 0
             },
+            Self::RunFormat { .. } => 0,
             Self::Alignment { .. }
             | Self::Bold { .. }
             | Self::Italic { .. }
@@ -1235,6 +1617,9 @@ impl Operation {
             Self::ParagraphLayout {
                 position, fields, ..
             } => layout_effect_keys(*position, *fields),
+            Self::RunFormat {
+                paragraph, run, ..
+            } => vec![format!("body:paragraph:{paragraph}:run:{run}:format")],
             Self::Bold { span, .. } => {
                 vec![format!("body:character:{}-{}:bold", span.start, span.end)]
             },
@@ -1337,6 +1722,7 @@ impl Operation {
             | Self::InsertParagraph { span, .. } => Some(*span),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
+            | Self::RunFormat { .. }
             | Self::RemoveParagraph { .. }
             | Self::RestoreParagraph { .. }
             | Self::MoveParagraph { .. }
@@ -1359,6 +1745,7 @@ impl Operation {
             self,
             Self::Alignment { .. }
                 | Self::ParagraphLayout { .. }
+                | Self::RunFormat { .. }
                 | Self::Bold { .. }
                 | Self::Italic { .. }
                 | Self::Underline { .. }
@@ -3090,6 +3477,147 @@ impl Edit {
         self.replace_text(TextSpan::new(owner.end, removed.end)?, "")
     }
 
+    /// Stages one omission-preserving character-format patch for an ordinary
+    /// body run.
+    pub fn patch_run_format(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        patch: RunFormatPatch,
+    ) -> Result<&mut Self, Error> {
+        self.patch_body_run_formats(&[RunFormatUpdate::new(paragraph, run, patch)])
+    }
+
+    /// Atomically stages source-ordered character-format patches for ordinary
+    /// body runs.
+    ///
+    /// Run selectors resolve against the immutable source paragraph/run axes.
+    /// They must be strictly increasing by `(paragraph, run)` and each target
+    /// contributes one bounded operation, even when several facets change.
+    /// Every selector, source capability, mixed-source mapping, and limit is
+    /// preflighted before any operation is appended. Character patches cannot
+    /// compose with text, paragraph, lifecycle, or retained-destination work;
+    /// the source bytes are spliced around the selected literal run text so
+    /// omitted and unrelated properties remain byte-for-byte untouched.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an empty patch, an
+    /// invalid selector, unsupported source dependencies, conflicting staged
+    /// work, or finite operation limits.
+    pub fn patch_body_run_formats(
+        &mut self,
+        updates: &[RunFormatUpdate],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if updates.is_empty() {
+            return Err(Error::EmptyRunFormatBatch);
+        }
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::RunFormat { .. }))
+        {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        for (previous, incoming) in updates.iter().zip(updates.iter().skip(1)) {
+            let previous_key = (previous.paragraph.get(), previous.run.get());
+            let incoming_key = (incoming.paragraph.get(), incoming.run.get());
+            if incoming_key <= previous_key {
+                return Err(Error::RunFormatBatchOutOfOrder {
+                    previous_paragraph: previous_key.0,
+                    previous_run: previous_key.1,
+                    incoming_paragraph: incoming_key.0,
+                    incoming_run: incoming_key.1,
+                });
+            }
+        }
+        if let Some(Operation::RunFormat {
+            paragraph,
+            run,
+            ..
+        }) = self.operations.last()
+        {
+            let first = updates
+                .first()
+                .map(|update| (update.paragraph.get(), update.run.get()))
+                .ok_or(Error::EmptyRunFormatBatch)?;
+            if first <= (*paragraph, *run) {
+                return Err(Error::RunFormatBatchOutOfOrder {
+                    previous_paragraph: *paragraph,
+                    previous_run: *run,
+                    incoming_paragraph: first.0,
+                    incoming_run: first.1,
+                });
+            }
+        }
+        self.ensure_operation_room_for(updates.len())?;
+
+        let mut staged = Vec::new();
+        staged.try_reserve_exact(updates.len()).map_err(|_error| {
+            Error::Write("could not reserve run-format operations".to_string())
+        })?;
+        let paragraphs = self.source.body().paragraphs().collect::<Vec<_>>();
+        for update in updates {
+            if update.patch.is_empty() {
+                return Err(Error::EmptyRunFormatPatch {
+                    paragraph: update.paragraph.get(),
+                    run: update.run.get(),
+                });
+            }
+        }
+        let mut update_index = 0usize;
+        for (paragraph, selected_paragraph) in paragraphs.iter().enumerate() {
+            let Some(first) = updates.get(update_index) else {
+                break;
+            };
+            if first.paragraph.get() > paragraph {
+                continue;
+            }
+            if first.paragraph.get() < paragraph {
+                return Err(Error::UnsupportedSource(
+                    "run-format selector cursor became inconsistent",
+                ));
+            }
+            let mut runs = selected_paragraph.runs();
+            let mut run_index = 0usize;
+            while let Some(update) = updates.get(update_index) {
+                if update.paragraph.get() != paragraph {
+                    break;
+                }
+                let requested_run = update.run.get();
+                while run_index <= requested_run {
+                    let Some(selected_run) = runs.next() else {
+                        return Err(Error::RunOutOfRange {
+                            paragraph,
+                            run: requested_run,
+                            count: run_index,
+                        });
+                    };
+                    if run_index == requested_run {
+                        let before =
+                            RunFormatPatch::from_format(selected_run.format().raw(), update.patch);
+                        staged.push(Operation::RunFormat {
+                            paragraph,
+                            run: requested_run,
+                            before,
+                            after: update.patch,
+                        });
+                    }
+                    run_index = run_index.saturating_add(1);
+                }
+                update_index = update_index.saturating_add(1);
+            }
+        }
+        if let Some(update) = updates.get(update_index) {
+            return Err(Error::ParagraphOutOfRange {
+                position: update.paragraph.get(),
+                count: paragraphs.len(),
+            });
+        }
+        self.operations.extend(staged);
+        Ok(self)
+    }
+
     /// Stages the local alignment of one checked base-snapshot paragraph.
     ///
     /// This is a property facet, not a raw control-word API. The commit writes
@@ -3258,6 +3786,7 @@ impl Edit {
             matches!(
                 operation,
                 Operation::Text { .. }
+                    | Operation::RunFormat { .. }
                     | Operation::Bold { .. }
                     | Operation::Italic { .. }
                     | Operation::Underline { .. }
@@ -3812,6 +4341,13 @@ impl Edit {
         if operation_count == 0 {
             return Ok(Commit::new(self.source.clone(), self.source, 0, Vec::new()));
         }
+        if self
+            .operations
+            .iter()
+            .all(|operation| matches!(operation, Operation::RunFormat { .. }))
+        {
+            return commit_body_run_formats(self, operation_count);
+        }
 
         if matches!(
             self.operations.as_slice(),
@@ -3925,6 +4461,7 @@ impl Edit {
                 operation,
                 Operation::Alignment { .. }
                     | Operation::ParagraphLayout { .. }
+                    | Operation::RunFormat { .. }
                     | Operation::Bold { .. }
                     | Operation::Italic { .. }
                     | Operation::Underline { .. }
@@ -4180,6 +4717,7 @@ impl Edit {
                         .push((project_base_span(*span, &self.operations)?, *after));
                 },
                 Operation::Text { .. }
+                | Operation::RunFormat { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -4707,6 +5245,217 @@ impl Edit {
     }
 }
 
+fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_runs = ordinary_run_source_map(&edit.source)?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(edit.operations.len().saturating_mul(2))
+        .map_err(|_error| Error::Write("could not reserve run-format replacements".to_string()))?;
+    let mut source_run_index = 0usize;
+    for operation in &edit.operations {
+        let Operation::RunFormat {
+            paragraph,
+            run,
+            before,
+            after,
+        } = operation
+        else {
+            return Err(Error::StructuralPropertyConflict);
+        };
+        while source_runs
+            .get(source_run_index)
+            .is_some_and(|candidate| {
+                (candidate.paragraph, candidate.run) < (*paragraph, *run)
+            })
+        {
+            source_run_index = source_run_index.saturating_add(1);
+        }
+        let source_run = source_runs
+            .get(source_run_index)
+            .filter(|candidate| candidate.paragraph == *paragraph && candidate.run == *run)
+            .ok_or(Error::RunOutOfRange {
+                paragraph: *paragraph,
+                run: *run,
+                count: 0,
+            })?;
+        source_run_index = source_run_index.saturating_add(1);
+        let changed = RunFormatPatch::changed_from(*before, *after);
+        let restore = RunFormatPatch::changed_from(*after, *before);
+        let target_bold = after.bold.unwrap_or(source_run.bold);
+        replacements.push((
+            source_run.source.start..source_run.source.start,
+            encoded_run_format_boundary_controls(
+                source_run.bold,
+                changed,
+                edit.source.limits(),
+            )?,
+        ));
+        replacements.push((
+            source_run.source.end..source_run.source.end,
+            encoded_run_format_boundary_controls(
+                target_bold,
+                restore,
+                edit.source.limits(),
+            )?,
+        ));
+    }
+    replacements.sort_by(|left, right| left.0.start.cmp(&right.0.start));
+    let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
+    validate_run_format_candidate(&edit.source, &snapshot, &edit.operations)?;
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn encoded_run_format_controls(
+    patch: RunFormatPatch,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    if let Some(value) = patch.bold {
+        write_bold(&mut output, value)?;
+    }
+    if let Some(value) = patch.italic {
+        write_italic(&mut output, value)?;
+    }
+    if let Some(value) = patch.underline {
+        write_underline(&mut output, value)?;
+    }
+    if let Some(value) = patch.size {
+        write_font_size(&mut output, value)?;
+    }
+    if let Some(value) = patch.strike {
+        write_strike(&mut output, value)?;
+    }
+    if let Some(value) = patch.double_strike {
+        write_double_strike(&mut output, value)?;
+    }
+    if let Some(value) = patch.hidden {
+        write_hidden(&mut output, value)?;
+    }
+    if let Some(value) = patch.all_caps {
+        write_all_caps(&mut output, value)?;
+    }
+    if let Some(value) = patch.small_caps {
+        write_small_caps(&mut output, value)?;
+    }
+    if let Some(value) = patch.outline {
+        write_outline(&mut output, value)?;
+    }
+    Ok(output.into_inner())
+}
+
+fn encoded_run_format_boundary_controls(
+    boundary_bold: bool,
+    patch: RunFormatPatch,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    write_bold(&mut output, boundary_bold)?;
+    let controls = encoded_run_format_controls(patch, limits)?;
+    output.append(&controls)?;
+    Ok(output.into_inner())
+}
+
+fn validate_run_format_candidate(
+    source: &Package,
+    target: &Package,
+    operations: &[Operation],
+) -> Result<(), Error> {
+    let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
+    if source_paragraphs.len() != target_paragraphs.len() {
+        return Err(Error::UnsupportedSource(
+            "candidate run-format publication changed paragraph boundaries",
+        ));
+    }
+    let mut operation_index = 0usize;
+    for (paragraph_index, (source_paragraph, target_paragraph)) in source_paragraphs
+        .iter()
+        .zip(&target_paragraphs)
+        .enumerate()
+    {
+        if source_paragraph.format().raw() != target_paragraph.format().raw() {
+            return Err(Error::UnsupportedSource(
+                "candidate run-format publication changed paragraph properties",
+            ));
+        }
+        let source_runs = source_paragraph.runs().collect::<Vec<_>>();
+        let target_runs = target_paragraph.runs().collect::<Vec<_>>();
+        if source_runs.len() != target_runs.len() {
+            return Err(Error::UnsupportedSource(
+                "candidate run-format publication changed the run axis",
+            ));
+        }
+        while operations.get(operation_index).is_some_and(|operation| {
+            matches!(
+                operation,
+                Operation::RunFormat { paragraph, .. } if *paragraph < paragraph_index
+            )
+        }) {
+            operation_index = operation_index.saturating_add(1);
+        }
+        for (run_index, (source_run, target_run)) in source_runs.iter().zip(&target_runs).enumerate() {
+            if source_run.text() != target_run.text() {
+                return Err(Error::UnsupportedSource(
+                    "candidate run-format publication changed run text",
+                ));
+            }
+            let mut expected = *source_run.format().raw();
+            while operations.get(operation_index).is_some_and(|operation| {
+                matches!(
+                    operation,
+                    Operation::RunFormat {
+                        paragraph,
+                        run,
+                        ..
+                    } if *paragraph == paragraph_index && *run < run_index
+                )
+            }) {
+                operation_index = operation_index.saturating_add(1);
+            }
+            if let Some(Operation::RunFormat { paragraph, run, after, .. }) =
+                operations.get(operation_index)
+            {
+                if *paragraph == paragraph_index && *run == run_index {
+                    after.apply_to(&mut expected);
+                    operation_index = operation_index.saturating_add(1);
+                }
+            }
+            if expected != *target_run.format().raw() {
+                return Err(Error::UnsupportedSource(
+                    "candidate run-format publication changed unrelated run properties",
+                ));
+            }
+        }
+    }
+    if operation_index != operations.len() {
+        return Err(Error::UnsupportedSource(
+            "candidate run-format publication left an unapplied operation",
+        ));
+    }
+    Ok(())
+}
+
 fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
     ensure_changed_publication_allowed(&edit.source)?;
     let source_bytes = edit
@@ -4848,7 +5597,9 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                 }];
                 (snapshot, semantic_delta)
             },
-            Operation::Text { .. } => return Err(Error::BodyDestinationConflict),
+            Operation::Text { .. } | Operation::RunFormat { .. } => {
+                return Err(Error::BodyDestinationConflict)
+            },
             _ => return Err(Error::BodyDestinationConflict),
         };
     Ok(Commit::new(
@@ -5400,6 +6151,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Expansion { .. }
             | Operation::HorizontalScale { .. }
             | Operation::Kerning { .. }
@@ -5502,6 +6254,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Expansion { .. }
             | Operation::HorizontalScale { .. }
             | Operation::Kerning { .. }
@@ -6085,6 +6838,586 @@ fn ordinary_paragraph_source_map_inner(
     Ok(OrdinaryParagraphSourceMap { paragraphs })
 }
 
+#[derive(Debug, Clone)]
+struct OrdinaryRunSource {
+    paragraph: usize,
+    run: usize,
+    bold: bool,
+    source: Range<usize>,
+}
+
+fn ordinary_run_body_source_span(
+    source: &[u8],
+    semantic_text: &str,
+    options: crate::OpenOptions,
+) -> Result<Range<usize>, Error> {
+    let lexical = std::str::from_utf8(source)
+        .map_err(|_error| Error::UnsupportedSource("ordinary run source is not UTF-8"))?;
+    let arena = Bump::new();
+    let mut lexer = crate::lexer::Lexer::new_with_limits(
+        lexical,
+        &arena,
+        options.source_limits_value(),
+    )
+    .for_document(options.leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut depth = 0usize;
+    let mut start = None;
+    let mut end = None;
+    for (index, (token, span)) in tokens.iter().zip(&spans).enumerate() {
+        if depth == 1 && start.is_none() && index != 0 {
+            // Keep root-level defaults such as `\\uc0` in the lexical span.
+            // They affect the first grouped body run even when a destination
+            // group precedes it; the mapper skips those destinations below.
+            start = Some(span.start);
+        }
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                depth = depth.checked_add(1).ok_or(Error::UnsupportedSource(
+                    "ordinary run source group nesting overflowed",
+                ))?;
+            },
+            crate::lexer::Token::CloseBrace => {
+                if depth == 1 {
+                    end = Some(span.start);
+                    break;
+                }
+                depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
+                    "ordinary run source has an unmatched closing group",
+                ))?;
+            },
+            _ => {},
+        }
+    }
+    let root_end = end.ok_or(Error::UnsupportedSource(
+        "ordinary run source root group has no closing boundary",
+    ))?;
+    match start {
+        Some(start) => Ok(start..root_end),
+        None if semantic_text.is_empty() => Ok(root_end..root_end),
+        None => Err(Error::UnsupportedSource(
+            "ordinary run source has no body text span",
+        )),
+    }
+}
+
+fn ordinary_run_group_is_destination(
+    tokens: &[crate::lexer::Token<'_>],
+    open_index: usize,
+) -> bool {
+    let index = open_index.saturating_add(1);
+    if matches!(
+        tokens.get(index),
+        Some(crate::lexer::Token::Control(
+            crate::lexer::ControlWord::IgnorableDestination
+        ))
+    ) {
+        return true;
+    }
+    matches!(
+        tokens.get(index),
+        Some(crate::lexer::Token::Control(
+            crate::lexer::ControlWord::FontTable
+                | crate::lexer::ControlWord::ColorTable
+                | crate::lexer::ControlWord::StyleSheet
+                | crate::lexer::ControlWord::Info
+                | crate::lexer::ControlWord::FileTable
+                | crate::lexer::ControlWord::ListTable
+                | crate::lexer::ControlWord::ListOverrideTable
+                | crate::lexer::ControlWord::Header
+                | crate::lexer::ControlWord::HeaderFirst
+                | crate::lexer::ControlWord::HeaderLeft
+                | crate::lexer::ControlWord::HeaderRight
+                | crate::lexer::ControlWord::Footer
+                | crate::lexer::ControlWord::FooterFirst
+                | crate::lexer::ControlWord::FooterLeft
+                | crate::lexer::ControlWord::FooterRight
+                | crate::lexer::ControlWord::Footnote
+                | crate::lexer::ControlWord::Endnote
+                | crate::lexer::ControlWord::Annotation
+                | crate::lexer::ControlWord::Field
+                | crate::lexer::ControlWord::FieldInstruction
+                | crate::lexer::ControlWord::FieldResult
+                | crate::lexer::ControlWord::Object
+                | crate::lexer::ControlWord::Picture
+                | crate::lexer::ControlWord::Result
+                | crate::lexer::ControlWord::Shape(_)
+                | crate::lexer::ControlWord::ShapeGroup(_)
+                | crate::lexer::ControlWord::XmlNamespaceTable
+                | crate::lexer::ControlWord::DocumentVariable
+                | crate::lexer::ControlWord::UserProperties
+                | crate::lexer::ControlWord::DataStore
+                | crate::lexer::ControlWord::Generator
+        ))
+    )
+}
+
+/// Proves source ranges for the borrowed ordinary-body run axis.
+///
+/// The map keeps all original bytes between the mapped visible tokens. The
+/// lexer deliberately reports the source span of an escaped character (for
+/// example `\\{`) while returning its one-character semantic value; keeping
+/// those two widths separate is what lets a run splice retain escaped and
+/// hexadecimal text. Unicode controls are handled together with their RTF
+/// fallback tokens. Visible inline structure, binary data, and dependent
+/// destinations still fail closed because they have no ordinary run byte
+/// range that this operation can safely address.
+fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, Error> {
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::UnsupportedSource(
+            "run-format editing refuses compressed RTF",
+        ));
+    }
+    if !source.tables().is_empty()
+        || !source.fields().is_empty()
+        || !source.objects().is_empty()
+        || !source.pictures().is_empty()
+        || !source.shapes().is_empty()
+        || !source.revisions().is_empty()
+        || !source.annotations().is_empty()
+        || !source.notes().is_empty()
+        || !source.model().form_fields().is_empty()
+    {
+        return Err(Error::UnsupportedSource(
+            "run-format editing refuses dependent body destinations or review content",
+        ));
+    }
+    if source
+        .body()
+        .inlines()
+        .any(|inline| matches!(inline, crate::text::Inline::Break(crate::text::Break::Line)))
+    {
+        return Err(Error::UnsupportedSource(
+            "run-format editing refuses inline line breaks",
+        ));
+    }
+    // The model's compact span cache intentionally excludes nested root
+    // groups, since the older uniform-body writer cannot preserve them. A
+    // run splice can preserve such groups byte-for-byte, so locate the body
+    // with the nested-group-capable scanner when the cache is absent.
+    let body_span = match source.model().ordinary_body_source_span() {
+        Some(span) if span.start <= span.end && span.end <= source_bytes.len() => span,
+        Some(_) | None => ordinary_run_body_source_span(
+            source_bytes,
+            source.text(),
+            source.options(),
+        )?,
+    };
+    if body_span.start > body_span.end || body_span.end > source_bytes.len() {
+        return Err(Error::UnsupportedSource(
+            "ordinary run source span is malformed",
+        ));
+    }
+    let body_bytes = source_bytes
+        .get(body_span.clone())
+        .ok_or(Error::UnsupportedSource(
+            "ordinary run source span is outside the source",
+        ))?;
+    let body_input = std::str::from_utf8(body_bytes)
+        .map_err(|_error| Error::UnsupportedSource("ordinary run source is not UTF-8"))?;
+    let paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    let paragraph_runs = paragraphs
+        .iter()
+        .map(|paragraph| paragraph.runs().collect::<Vec<_>>())
+        .collect::<Vec<_>>();
+    let arena = Bump::new();
+    let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
+        .with_leniency(source.options().leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    if tokens.len() != spans.len() {
+        return Err(Error::UnsupportedSource(
+            "ordinary run source token map is inconsistent",
+        ));
+    }
+
+    let mut result = Vec::new();
+    result
+        .try_reserve_exact(source.body().runs().count())
+        .map_err(|_error| Error::Write("could not reserve run source map".to_string()))?;
+    let mut paragraph = 0usize;
+    let mut run = 0usize;
+    let mut run_offset = 0usize;
+    let mut run_source_start = None;
+    let mut unicode_skip = 1usize;
+    let mut unicode_skip_stack = Vec::new();
+    let mut ignored_group_depth = 0usize;
+    let mut text_offset = 0usize;
+    let mut token_index = 0usize;
+    while token_index < tokens.len() {
+        let token = tokens
+            .get(token_index)
+            .ok_or(Error::UnsupportedSource("ordinary run token disappeared"))?;
+        let relative_span = spans
+            .get(token_index)
+            .ok_or(Error::UnsupportedSource("ordinary run token span disappeared"))?;
+        let absolute_span = relative_span
+            .start
+            .checked_add(body_span.start)
+            .and_then(|start| {
+                relative_span
+                    .end
+                    .checked_add(body_span.start)
+                    .map(|end| start..end)
+            })
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+        let current_text_offset = text_offset;
+        text_offset = 0;
+        let ignored_before = ignored_group_depth;
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                unicode_skip_stack.push(unicode_skip);
+                if ignored_before != 0
+                    || ordinary_run_group_is_destination(&tokens, token_index)
+                {
+                    ignored_group_depth = ignored_group_depth.saturating_add(1);
+                }
+            },
+            crate::lexer::Token::CloseBrace => {
+                unicode_skip = unicode_skip_stack.pop().ok_or(
+                    Error::UnsupportedSource("ordinary run source has an unmatched closing group"),
+                )?;
+                if ignored_before != 0 {
+                    ignored_group_depth = ignored_group_depth.saturating_sub(1);
+                }
+            },
+            _ => {},
+        }
+        if ignored_before != 0
+            || (matches!(token, crate::lexer::Token::OpenBrace)
+                && ignored_group_depth != 0)
+        {
+            token_index = token_index.saturating_add(1);
+            continue;
+        }
+        let mut visible = None;
+        let mut visible_span = absolute_span.clone();
+        match token {
+            crate::lexer::Token::OpenBrace | crate::lexer::Token::CloseBrace => {},
+            crate::lexer::Token::Text(value) => {
+                let value = value.as_ref().get(current_text_offset..).ok_or(
+                    Error::UnsupportedSource("ordinary run text suffix is not a character boundary"),
+                )?;
+                if !value.is_empty() {
+                    let start = absolute_span
+                        .start
+                        .checked_add(current_text_offset)
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: source.limits().max_input_bytes(),
+                        })?;
+                    visible_span = start..absolute_span.end;
+                    visible = Some(value.to_owned());
+                }
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Unicode(_)) => {
+                let mut end = token_index;
+                let mut units = Vec::new();
+                loop {
+                    let Some(crate::lexer::Token::Control(
+                        crate::lexer::ControlWord::Unicode(value),
+                    )) = tokens.get(end)
+                    else {
+                        return Err(Error::UnsupportedSource(
+                            "ordinary Unicode run lost its control token",
+                        ));
+                    };
+                    units.push(*value as u16);
+                    end = end.saturating_add(1);
+                    if matches!(
+                        tokens.get(end),
+                        Some(crate::lexer::Token::Control(
+                            crate::lexer::ControlWord::Unicode(_)
+                        ))
+                    ) {
+                        continue;
+                    }
+                    let high = units
+                        .last()
+                        .is_some_and(|unit| (0xd800..=0xdbff).contains(unit));
+                    let owed = unicode_skip.saturating_mul(units.len());
+                    if high {
+                        let mut candidate = end;
+                        let mut remaining = owed;
+                        while remaining != 0 {
+                            let Some(fallback) = tokens.get(candidate) else {
+                                break;
+                            };
+                            match fallback {
+                                crate::lexer::Token::Text(value) => {
+                                    let count = value.chars().count();
+                                    if count > remaining {
+                                        break;
+                                    }
+                                    remaining = remaining.saturating_sub(count);
+                                },
+                                crate::lexer::Token::Control(control)
+                                    if run_control_symbol_text(control).is_some() => {
+                                        remaining = remaining.saturating_sub(1);
+                                    },
+                                _ => break,
+                            }
+                            candidate = candidate.saturating_add(1);
+                        }
+                        if remaining == 0
+                            && matches!(
+                                tokens.get(candidate),
+                                Some(crate::lexer::Token::Control(
+                                    crate::lexer::ControlWord::Unicode(value)
+                                )) if (0xdc00..=0xdfff).contains(&(*value as u16))
+                            )
+                        {
+                            end = candidate;
+                            continue;
+                        }
+                    }
+                    break;
+                }
+                let fallback_count = unicode_skip.saturating_mul(units.len());
+                let mut remaining_fallback = fallback_count;
+                let mut fallback_cursor = end;
+                let mut partial_fallback_end = None;
+                while remaining_fallback != 0 {
+                    let Some(fallback) = tokens.get(fallback_cursor) else {
+                        break;
+                    };
+                    match fallback {
+                        crate::lexer::Token::Text(value) => {
+                            let count = value.chars().count();
+                            if count > remaining_fallback {
+                                let prefix_bytes = value
+                                    .char_indices()
+                                    .nth(remaining_fallback)
+                                    .map_or(value.len(), |(offset, _)| offset);
+                                let fallback_span = spans.get(fallback_cursor).ok_or(
+                                    Error::UnsupportedSource(
+                                        "ordinary Unicode fallback span disappeared",
+                                    ),
+                                )?;
+                                partial_fallback_end = Some(
+                                    fallback_span
+                                        .start
+                                        .checked_add(prefix_bytes)
+                                        .and_then(|end| end.checked_add(body_span.start))
+                                        .ok_or(Error::InputTooLarge {
+                                            observed: usize::MAX,
+                                            limit: source.limits().max_input_bytes(),
+                                        })?,
+                                );
+                                remaining_fallback = 0;
+                                text_offset = prefix_bytes;
+                                break;
+                            }
+                            remaining_fallback = remaining_fallback.saturating_sub(count);
+                        },
+                        crate::lexer::Token::Control(control)
+                            if run_control_symbol_text(control).is_some() => {
+                                remaining_fallback = remaining_fallback.saturating_sub(1);
+                            },
+                        crate::lexer::Token::Control(
+                            crate::lexer::ControlWord::Unicode(_),
+                        ) => break,
+                        _ => {
+                            return Err(Error::UnsupportedSource(
+                                "ordinary Unicode fallback contains structure",
+                            ));
+                        },
+                    }
+                    fallback_cursor = fallback_cursor.saturating_add(1);
+                }
+                let end_index = fallback_cursor
+                    .saturating_sub(1)
+                    .max(end.saturating_sub(1));
+                let end_span = spans
+                    .get(end_index)
+                    .ok_or(Error::UnsupportedSource("ordinary Unicode span disappeared"))?;
+                let end = partial_fallback_end.unwrap_or_else(|| {
+                    end_span.end.saturating_add(body_span.start)
+                });
+                visible_span = relative_span.start
+                    .checked_add(body_span.start)
+                    .map(|start| start..end)
+                    .ok_or(Error::InputTooLarge {
+                        observed: usize::MAX,
+                        limit: source.limits().max_input_bytes(),
+                    })?;
+                let decoded = String::from_utf16_lossy(&units);
+                visible = Some(decoded);
+                token_index = if partial_fallback_end.is_some() {
+                    fallback_cursor
+                } else {
+                    fallback_cursor.saturating_sub(1)
+                };
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Par) => {
+                let selected_paragraph = paragraph_runs.get(paragraph).ok_or(
+                    Error::UnsupportedSource("ordinary run source has excess paragraph breaks"),
+                )?;
+                if run < selected_paragraph.len() || run_offset != 0 {
+                    return Err(Error::UnsupportedSource(
+                        "ordinary run source paragraph ended inside a run",
+                    ));
+                }
+                paragraph = paragraph.saturating_add(1);
+                run = 0;
+                run_offset = 0;
+                run_source_start = None;
+                if paragraph > paragraphs.len() {
+                    return Err(Error::UnsupportedSource(
+                        "ordinary run source has excess paragraph breaks",
+                    ));
+                }
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::UnicodeSkip(value)) => {
+                unicode_skip = (*value).max(0) as usize;
+            },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Line)
+            | crate::lexer::Token::Control(crate::lexer::ControlWord::Tab)
+            | crate::lexer::Token::Control(crate::lexer::ControlWord::SoftLineBreak(_))
+            | crate::lexer::Token::Control(crate::lexer::ControlWord::SoftLineHeight(_)) => {
+                return Err(Error::UnsupportedSource(
+                    "ordinary run source contains a visible or structural control",
+                ));
+            },
+            crate::lexer::Token::Control(control) => {
+                visible = run_control_symbol_text(control).map(str::to_owned);
+                if visible.is_none() && matches!(
+                    control,
+                    crate::lexer::ControlWord::NonBreakingSpace
+                        | crate::lexer::ControlWord::OptionalHyphen
+                        | crate::lexer::ControlWord::NonBreakingHyphen
+                        | crate::lexer::ControlWord::EmDash
+                        | crate::lexer::ControlWord::EnDash
+                        | crate::lexer::ControlWord::EmSpace
+                        | crate::lexer::ControlWord::EnSpace
+                        | crate::lexer::ControlWord::QuarterEmSpace
+                        | crate::lexer::ControlWord::Bullet
+                        | crate::lexer::ControlWord::LeftSingleQuote
+                        | crate::lexer::ControlWord::RightSingleQuote
+                        | crate::lexer::ControlWord::LeftDoubleQuote
+                        | crate::lexer::ControlWord::RightDoubleQuote
+                        | crate::lexer::ControlWord::LeftToRightMark
+                        | crate::lexer::ControlWord::RightToLeftMark
+                        | crate::lexer::ControlWord::ZeroWidthJoiner
+                        | crate::lexer::ControlWord::ZeroWidthNonJoiner
+                        | crate::lexer::ControlWord::ZeroWidthBreakOpportunity
+                        | crate::lexer::ControlWord::ZeroWidthNoBreakOpportunity
+                ) {
+                    return Err(Error::UnsupportedSource(
+                        "ordinary run source control symbol has no semantic mapping",
+                    ));
+                }
+            },
+            crate::lexer::Token::Binary(_) => {
+                return Err(Error::UnsupportedSource(
+                    "ordinary run source contains binary data",
+                ));
+            },
+        }
+        if let Some(value) = visible {
+            let value = value.as_str();
+            if value.is_empty() {
+                token_index = token_index.saturating_add(1);
+                continue;
+            }
+            let selected_paragraph = paragraph_runs.get(paragraph).ok_or(
+                Error::UnsupportedSource("ordinary run source has excess visible text"),
+            )?;
+            let selected_run = selected_paragraph.get(run).copied().ok_or(
+                Error::UnsupportedSource("ordinary run source has excess visible text"),
+            )?;
+            let expected = selected_run.text();
+            let remaining = expected.get(run_offset..).ok_or(Error::UnsupportedSource(
+                "ordinary run source text offset is invalid",
+            ))?;
+            if !remaining.starts_with(value) {
+                return Err(Error::UnsupportedSource(
+                    "ordinary run source text does not match the run axis",
+                ));
+            }
+            if value.len() > remaining.len() {
+                return Err(Error::UnsupportedSource(
+                    "ordinary run source token crosses a native run boundary",
+                ));
+            }
+            run_source_start.get_or_insert(visible_span.start);
+            run_offset = run_offset.saturating_add(value.len());
+            if run_offset == expected.len() {
+                let start = run_source_start.take().ok_or(Error::UnsupportedSource(
+                    "ordinary run source has no text start",
+                ))?;
+                let end = visible_span.end;
+                if start >= end {
+                    return Err(Error::UnsupportedSource(
+                        "ordinary run source text range is empty",
+                    ));
+                }
+                result.push(OrdinaryRunSource {
+                    paragraph,
+                    run,
+                    bold: selected_run.format().raw().bold,
+                    source: start..end,
+                });
+                run = run.saturating_add(1);
+                run_offset = 0;
+            }
+        }
+        if text_offset != 0 {
+            continue;
+        }
+        token_index = token_index.saturating_add(1);
+    }
+    let final_unterminated_paragraph = paragraph
+        .checked_add(1)
+        .is_some_and(|next| next == paragraphs.len())
+        && paragraph_runs
+            .get(paragraph)
+            .is_some_and(|selected| run == selected.len() && run_offset == 0);
+    if !unicode_skip_stack.is_empty()
+        || ignored_group_depth != 0
+        || (paragraph != paragraphs.len() && !final_unterminated_paragraph)
+        || paragraph_runs
+            .get(paragraph)
+            .is_some_and(|selected| run < selected.len() || run_offset != 0)
+        || result.len() != source.body().runs().count()
+    {
+        return Err(Error::UnsupportedSource(
+            "ordinary run source map does not cover the complete body story",
+        ));
+    }
+    Ok(result)
+}
+
+fn run_control_symbol_text(control: &crate::lexer::ControlWord<'_>) -> Option<&'static str> {
+    match control {
+        crate::lexer::ControlWord::NonBreakingSpace => Some("\u{00a0}"),
+        crate::lexer::ControlWord::OptionalHyphen => Some("\u{00ad}"),
+        crate::lexer::ControlWord::NonBreakingHyphen => Some("\u{2011}"),
+        crate::lexer::ControlWord::EmDash => Some("\u{2014}"),
+        crate::lexer::ControlWord::EnDash => Some("\u{2013}"),
+        crate::lexer::ControlWord::EmSpace => Some("\u{2003}"),
+        crate::lexer::ControlWord::EnSpace => Some("\u{2002}"),
+        crate::lexer::ControlWord::QuarterEmSpace => Some("\u{2005}"),
+        crate::lexer::ControlWord::Bullet => Some("\u{2022}"),
+        crate::lexer::ControlWord::LeftSingleQuote => Some("\u{2018}"),
+        crate::lexer::ControlWord::RightSingleQuote => Some("\u{2019}"),
+        crate::lexer::ControlWord::LeftDoubleQuote => Some("\u{201c}"),
+        crate::lexer::ControlWord::RightDoubleQuote => Some("\u{201d}"),
+        crate::lexer::ControlWord::LeftToRightMark => Some("\u{200e}"),
+        crate::lexer::ControlWord::RightToLeftMark => Some("\u{200f}"),
+        crate::lexer::ControlWord::ZeroWidthJoiner => Some("\u{200d}"),
+        crate::lexer::ControlWord::ZeroWidthNonJoiner => Some("\u{200c}"),
+        crate::lexer::ControlWord::ZeroWidthBreakOpportunity => Some("\u{200b}"),
+        crate::lexer::ControlWord::ZeroWidthNoBreakOpportunity => Some("\u{feff}"),
+        _ => None,
+    }
+}
+
 /// Locates the contiguous root-level ordinary body span, including leading
 /// `\\par` controls that represent empty paragraphs. The retained parser span
 /// intentionally starts at the first literal text, which is insufficient for
@@ -6214,6 +7547,7 @@ fn project_text(
             },
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -6415,6 +7749,7 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
         Operation::Text { .. }
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }
+        | Operation::RunFormat { .. }
         | Operation::Bold { .. }
         | Operation::Italic { .. }
         | Operation::Underline { .. }
@@ -6695,6 +8030,7 @@ fn base_bold_for_edit(source: &Package, operations: &[Operation]) -> Result<bool
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
@@ -6760,6 +8096,7 @@ fn base_bold_for_edit(source: &Package, operations: &[Operation]) -> Result<bool
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
@@ -6815,6 +8152,7 @@ fn base_italic_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
@@ -6880,6 +8218,7 @@ fn base_italic_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
@@ -6938,6 +8277,7 @@ fn base_underline_for_edit(
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Strike { .. }
@@ -7003,6 +8343,7 @@ fn base_underline_for_edit(
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Strike { .. }
@@ -7061,6 +8402,7 @@ fn base_font_size_for_edit(
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -7126,6 +8468,7 @@ fn base_font_size_for_edit(
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -7450,6 +8793,7 @@ fn base_baseline_for_edit(
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -7515,6 +8859,7 @@ fn base_baseline_for_edit(
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -7584,6 +8929,7 @@ fn base_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -7649,6 +8995,7 @@ fn base_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -7690,6 +9037,7 @@ fn base_double_strike_for_edit(source: &Package, operations: &[Operation]) -> Re
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -7755,6 +9103,7 @@ fn base_double_strike_for_edit(source: &Package, operations: &[Operation]) -> Re
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -7810,6 +9159,7 @@ fn base_hidden_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -7875,6 +9225,7 @@ fn base_hidden_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -7930,6 +9281,7 @@ fn base_small_caps_for_edit(source: &Package, operations: &[Operation]) -> Resul
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -7995,6 +9347,7 @@ fn base_small_caps_for_edit(source: &Package, operations: &[Operation]) -> Resul
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -8050,6 +9403,7 @@ fn base_all_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -8115,6 +9469,7 @@ fn base_all_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<
                 Operation::Text { .. }
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
+                | Operation::RunFormat { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -8172,6 +9527,7 @@ fn operation_changes_semantics(operation: &Operation) -> bool {
         | Operation::ShapeText { before, after, .. } => before != after,
         Operation::Alignment { before, after, .. } => before != after,
         Operation::ParagraphLayout { before, after, .. } => before != after,
+        Operation::RunFormat { before, after, .. } => before != after,
         Operation::Bold { before, after, .. }
         | Operation::Italic { before, after, .. }
         | Operation::Strike { before, after, .. }
@@ -8726,6 +10082,7 @@ fn project_base_position(position: usize, operations: &[Operation]) -> Result<us
             },
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -10082,6 +11439,12 @@ enum Change {
         before: ParagraphLayout,
         after: ParagraphLayout,
     },
+    RunFormat {
+        paragraph: usize,
+        run: usize,
+        before: RunFormatPatch,
+        after: RunFormatPatch,
+    },
     Bold {
         span: TextSpan,
         after_span: TextSpan,
@@ -10285,6 +11648,17 @@ impl Change {
             } => Self::ParagraphLayout {
                 position: *position,
                 fields: *fields,
+                before: *after,
+                after: *before,
+            },
+            Self::RunFormat {
+                paragraph,
+                run,
+                before,
+                after,
+            } => Self::RunFormat {
+                paragraph: *paragraph,
+                run: *run,
                 before: *after,
                 after: *before,
             },
@@ -10637,6 +12011,7 @@ impl Change {
                 )),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
+            | Self::RunFormat { .. }
             | Self::Bold { .. }
             | Self::Italic { .. }
             | Self::Underline { .. }
@@ -10784,6 +12159,17 @@ fn semantic_changes_with_replacement(
             } if before != after => Some(Change::ParagraphLayout {
                 position: *position,
                 fields: *fields,
+                before: *before,
+                after: *after,
+            }),
+            Operation::RunFormat {
+                paragraph,
+                run,
+                before,
+                after,
+            } if before != after => Some(Change::RunFormat {
+                paragraph: *paragraph,
+                run: *run,
                 before: *before,
                 after: *after,
             }),
@@ -11099,6 +12485,7 @@ fn semantic_changes_with_replacement(
             Operation::Text { .. }
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
+            | Operation::RunFormat { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -11228,6 +12615,15 @@ impl Patch {
         {
             return Err(litchi_core::patch::PatchError::InvalidText {
                 field: "RTF paragraph-layout durable patches are not supported",
+            });
+        }
+        if self
+            .changes
+            .iter()
+            .any(|change| matches!(change, Change::RunFormat { .. }))
+        {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF run-format patches are source-bound",
             });
         }
         if self
@@ -11395,6 +12791,9 @@ fn durable_operation(
             after: _,
         } => Err(litchi_core::patch::PatchError::InvalidText {
             field: "RTF paragraph-layout durable patches are not supported",
+        }),
+        Change::RunFormat { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF run-format patches are source-bound",
         }),
         Change::Bold {
             span,

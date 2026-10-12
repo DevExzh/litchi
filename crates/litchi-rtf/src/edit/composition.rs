@@ -367,6 +367,7 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         Operation::Text { .. }
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }
+        | Operation::RunFormat { .. }
         | Operation::Bold { .. }
         | Operation::Italic { .. }
         | Operation::Underline { .. }
