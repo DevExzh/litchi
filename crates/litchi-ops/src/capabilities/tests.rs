@@ -370,7 +370,7 @@ fn rtf_advertises_native_paragraph_structural_writes_and_keeps_closure_gaps() {
     let paragraph = capabilities.element("paragraph").expect("RTF paragraph");
     assert!(paragraph.operations().set);
     assert!(paragraph.operations().remove);
-    assert!(!paragraph.operations().add);
+    assert!(paragraph.operations().add);
     assert!(paragraph.property("text").expect("paragraph text").add());
     let align = paragraph.property("align").expect("paragraph alignment");
     assert!(align.get());

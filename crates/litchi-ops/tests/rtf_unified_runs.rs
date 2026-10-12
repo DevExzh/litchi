@@ -154,14 +154,14 @@ fn compiled_run_queries_are_reusable_and_bound_to_current_immutable_owner() {
 }
 
 #[test]
-fn run_capabilities_admit_sets_and_removal_with_other_structural_gaps() {
+fn run_capabilities_admit_sets_adds_and_removal_with_ordering_gaps() {
     let file = open_bytes(br"{\rtf1\ansi First\par Second}").unwrap();
     let before = file.to_bytes().unwrap();
     let run = file.capabilities().element("r").unwrap();
     assert!(run.gap().is_none());
     let ops = run.operations();
     assert!(ops.get && ops.query);
-    assert!(ops.set && !ops.add && ops.remove);
+    assert!(ops.set && ops.add && ops.remove);
     let writable = [
         "text",
         "size",
@@ -178,7 +178,7 @@ fn run_capabilities_admit_sets_and_removal_with_other_structural_gaps() {
     for property in run.properties() {
         assert!(property.get());
         assert_eq!(property.set(), writable.contains(&property.name()));
-        assert!(!property.add());
+        assert_eq!(property.add(), writable.contains(&property.name()));
     }
     assert!(
         file.capabilities()
@@ -196,9 +196,19 @@ fn run_capabilities_admit_sets_and_removal_with_other_structural_gaps() {
     assert!(file.remove(Query::parse("r").unwrap()).is_err()); // unscoped mutation
     assert!(file.move_to("/body/p[1]/r[1]", Placement::End).is_err());
     assert!(file.swap("/body/p[1]/r[1]", "/body/p[2]").is_err());
-    assert!(
-        file.add("/body/p[1]", NewNode::new("r").prop("text", "bad"))
-            .is_err()
+    let added = file
+        .add("/body/p[1]", NewNode::new("r").prop("text", "added"))
+        .unwrap();
+    assert_eq!(
+        added
+            .file
+            .get(&added.path)
+            .unwrap()
+            .view()
+            .text()
+            .unwrap()
+            .as_deref(),
+        Some("added")
     );
     assert_eq!(file.to_bytes().unwrap(), before);
 }

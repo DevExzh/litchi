@@ -1640,7 +1640,7 @@ enum Operation {
         span: TextSpan,
         text: String,
         format: Option<RunFormatPatch>,
-        inherited: crate::types::Formatting,
+        inherited: Box<crate::types::Formatting>,
         after: crate::types::Formatting,
     },
     Bold {
@@ -4001,7 +4001,7 @@ impl Edit {
                 span,
                 text: insertion.text.clone(),
                 format: insertion.format,
-                inherited,
+                inherited: Box::new(inherited),
                 after,
             });
         }
@@ -6354,7 +6354,7 @@ fn validate_run_insert_candidate(
                         "run-insertion operation order is inconsistent",
                     ));
                 }
-                if format.is_none() && after != inherited {
+                if format.is_none() && after != inherited.as_ref() {
                     return Err(Error::UnsupportedSource(
                         "run-insertion inheritance precondition changed",
                     ));
@@ -6385,7 +6385,7 @@ fn validate_run_insert_candidate(
             else {
                 return Err(Error::StructuralPropertyConflict);
             };
-            if format.is_none() && after != inherited {
+            if format.is_none() && after != inherited.as_ref() {
                 return Err(Error::UnsupportedSource(
                     "run-insertion inheritance precondition changed",
                 ));
@@ -8196,7 +8196,7 @@ fn empty_paragraph_boundary_formats(
     }
     let mut formats = vec![None; paragraph_starts.len()];
     let mut next_empty = 0usize;
-    while next_empty < empty_paragraphs.len() && !empty_paragraphs[next_empty] {
+    while empty_paragraphs.get(next_empty) == Some(&false) {
         next_empty = next_empty.saturating_add(1);
     }
     let mut block_start = 0usize;
@@ -8230,9 +8230,12 @@ fn empty_paragraph_boundary_formats(
                     "empty paragraph has no retained native newline block",
                 ));
             }
-            formats[paragraph_index] = Some(block.formatting);
+            let format = formats.get_mut(paragraph_index).ok_or(Error::UnsupportedSource(
+                "empty paragraph formatting slot is missing",
+            ))?;
+            *format = Some(block.formatting);
             next_empty = paragraph_index.saturating_add(1);
-            while next_empty < empty_paragraphs.len() && !empty_paragraphs[next_empty] {
+            while empty_paragraphs.get(next_empty) == Some(&false) {
                 next_empty = next_empty.saturating_add(1);
             }
         }
@@ -12009,8 +12012,9 @@ fn project_run_insertion_opaque_position(
             || (change.semantic_position == source_position
                 && change.source_offset <= node_source_offset)
     });
-    let prefix_inserted_len = changes
-        .get(change_count.saturating_sub(1))
+    let prefix_inserted_len = change_count
+        .checked_sub(1)
+        .and_then(|index| changes.get(index))
         .map_or(0, |change| change.prefix_inserted_len);
     source_position
         .checked_add(prefix_inserted_len)
@@ -12056,7 +12060,7 @@ fn validate_opaque_preservation(
         .as_ref()
         .map(|source_offsets| run_insertion_position_changes(operations, source_offsets))
         .transpose()?;
-    let position_changes = (!run_insert_source_offsets.is_some())
+    let position_changes = run_insert_source_offsets.is_none()
         .then(|| base_position_changes(Some(source), operations))
         .transpose()?;
     for (node_index, (source_node, target_node)) in

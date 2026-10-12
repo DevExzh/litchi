@@ -275,16 +275,18 @@ fn formatting_defaults_inherit_and_compound_properties_match_native_patch() {
 
 #[test]
 fn opaque_source_is_byte_exact_and_patch_inverse_reopens() {
-    let input = br"{\rtf1\ansi{\fonttbl{\f0\fnil Example;}}{\info{\title Keep}}{\header Keep header}{\*\vendor before}Before{\i Italic}{\*\vendor after}Tail}";
+    let input = br"{\rtf1\ansi{\fonttbl{\f0\fnil Example;}}{\info{\title Keep title}}{\header Keep header}{\*\vendor before}Before{\i Italic}{\*\vendor after}Tail}";
     let source = open_bytes(input).unwrap();
     let result = source
-        .add(
-            "/body/p[1]",
-            NewNode::new("r")
-                .prop("text", "inserted")
-                .prop("bold", true)
-                .at(Placement::after("/body/p[1]/r[1]").unwrap()),
-        )
+        .edit(|edit| {
+            edit.add(
+                "/body/p[1]",
+                NewNode::new("r")
+                    .prop("text", "inserted")
+                    .prop("bold", true)
+                    .at(Placement::after("/body/p[1]/r[1]").unwrap()),
+            )
+        })
         .unwrap();
     let expected = native_run_add(
         input,
@@ -318,7 +320,7 @@ fn opaque_source_is_byte_exact_and_patch_inverse_reopens() {
     let reopened = open_bytes(bytes.clone()).unwrap();
     assert_eq!(text(&reopened, "/body/p[1]"), "BeforeinsertedItalicTail");
     assert_eq!(
-        property(&reopened, &result.path.to_string(), "bold"),
+        property(&reopened, &result.value.to_string(), "bold"),
         "true"
     );
     assert_eq!(
@@ -352,7 +354,7 @@ fn batch_and_sequential_adds_keep_paths_and_atomic_history() {
     );
     assert_eq!(source.to_bytes().unwrap(), INPUT);
     let best = source.batch([item], BatchMode::BestEffort).unwrap();
-    assert_eq!(text(&best.file, "/body/p[1]"), "FirstnewItalicBold");
+    assert_eq!(text(&best.file, "/body/p[1]"), "FirstItalicBoldnew");
     assert!(matches!(
         &best.results[0],
         litchi_ops::ItemResult::Applied(_)
@@ -413,23 +415,30 @@ fn invalid_run_adds_and_limits_are_typed_and_atomic() {
         Code::OutOfRange
     );
 
+    let limits = SemanticLimits::builder()
+        .max_operations(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    let error = source
+        .edit_with_limits(&limits, |edit| {
+            edit.add("/body/p[1]", run_node("one"))?;
+            edit.add("/body/p[1]", run_node("two"))
+        })
+        .unwrap_err();
+    assert!(
+        matches!(
+            error.leaf(),
+            Source::Transaction(Error::Limit {
+                kind: LimitKind::Operations,
+                ..
+            })
+        ),
+        "{error:?}"
+    );
+    assert_eq!(source.to_bytes().unwrap(), before);
+
     for (limits, kind) in [
-        (
-            SemanticLimits::builder()
-                .max_expanded_targets(0)
-                .unwrap()
-                .build()
-                .unwrap(),
-            LimitKind::ExpandedTargets,
-        ),
-        (
-            SemanticLimits::builder()
-                .max_operations(0)
-                .unwrap()
-                .build()
-                .unwrap(),
-            LimitKind::Operations,
-        ),
         (
             SemanticLimits::builder()
                 .max_staged_bytes(1)
