@@ -2957,18 +2957,170 @@
         },
         {
           "name": "snapshot",
-          "scope": "litchi_rtf::tail_append::TailAppendCommit",
+          "scope": "litchi_rtf::tail_append::Commit",
           "replacement": "use package, into_package or into_parts",
           "recursive": false
         },
         {
           "name": "apply",
-          "scope": "litchi_rtf::tail_append::TailAppendPatch",
+          "scope": "litchi_rtf::tail_append::Patch",
           "replacement": "use Package::apply_tail_append",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendEdit",
+          "scope": "litchi_rtf",
+          "replacement": "use tail_append::Edit",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendEdit",
+          "scope": "litchi_rtf::tail_append",
+          "replacement": "use tail_append::Edit",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendCommit",
+          "scope": "litchi_rtf",
+          "replacement": "use tail_append::Commit",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendCommit",
+          "scope": "litchi_rtf::tail_append",
+          "replacement": "use tail_append::Commit",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendPatch",
+          "scope": "litchi_rtf",
+          "replacement": "use tail_append::Patch",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendPatch",
+          "scope": "litchi_rtf::tail_append",
+          "replacement": "use tail_append::Patch",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendDiagnostics",
+          "scope": "litchi_rtf",
+          "replacement": "use tail_append::Diagnostics",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendDiagnostics",
+          "scope": "litchi_rtf::tail_append",
+          "replacement": "use tail_append::Diagnostics",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendError",
+          "scope": "litchi_rtf",
+          "replacement": "use tail_append::Error",
+          "recursive": false
+        },
+        {
+          "name": "TailAppendError",
+          "scope": "litchi_rtf::tail_append",
+          "replacement": "use tail_append::Error",
+          "recursive": false
+        },
+        {
+          "name": "tail_append",
+          "scope": "litchi_rtf::read::Package",
+          "replacement": "use edit_tail_append or edit_tail_append_with_limits",
+          "recursive": false
+        },
+        {
+          "name": "tail_append_with_limits",
+          "scope": "litchi_rtf::read::Package",
+          "replacement": "use edit_tail_append or edit_tail_append_with_limits",
+          "recursive": false
+        },
+        {
+          "name": "LimitExceeded",
+          "scope": "litchi_rtf::tail_append::Error",
+          "replacement": "use Limit with typed LimitKind",
+          "recursive": false
+        },
+        {
+          "name": "append_plain_paragraphs",
+          "scope": "litchi_rtf::tail_append::Edit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "append_plain_runs",
+          "scope": "litchi_rtf::tail_append::Edit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "plan_publication",
+          "scope": "litchi_rtf::tail_append::Edit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "plan_publication_with_limits",
+          "scope": "litchi_rtf::tail_append::Edit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "plan_publication_with_context",
+          "scope": "litchi_rtf::tail_append::Edit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "plan_publication_with_limits_and_context",
+          "scope": "litchi_rtf::tail_append::Edit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "append_plain_paragraphs",
+          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "append_plain_runs",
+          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "plan_publication",
+          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "plan_publication_with_limits",
+          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "plan_publication_with_context",
+          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
+          "recursive": false
+        },
+        {
+          "name": "plan_publication_with_limits_and_context",
+          "scope": "litchi_rtf::tail_append::TailAppendSourceEdit",
+          "replacement": "use append_paragraphs, append_runs or publication_plan variants",
           "recursive": false
         }
       ],
-      "families": []
+      "families": [
+        "litchi_rtf::tail_append"
+      ]
     }
   ]
 }

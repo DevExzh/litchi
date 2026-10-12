@@ -583,21 +583,21 @@ impl Package {
     /// artifact only after a complete source-proof, byte splice, reopen, and
     /// semantic readback.
     #[must_use]
-    pub fn tail_append(
+    pub fn edit_tail_append(
         &self,
         selector: crate::tail_append::TailSelector,
-    ) -> crate::tail_append::TailAppendEdit {
-        crate::tail_append::TailAppendEdit::new(self, selector)
+    ) -> crate::tail_append::Edit {
+        crate::tail_append::Edit::new(self, selector)
     }
 
     /// Starts a bounded preservation-first append with explicit limits.
     #[must_use]
-    pub fn tail_append_with_limits(
+    pub fn edit_tail_append_with_limits(
         &self,
         selector: crate::tail_append::TailSelector,
         limits: crate::tail_append::TailAppendLimits,
-    ) -> crate::tail_append::TailAppendEdit {
-        crate::tail_append::TailAppendEdit::with_limits(self, selector, limits)
+    ) -> crate::tail_append::Edit {
+        crate::tail_append::Edit::with_limits(self, selector, limits)
     }
 
     /// Apply an exact-source primary patch under this package's open policy.
@@ -614,8 +614,8 @@ impl Package {
     /// Returns an error for a source conflict or candidate admission failure.
     pub fn apply_tail_append(
         &self,
-        patch: &crate::tail_append::TailAppendPatch,
-    ) -> Result<Self, crate::tail_append::TailAppendError> {
+        patch: &crate::tail_append::Patch,
+    ) -> Result<Self, crate::tail_append::Error> {
         patch.apply(self)
     }
 

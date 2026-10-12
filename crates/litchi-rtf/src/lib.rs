@@ -193,8 +193,7 @@ pub use api::{Document, Package};
 pub use builder::Builder;
 pub use codec::error::{RtfError as Error, RtfResult as Result};
 pub use tail_append::{
-    DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendCommit, TailAppendDiagnostics,
-    TailAppendEdit, TailAppendError, TailAppendLimits, TailAppendOutputProgress, TailAppendPatch,
+    DurableTailAppendPatch, PlainParagraph, PlainRun, TailAppendLimits, TailAppendOutputProgress,
     TailAppendPublicationError, TailAppendPublicationLimits, TailAppendPublicationPlan,
     TailAppendPublicationReport, TailAppendSourceEdit, TailAppendSourceProof,
     TailAppendSourcePublicationPlan, TailAppendSourcePublicationReport, TailSelector,

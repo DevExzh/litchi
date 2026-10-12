@@ -71,8 +71,12 @@ Records 0227–0228 add checked operation-count and replacement-byte
 payload copies; text uses UTF-8 bytes and pictures use preserved wire bytes.
 Logical-tail commits now use the same package accessors and `into_parts`;
 replay is `Package::apply_tail_append`, preserves recipient policy, and exposes
-`Patch::is_noop` (0229). Remaining append family names/policies and redaction
-vocabulary remain pending.
+`Patch::is_noop` (0229). Record 0230 registers
+`tail_append::{Edit, Commit, Patch, Diagnostics, Error, LimitKind}` and
+`Package::edit_tail_append`; old prefixed names and duplicate forwarding
+methods are removed. Transaction limit errors carry a typed dimension and
+observed/maximum counts. Checked scoped profiles, source-publication naming
+and redaction vocabulary remain pending.
 
 ## 3. Open, create, save
 

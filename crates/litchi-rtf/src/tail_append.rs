@@ -17,6 +17,34 @@ use std::fmt;
 use std::io::{self, Write};
 use std::sync::Arc;
 
+/// Stable resource dimension for a logical-tail transaction refusal.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Admitted paragraphs.
+    Paragraphs,
+    /// Admitted runs.
+    Runs,
+    /// Admitted input bytes.
+    InputBytes,
+    /// Admitted inserted bytes.
+    InsertedBytes,
+    /// Admitted output bytes.
+    OutputBytes,
+    /// Admitted source bytes.
+    SourceBytes,
+    /// Admitted patch bytes.
+    PatchBytes,
+    /// Admitted patch offset.
+    PatchOffset,
+    /// Admitted after bytes.
+    AfterBytes,
+    /// Admitted before bytes.
+    BeforeBytes,
+    /// Admitted memory.
+    MemoryBytes,
+}
+
 /// The only story currently accepted by the logical-tail splice.
 ///
 /// Keeping the selector explicit makes the API selector-first and leaves room
@@ -85,7 +113,7 @@ pub struct TailAppendLimits {
     pub max_input_bytes: usize,
     /// Maximum encoded bytes inserted before the root close.
     pub max_inserted_bytes: usize,
-    /// Maximum output bytes accepted by [`TailAppendCommit::write_to`].
+    /// Maximum output bytes accepted by [`Commit::write_to`].
     pub max_output_bytes: usize,
     /// Maximum durable JSON envelope bytes.
     pub max_patch_bytes: usize,
@@ -129,7 +157,7 @@ impl Default for TailAppendLimits {
 /// Hard publication-window bounds for an existing-document logical-tail
 /// append.
 ///
-/// The semantic [`TailAppendCommit`] path intentionally retains its complete
+/// The semantic [`Commit`] path intentionally retains its complete
 /// validated candidate.  A [`TailAppendPublicationPlan`] instead emits the
 /// exact source prefix, bounded inserted span, and exact source suffix
 /// directly to a sequential sink.  `max_window_bytes` bounds each source or
@@ -215,7 +243,7 @@ pub enum TailAppendOutputProgress {
 pub enum TailAppendPublicationError {
     /// The publication plan could not be constructed or its source proof
     /// failed before output began.
-    Plan(TailAppendError),
+    Plan(Error),
     /// The caller supplied an invalid publication window configuration.
     InvalidLimits(&'static str),
     /// The caller supplied a different immutable source snapshot.
@@ -404,8 +432,8 @@ impl std::error::Error for TailAppendPublicationError {
     }
 }
 
-impl From<TailAppendError> for TailAppendPublicationError {
-    fn from(error: TailAppendError) -> Self {
+impl From<Error> for TailAppendPublicationError {
+    fn from(error: Error) -> Self {
         Self::Plan(error)
     }
 }
@@ -469,7 +497,7 @@ impl TailAppendPublicationReport {
 /// Failure from a bounded logical-tail transaction or its durable patch.
 #[derive(Debug, Clone)]
 #[non_exhaustive]
-pub enum TailAppendError {
+pub enum Error {
     /// The selector is not supported by this transaction family.
     UnsupportedSelector,
     /// The existing source cannot be proven safe for an exact tail splice.
@@ -481,10 +509,10 @@ pub enum TailAppendError {
     /// A transaction already owns one staged bounded batch.
     AlreadyStaged,
     /// A finite owner count was exceeded.
-    LimitExceeded {
-        resource: &'static str,
+    Limit {
+        kind: LimitKind,
         observed: usize,
-        limit: usize,
+        maximum: usize,
     },
     /// A submitted text scalar is not plain-text-safe for this API.
     InvalidText(&'static str),
@@ -503,7 +531,7 @@ pub enum TailAppendError {
     Sink { kind: io::ErrorKind, written: usize },
 }
 
-impl fmt::Display for TailAppendError {
+impl fmt::Display for Error {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Self::UnsupportedSelector => {
@@ -525,13 +553,9 @@ impl fmt::Display for TailAppendError {
             Self::AlreadyStaged => {
                 formatter.write_str("RTF logical-tail edit already has a staged batch")
             }
-            Self::LimitExceeded {
-                resource,
-                observed,
-                limit,
-            } => write!(
+            Self::Limit { kind, observed, maximum } => write!(
                 formatter,
-                "RTF logical-tail limit exceeded for {resource}: observed {observed}, limit {limit}"
+                "RTF logical-tail {kind:?} limit exceeded: observed {observed}, maximum {maximum}"
             ),
             Self::InvalidText(reason) => {
                 write!(formatter, "invalid RTF logical-tail text: {reason}")
@@ -560,9 +584,9 @@ impl fmt::Display for TailAppendError {
     }
 }
 
-impl std::error::Error for TailAppendError {}
+impl std::error::Error for Error {}
 
-impl From<RtfError> for TailAppendError {
+impl From<RtfError> for Error {
     fn from(error: RtfError) -> Self {
         Self::Rtf(error)
     }
@@ -574,7 +598,20 @@ struct OwnedParagraph {
 }
 
 /// A detached, selector-first append transaction.
-pub struct TailAppendEdit {
+///
+/// ```
+/// use litchi_rtf::{Package, tail_append::{Edit, TailSelector}};
+/// let source = Package::parse(r"{\rtf1 Before}")?;
+/// let mut edit: Edit = source.edit_tail_append(TailSelector::Body);
+/// edit.append_text_paragraphs(&["After"])?;
+/// let commit = edit.commit()?;
+/// assert!(commit.diagnostics().changed());
+/// let (package, patch) = commit.into_parts();
+/// assert!(!patch.is_noop());
+/// assert_eq!(source.apply_tail_append(&patch)?.text(), package.text());
+/// # Ok::<(), Box<dyn std::error::Error>>(())
+/// ```
+pub struct Edit {
     source: Package,
     selector: TailSelector,
     limits: TailAppendLimits,
@@ -583,7 +620,7 @@ pub struct TailAppendEdit {
     input_bytes: usize,
 }
 
-impl TailAppendEdit {
+impl Edit {
     /// Starts a bounded body-tail transaction rooted at an immutable snapshot.
     #[must_use]
     pub fn new(source: &Package, selector: TailSelector) -> Self {
@@ -644,9 +681,9 @@ impl TailAppendEdit {
     pub fn append_paragraphs(
         &mut self,
         paragraphs: &[PlainParagraph<'_>],
-    ) -> Result<&mut Self, TailAppendError> {
+    ) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
-            return Err(TailAppendError::AlreadyStaged);
+            return Err(Error::AlreadyStaged);
         }
         if paragraphs.is_empty() {
             // An empty append is an exact semantic no-op.  Keeping the edit
@@ -658,7 +695,7 @@ impl TailAppendEdit {
 
         let mut owned = Vec::new();
         owned.try_reserve(observed_paragraphs).map_err(|_error| {
-            TailAppendError::AllocationFailed {
+            Error::AllocationFailed {
                 resource: "tail paragraphs",
                 requested: observed_paragraphs.saturating_mul(size_of::<OwnedParagraph>()),
             }
@@ -666,7 +703,7 @@ impl TailAppendEdit {
         for paragraph in paragraphs {
             let mut runs = Vec::new();
             runs.try_reserve(paragraph.runs().len()).map_err(|_error| {
-                TailAppendError::AllocationFailed {
+                Error::AllocationFailed {
                     resource: "tail runs",
                     requested: paragraph.runs().len().saturating_mul(size_of::<String>()),
                 }
@@ -674,7 +711,7 @@ impl TailAppendEdit {
             for run in paragraph.runs() {
                 let mut text = String::new();
                 text.try_reserve(run.text().len()).map_err(|_error| {
-                    TailAppendError::AllocationFailed {
+                    Error::AllocationFailed {
                         resource: "tail text",
                         requested: run.text().len(),
                     }
@@ -691,21 +728,13 @@ impl TailAppendEdit {
     }
 
     /// Alias that makes the plain-text ownership boundary explicit at call
-    /// sites that also use richer format-owned append APIs.
-    pub fn append_plain_paragraphs(
-        &mut self,
-        paragraphs: &[PlainParagraph<'_>],
-    ) -> Result<&mut Self, TailAppendError> {
-        self.append_paragraphs(paragraphs)
-    }
-
     /// Convenience staging method for one plain-text run per paragraph.
     pub fn append_text_paragraphs(
         &mut self,
         paragraphs: &[&str],
-    ) -> Result<&mut Self, TailAppendError> {
+    ) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
-            return Err(TailAppendError::AlreadyStaged);
+            return Err(Error::AlreadyStaged);
         }
         if paragraphs.is_empty() {
             return Ok(self);
@@ -713,14 +742,14 @@ impl TailAppendEdit {
         preflight_plain_text_paragraphs(paragraphs, self.limits)?;
         let mut runs = Vec::new();
         runs.try_reserve(paragraphs.len())
-            .map_err(|_error| TailAppendError::AllocationFailed {
+            .map_err(|_error| Error::AllocationFailed {
                 resource: "tail input descriptors",
                 requested: paragraphs.len().saturating_mul(size_of::<PlainRun<'_>>()),
             })?;
         let mut descriptors = Vec::new();
         descriptors
             .try_reserve(paragraphs.len())
-            .map_err(|_error| TailAppendError::AllocationFailed {
+            .map_err(|_error| Error::AllocationFailed {
                 resource: "tail input descriptors",
                 requested: paragraphs
                     .len()
@@ -738,20 +767,12 @@ impl TailAppendEdit {
     }
 
     /// Convenience staging method for one paragraph made from plain runs.
-    pub fn append_runs(&mut self, runs: &[PlainRun<'_>]) -> Result<&mut Self, TailAppendError> {
+    pub fn append_runs(&mut self, runs: &[PlainRun<'_>]) -> Result<&mut Self, Error> {
         if runs.is_empty() {
             return Ok(self);
         }
         let paragraph = PlainParagraph::new(runs);
         self.append_paragraphs(std::slice::from_ref(&paragraph))
-    }
-
-    /// Alias for [`Self::append_runs`] with an explicit plain-text name.
-    pub fn append_plain_runs(
-        &mut self,
-        runs: &[PlainRun<'_>],
-    ) -> Result<&mut Self, TailAppendError> {
-        self.append_runs(runs)
     }
 
     /// Converts this staged transaction into a publication-only plan using
@@ -761,7 +782,7 @@ impl TailAppendEdit {
     /// a complete candidate artifact.  It proves the exact source tail and
     /// stores only the bounded inserted span; callers can later publish it to
     /// a sequential non-seek sink with an explicit [`ExecutionContext`].
-    pub fn publication_plan(self) -> Result<TailAppendPublicationPlan, TailAppendError> {
+    pub fn publication_plan(self) -> Result<TailAppendPublicationPlan, Error> {
         self.publication_plan_with_limits(TailAppendPublicationLimits::default())
     }
 
@@ -776,7 +797,7 @@ impl TailAppendEdit {
     pub fn publication_plan_with_limits(
         self,
         publication_limits: TailAppendPublicationLimits,
-    ) -> Result<TailAppendPublicationPlan, TailAppendError> {
+    ) -> Result<TailAppendPublicationPlan, Error> {
         self.publication_plan_inner(publication_limits, None)
             .map_err(|error| match error {
                 TailAppendPublicationError::Plan(error) => error,
@@ -790,7 +811,7 @@ impl TailAppendEdit {
                 | TailAppendPublicationError::LimitExceeded { .. }
                 | TailAppendPublicationError::Sink { .. }
                 | TailAppendPublicationError::IncompleteOutput { .. } => {
-                    TailAppendError::UnsupportedSource(
+                    Error::UnsupportedSource(
                         "publication planning failed outside the source proof",
                     )
                 }
@@ -831,20 +852,20 @@ impl TailAppendEdit {
         planning_context: Option<&ExecutionContext>,
     ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
         if self.selector != TailSelector::Body {
-            return Err(TailAppendError::UnsupportedSelector.into());
+            return Err(Error::UnsupportedSelector.into());
         }
         let source_bytes = self
             .source
             .source_bytes()
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "snapshot has no exact RTF source",
             ))?;
         let source_length = source_bytes.len();
         if source_length > self.limits.max_output_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "output bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: source_length,
-                limit: self.limits.max_output_bytes,
+                maximum: self.limits.max_output_bytes,
             }
             .into());
         }
@@ -873,34 +894,34 @@ impl TailAppendEdit {
                 )
             };
         if inserted_len > self.limits.max_inserted_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "inserted bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::InsertedBytes,
                 observed: inserted_len,
-                limit: self.limits.max_inserted_bytes,
+                maximum: self.limits.max_inserted_bytes,
             }
             .into());
         }
         let output_length =
             source_length
                 .checked_add(inserted_len)
-                .ok_or(TailAppendError::LimitExceeded {
-                    resource: "output bytes",
+                .ok_or(Error::Limit {
+                    kind: LimitKind::OutputBytes,
                     observed: usize::MAX,
-                    limit: self.limits.max_output_bytes,
+                    maximum: self.limits.max_output_bytes,
                 })?;
         if output_length > self.limits.max_output_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "output bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: output_length,
-                limit: self.limits.max_output_bytes,
+                maximum: self.limits.max_output_bytes,
             }
             .into());
         }
         if output_length > self.source.limits().max_input_bytes() {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "source bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::SourceBytes,
                 observed: output_length,
-                limit: self.source.limits().max_input_bytes(),
+                maximum: self.source.limits().max_input_bytes(),
             }
             .into());
         }
@@ -908,10 +929,10 @@ impl TailAppendEdit {
         let planning_memory = if let Some(context) = planning_context {
             let window = publication_limits.max_window_bytes.min(output_length);
             let amount = window.checked_add(inserted_len).ok_or({
-                TailAppendPublicationError::Plan(TailAppendError::LimitExceeded {
-                    resource: "memory",
+                TailAppendPublicationError::Plan(Error::Limit {
+                    kind: LimitKind::MemoryBytes,
                     observed: usize::MAX,
-                    limit: self.limits.max_output_bytes,
+                    maximum: self.limits.max_output_bytes,
                 })
             })?;
             context
@@ -933,7 +954,7 @@ impl TailAppendEdit {
                 .into_boxed_slice()
         };
         if inserted.len() != inserted_len {
-            return Err(TailAppendError::UnsupportedSource(
+            return Err(Error::UnsupportedSource(
                 "encoded insertion length changed after bounded preflight",
             )
             .into());
@@ -955,49 +976,19 @@ impl TailAppendEdit {
         })
     }
 
-    /// Alias for [`Self::publication_plan`].
-    pub fn plan_publication(self) -> Result<TailAppendPublicationPlan, TailAppendError> {
-        self.publication_plan()
-    }
-
-    /// Alias for [`Self::publication_plan_with_limits`].
-    pub fn plan_publication_with_limits(
-        self,
-        publication_limits: TailAppendPublicationLimits,
-    ) -> Result<TailAppendPublicationPlan, TailAppendError> {
-        self.publication_plan_with_limits(publication_limits)
-    }
-
-    /// Alias for [`Self::publication_plan_with_context`].
-    pub fn plan_publication_with_context(
-        self,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_context(context)
-    }
-
-    /// Alias for [`Self::publication_plan_with_limits_and_context`].
-    pub fn plan_publication_with_limits_and_context(
-        self,
-        publication_limits: TailAppendPublicationLimits,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendPublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits_and_context(publication_limits, context)
-    }
-
     /// Atomically validates and publishes the candidate artifact.
-    pub fn commit(self) -> Result<TailAppendCommit, TailAppendError> {
+    pub fn commit(self) -> Result<Commit, Error> {
         if self.selector != TailSelector::Body {
-            return Err(TailAppendError::UnsupportedSelector);
+            return Err(Error::UnsupportedSelector);
         }
         let operation_count = usize::from(!self.paragraphs.is_empty());
         if self.paragraphs.is_empty() {
             let source_bytes = self.source.source_bytes().map_or(0, <[u8]>::len);
-            let patch = TailAppendPatch::no_op(self.source.clone(), self.selector);
-            return Ok(TailAppendCommit {
+            let patch = Patch::no_op(self.source.clone(), self.selector);
+            return Ok(Commit {
                 snapshot: self.source,
                 patch,
-                diagnostics: TailAppendDiagnostics {
+                diagnostics: Diagnostics {
                     changed: false,
                     operation_count,
                     paragraphs: 0,
@@ -1013,39 +1004,39 @@ impl TailAppendEdit {
         let source_bytes = self
             .source
             .source_bytes()
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "snapshot has no exact RTF source",
             ))?;
         let inserted_len =
             encoded_inserted_len(&self.source, &self.paragraphs, proof.ends_with_par)?;
         if inserted_len > self.limits.max_inserted_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "inserted bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::InsertedBytes,
                 observed: inserted_len,
-                limit: self.limits.max_inserted_bytes,
+                maximum: self.limits.max_inserted_bytes,
             });
         }
         let output_len =
             source_bytes
                 .len()
                 .checked_add(inserted_len)
-                .ok_or(TailAppendError::LimitExceeded {
-                    resource: "output bytes",
+                .ok_or(Error::Limit {
+                    kind: LimitKind::OutputBytes,
                     observed: usize::MAX,
-                    limit: self.limits.max_output_bytes,
+                    maximum: self.limits.max_output_bytes,
                 })?;
         if output_len > self.limits.max_output_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "output bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: output_len,
-                limit: self.limits.max_output_bytes,
+                maximum: self.limits.max_output_bytes,
             });
         }
         if output_len > self.source.limits().max_input_bytes() {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "source bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::SourceBytes,
                 observed: output_len,
-                limit: self.source.limits().max_input_bytes(),
+                maximum: self.source.limits().max_input_bytes(),
             });
         }
         let inserted = encode_inserted(
@@ -1057,20 +1048,20 @@ impl TailAppendEdit {
         let mut output = Vec::new();
         output
             .try_reserve(output_len)
-            .map_err(|_error| TailAppendError::AllocationFailed {
+            .map_err(|_error| Error::AllocationFailed {
                 resource: "tail candidate",
                 requested: output_len,
             })?;
         let prefix =
             source_bytes
                 .get(..proof.root_close)
-                .ok_or(TailAppendError::UnsupportedSource(
+                .ok_or(Error::UnsupportedSource(
                     "root-close proof is outside the source",
                 ))?;
         let suffix =
             source_bytes
                 .get(proof.root_close..)
-                .ok_or(TailAppendError::UnsupportedSource(
+                .ok_or(Error::UnsupportedSource(
                     "root-close proof is outside the source",
                 ))?;
         output.extend_from_slice(prefix);
@@ -1084,7 +1075,7 @@ impl TailAppendEdit {
             &self.paragraphs,
             proof.ends_with_par,
         )?;
-        let patch = TailAppendPatch {
+        let patch = Patch {
             before: self.source.clone(),
             after: candidate.clone(),
             selector: self.selector,
@@ -1092,10 +1083,10 @@ impl TailAppendEdit {
             inserted: inserted.into_boxed_slice(),
             direction: Direction::Append,
         };
-        Ok(TailAppendCommit {
+        Ok(Commit {
             snapshot: candidate,
             patch,
-            diagnostics: TailAppendDiagnostics {
+            diagnostics: Diagnostics {
                 changed: true,
                 operation_count,
                 paragraphs: self.paragraphs.len(),
@@ -1254,13 +1245,13 @@ impl TailAppendPublicationPlan {
         self.publication_limits.validate()?;
         if self.selector != TailSelector::Body {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSelector,
+                Error::UnsupportedSelector,
             ));
         }
         let source_bytes = source
             .source_bytes()
             .ok_or(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource("snapshot has no exact RTF source"),
+                Error::UnsupportedSource("snapshot has no exact RTF source"),
             ))?;
         let observed_version = source.source_version();
         if observed_version != self.source_version {
@@ -1296,7 +1287,7 @@ impl TailAppendPublicationPlan {
         )?;
         if output_length != self.output_bytes() {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource(
+                Error::UnsupportedSource(
                     "publication output length no longer matches its proof",
                 ),
             ));
@@ -1319,7 +1310,7 @@ impl TailAppendPublicationPlan {
         }
         if self.root_close > source_bytes.len() {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource(
+                Error::UnsupportedSource(
                     "publication root-close proof is outside the source",
                 ),
             ));
@@ -1381,14 +1372,14 @@ impl TailAppendPublicationPlan {
         let prefix = source_bytes
             .get(..root_close)
             .ok_or(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource(
+                Error::UnsupportedSource(
                     "publication prefix proof is outside the source",
                 ),
             ))?;
         let suffix = source_bytes
             .get(root_close..)
             .ok_or(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource(
+                Error::UnsupportedSource(
                     "publication suffix proof is outside the source",
                 ),
             ))?;
@@ -1507,7 +1498,7 @@ impl TailAppendPublicationPlan {
 ///
 /// The proof contains no parsed document or candidate artifact. It is issued
 /// only by the constructors on this type, all of which call the same
-/// conservative proof used by [`TailAppendEdit`].
+/// conservative proof used by [`Edit`].
 #[derive(Debug, Clone)]
 pub struct TailAppendSourceProof {
     selector: TailSelector,
@@ -1530,7 +1521,7 @@ impl TailAppendSourceProof {
     pub fn from_document(
         source: &Package,
         selector: TailSelector,
-    ) -> Result<Self, TailAppendError> {
+    ) -> Result<Self, Error> {
         Self::from_document_with_source_version(source, selector, source.source_version())
     }
 
@@ -1543,11 +1534,11 @@ impl TailAppendSourceProof {
         source: &Package,
         selector: TailSelector,
         source_version: SourceVersion,
-    ) -> Result<Self, TailAppendError> {
+    ) -> Result<Self, Error> {
         let splice = prove_splice_source(source, selector)?;
         let bytes = source
             .source_bytes()
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "snapshot has no exact RTF source",
             ))?;
         Ok(Self {
@@ -1604,7 +1595,7 @@ impl TailAppendSourceProof {
         let document_bytes = document
             .source_bytes()
             .ok_or(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource("snapshot has no exact RTF source"),
+                Error::UnsupportedSource("snapshot has no exact RTF source"),
             ))?;
         let expected_version = source
             .version()
@@ -1858,9 +1849,9 @@ impl TailAppendSourceEdit {
     pub fn append_paragraphs(
         &mut self,
         paragraphs: &[PlainParagraph<'_>],
-    ) -> Result<&mut Self, TailAppendError> {
+    ) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
-            return Err(TailAppendError::AlreadyStaged);
+            return Err(Error::AlreadyStaged);
         }
         if paragraphs.is_empty() {
             return Ok(self);
@@ -1872,21 +1863,13 @@ impl TailAppendSourceEdit {
         Ok(self)
     }
 
-    /// Alias for [`Self::append_paragraphs`].
-    pub fn append_plain_paragraphs(
-        &mut self,
-        paragraphs: &[PlainParagraph<'_>],
-    ) -> Result<&mut Self, TailAppendError> {
-        self.append_paragraphs(paragraphs)
-    }
-
     /// Convenience staging method for one plain run per paragraph.
     pub fn append_text_paragraphs(
         &mut self,
         paragraphs: &[&str],
-    ) -> Result<&mut Self, TailAppendError> {
+    ) -> Result<&mut Self, Error> {
         if !self.paragraphs.is_empty() {
-            return Err(TailAppendError::AlreadyStaged);
+            return Err(Error::AlreadyStaged);
         }
         if paragraphs.is_empty() {
             return Ok(self);
@@ -1894,14 +1877,14 @@ impl TailAppendSourceEdit {
         preflight_plain_text_paragraphs(paragraphs, self.limits)?;
         let mut runs = Vec::new();
         runs.try_reserve(paragraphs.len())
-            .map_err(|_error| TailAppendError::AllocationFailed {
+            .map_err(|_error| Error::AllocationFailed {
                 resource: "tail input descriptors",
                 requested: paragraphs.len().saturating_mul(size_of::<PlainRun<'_>>()),
             })?;
         let mut descriptors = Vec::new();
         descriptors
             .try_reserve(paragraphs.len())
-            .map_err(|_error| TailAppendError::AllocationFailed {
+            .map_err(|_error| Error::AllocationFailed {
                 resource: "tail input descriptors",
                 requested: paragraphs
                     .len()
@@ -1917,20 +1900,12 @@ impl TailAppendSourceEdit {
     }
 
     /// Convenience staging method for one paragraph made from plain runs.
-    pub fn append_runs(&mut self, runs: &[PlainRun<'_>]) -> Result<&mut Self, TailAppendError> {
+    pub fn append_runs(&mut self, runs: &[PlainRun<'_>]) -> Result<&mut Self, Error> {
         if runs.is_empty() {
             return Ok(self);
         }
         let paragraph = PlainParagraph::new(runs);
         self.append_paragraphs(std::slice::from_ref(&paragraph))
-    }
-
-    /// Alias for [`Self::append_runs`].
-    pub fn append_plain_runs(
-        &mut self,
-        runs: &[PlainRun<'_>],
-    ) -> Result<&mut Self, TailAppendError> {
-        self.append_runs(runs)
     }
 
     /// Builds a source-backed publication plan with the default window.
@@ -1971,38 +1946,6 @@ impl TailAppendSourceEdit {
         self.publication_plan_inner(publication_limits, Some(context))
     }
 
-    /// Alias for [`Self::publication_plan`].
-    pub fn plan_publication(
-        self,
-    ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
-        self.publication_plan()
-    }
-
-    /// Alias for [`Self::publication_plan_with_limits`].
-    pub fn plan_publication_with_limits(
-        self,
-        publication_limits: TailAppendPublicationLimits,
-    ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits(publication_limits)
-    }
-
-    /// Alias for [`Self::publication_plan_with_context`].
-    pub fn plan_publication_with_context(
-        self,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_context(context)
-    }
-
-    /// Alias for [`Self::publication_plan_with_limits_and_context`].
-    pub fn plan_publication_with_limits_and_context(
-        self,
-        publication_limits: TailAppendPublicationLimits,
-        context: &ExecutionContext,
-    ) -> Result<TailAppendSourcePublicationPlan, TailAppendPublicationError> {
-        self.publication_plan_with_limits_and_context(publication_limits, context)
-    }
-
     fn publication_plan_inner(
         self,
         publication_limits: TailAppendPublicationLimits,
@@ -2012,12 +1955,12 @@ impl TailAppendSourceEdit {
         let _capability = self.proof.capability;
         if self.selector != TailSelector::Body || self.proof.selector != TailSelector::Body {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSelector,
+                Error::UnsupportedSelector,
             ));
         }
         if self.selector != self.proof.selector {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSelector,
+                Error::UnsupportedSelector,
             ));
         }
         let source_version = self
@@ -2042,10 +1985,10 @@ impl TailAppendSourceEdit {
             });
         }
         let source_length_usize = usize::try_from(source_length).map_err(|_error| {
-            TailAppendPublicationError::Plan(TailAppendError::LimitExceeded {
-                resource: "source bytes",
+            TailAppendPublicationError::Plan(Error::Limit {
+                kind: LimitKind::SourceBytes,
                 observed: usize::MAX,
-                limit: self.proof.source_limit,
+                maximum: self.proof.source_limit,
             })
         })?;
         let root_close = if self.paragraphs.is_empty() {
@@ -2055,7 +1998,7 @@ impl TailAppendSourceEdit {
         };
         if root_close > source_length_usize {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource(
+                Error::UnsupportedSource(
                     "source-backed root-close proof is outside the source",
                 ),
             ));
@@ -2071,35 +2014,35 @@ impl TailAppendSourceEdit {
         };
         if inserted_len > self.limits.max_inserted_bytes {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::LimitExceeded {
-                    resource: "inserted bytes",
+                Error::Limit {
+                    kind: LimitKind::InsertedBytes,
                     observed: inserted_len,
-                    limit: self.limits.max_inserted_bytes,
+                    maximum: self.limits.max_inserted_bytes,
                 },
             ));
         }
         let output_length = source_length_usize.checked_add(inserted_len).ok_or(
-            TailAppendPublicationError::Plan(TailAppendError::LimitExceeded {
-                resource: "output bytes",
+            TailAppendPublicationError::Plan(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: usize::MAX,
-                limit: self.limits.max_output_bytes,
+                maximum: self.limits.max_output_bytes,
             }),
         )?;
         if output_length > self.limits.max_output_bytes {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::LimitExceeded {
-                    resource: "output bytes",
+                Error::Limit {
+                    kind: LimitKind::OutputBytes,
                     observed: output_length,
-                    limit: self.limits.max_output_bytes,
+                    maximum: self.limits.max_output_bytes,
                 },
             ));
         }
         if output_length > self.proof.source_limit {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::LimitExceeded {
-                    resource: "source bytes",
+                Error::Limit {
+                    kind: LimitKind::SourceBytes,
                     observed: output_length,
-                    limit: self.proof.source_limit,
+                    maximum: self.proof.source_limit,
                 },
             ));
         }
@@ -2114,17 +2057,17 @@ impl TailAppendSourceEdit {
                 .min(source_length_usize)
                 .checked_add(inserted_len)
                 .ok_or(TailAppendPublicationError::Plan(
-                    TailAppendError::LimitExceeded {
-                        resource: "memory",
+                    Error::Limit {
+                        kind: LimitKind::MemoryBytes,
                         observed: usize::MAX,
-                        limit: self.limits.max_output_bytes,
+                        maximum: self.limits.max_output_bytes,
                     },
                 ))?;
             let scan_amount = source_length_usize.checked_add(inserted_len).ok_or(
-                TailAppendPublicationError::Plan(TailAppendError::LimitExceeded {
-                    resource: "input bytes",
+                TailAppendPublicationError::Plan(Error::Limit {
+                    kind: LimitKind::InputBytes,
                     observed: usize::MAX,
-                    limit: self.limits.max_input_bytes,
+                    maximum: self.limits.max_input_bytes,
                 }),
             )?;
             let memory = context
@@ -2163,7 +2106,7 @@ impl TailAppendSourceEdit {
         };
         if inserted.len() != inserted_len {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource(
+                Error::UnsupportedSource(
                     "source-backed encoded insertion changed after preflight",
                 ),
             ));
@@ -2510,7 +2453,7 @@ impl TailAppendSourcePublicationPlan {
         self.publication_limits.validate()?;
         if self.selector != TailSelector::Body || self.proof.selector != TailSelector::Body {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSelector,
+                Error::UnsupportedSelector,
             ));
         }
         let expected = u64::try_from(self.source_bytes).unwrap_or(u64::MAX);
@@ -2542,7 +2485,7 @@ impl TailAppendSourcePublicationPlan {
         })?;
         if source_length != self.source_bytes || self.root_close > source_length {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource(
+                Error::UnsupportedSource(
                     "source-backed publication bounds no longer match the proof",
                 ),
             ));
@@ -2565,7 +2508,7 @@ impl TailAppendSourcePublicationPlan {
         })?;
         if output_length != self.output_bytes() {
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::UnsupportedSource(
+                Error::UnsupportedSource(
                     "source-backed output length no longer matches its plan",
                 ),
             ));
@@ -2764,7 +2707,7 @@ impl TailAppendSourcePublicationPlan {
                 0,
             );
             return Err(TailAppendPublicationError::Plan(
-                TailAppendError::AllocationFailed {
+                Error::AllocationFailed {
                     resource: "source publication window",
                     requested: source_window_len,
                 },
@@ -3033,7 +2976,7 @@ impl TailAppendSourcePublicationPlan {
                         bytes: expected_output,
                     },
                     source: Box::new(TailAppendPublicationError::Plan(
-                        TailAppendError::AllocationFailed {
+                        Error::AllocationFailed {
                             resource,
                             requested,
                         },
@@ -3064,7 +3007,7 @@ impl TailAppendSourcePublicationPlan {
     /// Converts this source-backed plan to the existing safe durable codec.
     /// The codec remains document-authorized on application; parsing JSON
     /// alone never creates a source proof.
-    pub fn to_durable(&self) -> Result<DurableTailAppendPatch, TailAppendError> {
+    pub fn to_durable(&self) -> Result<DurableTailAppendPatch, Error> {
         let wire = DurableTailAppendPatch {
             selector: self.selector,
             direction: Direction::Append,
@@ -3097,13 +3040,13 @@ impl TailAppendSourcePublicationPlan {
 fn preflight_plain_paragraphs(
     paragraphs: &[PlainParagraph<'_>],
     limits: TailAppendLimits,
-) -> Result<(usize, usize, usize), TailAppendError> {
+) -> Result<(usize, usize, usize), Error> {
     let observed_paragraphs = paragraphs.len();
     if observed_paragraphs > limits.max_paragraphs {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "paragraphs",
+        return Err(Error::Limit {
+            kind: LimitKind::Paragraphs,
             observed: observed_paragraphs,
-            limit: limits.max_paragraphs,
+            maximum: limits.max_paragraphs,
         });
     }
     let mut observed_runs = 0usize;
@@ -3112,33 +3055,33 @@ fn preflight_plain_paragraphs(
         for run in paragraph.runs() {
             observed_runs = observed_runs
                 .checked_add(1)
-                .ok_or(TailAppendError::LimitExceeded {
-                    resource: "runs",
+                .ok_or(Error::Limit {
+                    kind: LimitKind::Runs,
                     observed: usize::MAX,
-                    limit: limits.max_runs,
+                    maximum: limits.max_runs,
                 })?;
             validate_plain_text(run.text())?;
             observed_input_bytes = observed_input_bytes.checked_add(run.text().len()).ok_or(
-                TailAppendError::LimitExceeded {
-                    resource: "input bytes",
+                Error::Limit {
+                    kind: LimitKind::InputBytes,
                     observed: usize::MAX,
-                    limit: limits.max_input_bytes,
+                    maximum: limits.max_input_bytes,
                 },
             )?;
         }
     }
     if observed_runs > limits.max_runs {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "runs",
+        return Err(Error::Limit {
+            kind: LimitKind::Runs,
             observed: observed_runs,
-            limit: limits.max_runs,
+            maximum: limits.max_runs,
         });
     }
     if observed_input_bytes > limits.max_input_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "input bytes",
+        return Err(Error::Limit {
+            kind: LimitKind::InputBytes,
             observed: observed_input_bytes,
-            limit: limits.max_input_bytes,
+            maximum: limits.max_input_bytes,
         });
     }
     Ok((observed_paragraphs, observed_runs, observed_input_bytes))
@@ -3147,20 +3090,20 @@ fn preflight_plain_paragraphs(
 fn preflight_plain_text_paragraphs(
     paragraphs: &[&str],
     limits: TailAppendLimits,
-) -> Result<(), TailAppendError> {
+) -> Result<(), Error> {
     let observed_paragraphs = paragraphs.len();
     if observed_paragraphs > limits.max_paragraphs {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "paragraphs",
+        return Err(Error::Limit {
+            kind: LimitKind::Paragraphs,
             observed: observed_paragraphs,
-            limit: limits.max_paragraphs,
+            maximum: limits.max_paragraphs,
         });
     }
     if observed_paragraphs > limits.max_runs {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "runs",
+        return Err(Error::Limit {
+            kind: LimitKind::Runs,
             observed: observed_paragraphs,
-            limit: limits.max_runs,
+            maximum: limits.max_runs,
         });
     }
     let mut observed_input_bytes = 0usize;
@@ -3169,17 +3112,17 @@ fn preflight_plain_text_paragraphs(
         observed_input_bytes =
             observed_input_bytes
                 .checked_add(text.len())
-                .ok_or(TailAppendError::LimitExceeded {
-                    resource: "input bytes",
+                .ok_or(Error::Limit {
+                    kind: LimitKind::InputBytes,
                     observed: usize::MAX,
-                    limit: limits.max_input_bytes,
+                    maximum: limits.max_input_bytes,
                 })?;
     }
     if observed_input_bytes > limits.max_input_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "input bytes",
+        return Err(Error::Limit {
+            kind: LimitKind::InputBytes,
             observed: observed_input_bytes,
-            limit: limits.max_input_bytes,
+            maximum: limits.max_input_bytes,
         });
     }
     Ok(())
@@ -3188,20 +3131,20 @@ fn preflight_plain_text_paragraphs(
 fn stage_plain_paragraphs(
     paragraphs: &[PlainParagraph<'_>],
     limits: TailAppendLimits,
-) -> Result<(Vec<OwnedParagraph>, usize, usize), TailAppendError> {
+) -> Result<(Vec<OwnedParagraph>, usize, usize), Error> {
     let (observed_paragraphs, observed_runs, observed_input_bytes) =
         preflight_plain_paragraphs(paragraphs, limits)?;
     let mut owned = Vec::new();
     owned
         .try_reserve(observed_paragraphs)
-        .map_err(|_error| TailAppendError::AllocationFailed {
+        .map_err(|_error| Error::AllocationFailed {
             resource: "tail paragraphs",
             requested: observed_paragraphs.saturating_mul(size_of::<OwnedParagraph>()),
         })?;
     for paragraph in paragraphs {
         let mut runs = Vec::new();
         runs.try_reserve(paragraph.runs().len()).map_err(|_error| {
-            TailAppendError::AllocationFailed {
+            Error::AllocationFailed {
                 resource: "tail runs",
                 requested: paragraph.runs().len().saturating_mul(size_of::<String>()),
             }
@@ -3209,7 +3152,7 @@ fn stage_plain_paragraphs(
         for run in paragraph.runs() {
             let mut text = String::new();
             text.try_reserve(run.text().len()).map_err(|_error| {
-                TailAppendError::AllocationFailed {
+                Error::AllocationFailed {
                     resource: "tail text",
                     requested: run.text().len(),
                 }
@@ -3246,7 +3189,7 @@ fn source_scan_publication_error(
         SourceScanFailure::Allocation {
             resource,
             requested,
-        } => TailAppendPublicationError::Plan(TailAppendError::AllocationFailed {
+        } => TailAppendPublicationError::Plan(Error::AllocationFailed {
             resource,
             requested,
         }),
@@ -3606,7 +3549,7 @@ fn with_publication_progress(
         PublicationWriteFailure::Allocation {
             resource,
             requested,
-        } => TailAppendPublicationError::Plan(TailAppendError::AllocationFailed {
+        } => TailAppendPublicationError::Plan(Error::AllocationFailed {
             resource,
             requested,
         }),
@@ -3641,7 +3584,7 @@ fn with_publication_progress(
 
 /// Deterministic facts about a logical-tail commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct TailAppendDiagnostics {
+pub struct Diagnostics {
     changed: bool,
     operation_count: usize,
     paragraphs: usize,
@@ -3652,7 +3595,7 @@ pub struct TailAppendDiagnostics {
     output_bytes: usize,
 }
 
-impl TailAppendDiagnostics {
+impl Diagnostics {
     /// Whether a distinct candidate artifact was published.
     #[must_use]
     pub const fn changed(self) -> bool {
@@ -3703,13 +3646,13 @@ impl TailAppendDiagnostics {
 }
 
 /// Result of a validated logical-tail append.
-pub struct TailAppendCommit {
+pub struct Commit {
     snapshot: Package,
-    patch: TailAppendPatch,
-    diagnostics: TailAppendDiagnostics,
+    patch: Patch,
+    diagnostics: Diagnostics,
 }
 
-impl TailAppendCommit {
+impl Commit {
     /// Published immutable candidate snapshot.
     #[must_use]
     pub const fn package(&self) -> &Package {
@@ -3724,19 +3667,19 @@ impl TailAppendCommit {
 
     /// Split the published package and its reversible patch.
     #[must_use]
-    pub fn into_parts(self) -> (Package, TailAppendPatch) {
+    pub fn into_parts(self) -> (Package, Patch) {
         (self.snapshot, self.patch)
     }
 
     /// Exact-source-checked reversible in-memory patch.
     #[must_use]
-    pub const fn patch(&self) -> &TailAppendPatch {
+    pub const fn patch(&self) -> &Patch {
         &self.patch
     }
 
     /// Deterministic commit diagnostics.
     #[must_use]
-    pub const fn diagnostics(&self) -> TailAppendDiagnostics {
+    pub const fn diagnostics(&self) -> Diagnostics {
         self.diagnostics
     }
 
@@ -3747,18 +3690,18 @@ impl TailAppendCommit {
         &self,
         sink: &mut W,
         limits: TailAppendLimits,
-    ) -> Result<usize, TailAppendError> {
+    ) -> Result<usize, Error> {
         let bytes = self
             .snapshot
             .source_bytes()
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "snapshot has no exact RTF source",
             ))?;
         if bytes.len() > limits.max_output_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "output bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: bytes.len(),
-                limit: limits.max_output_bytes,
+                maximum: limits.max_output_bytes,
             });
         }
         write_sequential(sink, bytes)
@@ -3767,7 +3710,7 @@ impl TailAppendCommit {
 
 /// Exact-source-checked reversible logical-tail patch.
 #[derive(Clone)]
-pub struct TailAppendPatch {
+pub struct Patch {
     before: Package,
     after: Package,
     selector: TailSelector,
@@ -3776,7 +3719,7 @@ pub struct TailAppendPatch {
     direction: Direction,
 }
 
-impl TailAppendPatch {
+impl Patch {
     fn no_op(source: Package, selector: TailSelector) -> Self {
         Self {
             before: source.clone(),
@@ -3789,9 +3732,9 @@ impl TailAppendPatch {
     }
 
     /// Applies this patch only to the exact source artifact that created it.
-    pub(crate) fn apply(&self, source: &Package) -> Result<Package, TailAppendError> {
+    pub(crate) fn apply(&self, source: &Package) -> Result<Package, Error> {
         if source.source_bytes() != self.before.source_bytes() {
-            return Err(TailAppendError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if self.is_noop() {
             return Ok(source.clone());
@@ -3799,7 +3742,7 @@ impl TailAppendPatch {
         if source.options() == self.after.options() {
             return Ok(self.after.clone());
         }
-        let bytes = self.after.source_bytes().ok_or(TailAppendError::UnsupportedSource(
+        let bytes = self.after.source_bytes().ok_or(Error::UnsupportedSource(
             "patch target has no retained source artifact",
         ))?;
         Ok(Package::from_bytes_with_options(bytes, source.options())?)
@@ -3844,17 +3787,17 @@ impl TailAppendPatch {
     pub fn to_durable(
         &self,
         limits: TailAppendLimits,
-    ) -> Result<DurableTailAppendPatch, TailAppendError> {
+    ) -> Result<DurableTailAppendPatch, Error> {
         let before = self
             .before
             .source_bytes()
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "patch source has no exact RTF source",
             ))?;
         let after = self
             .after
             .source_bytes()
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "patch target has no exact RTF source",
             ))?;
         let wire = DurableTailAppendPatch {
@@ -3900,7 +3843,7 @@ pub struct DurableTailAppendPatch {
 
 impl DurableTailAppendPatch {
     /// Serializes the patch in deterministic JSON and enforces its wire cap.
-    pub fn to_deterministic_json(&self) -> Result<Vec<u8>, TailAppendError> {
+    pub fn to_deterministic_json(&self) -> Result<Vec<u8>, Error> {
         validate_wire_fields(self)?;
         validate_wire_bounds(
             self.direction,
@@ -3912,10 +3855,10 @@ impl DurableTailAppendPatch {
         )?;
         let encoded_len = deterministic_json_len(self)?;
         if encoded_len > self.limits.max_patch_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "patch bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
                 observed: encoded_len,
-                limit: self.limits.max_patch_bytes,
+                maximum: self.limits.max_patch_bytes,
             });
         }
         let encoded = hex_encode(&self.inserted)?;
@@ -3943,17 +3886,17 @@ impl DurableTailAppendPatch {
         object.insert("selector".to_string(), Value::String("body".to_string()));
         object.insert("version".to_string(), Value::from(1_u64));
         let bytes = serde_json::to_vec(&Value::Object(object))
-            .map_err(|_error| TailAppendError::DurablePatch("JSON serialization failed"))?;
+            .map_err(|_error| Error::DurablePatch("JSON serialization failed"))?;
         if bytes.len() != encoded_len {
-            return Err(TailAppendError::DurablePatch(
+            return Err(Error::DurablePatch(
                 "deterministic JSON size preflight disagrees with serializer",
             ));
         }
         if bytes.len() > self.limits.max_patch_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "patch bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
                 observed: bytes.len(),
-                limit: self.limits.max_patch_bytes,
+                maximum: self.limits.max_patch_bytes,
             });
         }
         Ok(bytes)
@@ -3963,23 +3906,23 @@ impl DurableTailAppendPatch {
     pub fn from_deterministic_json(
         bytes: &[u8],
         limits: TailAppendLimits,
-    ) -> Result<Self, TailAppendError> {
+    ) -> Result<Self, Error> {
         if bytes.len() > limits.max_patch_bytes {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "patch bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
                 observed: bytes.len(),
-                limit: limits.max_patch_bytes,
+                maximum: limits.max_patch_bytes,
             });
         }
         let value: Value = serde_json::from_slice(bytes)
-            .map_err(|_error| TailAppendError::DurablePatch("JSON is malformed"))?;
+            .map_err(|_error| Error::DurablePatch("JSON is malformed"))?;
         let canonical = serde_json::to_vec(&value)
-            .map_err(|_error| TailAppendError::DurablePatch("JSON cannot be canonicalized"))?;
+            .map_err(|_error| Error::DurablePatch("JSON cannot be canonicalized"))?;
         if canonical != bytes {
-            return Err(TailAppendError::DurablePatch("JSON is not canonical"));
+            return Err(Error::DurablePatch("JSON is not canonical"));
         }
         let Value::Object(object) = value else {
-            return Err(TailAppendError::DurablePatch(
+            return Err(Error::DurablePatch(
                 "patch root must be an object",
             ));
         };
@@ -3997,13 +3940,13 @@ impl DurableTailAppendPatch {
         ];
         let keys = object.keys().map(String::as_str).collect::<BTreeSet<_>>();
         if keys.len() != expected.len() || expected.iter().any(|key| !keys.contains(key)) {
-            return Err(TailAppendError::DurablePatch("patch fields are not exact"));
+            return Err(Error::DurablePatch("patch fields are not exact"));
         }
         if object.get("format") != Some(&Value::String("litchi-rtf-tail-append".to_string()))
             || object.get("selector") != Some(&Value::String("body".to_string()))
             || object.get("version") != Some(&Value::from(1_u64))
         {
-            return Err(TailAppendError::DurablePatch(
+            return Err(Error::DurablePatch(
                 "unsupported patch format or version",
             ));
         }
@@ -4063,9 +4006,9 @@ impl DurableTailAppendPatch {
     }
 
     /// Applies this patch to an exact source artifact and reopens the result.
-    pub fn apply(&self, source: &Package) -> Result<Package, TailAppendError> {
+    pub fn apply(&self, source: &Package) -> Result<Package, Error> {
         if self.selector != TailSelector::Body {
-            return Err(TailAppendError::UnsupportedSelector);
+            return Err(Error::UnsupportedSelector);
         }
         validate_wire_fields(self)?;
         validate_wire_bounds(
@@ -4078,22 +4021,22 @@ impl DurableTailAppendPatch {
         )?;
         let source_bytes = source
             .source_bytes()
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "snapshot has no exact RTF source",
             ))?;
         if self.direction == Direction::Append && source_bytes.len() > self.limits.max_output_bytes
         {
-            return Err(TailAppendError::LimitExceeded {
-                resource: "output bytes",
+            return Err(Error::Limit {
+                kind: LimitKind::OutputBytes,
                 observed: source_bytes.len(),
-                limit: self.limits.max_output_bytes,
+                maximum: self.limits.max_output_bytes,
             });
         }
         if source_bytes.len() != self.before_bytes {
-            return Err(TailAppendError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if BlobId::of(source_bytes).as_hex() != self.before_digest {
-            return Err(TailAppendError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         if self.inserted.is_empty() && self.before_digest == self.after_digest {
             // Empty append patches are exact identity transitions, but the
@@ -4109,53 +4052,53 @@ impl DurableTailAppendPatch {
             Direction::Remove => self
                 .root_close
                 .checked_add(self.inserted.len())
-                .ok_or(TailAppendError::PatchConflict)?,
+                .ok_or(Error::PatchConflict)?,
         };
         if expected_root_close != proof.root_close {
-            return Err(TailAppendError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         let output = match self.direction {
             Direction::Append => {
                 if self.root_close > source_bytes.len() {
-                    return Err(TailAppendError::PatchConflict);
+                    return Err(Error::PatchConflict);
                 }
                 let mut output = Vec::new();
                 let output_len = source_bytes.len().checked_add(self.inserted.len()).ok_or(
-                    TailAppendError::LimitExceeded {
-                        resource: "output bytes",
+                    Error::Limit {
+                        kind: LimitKind::OutputBytes,
                         observed: usize::MAX,
-                        limit: self.limits.max_output_bytes,
+                        maximum: self.limits.max_output_bytes,
                     },
                 )?;
                 if output_len != self.after_bytes {
-                    return Err(TailAppendError::PatchConflict);
+                    return Err(Error::PatchConflict);
                 }
                 if output_len > source.limits().max_input_bytes() {
-                    return Err(TailAppendError::LimitExceeded {
-                        resource: "source bytes",
+                    return Err(Error::Limit {
+                        kind: LimitKind::SourceBytes,
                         observed: output_len,
-                        limit: source.limits().max_input_bytes(),
+                        maximum: source.limits().max_input_bytes(),
                     });
                 }
                 if output_len > self.limits.max_output_bytes {
-                    return Err(TailAppendError::LimitExceeded {
-                        resource: "output bytes",
+                    return Err(Error::Limit {
+                        kind: LimitKind::OutputBytes,
                         observed: output_len,
-                        limit: self.limits.max_output_bytes,
+                        maximum: self.limits.max_output_bytes,
                     });
                 }
                 output.try_reserve(output_len).map_err(|_error| {
-                    TailAppendError::AllocationFailed {
+                    Error::AllocationFailed {
                         resource: "durable tail candidate",
                         requested: output_len,
                     }
                 })?;
                 let prefix = source_bytes
                     .get(..self.root_close)
-                    .ok_or(TailAppendError::PatchConflict)?;
+                    .ok_or(Error::PatchConflict)?;
                 let suffix = source_bytes
                     .get(self.root_close..)
-                    .ok_or(TailAppendError::PatchConflict)?;
+                    .ok_or(Error::PatchConflict)?;
                 output.extend_from_slice(prefix);
                 output.extend_from_slice(&self.inserted);
                 output.extend_from_slice(suffix);
@@ -4165,46 +4108,46 @@ impl DurableTailAppendPatch {
                 let end = self
                     .root_close
                     .checked_add(self.inserted.len())
-                    .ok_or(TailAppendError::PatchConflict)?;
+                    .ok_or(Error::PatchConflict)?;
                 if end > source_bytes.len()
                     || source_bytes.get(self.root_close..end) != Some(&self.inserted)
                 {
-                    return Err(TailAppendError::PatchConflict);
+                    return Err(Error::PatchConflict);
                 }
                 let output_len = source_bytes
                     .len()
                     .checked_sub(self.inserted.len())
-                    .ok_or(TailAppendError::PatchConflict)?;
+                    .ok_or(Error::PatchConflict)?;
                 if output_len > self.limits.max_output_bytes {
-                    return Err(TailAppendError::LimitExceeded {
-                        resource: "output bytes",
+                    return Err(Error::Limit {
+                        kind: LimitKind::OutputBytes,
                         observed: output_len,
-                        limit: self.limits.max_output_bytes,
+                        maximum: self.limits.max_output_bytes,
                     });
                 }
                 if output_len != self.after_bytes {
-                    return Err(TailAppendError::PatchConflict);
+                    return Err(Error::PatchConflict);
                 }
                 let mut output = Vec::new();
                 output.try_reserve(output_len).map_err(|_error| {
-                    TailAppendError::AllocationFailed {
+                    Error::AllocationFailed {
                         resource: "durable inverse candidate",
                         requested: output_len,
                     }
                 })?;
                 let prefix = source_bytes
                     .get(..self.root_close)
-                    .ok_or(TailAppendError::PatchConflict)?;
+                    .ok_or(Error::PatchConflict)?;
                 let suffix = source_bytes
                     .get(end..)
-                    .ok_or(TailAppendError::PatchConflict)?;
+                    .ok_or(Error::PatchConflict)?;
                 output.extend_from_slice(prefix);
                 output.extend_from_slice(suffix);
                 output
             }
         };
         if BlobId::of(&output).as_hex() != self.after_digest {
-            return Err(TailAppendError::PatchConflict);
+            return Err(Error::PatchConflict);
         }
         Ok(Package::from_bytes_with_options(&output, source.options())?)
     }
@@ -4231,16 +4174,16 @@ impl Direction {
         }
     }
 
-    fn parse(value: &str) -> Result<Self, TailAppendError> {
+    fn parse(value: &str) -> Result<Self, Error> {
         match value {
             "append" => Ok(Self::Append),
             "remove" => Ok(Self::Remove),
-            _ => Err(TailAppendError::DurablePatch("invalid patch direction")),
+            _ => Err(Error::DurablePatch("invalid patch direction")),
         }
     }
 }
 
-fn validate_wire_fields(patch: &DurableTailAppendPatch) -> Result<(), TailAppendError> {
+fn validate_wire_fields(patch: &DurableTailAppendPatch) -> Result<(), Error> {
     validate_digest(&patch.before_digest)?;
     validate_digest(&patch.after_digest)?;
     if patch.inserted.is_empty() {
@@ -4248,12 +4191,12 @@ fn validate_wire_fields(patch: &DurableTailAppendPatch) -> Result<(), TailAppend
             || patch.root_close != 0
             || patch.before_digest != patch.after_digest
         {
-            return Err(TailAppendError::DurablePatch(
+            return Err(Error::DurablePatch(
                 "empty durable patch is not the canonical no-op shape",
             ));
         }
     } else if patch.before_digest == patch.after_digest {
-        return Err(TailAppendError::DurablePatch(
+        return Err(Error::DurablePatch(
             "changed durable patch has equal source and target digests",
         ));
     }
@@ -4267,26 +4210,26 @@ fn validate_wire_bounds(
     root_close: usize,
     inserted_len: usize,
     limits: TailAppendLimits,
-) -> Result<(), TailAppendError> {
+) -> Result<(), Error> {
     if inserted_len > limits.max_inserted_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "inserted bytes",
+        return Err(Error::Limit {
+            kind: LimitKind::InsertedBytes,
             observed: inserted_len,
-            limit: limits.max_inserted_bytes,
+            maximum: limits.max_inserted_bytes,
         });
     }
     if root_close > limits.max_output_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "patch offset",
+        return Err(Error::Limit {
+            kind: LimitKind::PatchOffset,
             observed: root_close,
-            limit: limits.max_output_bytes,
+            maximum: limits.max_output_bytes,
         });
     }
     if after_bytes > limits.max_output_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "output bytes",
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: after_bytes,
-            limit: limits.max_output_bytes,
+            maximum: limits.max_output_bytes,
         });
     }
     match direction {
@@ -4294,18 +4237,18 @@ fn validate_wire_bounds(
             let expected_after =
                 before_bytes
                     .checked_add(inserted_len)
-                    .ok_or(TailAppendError::LimitExceeded {
-                        resource: "after bytes",
+                    .ok_or(Error::Limit {
+                        kind: LimitKind::AfterBytes,
                         observed: usize::MAX,
-                        limit: limits.max_output_bytes,
+                        maximum: limits.max_output_bytes,
                     })?;
             if after_bytes != expected_after {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "append before/after byte sizes do not match inserted bytes",
                 ));
             }
             if root_close > before_bytes {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "append offset exceeds before artifact size",
                 ));
             }
@@ -4314,18 +4257,18 @@ fn validate_wire_bounds(
             let expected_before =
                 after_bytes
                     .checked_add(inserted_len)
-                    .ok_or(TailAppendError::LimitExceeded {
-                        resource: "before bytes",
+                    .ok_or(Error::Limit {
+                        kind: LimitKind::BeforeBytes,
                         observed: usize::MAX,
-                        limit: limits.max_output_bytes,
+                        maximum: limits.max_output_bytes,
                     })?;
             if before_bytes != expected_before {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "remove before/after byte sizes do not match inserted bytes",
                 ));
             }
             if root_close > after_bytes {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "remove offset exceeds after artifact size",
                 ));
             }
@@ -4333,20 +4276,20 @@ fn validate_wire_bounds(
     }
     let end = root_close
         .checked_add(inserted_len)
-        .ok_or(TailAppendError::LimitExceeded {
-            resource: "output bytes",
+        .ok_or(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: usize::MAX,
-            limit: limits.max_output_bytes,
+            maximum: limits.max_output_bytes,
         })?;
     if direction == Direction::Append && end > limits.max_output_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "output bytes",
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: end,
-            limit: limits.max_output_bytes,
+            maximum: limits.max_output_bytes,
         });
     }
     if inserted_len == 0 && (direction != Direction::Append || before_bytes != after_bytes) {
-        return Err(TailAppendError::DurablePatch(
+        return Err(Error::DurablePatch(
             "empty durable patch must use canonical append identity shape",
         ));
     }
@@ -4362,7 +4305,7 @@ fn validate_artifact_splice(
     root_close: usize,
     inserted: &[u8],
     limits: TailAppendLimits,
-) -> Result<(), TailAppendError> {
+) -> Result<(), Error> {
     validate_wire_bounds(
         direction,
         before_bytes,
@@ -4372,21 +4315,21 @@ fn validate_artifact_splice(
         limits,
     )?;
     if direction == Direction::Append && before.len() > limits.max_output_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "output bytes",
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: before.len(),
-            limit: limits.max_output_bytes,
+            maximum: limits.max_output_bytes,
         });
     }
     if after.len() > limits.max_output_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "output bytes",
+        return Err(Error::Limit {
+            kind: LimitKind::OutputBytes,
             observed: after.len(),
-            limit: limits.max_output_bytes,
+            maximum: limits.max_output_bytes,
         });
     }
     if before.len() != before_bytes || after.len() != after_bytes {
-        return Err(TailAppendError::DurablePatch(
+        return Err(Error::DurablePatch(
             "artifact byte sizes do not match durable wire sizes",
         ));
     }
@@ -4396,24 +4339,24 @@ fn validate_artifact_splice(
                 before
                     .len()
                     .checked_add(inserted.len())
-                    .ok_or(TailAppendError::LimitExceeded {
-                        resource: "output bytes",
+                    .ok_or(Error::Limit {
+                        kind: LimitKind::OutputBytes,
                         observed: usize::MAX,
-                        limit: limits.max_output_bytes,
+                        maximum: limits.max_output_bytes,
                     })?;
             if after.len() != expected_after {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "append source/target sizes do not match inserted bytes",
                 ));
             }
             let end =
                 root_close
                     .checked_add(inserted.len())
-                    .ok_or(TailAppendError::DurablePatch(
+                    .ok_or(Error::DurablePatch(
                         "append offset overflows inserted span",
                     ))?;
             if root_close > before.len() || end > after.len() {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "append offset is outside the source/target artifacts",
                 ));
             }
@@ -4421,7 +4364,7 @@ fn validate_artifact_splice(
                 || after.get(root_close..end) != Some(inserted)
                 || after.get(end..) != before.get(root_close..)
             {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "append artifacts do not contain the exact inserted span",
                 ));
             }
@@ -4431,24 +4374,24 @@ fn validate_artifact_splice(
                 after
                     .len()
                     .checked_add(inserted.len())
-                    .ok_or(TailAppendError::LimitExceeded {
-                        resource: "output bytes",
+                    .ok_or(Error::Limit {
+                        kind: LimitKind::OutputBytes,
                         observed: usize::MAX,
-                        limit: limits.max_output_bytes,
+                        maximum: limits.max_output_bytes,
                     })?;
             if before.len() != expected_before {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "remove source/target sizes do not match inserted bytes",
                 ));
             }
             let end =
                 root_close
                     .checked_add(inserted.len())
-                    .ok_or(TailAppendError::DurablePatch(
+                    .ok_or(Error::DurablePatch(
                         "remove offset overflows inserted span",
                     ))?;
             if root_close > after.len() || end > before.len() {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "remove offset is outside the source/target artifacts",
                 ));
             }
@@ -4456,7 +4399,7 @@ fn validate_artifact_splice(
                 || before.get(..root_close) != after.get(..root_close)
                 || before.get(end..) != after.get(root_close..)
             {
-                return Err(TailAppendError::DurablePatch(
+                return Err(Error::DurablePatch(
                     "remove artifacts do not contain the exact inserted span",
                 ));
             }
@@ -4465,10 +4408,10 @@ fn validate_artifact_splice(
     Ok(())
 }
 
-fn deterministic_json_len(patch: &DurableTailAppendPatch) -> Result<usize, TailAppendError> {
+fn deterministic_json_len(patch: &DurableTailAppendPatch) -> Result<usize, Error> {
     for value in [patch.after_bytes, patch.before_bytes, patch.root_close] {
         let _ = u64::try_from(value).map_err(|_error| {
-            TailAppendError::DurablePatch("patch number exceeds the durable integer range")
+            Error::DurablePatch("patch number exceeds the durable integer range")
         })?;
     }
     let encoded_len =
@@ -4476,7 +4419,7 @@ fn deterministic_json_len(patch: &DurableTailAppendPatch) -> Result<usize, TailA
             .inserted
             .len()
             .checked_mul(2)
-            .ok_or(TailAppendError::AllocationFailed {
+            .ok_or(Error::AllocationFailed {
                 resource: "durable inserted hex",
                 requested: usize::MAX,
             })?;
@@ -4501,7 +4444,7 @@ fn deterministic_json_len(patch: &DurableTailAppendPatch) -> Result<usize, TailA
     parts.into_iter().try_fold(0usize, |total, part| {
         total
             .checked_add(part)
-            .ok_or(TailAppendError::AllocationFailed {
+            .ok_or(Error::AllocationFailed {
                 resource: "durable JSON size",
                 requested: usize::MAX,
             })
@@ -4526,41 +4469,41 @@ struct SpliceProof {
 fn prove_splice_source(
     source: &Package,
     selector: TailSelector,
-) -> Result<SpliceProof, TailAppendError> {
+) -> Result<SpliceProof, Error> {
     if selector != TailSelector::Body {
-        return Err(TailAppendError::UnsupportedSelector);
+        return Err(Error::UnsupportedSelector);
     }
     let provenance = source.model().parse_provenance();
     if !provenance.syntax_valid || !provenance.root_valid || !provenance.document_valid {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "parser provenance does not prove a complete document",
         ));
     }
     if source.model().protection().is_protected() {
-        return Err(TailAppendError::ProtectedDocument(
+        return Err(Error::ProtectedDocument(
             source.model().protection().protection_type(),
         ));
     }
     if source.model().unknown_syntax_markers() != 0 {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "dropped unknown syntax prevents a safe root-tail splice",
         ));
     }
     reject_active_or_external_surfaces(source)?;
     if crate::compressed::is_compressed_rtf(source.source_bytes().ok_or(
-        TailAppendError::UnsupportedSource("snapshot has no exact RTF source"),
+        Error::UnsupportedSource("snapshot has no exact RTF source"),
     )?) {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "compressed RTF is not an exact uncompressed splice source",
         ));
     }
     let bytes = source
         .source_bytes()
-        .ok_or(TailAppendError::UnsupportedSource(
+        .ok_or(Error::UnsupportedSource(
             "snapshot has no exact RTF source",
         ))?;
     if !bytes.is_ascii() {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "non-ASCII transport requires an explicit code-page writer",
         ));
     }
@@ -4572,19 +4515,19 @@ fn prove_splice_source(
     })
 }
 
-fn reject_active_or_external_surfaces(source: &Package) -> Result<(), TailAppendError> {
+fn reject_active_or_external_surfaces(source: &Package) -> Result<(), Error> {
     let model = source.model();
     if !model.external_references().is_empty()
         || model.mail_merge().is_some()
         || model.xsl_transform().is_some()
         || model.xsl_transform_usage().is_requested()
     {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "external document or transformation content is present",
         ));
     }
     if !model.form_fields().is_empty() || !model.objects().is_empty() {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "active form or embedded-object content is present",
         ));
     }
@@ -4593,7 +4536,7 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), TailAppend
         .iter()
         .any(|picture| picture.image_type == crate::ImageType::Unknown)
     {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "an unsupported picture payload is present",
         ));
     }
@@ -4604,13 +4547,13 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), TailAppend
             | crate::validation::FieldSafety::ExternalUnknown
             | crate::validation::FieldSafety::ExternalAndActive
             | crate::validation::FieldSafety::ExternalAndActiveUnknown => {
-                return Err(TailAppendError::UnsupportedSource(
+                return Err(Error::UnsupportedSource(
                     "external field content is present",
                 ));
             }
             crate::validation::FieldSafety::Active
             | crate::validation::FieldSafety::ActiveUnknown => {
-                return Err(TailAppendError::UnsupportedSource(
+                return Err(Error::UnsupportedSource(
                     "active field content is present",
                 ));
             }
@@ -4619,9 +4562,9 @@ fn reject_active_or_external_surfaces(source: &Package) -> Result<(), TailAppend
     Ok(())
 }
 
-fn scan_root_close(bytes: &[u8]) -> Result<usize, TailAppendError> {
+fn scan_root_close(bytes: &[u8]) -> Result<usize, Error> {
     if bytes.first() != Some(&b'{') {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "source does not begin with one root group",
         ));
     }
@@ -4631,14 +4574,14 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, TailAppendError> {
         let byte = bytes
             .get(index)
             .copied()
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "root scanner offset is outside the source",
             ))?;
         match byte {
             b'{' => {
                 depth = depth
                     .checked_add(1)
-                    .ok_or(TailAppendError::UnsupportedSource(
+                    .ok_or(Error::UnsupportedSource(
                         "root nesting depth overflowed",
                     ))?;
                 index += 1;
@@ -4646,19 +4589,19 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, TailAppendError> {
             b'}' => {
                 depth = depth
                     .checked_sub(1)
-                    .ok_or(TailAppendError::UnsupportedSource(
+                    .ok_or(Error::UnsupportedSource(
                         "root group closed before its opening brace",
                     ))?;
                 if depth == 0 {
                     if bytes
                         .get(index + 1..)
-                        .ok_or(TailAppendError::UnsupportedSource(
+                        .ok_or(Error::UnsupportedSource(
                             "root scanner suffix is outside the source",
                         ))?
                         .iter()
                         .any(|byte| !byte.is_ascii_whitespace())
                     {
-                        return Err(TailAppendError::UnsupportedSource(
+                        return Err(Error::UnsupportedSource(
                             "trailing non-whitespace follows the root group",
                         ));
                     }
@@ -4672,19 +4615,19 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, TailAppendError> {
             _ => index += 1,
         }
     }
-    Err(TailAppendError::UnsupportedSource(
+    Err(Error::UnsupportedSource(
         "root group does not have one exact closing brace",
     ))
 }
 
-fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, TailAppendError> {
+fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, Error> {
     let next = slash
         .checked_add(1)
-        .ok_or(TailAppendError::UnsupportedSource(
+        .ok_or(Error::UnsupportedSource(
             "control offset overflowed",
         ))?;
     let Some(&byte) = bytes.get(next) else {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "source ends after a control slash",
         ));
     };
@@ -4694,18 +4637,18 @@ fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, TailAppendError> {
     if byte == b'\'' {
         let end = next
             .checked_add(3)
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "hex control offset overflowed",
             ))?;
         let digits = bytes
             .get(next + 1..next + 3)
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "malformed hexadecimal control",
             ))?;
         if !digits.first().is_some_and(u8::is_ascii_hexdigit)
             || !digits.get(1).is_some_and(u8::is_ascii_hexdigit)
         {
-            return Err(TailAppendError::UnsupportedSource(
+            return Err(Error::UnsupportedSource(
                 "malformed hexadecimal control",
             ));
         }
@@ -4720,11 +4663,11 @@ fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, TailAppendError> {
     }
     let name = bytes
         .get(next..end)
-        .ok_or(TailAppendError::UnsupportedSource(
+        .ok_or(Error::UnsupportedSource(
             "control word span is invalid",
         ))?;
     if name.eq_ignore_ascii_case(b"bin") {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "binary destinations are outside the exact ASCII splice proof",
         ));
     }
@@ -4751,15 +4694,15 @@ fn ends_with_parameterless_par(source: &Package) -> bool {
     )
 }
 
-fn validate_plain_text(text: &str) -> Result<(), TailAppendError> {
+fn validate_plain_text(text: &str) -> Result<(), Error> {
     for character in text.chars() {
         if character == '\n' || character == '\r' {
-            return Err(TailAppendError::InvalidText(
+            return Err(Error::InvalidText(
                 "paragraph separators must be expressed by the paragraph API",
             ));
         }
         if character != '\t' && character.is_control() {
-            return Err(TailAppendError::InvalidText(
+            return Err(Error::InvalidText(
                 "control characters other than tab are not plain text",
             ));
         }
@@ -4772,7 +4715,7 @@ fn encode_inserted(
     paragraphs: &[OwnedParagraph],
     ends_with_par: bool,
     estimated: usize,
-) -> Result<Vec<u8>, TailAppendError> {
+) -> Result<Vec<u8>, Error> {
     encode_inserted_for_body(
         !source.body().is_empty(),
         paragraphs,
@@ -4786,12 +4729,12 @@ fn encode_inserted_for_body(
     paragraphs: &[OwnedParagraph],
     ends_with_par: bool,
     estimated: usize,
-) -> Result<Vec<u8>, TailAppendError> {
+) -> Result<Vec<u8>, Error> {
     let separator = body_nonempty && !ends_with_par;
     let mut encoded = Vec::new();
     encoded
         .try_reserve(estimated)
-        .map_err(|_error| TailAppendError::AllocationFailed {
+        .map_err(|_error| Error::AllocationFailed {
             resource: "tail encoded payload",
             requested: estimated,
         })?;
@@ -4821,7 +4764,7 @@ fn encoded_inserted_len(
     source: &Package,
     paragraphs: &[OwnedParagraph],
     ends_with_par: bool,
-) -> Result<usize, TailAppendError> {
+) -> Result<usize, Error> {
     encoded_inserted_len_for_body(!source.body().is_empty(), paragraphs, ends_with_par)
 }
 
@@ -4829,10 +4772,10 @@ fn encoded_inserted_len_for_body(
     body_nonempty: bool,
     paragraphs: &[OwnedParagraph],
     ends_with_par: bool,
-) -> Result<usize, TailAppendError> {
+) -> Result<usize, Error> {
     let separator = body_nonempty && !ends_with_par;
     let mut length = usize::from(separator).checked_mul(b"\\par ".len()).ok_or(
-        TailAppendError::AllocationFailed {
+        Error::AllocationFailed {
             resource: "tail encoded estimate",
             requested: usize::MAX,
         },
@@ -4841,7 +4784,7 @@ fn encoded_inserted_len_for_body(
         length = length
             .checked_add(b"\\pard ".len())
             .and_then(|value| value.checked_add(b"\\par ".len()))
-            .ok_or(TailAppendError::AllocationFailed {
+            .ok_or(Error::AllocationFailed {
                 resource: "tail encoded estimate",
                 requested: usize::MAX,
             })?;
@@ -4851,7 +4794,7 @@ fn encoded_inserted_len_for_body(
                 .checked_add(b"{\\plain \\uc1 ".len())
                 .and_then(|value| value.checked_add(1))
                 .and_then(|value| value.checked_add(run_length))
-                .ok_or(TailAppendError::AllocationFailed {
+                .ok_or(Error::AllocationFailed {
                     resource: "tail encoded estimate",
                     requested: usize::MAX,
                 })?;
@@ -4860,7 +4803,7 @@ fn encoded_inserted_len_for_body(
     Ok(length)
 }
 
-fn encoded_plain_text_len(text: &str) -> Result<usize, TailAppendError> {
+fn encoded_plain_text_len(text: &str) -> Result<usize, Error> {
     let mut length = 0usize;
     for character in text.chars() {
         let addition = match character {
@@ -4876,7 +4819,7 @@ fn encoded_plain_text_len(text: &str) -> Result<usize, TailAppendError> {
                     units_length = units_length
                         .checked_add(3)
                         .and_then(|value| value.checked_add(decimal_len(signed)))
-                        .ok_or(TailAppendError::AllocationFailed {
+                        .ok_or(Error::AllocationFailed {
                             resource: "tail encoded estimate",
                             requested: usize::MAX,
                         })?;
@@ -4886,7 +4829,7 @@ fn encoded_plain_text_len(text: &str) -> Result<usize, TailAppendError> {
         };
         length = length
             .checked_add(addition)
-            .ok_or(TailAppendError::AllocationFailed {
+            .ok_or(Error::AllocationFailed {
                 resource: "tail encoded estimate",
                 requested: usize::MAX,
             })?;
@@ -4969,18 +4912,18 @@ fn verify_candidate(
     candidate: &Package,
     paragraphs: &[OwnedParagraph],
     ends_with_par: bool,
-) -> Result<(), TailAppendError> {
+) -> Result<(), Error> {
     let source_text = source.text();
     let candidate_text = candidate.text();
     if !candidate_text.starts_with(source_text) {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "candidate changed the pre-existing body text",
         ));
     }
     let suffix =
         candidate_text
             .get(source_text.len()..)
-            .ok_or(TailAppendError::UnsupportedSource(
+            .ok_or(Error::UnsupportedSource(
                 "candidate text prefix is invalid",
             ))?;
     let separator = !source.body().is_empty() && !ends_with_par;
@@ -4990,14 +4933,14 @@ fn verify_candidate(
             expected_len =
                 expected_len
                     .checked_add(run.len())
-                    .ok_or(TailAppendError::AllocationFailed {
+                    .ok_or(Error::AllocationFailed {
                         resource: "tail readback text",
                         requested: usize::MAX,
                     })?;
         }
         expected_len = expected_len
             .checked_add(1)
-            .ok_or(TailAppendError::AllocationFailed {
+            .ok_or(Error::AllocationFailed {
                 resource: "tail readback text",
                 requested: usize::MAX,
             })?;
@@ -5005,7 +4948,7 @@ fn verify_candidate(
     let mut expected = String::new();
     expected
         .try_reserve(expected_len)
-        .map_err(|_error| TailAppendError::AllocationFailed {
+        .map_err(|_error| Error::AllocationFailed {
             resource: "tail readback text",
             requested: expected_len,
         })?;
@@ -5019,30 +4962,30 @@ fn verify_candidate(
         expected.push('\n');
     }
     if suffix != expected {
-        return Err(TailAppendError::UnsupportedSource(
+        return Err(Error::UnsupportedSource(
             "candidate plain paragraphs did not survive RTF readback",
         ));
     }
     Ok(())
 }
 
-fn write_sequential<W: Write>(sink: &mut W, bytes: &[u8]) -> Result<usize, TailAppendError> {
+fn write_sequential<W: Write>(sink: &mut W, bytes: &[u8]) -> Result<usize, Error> {
     let mut written = 0usize;
     while written < bytes.len() {
-        let remaining = bytes.get(written..).ok_or(TailAppendError::Sink {
+        let remaining = bytes.get(written..).ok_or(Error::Sink {
             kind: io::ErrorKind::InvalidData,
             written,
         })?;
         match sink.write(remaining) {
             Ok(0) => {
-                return Err(TailAppendError::Sink {
+                return Err(Error::Sink {
                     kind: io::ErrorKind::WriteZero,
                     written,
                 });
             }
             Ok(count) => {
                 if count > bytes.len().saturating_sub(written) {
-                    return Err(TailAppendError::Sink {
+                    return Err(Error::Sink {
                         kind: io::ErrorKind::InvalidData,
                         written,
                     });
@@ -5051,31 +4994,31 @@ fn write_sequential<W: Write>(sink: &mut W, bytes: &[u8]) -> Result<usize, TailA
             }
             Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
             Err(error) => {
-                return Err(TailAppendError::Sink {
+                return Err(Error::Sink {
                     kind: error.kind(),
                     written,
                 });
             }
         }
     }
-    sink.flush().map_err(|error| TailAppendError::Sink {
+    sink.flush().map_err(|error| Error::Sink {
         kind: error.kind(),
         written,
     })?;
     Ok(written)
 }
 
-fn hex_encode(bytes: &[u8]) -> Result<String, TailAppendError> {
+fn hex_encode(bytes: &[u8]) -> Result<String, Error> {
     let encoded_len = bytes
         .len()
         .checked_mul(2)
-        .ok_or(TailAppendError::AllocationFailed {
+        .ok_or(Error::AllocationFailed {
             resource: "durable inserted hex",
             requested: usize::MAX,
         })?;
     let mut text = String::new();
     text.try_reserve(encoded_len)
-        .map_err(|_error| TailAppendError::AllocationFailed {
+        .map_err(|_error| Error::AllocationFailed {
             resource: "durable inserted hex",
             requested: encoded_len,
         })?;
@@ -5084,13 +5027,13 @@ fn hex_encode(bytes: &[u8]) -> Result<String, TailAppendError> {
         let high = HEX
             .get((byte >> 4) as usize)
             .copied()
-            .ok_or(TailAppendError::DurablePatch(
+            .ok_or(Error::DurablePatch(
                 "hex encoder index overflowed",
             ))?;
         let low = HEX
             .get((byte & 0x0f) as usize)
             .copied()
-            .ok_or(TailAppendError::DurablePatch(
+            .ok_or(Error::DurablePatch(
                 "hex encoder index overflowed",
             ))?;
         text.push(high as char);
@@ -5099,22 +5042,22 @@ fn hex_encode(bytes: &[u8]) -> Result<String, TailAppendError> {
     Ok(text)
 }
 
-fn hex_decode(text: &str, max_bytes: usize) -> Result<Vec<u8>, TailAppendError> {
+fn hex_decode(text: &str, max_bytes: usize) -> Result<Vec<u8>, Error> {
     if text.len() % 2 != 0 {
-        return Err(TailAppendError::DurablePatch("inserted hex has odd length"));
+        return Err(Error::DurablePatch("inserted hex has odd length"));
     }
     let observed = text.len() / 2;
     if observed > max_bytes {
-        return Err(TailAppendError::LimitExceeded {
-            resource: "inserted bytes",
+        return Err(Error::Limit {
+            kind: LimitKind::InsertedBytes,
             observed,
-            limit: max_bytes,
+            maximum: max_bytes,
         });
     }
     let mut bytes = Vec::new();
     bytes
         .try_reserve(observed)
-        .map_err(|_error| TailAppendError::AllocationFailed {
+        .map_err(|_error| Error::AllocationFailed {
             resource: "durable inserted bytes",
             requested: observed,
         })?;
@@ -5123,15 +5066,15 @@ fn hex_decode(text: &str, max_bytes: usize) -> Result<Vec<u8>, TailAppendError> 
         let high = hex_value(
             *pair
                 .first()
-                .ok_or(TailAppendError::DurablePatch("invalid inserted hex"))?,
+                .ok_or(Error::DurablePatch("invalid inserted hex"))?,
         )
-        .ok_or(TailAppendError::DurablePatch("invalid inserted hex"))?;
+        .ok_or(Error::DurablePatch("invalid inserted hex"))?;
         let low = hex_value(
             *pair
                 .get(1)
-                .ok_or(TailAppendError::DurablePatch("invalid inserted hex"))?,
+                .ok_or(Error::DurablePatch("invalid inserted hex"))?,
         )
-        .ok_or(TailAppendError::DurablePatch("invalid inserted hex"))?;
+        .ok_or(Error::DurablePatch("invalid inserted hex"))?;
         bytes.push((high << 4) | low);
     }
     Ok(bytes)
@@ -5146,39 +5089,39 @@ const fn hex_value(byte: u8) -> Option<u8> {
     }
 }
 
-fn string_field<'a>(object: &'a Map<String, Value>, key: &str) -> Result<&'a str, TailAppendError> {
+fn string_field<'a>(object: &'a Map<String, Value>, key: &str) -> Result<&'a str, Error> {
     object
         .get(key)
         .and_then(Value::as_str)
-        .ok_or(TailAppendError::DurablePatch(
+        .ok_or(Error::DurablePatch(
             "patch string field is missing",
         ))
 }
 
-fn number(value: usize) -> Result<Value, TailAppendError> {
+fn number(value: usize) -> Result<Value, Error> {
     let value = u64::try_from(value).map_err(|_error| {
-        TailAppendError::DurablePatch("patch offset exceeds the durable integer range")
+        Error::DurablePatch("patch offset exceeds the durable integer range")
     })?;
     Ok(Value::from(value))
 }
 
-fn number_field(object: &Map<String, Value>, key: &str) -> Result<usize, TailAppendError> {
+fn number_field(object: &Map<String, Value>, key: &str) -> Result<usize, Error> {
     let value = object
         .get(key)
         .and_then(Value::as_u64)
-        .ok_or(TailAppendError::DurablePatch("patch offset is missing"))?;
+        .ok_or(Error::DurablePatch("patch offset is missing"))?;
     usize::try_from(value)
-        .map_err(|_error| TailAppendError::DurablePatch("patch offset overflows usize"))
+        .map_err(|_error| Error::DurablePatch("patch offset overflows usize"))
 }
 
-fn validate_digest(value: &str) -> Result<(), TailAppendError> {
+fn validate_digest(value: &str) -> Result<(), Error> {
     if value.len() != 64
         || !value
             .as_bytes()
             .iter()
             .all(|byte| byte.is_ascii_digit() || matches!(byte, b'a'..=b'f'))
     {
-        return Err(TailAppendError::DurablePatch(
+        return Err(Error::DurablePatch(
             "patch digest is not canonical lowercase SHA-256 hex",
         ));
     }

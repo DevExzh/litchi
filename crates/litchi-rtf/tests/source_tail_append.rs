@@ -10,7 +10,7 @@ use litchi_core::{
 };
 use litchi_rtf::Package;
 use litchi_rtf::tail_append::{
-    PlainParagraph, PlainRun, TailAppendError, TailAppendLimits, TailAppendOutputProgress,
+    Error, PlainParagraph, PlainRun, TailAppendLimits, TailAppendOutputProgress,
     TailAppendPublicationError, TailAppendPublicationLimits, TailAppendSourceEdit,
     TailAppendSourceProof, TailSelector,
 };
@@ -754,7 +754,7 @@ fn durable_source_plan_round_trips_and_forged_source_never_grants_proof() {
     let foreign = Package::from_bytes(br#"{\rtf1\ansi Foreign}"#).unwrap();
     assert!(matches!(
         parsed.apply(&foreign),
-        Err(TailAppendError::PatchConflict)
+        Err(Error::PatchConflict)
     ));
 }
 
@@ -773,7 +773,7 @@ fn source_proof_is_private_capability_and_plain_staging_is_atomic() {
     let invalid = [PlainParagraph::new(&invalid_runs)];
     assert!(matches!(
         edit.append_paragraphs(&invalid),
-        Err(TailAppendError::InvalidText(_))
+        Err(Error::InvalidText(_))
     ));
     assert_eq!(edit.paragraph_count(), 0);
     edit.append_paragraphs(&[PlainParagraph::new(&[PlainRun::new("C")])])

@@ -16925,8 +16925,8 @@ fn stage_rtf_logical_tail(
     source: &litchi_rtf::Package,
     paragraphs: &[&str],
     limits: litchi_rtf::TailAppendLimits,
-) -> Result<litchi_rtf::TailAppendCommit, Box<dyn Error>> {
-    let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+) -> Result<litchi_rtf::tail_append::Commit, Box<dyn Error>> {
+    let mut edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
     edit.append_text_paragraphs(paragraphs)?;
     Ok(edit.commit()?)
 }
@@ -16969,8 +16969,8 @@ fn verify_rtf_logical_tail_projection(
 
 fn verify_rtf_logical_tail_gates(
     source: &litchi_rtf::Package,
-    changed: &litchi_rtf::TailAppendCommit,
-    noop: &litchi_rtf::TailAppendCommit,
+    changed: &litchi_rtf::tail_append::Commit,
+    noop: &litchi_rtf::tail_append::Commit,
     appended: &[String],
     limits: litchi_rtf::TailAppendLimits,
     expected: &[u8],
@@ -17041,10 +17041,10 @@ fn verify_rtf_logical_tail_gates(
     let foreign = litchi_rtf::Package::parse(r"{\rtf1\ansi foreign source}")?;
     if !matches!(
         foreign.apply_tail_append(changed.patch()),
-        Err(litchi_rtf::TailAppendError::PatchConflict)
+        Err(litchi_rtf::tail_append::Error::PatchConflict)
     ) || !matches!(
         decoded.apply(&foreign),
-        Err(litchi_rtf::TailAppendError::PatchConflict)
+        Err(litchi_rtf::tail_append::Error::PatchConflict)
     ) {
         return Err("RTF logical-tail source-conflict gate accepted a foreign source".into());
     }
@@ -17054,10 +17054,10 @@ fn verify_rtf_logical_tail_gates(
     let stale = stale_edit.commit()?.into_package();
     if !matches!(
         stale.apply_tail_append(changed.patch()),
-        Err(litchi_rtf::TailAppendError::PatchConflict)
+        Err(litchi_rtf::tail_append::Error::PatchConflict)
     ) || !matches!(
         decoded.apply(&stale),
-        Err(litchi_rtf::TailAppendError::PatchConflict)
+        Err(litchi_rtf::tail_append::Error::PatchConflict)
     ) {
         return Err("RTF logical-tail stale-source gate accepted a changed source".into());
     }
@@ -33436,7 +33436,7 @@ fn run_rtf_logical_tail_append(
     let limits = rtf_logical_tail_limits(corpus.archive.len(), input_bytes, appended.len())?;
     let changed = stage_rtf_logical_tail(&source, &paragraph_inputs, limits)?;
     let noop = {
-        let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
         edit.commit()?
     };
     let expected = changed.package().to_bytes()?;
@@ -33459,7 +33459,7 @@ fn run_rtf_logical_tail_append(
                 commit.write_to(&mut sink, limits)?
             },
             Case::RtfLogicalTailNoopSave => {
-                let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+                let edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
                 let commit = edit.commit()?;
                 commit.write_to(&mut sink, limits)?
             },
@@ -33550,7 +33550,7 @@ fn run_rtf_logical_tail_append(
 }
 
 enum RtfTailPrepared {
-    Commit(litchi_rtf::TailAppendCommit),
+    Commit(litchi_rtf::tail_append::Commit),
     Plan {
         plan: litchi_rtf::TailAppendPublicationPlan,
         context: ExecutionContext,
@@ -33650,7 +33650,7 @@ fn stage_rtf_tail_prepared(
     inserted_bytes: u64,
 ) -> Result<(RtfTailPrepared, u64), Box<dyn Error>> {
     let started = Instant::now();
-    let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    let mut edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
     edit.append_text_paragraphs(paragraphs)?;
     let prepared = if plan_based {
         let context = rtf_tail_publication_context(expected_output_bytes, inserted_bytes)?;
@@ -33815,7 +33815,7 @@ fn verify_rtf_tail_publication_plan_gates(
     let mut bounded_limits = limits;
     bounded_limits.max_output_bytes = expected.len().saturating_sub(1);
     let mut bounded_edit =
-        source.tail_append_with_limits(litchi_rtf::TailSelector::Body, bounded_limits);
+        source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, bounded_limits);
     bounded_edit
         .append_text_paragraphs(&appended.iter().map(String::as_str).collect::<Vec<_>>())?;
     let bounded_context = rtf_tail_publication_context(
@@ -33826,8 +33826,8 @@ fn verify_rtf_tail_publication_plan_gates(
         bounded_edit
             .publication_plan_with_limits_and_context(publication_limits, &bounded_context,),
         Err(litchi_rtf::TailAppendPublicationError::Plan(
-            litchi_rtf::TailAppendError::LimitExceeded {
-                resource: "output bytes",
+            litchi_rtf::tail_append::Error::Limit {
+                kind: litchi_rtf::tail_append::LimitKind::OutputBytes,
                 ..
             }
         ))
@@ -33835,7 +33835,7 @@ fn verify_rtf_tail_publication_plan_gates(
         return Err("RTF publication plan did not enforce the output limit gate".into());
     }
 
-    let mut invalid_edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+    let mut invalid_edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
     invalid_edit
         .append_text_paragraphs(&appended.iter().map(String::as_str).collect::<Vec<_>>())?;
     let invalid_context = rtf_tail_publication_context(
@@ -33856,8 +33856,8 @@ fn verify_rtf_tail_publication_plan_gates(
 
 fn verify_rtf_tail_publication_lifecycle(
     source: &litchi_rtf::Package,
-    changed: &litchi_rtf::TailAppendCommit,
-    noop: &litchi_rtf::TailAppendCommit,
+    changed: &litchi_rtf::tail_append::Commit,
+    noop: &litchi_rtf::tail_append::Commit,
     plan: &litchi_rtf::TailAppendPublicationPlan,
     changed_appended: &[String],
     plan_appended: &[String],
@@ -33936,7 +33936,7 @@ fn run_rtf_logical_tail_publication(
     );
     let changed = stage_rtf_logical_tail(&source, &changed_inputs, limits)?;
     let noop = {
-        let edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
         edit.commit()?
     };
     let expected_changed = changed.package().to_bytes()?;
@@ -33953,7 +33953,7 @@ fn run_rtf_logical_tail_publication(
         .ok_or("RTF publication output is smaller than its source")?;
 
     let correctness_plan = {
-        let mut edit = source.tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
+        let mut edit = source.edit_tail_append_with_limits(litchi_rtf::TailSelector::Body, limits);
         edit.append_text_paragraphs(&paragraph_inputs)?;
         edit.publication_plan_with_limits(publication_limits)?
     };
