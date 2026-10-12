@@ -62,13 +62,13 @@ fn presentation_with_vba_storage() -> Presentation {
         slide_directory: SlideDirectory::new_for_test(0),
         pictures_data: None,
         pictures_source: None,
-        record_limits: crate::RecordLimits::default(),
+        source_limits: crate::SourceLimits::default(),
         tolerance: crate::leniency::ToleranceReport::default(),
     }
 }
 
 #[test]
-fn lazy_live_document_reuses_presentation_record_limits() {
+fn lazy_live_document_reuses_presentation_source_limits() {
     let powerpoint_document = record_bytes(0x0f, 0, RecordType::Document, &[1]);
     let mut persist_mapping = PersistMapping::new();
     persist_mapping.add_mapping(1, 0);
@@ -79,16 +79,19 @@ fn lazy_live_document_reuses_presentation_record_limits() {
         slide_directory: SlideDirectory::new_for_test(0),
         pictures_data: None,
         pictures_source: None,
-        record_limits: crate::RecordLimits {
+        source_limits: crate::SourceLimits {
             max_record_payload_bytes: 0,
-            ..crate::RecordLimits::default()
+            ..crate::SourceLimits::default()
         },
         tolerance: crate::leniency::ToleranceReport::default(),
     };
 
     assert!(matches!(
         presentation.live_document_record(),
-        Err(Error::ResourceLimit(_))
+        Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordPayloadBytes,
+            ..
+        })
     ));
 }
 
@@ -206,7 +209,7 @@ fn owned_factory(presentation: &Presentation) -> crate::slide::SlideFactory<'_> 
         presentation.powerpoint_document.as_slice(),
         &presentation.persist_mapping,
         &presentation.slide_directory,
-        presentation.record_limits,
+        presentation.source_limits,
     )
 }
 
@@ -215,7 +218,7 @@ fn shared_factory(presentation: &Presentation) -> crate::slide::SlideFactory<'_>
         &presentation.powerpoint_document,
         &presentation.persist_mapping,
         &presentation.slide_directory,
-        presentation.record_limits,
+        presentation.source_limits,
     )
 }
 
@@ -320,9 +323,9 @@ fn the_shared_slide_factory_charges_the_same_copy_budget() {
         assert!(total > 0, "{relative}");
 
         for budget in [total, total - 1] {
-            let limits = crate::RecordLimits {
+            let limits = crate::SourceLimits {
                 max_copied_payload_bytes: budget,
-                ..presentation.record_limits
+                ..presentation.source_limits
             };
             let owned = crate::slide::SlideFactory::new_with_limits(
                 presentation.powerpoint_document.as_slice(),

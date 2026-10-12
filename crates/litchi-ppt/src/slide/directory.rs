@@ -3,7 +3,7 @@
 use crate::consts::RecordType;
 use crate::current_user::CurrentUser;
 use crate::leniency::{DefectLocation, PersistDefect, SlideListDefect, ToleranceReport};
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::persist::PersistMapping;
 use crate::records::Record;
 use std::collections::HashMap;
@@ -88,7 +88,7 @@ impl SlideDirectory {
             document_data,
             current_user_data,
             persist_mapping,
-            RecordLimits::default(),
+            SourceLimits::default(),
             &mut ToleranceReport::default(),
         )
     }
@@ -101,7 +101,7 @@ impl SlideDirectory {
         document_data: &[u8],
         current_user_data: &[u8],
         persist_mapping: &PersistMapping,
-        limits: RecordLimits,
+        limits: SourceLimits,
         report: &mut ToleranceReport,
     ) -> Result<Self> {
         let current_user = CurrentUser::parse_with_limits(current_user_data, limits)?;
@@ -121,15 +121,15 @@ impl SlideDirectory {
         document_data: &[u8],
         user_edit_offset: u32,
         persist_mapping: &PersistMapping,
-        limits: RecordLimits,
+        limits: SourceLimits,
         report: &mut ToleranceReport,
     ) -> Result<Self> {
         if document_data.len() > limits.max_input_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PowerPoint Document stream size {} exceeds limit {}",
-                document_data.len(),
-                limits.max_input_bytes
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::EntryBytes,
+                observed: document_data.len(),
+                maximum: limits.max_input_bytes,
+            });
         }
         let user_edit_offset = usize::try_from(user_edit_offset).map_err(|_err| {
             Error::Corrupted("current edit offset does not fit usize".to_string())
@@ -376,7 +376,7 @@ impl SlideDirectory {
 pub(crate) fn locate_head_user_edit(
     document_data: &[u8],
     current_user_data: Option<&[u8]>,
-    limits: RecordLimits,
+    limits: SourceLimits,
     report: &mut ToleranceReport,
 ) -> Result<u32> {
     let defect = match current_user_data {
@@ -443,17 +443,18 @@ fn is_live_user_edit(document_data: &[u8], offset: u32) -> bool {
 /// The offset of the last well-formed `UserEditAtom` among the document
 /// stream's top-level records. The walk stops at the first header that does
 /// not fit in the stream, as LibreOffice's record manager does.
-fn last_user_edit(document_data: &[u8], limits: RecordLimits) -> Result<Option<u32>> {
+fn last_user_edit(document_data: &[u8], limits: SourceLimits) -> Result<Option<u32>> {
     let mut offset = 0usize;
     let mut records = 0usize;
     let mut last = None;
     while let Ok(header) = read_header(document_data, offset, "top-level record") {
         records += 1;
         if records > limits.max_records {
-            return Err(Error::ResourceLimit(format!(
-                "PowerPoint Document top-level record count exceeds limit {}",
-                limits.max_records
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: records,
+                maximum: limits.max_records,
+            });
         }
         let offset_u32 = u32::try_from(offset)
             .map_err(|_err| Error::Corrupted("UserEditAtom offset overflow".to_string()))?;
@@ -739,7 +740,7 @@ mod tests {
             stream,
             current_user,
             mapping,
-            RecordLimits::default(),
+            SourceLimits::default(),
             &mut report,
         )
         .unwrap();
@@ -942,7 +943,7 @@ mod tests {
     ) -> (Result<u32>, Vec<(crate::Defect, u32)>) {
         let mut report = ToleranceReport::default();
         let head =
-            locate_head_user_edit(stream, current_user, RecordLimits::default(), &mut report);
+            locate_head_user_edit(stream, current_user, SourceLimits::default(), &mut report);
         let defects = report
             .defects()
             .iter()

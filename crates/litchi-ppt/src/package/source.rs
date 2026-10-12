@@ -5,7 +5,7 @@
 //! the native CFB reader and lets the presentation defer the optional
 //! `Pictures` stream until an image query is made.
 
-use super::{Error, OpenOptions, RecordLimits, Result};
+use super::{Error, OpenOptions, Result, SourceLimits};
 use crate::presentation::Presentation;
 use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits};
 #[cfg(any(unix, windows))]
@@ -26,7 +26,7 @@ use std::sync::Arc;
 #[derive(Clone)]
 pub struct SourceBackedPackage {
     shared: Arc<SharedOleFile>,
-    record_limits: RecordLimits,
+    source_limits: SourceLimits,
 }
 
 impl std::fmt::Debug for SourceBackedPackage {
@@ -34,7 +34,7 @@ impl std::fmt::Debug for SourceBackedPackage {
         formatter
             .debug_struct("SourceBackedPackage")
             .field("file_size", &self.shared.file_size())
-            .field("record_limits", &self.record_limits)
+            .field("source_limits", &self.source_limits)
             .finish_non_exhaustive()
     }
 }
@@ -42,7 +42,7 @@ impl std::fmt::Debug for SourceBackedPackage {
 impl SourceBackedPackage {
     /// Open a positional source with the default finite PPT limits.
     pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, RecordLimits::default())
+        Self::from_read_at_with_limits(source, SourceLimits::default())
     }
 
     /// Open a positional source with explicit finite PPT limits.
@@ -51,15 +51,17 @@ impl SourceBackedPackage {
     /// are not read by the package constructor.
     pub fn from_read_at_with_limits(
         source: Arc<dyn ReadAt>,
-        record_limits: RecordLimits,
+        source_limits: SourceLimits,
     ) -> Result<Self> {
-        let cfb_limit = record_limits
+        let cfb_limit = source_limits
             .max_package_bytes
             .min(usize::try_from(SharedOleFileLimits::MAX_INPUT_BYTES).unwrap_or(usize::MAX));
         if cfb_limit == 0 {
-            return Err(Error::ResourceLimit(
-                "PPT package limit must be non-zero".to_string(),
-            ));
+            return Err(Error::InvalidLimit {
+                kind: super::SourceLimitKind::InputBytes,
+                value: 0,
+                maximum: SourceLimits::MAX_INPUT_BYTES,
+            });
         }
         let expected_version = source.version().map_err(OleError::Io)?;
         let source_length = source.len().map_err(OleError::Io)?;
@@ -70,28 +72,36 @@ impl SourceBackedPackage {
                 observed: observed_version,
             }));
         }
-        let source_bytes = usize::try_from(source_length).map_err(|_error| {
-            Error::ResourceLimit("PPT package size exceeds this platform".to_string())
+        let source_bytes = usize::try_from(source_length).map_err(|_error| Error::Limit {
+            kind: super::SourceLimitKind::InputBytes,
+            observed: usize::MAX,
+            maximum: source_limits.max_package_bytes,
         })?;
-        if source_bytes > record_limits.max_package_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT package size {source_bytes} exceeds limit {}",
-                record_limits.max_package_bytes
-            )));
+        if source_bytes > source_limits.max_package_bytes {
+            return Err(Error::Limit {
+                kind: super::SourceLimitKind::InputBytes,
+                observed: source_bytes,
+                maximum: source_limits.max_package_bytes,
+            });
         }
-        let cfb_limit = u64::try_from(cfb_limit).map_err(|_error| {
-            Error::ResourceLimit("PPT package limit does not fit u64".to_string())
+        let cfb_limit = u64::try_from(cfb_limit).map_err(|_error| Error::Limit {
+            kind: super::SourceLimitKind::InputBytes,
+            observed: usize::MAX,
+            maximum: source_limits.max_package_bytes,
         })?;
         if source_length > cfb_limit {
-            return Err(Error::ResourceLimit(format!(
-                "PPT package size {source_length} exceeds shared CFB limit {cfb_limit}"
-            )));
+            return Err(Error::Limit {
+                kind: super::SourceLimitKind::InputBytes,
+                observed: usize::try_from(source_length).unwrap_or(usize::MAX),
+                maximum: usize::try_from(cfb_limit).unwrap_or(source_limits.max_package_bytes),
+            });
         }
         let cfb_limits = SharedOleFileLimits::new(cfb_limit)?;
         let shared = SharedOleFile::open_with_limits(source, cfb_limits)?;
+        super::preflight_shared_ole_file(&shared, source_limits)?;
         Ok(Self {
             shared: Arc::new(shared),
-            record_limits,
+            source_limits,
         })
     }
 
@@ -103,39 +113,52 @@ impl SourceBackedPackage {
     /// inputs. A recognized PPT owner still receives the normal typed resource
     /// error when it exceeds the default package ceiling.
     pub fn from_shared_if_powerpoint(shared: SharedOleFile) -> Result<Option<Self>> {
+        Self::from_shared_if_powerpoint_with_limits(shared, SourceLimits::default())
+    }
+
+    /// Adopt an already validated positional CFB owner under an explicit
+    /// source profile when it contains native PowerPoint streams.
+    pub fn from_shared_if_powerpoint_with_limits(
+        shared: SharedOleFile,
+        source_limits: SourceLimits,
+    ) -> Result<Option<Self>> {
+        shared.source_version()?;
         if !shared_is_powerpoint(&shared) {
             return Ok(None);
         }
         let source_length = shared.file_size();
-        let record_limits = RecordLimits::default();
-        let source_bytes = usize::try_from(source_length).map_err(|_error| {
-            Error::ResourceLimit("PPT package size exceeds this platform".to_string())
+        let source_bytes = usize::try_from(source_length).map_err(|_error| Error::Limit {
+            kind: super::SourceLimitKind::InputBytes,
+            observed: usize::MAX,
+            maximum: source_limits.max_package_bytes,
         })?;
-        if source_bytes > record_limits.max_package_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT package size {source_bytes} exceeds limit {}",
-                record_limits.max_package_bytes
-            )));
+        if source_bytes > source_limits.max_package_bytes {
+            return Err(Error::Limit {
+                kind: super::SourceLimitKind::InputBytes,
+                observed: source_bytes,
+                maximum: source_limits.max_package_bytes,
+            });
         }
+        super::preflight_shared_ole_file(&shared, source_limits)?;
         Ok(Some(Self {
             shared: Arc::new(shared),
-            record_limits,
+            source_limits,
         }))
     }
 
     /// Open a filesystem-backed PPT without slurping the complete artifact.
     #[cfg(any(unix, windows))]
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path_with_limits(path, RecordLimits::default())
+        Self::from_path_with_limits(path, SourceLimits::default())
     }
 
     /// Open a filesystem-backed PPT with explicit finite limits.
     #[cfg(any(unix, windows))]
     pub fn from_path_with_limits(
         path: impl AsRef<Path>,
-        record_limits: RecordLimits,
+        source_limits: SourceLimits,
     ) -> Result<Self> {
-        Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), record_limits)
+        Self::from_read_at_with_limits(Arc::new(FileSource::open(path)?), source_limits)
     }
 
     /// Source version captured by the validated CFB index.
@@ -168,8 +191,8 @@ impl SourceBackedPackage {
 
     /// Limits inherited by [`Self::presentation`].
     #[must_use]
-    pub const fn record_limits(&self) -> RecordLimits {
-        self.record_limits
+    pub const fn source_limits(&self) -> SourceLimits {
+        self.source_limits
     }
 
     /// Build a presentation using the default password options.
@@ -183,15 +206,17 @@ impl SourceBackedPackage {
 
     /// Build a presentation with password-to-open options.
     pub fn presentation_with_options(&self, options: OpenOptions<'_>) -> Result<Presentation> {
-        Presentation::from_shared_with_options(
-            Arc::clone(&self.shared),
-            options,
-            self.record_limits,
-        )
+        let source_limits = if options.has_explicit_source_limits() {
+            self.source_limits
+                .constrained_by(options.get_source_limits())
+        } else {
+            self.source_limits
+        };
+        Presentation::from_shared_with_options(Arc::clone(&self.shared), options, source_limits)
     }
 
     /// Build a presentation with stricter record limits.
-    pub fn presentation_with_limits(&self, limits: RecordLimits) -> Result<Presentation> {
+    pub fn presentation_with_limits(&self, limits: SourceLimits) -> Result<Presentation> {
         self.presentation_with_options_and_limits(OpenOptions::default(), limits)
     }
 
@@ -199,13 +224,15 @@ impl SourceBackedPackage {
     pub fn presentation_with_options_and_limits(
         &self,
         options: OpenOptions<'_>,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<Presentation> {
-        Presentation::from_shared_with_options(
-            Arc::clone(&self.shared),
-            options,
-            limits.constrained_by(self.record_limits),
-        )
+        let source_limits = limits.constrained_by(self.source_limits);
+        let source_limits = if options.has_explicit_source_limits() {
+            source_limits.constrained_by(options.get_source_limits())
+        } else {
+            source_limits
+        };
+        Presentation::from_shared_with_options(Arc::clone(&self.shared), options, source_limits)
     }
 }
 
@@ -225,7 +252,7 @@ impl SourceBackedPackage {
     /// Returns an error when the package is signed, encrypted or DRM
     /// protected, when its source changed, or when it exceeds the limits.
     pub fn text_edit_snapshot(&self) -> crate::text_edit::Result<crate::text_edit::SourceSnapshot> {
-        self.text_edit_snapshot_with_limits(self.record_limits)
+        self.text_edit_snapshot_with_limits(self.source_limits)
     }
 
     /// Borrow the validated compound-file view this package reads from.
@@ -248,12 +275,12 @@ impl SourceBackedPackage {
     /// Returns the errors of [`Self::text_edit_snapshot`].
     pub fn text_edit_snapshot_with_limits(
         &self,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> crate::text_edit::Result<crate::text_edit::SourceSnapshot> {
         crate::text_edit::SourceSnapshot::from_shared(
             Arc::clone(&self.shared),
             crate::text_edit::SourceBackedOptions {
-                record_limits: limits.constrained_by(self.record_limits),
+                source_limits: limits.constrained_by(self.source_limits),
                 ..crate::text_edit::SourceBackedOptions::default()
             },
         )

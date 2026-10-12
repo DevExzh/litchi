@@ -6,7 +6,7 @@
 //! executes a VBA project, resolves an external target, verifies a signature,
 //! or repairs a malformed source.
 
-use crate::{Error, RecordLimits, records::Record};
+use crate::{Error, SourceLimits, records::Record};
 use litchi_cfb::{OleError, SharedOleFile, SharedOleFileLimits};
 use litchi_core::{
     CheckCapabilityId, CheckStatus, CompatibilityImpact, EvidenceDigest, EvidenceValue,
@@ -69,7 +69,7 @@ struct CurrentUserBootstrap {
 }
 
 impl CurrentUserBootstrap {
-    fn parse(data: &[u8], limits: RecordLimits) -> Result<Self, CurrentUserBootstrapError> {
+    fn parse(data: &[u8], limits: SourceLimits) -> Result<Self, CurrentUserBootstrapError> {
         const HEADER_SIZE: usize = 8;
         const FIXED_PAYLOAD_SIZE: usize = 20;
         const MIN_SIZE: usize = HEADER_SIZE + FIXED_PAYLOAD_SIZE;
@@ -216,7 +216,7 @@ pub struct PptValidationLimits {
     max_aggregate_stream_bytes: u64,
     max_directory_entries: usize,
     max_directory_depth: usize,
-    record: RecordLimits,
+    record: SourceLimits,
     report: ValidationLimits,
 }
 
@@ -235,7 +235,7 @@ impl PptValidationLimits {
         max_aggregate_stream_bytes: u64,
         max_directory_entries: usize,
         max_directory_depth: usize,
-        record: RecordLimits,
+        record: SourceLimits,
         report: ValidationLimits,
     ) -> Self {
         Self {
@@ -296,7 +296,7 @@ impl PptValidationLimits {
     /// Bounded record-parser policy used for `PowerPoint Document` and
     /// `Current User`.
     #[must_use]
-    pub const fn record(self) -> RecordLimits {
+    pub const fn record(self) -> SourceLimits {
         self.record
     }
 
@@ -309,7 +309,7 @@ impl PptValidationLimits {
 
 impl Default for PptValidationLimits {
     fn default() -> Self {
-        let record = RecordLimits::default();
+        let record = SourceLimits::default();
         Self {
             max_input_bytes: record.max_package_bytes as u64,
             max_document_stream_bytes: record.max_input_bytes as u64,
@@ -879,7 +879,11 @@ pub fn validate_source_with_limits(
                 limits.record,
             ) {
                 Ok(records) => Some(records),
-                Err(error @ Error::ResourceLimit(_)) => {
+                Err(
+                    error @ (Error::Limit { .. }
+                    | Error::InvalidLimit { .. }
+                    | Error::ResourceLimit(_)),
+                ) => {
                     statuses[4] = CheckStatus::blocked(
                         "PPT record traversal reached a configured byte, record, or depth ceiling",
                         limits.report,

@@ -14,8 +14,8 @@
 #[cfg(feature = "encryption")]
 use litchi_ppt::FontPackageOptions;
 use litchi_ppt::{
-    Font, FontCollection, FontEmbeddingFlags, FontScope, FontSnapshot, Record, RecordLimits,
-    RecordType,
+    Error, Font, FontCollection, FontEmbeddingFlags, FontScope, FontSnapshot, Record, RecordType,
+    SourceLimitKind, SourceLimits,
 };
 use std::io::Cursor;
 
@@ -145,16 +145,233 @@ fn malformed_font_names_and_entity_lengths_are_rejected() {
 }
 
 #[test]
-fn record_limits_reject_oversize_font_records_before_materialization() {
+fn source_limits_reject_oversize_font_records_before_materialization() {
     let bytes = collection(RT_FONT_COLLECTION, &[0; 128]);
-    let limits = RecordLimits {
-        max_input_bytes: bytes.len(),
-        max_record_bytes: 64,
-        max_record_payload_bytes: 56,
-        max_copied_payload_bytes: 56,
-        ..RecordLimits::default()
-    };
-    assert!(Record::parse_with_limits(&bytes, 0, limits).is_err());
+    let limits = SourceLimits::builder()
+        .max_entry_bytes(bytes.len())
+        .unwrap()
+        .max_record_bytes(64)
+        .unwrap()
+        .max_record_payload_bytes(56)
+        .unwrap()
+        .max_aggregate_payload_bytes(56)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Record::parse_with_limits(&bytes, 0, limits),
+        Err(Error::Limit {
+            kind: SourceLimitKind::RecordBytes | SourceLimitKind::RecordPayloadBytes,
+            ..
+        })
+    ));
+}
+
+#[test]
+fn source_limits_checked_builder_preserves_profiles_and_accepts_boundaries() {
+    let defaults = SourceLimits::default();
+    assert_eq!(
+        defaults.max_input_bytes(),
+        SourceLimits::DEFAULT_MAX_INPUT_BYTES
+    );
+    assert_eq!(
+        defaults.max_entry_bytes(),
+        SourceLimits::DEFAULT_MAX_ENTRY_BYTES
+    );
+    assert_eq!(
+        defaults.max_aggregate_bytes(),
+        SourceLimits::DEFAULT_MAX_AGGREGATE_BYTES
+    );
+    assert_eq!(defaults.max_depth(), SourceLimits::DEFAULT_MAX_DEPTH);
+
+    let custom = SourceLimits::builder()
+        .max_input_bytes(1234)
+        .unwrap()
+        .max_entry_bytes(123)
+        .unwrap()
+        .max_aggregate_bytes(5678)
+        .unwrap()
+        .max_record_bytes(4096)
+        .unwrap()
+        .max_events(17)
+        .unwrap()
+        .max_depth(9)
+        .unwrap()
+        .max_record_payload_bytes(2048)
+        .unwrap()
+        .max_aggregate_payload_bytes(8192)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(custom.max_input_bytes(), 1234);
+    assert_eq!(custom.max_entry_bytes(), 123);
+    assert_eq!(custom.max_aggregate_bytes(), 5678);
+    assert_eq!(custom.max_record_bytes(), 4096);
+    assert_eq!(custom.max_events(), 17);
+    assert_eq!(custom.max_depth(), 9);
+    assert_eq!(custom.max_record_payload_bytes(), 2048);
+    assert_eq!(custom.max_aggregate_payload_bytes(), 8192);
+    assert_eq!(custom.to_builder().build().unwrap(), custom);
+
+    assert!(matches!(
+        SourceLimits::builder().max_input_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::InputBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_input_bytes(SourceLimits::MAX_INPUT_BYTES + 1),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::InputBytes,
+            value,
+            maximum: SourceLimits::MAX_INPUT_BYTES,
+        }) if value == SourceLimits::MAX_INPUT_BYTES + 1
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_entry_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::EntryBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_aggregate_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::AggregateBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_record_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::RecordBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_events(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::Events,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_depth(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::Depth,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_record_payload_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::RecordPayloadBytes,
+            value: 0,
+            ..
+        })
+    ));
+    assert!(matches!(
+        SourceLimits::builder().max_aggregate_payload_bytes(0),
+        Err(Error::InvalidLimit {
+            kind: SourceLimitKind::AggregatePayloadBytes,
+            value: 0,
+            ..
+        })
+    ));
+
+    let boundaries = SourceLimits::builder()
+        .max_input_bytes(SourceLimits::MAX_INPUT_BYTES)
+        .unwrap()
+        .max_entry_bytes(SourceLimits::MAX_ENTRY_BYTES)
+        .unwrap()
+        .max_aggregate_bytes(SourceLimits::MAX_AGGREGATE_BYTES)
+        .unwrap()
+        .max_record_bytes(SourceLimits::MAX_RECORD_BYTES)
+        .unwrap()
+        .max_events(SourceLimits::MAX_EVENTS)
+        .unwrap()
+        .max_depth(SourceLimits::MAX_DEPTH)
+        .unwrap()
+        .max_record_payload_bytes(SourceLimits::MAX_RECORD_PAYLOAD_BYTES)
+        .unwrap()
+        .max_aggregate_payload_bytes(SourceLimits::MAX_AGGREGATE_PAYLOAD_BYTES)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert_eq!(boundaries.max_input_bytes(), SourceLimits::MAX_INPUT_BYTES);
+    assert_eq!(boundaries.max_entry_bytes(), SourceLimits::MAX_ENTRY_BYTES);
+    assert_eq!(
+        boundaries.max_aggregate_bytes(),
+        SourceLimits::MAX_AGGREGATE_BYTES
+    );
+    assert_eq!(
+        boundaries.max_record_bytes(),
+        SourceLimits::MAX_RECORD_BYTES
+    );
+    assert_eq!(boundaries.max_events(), SourceLimits::MAX_EVENTS);
+    assert_eq!(boundaries.max_depth(), SourceLimits::MAX_DEPTH);
+    assert_eq!(
+        boundaries.max_record_payload_bytes(),
+        SourceLimits::MAX_RECORD_PAYLOAD_BYTES
+    );
+    assert_eq!(
+        boundaries.max_aggregate_payload_bytes(),
+        SourceLimits::MAX_AGGREGATE_PAYLOAD_BYTES
+    );
+}
+
+fn nested_record(depth: usize) -> Vec<u8> {
+    let mut value = record(0, 0, RT_FONT_ENTITY_ATOM, &[]);
+    for _ in 0..depth {
+        value = collection(RT_FONT_COLLECTION, &value);
+    }
+    value
+}
+
+#[test]
+fn source_limits_bound_record_events_and_depth() {
+    let event_bytes = collection(
+        RT_FONT_COLLECTION,
+        &[
+            record(0, 0, RT_FONT_ENTITY_ATOM, &[]),
+            record(0, 1, RT_FONT_ENTITY_ATOM, &[]),
+        ]
+        .concat(),
+    );
+    let event_limits = SourceLimits::builder()
+        .max_events(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Record::parse_with_limits(&event_bytes, 0, event_limits),
+        Err(Error::Limit {
+            kind: SourceLimitKind::Events,
+            observed,
+            maximum: maximum @ 1,
+        }) if observed > maximum
+    ));
+
+    let depth_limits = SourceLimits::builder()
+        .max_depth(1)
+        .unwrap()
+        .build()
+        .unwrap();
+    assert!(matches!(
+        Record::parse_with_limits(&nested_record(3), 0, depth_limits),
+        Err(Error::Limit {
+            kind: SourceLimitKind::Depth,
+            observed,
+            maximum: maximum @ 1,
+        }) if observed > maximum
+    ));
 }
 
 #[cfg(feature = "fonts")]

@@ -4,7 +4,7 @@ use super::directory::SlideDirectory;
 use super::types::Slide;
 use crate::consts::RecordType;
 use crate::odraw::ShapeExt as _;
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::persist::PersistMapping;
 use crate::records::{PayloadStore, Record};
 use crate::shapes::ShapeEnum;
@@ -41,14 +41,14 @@ impl NotesIndex {
         Self::build_with_limits(
             PayloadStore::Owned(document_data),
             slide_directory,
-            RecordLimits::default(),
+            SourceLimits::default(),
         )
     }
 
     pub(crate) fn build_with_limits(
         source: PayloadStore<'_>,
         slide_directory: &SlideDirectory,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Self {
         match Self::try_build_with_limits(source, slide_directory, limits) {
             Ok(index) => index,
@@ -64,14 +64,14 @@ impl NotesIndex {
         Self::try_build_with_limits(
             PayloadStore::Owned(document_data),
             slide_directory,
-            RecordLimits::default(),
+            SourceLimits::default(),
         )
     }
 
     fn try_build_with_limits(
         source: PayloadStore<'_>,
         slide_directory: &SlideDirectory,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         let (document, _) = Record::parse_from_store_with_limits(
             source,
@@ -211,7 +211,7 @@ impl SpeakerNotes {
     pub(crate) fn parse_with_limits(
         descriptor: NoteDescriptor,
         source: PayloadStore<'_>,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<Self> {
         if descriptor
             .offset

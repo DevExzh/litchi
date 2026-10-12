@@ -15817,30 +15817,49 @@ fn ppt_picture_semantic_digest_from_images(
     Ok(fingerprint_hex(&bytes))
 }
 
-fn ppt_picture_record_limits(
+fn ppt_picture_source_limits(
     archive: &[u8],
     pictures_bytes: usize,
-) -> Result<litchi_ppt::RecordLimits, Box<dyn Error>> {
+) -> Result<litchi_ppt::SourceLimits, Box<dyn Error>> {
     let parsed = OleFile::open(Cursor::new(archive))?;
-    let document_bytes = parsed.stream_len(&["PowerPoint Document"])?;
-    let current_user_bytes = parsed.stream_len(&["Current User"])?;
-    let aggregate = document_bytes
-        .checked_add(current_user_bytes)
-        .and_then(|value| value.checked_add(u64::try_from(pictures_bytes).ok()?))
-        .ok_or("PPT Pictures limit aggregate overflows u64")?;
-    Ok(litchi_ppt::RecordLimits {
-        max_package_bytes: archive.len(),
-        max_input_bytes: pictures_bytes,
-        max_aggregate_input_bytes: usize::try_from(aggregate)?,
-        ..litchi_ppt::RecordLimits::default()
-    })
+    let mut aggregate = 0_u64;
+    for index in 0..parsed.directory_entry_count() {
+        let sid = u32::try_from(index)?;
+        let Some(entry) = parsed.directory_entry_by_sid(sid) else {
+            continue;
+        };
+        if entry.entry_type == litchi_cfb::consts::STGTY_STREAM {
+            aggregate = aggregate
+                .checked_add(entry.size)
+                .ok_or("PPT Pictures limit aggregate overflows u64")?;
+        }
+    }
+    Ok(litchi_ppt::SourceLimits::builder()
+        .max_input_bytes(archive.len())?
+        .max_entry_bytes(pictures_bytes)?
+        .max_aggregate_bytes(usize::try_from(aggregate)?)?
+        .build()?)
+}
+
+fn ppt_source_limits_with(
+    limits: litchi_ppt::SourceLimits,
+    input_bytes: usize,
+    entry_bytes: usize,
+    aggregate_bytes: usize,
+) -> Result<litchi_ppt::SourceLimits, Box<dyn Error>> {
+    Ok(limits
+        .to_builder()
+        .max_input_bytes(input_bytes)?
+        .max_entry_bytes(entry_bytes)?
+        .max_aggregate_bytes(aggregate_bytes)?
+        .build()?)
 }
 
 fn verify_ppt_picture_limit_gates(
     archive: &[u8],
     pictures_bytes: usize,
 ) -> Result<(), Box<dyn Error>> {
-    let exact = ppt_picture_record_limits(archive, pictures_bytes)?;
+    let exact = ppt_picture_source_limits(archive, pictures_bytes)?;
     let pictures_payload = {
         let mut parsed = OleFile::open(Cursor::new(archive))?;
         parsed.open_stream(&["Pictures"])?
@@ -15855,11 +15874,15 @@ fn verify_ppt_picture_limit_gates(
     )?;
     source.presentation_with_limits(exact)?;
 
-    let mut package_under = exact;
-    package_under.max_package_bytes = package_under
-        .max_package_bytes
-        .checked_sub(1)
-        .ok_or("PPT package fixture is empty")?;
+    let package_under = ppt_source_limits_with(
+        exact,
+        exact
+            .max_input_bytes()
+            .checked_sub(1)
+            .ok_or("PPT package fixture is empty")?,
+        exact.max_entry_bytes(),
+        exact.max_aggregate_bytes(),
+    )?;
     if litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), package_under)
         .is_ok()
     {
@@ -15874,11 +15897,15 @@ fn verify_ppt_picture_limit_gates(
         return Err("PPT source-backed package limit accepted one byte under package size".into());
     }
 
-    let mut pictures_under = exact;
-    pictures_under.max_input_bytes = pictures_under
-        .max_input_bytes
-        .checked_sub(1)
-        .ok_or("PPT Pictures fixture is empty")?;
+    let pictures_under = ppt_source_limits_with(
+        exact,
+        exact.max_input_bytes(),
+        exact
+            .max_entry_bytes()
+            .checked_sub(1)
+            .ok_or("PPT Pictures fixture is empty")?,
+        exact.max_aggregate_bytes(),
+    )?;
     let mut eager =
         litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
     if eager.presentation_with_limits(pictures_under).is_ok() {
@@ -15959,13 +15986,13 @@ fn time_ppt_pictures_eager(
     phase: &str,
     cached_repeat: bool,
     archive: &[u8],
-    record_limits: litchi_ppt::RecordLimits,
+    source_limits: litchi_ppt::SourceLimits,
 ) -> Result<Duration, Box<dyn Error>> {
     let cursor = Cursor::new(archive);
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, source_limits)?;
+        let presentation = package.presentation_with_limits(source_limits)?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -15976,8 +16003,8 @@ fn time_ppt_pictures_eager(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, source_limits)?;
+        let presentation = package.presentation_with_limits(source_limits)?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -15985,8 +16012,8 @@ fn time_ppt_pictures_eager(
         return Ok(duration);
     }
 
-    let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, record_limits)?;
-    let presentation = package.presentation_with_limits(record_limits)?;
+    let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, source_limits)?;
+    let presentation = package.presentation_with_limits(source_limits)?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16003,13 +16030,13 @@ fn time_ppt_pictures_source_backed(
     phase: &str,
     cached_repeat: bool,
     source: Arc<dyn ReadAt>,
-    record_limits: litchi_ppt::RecordLimits,
+    source_limits: litchi_ppt::SourceLimits,
 ) -> Result<Duration, Box<dyn Error>> {
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
         let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
+        let presentation = package.presentation_with_limits(source_limits)?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
         if !presentation.has_pictures() {
@@ -16021,8 +16048,8 @@ fn time_ppt_pictures_source_backed(
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
         let package =
-            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+            litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
+        let presentation = package.presentation_with_limits(source_limits)?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
         let duration = started.elapsed();
@@ -16030,8 +16057,8 @@ fn time_ppt_pictures_source_backed(
         return Ok(duration);
     }
 
-    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, record_limits)?;
-    let presentation = package.presentation_with_limits(record_limits)?;
+    let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source, source_limits)?;
+    let presentation = package.presentation_with_limits(source_limits)?;
     if cached_repeat {
         let first = presentation.images()?;
         verify_ppt_picture_images(&first)?;
@@ -16049,7 +16076,7 @@ fn collect_ppt_pictures_source_evidence(
     cached_repeat: bool,
     archive: &[u8],
     picture_ranges: &[Range<u64>],
-    record_limits: litchi_ppt::RecordLimits,
+    source_limits: litchi_ppt::SourceLimits,
 ) -> Result<SourceSnapshot, Box<dyn Error>> {
     let source = Arc::new(InstrumentedSource::new(
         archive.to_vec(),
@@ -16059,9 +16086,9 @@ fn collect_ppt_pictures_source_evidence(
     if phase == "presentation_open_no_image_query" {
         let package = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
             source.clone(),
-            record_limits,
+            source_limits,
         )?;
-        let presentation = package.presentation_with_limits(record_limits)?;
+        let presentation = package.presentation_with_limits(source_limits)?;
         if !presentation.has_pictures() {
             return Err("PPT source-backed evidence open lost Pictures descriptor".into());
         }
@@ -16069,8 +16096,8 @@ fn collect_ppt_pictures_source_evidence(
     }
 
     let package =
-        litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), record_limits)?;
-    let presentation = package.presentation_with_limits(record_limits)?;
+        litchi_ppt::SourceBackedPackage::from_read_at_with_limits(source.clone(), source_limits)?;
+    let presentation = package.presentation_with_limits(source_limits)?;
     if phase != "fresh_open_plus_cold_all_images_query" {
         source.reset();
     }
@@ -16143,7 +16170,7 @@ fn run_ppt_pictures(
     let (implementation, phase, cached_repeat) = ppt_pictures_case_parameters(case)?;
     let source_backed = implementation == "source_backed";
     let picture_stream_bytes = u64::try_from(corpus.target_payload.len())?;
-    let record_limits = ppt_picture_record_limits(&corpus.archive, corpus.target_payload.len())?;
+    let source_limits = ppt_picture_source_limits(&corpus.archive, corpus.target_payload.len())?;
     let picture_ranges = ppt_pictures_source_range(corpus)?;
     let picture_stream_sha256 = corpus.manifest.target_payload_sha256.clone();
     let canonical_semantic_sha256 = ppt_picture_semantic_digest();
@@ -16186,13 +16213,13 @@ fn run_ppt_pictures(
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let duration = if let Some(source) = timed_source.as_ref() {
-            time_ppt_pictures_source_backed(phase, cached_repeat, source.clone(), record_limits)?
+            time_ppt_pictures_source_backed(phase, cached_repeat, source.clone(), source_limits)?
         } else {
             time_ppt_pictures_eager(
                 phase,
                 cached_repeat,
                 corpus.archive.as_slice(),
-                record_limits,
+                source_limits,
             )?
         };
         record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -16205,7 +16232,7 @@ fn run_ppt_pictures(
                 cached_repeat,
                 corpus.archive.as_slice(),
                 &picture_ranges,
-                record_limits,
+                source_limits,
             )?;
             verify_ppt_pictures_source_evidence(phase, snapshot, picture_stream_bytes)?;
             source_summary.source_read_calls.push(snapshot.read_calls);

@@ -4,7 +4,7 @@ use crate::consts::RecordType;
 /// `SlideFactory` - Creates slides from persist mapping with zero-copy parsing.
 ///
 /// High-performance implementation using lifetimes to avoid data copying.
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::persist::PersistMapping;
 use crate::records::{PayloadStore, Record};
 use once_cell::unsync::OnceCell;
@@ -29,7 +29,7 @@ pub struct SlideFactory<'doc> {
     persist_mapping: &'doc PersistMapping,
     notes_index: OnceCell<NotesIndex>,
     slide_directory: &'doc SlideDirectory,
-    record_limits: RecordLimits,
+    source_limits: SourceLimits,
 }
 
 impl<'doc> SlideFactory<'doc> {
@@ -45,7 +45,7 @@ impl<'doc> SlideFactory<'doc> {
             doc_data,
             persist_mapping,
             slide_directory,
-            RecordLimits::default(),
+            SourceLimits::default(),
         )
     }
 
@@ -53,13 +53,13 @@ impl<'doc> SlideFactory<'doc> {
         doc_data: &'doc [u8],
         persist_mapping: &'doc PersistMapping,
         slide_directory: &'doc SlideDirectory,
-        record_limits: RecordLimits,
+        source_limits: SourceLimits,
     ) -> Self {
         Self::from_source(
             PayloadStore::Owned(doc_data),
             persist_mapping,
             slide_directory,
-            record_limits,
+            source_limits,
         )
     }
 
@@ -74,13 +74,13 @@ impl<'doc> SlideFactory<'doc> {
         document: &'doc Arc<Vec<u8>>,
         persist_mapping: &'doc PersistMapping,
         slide_directory: &'doc SlideDirectory,
-        record_limits: RecordLimits,
+        source_limits: SourceLimits,
     ) -> Self {
         Self::from_source(
             PayloadStore::Shared(document),
             persist_mapping,
             slide_directory,
-            record_limits,
+            source_limits,
         )
     }
 
@@ -88,14 +88,14 @@ impl<'doc> SlideFactory<'doc> {
         source: PayloadStore<'doc>,
         persist_mapping: &'doc PersistMapping,
         slide_directory: &'doc SlideDirectory,
-        record_limits: RecordLimits,
+        source_limits: SourceLimits,
     ) -> Self {
         Self {
             source,
             persist_mapping,
             notes_index: OnceCell::new(),
             slide_directory,
-            record_limits,
+            source_limits,
         }
     }
 
@@ -151,7 +151,7 @@ impl<'doc> SlideFactory<'doc> {
 
         // Parse the Slide record at this offset
         let (record, _consumed) =
-            Record::parse_from_store_with_limits(self.source, offset_usize, self.record_limits)?;
+            Record::parse_from_store_with_limits(self.source, offset_usize, self.source_limits)?;
 
         if record.record_type != RecordType::Slide {
             return Err(Error::InvalidFormat(format!(
@@ -163,7 +163,7 @@ impl<'doc> SlideFactory<'doc> {
         let note_descriptor = self
             .notes_index
             .get_or_init(|| {
-                NotesIndex::build_with_limits(self.source, self.slide_directory, self.record_limits)
+                NotesIndex::build_with_limits(self.source, self.slide_directory, self.source_limits)
             })
             .descriptor(&record, entry.persist_id(), self.persist_mapping);
 
@@ -177,7 +177,7 @@ impl<'doc> SlideFactory<'doc> {
             record,
             doc_data: self.source,
             note_descriptor,
-            record_limits: self.record_limits,
+            source_limits: self.source_limits,
         })
     }
 
@@ -219,7 +219,7 @@ pub struct SlideData<'doc> {
     /// payload bytes from (for lazy speaker-notes parsing)
     doc_data: PayloadStore<'doc>,
     pub(crate) note_descriptor: std::result::Result<Option<NoteDescriptor>, String>,
-    pub(crate) record_limits: RecordLimits,
+    pub(crate) source_limits: SourceLimits,
 }
 
 impl<'doc> SlideData<'doc> {
@@ -280,7 +280,7 @@ impl<'doc> SlideData<'doc> {
             record,
             doc_data: PayloadStore::Owned(doc_data),
             note_descriptor: Ok(None),
-            record_limits: RecordLimits::default(),
+            source_limits: SourceLimits::default(),
         }
     }
 }

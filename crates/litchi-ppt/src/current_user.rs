@@ -3,7 +3,7 @@
 /// The `CurrentUser` stream contains information about the current editing session,
 /// including the offset to the current user edit record. This follows Apache POI's
 /// `CurrentUserAtom` implementation.
-use super::package::{Error, RecordLimits, Result};
+use super::package::{Error, Result, SourceLimits};
 
 /// Minimum size of `CurrentUser` stream in bytes
 const CURRENT_USER_MIN_SIZE: usize = 28;
@@ -88,7 +88,7 @@ impl CurrentUser {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8]) -> Result<Self> {
-        Self::parse_with_limits(data, RecordLimits::default())
+        Self::parse_with_limits(data, SourceLimits::default())
     }
 
     /// Parse a Current User stream with the same input bound as the document.
@@ -96,13 +96,13 @@ impl CurrentUser {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_with_limits(data: &[u8], limits: RecordLimits) -> Result<Self> {
+    pub fn parse_with_limits(data: &[u8], limits: SourceLimits) -> Result<Self> {
         if data.len() > limits.max_input_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "CurrentUser stream size {} exceeds limit {}",
-                data.len(),
-                limits.max_input_bytes
-            )));
+            return Err(Error::Limit {
+                kind: super::package::SourceLimitKind::EntryBytes,
+                observed: data.len(),
+                maximum: limits.max_input_bytes,
+            });
         }
         if data.len() < CURRENT_USER_MIN_SIZE {
             return Err(Error::Corrupted("CurrentUser stream too short".to_string()));
@@ -406,20 +406,26 @@ mod tests {
         let data = current_user_stream(b"A", Some("A"), UNENCRYPTED_HEADER_TOKEN);
         CurrentUser::parse_with_limits(
             &data,
-            RecordLimits {
+            SourceLimits {
                 max_input_bytes: data.len(),
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
         )
         .unwrap();
         let error = CurrentUser::parse_with_limits(
             &data,
-            RecordLimits {
+            SourceLimits {
                 max_input_bytes: data.len() - 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
         )
         .unwrap_err();
-        assert!(matches!(error, Error::ResourceLimit(message) if message.contains("CurrentUser")));
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::SourceLimitKind::EntryBytes,
+                ..
+            }
+        ));
     }
 }

@@ -101,6 +101,8 @@ impl Snapshot {
         #[cfg(feature = "encryption")]
         let presentation = package.presentation_with_options_and_limits(
             crate::OpenOptions {
+                source_limits: crate::SourceLimits::default(),
+                source_limits_explicit: false,
                 password: options.password,
                 ..Default::default()
             },

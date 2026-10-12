@@ -7,7 +7,7 @@
 use litchi_cfb::OleWriter;
 use litchi_core::{OwnedSource, ReadAt, SourceVersion};
 use litchi_ppt::{
-    DocumentAtom, DocumentDimensions, PptValidationError, PptValidationLimits, Ratio, RecordLimits,
+    DocumentAtom, DocumentDimensions, PptValidationError, PptValidationLimits, Ratio,
     SlideSizeType, validate_source, validate_source_with_limits,
 };
 use std::{
@@ -602,10 +602,13 @@ fn current_user_parser_resource_limit_blocks_without_document_read() {
     let bytes = package_with_streams(false, &document, &current, &[]);
     let (document_range, _) = fat_stream_range_and_size(&bytes, "PowerPoint Document");
     let defaults = PptValidationLimits::default();
-    let record_limits = RecordLimits {
-        max_input_bytes: 32,
-        ..defaults.record()
-    };
+    let source_limits = defaults
+        .record()
+        .to_builder()
+        .max_entry_bytes(32)
+        .unwrap()
+        .build()
+        .unwrap();
     let limits = PptValidationLimits::new(
         defaults.max_input_bytes(),
         defaults.max_document_stream_bytes(),
@@ -614,7 +617,7 @@ fn current_user_parser_resource_limit_blocks_without_document_read() {
         defaults.max_aggregate_stream_bytes(),
         defaults.max_directory_entries(),
         defaults.max_directory_depth(),
-        record_limits,
+        source_limits,
         defaults.report(),
     );
     let source = Arc::new(RejectRangesSource::new(bytes, [document_range]));
@@ -781,7 +784,7 @@ fn top_level_document_container_header_is_checked() {
 }
 
 #[test]
-fn stream_and_record_limits_stop_work_before_unbounded_materialization() {
+fn stream_and_source_limits_stop_work_before_unbounded_materialization() {
     let bytes = package(false, false, &[], &[]);
     let defaults = PptValidationLimits::default();
     let too_small = PptValidationLimits::new(
@@ -799,10 +802,13 @@ fn stream_and_record_limits_stop_work_before_unbounded_materialization() {
         validate_source_with_limits(Arc::new(OwnedSource::new(bytes.clone())), too_small).unwrap();
     assert!(!check(&report, "ppt.document.stream").status().is_complete());
 
-    let limited_record = RecordLimits {
-        max_records: 1,
-        ..defaults.record()
-    };
+    let limited_source = defaults
+        .record()
+        .to_builder()
+        .max_events(1)
+        .unwrap()
+        .build()
+        .unwrap();
     let limits = PptValidationLimits::new(
         defaults.max_input_bytes(),
         defaults.max_document_stream_bytes(),
@@ -811,7 +817,7 @@ fn stream_and_record_limits_stop_work_before_unbounded_materialization() {
         defaults.max_aggregate_stream_bytes(),
         defaults.max_directory_entries(),
         defaults.max_directory_depth(),
-        limited_record,
+        limited_source,
         defaults.report(),
     );
     let report = validate_source_with_limits(Arc::new(OwnedSource::new(bytes)), limits).unwrap();

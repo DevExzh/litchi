@@ -84,15 +84,34 @@ composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); 🔴 ODF/other legacy/iWork |
+| Physical ingress limits | `SourceLimits` | `ReadLimits` (OPC re-exports in docx/pptx/xlsx/xlsb), `SourcePackageLimits` (odt), `package::Limits` (doc), `RecordLimits` (ppt), `DocumentSourceLimits` (iWork) | ✅ OPC `SourceLimits`/`SourceLimitsBuilder` and OOXML `SourceLimits` re-exports, record 0035 · ✅ DOC (0192); ✅ XLS eager/retained policies (0196–0198); ✅ PPT (0210); 🔴 ODF/iWork |
 | Semantic limits | `SemanticLimits` | `DocumentLimits` (numbers), `DocumentSemanticLimits` (keynote) | ✅ pages · 🔴 W1 |
 | Open configuration envelope | `OpenOptions` (per format, extensible fields) | `PackageOpenOptions` (doc — merges), `ReadOptions` (numbers), `iwork::Options` (facade) | ✅ DOCX ingress envelope (0038–0040); owning lazy-policy support and W1–W4 pending |
-| Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC and DOC (0192) · 🔴 other W1 |
-| Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192); other owners pending |
-| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036) and DOC (0192) kind/observed/maximum; broader taxonomy pending |
-| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC/OOXML (0036) and DOC (0192) `SourceLimitKind`; semantic kinds pending |
+| Construction idiom | consuming builder, fallible `max_<dimension>` setters, fallible `build()` | positional `new(...)` constructors (iWork) | ✅ OPC, DOC (0192), XLS (0196) and PPT (0210) · 🔴 other W1 |
+| Build-time invalid limit | `Error::InvalidLimit { kind, value, maximum }` | standalone `*LimitsError` types (doc, iWork) | ✅ OPC `InvalidLimit` with contextual maximum (0036); DOC (0192), XLS (0196), PPT (0210); other owners pending |
+| Ingress limit exceeded | `Error::Limit { kind, observed, maximum }` | `OpcError::ReadLimit`, facade `ResourceLimit` mapping drift | ✅ OPC (0036), DOC (0192), XLS (0196), PPT (0210) kind/observed/maximum; broader taxonomy pending |
+| Limit kind enums | `SourceLimitKind` / `SemanticLimitKind` | `ReadResource`, per-crate one-off kinds | ✅ OPC/OOXML (0036), DOC (0192), XLS (0196), PPT (0210) `SourceLimitKind`; semantic kinds pending |
 | Dimension naming | nouns (`input_bytes`, `members`, `entry_bytes`, `aggregate_bytes`, `depth`, `events`, …); setters `max_<noun>` | a second name for an existing dimension | ✅ OPC common nouns (0037); shared defaults remain 512 MiB input and XML depth 256; other families pending |
-| Coverage policy | caller-selected limits on **every** public ingress path | — | 🔴 gaps: ppt/xls (W4), ODF (W3) |
+| Coverage policy | caller-selected limits on **every** public ingress path | — | ✅ PPT package/record ingress (0210), XLS eager ingress (0196); 🔴 remaining specialized ingress and ODF (W3) |
+
+### PPT source dimensions
+
+PPT uses checked `SourceLimits`/`SourceLimitsBuilder` and typed
+`Error::InvalidLimit`/`Error::Limit` with `SourceLimitKind` (record 0210).
+`max_input_bytes` bounds the complete CFB input, `max_entry_bytes` each declared
+stream, and `max_aggregate_bytes` the sum of all declared stream lengths,
+including metadata and unrelated streams. The root mini-stream backing is
+excluded to avoid counting its child payloads twice. Admission precedes stream
+payload reads, including adoption of an already parsed CFB owner.
+
+Complete-input, entry and aggregate defaults are 512 MiB, 512 MiB and 2 GiB;
+record depth defaults to 256. PPT also bounds encoded record bytes, record
+events, individual record payload bytes and aggregate record payload bytes.
+`to_builder()` preserves all selected dimensions when changing one ceiling.
+`OpenOptions` exposes `password`, `leniency`, `source_limits` and corresponding
+`get_*` accessors; its debug output redacts credentials. Package projections
+retain the stricter combination of admitted and explicitly requested limits.
+The canonical immutable primary owner and transaction migration remain open.
 
 ### OPC source dimensions
 

@@ -22,7 +22,7 @@ use litchi_cfb::{OleFile, SharedOleFile, SharedOleFileLimits};
 use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt, SourceVersion};
 use litchi_ole_common::property_set::PropertySetReader;
 use litchi_ppt::text_edit::{self, SourceSnapshot};
-use litchi_ppt::{RecordLimits, SourceBackedPackage};
+use litchi_ppt::{SourceBackedPackage, SourceLimits};
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
@@ -45,8 +45,8 @@ struct PptState {
     /// (record 0003 §1.6); `None` when the streams are absent, unreadable or
     /// empty.
     metadata: Option<Metadata>,
-    /// The record limits the reader was built under, inherited by editors.
-    record_limits: RecordLimits,
+    /// The source limits the reader was built under, inherited by editors.
+    source_limits: SourceLimits,
     /// The source an editor is built from.
     owner: PptOwner,
 }
@@ -101,18 +101,18 @@ impl Ppt {
         package: SourceBackedPackage,
         options: &OpenOptions,
     ) -> Result<Self> {
+        let (presentation, source_limits) = match options.ppt_source_limits {
+            None => (package.presentation()?, package.source_limits()),
+            Some(limits) => {
+                let limits = limits.constrained_by(package.source_limits());
+                (package.presentation_with_limits(limits)?, limits)
+            },
+        };
         let metadata = package
             .metadata()
             .ok()
             .map(Metadata::from)
             .filter(Metadata::has_data);
-        let (presentation, record_limits) = match options.ppt_limits {
-            None => (package.presentation()?, package.record_limits()),
-            Some(limits) => {
-                let limits = limits.constrained_by(package.record_limits());
-                (package.presentation_with_limits(limits)?, limits)
-            },
-        };
         let owner = if options.retain_source {
             PptOwner::Source(package)
         } else {
@@ -121,7 +121,7 @@ impl Ppt {
         Ok(Self(Opened::new(PptState {
             presentation,
             metadata,
-            record_limits,
+            source_limits,
             owner,
         })))
     }
@@ -145,7 +145,7 @@ impl Ppt {
         options: &OpenOptions,
         password: Option<&str>,
     ) -> Result<LegacyOpen<Self>> {
-        let mut package = match options.ppt_limits {
+        let mut package = match options.ppt_source_limits {
             None => litchi_ppt::Package::from_ole_file(ole)?,
             Some(limits) => litchi_ppt::Package::from_ole_file_with_limits(ole, limits)?,
         };
@@ -157,9 +157,9 @@ impl Ppt {
             .filter(Metadata::has_data);
         let opened = match password {
             None => package.presentation(),
-            Some(password) => package.presentation_with_options(
-                litchi_ppt::OpenOptions::default().with_password(password),
-            ),
+            Some(password) => {
+                package.presentation_with_options(litchi_ppt::OpenOptions::new().password(password))
+            },
         };
         let presentation = match opened {
             Ok(presentation) => presentation,
@@ -170,7 +170,7 @@ impl Ppt {
             },
             Err(error) => return Err(error.into()),
         };
-        let record_limits = package.record_limits();
+        let source_limits = package.source_limits();
         let owner = if options.retain_source {
             let shared = SharedOleFile::from_owned_ole_file(
                 package.into_ole_file(),
@@ -184,7 +184,7 @@ impl Ppt {
         Ok(LegacyOpen::Opened(Self(Opened::new(PptState {
             presentation,
             metadata,
-            record_limits,
+            source_limits,
             owner,
         }))))
     }
@@ -267,7 +267,7 @@ impl Ppt {
             return Err(signature::refusal(FileFormat::Ppt));
         }
         let options = text_edit::SourceBackedOptions {
-            record_limits: self.0.record_limits,
+            source_limits: self.0.source_limits,
             ..text_edit::SourceBackedOptions::default()
         };
         if self.0.signature() == Signature::RemovalAuthorized {
@@ -285,7 +285,7 @@ impl Ppt {
         }
         Ok(match &self.0.owner {
             PptOwner::Source(package) => {
-                Some(package.text_edit_snapshot_with_limits(self.0.record_limits)?)
+                Some(package.text_edit_snapshot_with_limits(self.0.source_limits)?)
             },
             PptOwner::Eager(shared) => {
                 Some(SourceSnapshot::from_shared(Arc::clone(shared), options)?)
@@ -442,12 +442,13 @@ mod tests {
     }
 
     #[test]
-    fn record_limits_reach_the_reader() {
-        let limits = RecordLimits {
-            max_input_bytes: 16,
-            ..RecordLimits::default()
-        };
-        let options = OpenOptions::default().ppt_limits(limits);
+    fn source_limits_reach_the_reader() {
+        let limits = SourceLimits::builder()
+            .max_entry_bytes(16)
+            .expect("a finite entry limit is valid")
+            .build()
+            .expect("a checked PPT source limit is valid");
+        let options = OpenOptions::default().ppt_source_limits(limits);
         let error = match open_bytes(fixture("SampleShow.ppt"), &options) {
             Ok(_) => panic!("a PPT larger than the package limit opened"),
             Err(error) => error,

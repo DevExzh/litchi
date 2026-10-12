@@ -1,6 +1,6 @@
 //! `PowerPoint` 9 picture-bullet collection parsing.
 
-use super::package::{Error, RecordLimits, Result};
+use super::package::{Error, Result, SourceLimits};
 use super::records::{Record, RecordParseSession};
 use crate::consts::RecordType;
 
@@ -19,7 +19,7 @@ pub struct PictureBulletLimits {
     /// Maximum number of discoverable `TextPFException9` references.
     pub max_references: usize,
     /// Shared limits for the strict PPT child-record parser.
-    pub records: RecordLimits,
+    pub records: SourceLimits,
 }
 
 impl Default for PictureBulletLimits {
@@ -29,7 +29,7 @@ impl Default for PictureBulletLimits {
             max_bullets: usize::from(MAX_PICTURE_BULLET_INDEX) + 1,
             max_officeart_record_bytes: 256 * 1024 * 1024 - 18,
             max_references: 1_000_000,
-            records: RecordLimits::default(),
+            records: SourceLimits::default(),
         }
     }
 }
@@ -55,8 +55,8 @@ impl PictureBulletLimits {
         Ok(())
     }
 
-    fn collection_record_limits(self) -> RecordLimits {
-        RecordLimits {
+    fn collection_source_limits(self) -> SourceLimits {
+        SourceLimits {
             max_input_bytes: self.records.max_input_bytes.min(self.max_collection_bytes),
             max_records: self.records.max_records.min(self.max_bullets),
             max_record_bytes: self.records.max_record_bytes.min(
@@ -283,7 +283,7 @@ impl PictureBulletCollection {
             ));
         }
         let mut parser =
-            RecordParseSession::new(limits.collection_record_limits(), record.data.len())?;
+            RecordParseSession::new(limits.collection_source_limits(), record.data.len())?;
         let children = parser.parse_sequence(&record.data, "picture-bullet collection", 0)?;
         if children.len() > limits.max_bullets {
             return Err(Error::ResourceLimit(
@@ -1078,14 +1078,14 @@ fn admit_picture_bullet_source(
     limits.picture_bullets.validate()?;
     let (document_persist_id, source) =
         crate::embedded::object::Editor::inspect_live_document(bytes)?;
-    let record_limits = limits.picture_bullets.records;
-    let (record, consumed) = Record::parse_strict_with_limits(&source, 0, record_limits)?;
+    let source_limits = limits.picture_bullets.records;
+    let (record, consumed) = Record::parse_strict_with_limits(&source, 0, source_limits)?;
     if consumed != source.len() || record.record_type != RecordType::Document {
         return Err(Error::Corrupted(
             "live document persist owner is not one complete DocumentContainer".into(),
         ));
     }
-    let encoded = encode_record(&record, record_limits.max_record_bytes)?;
+    let encoded = encode_record(&record, source_limits.max_record_bytes)?;
     if encoded != source.as_slice() {
         return Err(Error::InvalidFormat(
             "live picture-bullet owner is not losslessly representable".into(),
@@ -1617,7 +1617,7 @@ impl crate::Presentation {
         &self,
         mut limits: PictureBulletLimits,
     ) -> Result<Option<PictureBulletCollection>> {
-        limits.records = limits.records.constrained_by(self.record_limits);
+        limits.records = limits.records.constrained_by(self.source_limits);
         PictureBulletCollection::parse_from_with_limits(&self.live_document_record()?, limits)
     }
 }

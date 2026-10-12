@@ -17,7 +17,7 @@ pub use litchi_core::Position;
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 
 use crate::document_structure;
-use crate::package::{Error as PackageError, Package, RecordLimits};
+use crate::package::{Error as PackageError, Package, SourceLimits};
 
 /// Explicit bounded undo/redo history for slide-order snapshots.
 pub type History = litchi_core::patch::History<Snapshot>;
@@ -573,7 +573,7 @@ pub struct Snapshot {
     artifact: Artifact,
     document: document_structure::Snapshot,
     document_persist_id: u32,
-    limits: RecordLimits,
+    limits: SourceLimits,
     has_review_history: bool,
 }
 
@@ -594,7 +594,7 @@ impl Snapshot {
     ///
     /// Returns an error when the complete package cannot be reopened.
     pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with_limits(bytes, RecordLimits::default())
+        Self::from_bytes_with_limits(bytes, SourceLimits::default())
     }
 
     /// Captures an owned exact PPT artifact under explicit finite limits.
@@ -603,13 +603,13 @@ impl Snapshot {
     ///
     /// Returns an error when the artifact exceeds the limits or its live
     /// presentation structure is malformed.
-    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: RecordLimits) -> Result<Self> {
+    pub fn from_bytes_with_limits(bytes: Vec<u8>, limits: SourceLimits) -> Result<Self> {
         if bytes.len() > limits.max_package_bytes {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT slide-order source size {} exceeds limit {}",
-                bytes.len(),
-                limits.max_package_bytes
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: limits.max_package_bytes,
+            }
             .into());
         }
         let mut package = Package::from_reader_with_limits(Cursor::new(bytes.as_slice()), limits)?;
@@ -685,15 +685,15 @@ impl Snapshot {
         }
 
         let bytes = publication.into_output();
-        if self.limits != RecordLimits::default() {
+        if self.limits != SourceLimits::default() {
             return Self::from_bytes_with_limits(bytes.to_vec(), self.limits);
         }
         if bytes.len() > self.limits.max_package_bytes {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT slide-order source size {} exceeds limit {}",
-                bytes.len(),
-                self.limits.max_package_bytes
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: self.limits.max_package_bytes,
+            }
             .into());
         }
         Ok(Self {
@@ -733,16 +733,16 @@ impl Snapshot {
         }
 
         let (bytes, changes) = publication.into_parts();
-        if self.limits != RecordLimits::default() {
+        if self.limits != SourceLimits::default() {
             let reopened = Self::from_bytes_with_limits(bytes.to_vec(), self.limits)?;
             return Ok((reopened, changes));
         }
         if bytes.len() > self.limits.max_package_bytes {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT slide-order source size {} exceeds limit {}",
-                bytes.len(),
-                self.limits.max_package_bytes
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: bytes.len(),
+                maximum: self.limits.max_package_bytes,
+            }
             .into());
         }
         Ok((
@@ -846,7 +846,7 @@ impl Snapshot {
 
     /// Resource bounds retained for commits and patch application.
     #[must_use]
-    pub const fn limits(&self) -> RecordLimits {
+    pub const fn limits(&self) -> SourceLimits {
         self.limits
     }
 
@@ -4550,7 +4550,7 @@ fn slide_payload(group: Vec<crate::records::Record>, record: Vec<u8>) -> Result<
         )
         .into());
     }
-    let (root, consumed) = crate::Record::parse_with_limits(&record, 0, RecordLimits::default())?;
+    let (root, consumed) = crate::Record::parse_with_limits(&record, 0, SourceLimits::default())?;
     if consumed != record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "slide transfer persist record is not one SlideContainer".into(),
@@ -4593,7 +4593,7 @@ fn require_portable_slide(
     record: &mut Vec<u8>,
 ) -> Result<TransferClosure> {
     let (mut root, consumed) =
-        crate::Record::parse_with_limits(record, 0, RecordLimits::default())?;
+        crate::Record::parse_with_limits(record, 0, SourceLimits::default())?;
     if consumed != record.len() || root.record_type != crate::RecordType::Slide {
         return Err(PackageError::Corrupted(
             "slide transfer persist record is not one SlideContainer".into(),
@@ -6316,7 +6316,7 @@ fn patch_effects(patch: &Patch) -> BTreeSet<String> {
                 if let Ok((root, consumed)) = crate::Record::parse_with_limits(
                     &list_change.payload.record,
                     0,
-                    RecordLimits::default(),
+                    SourceLimits::default(),
                 ) && consumed == list_change.payload.record.len()
                     && let Ok(relationships) = scan_slide_relationships(&root)
                 {
@@ -6367,7 +6367,7 @@ fn encode_payload(payload: &SlidePayload) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn decode_payload(bytes: &[u8], limits: RecordLimits) -> Result<SlidePayload> {
+fn decode_payload(bytes: &[u8], limits: SourceLimits) -> Result<SlidePayload> {
     let version = bytes.get(0..4);
     if bytes.len() > limits.max_input_bytes || !matches!(version, Some(b"LSP1" | b"LSP2")) {
         return Err(invalid_durable_patch(
@@ -6902,7 +6902,7 @@ mod tests {
     #[test]
     fn root_text_publication_with_custom_limits_retains_complete_reopen() {
         let bytes = authored_fixture();
-        let mut limits = RecordLimits::default();
+        let mut limits = SourceLimits::default();
         limits.max_records -= 1;
         let source = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
         let target = crate::text_edit::Target::new(Position::new(0), Position::new(0));
@@ -7168,7 +7168,7 @@ mod tests {
     #[test]
     fn shape_text_batch_oversized_late_replacement_is_atomic() {
         let bytes = authored_batch_fixture();
-        let limits = RecordLimits {
+        let limits = SourceLimits {
             max_package_bytes: bytes.len(),
             ..Default::default()
         };
@@ -7234,7 +7234,7 @@ mod tests {
                 .any(|conflict| conflict.target() == "slide:0/shape:0/text")
         );
 
-        let mut limits = RecordLimits::default();
+        let mut limits = SourceLimits::default();
         limits.max_records -= 1;
         let limited = Snapshot::from_bytes_with_limits(bytes, limits).unwrap();
         let mut limited_edit = limited.edit().unwrap();

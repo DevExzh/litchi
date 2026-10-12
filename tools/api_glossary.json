@@ -2465,6 +2465,85 @@
       "families": [
         "litchi_xls::package::edit"
       ]
+    },
+    {
+      "id": "ppt-minimal",
+      "package": "litchi-ppt",
+      "default_features": false,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "RecordLimits",
+          "scope": "litchi_ppt",
+          "replacement": "use checked SourceLimits"
+        },
+        {
+          "name": "RecordLimits",
+          "scope": "litchi_ppt::package",
+          "replacement": "use checked SourceLimits"
+        },
+        {
+          "name": "with_password",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use canonical consuming password/leniency setters"
+        },
+        {
+          "name": "with_leniency",
+          "scope": "litchi_ppt::OpenOptions",
+          "replacement": "use canonical consuming password/leniency setters"
+        },
+        {
+          "name": "max_package_bytes",
+          "scope": "litchi_ppt::SourceLimits",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_aggregate_input_bytes",
+          "scope": "litchi_ppt::SourceLimits",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_records",
+          "scope": "litchi_ppt::SourceLimits",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_copied_payload_bytes",
+          "scope": "litchi_ppt::SourceLimits",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_package_bytes",
+          "scope": "litchi_ppt::SourceLimitsBuilder",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_aggregate_input_bytes",
+          "scope": "litchi_ppt::SourceLimitsBuilder",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_records",
+          "scope": "litchi_ppt::SourceLimitsBuilder",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "max_copied_payload_bytes",
+          "scope": "litchi_ppt::SourceLimitsBuilder",
+          "replacement": "use canonical input_bytes/aggregate_bytes/events/aggregate_payload_bytes dimensions"
+        },
+        {
+          "name": "record_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use source_limits()"
+        },
+        {
+          "name": "record_limits",
+          "scope": "litchi_ppt::SourceBackedPackage",
+          "replacement": "use source_limits()"
+        }
+      ],
+      "families": []
     }
   ]
 }

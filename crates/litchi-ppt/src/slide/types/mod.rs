@@ -67,5 +67,5 @@ pub struct Slide<'doc> {
     round_trip_metadata: OnceCell<SlideRoundTripMetadata12>,
     notes_descriptor: Result<Option<NoteDescriptor>, String>,
     speaker_notes: OnceCell<Option<SpeakerNotes>>,
-    record_limits: crate::RecordLimits,
+    source_limits: crate::SourceLimits,
 }

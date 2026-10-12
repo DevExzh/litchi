@@ -6,7 +6,7 @@
 use super::payload::RecordPayload;
 use super::{DocumentInfo, SlideAtomsSet, SlideInfo};
 use crate::consts::RecordType;
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::text::extractor::{parse_cstring, parse_text_bytes_atom, parse_text_chars_atom};
 use std::sync::Arc;
 use zerocopy::{
@@ -96,7 +96,7 @@ impl Record {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse(data: &[u8], offset: usize) -> Result<(Self, usize)> {
-        Self::parse_with_limits(data, offset, RecordLimits::default())
+        Self::parse_with_limits(data, offset, SourceLimits::default())
     }
 
     /// Parse a PPT record with explicit finite resource limits.
@@ -107,7 +107,7 @@ impl Record {
     pub fn parse_with_limits(
         data: &[u8],
         offset: usize,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<(Self, usize)> {
         Self::parse_from_store_with_limits(PayloadStore::Owned(data), offset, limits)
     }
@@ -121,7 +121,7 @@ impl Record {
     pub(crate) fn parse_from_store_with_limits(
         store: PayloadStore<'_>,
         offset: usize,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<(Self, usize)> {
         let window_end = store.bytes().len();
         let mut budget = ParseBudget::new(limits, window_end)?;
@@ -130,13 +130,13 @@ impl Record {
 
     /// Parse a record without truncation recovery or byte resynchronization.
     pub(crate) fn parse_strict(data: &[u8], offset: usize) -> Result<(Self, usize)> {
-        Self::parse_strict_with_limits(data, offset, RecordLimits::default())
+        Self::parse_strict_with_limits(data, offset, SourceLimits::default())
     }
 
     pub(crate) fn parse_strict_with_limits(
         data: &[u8],
         offset: usize,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<(Self, usize)> {
         let mut budget = ParseBudget::new(limits, data.len())?;
         Self::parse_impl(
@@ -389,7 +389,12 @@ impl Record {
                         break;
                     }
                 },
-                Err(error @ (Error::ResourceLimit(_) | Error::AllocationFailed(_))) => {
+                Err(
+                    error @ (Error::Limit { .. }
+                    | Error::InvalidLimit { .. }
+                    | Error::ResourceLimit(_)
+                    | Error::AllocationFailed(_)),
+                ) => {
                     return Err(error);
                 },
                 Err(_) => {
@@ -461,7 +466,7 @@ impl Record {
     ///
     /// Returns an error if the operation fails.
     pub fn versioned_binary_tag_records(&self, version: u8) -> Result<Vec<Record>> {
-        self.versioned_binary_tag_records_with_limits(version, RecordLimits::default())
+        self.versioned_binary_tag_records_with_limits(version, SourceLimits::default())
     }
 
     /// Return versioned programmable-tag records with explicit parse limits.
@@ -472,7 +477,7 @@ impl Record {
     pub fn versioned_binary_tag_records_with_limits(
         &self,
         version: u8,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<Vec<Record>> {
         if !matches!(version, 9..=12) {
             return Err(Error::Corrupted(
@@ -544,13 +549,13 @@ impl Record {
     }
 
     pub(crate) fn parse_sequence_strict(data: &[u8], context: &str) -> Result<Vec<Record>> {
-        Self::parse_sequence_strict_with_limits(data, context, RecordLimits::default())
+        Self::parse_sequence_strict_with_limits(data, context, SourceLimits::default())
     }
 
     pub(crate) fn parse_sequence_strict_with_limits(
         data: &[u8],
         context: &str,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<Vec<Record>> {
         let mut session = RecordParseSession::new(limits, data.len())?;
         session.parse_sequence(data, context, 0)
@@ -832,7 +837,7 @@ impl Record {
 }
 
 pub(crate) struct ParseBudget {
-    limits: RecordLimits,
+    limits: SourceLimits,
     records: usize,
     copied_payload_bytes: usize,
 }
@@ -846,7 +851,7 @@ pub(crate) struct RecordParseSession {
 }
 
 impl RecordParseSession {
-    pub(crate) fn new(limits: RecordLimits, input_bytes: usize) -> Result<Self> {
+    pub(crate) fn new(limits: SourceLimits, input_bytes: usize) -> Result<Self> {
         Ok(Self {
             budget: ParseBudget::new(limits, input_bytes)?,
         })
@@ -916,12 +921,13 @@ impl RecordParseSession {
 }
 
 impl ParseBudget {
-    pub(crate) fn new(limits: RecordLimits, input_bytes: usize) -> Result<Self> {
+    pub(crate) fn new(limits: SourceLimits, input_bytes: usize) -> Result<Self> {
         if input_bytes > limits.max_input_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT input size {input_bytes} exceeds limit {}",
-                limits.max_input_bytes
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::EntryBytes,
+                observed: input_bytes,
+                maximum: limits.max_input_bytes,
+            });
         }
         Ok(Self {
             limits,
@@ -932,45 +938,50 @@ impl ParseBudget {
 
     fn charge_record(&mut self, depth: usize, payload_bytes: usize) -> Result<()> {
         if depth > self.limits.max_depth {
-            return Err(Error::ResourceLimit(format!(
-                "PPT record nesting depth {depth} exceeds limit {}",
-                self.limits.max_depth
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Depth,
+                observed: depth,
+                maximum: self.limits.max_depth,
+            });
         }
         if payload_bytes > self.limits.max_record_payload_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT record payload size {payload_bytes} exceeds limit {}",
-                self.limits.max_record_payload_bytes
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordPayloadBytes,
+                observed: payload_bytes,
+                maximum: self.limits.max_record_payload_bytes,
+            });
         }
         let encoded_bytes = payload_bytes
             .checked_add(8)
             .ok_or_else(|| Error::Corrupted("PPT encoded record size overflow".to_string()))?;
         if encoded_bytes > self.limits.max_record_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT record size {encoded_bytes} exceeds limit {}",
-                self.limits.max_record_bytes
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: encoded_bytes,
+                maximum: self.limits.max_record_bytes,
+            });
         }
         self.charge_visit(depth)
     }
 
     fn charge_visit(&mut self, depth: usize) -> Result<()> {
         if depth > self.limits.max_depth {
-            return Err(Error::ResourceLimit(format!(
-                "PPT record nesting depth {depth} exceeds limit {}",
-                self.limits.max_depth
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Depth,
+                observed: depth,
+                maximum: self.limits.max_depth,
+            });
         }
         self.records = self
             .records
             .checked_add(1)
             .ok_or_else(|| Error::Corrupted("PPT record count overflow".to_string()))?;
         if self.records > self.limits.max_records {
-            return Err(Error::ResourceLimit(format!(
-                "PPT record count exceeds limit {}",
-                self.limits.max_records
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: self.records,
+                maximum: self.limits.max_records,
+            });
         }
         Ok(())
     }
@@ -981,10 +992,11 @@ impl ParseBudget {
             .checked_add(bytes)
             .ok_or_else(|| Error::Corrupted("PPT copied payload size overflow".to_string()))?;
         if self.copied_payload_bytes > self.limits.max_copied_payload_bytes {
-            return Err(Error::ResourceLimit(format!(
-                "PPT copied payload bytes exceed limit {}",
-                self.limits.max_copied_payload_bytes
-            )));
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::AggregatePayloadBytes,
+                observed: self.copied_payload_bytes,
+                maximum: self.limits.max_copied_payload_bytes,
+            });
         }
         Ok(())
     }
@@ -1153,9 +1165,9 @@ mod tests {
     }
 
     #[test]
-    fn explicit_payload_and_record_limits_accept_exact_boundaries() {
+    fn explicit_payload_and_source_limits_accept_exact_boundaries() {
         let bytes = atom(0x2222, &[1, 2, 3, 4]);
-        let limits = RecordLimits {
+        let limits = SourceLimits {
             max_package_bytes: bytes.len(),
             max_input_bytes: bytes.len(),
             max_aggregate_input_bytes: bytes.len(),
@@ -1175,17 +1187,17 @@ mod tests {
     fn explicit_limits_reject_input_payload_and_copied_bytes_over_boundary() {
         let bytes = atom(0x2222, &[1, 2, 3, 4]);
         for limits in [
-            RecordLimits {
+            SourceLimits {
                 max_input_bytes: bytes.len() - 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
-            RecordLimits {
+            SourceLimits {
                 max_record_payload_bytes: 3,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
-            RecordLimits {
+            SourceLimits {
                 max_copied_payload_bytes: 3,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
         ] {
             assert!(Record::parse_with_limits(&bytes, 0, limits).is_err());
@@ -1201,9 +1213,9 @@ mod tests {
             Record::parse_with_limits(
                 &container,
                 0,
-                RecordLimits {
+                SourceLimits {
                     max_depth: 0,
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 }
             )
             .is_err()
@@ -1212,9 +1224,9 @@ mod tests {
             Record::parse_with_limits(
                 &container,
                 0,
-                RecordLimits {
+                SourceLimits {
                     max_records: 1,
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 }
             )
             .is_err()
@@ -1223,9 +1235,9 @@ mod tests {
             Record::parse_with_limits(
                 &container,
                 0,
-                RecordLimits {
+                SourceLimits {
                     max_copied_payload_bytes: leaf.len(),
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 }
             )
             .is_err()
@@ -1236,11 +1248,11 @@ mod tests {
     fn semantic_session_shares_count_copy_and_logical_depth_across_sequences() {
         let bytes = atom(0x2222, &[1, 2, 3, 4]);
         let mut session = RecordParseSession::new(
-            RecordLimits {
+            SourceLimits {
                 max_records: 2,
                 max_copied_payload_bytes: 7,
                 max_depth: 2,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
             bytes.len(),
         )
@@ -1248,14 +1260,18 @@ mod tests {
 
         session.parse_sequence(&bytes, "first", 1).unwrap();
         let error = session.parse_sequence(&bytes, "second", 2).unwrap_err();
-        assert!(
-            matches!(error, Error::ResourceLimit(message) if message.contains("copied payload"))
-        );
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::SourceLimitKind::AggregatePayloadBytes,
+                ..
+            }
+        ));
 
         let mut count_session = RecordParseSession::new(
-            RecordLimits {
+            SourceLimits {
                 max_records: 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
             0,
         )
@@ -1263,20 +1279,26 @@ mod tests {
         count_session.account_existing(0).unwrap();
         assert!(matches!(
             count_session.account_existing(0),
-            Err(Error::ResourceLimit(_))
+            Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                ..
+            })
         ));
 
         let mut depth_session = RecordParseSession::new(
-            RecordLimits {
+            SourceLimits {
                 max_depth: 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
             bytes.len(),
         )
         .unwrap();
         assert!(matches!(
             depth_session.parse_sequence(&bytes, "deep", 2),
-            Err(Error::ResourceLimit(_))
+            Err(Error::Limit {
+                kind: crate::SourceLimitKind::Depth,
+                ..
+            })
         ));
     }
 
@@ -1284,12 +1306,12 @@ mod tests {
     fn header_only_accounting_does_not_consume_copy_budget() {
         let bytes = atom(0x2222, &[1, 2, 3, 4]);
         let mut header_session = RecordParseSession::new(
-            RecordLimits {
+            SourceLimits {
                 max_copied_payload_bytes: 0,
                 max_record_payload_bytes: 4,
                 max_record_bytes: bytes.len(),
                 max_records: 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
             0,
         )
@@ -1297,12 +1319,12 @@ mod tests {
         header_session.account_existing_header(0, 4).unwrap();
 
         let mut exact_session = RecordParseSession::new(
-            RecordLimits {
+            SourceLimits {
                 max_copied_payload_bytes: 4,
                 max_record_payload_bytes: 4,
                 max_record_bytes: bytes.len(),
                 max_records: 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
             bytes.len(),
         )
@@ -1310,19 +1332,22 @@ mod tests {
         exact_session.parse_strict_record(&bytes, 0).unwrap();
 
         let mut one_under_session = RecordParseSession::new(
-            RecordLimits {
+            SourceLimits {
                 max_copied_payload_bytes: 3,
                 max_record_payload_bytes: 4,
                 max_record_bytes: bytes.len(),
                 max_records: 1,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
             bytes.len(),
         )
         .unwrap();
         assert!(matches!(
             one_under_session.parse_strict_record(&bytes, 0),
-            Err(Error::ResourceLimit(message)) if message.contains("copied payload")
+            Err(Error::Limit {
+                kind: crate::SourceLimitKind::AggregatePayloadBytes,
+                ..
+            })
         ));
     }
 
@@ -1332,10 +1357,10 @@ mod tests {
         assert_eq!(
             one.versioned_binary_tag_records_with_limits(
                 10,
-                RecordLimits {
+                SourceLimits {
                     max_records: 10,
                     max_depth: 8,
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 },
             )
             .unwrap()
@@ -1346,13 +1371,16 @@ mod tests {
         assert!(matches!(
             many.versioned_binary_tag_records_with_limits(
                 10,
-                RecordLimits {
+                SourceLimits {
                     max_records: 10,
                     max_depth: 8,
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 },
             ),
-            Err(Error::ResourceLimit(message)) if message.contains("record count")
+            Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                ..
+            })
         ));
     }
 
@@ -1361,11 +1389,11 @@ mod tests {
         let one = versioned_tag_root(1);
         one.versioned_binary_tag_records_with_limits(
             10,
-            RecordLimits {
+            SourceLimits {
                 max_records: 100,
                 max_depth: 8,
                 max_copied_payload_bytes: 200,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             },
         )
         .unwrap();
@@ -1373,14 +1401,17 @@ mod tests {
         assert!(matches!(
             many.versioned_binary_tag_records_with_limits(
                 10,
-                RecordLimits {
+                SourceLimits {
                     max_records: 100,
                     max_depth: 8,
                     max_copied_payload_bytes: 200,
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 },
             ),
-            Err(Error::ResourceLimit(message)) if message.contains("copied payload")
+            Err(Error::Limit {
+                kind: crate::SourceLimitKind::AggregatePayloadBytes,
+                ..
+            })
         ));
     }
 
@@ -1420,7 +1451,7 @@ mod tests {
             let mut shared = RecordParser::new();
             let shared_result = shared.parse_shared_document_with_limits(
                 &Arc::new(bytes.clone()),
-                RecordLimits::default(),
+                SourceLimits::default(),
             );
             assert_eq!(
                 format!("{owned_result:?}"),
@@ -1454,9 +1485,9 @@ mod tests {
         );
 
         for budget in [payload_bytes, payload_bytes - 1] {
-            let limits = RecordLimits {
+            let limits = SourceLimits {
                 max_copied_payload_bytes: budget,
-                ..RecordLimits::default()
+                ..SourceLimits::default()
             };
             let owned = RecordParser::new()
                 .parse_document_with_limits(&bytes, limits)
@@ -1475,7 +1506,7 @@ mod tests {
     #[test]
     fn editing_a_shared_payload_leaves_the_stream_and_its_siblings_intact() {
         let bytes = Arc::new(nested_tree());
-        let mut budget = ParseBudget::new(RecordLimits::default(), bytes.len()).unwrap();
+        let mut budget = ParseBudget::new(SourceLimits::default(), bytes.len()).unwrap();
         let (mut document, _) =
             Record::parse_shared_with_budget(&bytes, 0, false, &mut budget).unwrap();
         let before = document.children[0].data.to_vec();

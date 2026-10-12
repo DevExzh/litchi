@@ -498,9 +498,11 @@ impl FontCollection {
                 "font collection has an invalid header".into(),
             ));
         }
-        let child_depth = logical_depth
-            .checked_add(1)
-            .ok_or_else(|| Error::ResourceLimit("font record depth overflow".into()))?;
+        let child_depth = logical_depth.checked_add(1).ok_or(Error::Limit {
+            kind: crate::SourceLimitKind::Depth,
+            observed: usize::MAX,
+            maximum: limits.records.max_depth,
+        })?;
         let parsed;
         let children = if record.children.is_empty() {
             parsed = session.parse_sequence(&record.data, "font collection", child_depth)?;
@@ -513,12 +515,19 @@ impl FontCollection {
         } else {
             record.children.as_slice()
         };
-        if children.len() > limits.records.max_records
-            || (!children.is_empty() && limits.records.max_depth == 0)
-        {
-            return Err(Error::ResourceLimit(
-                "font collection exceeds its record-count or depth limit".into(),
-            ));
+        if children.len() > limits.records.max_records {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                observed: children.len(),
+                maximum: limits.records.max_records,
+            });
+        }
+        if !children.is_empty() && limits.records.max_depth == 0 {
+            return Err(Error::Limit {
+                kind: crate::SourceLimitKind::Depth,
+                observed: child_depth,
+                maximum: limits.records.max_depth,
+            });
         }
         let mut collection = FontCollection::new(scope);
         collection
@@ -529,16 +538,24 @@ impl FontCollection {
         let mut facets = 0usize;
         let mut embedded_bytes = 0usize;
         for child in children {
-            let encoded =
-                child.data.len().checked_add(8).ok_or_else(|| {
-                    Error::ResourceLimit("font child record size overflow".into())
-                })?;
-            if child.data.len() > limits.records.max_record_payload_bytes
-                || encoded > limits.records.max_record_bytes
-            {
-                return Err(Error::ResourceLimit(
-                    "font child exceeds its record byte limit".into(),
-                ));
+            let encoded = child.data.len().checked_add(8).ok_or(Error::Limit {
+                kind: crate::SourceLimitKind::RecordBytes,
+                observed: usize::MAX,
+                maximum: limits.records.max_record_bytes,
+            })?;
+            if child.data.len() > limits.records.max_record_payload_bytes {
+                return Err(Error::Limit {
+                    kind: crate::SourceLimitKind::RecordPayloadBytes,
+                    observed: child.data.len(),
+                    maximum: limits.records.max_record_payload_bytes,
+                });
+            }
+            if encoded > limits.records.max_record_bytes {
+                return Err(Error::Limit {
+                    kind: crate::SourceLimitKind::RecordBytes,
+                    observed: encoded,
+                    maximum: limits.records.max_record_bytes,
+                });
             }
             #[allow(
                 clippy::wildcard_enum_match_arm,
@@ -1242,7 +1259,7 @@ fn one_blob_mut(pair: &mut [Record]) -> Result<&mut Record> {
 
 pub(crate) fn encode_sequence(
     records: &[Record],
-    limits: crate::package::RecordLimits,
+    limits: crate::package::SourceLimits,
 ) -> Result<Vec<u8>> {
     let capacity = records
         .iter()
@@ -1262,7 +1279,7 @@ pub(crate) fn encode_sequence(
 
 pub(crate) fn encode_record(
     record: &Record,
-    limits: crate::package::RecordLimits,
+    limits: crate::package::SourceLimits,
 ) -> Result<Vec<u8>> {
     let nested;
     let payload = if record.children.is_empty() {
@@ -1275,10 +1292,19 @@ pub(crate) fn encode_record(
         .len()
         .checked_add(8)
         .ok_or_else(|| Error::Corrupted("record size overflow".into()))?;
-    if total > limits.max_record_bytes || payload.len() > limits.max_record_payload_bytes {
-        return Err(Error::Corrupted(
-            "serialized PPT record exceeds configured limits".into(),
-        ));
+    if payload.len() > limits.max_record_payload_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordPayloadBytes,
+            observed: payload.len(),
+            maximum: limits.max_record_payload_bytes,
+        });
+    }
+    if total > limits.max_record_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordBytes,
+            observed: total,
+            maximum: limits.max_record_bytes,
+        });
     }
     let length = u32::try_from(payload.len())
         .map_err(|_err| Error::Corrupted("record payload exceeds u32".into()))?;
@@ -1299,16 +1325,25 @@ fn append_leaf_record(
     instance: u16,
     record_type: u16,
     payload: &[u8],
-    limits: crate::package::RecordLimits,
+    limits: crate::package::SourceLimits,
 ) -> Result<()> {
     let total = payload
         .len()
         .checked_add(8)
         .ok_or_else(|| Error::Corrupted("record size overflow".into()))?;
-    if total > limits.max_record_bytes || payload.len() > limits.max_record_payload_bytes {
-        return Err(Error::ResourceLimit(
-            "serialized font record exceeds configured limits".into(),
-        ));
+    if payload.len() > limits.max_record_payload_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordPayloadBytes,
+            observed: payload.len(),
+            maximum: limits.max_record_payload_bytes,
+        });
+    }
+    if total > limits.max_record_bytes {
+        return Err(Error::Limit {
+            kind: crate::SourceLimitKind::RecordBytes,
+            observed: total,
+            maximum: limits.max_record_bytes,
+        });
     }
     let length = u32::try_from(payload.len())
         .map_err(|_err| Error::Corrupted("record payload exceeds u32".into()))?;

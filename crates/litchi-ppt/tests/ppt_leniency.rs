@@ -1278,7 +1278,7 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
         assert!(error.to_string().contains("cyclic"), "{error}");
     }
 
-    let options = OpenOptions::default().with_leniency(Leniency::TolerateUserEditChainDefects);
+    let options = OpenOptions::new().leniency(Leniency::TolerateUserEditChainDefects);
     for presentation in [
         Package::from_reader(Cursor::new(bytes.clone()))
             .unwrap()

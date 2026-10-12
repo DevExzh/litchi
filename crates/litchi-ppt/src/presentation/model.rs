@@ -12,7 +12,7 @@ use crate::hyperlink::Hyperlinks;
 use crate::main_master::MainMasterMetadata12;
 use crate::non_zoom_view::OutlineSorterViewInformation;
 /// High-performance Presentation API with zero-copy slide parsing.
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::parsers::RecordParser;
 use crate::persist::PersistMapping;
 use crate::records::Record;
@@ -37,7 +37,7 @@ pub(super) struct LazyPictures {
     shared: Arc<SharedOleFile>,
     path: &'static [&'static str],
     length: usize,
-    limits: RecordLimits,
+    limits: SourceLimits,
     #[cfg(feature = "encryption")]
     crypto: Option<litchi_crypto::rc4::Context>,
     cache: OnceLock<Arc<[u8]>>,
@@ -48,7 +48,7 @@ impl LazyPictures {
         shared: Arc<SharedOleFile>,
         path: &'static [&'static str],
         length: usize,
-        limits: RecordLimits,
+        limits: SourceLimits,
         #[cfg(feature = "encryption")] crypto: Option<litchi_crypto::rc4::Context>,
     ) -> Self {
         Self {
@@ -68,14 +68,17 @@ impl LazyPictures {
         self.shared.source_version()?;
         if self.cache.get().is_none() {
             if self.length > self.limits.max_input_bytes {
-                return Err(Error::ResourceLimit(format!(
-                    "Pictures stream size {} exceeds limit {}",
-                    self.length, self.limits.max_input_bytes
-                )));
+                return Err(Error::Limit {
+                    kind: crate::SourceLimitKind::EntryBytes,
+                    observed: self.length,
+                    maximum: self.limits.max_input_bytes,
+                });
             }
             let declared = self.shared.stream_len(self.path)?;
-            let declared = usize::try_from(declared).map_err(|_error| {
-                Error::ResourceLimit("Pictures stream size exceeds this platform".to_string())
+            let declared = usize::try_from(declared).map_err(|_error| Error::Limit {
+                kind: crate::SourceLimitKind::EntryBytes,
+                observed: usize::MAX,
+                maximum: self.limits.max_input_bytes,
             })?;
             if declared != self.length {
                 return Err(Error::Corrupted(
@@ -145,7 +148,7 @@ pub struct Presentation {
     /// Positional Pictures descriptor and success-only payload cache.
     pub(super) pictures_source: Option<LazyPictures>,
     /// Record limits retained for lazy live-persist parsing.
-    pub(crate) record_limits: RecordLimits,
+    pub(crate) source_limits: SourceLimits,
     /// Non-structural defects repaired while the presentation was opened.
     ///
     /// Aggregated by the constructors in `package.rs`; see
@@ -230,7 +233,7 @@ impl Presentation {
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
-            self.record_limits,
+            self.source_limits,
         );
 
         factory
@@ -255,7 +258,7 @@ impl Presentation {
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
-            self.record_limits,
+            self.source_limits,
         );
         let slide_data = factory.parse_slide(entry.persist_id())?;
         Ok(Some(Slide::from_slide_data(slide_data, position + 1)))
@@ -727,7 +730,7 @@ impl Presentation {
         let (record, _) = Record::parse_with_limits(
             &self.powerpoint_document,
             storage_offset,
-            self.record_limits,
+            self.source_limits,
         )?;
         if record.record_type != RecordType::ExternalOleObjectStg {
             return Err(Error::Corrupted(format!(
@@ -792,7 +795,7 @@ impl Presentation {
         &self,
         mut limits: crate::font::Limits,
     ) -> Result<crate::font::FontCollections> {
-        limits.records = limits.records.constrained_by(self.record_limits);
+        limits.records = limits.records.constrained_by(self.source_limits);
         crate::font::FontCollections::parse_with_limits(&self.live_document_record()?, limits)
     }
 
@@ -810,7 +813,7 @@ impl Presentation {
         let (record, _) = Record::parse_with_limits(
             &self.powerpoint_document,
             document_offset,
-            self.record_limits,
+            self.source_limits,
         )?;
         if record.record_type != RecordType::Document {
             return Err(Error::Corrupted(
@@ -1293,7 +1296,7 @@ impl Presentation {
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
-            self.record_limits,
+            self.source_limits,
         );
         let mut text = String::new();
 
@@ -1342,7 +1345,7 @@ impl Presentation {
             &self.powerpoint_document,
             &self.persist_mapping,
             &self.slide_directory,
-            self.record_limits,
+            self.source_limits,
         );
 
         let mut results = Vec::with_capacity(self.slide_directory.len());

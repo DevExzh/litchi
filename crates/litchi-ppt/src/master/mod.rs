@@ -42,7 +42,7 @@ impl Presentation {
             let (resolved, _) = Record::parse_with_limits(
                 self.document_stream(),
                 persist_offset,
-                self.record_limits,
+                self.source_limits,
             )?;
             if let Some(record) = records
                 .iter()

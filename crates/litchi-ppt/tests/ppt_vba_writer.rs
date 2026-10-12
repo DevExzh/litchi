@@ -167,10 +167,7 @@ fn project_remains_available_after_presentation_decryption() {
 
     let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package
-        .presentation_with_options(OpenOptions {
-            password: Some("secret"),
-            ..Default::default()
-        })
+        .presentation_with_options(OpenOptions::new().password("secret"))
         .unwrap();
     let read_project = presentation.vba().unwrap().unwrap();
     assert_eq!(read_project.name(), "EncryptedPresentation");

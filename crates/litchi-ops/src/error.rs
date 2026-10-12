@@ -1481,7 +1481,8 @@ impl Classify for litchi_ppt::Error {
         match self {
             Self::Io(error) => error.classify(),
             Self::Ole(error) => error.classify(),
-            Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
+            Self::Limit { .. } | Self::ResourceLimit(_) => Class::of(Code::LimitExceeded),
+            Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::AllocationFailed(_) => Class::of(Code::InternalError),
             Self::PasswordRequired => Class::suggest(Code::DocumentProtected, PASSWORD_SUGGESTION),
             Self::InvalidPassword => {
@@ -1494,6 +1495,7 @@ impl Classify for litchi_ppt::Error {
             | Self::StreamNotFound(_)
             | Self::Corrupted(_)
             | Self::MalformedEncryptionHeader(_) => Class::of(Code::CorruptFile),
+            _ => Class::of(Code::InternalError),
         }
     }
 }

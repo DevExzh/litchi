@@ -326,12 +326,12 @@ impl Snapshot {
 /// Options for the narrow immutable positional PPT text-splice owner.
 ///
 /// The owner intentionally has no length-changing or topology-changing
-/// fallback. `record_limits` bounds the semantic metadata and selected slide
+/// fallback. `source_limits` bounds the semantic metadata and selected slide
 /// reads; `splice_limits` bounds the common CFB physical plan.
 #[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
 pub struct SourceBackedOptions {
     /// Finite PPT record and stream limits.
-    pub record_limits: crate::RecordLimits,
+    pub source_limits: crate::SourceLimits,
     /// Finite CFB same-length splice limits.
     pub splice_limits: StreamSpliceLimits,
 }
@@ -383,12 +383,12 @@ impl SourceSnapshot {
     /// Opens a positional source with explicit finite limits.
     pub fn open_with_limits(
         source: Arc<dyn ReadAt>,
-        record_limits: crate::RecordLimits,
+        source_limits: crate::SourceLimits,
     ) -> Result<Self> {
         Self::open_with_options(
             source,
             SourceBackedOptions {
-                record_limits,
+                source_limits,
                 ..SourceBackedOptions::default()
             },
         )
@@ -399,20 +399,23 @@ impl SourceSnapshot {
         source: Arc<dyn ReadAt>,
         options: SourceBackedOptions,
     ) -> Result<Self> {
-        let shared_limits = shared_limits(options.record_limits)?;
+        let shared_limits = shared_limits(options.source_limits)?;
         let length = source
             .len()
             .map_err(|error| Error::Source(OverlayError::Io(error)))?;
         if length > shared_limits.max_input_bytes() {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT source length {length} exceeds limit {}",
-                shared_limits.max_input_bytes()
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: usize::try_from(length).unwrap_or(usize::MAX),
+                maximum: options.source_limits.max_input_bytes(),
+            }
             .into());
         }
         let publisher =
             SourceBackedOverlayPublisher::open_with_limits(Arc::clone(&source), shared_limits)
                 .map_err(Error::Source)?;
+        let shared = publisher.shared();
+        crate::package::preflight_shared_ole_file(&shared, options.source_limits)?;
         Self::from_publisher(source, length, &publisher, options)
     }
 
@@ -423,7 +426,7 @@ impl SourceSnapshot {
     /// The checks are the ones [`Self::open_with_options`] runs after its own
     /// index: the protected-container refusal, the source version, and the
     /// complete-artifact fingerprint of an empty splice plan. The CFB index
-    /// is the adopted one, so `options.record_limits` bounds the input length
+    /// is the adopted one, so `options.source_limits` bounds the input length
     /// here but cannot re-run the index's directory and allocation-table
     /// ceilings; those are the ones `shared` was opened under.
     ///
@@ -432,14 +435,17 @@ impl SourceSnapshot {
     /// Returns an error when the source exceeds `options`, is protected, has
     /// changed since `shared` was opened, or cannot be fingerprinted.
     pub fn from_shared(shared: Arc<SharedOleFile>, options: SourceBackedOptions) -> Result<Self> {
-        let shared_limits = shared_limits(options.record_limits)?;
+        shared.source_version().map_err(map_ole_error)?;
+        crate::package::preflight_shared_ole_file(&shared, options.source_limits)?;
+        let shared_limits = shared_limits(options.source_limits)?;
         let source = shared.source_arc();
         let length = shared.file_size();
         if length > shared_limits.max_input_bytes() {
-            return Err(PackageError::ResourceLimit(format!(
-                "PPT source length {length} exceeds limit {}",
-                shared_limits.max_input_bytes()
-            ))
+            return Err(PackageError::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                observed: usize::try_from(length).unwrap_or(usize::MAX),
+                maximum: options.source_limits.max_input_bytes(),
+            }
             .into());
         }
         let publisher = SourceBackedOverlayPublisher::from_shared(shared).map_err(Error::Source)?;
@@ -547,7 +553,7 @@ impl SourceSnapshot {
             &document_path,
             &current_user_path,
             target,
-            self.inner.options.record_limits,
+            self.inner.options.source_limits,
         )?;
         self.ensure_current()?;
         Ok(resolved)
@@ -957,7 +963,7 @@ fn publish_source_text(
 
 fn publish_source_noop(source: SourceSnapshot, target: Target) -> Result<SourceBackedCommit> {
     source.ensure_current()?;
-    let shared_limits = shared_limits(source.inner.options.record_limits)?;
+    let shared_limits = shared_limits(source.inner.options.source_limits)?;
     let publisher = SourceBackedOverlayPublisher::open_with_limits(
         Arc::clone(&source.inner.source),
         shared_limits,
@@ -1000,7 +1006,7 @@ fn publish_source_operation(
     operation: SourceOperation,
 ) -> Result<SourceBackedCommit> {
     source.ensure_current()?;
-    let shared_limits = shared_limits(source.inner.options.record_limits)?;
+    let shared_limits = shared_limits(source.inner.options.source_limits)?;
     let publisher = SourceBackedOverlayPublisher::open_with_limits(
         Arc::clone(&source.inner.source),
         shared_limits,
@@ -1032,7 +1038,7 @@ fn publish_source_operation(
                 &operation.document_path,
                 &operation.current_user_path,
                 operation.target,
-                source.inner.options.record_limits,
+                source.inner.options.source_limits,
             )?;
             verify_source_readback(&operation, &candidate_resolved)?;
             let target_version = candidate
@@ -1107,10 +1113,8 @@ fn verify_source_readback(operation: &SourceOperation, resolved: &SourceResolved
     Ok(())
 }
 
-fn shared_limits(record_limits: crate::RecordLimits) -> Result<SharedOleFileLimits> {
-    let maximum = u64::try_from(record_limits.max_package_bytes).map_err(|_error| {
-        PackageError::ResourceLimit("PPT package limit does not fit u64".into())
-    })?;
+fn shared_limits(source_limits: crate::SourceLimits) -> Result<SharedOleFileLimits> {
+    let maximum = u64::try_from(source_limits.max_package_bytes).unwrap_or(u64::MAX);
     SharedOleFileLimits::new(maximum).map_err(map_ole_error)
 }
 
@@ -1134,7 +1138,7 @@ fn open_shared_source(source: &SourceSnapshot) -> Result<Arc<SharedOleFile>> {
 impl SourceSnapshot {
     fn ensure_identity(&self) -> Result<()> {
         self.ensure_current()?;
-        let shared_limits = shared_limits(self.inner.options.record_limits)?;
+        let shared_limits = shared_limits(self.inner.options.source_limits)?;
         let publisher = SourceBackedOverlayPublisher::open_with_limits(
             Arc::clone(&self.inner.source),
             shared_limits,
@@ -1206,19 +1210,22 @@ fn ensure_matching_stream_topology(document: &[String], current_user: &[String])
 fn read_bounded_stream(
     shared: &SharedOleFile,
     path: &[String],
-    limits: crate::RecordLimits,
-    label: &str,
+    limits: crate::SourceLimits,
+    _label: &str,
 ) -> Result<Vec<u8>> {
     let refs: Vec<_> = path.iter().map(String::as_str).collect();
     let length = shared.stream_len(&refs).map_err(map_ole_error)?;
-    let length_usize = usize::try_from(length).map_err(|_error| {
-        PackageError::ResourceLimit(format!("{label} stream size exceeds this platform"))
+    let length_usize = usize::try_from(length).map_err(|_error| PackageError::Limit {
+        kind: crate::SourceLimitKind::EntryBytes,
+        observed: usize::MAX,
+        maximum: limits.max_input_bytes,
     })?;
     if length_usize > limits.max_input_bytes {
-        return Err(PackageError::ResourceLimit(format!(
-            "{label} stream size {length_usize} exceeds limit {}",
-            limits.max_input_bytes
-        ))
+        return Err(PackageError::Limit {
+            kind: crate::SourceLimitKind::EntryBytes,
+            observed: length_usize,
+            maximum: limits.max_input_bytes,
+        }
         .into());
     }
     let mut bytes = Vec::new();
@@ -1266,7 +1273,7 @@ fn is_macro_storage_name(name: &str) -> bool {
 fn reject_macro_records(
     document: &[u8],
     document_offset: usize,
-    limits: crate::RecordLimits,
+    limits: crate::SourceLimits,
 ) -> Result<()> {
     let (record, _consumed) =
         crate::Record::parse_strict_with_limits(document, document_offset, limits)?;
@@ -1406,7 +1413,7 @@ fn resolve_source_target_owned(
     document_path: &[String],
     current_user_path: &[String],
     target: Target,
-    limits: crate::RecordLimits,
+    limits: crate::SourceLimits,
 ) -> Result<SourceResolved> {
     let document_refs: Vec<_> = document_path.iter().map(String::as_str).collect();
     let current_user_refs: Vec<_> = current_user_path.iter().map(String::as_str).collect();
@@ -1414,17 +1421,21 @@ fn resolve_source_target_owned(
     let current_user_length = shared
         .stream_len(&current_user_refs)
         .map_err(map_ole_error)?;
-    let aggregate_length = document_length
-        .checked_add(current_user_length)
-        .ok_or_else(|| PackageError::ResourceLimit("PPT metadata stream sizes overflow".into()))?;
-    let aggregate_limit = u64::try_from(limits.max_aggregate_input_bytes).map_err(|_error| {
-        PackageError::ResourceLimit("PPT aggregate input limit does not fit u64".into())
-    })?;
+    let aggregate_length =
+        document_length
+            .checked_add(current_user_length)
+            .ok_or(PackageError::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                observed: usize::MAX,
+                maximum: limits.max_aggregate_input_bytes,
+            })?;
+    let aggregate_limit = u64::try_from(limits.max_aggregate_input_bytes).unwrap_or(u64::MAX);
     if aggregate_length > aggregate_limit {
-        return Err(PackageError::ResourceLimit(format!(
-            "PPT Document and Current User streams total {aggregate_length} bytes, exceeding limit {}",
-            limits.max_aggregate_input_bytes
-        ))
+        return Err(PackageError::Limit {
+            kind: crate::SourceLimitKind::AggregateBytes,
+            observed: usize::try_from(aggregate_length).unwrap_or(usize::MAX),
+            maximum: limits.max_aggregate_input_bytes,
+        }
         .into());
     }
     // Shared so the selected slide's record payloads span this buffer instead
@@ -1499,7 +1510,7 @@ fn inspect_source_text_atom(
     document: &[u8],
     slide_offset: usize,
     shape_id: u32,
-    limits: crate::RecordLimits,
+    limits: crate::SourceLimits,
 ) -> Result<SourceTextAtom> {
     let (slide, consumed) =
         crate::Record::parse_strict_with_limits(document, slide_offset, limits)?;
@@ -3656,7 +3667,7 @@ mod tests {
                 .unwrap();
         let current_user_path =
             super::select_stream_path(&shared, &super::CURRENT_USER_PATHS, "Current User").unwrap();
-        let limits = crate::RecordLimits::default();
+        let limits = crate::SourceLimits::default();
         let owned = super::resolve_source_target_owned(
             &shared,
             &document_path,
@@ -3692,7 +3703,7 @@ mod tests {
         let (_record, consumed) = crate::Record::parse_strict_with_limits(
             &document,
             offset,
-            crate::RecordLimits::default(),
+            crate::SourceLimits::default(),
         )
         .unwrap();
         (document, offset, offset + consumed)
@@ -3837,7 +3848,7 @@ mod tests {
             &["PowerPoint Document".to_string()],
             &["Current User".to_string()],
             target(),
-            crate::RecordLimits::default(),
+            crate::SourceLimits::default(),
         )
         .map(|_| ())
     }
@@ -4151,17 +4162,19 @@ mod tests {
 
         let limited_source = Arc::new(OwnedSource::new(fixture("abc")));
         let limited_options = super::SourceBackedOptions {
-            record_limits: crate::RecordLimits {
+            source_limits: crate::SourceLimits {
                 max_aggregate_input_bytes: 1,
-                ..crate::RecordLimits::default()
+                ..crate::SourceLimits::default()
             },
             ..super::SourceBackedOptions::default()
         };
-        let limited =
-            super::SourceSnapshot::open_with_options(limited_source, limited_options).unwrap();
         assert!(matches!(
-            limited.edit_text(target()),
-            Err(Error::Package(crate::package::Error::ResourceLimit(_)))
+            super::SourceSnapshot::open_with_options(limited_source, limited_options),
+            Err(Error::Package(crate::package::Error::Limit {
+                kind: crate::SourceLimitKind::AggregateBytes,
+                maximum: 1,
+                ..
+            }))
         ));
     }
 
@@ -4266,15 +4279,19 @@ mod tests {
         );
 
         let limited = super::SourceBackedOptions {
-            record_limits: crate::RecordLimits {
+            source_limits: crate::SourceLimits {
                 max_package_bytes: 1,
-                ..crate::RecordLimits::default()
+                ..crate::SourceLimits::default()
             },
             ..super::SourceBackedOptions::default()
         };
         assert!(matches!(
             super::SourceSnapshot::from_shared(shared, limited),
-            Err(Error::Package(crate::package::Error::ResourceLimit(_)))
+            Err(Error::Package(crate::package::Error::Limit {
+                kind: crate::SourceLimitKind::InputBytes,
+                maximum: 1,
+                ..
+            }))
         ));
     }
 
@@ -4305,7 +4322,7 @@ mod tests {
             legacy_snapshot.ensure_current().unwrap();
             let shared = SharedOleFile::open_with_limits(
                 Arc::clone(&legacy_source),
-                super::shared_limits(crate::RecordLimits::default()).unwrap(),
+                super::shared_limits(crate::SourceLimits::default()).unwrap(),
             )
             .unwrap();
             super::reject_macro_components(&shared).unwrap();
@@ -4321,7 +4338,7 @@ mod tests {
                 &document_path,
                 &current_user_path,
                 Target::new(Position::new(5), Position::new(3)),
-                crate::RecordLimits::default(),
+                crate::SourceLimits::default(),
             )
             .unwrap();
             if let Some(expected) = &legacy_text {
@@ -4409,9 +4426,9 @@ mod tests {
         let limited = super::SourceSnapshot::open_with_options(
             Arc::new(OwnedSource::new(fixture("abc"))),
             super::SourceBackedOptions {
-                record_limits: crate::RecordLimits {
-                    max_aggregate_input_bytes: 1,
-                    ..crate::RecordLimits::default()
+                source_limits: crate::SourceLimits {
+                    max_records: 1,
+                    ..crate::SourceLimits::default()
                 },
                 ..super::SourceBackedOptions::default()
             },
@@ -4419,8 +4436,11 @@ mod tests {
         .unwrap();
         assert!(matches!(
             limited.read_text(target()),
-            Err(Error::Package(crate::package::Error::ResourceLimit(message)))
-                if message.contains("total") || message.contains("aggregate")
+            Err(Error::Package(crate::package::Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                maximum: 1,
+                ..
+            }))
         ));
 
         let valid =
@@ -4618,7 +4638,7 @@ mod tests {
         let doc_info = raw_record(0x0F, 0, crate::RecordType::DocInfoList as u16, &macro_info);
         let document = raw_record(0x0F, 0, crate::RecordType::Document as u16, &doc_info);
         assert!(matches!(
-            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            super::reject_macro_records(&document, 0, crate::SourceLimits::default()),
             Err(Error::Refused(Refusal::UnsupportedSource))
         ));
 
@@ -4639,7 +4659,7 @@ mod tests {
         );
         let document = raw_record(0x0F, 0, crate::RecordType::Document as u16, &duplicate_info);
         assert!(matches!(
-            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            super::reject_macro_records(&document, 0, crate::SourceLimits::default()),
             Err(Error::Package(crate::package::Error::Corrupted(message)))
                 if message.contains("multiple VBAInfo")
         ));
@@ -4652,7 +4672,7 @@ mod tests {
             &[doc_info.clone(), doc_info].concat(),
         );
         assert!(matches!(
-            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            super::reject_macro_records(&document, 0, crate::SourceLimits::default()),
             Err(Error::Package(crate::package::Error::Corrupted(message)))
                 if message.contains("multiple DocInfoList")
         ));
@@ -4666,7 +4686,7 @@ mod tests {
         let doc_info = raw_record(0x0F, 0, crate::RecordType::DocInfoList as u16, &orphan_atom);
         let document = raw_record(0x0F, 0, crate::RecordType::Document as u16, &doc_info);
         assert!(matches!(
-            super::reject_macro_records(&document, 0, crate::RecordLimits::default()),
+            super::reject_macro_records(&document, 0, crate::SourceLimits::default()),
             Err(Error::Refused(Refusal::UnsupportedSource))
         ));
 

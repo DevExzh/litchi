@@ -3,7 +3,7 @@
 //! Based on Apache POI's `HSLFSlideShow` and `QuickButCruddyTextExtractor`.
 
 use crate::consts::RecordType;
-use crate::package::{Error, RecordLimits, Result};
+use crate::package::{Error, Result, SourceLimits};
 use crate::records::Record;
 use crate::records::record::ParseBudget;
 use std::sync::{Arc, OnceLock};
@@ -42,7 +42,7 @@ impl RecordParser {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn parse_document(&mut self, data: &[u8]) -> Result<()> {
-        self.parse_document_with_limits(data, RecordLimits::default())
+        self.parse_document_with_limits(data, SourceLimits::default())
     }
 
     /// Parse a complete PPT document with a shared finite record budget.
@@ -50,7 +50,7 @@ impl RecordParser {
     /// # Errors
     ///
     /// Returns an error if the input cannot be read or is malformed.
-    pub fn parse_document_with_limits(&mut self, data: &[u8], limits: RecordLimits) -> Result<()> {
+    pub fn parse_document_with_limits(&mut self, data: &[u8], limits: SourceLimits) -> Result<()> {
         if data.is_empty() {
             return Ok(());
         }
@@ -72,7 +72,7 @@ impl RecordParser {
     pub(crate) fn parse_shared_document_with_limits(
         &mut self,
         data: &Arc<Vec<u8>>,
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         if data.is_empty() {
             return Ok(());
@@ -104,7 +104,12 @@ impl RecordParser {
                         break;
                     }
                 },
-                Err(error @ (Error::ResourceLimit(_) | Error::AllocationFailed(_))) => {
+                Err(
+                    error @ (Error::Limit { .. }
+                    | Error::InvalidLimit { .. }
+                    | Error::ResourceLimit(_)
+                    | Error::AllocationFailed(_)),
+                ) => {
                     return Err(error);
                 },
                 Err(_) => {
@@ -126,7 +131,7 @@ impl RecordParser {
         &mut self,
         data: &Arc<Vec<u8>>,
         offsets: &[usize],
-        limits: RecordLimits,
+        limits: SourceLimits,
     ) -> Result<()> {
         let mut budget = ParseBudget::new(limits, data.len())?;
         for &offset in offsets {
@@ -349,12 +354,18 @@ mod tests {
         let error = parser
             .parse_document_with_limits(
                 &data,
-                RecordLimits {
+                SourceLimits {
                     max_records: 1,
-                    ..RecordLimits::default()
+                    ..SourceLimits::default()
                 },
             )
             .unwrap_err();
-        assert!(matches!(error, Error::ResourceLimit(message) if message.contains("record count")));
+        assert!(matches!(
+            error,
+            Error::Limit {
+                kind: crate::SourceLimitKind::Events,
+                ..
+            }
+        ));
     }
 }

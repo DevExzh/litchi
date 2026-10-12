@@ -278,7 +278,10 @@ fn nested_programmable_tags_share_one_record_budget() {
     limits.records.max_records = 12;
     assert!(matches!(
         FontCollections::parse_with_limits(&root, limits),
-        Err(crate::Error::ResourceLimit(_))
+        Err(crate::Error::Limit {
+            kind: crate::SourceLimitKind::Events,
+            ..
+        })
     ));
 }
 

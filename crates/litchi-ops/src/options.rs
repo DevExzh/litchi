@@ -78,9 +78,9 @@ pub struct OpenOptions {
     /// Legacy Word options other than credentials.
     #[cfg(feature = "doc")]
     pub(crate) doc: Option<DocOptions>,
-    /// Legacy `PowerPoint` record limits.
+    /// Legacy `PowerPoint` source limits.
     #[cfg(feature = "ppt")]
-    pub(crate) ppt_limits: Option<litchi_ppt::RecordLimits>,
+    pub(crate) ppt_source_limits: Option<litchi_ppt::SourceLimits>,
     /// ODF package limits shared by ODT, ODS and ODP.
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     pub(crate) odf_limits: Option<litchi_odf_common::SourcePackageLimits>,
@@ -107,7 +107,7 @@ impl OpenOptions {
             #[cfg(feature = "doc")]
             doc: None,
             #[cfg(feature = "ppt")]
-            ppt_limits: None,
+            ppt_source_limits: None,
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
             odf_limits: None,
         }
@@ -234,17 +234,17 @@ impl OpenOptions {
         self
     }
 
-    /// Replace the legacy `PowerPoint` record limits.
+    /// Replace the legacy `PowerPoint` source limits.
     ///
     /// ```
     /// let options = litchi_ops::OpenOptions::new()
-    ///     .ppt_limits(litchi_ppt::RecordLimits::default());
+    ///     .ppt_source_limits(litchi_ppt::SourceLimits::default());
     /// # let _ = options;
     /// ```
     #[cfg(feature = "ppt")]
     #[must_use]
-    pub const fn ppt_limits(mut self, limits: litchi_ppt::RecordLimits) -> Self {
-        self.ppt_limits = Some(limits);
+    pub const fn ppt_source_limits(mut self, limits: litchi_ppt::SourceLimits) -> Self {
+        self.ppt_source_limits = Some(limits);
         self
     }
 
@@ -358,7 +358,7 @@ mod tests {
         #[cfg(feature = "doc")]
         assert_eq!(options.doc, None);
         #[cfg(feature = "ppt")]
-        assert_eq!(options.ppt_limits, None);
+        assert_eq!(options.ppt_source_limits, None);
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
         assert_eq!(options.odf_limits, None);
     }
@@ -424,9 +424,9 @@ mod tests {
     #[cfg(feature = "ppt")]
     #[test]
     fn builder_sets_ppt_sub_options() {
-        let limits = litchi_ppt::RecordLimits::default();
-        let options = OpenOptions::new().ppt_limits(limits);
-        assert_eq!(options.ppt_limits, Some(limits));
+        let limits = litchi_ppt::SourceLimits::default();
+        let options = OpenOptions::new().ppt_source_limits(limits);
+        assert_eq!(options.ppt_source_limits, Some(limits));
     }
 
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]

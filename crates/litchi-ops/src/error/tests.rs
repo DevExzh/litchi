@@ -529,7 +529,14 @@ fn row_resource_limits_are_limit_exceeded() {
         );
     }
     #[cfg(feature = "ppt")]
-    check(litchi_ppt::Error::ResourceLimit("records".into()).into());
+    check(
+        litchi_ppt::Error::Limit {
+            kind: litchi_ppt::SourceLimitKind::Events,
+            observed: 11,
+            maximum: 10,
+        }
+        .into(),
+    );
     #[cfg(feature = "rtf")]
     check(
         litchi_rtf::Error::LimitExceeded {
@@ -1498,4 +1505,26 @@ fn xls_primary_edit_errors_keep_typed_sources_and_codes() {
             litchi_xls::package::Error::EncryptionPolicy
         ))
     ));
+}
+
+#[cfg(feature = "ppt")]
+#[test]
+fn ppt_source_limit_configuration_preserves_dimension_and_values() {
+    let native = litchi_ppt::SourceLimits::builder()
+        .max_input_bytes(litchi_ppt::SourceLimits::MAX_INPUT_BYTES + 1)
+        .unwrap_err();
+    let error = assert_code(native, Code::InvalidArgument);
+    assert!(matches!(
+        error.leaf(),
+        Source::Ppt(litchi_ppt::Error::InvalidLimit {
+            kind: litchi_ppt::SourceLimitKind::InputBytes,
+            value,
+            maximum,
+        }) if *value == litchi_ppt::SourceLimits::MAX_INPUT_BYTES + 1
+            && *maximum == litchi_ppt::SourceLimits::MAX_INPUT_BYTES
+    ));
+    assert_code(
+        litchi_ppt::Error::ResourceLimit("domain-specific bound".into()),
+        Code::LimitExceeded,
+    );
 }
