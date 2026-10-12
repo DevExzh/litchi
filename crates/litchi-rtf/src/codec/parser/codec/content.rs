@@ -103,13 +103,6 @@ impl<'a> Parser<'a> {
                         }
                     } else {
                         text_buffer.push(b'\n');
-                        // Keep the paragraph break in a block carrying the
-                        // paragraph state that ended the paragraph.  If it
-                        // remains buffered, a following alignment control
-                        // gets attached to the break and the lazy paragraph
-                        // view reads the next paragraph's alignment for the
-                        // paragraph that just ended.
-                        self.flush_text_buffer(&mut text_buffer)?;
                     }
                 }
                 if matches!(control, ControlWord::Par) {
@@ -344,11 +337,16 @@ impl<'a> Parser<'a> {
                 }
             },
             _ => {
-                // Character formatting takes effect at its lexical position,
-                // so preceding buffered text retains the old state.
+                // Character formatting takes effect at its lexical position.
+                // Alignment changes must also flush a pending paragraph break
+                // before changing the state attached to that preceding boundary.
                 if matches!(
                     control,
-                    ControlWord::Bold(_)
+                    ControlWord::LeftAlign
+                        | ControlWord::RightAlign
+                        | ControlWord::Center
+                        | ControlWord::Justify
+                        | ControlWord::Bold(_)
                         | ControlWord::Superscript(_)
                         | ControlWord::Subscript(_)
                         | ControlWord::NoSuperSub(_)

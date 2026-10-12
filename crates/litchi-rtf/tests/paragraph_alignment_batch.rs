@@ -56,10 +56,10 @@ fn batch_updates_first_middle_and_last_and_reopens() {
 
     assert_eq!(commit.package().text(), source.text());
     assert_eq!(
-        alignments(&commit.package()),
+        alignments(commit.package()),
         [Alignment::Right, Alignment::Center, Alignment::Left,]
     );
-    assert_eq!(
+    assert!(
         commit
             .package()
             .body()
@@ -67,13 +67,12 @@ fn batch_updates_first_middle_and_last_and_reopens() {
             .next()
             .unwrap()
             .format()
-            .bold(),
-        true
+            .bold()
     );
 
     let reopened = Package::from_bytes(&commit.package().to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), source.text());
-    assert_eq!(alignments(&reopened), alignments(&commit.package()));
+    assert_eq!(alignments(&reopened), alignments(commit.package()));
 }
 
 #[test]
@@ -156,7 +155,7 @@ fn alignment_batch_composes_with_non_structural_text_and_inverse_is_exact() {
     assert_eq!(commit.diagnostics().operation_count(), 3);
     assert_eq!(commit.package().text(), "One\nSecond\nThird");
     assert_eq!(
-        alignments(&commit.package()),
+        alignments(commit.package()),
         [Alignment::Center, Alignment::Left, Alignment::Justify,]
     );
     let restored = commit.package().apply(&commit.patch().inverse()).unwrap();
@@ -196,5 +195,5 @@ fn all_noop_alignment_updates_share_the_source_snapshot_and_batches_are_reusable
         second.package().to_bytes().unwrap(),
         source.to_bytes().unwrap()
     );
-    assert_eq!(alignments(&second.package()), alignments(&first.package()));
+    assert_eq!(alignments(second.package()), alignments(first.package()));
 }

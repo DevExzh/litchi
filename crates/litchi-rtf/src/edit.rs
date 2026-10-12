@@ -2685,8 +2685,8 @@ impl Edit {
     /// compressed, opaque, or protected sources.
     pub fn swap_paragraphs(
         &mut self,
-        first: litchi_core::Position,
-        second: litchi_core::Position,
+        first: Position,
+        second: Position,
     ) -> Result<&mut Self, Error> {
         let first = first.get();
         let second = second.get();
@@ -2991,7 +2991,7 @@ impl Edit {
     /// policy.
     pub fn insert_paragraph<'text>(
         &mut self,
-        position: litchi_core::Position,
+        position: Position,
         input: impl Into<Cow<'text, str>>,
     ) -> Result<&mut Self, Error> {
         let input = input.into();
@@ -3014,7 +3014,7 @@ impl Edit {
     }
 
     fn restore_paragraph(&mut self, position: usize, text: &str) -> Result<&mut Self, Error> {
-        self.insert_paragraph(litchi_core::Position::new(position), text)
+        self.insert_paragraph(Position::new(position), text)
     }
 
     fn ensure_lifecycle_room(&self) -> Result<(), Error> {
@@ -3123,6 +3123,30 @@ impl Edit {
             return Err(Error::StructuralPropertyConflict);
         }
 
+        // Search only existing alignment facets against the ordered request.
+        // In particular, a text-plus-alignment batch must not scan all text
+        // operations again for every selected paragraph.
+        let conflict = self
+            .operations
+            .iter()
+            .enumerate()
+            .filter_map(|(existing, operation)| {
+                let Operation::Alignment { position, .. } = operation else {
+                    return None;
+                };
+                updates
+                    .binary_search_by_key(position, |update| update.position.get())
+                    .ok()
+                    .map(|index| (index, existing))
+            })
+            .min_by_key(|&(index, existing)| (index, existing));
+        if let Some((index, existing)) = conflict {
+            return Err(Error::Conflict {
+                existing,
+                incoming: self.operations.len().saturating_add(index),
+            });
+        }
+
         let mut staged = Vec::new();
         staged.try_reserve_exact(updates.len()).map_err(|_error| {
             Error::Write("could not reserve paragraph-alignment batch".to_string())
@@ -3136,18 +3160,6 @@ impl Edit {
                 let update = updates.next().ok_or(Error::UnsupportedSource(
                     "paragraph-alignment selector cursor became inconsistent",
                 ))?;
-                let incoming = self.operations.len().saturating_add(staged.len());
-                if let Some(existing) = self.operations.iter().position(|operation| {
-                    matches!(
-                        operation,
-                        Operation::Alignment {
-                            position: existing_position,
-                            ..
-                        } if *existing_position == position
-                    )
-                }) {
-                    return Err(Error::Conflict { existing, incoming });
-                }
                 staged.push(Operation::Alignment {
                     position,
                     before: paragraph.format().alignment(),

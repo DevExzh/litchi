@@ -7,11 +7,11 @@
 
 use litchi_core::selector::{Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
+use litchi_rtf::Alignment;
 use litchi_rtf::edit::{
     EditOptions, ParagraphAlignmentUpdate, ParagraphTextReplacement, Patch,
     SemanticLimits as NativeLimits,
 };
-use litchi_rtf::raw::Alignment;
 
 use super::{Nav, Node, Rtf};
 use crate::error::{Code, Error, Result};
