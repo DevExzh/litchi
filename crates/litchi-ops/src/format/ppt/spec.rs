@@ -185,6 +185,7 @@ const SLIDE_PROPS: &[PropSpec] = &[
     PropSpec::new("slideNumber", ValueType::Int),
     raw("slideId", ValueType::Int),
     raw("persistId", ValueType::Int),
+    PropSpec::new("hidden", ValueType::Bool),
 ];
 
 const SHAPE_PROPS: &[PropSpec] = &[
@@ -906,3 +907,115 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
 check_format_spec!(SPEC);
 
 const _: () = assert!(SPEC.elements.len() <= 128);
+
+/// Setter keys shared by the PPT shape and placeholder registries.
+#[derive(Clone, Copy)]
+pub(super) enum ShapeSetter {
+    Text,
+    X,
+    Y,
+    Width,
+    Height,
+}
+
+/// Setter key for the fixed-width slide visibility owner.
+#[derive(Clone, Copy)]
+pub(super) enum SlideSetter {
+    Hidden,
+}
+
+const fn shape_write_entries<const N: usize>(
+    readable: &[PropSpec],
+) -> [crate::registry::Entry<ShapeSetter>; N] {
+    use crate::registry::{Access as WriteAccess, Constraint, Entry};
+
+    let mut text_spec = PropSpec::new("text", ValueType::Text);
+    text_spec.access.get = false;
+    let text = Entry {
+        spec: text_spec,
+        access: WriteAccess::Set(ShapeSetter::Text),
+        constraint: Constraint::None,
+        clear: true,
+    };
+    let mut entries = [text; N];
+    let mut index = 0;
+    while index < readable.len() {
+        entries[index] = Entry::read(readable[index]);
+        let setter = if same_name(readable[index].name, "x") {
+            Some(ShapeSetter::X)
+        } else if same_name(readable[index].name, "y") {
+            Some(ShapeSetter::Y)
+        } else if same_name(readable[index].name, "width") {
+            Some(ShapeSetter::Width)
+        } else if same_name(readable[index].name, "height") {
+            Some(ShapeSetter::Height)
+        } else {
+            None
+        };
+        if let Some(setter) = setter {
+            entries[index].access = WriteAccess::Set(setter);
+            if matches!(setter, ShapeSetter::Width | ShapeSetter::Height) {
+                entries[index].constraint = Constraint::Length {
+                    min: crate::value::Length::from_emu(0),
+                    max: crate::value::Length::from_emu(i64::MAX),
+                };
+            }
+        }
+        index += 1;
+    }
+    entries[N - 1] = text;
+    entries
+}
+
+const fn same_name(left: &str, right: &str) -> bool {
+    let left = left.as_bytes();
+    let right = right.as_bytes();
+    if left.len() != right.len() {
+        return false;
+    }
+    let mut index = 0;
+    while index < left.len() {
+        if left[index].to_ascii_lowercase() != right[index].to_ascii_lowercase() {
+            return false;
+        }
+        index += 1;
+    }
+    true
+}
+
+const SHAPE_WRITE_COUNT: usize = SHAPE_PROPS.len() + 1;
+const PLACEHOLDER_WRITE_COUNT: usize = PLACEHOLDER_PROPS.len() + 1;
+
+pub(super) const SHAPE_WRITE_TABLE: crate::registry::Table<ShapeSetter, SHAPE_WRITE_COUNT, 0> =
+    crate::registry::Table::new(shape_write_entries::<SHAPE_WRITE_COUNT>(&SHAPE_PROPS), []);
+pub(crate) const SHAPE_CAPABILITY_PROPS: &[PropSpec] = &SHAPE_WRITE_TABLE.readable();
+
+pub(super) const PLACEHOLDER_WRITE_TABLE: crate::registry::Table<
+    ShapeSetter,
+    PLACEHOLDER_WRITE_COUNT,
+    0,
+> = crate::registry::Table::new(
+    shape_write_entries::<PLACEHOLDER_WRITE_COUNT>(&PLACEHOLDER_PROPS),
+    [],
+);
+pub(crate) const PLACEHOLDER_CAPABILITY_PROPS: &[PropSpec] = &PLACEHOLDER_WRITE_TABLE.readable();
+
+const SLIDE_WRITE_COUNT: usize = SLIDE_PROPS.len();
+const fn slide_write_entries() -> [crate::registry::Entry<SlideSetter>; SLIDE_WRITE_COUNT] {
+    use crate::registry::{Access as WriteAccess, Entry};
+
+    let mut entries = [Entry::read(SLIDE_PROPS[0]); SLIDE_WRITE_COUNT];
+    let mut index = 0;
+    while index < SLIDE_PROPS.len() {
+        entries[index] = Entry::read(SLIDE_PROPS[index]);
+        if same_name(SLIDE_PROPS[index].name, "hidden") {
+            entries[index].access = WriteAccess::Set(SlideSetter::Hidden);
+        }
+        index += 1;
+    }
+    entries
+}
+
+pub(super) const SLIDE_WRITE_TABLE: crate::registry::Table<SlideSetter, SLIDE_WRITE_COUNT, 0> =
+    crate::registry::Table::new(slide_write_entries(), []);
+pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();

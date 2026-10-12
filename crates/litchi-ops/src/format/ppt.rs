@@ -17,7 +17,7 @@ use std::io::{Cursor, Write};
 use std::sync::Arc;
 
 use litchi_cfb::OleFile;
-use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt};
+use litchi_core::{FileFormat, Metadata, OwnedSource, Position, ReadAt};
 use litchi_ppt::text_edit::{self, SourceSnapshot};
 use litchi_ppt::{Package, SourceBackedPackage, SourceLimits};
 
@@ -30,13 +30,17 @@ mod nav;
 mod node;
 mod spec;
 mod views;
+pub(crate) mod write;
 
 pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
-pub(crate) use spec::SPEC;
+pub(crate) use spec::{
+    PLACEHOLDER_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
+};
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
+pub(crate) use write::WriteCommit;
 
 /// An opened legacy PowerPoint (`.ppt`) presentation.
 ///
@@ -156,6 +160,109 @@ impl Ppt {
     /// Whether this handle retains an edit source, without reading any payload.
     pub(crate) fn retains_source(&self) -> bool {
         !matches!(self.0.owner, PptOwner::Released)
+    }
+
+    /// Whether two handles retain the same immutable source snapshot.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+
+    /// Admit a primary native PPT edit under the signature, encryption and
+    /// source-retention policy shared by the other native formats.
+    pub(crate) fn admit_edit(&self) -> Result<()> {
+        self.check_source()?;
+        if self.is_encrypted() {
+            return Err(litchi_ppt::Error::EncryptionPolicy.into());
+        }
+        if self.signature() == Signature::Signed {
+            return Err(signature::refusal(FileFormat::Ppt));
+        }
+        if !self.retains_source() {
+            return Err(crate::Error::new(
+                crate::Code::UnsupportedCapability,
+                "the PPT source was released before editing",
+            )
+            .with_format(FileFormat::Ppt)
+            .with_suggestion(
+                "reopen the presentation without `OpenOptions::retain_source(false)`",
+            ));
+        }
+        Ok(())
+    }
+
+    /// Return the native package that may receive one immutable edit.
+    /// Authorized signature removal starts from an unsigned copy of the exact
+    /// retained CFB artifact.
+    pub(crate) fn editable_package(&self) -> Result<Package> {
+        self.admit_edit()?;
+        let package = match &self.0.owner {
+            PptOwner::Source(package) | PptOwner::Eager(package) => package,
+            PptOwner::Released => unreachable!("admit_edit checks source retention"),
+        };
+        if self.signature() == Signature::RemovalAuthorized {
+            let bytes = signature::unsign_compound_file(
+                package.to_encrypted_bytes()?,
+                litchi_sign::cfb::Format::Ppt,
+            )?;
+            return Ok(Package::from_bytes_with_options(
+                &bytes,
+                litchi_ppt::OpenOptions::new()
+                    .source_limits(self.0.source_limits)
+                    .leniency(package.leniency()),
+            )?);
+        }
+        Ok(package.clone())
+    }
+
+    /// Adopt a committed native package as an eager immutable handle while
+    /// retaining the origin and the explicit signature transition.
+    pub(crate) fn with_package(&self, package: Package) -> Result<Self> {
+        let signature = match self.signature() {
+            Signature::RemovalAuthorized => Signature::Unsigned,
+            signature => signature,
+        };
+        Ok(Self::from_package(package)?
+            .with_origin(self.origin())
+            .with_signature(signature))
+    }
+
+    /// One-shot unified PPT setter.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        props: impl crate::props::IntoProps<'v>,
+    ) -> Result<WriteCommit> {
+        self.set_with_limits(
+            target,
+            props,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Set PPT shape or slide properties under an explicit semantic budget.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        props: impl crate::props::IntoProps<'v>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<WriteCommit> {
+        self.check_source()?;
+        let result = write::set_with_limits(self, target, props, limits);
+        self.check_source()?;
+        result
+    }
+
+    /// Read a slide's native fixed-width hidden flag. The presentation
+    /// projection already parses the optional timing record, so this remains
+    /// cheap and available after an explicit source release.
+    pub(crate) fn slide_hidden(&self, position: Position) -> Result<Option<bool>> {
+        self.check_source()?;
+        let hidden = self
+            .reader()
+            .slide_at(position.get())?
+            .and_then(|slide| slide.timing().map(|timing| timing.hidden));
+        self.check_source()?;
+        Ok(hidden)
     }
 
     /// Opens the presentation over the positional package filesystem

@@ -135,6 +135,77 @@ impl<'f> Node<'f> {
         }
     }
 
+    /// Return the native source-order target for a direct slide shape.
+    ///
+    /// The native PPT edit owner addresses a shape by its index in the
+    /// complete slide shape array.  A navigation path's final ordinal is
+    /// kind-specific (`/shape[N]`, `/picture[N]`, ...), so it cannot be used
+    /// as the native target.  Nested group paths are deliberately refused by
+    /// returning `None` until the native transaction grows a group-aware
+    /// target identity.
+    pub(crate) fn native_shape_target(&self) -> Option<litchi_ppt::text_edit::Target> {
+        let Item::Shape(shape) = &self.item else {
+            return None;
+        };
+        let [position] = shape.path.as_ref() else {
+            return None;
+        };
+        Some(litchi_ppt::text_edit::Target::new(
+            Position::new(shape.slide),
+            Position::new(*position),
+        ))
+    }
+
+    /// Return the native complete anchor bounds for a shape that exposes
+    /// them through the read projection.
+    pub(crate) fn anchor_bounds(&self) -> Option<(i32, i32, i32, i32)> {
+        match self.shape()? {
+            ShapeEnum::TextBox(shape) => {
+                let properties = shape.properties();
+                Some((
+                    properties.x,
+                    properties.y,
+                    properties.width,
+                    properties.height,
+                ))
+            },
+            ShapeEnum::Placeholder(shape) => {
+                let properties = shape.properties();
+                Some((
+                    properties.x,
+                    properties.y,
+                    properties.width,
+                    properties.height,
+                ))
+            },
+            ShapeEnum::AutoShape(shape) => {
+                let properties = shape.properties();
+                Some((
+                    properties.x,
+                    properties.y,
+                    properties.width,
+                    properties.height,
+                ))
+            },
+            ShapeEnum::Picture(shape) => {
+                let properties = shape.properties();
+                Some((
+                    properties.x,
+                    properties.y,
+                    properties.width,
+                    properties.height,
+                ))
+            },
+            ShapeEnum::Table(shape) => {
+                Some((shape.left(), shape.top(), shape.width(), shape.height()))
+            },
+            ShapeEnum::Group(shape) => {
+                Some((shape.left(), shape.top(), shape.width(), shape.height()))
+            },
+            ShapeEnum::Line(_) => None,
+        }
+    }
+
     /// The native shape carried by a shape node.
     #[must_use]
     pub fn shape(&self) -> Option<&ShapeEnum<'static>> {
@@ -305,6 +376,7 @@ enum PropKind<'a> {
         number: usize,
         slide_id: u32,
         persist_id: u32,
+        hidden: Option<bool>,
     },
     Shape {
         kind: Kind,
@@ -328,6 +400,7 @@ impl<'a> Props<'a> {
                     number: selected.slide_number(),
                     slide_id: selected.slide_id(),
                     persist_id: selected.persist_id(),
+                    hidden: node.file.slide_hidden(Position::new(slide.position))?,
                 }
             },
             Item::Shape(shape) => PropKind::Shape {
@@ -356,10 +429,12 @@ impl<'a> Props<'a> {
                 number,
                 slide_id,
                 persist_id,
+                hidden,
             } => match Kind::Slide.spec().props.get(index)?.name {
                 "slideNumber" => Some(Value::Int(i64::try_from(*number).unwrap_or(i64::MAX))),
                 "slideId" => Some(Value::Int(i64::from(*slide_id))),
                 "persistId" => Some(Value::Int(i64::from(*persist_id))),
+                "hidden" => hidden.as_ref().map(|value| Value::Bool(*value)),
                 _ => None,
             },
             PropKind::Shape { kind, shape } => shape_value(*kind, shape, index),
