@@ -4,6 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
+use litchi_core::Position;
 use litchi_rtf::{
     Alignment, CharacterBaseline, EditOptions, MAX_PARAGRAPH_FRAME_TWIPS, OpenOptions, Package,
     ParagraphFrame, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
@@ -82,19 +83,19 @@ fn first_middle_last_batch_preserves_text_runs_and_unrelated_paragraph_propertie
 
     let updates = [
         ParagraphLayoutUpdate::new(
-            0,
+            Position::new(0),
             ParagraphLayoutPatch::new()
                 .clear_space_before()
                 .clear_keep_together(),
         ),
         ParagraphLayoutUpdate::new(
-            1,
+            Position::new(1),
             ParagraphLayoutPatch::new()
                 .with_left_indent(360)
                 .with_keep_with_next(true),
         ),
         ParagraphLayoutUpdate::new(
-            2,
+            Position::new(2),
             ParagraphLayoutPatch::new()
                 .clear_right_indent()
                 .with_first_line_indent(120)
@@ -167,19 +168,31 @@ fn batch_preflights_shape_selectors_limits_and_conflicts_atomically() {
 
     let mut empty_patch = source.edit();
     assert!(matches!(
-        empty_patch.patch_paragraph_layout(1, ParagraphLayoutPatch::new()),
+        empty_patch.patch_paragraph_layout(Position::new(1), ParagraphLayoutPatch::new()),
         Err(Error::EmptyParagraphLayoutPatch { position: 1 })
     ));
     assert_eq!(empty_patch.operation_count(), 0);
 
     for updates in [
         [
-            ParagraphLayoutUpdate::new(2, ParagraphLayoutPatch::new().with_space_before(20)),
-            ParagraphLayoutUpdate::new(1, ParagraphLayoutPatch::new().with_space_before(10)),
+            ParagraphLayoutUpdate::new(
+                Position::new(2),
+                ParagraphLayoutPatch::new().with_space_before(20),
+            ),
+            ParagraphLayoutUpdate::new(
+                Position::new(1),
+                ParagraphLayoutPatch::new().with_space_before(10),
+            ),
         ],
         [
-            ParagraphLayoutUpdate::new(1, ParagraphLayoutPatch::new().with_space_before(20)),
-            ParagraphLayoutUpdate::new(1, ParagraphLayoutPatch::new().with_space_after(10)),
+            ParagraphLayoutUpdate::new(
+                Position::new(1),
+                ParagraphLayoutPatch::new().with_space_before(20),
+            ),
+            ParagraphLayoutUpdate::new(
+                Position::new(1),
+                ParagraphLayoutPatch::new().with_space_after(10),
+            ),
         ],
     ] {
         let mut edit = source.edit();
@@ -193,8 +206,14 @@ fn batch_preflights_shape_selectors_limits_and_conflicts_atomically() {
     let mut late = source.edit();
     assert!(matches!(
         late.patch_body_paragraph_layouts(&[
-            ParagraphLayoutUpdate::new(0, ParagraphLayoutPatch::new().with_space_before(20),),
-            ParagraphLayoutUpdate::new(9, ParagraphLayoutPatch::new().with_space_after(10),),
+            ParagraphLayoutUpdate::new(
+                Position::new(0),
+                ParagraphLayoutPatch::new().with_space_before(20),
+            ),
+            ParagraphLayoutUpdate::new(
+                Position::new(9),
+                ParagraphLayoutPatch::new().with_space_after(10),
+            ),
         ]),
         Err(Error::ParagraphOutOfRange {
             position: 9,
@@ -207,8 +226,14 @@ fn batch_preflights_shape_selectors_limits_and_conflicts_atomically() {
         source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
     assert!(matches!(
         bounded.patch_body_paragraph_layouts(&[
-            ParagraphLayoutUpdate::new(0, ParagraphLayoutPatch::new().with_space_before(20),),
-            ParagraphLayoutUpdate::new(2, ParagraphLayoutPatch::new().with_space_after(10),),
+            ParagraphLayoutUpdate::new(
+                Position::new(0),
+                ParagraphLayoutPatch::new().with_space_before(20),
+            ),
+            ParagraphLayoutUpdate::new(
+                Position::new(2),
+                ParagraphLayoutPatch::new().with_space_after(10),
+            ),
         ]),
         Err(Error::Limit {
             kind: SemanticLimitKind::Operations,
@@ -220,17 +245,26 @@ fn batch_preflights_shape_selectors_limits_and_conflicts_atomically() {
 
     let mut overlap = source.edit();
     overlap
-        .patch_paragraph_layout(1, ParagraphLayoutPatch::new().with_space_before(20))
+        .patch_paragraph_layout(
+            Position::new(1),
+            ParagraphLayoutPatch::new().with_space_before(20),
+        )
         .unwrap();
     assert!(matches!(
-        overlap.patch_paragraph_layout(1, ParagraphLayoutPatch::new().with_space_before(40)),
+        overlap.patch_paragraph_layout(
+            Position::new(1),
+            ParagraphLayoutPatch::new().with_space_before(40)
+        ),
         Err(Error::Conflict {
             existing: 0,
             incoming: 1
         })
     ));
     overlap
-        .patch_paragraph_layout(1, ParagraphLayoutPatch::new().with_space_after(30))
+        .patch_paragraph_layout(
+            Position::new(1),
+            ParagraphLayoutPatch::new().with_space_after(30),
+        )
         .unwrap();
     assert_eq!(overlap.operation_count(), 2);
 }
@@ -239,8 +273,11 @@ fn batch_preflights_shape_selectors_limits_and_conflicts_atomically() {
 fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
     let source = Package::parse(r"{\rtf1\ansi One\par Two}").unwrap();
     let mut edit = source.edit();
-    edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_keep_together(true))
-        .unwrap();
+    edit.patch_paragraph_layout(
+        Position::new(0),
+        ParagraphLayoutPatch::new().with_keep_together(true),
+    )
+    .unwrap();
     edit.set_paragraph_alignment(0, Alignment::Center).unwrap();
     assert!(matches!(
         edit.replace_text(TextSpan::new(0, 3).unwrap(), "First"),
@@ -263,11 +300,17 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
     let limits = CompositionLimits::new(4, 8, 16, 8);
     let mut before = source.edit();
     before
-        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(120))
+        .patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_space_before(120),
+        )
         .unwrap();
     let mut after = source.edit();
     after
-        .patch_paragraph_layout(1, ParagraphLayoutPatch::new().with_space_after(80))
+        .patch_paragraph_layout(
+            Position::new(1),
+            ParagraphLayoutPatch::new().with_space_after(80),
+        )
         .unwrap();
     let mut composition = Composition::new(&source, limits);
     composition
@@ -280,11 +323,17 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
     assert_eq!(layout(composed.package(), 1).space_after(), 80);
 
     let mut left = source.edit();
-    left.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_left_indent(100))
-        .unwrap();
+    left.patch_paragraph_layout(
+        Position::new(0),
+        ParagraphLayoutPatch::new().with_left_indent(100),
+    )
+    .unwrap();
     let mut right = source.edit();
     right
-        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_left_indent(200))
+        .patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_left_indent(200),
+        )
         .unwrap();
     let mut conflict = Composition::new(&source, limits);
     conflict
@@ -297,7 +346,10 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
 
     let mut paragraph_layout = source.edit();
     paragraph_layout
-        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(120))
+        .patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_space_before(120),
+        )
         .unwrap();
     let mut character = source.edit();
     character
@@ -323,13 +375,13 @@ fn durable_layout_patch_is_deterministic_reversible_and_stale_checked() {
     let mut edit = source.edit();
     edit.patch_body_paragraph_layouts(&[
         ParagraphLayoutUpdate::new(
-            0,
+            Position::new(0),
             ParagraphLayoutPatch::new()
                 .with_space_before(120)
                 .with_keep_together(true),
         ),
         ParagraphLayoutUpdate::new(
-            1,
+            Position::new(1),
             ParagraphLayoutPatch::new()
                 .with_left_indent(240)
                 .with_page_break_before(true),
@@ -419,7 +471,10 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
     };
     let mut create = source.edit();
     create
-        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_frame(frame))
+        .patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_frame(frame),
+        )
         .unwrap();
     let created = create.commit().unwrap();
     assert_eq!(layout(created.package(), 0).frame(), Some(frame));
@@ -448,7 +503,10 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
     };
     let mut update = created.package().edit();
     update
-        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_frame(updated_frame))
+        .patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_frame(updated_frame),
+        )
         .unwrap();
     let updated = update.commit().unwrap();
     assert_eq!(layout(updated.package(), 0).frame(), Some(updated_frame));
@@ -459,7 +517,7 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
 
     let mut remove = updated.package().edit();
     remove
-        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().clear_frame())
+        .patch_paragraph_layout(Position::new(0), ParagraphLayoutPatch::new().clear_frame())
         .unwrap();
     let removed = remove.commit().unwrap();
     assert_eq!(layout(removed.package(), 0).frame(), None);
@@ -487,10 +545,13 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
     assert!(matches!(
         batch.patch_body_paragraph_layouts(&[
             ParagraphLayoutUpdate::new(
-                0,
+                Position::new(0),
                 ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
             ),
-            ParagraphLayoutUpdate::new(1, ParagraphLayoutPatch::new().with_frame(invalid)),
+            ParagraphLayoutUpdate::new(
+                Position::new(1),
+                ParagraphLayoutPatch::new().with_frame(invalid)
+            ),
         ]),
         Err(Error::Rtf(_))
     ));
@@ -502,7 +563,7 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
     let mut unknown_edit = unknown.edit();
     unknown_edit
         .patch_paragraph_layout(
-            0,
+            Position::new(0),
             ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
         )
         .unwrap();
@@ -542,7 +603,10 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
     let metadata_before = metadata.to_bytes().unwrap();
     let mut metadata_edit = metadata.edit();
     metadata_edit
-        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))
+        .patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_space_before(20),
+        )
         .unwrap();
     let metadata_after = metadata_edit
         .commit()
@@ -568,7 +632,7 @@ fn frame_layout_preserves_zero_width_bookmark_events() {
     let source = Package::parse(r#"{\rtf1\ansi One{\*\bkmkstart bm}two{\*\bkmkend bm}}"#).unwrap();
     let mut edit = source.edit();
     edit.patch_paragraph_layout(
-        0,
+        Position::new(0),
         ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
     )
     .unwrap();
@@ -598,7 +662,7 @@ fn frame_layout_does_not_duplicate_leading_zero_width_bookmark_events() {
     let before = source.to_bytes().unwrap();
     let mut edit = source.edit();
     edit.patch_paragraph_layout(
-        0,
+        Position::new(0),
         ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
     )
     .unwrap();
@@ -629,7 +693,7 @@ fn frame_layout_preserves_offset_only_break_events() {
     let source = Package::parse(r#"{\rtf1\ansi One\page Two\column Three\softline Four}"#).unwrap();
     let mut edit = source.edit();
     edit.patch_paragraph_layout(
-        0,
+        Position::new(0),
         ParagraphLayoutPatch::new().with_frame(ParagraphFrame::default()),
     )
     .unwrap();
@@ -654,8 +718,11 @@ fn frame_layout_preserves_leading_body_opaque_destination() {
         litchi_rtf::opaque::Anchor::Body(0)
     ));
     let mut edit = source.edit();
-    edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))
-        .unwrap();
+    edit.patch_paragraph_layout(
+        Position::new(0),
+        ParagraphLayoutPatch::new().with_space_before(20),
+    )
+    .unwrap();
     let committed = edit.commit().unwrap();
     let after = committed.package().to_bytes().unwrap();
     assert!(
@@ -680,15 +747,21 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1\sb40 Same}").unwrap();
     let exact = protected.to_bytes().unwrap();
     let mut noop = protected.edit();
-    noop.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(40))
-        .unwrap();
+    noop.patch_paragraph_layout(
+        Position::new(0),
+        ParagraphLayoutPatch::new().with_space_before(40),
+    )
+    .unwrap();
     let noop = noop.commit().unwrap();
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.package().to_bytes().unwrap(), exact);
 
     let mut changed = protected.edit();
     changed
-        .patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(80))
+        .patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_space_before(80),
+        )
         .unwrap();
     assert!(matches!(
         changed.commit(),
@@ -706,7 +779,10 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
         let exact = source.to_bytes().unwrap();
         let mut edit = source.edit();
         assert!(matches!(
-            edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20)),
+            edit.patch_paragraph_layout(
+                Position::new(0),
+                ParagraphLayoutPatch::new().with_space_before(20)
+            ),
             Err(Error::UnsupportedSource(_))
         ));
         assert_eq!(edit.operation_count(), 0);
@@ -717,7 +793,10 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     let compressed = Package::from_bytes(&compress(raw, true).unwrap()).unwrap();
     let mut edit = compressed.edit();
     assert!(matches!(
-        edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20)),
+        edit.patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_space_before(20)
+        ),
         Err(Error::UnsupportedSource(_))
     ));
 
@@ -727,7 +806,10 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     let non_ascii = Package::from_bytes(&non_ascii_bytes).unwrap();
     let mut edit = non_ascii.edit();
     assert!(matches!(
-        edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20)),
+        edit.patch_paragraph_layout(
+            Position::new(0),
+            ParagraphLayoutPatch::new().with_space_before(20)
+        ),
         Err(Error::UnsupportedSource(_))
     ));
 
@@ -741,8 +823,11 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
         Package::parse_with_options(source_text, OpenOptions::new().source_limits(limits)).unwrap();
     let exact = bounded.to_bytes().unwrap();
     let mut edit = bounded.edit();
-    edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))
-        .unwrap();
+    edit.patch_paragraph_layout(
+        Position::new(0),
+        ParagraphLayoutPatch::new().with_space_before(20),
+    )
+    .unwrap();
     assert!(matches!(edit.commit(), Err(Error::InputTooLarge { .. })));
     assert_eq!(bounded.to_bytes().unwrap(), exact);
 }

@@ -52,6 +52,39 @@ fn text_concatenates_fragmented_blocks_without_changing_separators() {
 }
 
 #[test]
+fn paragraph_properties_after_a_break_attach_to_the_following_paragraph() {
+    let doc = RtfDocument::parse(
+        r"{\rtf1\ansi\qc\sb40\li80\keepn First\par\sb120\li240\keep\pagebb\qr Second}",
+    )
+    .unwrap();
+
+    assert_eq!(doc.text(), "First\nSecond");
+    assert_eq!(doc.blocks().len(), 3);
+
+    let first = &doc.blocks()[0].paragraph;
+    assert_eq!(first.alignment, Alignment::Center);
+    assert_eq!(first.spacing.before, 40);
+    assert_eq!(first.indentation.left, 80);
+    assert!(first.keep_next);
+
+    // The newline is retained in its own block when the next paragraph
+    // changes paragraph properties. It must retain the preceding paragraph's
+    // state because paragraph formatting is read at the break boundary.
+    let break_block = &doc.blocks()[1].paragraph;
+    assert_eq!(break_block.alignment, Alignment::Center);
+    assert_eq!(break_block.spacing.before, 40);
+    assert_eq!(break_block.indentation.left, 80);
+    assert!(break_block.keep_next);
+
+    let second = &doc.blocks()[2].paragraph;
+    assert_eq!(second.alignment, Alignment::Right);
+    assert_eq!(second.spacing.before, 120);
+    assert_eq!(second.indentation.left, 240);
+    assert!(second.keep_together);
+    assert!(second.page_break_before);
+}
+
+#[test]
 fn root_drawing_mutations_preflight_corrupt_indices_and_events() {
     let mut document = RtfDocument::parse(r"{\rtf1 body}").unwrap();
     let mut first = crate::Shape::new(crate::ShapeType::Rectangle);

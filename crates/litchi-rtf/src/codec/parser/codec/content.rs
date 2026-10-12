@@ -337,15 +337,44 @@ impl<'a> Parser<'a> {
                 }
             },
             _ => {
-                // Character formatting takes effect at its lexical position.
-                // Alignment changes must also flush a pending paragraph break
-                // before changing the state attached to that preceding boundary.
+                // Formatting takes effect at its lexical position.  Alignment,
+                // character, and paragraph-property changes must flush a
+                // pending paragraph break before changing the state attached
+                // to that preceding boundary.  Keep this list scoped to
+                // controls that alter retained block properties: flushing on
+                // every paragraph break would multiply dense plain-text
+                // blocks without improving the paragraph model.
                 if matches!(
                     control,
                     ControlWord::LeftAlign
                         | ControlWord::RightAlign
                         | ControlWord::Center
                         | ControlWord::Justify
+                        | ControlWord::Pard
+                        | ControlWord::SpaceBefore(_)
+                        | ControlWord::SpaceAfter(_)
+                        | ControlWord::SpaceBetween(_)
+                        | ControlWord::LineMultiple(_)
+                        | ControlWord::SpaceBeforeAuto(_)
+                        | ControlWord::SpaceAfterAuto(_)
+                        | ControlWord::ListSpaceBefore(_)
+                        | ControlWord::ListSpaceAfter(_)
+                        | ControlWord::NoSnapLineGrid(_)
+                        | ControlWord::ContextualSpacing(_)
+                        | ControlWord::LeftIndent(_)
+                        | ControlWord::RightIndent(_)
+                        | ControlWord::FirstLineIndent(_)
+                        | ControlWord::LogicalLeftIndent(_)
+                        | ControlWord::LogicalRightIndent(_)
+                        | ControlWord::CharacterFirstLineIndent(_)
+                        | ControlWord::CharacterLeftIndent(_)
+                        | ControlWord::CharacterRightIndent(_)
+                        | ControlWord::MirrorIndents(_)
+                        | ControlWord::KeepTogether
+                        | ControlWord::KeepNext
+                        | ControlWord::SideBySide(_)
+                        | ControlWord::PageBreakBefore
+                        | ControlWord::WidowControl
                         | ControlWord::Bold(_)
                         | ControlWord::Superscript(_)
                         | ControlWord::Subscript(_)

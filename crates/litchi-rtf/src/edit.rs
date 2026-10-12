@@ -471,18 +471,18 @@ impl ParagraphLayoutPatch {
 /// One immutable-source selector and typed local paragraph-layout delta.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParagraphLayoutUpdate {
-    position: usize,
+    position: Position,
     patch: ParagraphLayoutPatch,
 }
 
 impl ParagraphLayoutUpdate {
     #[must_use]
-    pub const fn new(position: usize, patch: ParagraphLayoutPatch) -> Self {
+    pub const fn new(position: Position, patch: ParagraphLayoutPatch) -> Self {
         Self { position, patch }
     }
 
     #[must_use]
-    pub const fn position(self) -> usize {
+    pub const fn position(self) -> Position {
         self.position
     }
 
@@ -535,19 +535,28 @@ fn layout_effect_keys(position: usize, fields: LayoutFields) -> Vec<String> {
     effects
 }
 
-fn layout_operation_conflicts(
-    operation: &Operation,
+fn first_layout_conflict(
+    operations: &[(usize, LayoutFields, usize)],
     position: usize,
     fields: LayoutFields,
-) -> bool {
-    matches!(
-        operation,
-        Operation::ParagraphLayout {
-            position: existing_position,
-            fields: existing_fields,
-            ..
-        } if *existing_position == position && existing_fields.overlaps(fields)
-    )
+) -> Option<usize> {
+    let mut start = 0;
+    let mut end = operations.len();
+    while start < end {
+        let middle = start + (end - start) / 2;
+        if operations[middle].0 < position {
+            start = middle + 1;
+        } else {
+            end = middle;
+        }
+    }
+    while start < operations.len() && operations[start].0 == position {
+        if operations[start].1.overlaps(fields) {
+            return Some(operations[start].2);
+        }
+        start += 1;
+    }
+    None
 }
 
 fn ensure_paragraph_layout_source(source: &Package) -> Result<(), Error> {
@@ -3189,7 +3198,7 @@ impl Edit {
     /// facet, unsupported source closure, or retained operation bound.
     pub fn patch_paragraph_layout(
         &mut self,
-        position: usize,
+        position: Position,
         patch: ParagraphLayoutPatch,
     ) -> Result<&mut Self, Error> {
         self.patch_body_paragraph_layouts(&[ParagraphLayoutUpdate::new(position, patch)])
@@ -3216,8 +3225,8 @@ impl Edit {
         for (previous, incoming) in updates.iter().zip(updates.iter().skip(1)) {
             if incoming.position <= previous.position {
                 return Err(Error::ParagraphLayoutBatchOutOfOrder {
-                    previous: previous.position,
-                    incoming: incoming.position,
+                    previous: previous.position.get(),
+                    incoming: incoming.position.get(),
                 });
             }
         }
@@ -3251,11 +3260,32 @@ impl Edit {
         staged.try_reserve_exact(updates.len()).map_err(|_error| {
             Error::Write("could not reserve paragraph-layout batch".to_string())
         })?;
+        let layout_count = self
+            .operations
+            .iter()
+            .filter(|operation| matches!(operation, Operation::ParagraphLayout { .. }))
+            .count();
+        let mut existing_layouts = Vec::new();
+        existing_layouts
+            .try_reserve_exact(layout_count)
+            .map_err(|_error| {
+                Error::Write("could not reserve paragraph-layout conflict index".to_string())
+            })?;
+        for (existing, operation) in self.operations.iter().enumerate() {
+            if let Operation::ParagraphLayout {
+                position, fields, ..
+            } = operation
+            {
+                existing_layouts.push((*position, *fields, existing));
+            }
+        }
+        existing_layouts
+            .sort_unstable_by_key(|(position, _fields, existing)| (*position, *existing));
         let mut updates = updates.iter().peekable();
         for (position, paragraph) in self.source.body().paragraphs().enumerate() {
             if updates
                 .peek()
-                .is_some_and(|update| update.position == position)
+                .is_some_and(|update| update.position.get() == position)
             {
                 let update = updates.next().ok_or(Error::UnsupportedSource(
                     "paragraph-layout selector cursor became inconsistent",
@@ -3274,10 +3304,10 @@ impl Edit {
                 let mut after = before;
                 update.patch.apply(&mut after);
                 let incoming = self.operations.len().saturating_add(staged.len());
-                for (existing, operation) in self.operations.iter().enumerate() {
-                    if layout_operation_conflicts(operation, position, fields) {
-                        return Err(Error::Conflict { existing, incoming });
-                    }
+                if let Some(existing) =
+                    first_layout_conflict(&existing_layouts, position, fields)
+                {
+                    return Err(Error::Conflict { existing, incoming });
                 }
                 staged.push(Operation::ParagraphLayout {
                     position,
@@ -3289,7 +3319,7 @@ impl Edit {
         }
         if let Some(update) = updates.next() {
             return Err(Error::ParagraphOutOfRange {
-                position: update.position,
+                position: update.position.get(),
                 count: self.source.paragraph_count(),
             });
         }
