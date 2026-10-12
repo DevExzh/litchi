@@ -731,10 +731,9 @@ impl Edit {
         let source = self.package.clone();
         let leaf_commit = self.inner.commit().map_err(Error::from)?;
         check_source_guard(self.source_guard.as_ref())?;
-        let leaf_snapshot = leaf_commit.snapshot().clone();
-        let leaf_patch = leaf_commit.patch().clone();
-        let diagnostics =
-            Diagnostics::from_leaf(leaf_commit.diagnostics(), leaf_patch.semantic().len());
+        let leaf_diagnostics = leaf_commit.diagnostics();
+        let (leaf_snapshot, leaf_patch) = leaf_commit.into_parts();
+        let diagnostics = Diagnostics::from_leaf(leaf_diagnostics, leaf_patch.semantic().len());
         let package = if leaf_patch.is_noop() {
             let mut package = source;
             Arc::make_mut(&mut package.inner).edit_snapshot = Some(leaf_snapshot);

@@ -2298,21 +2298,17 @@ fn patch_coordinate_dependencies(
 fn patch_selection_records(worksheet: &mut [u8], operations: &[&StructuralChange]) -> Result<()> {
     let records = raw_records(worksheet)?;
     for operation in operations {
+        let Some(shift) = axis_shift(operation) else {
+            continue;
+        };
         for record in records.iter().filter(|record| record.kind == SELECTION) {
             let payload = worksheet
                 .get_mut(record.start + 4..record.end)
                 .ok_or_else(|| Error::InvalidData("SELECTION payload is truncated".into()))?;
-            patch_selection(payload, operation)?;
+            patch_selection_shift(payload, shift)?;
         }
     }
     Ok(())
-}
-
-fn patch_selection(payload: &mut [u8], operation: &StructuralChange) -> Result<()> {
-    let Some(shift) = axis_shift(operation) else {
-        return Ok(());
-    };
-    patch_selection_shift(payload, shift)
 }
 
 fn patch_selection_shift(payload: &mut [u8], shift: AxisShift) -> Result<()> {
@@ -4665,7 +4661,7 @@ mod tests {
             count: 2,
             insert: true,
         };
-        patch_selection(&mut payload, &insert).unwrap();
+        patch_selection_shift(&mut payload, axis_shift(&insert).unwrap()).unwrap();
         assert_eq!(binary::read_u16_le_at(&payload, 1).unwrap(), 5);
         assert_eq!(binary::read_u16_le_at(&payload, 9).unwrap(), 5);
         assert_eq!(binary::read_u16_le_at(&payload, 11).unwrap(), 6);
@@ -4676,8 +4672,51 @@ mod tests {
             count: 2,
             insert: false,
         };
-        patch_selection(&mut payload, &delete).unwrap();
+        patch_selection_shift(&mut payload, axis_shift(&delete).unwrap()).unwrap();
         assert_eq!(payload, vec![3, 3, 0, 2, 0, 0, 0, 1, 0, 3, 0, 4, 0, 2, 5]);
+    }
+
+    #[test]
+    fn selection_records_skip_scalar_changes_but_keep_frame_validation() {
+        let payload = vec![3, 3, 0, 2, 0, 0, 0, 1, 0, 3, 0, 4, 0, 2, 5];
+        let mut worksheet = raw_record(SELECTION, &payload);
+        let original = worksheet.clone();
+        let scalar = StructuralChange::Cell {
+            sheet: 0,
+            reference: Reference { row: 3, column: 2 },
+            before: None,
+            after: None,
+        };
+
+        patch_selection_records(&mut worksheet, &[&scalar]).unwrap();
+        assert_eq!(worksheet, original);
+
+        let mut malformed = vec![(SELECTION & 0xff) as u8, (SELECTION >> 8) as u8, 9, 0, 0];
+        assert!(patch_selection_records(&mut malformed, &[&scalar]).is_err());
+    }
+
+    #[test]
+    fn selection_records_apply_axis_changes_after_scalar_changes() {
+        let payload = vec![3, 3, 0, 2, 0, 0, 0, 1, 0, 3, 0, 4, 0, 2, 5];
+        let mut worksheet = raw_record(SELECTION, &payload);
+        let scalar = StructuralChange::Cell {
+            sheet: 0,
+            reference: Reference { row: 3, column: 2 },
+            before: None,
+            after: None,
+        };
+        let rows = StructuralChange::Rows {
+            sheet: 0,
+            start: 2,
+            count: 2,
+            insert: true,
+        };
+
+        patch_selection_records(&mut worksheet, &[&scalar, &rows]).unwrap();
+        assert_eq!(
+            &worksheet[4..],
+            [3, 5, 0, 2, 0, 0, 0, 1, 0, 5, 0, 6, 0, 2, 5]
+        );
     }
 }
 
