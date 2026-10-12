@@ -128,9 +128,10 @@ impl Edit {
             return Err(Error::EmptyPictureRemovalBatch);
         }
         if positions.len() > MAX_PICTURE_REMOVAL_OPERATIONS {
-            return Err(Error::OperationLimit {
+            return Err(Error::Limit {
+                kind: super::SemanticLimitKind::Operations,
                 observed: positions.len(),
-                limit: MAX_PICTURE_REMOVAL_OPERATIONS,
+                maximum: MAX_PICTURE_REMOVAL_OPERATIONS,
             });
         }
         for pair in positions.windows(2) {
@@ -220,9 +221,10 @@ impl Edit {
             return Err(Error::EmptyPicturePayloadBatch);
         }
         if replacements.len() > MAX_PICTURE_PAYLOAD_OPERATIONS {
-            return Err(Error::OperationLimit {
+            return Err(Error::Limit {
+                kind: super::SemanticLimitKind::Operations,
                 observed: replacements.len(),
-                limit: MAX_PICTURE_PAYLOAD_OPERATIONS,
+                maximum: MAX_PICTURE_PAYLOAD_OPERATIONS,
             });
         }
         for (previous, incoming) in replacements.iter().zip(replacements.iter().skip(1)) {
@@ -248,9 +250,10 @@ impl Edit {
         self.ensure_operation_room_for(replacements.len())?;
         let observed_picture_operations = self.operations.len().saturating_add(replacements.len());
         if observed_picture_operations > MAX_PICTURE_PAYLOAD_OPERATIONS {
-            return Err(Error::OperationLimit {
+            return Err(Error::Limit {
+                kind: super::SemanticLimitKind::Operations,
                 observed: observed_picture_operations,
-                limit: MAX_PICTURE_PAYLOAD_OPERATIONS,
+                maximum: MAX_PICTURE_PAYLOAD_OPERATIONS,
             });
         }
 
@@ -324,9 +327,10 @@ impl Edit {
 
 pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
     if operation_count > MAX_PICTURE_PAYLOAD_OPERATIONS {
-        return Err(Error::OperationLimit {
+        return Err(Error::Limit {
+            kind: super::SemanticLimitKind::Operations,
             observed: operation_count,
-            limit: MAX_PICTURE_PAYLOAD_OPERATIONS,
+            maximum: MAX_PICTURE_PAYLOAD_OPERATIONS,
         });
     }
     let changes = super::semantic_changes(&edit.operations, &[]);
@@ -381,19 +385,15 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
 
     let snapshot = Package::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
     verify_candidate(&edit.source, &snapshot, &edit.operations)?;
-    Ok(Commit::new(
-        edit.source,
-        snapshot,
-        operation_count,
-        changes,
-    ))
+    Ok(Commit::new(edit.source, snapshot, operation_count, changes))
 }
 
 pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
     if operation_count > MAX_PICTURE_REMOVAL_OPERATIONS {
-        return Err(Error::OperationLimit {
+        return Err(Error::Limit {
+            kind: super::SemanticLimitKind::Operations,
             observed: operation_count,
-            limit: MAX_PICTURE_REMOVAL_OPERATIONS,
+            maximum: MAX_PICTURE_REMOVAL_OPERATIONS,
         });
     }
     super::ensure_changed_publication_allowed(&edit.source)?;
@@ -447,12 +447,7 @@ pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Comm
     let snapshot = Package::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
     verify_removal_candidate(&edit.source, &snapshot, &edit.operations)?;
     let changes = super::semantic_changes(&edit.operations, &[]);
-    Ok(Commit::new(
-        edit.source,
-        snapshot,
-        operation_count,
-        changes,
-    ))
+    Ok(Commit::new(edit.source, snapshot, operation_count, changes))
 }
 
 pub(super) fn durable_operation(
@@ -533,9 +528,10 @@ pub(super) fn apply_durable_removal_patch(
     source_hash: &str,
 ) -> Result<Package, Error> {
     if operations.is_empty() || operations.len() > MAX_PICTURE_REMOVAL_OPERATIONS {
-        return Err(Error::OperationLimit {
+        return Err(Error::Limit {
+            kind: super::SemanticLimitKind::Operations,
             observed: operations.len(),
-            limit: MAX_PICTURE_REMOVAL_OPERATIONS,
+            maximum: MAX_PICTURE_REMOVAL_OPERATIONS,
         });
     }
     let located = locate_standalone_pictures(source)?;
@@ -585,9 +581,10 @@ pub(super) fn apply_durable_insertion_patch(
     source_hash: &str,
 ) -> Result<Package, Error> {
     if operations.is_empty() || operations.len() > MAX_PICTURE_REMOVAL_OPERATIONS {
-        return Err(Error::OperationLimit {
+        return Err(Error::Limit {
+            kind: super::SemanticLimitKind::Operations,
             observed: operations.len(),
-            limit: MAX_PICTURE_REMOVAL_OPERATIONS,
+            maximum: MAX_PICTURE_REMOVAL_OPERATIONS,
         });
     }
     // Reuse the same closure proof for every picture already in the artifact.
@@ -778,9 +775,10 @@ pub(super) fn apply_durable_patch(
     source_hash: &str,
 ) -> Result<Package, Error> {
     if operations.len() > MAX_PICTURE_PAYLOAD_OPERATIONS {
-        return Err(Error::OperationLimit {
+        return Err(Error::Limit {
+            kind: super::SemanticLimitKind::Operations,
             observed: operations.len(),
-            limit: MAX_PICTURE_PAYLOAD_OPERATIONS,
+            maximum: MAX_PICTURE_PAYLOAD_OPERATIONS,
         });
     }
     let located = locate_standalone_pictures(source)?;
@@ -938,13 +936,13 @@ fn locate_standalone_pictures(source: &Package) -> Result<Vec<LocatedPicture>, E
                     cursor = close_index;
                     depth = depth.saturating_sub(1);
                 }
-            }
+            },
             Token::CloseBrace => {
                 depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
                     "picture source has an unmatched closing group",
                 ))?;
-            }
-            Token::Control(_) | Token::Text(_) | Token::Binary(_) => {}
+            },
+            Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
         }
         cursor = cursor.saturating_add(1);
     }
@@ -989,7 +987,7 @@ fn locate_picture_group(
         match token {
             Token::Control(control) if payload_start.is_none() => {
                 seen_controls.accept(control)?;
-            }
+            },
             Token::Text(text) => {
                 let span = spans.get(cursor).ok_or(Error::UnsupportedSource(
                     "picture token has no source provenance",
@@ -1005,23 +1003,23 @@ fn locate_picture_group(
                 }
                 payload_start.get_or_insert(span.start);
                 payload_end = Some(span.end);
-            }
+            },
             Token::CloseBrace => break,
             Token::Binary(_) => {
                 return Err(Error::UnsupportedSource(
                     "binary picture payloads are outside the exact hexadecimal closure",
                 ));
-            }
+            },
             Token::OpenBrace => {
                 return Err(Error::UnsupportedSource(
                     "nested picture destinations are outside the exact payload closure",
                 ));
-            }
+            },
             Token::Control(_) => {
                 return Err(Error::UnsupportedSource(
                     "picture controls after payload bytes are ambiguous",
                 ));
-            }
+            },
         }
         cursor = cursor.saturating_add(1);
     }
@@ -1115,7 +1113,7 @@ fn validate_supported_image(image_type: ImageType, payload: &[u8]) -> Result<(),
             return Err(Error::UnsupportedSource(
                 "exact picture payload editing currently supports PNG and JPEG only",
             ));
-        }
+        },
     };
     if !supported {
         return Err(Error::UnsupportedSource(
@@ -1163,7 +1161,7 @@ impl PictureControlSet {
                 return Err(Error::UnsupportedSource(
                     "picture payload editing refuses unknown or dependent picture controls",
                 ));
-            }
+            },
         };
         let mask = 1u32 << slot;
         if self.slots & mask != 0 {
@@ -1319,7 +1317,7 @@ fn verify_candidate(
         if let Some(operation) = operations.iter().find_map(|operation| match operation {
             Operation::PicturePayload(operation) if operation.position == position => {
                 Some(operation)
-            }
+            },
             _ => None,
         }) {
             expected.data = Cow::Owned(operation.after.clone());

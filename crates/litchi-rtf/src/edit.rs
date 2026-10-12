@@ -112,37 +112,11 @@ impl History {
     }
 }
 
-/// Default maximum number of operations staged in one edit.
-pub const DEFAULT_MAX_OPERATIONS: usize = 256;
+mod limits;
+pub use limits::{EditOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder};
 
 /// Exact bytes inserted for a raw ordinary-paragraph split.
 const PARAGRAPH_SPLIT_BYTES: &[u8] = br"\par ";
-
-/// Finite limits for one RTF edit plan.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub struct Limits {
-    max_operations: usize,
-}
-
-impl Limits {
-    /// Creates an operation bound. Zero permits only an empty commit.
-    #[must_use]
-    pub const fn new(max_operations: usize) -> Self {
-        Self { max_operations }
-    }
-
-    /// Maximum staged semantic operations.
-    #[must_use]
-    pub const fn max_operations(self) -> usize {
-        self.max_operations
-    }
-}
-
-impl Default for Limits {
-    fn default() -> Self {
-        Self::new(DEFAULT_MAX_OPERATIONS)
-    }
-}
 
 /// A checked half-open UTF-8 byte span in the semantic body text.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -700,7 +674,17 @@ pub enum Error {
     /// Compatibility variant retained from the former one-operation editor.
     OperationAlreadyStaged,
     /// The finite operation bound was exceeded.
-    OperationLimit { observed: usize, limit: usize },
+    Limit {
+        kind: SemanticLimitKind,
+        observed: usize,
+        maximum: usize,
+    },
+    /// A semantic profile value exceeds its addressable maximum.
+    InvalidLimit {
+        kind: SemanticLimitKind,
+        value: usize,
+        maximum: usize,
+    },
     /// A paragraph batch must contain at least one replacement.
     EmptyParagraphBatch,
     /// Paragraph batch selectors must be strictly increasing and unique.
@@ -786,9 +770,21 @@ impl fmt::Display for Error {
             Self::OperationAlreadyStaged => {
                 formatter.write_str("RTF edit already has a staged operation")
             },
-            Self::OperationLimit { observed, limit } => write!(
+            Self::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
                 formatter,
-                "RTF edit operation limit exceeded: observed {observed}, limit {limit}"
+                "RTF edit {kind:?} limit exceeded: observed {observed}, maximum {maximum}"
+            ),
+            Self::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                formatter,
+                "invalid RTF semantic {kind:?} limit: {value} > {maximum}"
             ),
             Self::EmptyParagraphBatch => {
                 formatter.write_str("RTF paragraph replacement batch must not be empty")
@@ -920,7 +916,7 @@ impl From<RtfError> for Error {
 /// Detached, bounded edit of an immutable snapshot.
 pub struct Edit {
     source: Package,
-    limits: Limits,
+    limits: SemanticLimits,
     operations: Vec<Operation>,
     replacement_bytes: usize,
 }
@@ -1354,14 +1350,20 @@ impl Operation {
 }
 
 impl Edit {
-    pub(crate) fn new(source: Package) -> Self {
-        Self::new_with_limits(source, Limits::default())
+    /// Options admitted for this detached edit.
+    #[must_use]
+    pub fn options(&self) -> EditOptions {
+        EditOptions::new().semantic_limits(self.limits)
     }
 
-    pub(crate) fn new_with_limits(source: Package, limits: Limits) -> Self {
+    pub(crate) fn new(source: Package) -> Self {
+        Self::new_with_options(source, EditOptions::default())
+    }
+
+    pub(crate) fn new_with_options(source: Package, options: EditOptions) -> Self {
         Self {
             source,
-            limits,
+            limits: options.semantic_limits_value(),
             operations: Vec::new(),
             replacement_bytes: 0,
         }
@@ -3367,10 +3369,11 @@ impl Edit {
 
     fn ensure_operation_room_for(&self, additional: usize) -> Result<(), Error> {
         let observed = self.operations.len().saturating_add(additional);
-        if observed > self.limits.max_operations {
-            return Err(Error::OperationLimit {
+        if observed > self.limits.max_operations() {
+            return Err(Error::Limit {
+                kind: SemanticLimitKind::Operations,
                 observed,
-                limit: self.limits.max_operations,
+                maximum: self.limits.max_operations(),
             });
         }
         Ok(())
@@ -10615,7 +10618,10 @@ pub(crate) fn apply_durable<Mode>(
     // bound larger than the ordinary edit default.  Bind replay to the
     // validated patch's operation count so a valid 257+ operation patch does
     // not fail merely because `Package::edit()` defaults to 256.
-    let mut edit = source.edit_with_limits(Limits::new(patch.operations().len()));
+    let profile = SemanticLimits::builder()
+        .max_operations(patch.operations().len())?
+        .build()?;
+    let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(profile));
     let mut expected_result_hash = None;
     for operation in patch.operations() {
         let expected_preconditions = match operation.op.as_str() {

@@ -36,7 +36,7 @@ fn usize_max_is_rejected_during_profile_construction() {
         Err(Error::InvalidLimit {
             kind: SemanticLimitKind::Operations,
             value: usize::MAX,
-            maximum: isize::MAX as usize,
+            maximum: SemanticLimits::MAX_OPERATIONS,
         })
     ));
 }

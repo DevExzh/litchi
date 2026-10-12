@@ -2936,6 +2936,24 @@
           "scope": "litchi_rtf::builder::Builder",
           "replacement": "publication belongs to Package",
           "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_rtf::edit",
+          "replacement": "use checked SemanticLimits and EditOptions",
+          "recursive": false
+        },
+        {
+          "name": "edit_with_limits",
+          "scope": "litchi_rtf::read::Package",
+          "replacement": "use edit_with_options",
+          "recursive": false
+        },
+        {
+          "name": "OperationLimit",
+          "scope": "litchi_rtf::edit::Error",
+          "replacement": "use Limit with SemanticLimitKind::Operations",
+          "recursive": false
         }
       ],
       "families": []

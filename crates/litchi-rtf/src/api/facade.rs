@@ -570,10 +570,10 @@ impl Package {
         crate::edit::Edit::new(self.clone())
     }
 
-    /// Starts a bounded detached edit with caller-selected operation limits.
+    /// Starts a bounded detached edit with caller-selected semantic policies.
     #[must_use]
-    pub fn edit_with_limits(&self, limits: crate::edit::Limits) -> crate::edit::Edit {
-        crate::edit::Edit::new_with_limits(self.clone(), limits)
+    pub fn edit_with_options(&self, options: crate::edit::EditOptions) -> crate::edit::Edit {
+        crate::edit::Edit::new_with_options(self.clone(), options)
     }
 
     /// Starts a bounded preservation-first append before the exact root close.

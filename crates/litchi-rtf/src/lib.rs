@@ -495,3 +495,6 @@ pub use native::*;
 
 /// Atomic filesystem publication policy.
 pub mod save;
+
+/// Checked primary-edit policy types.
+pub use edit::{EditOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder};

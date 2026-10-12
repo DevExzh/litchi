@@ -1,6 +1,6 @@
 //! Core-backed composition and non-applying merge plans for RTF edits.
 
-use super::{Edit, Error, Limits, Operation, Package};
+use super::{Edit, EditOptions, Error, Operation, Package, SemanticLimits};
 use litchi_core::patch as core;
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -192,7 +192,7 @@ impl Composition {
         });
         Edit {
             source: self.source,
-            limits: Limits::new(operations.len()),
+            limits: SemanticLimits::for_operations(&operations),
             operations,
             replacement_bytes,
         }
@@ -2419,7 +2419,10 @@ fn commit_durable_operations(
     operations: &[DurableOperation],
 ) -> Result<super::Commit, CompositionError> {
     let operation_limit = operations.len().max(1);
-    let mut edit = source.edit_with_limits(Limits::new(operation_limit));
+    let profile = SemanticLimits::builder()
+        .max_operations(operation_limit)?
+        .build()?;
+    let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(profile));
     for operation in operations {
         match operation.op.as_str() {
             "body-text.replace" => {
