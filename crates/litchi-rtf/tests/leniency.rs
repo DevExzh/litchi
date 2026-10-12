@@ -12,7 +12,7 @@ use litchi_rtf::leniency::{
     Defect, FontDefect, Leniency, ParameterDefect, SyntaxDefect, ToleranceReport, ToleratedDefect,
     UnicodeDefect,
 };
-use litchi_rtf::{Document, EmphasisMark, OpenOptions, RtfDocument, SourceLimits, compress};
+use litchi_rtf::{EmphasisMark, OpenOptions, Package, RtfDocument, SourceLimits, compress};
 
 /// A conformant document touching the main destinations.
 const CONFORMANT: &str = concat!(
@@ -39,23 +39,23 @@ fn conformant_input_reports_clean_through_every_entry_point() {
     assert_eq!(strict, OpenOptions::default());
     assert_eq!(strict.leniency_value(), Leniency::Strict);
 
-    let document = Document::parse(CONFORMANT).unwrap();
+    let document = Package::parse(CONFORMANT).unwrap();
     assert_clean(document.tolerance_report());
     assert!(document.text().contains("Title"));
 
-    let document = Document::parse_with_options(CONFORMANT, strict).unwrap();
+    let document = Package::parse_with_options(CONFORMANT, strict).unwrap();
     assert_clean(document.tolerance_report());
-    let document = Document::from_bytes_with_options(CONFORMANT.as_bytes(), strict).unwrap();
+    let document = Package::from_bytes_with_options(CONFORMANT.as_bytes(), strict).unwrap();
     assert_clean(document.tolerance_report());
     let document =
-        Document::from_owned_bytes_with_options(CONFORMANT.as_bytes().to_vec(), strict).unwrap();
+        Package::from_owned_bytes_with_options(CONFORMANT.as_bytes().to_vec(), strict).unwrap();
     assert_clean(document.tolerance_report());
 
     let raw = RtfDocument::parse_bytes_with_options(CONFORMANT.as_bytes(), strict).unwrap();
     assert_clean(raw.tolerance_report());
 
     let compressed = compress(CONFORMANT.as_bytes(), true).unwrap();
-    let document = Document::from_bytes_with_options(&compressed, strict).unwrap();
+    let document = Package::from_bytes_with_options(&compressed, strict).unwrap();
     assert_clean(document.tolerance_report());
 }
 
@@ -64,7 +64,7 @@ fn conformant_non_ascii_transport_reports_clean() {
     let mut bytes = br"{\rtf1\ansi\ansicpg1252 caf".to_vec();
     bytes.push(0xE9);
     bytes.extend_from_slice(br" bar\par}");
-    let document = Document::from_bytes(&bytes).unwrap();
+    let document = Package::from_bytes(&bytes).unwrap();
     assert_clean(document.tolerance_report());
 }
 
@@ -77,7 +77,7 @@ fn options_carry_limits_into_the_parse() {
         .expect("event profile is consistent");
     let options = OpenOptions::new().source_limits(limits);
     assert_eq!(options.source_limits_value(), limits);
-    assert!(Document::parse_with_options(CONFORMANT, options).is_err());
+    assert!(Package::parse_with_options(CONFORMANT, options).is_err());
 }
 
 #[test]
@@ -87,7 +87,7 @@ fn opening_a_file_with_options_reports_clean() {
     std::fs::create_dir_all(&directory).unwrap();
     let path = directory.join("conformant.rtf");
     std::fs::write(&path, CONFORMANT).unwrap();
-    let document = Document::open_with_options(&path, OpenOptions::new()).unwrap();
+    let document = Package::open_with_options(&path, OpenOptions::new()).unwrap();
     assert_clean(document.tolerance_report());
     std::fs::remove_dir_all(&directory).unwrap();
 }
@@ -101,7 +101,7 @@ fn recorded(report: &ToleranceReport) -> Vec<(Defect, u64)> {
 #[test]
 fn undefined_control_symbols_are_ignored_and_recorded_by_default() {
     let source = r"{\rtf1\ansi\pard before\!after \;x\par}";
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     assert_eq!(document.text(), "beforeafter x\n");
     let unknown = Defect::Syntax(SyntaxDefect::UnknownControlSymbol);
     let first = source.find(r"\!").unwrap() as u64;
@@ -116,7 +116,7 @@ fn undefined_control_symbols_are_ignored_and_recorded_by_default() {
 #[test]
 fn undefined_control_symbols_are_tolerated_in_header_destinations() {
     let source = r"{\rtf1\ansi{\fonttbl{\f0\fswiss Arial\!;}}{\info{\title A\?B}}\pard x\1y\par}";
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     assert_eq!(document.text(), "xy\n");
     assert_eq!(document.fonts().iter().next().unwrap().name(), "Arial");
     let report = document.tolerance_report();
@@ -134,7 +134,7 @@ fn undefined_control_symbols_are_tolerated_in_header_destinations() {
 fn defined_control_symbols_without_a_model_are_not_defects() {
     // `\|` (formula character) and `\:` (index subentry) are RTF 1.9.1
     // control symbols; they are retained inertly and the report stays clean.
-    let document = Document::parse(r"{\rtf1\ansi\pard a\|b\:c\par}").unwrap();
+    let document = Package::parse(r"{\rtf1\ansi\pard a\|b\:c\par}").unwrap();
     assert_eq!(document.text(), "abc\n");
     assert_clean(document.tolerance_report());
 }
@@ -145,7 +145,7 @@ fn undefined_control_symbol_offsets_count_transport_bytes() {
     bytes.push(0xE9);
     let offset = bytes.len() as u64;
     bytes.extend_from_slice(br"\!\par}");
-    let document = Document::from_bytes(&bytes).unwrap();
+    let document = Package::from_bytes(&bytes).unwrap();
     assert_eq!(document.text(), "caf\u{e9}\n");
     assert_eq!(
         recorded(document.tolerance_report()),
@@ -158,7 +158,7 @@ fn undefined_control_symbol_offsets_count_transport_bytes() {
 #[test]
 fn unpaired_surrogates_become_replacement_characters_and_are_recorded() {
     let source = r"{\rtf1\ansi\uc1\pard a\u-10179?b\u-9047?c\u-10179?\u-8694?d\u-10179?\u-10179?\u-8694?\par}";
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     // Lone high, lone low, a valid pair (U+1F60A), then a high orphaned by
     // the next high that does pair.
     assert_eq!(
@@ -188,7 +188,7 @@ fn unpaired_surrogates_are_repaired_in_destination_text() {
         r"{\header H\u-10179?\par}",
         r"\pard x{\footnote F\u-9047?}\par}",
     );
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     assert_eq!(document.fonts().iter().next().unwrap().name(), "A\u{fffd}");
     let report = document.tolerance_report();
     assert_eq!(report.total(), 5, "{report:?}");
@@ -201,7 +201,7 @@ fn unpaired_surrogates_are_repaired_in_destination_text() {
 
 #[test]
 fn paired_surrogates_are_not_defects() {
-    let document = Document::parse(r"{\rtf1\ansi\uc1\pard \u-10179?\u-8694?\u233?\par}").unwrap();
+    let document = Package::parse(r"{\rtf1\ansi\uc1\pard \u-10179?\u-8694?\u233?\par}").unwrap();
     assert_eq!(document.text(), "\u{1f60a}\u{e9}\n");
     assert_clean(document.tolerance_report());
 }
@@ -213,7 +213,7 @@ fn word_style_surrogate_pairs_with_fallbacks_decode_cleanly_in_destinations() {
     let source = format!(
         r"{{\rtf1\ansi\uc1{{\fonttbl{{\f0\fnil A{pair};}}}}{{\info{{\title T{pair}}}}}\pard x{pair}y\par}}"
     );
-    let document = Document::parse(&source).unwrap();
+    let document = Package::parse(&source).unwrap();
     assert_eq!(document.text(), "x\u{1f60a}y\n");
     assert_eq!(document.fonts().iter().next().unwrap().name(), "A\u{1f60a}");
     assert_eq!(document.info().title.as_deref(), Some("T\u{1f60a}"));
@@ -300,7 +300,7 @@ fn parameter_shapes_in_destinations_are_repaired() {
 #[test]
 fn content_after_the_root_group_is_ignored_and_recorded_by_default() {
     let source = "{\\rtf1\\ansi body}\r\n{\\rtf1 second}}junk";
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     assert_eq!(document.text(), "body");
     assert_eq!(
         recorded(document.tolerance_report()),
@@ -310,7 +310,7 @@ fn content_after_the_root_group_is_ignored_and_recorded_by_default() {
         )]
     );
 
-    let padded = Document::parse("{\\rtf1\\ansi body}\r\n\0\0").unwrap();
+    let padded = Package::parse("{\\rtf1\\ansi body}\r\n\0\0").unwrap();
     assert_clean(padded.tolerance_report());
 }
 
@@ -320,9 +320,9 @@ fn unclosed_groups_are_rejected_by_default() {
         r"{\rtf1\ansi\pard body\par",
         r"{\rtf1\ansi{\fonttbl{\f0 Arial;}}\pard{\b bold",
     ] {
-        assert!(Document::parse(source).is_err(), "accepted {source}");
+        assert!(Package::parse(source).is_err(), "accepted {source}");
         assert!(
-            Document::parse_with_options(source, OpenOptions::new().leniency(Leniency::Strict))
+            Package::parse_with_options(source, OpenOptions::new().leniency(Leniency::Strict))
                 .is_err()
         );
     }
@@ -334,7 +334,7 @@ fn unclosed_groups_are_closed_and_recorded_under_the_opt_in() {
     assert!(options.leniency_value().tolerates_unclosed_groups());
 
     let source = r"{\rtf1\ansi{\fonttbl{\f0 Arial;}}\pard plain {\b bold";
-    let document = Document::parse_with_options(source, options).unwrap();
+    let document = Package::parse_with_options(source, options).unwrap();
     assert_eq!(document.text(), "plain bold");
     let end = source.len() as u64;
     let unclosed = Defect::Syntax(SyntaxDefect::UnclosedGroup);
@@ -345,7 +345,7 @@ fn unclosed_groups_are_closed_and_recorded_under_the_opt_in() {
     assert!(!SyntaxDefect::UnclosedGroup.repair().is_empty());
 
     // A balanced document is unaffected by the opt-in.
-    let document = Document::parse_with_options(CONFORMANT, options).unwrap();
+    let document = Package::parse_with_options(CONFORMANT, options).unwrap();
     assert_clean(document.tolerance_report());
 }
 
@@ -354,11 +354,11 @@ fn the_opt_in_keeps_truncated_tokens_and_nesting_limits_fatal() {
     let options = OpenOptions::new().leniency(Leniency::TolerateUnclosedGroups);
     // A control word cut off by end of input and a truncated binary payload
     // are not group structure.
-    assert!(Document::parse_with_options(r"{\rtf1 text\", options).is_err());
-    assert!(Document::parse_with_options(r"{\rtf1 {\bin8 abc", options).is_err());
+    assert!(Package::parse_with_options(r"{\rtf1 text\", options).is_err());
+    assert!(Package::parse_with_options(r"{\rtf1 {\bin8 abc", options).is_err());
     // Nesting beyond the safety limit stays fatal even when never closed.
     let deep = format!(r"{{\rtf1 {}", "{".repeat(400));
-    assert!(Document::parse_with_options(&deep, options).is_err());
+    assert!(Package::parse_with_options(&deep, options).is_err());
 }
 
 // F9.7: malformed `\'hh` escapes stay fatal by default and decode the way
@@ -371,10 +371,10 @@ fn malformed_hex_escapes_are_rejected_by_default() {
         r"{\rtf1\ansi a\'4}",
         "{\\rtf1\\ansi a\\'4",
     ] {
-        assert!(Document::parse(source).is_err(), "accepted {source}");
+        assert!(Package::parse(source).is_err(), "accepted {source}");
         let groups_only = OpenOptions::new().leniency(Leniency::TolerateUnclosedGroups);
         assert!(
-            Document::parse_with_options(source, groups_only).is_err(),
+            Package::parse_with_options(source, groups_only).is_err(),
             "accepted {source} without the hex opt-in"
         );
     }
@@ -388,7 +388,7 @@ fn malformed_hex_escapes_decode_and_are_recorded_under_the_opt_in() {
     // "`\'<number><junk>` means `\'0<number>`"), `\'zz` has none and is
     // dropped, `\'4` before a brace keeps its digit, and `\'41` is intact.
     let source = r"{\rtf1\ansi a\'4gb\'zzc{\'4}d\'41\par}";
-    let document = Document::parse_with_options(source, options).unwrap();
+    let document = Package::parse_with_options(source, options).unwrap();
     assert_eq!(document.text(), "a\u{4}bc\u{4}dA\n");
     let malformed = Defect::Syntax(SyntaxDefect::MalformedHexEscape);
     let first = source.find(r"\'4g").unwrap() as u64;
@@ -401,7 +401,7 @@ fn malformed_hex_escapes_decode_and_are_recorded_under_the_opt_in() {
     assert!(!SyntaxDefect::MalformedHexEscape.repair().is_empty());
 
     // Well-formed escapes are unaffected by the opt-in.
-    let document = Document::parse_with_options(CONFORMANT, options).unwrap();
+    let document = Package::parse_with_options(CONFORMANT, options).unwrap();
     assert_clean(document.tolerance_report());
 }
 
@@ -409,7 +409,7 @@ fn malformed_hex_escapes_decode_and_are_recorded_under_the_opt_in() {
 fn the_combined_opt_in_recovers_a_truncated_escape_at_end_of_input() {
     let options = OpenOptions::new().leniency(Leniency::TolerateSyntaxDefects);
     let source = "{\\rtf1\\ansi caf\\'e";
-    let document = Document::parse_with_options(source, options).unwrap();
+    let document = Package::parse_with_options(source, options).unwrap();
     assert_eq!(document.text(), "caf\u{e}");
     assert_eq!(
         recorded(document.tolerance_report()),
@@ -432,8 +432,8 @@ fn the_combined_opt_in_recovers_a_truncated_escape_at_end_of_input() {
 fn documents_opened_through_an_opt_in_stay_editable() {
     let options = OpenOptions::new().leniency(Leniency::TolerateSyntaxDefects);
     let source = r"{\rtf1\ansi First\par caf\'e9 bad\'g1\par Third";
-    assert!(Document::parse(source).is_err());
-    let document = Document::parse_with_options(source, options).unwrap();
+    assert!(Package::parse(source).is_err());
+    let document = Package::parse_with_options(source, options).unwrap();
     assert_eq!(document.paragraph_count(), 3);
 
     for (index, expected) in [(0, "Second"), (2, "Last")] {
@@ -469,7 +469,7 @@ fn unsupported_font_charsets_and_code_pages_fall_back_and_are_recorded() {
         r"{\f1\fnil\cpg70000 Wide;}{\f2\fnil\fcharset2 Symbol;}{\f3\fnil\fcharset2 Unused;}}",
         r"\f0 caf\'e9 \f1 x\f2 \'b7\f0 y\f2 z\par}",
     );
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     assert_eq!(document.text(), "caf\u{e9} x\u{b7}yz\n");
     let names: Vec<_> = document
         .fonts()
@@ -505,7 +505,7 @@ fn supported_font_charsets_are_not_defects() {
         r"{\rtf1\ansi\ansicpg1252{\fonttbl{\f0\fnil\fcharset204 Cyr;}{\f1\fnil\fcharset0 Arial;}",
         r"{\f2\fnil\fcharset2 Symbol;}}\f0\'cf\'f0\f1 x\par}",
     );
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     assert_eq!(document.text(), "\u{41f}\u{440}x\n");
     assert_clean(document.tolerance_report());
 }

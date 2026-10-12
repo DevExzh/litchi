@@ -11,7 +11,7 @@
 //! cargo run -p litchi-rtf --example inline_demo
 //! ```
 
-use litchi_rtf::Document;
+use litchi_rtf::Package;
 use litchi_rtf::text::Inline;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
@@ -22,7 +22,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("{rtf}");
     println!("{}", "=".repeat(60));
 
-    let doc = Document::parse(rtf)?;
+    let doc = Package::parse(rtf)?;
 
     println!("Plain text       : {:?}", doc.text());
     println!("Paragraph count  : {}", doc.paragraph_count());

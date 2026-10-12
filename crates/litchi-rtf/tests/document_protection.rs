@@ -11,7 +11,7 @@ mod repair_support;
 
 use litchi_rtf::write::Writer;
 use litchi_rtf::{
-    Document, MAX_PASSWORD_HASH_BYTES, PasswordHash, ProtectionLevel, ProtectionType, RtfDocument,
+    MAX_PASSWORD_HASH_BYTES, Package, PasswordHash, ProtectionLevel, ProtectionType, RtfDocument,
     RtfWriter,
 };
 use std::borrow::Cow;
@@ -199,11 +199,11 @@ fn immutable_facade_write_preserves_passwordhash_source_exactly() {
         "\n010000004c000000010000000480000050c300001400000010000000f89c360d0c9d360d000000008bc29e2f78a2144122ed68a1701e2ea50bbbbeaf7333c40dfe048ccf55f709b8cc7e8b49",
         "}\nBody}"
     );
-    let document = Document::from_bytes(source.as_bytes()).unwrap();
+    let document = Package::from_bytes(source.as_bytes()).unwrap();
     let mut output = Vec::new();
     Writer::new(&mut output).write(&document).unwrap();
     assert_eq!(output, source.as_bytes());
-    assert_eq!(Document::from_bytes(&output).unwrap().text(), "Body");
+    assert_eq!(Package::from_bytes(&output).unwrap().text(), "Body");
 }
 
 #[test]

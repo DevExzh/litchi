@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Document,
+    Package,
     edit::{
         Composition, CompositionLimits, Error, Limits, MAX_PICTURE_PAYLOAD_OPERATIONS,
         PicturePayloadReplacement,
@@ -62,7 +62,7 @@ fn decode_hex(input: &str) -> Vec<u8> {
 
 #[test]
 fn selected_payload_splice_preserves_hex_layout_metadata_and_other_bytes() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     assert_eq!(source.pictures()[0].data(), PNG_A);
     assert_eq!(source.pictures()[1].data(), PNG_B);
     let before_second = source.pictures()[1].clone();
@@ -83,7 +83,7 @@ fn selected_payload_splice_preserves_hex_layout_metadata_and_other_bytes() {
 
 #[test]
 fn no_op_shares_snapshot_and_patch_inverse_is_exact_and_source_checked() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let mut no_op = source.edit();
     no_op.replace_picture_payload(0, PNG_A).unwrap();
     let no_op = no_op.commit().unwrap();
@@ -103,7 +103,7 @@ fn no_op_shares_snapshot_and_patch_inverse_is_exact_and_source_checked() {
             .unwrap(),
         source.to_bytes().unwrap()
     );
-    let stale = Document::parse(r"{\rtf1 unrelated}").unwrap();
+    let stale = Package::parse(r"{\rtf1 unrelated}").unwrap();
     assert!(matches!(
         commit.patch().apply(&stale),
         Err(Error::PatchConflict)
@@ -112,7 +112,7 @@ fn no_op_shares_snapshot_and_patch_inverse_is_exact_and_source_checked() {
 
 #[test]
 fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let replacements = [
         PicturePayloadReplacement::new(0, PNG_C),
         PicturePayloadReplacement::new(1, PNG_A),
@@ -183,7 +183,7 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
 
 #[test]
 fn refuses_size_format_nested_opaque_and_protected_sources() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let mut wrong_size = source.edit();
     assert!(matches!(
         wrong_size.replace_picture_payload(0, &PNG_C[..PNG_C.len() - 1]),
@@ -198,7 +198,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         Err(Error::UnsupportedSource(_))
     ));
 
-    let nested = Document::parse(concat!(
+    let nested = Package::parse(concat!(
         r"{\rtf1{\*\shppict{\pict\pngblip ",
         "89504e470d0a1a0a0102abcd",
         r"}}}",
@@ -209,7 +209,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         Err(Error::UnsupportedSource(_))
     ));
 
-    let opaque = Document::parse(concat!(
+    let opaque = Package::parse(concat!(
         r"{\rtf1\future42{\pict\pngblip ",
         "89504e470d0a1a0a0102abcd",
         r"}}",
@@ -220,7 +220,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         Err(Error::UnsupportedSource(_))
     ));
 
-    let protected = Document::parse(concat!(
+    let protected = Package::parse(concat!(
         r"{\rtf1\allprot\enforceprot1{\pict\pngblip ",
         "89504e470d0a1a0a0102abcd",
         r"}}",
@@ -233,17 +233,17 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         Err(Error::ProtectedDocument { .. })
     ));
 
-    assert!(Document::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0}}").is_err());
+    assert!(Package::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0}}").is_err());
 
     let late_control =
-        Document::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd\picw1}}").unwrap();
+        Package::parse(r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd\picw1}}").unwrap();
     assert!(matches!(
         late_control.edit().replace_picture_payload(0, PNG_C),
         Err(Error::UnsupportedSource(_))
     ));
 
     let unknown_picture_control =
-        Document::parse(r"{\rtf1{\pict\pngblip\vendorpicture1 89504e470d0a1a0a0102abcd}}").unwrap();
+        Package::parse(r"{\rtf1{\pict\pngblip\vendorpicture1 89504e470d0a1a0a0102abcd}}").unwrap();
     assert!(matches!(
         unknown_picture_control
             .edit()
@@ -256,7 +256,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
         r"{\rtf1{\pict\pngblip\jpegblip 89504e470d0a1a0a0102abcd}}",
         r"{\rtf1{\pict\pngblip\picw1\picw2 89504e470d0a1a0a0102abcd}}",
     ] {
-        let ambiguous = Document::parse(ambiguous).unwrap();
+        let ambiguous = Package::parse(ambiguous).unwrap();
         assert!(matches!(
             ambiguous.edit().replace_picture_payload(0, PNG_C),
             Err(Error::UnsupportedSource(_))
@@ -264,7 +264,7 @@ fn refuses_size_format_nested_opaque_and_protected_sources() {
     }
 
     let external_picture =
-        Document::parse(r"{\rtf1{\pict\pngblip\blipfile1 89504e470d0a1a0a0102abcd}}").unwrap();
+        Package::parse(r"{\rtf1{\pict\pngblip\blipfile1 89504e470d0a1a0a0102abcd}}").unwrap();
     assert!(matches!(
         external_picture.edit().replace_picture_payload(0, PNG_C),
         Err(Error::UnsupportedSource(_))
@@ -276,7 +276,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
     let mut binary = br"{\rtf1{\pict\jpegblip\bin6 ".to_vec();
     binary.extend_from_slice(&[0xff, 0xd8, 0x01, 0x02, 0xff, 0xd9]);
     binary.extend_from_slice(br"}}");
-    let binary = Document::from_bytes(&binary).unwrap();
+    let binary = Package::from_bytes(&binary).unwrap();
     assert!(matches!(
         binary
             .edit()
@@ -286,7 +286,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
 
     let compressed_bytes =
         litchi_rtf::transport::compress(two_picture_source().as_bytes(), true).unwrap();
-    let compressed = Document::from_bytes(&compressed_bytes).unwrap();
+    let compressed = Package::from_bytes(&compressed_bytes).unwrap();
     assert!(matches!(
         compressed.edit().replace_picture_payload(0, PNG_C),
         Err(Error::UnsupportedSource(_))
@@ -299,7 +299,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
         ),
         concat!(
             r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd}",
-            r"{\object\objemb{\*\objclass Package}{\*\objdata 0102}{\result fallback}}}",
+            r"{\object\objemb{\*\objclass Document}{\*\objdata 0102}{\result fallback}}}",
         ),
         concat!(
             r"{\rtf1{\pict\pngblip 89504e470d0a1a0a0102abcd}",
@@ -307,7 +307,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
         ),
     ];
     for source in sources {
-        let source = Document::parse(source).unwrap();
+        let source = Package::parse(source).unwrap();
         assert!(matches!(
             source.edit().replace_picture_payload(0, PNG_C),
             Err(Error::UnsupportedSource(_))
@@ -318,7 +318,7 @@ fn refuses_binary_compressed_field_object_and_shape_ownership() {
 #[test]
 fn jpeg_payload_retains_markers_and_exact_layout() {
     let source =
-        Document::parse(r"{\rtf1 A{\pict\jpegblip\picw9\pich8 Ff D8 01aB fF d9}B}").unwrap();
+        Package::parse(r"{\rtf1 A{\pict\jpegblip\picw9\pich8 Ff D8 01aB fF d9}B}").unwrap();
     let replacement = [0xff, 0xd8, 0xaa, 0x55, 0xff, 0xd9];
     let mut edit = source.edit();
     edit.replace_picture_payload(0, replacement).unwrap();
@@ -327,7 +327,7 @@ fn jpeg_payload_retains_markers_and_exact_layout() {
         output,
         br"{\rtf1 A{\pict\jpegblip\picw9\pich8 Ff D8 aa55 fF d9}B}"
     );
-    let reopened = Document::from_bytes(&output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
     assert_eq!(reopened.pictures()[0].data(), replacement);
 }
 
@@ -338,7 +338,7 @@ fn picture_specific_batch_ceiling_accepts_64_and_refuses_65_atomically() {
         source.push_str(r"{\pict\pngblip 89504e470d0a1a0a0102abcd}");
     }
     source.push('}');
-    let source = Document::parse(&source).unwrap();
+    let source = Package::parse(&source).unwrap();
     let accepted = (0..MAX_PICTURE_PAYLOAD_OPERATIONS)
         .map(|position| PicturePayloadReplacement::new(position, PNG_C))
         .collect::<Vec<_>>();
@@ -368,7 +368,7 @@ fn composition_cannot_bypass_the_picture_specific_batch_ceiling() {
         source.push_str(r"{\pict\pngblip 89504e470d0a1a0a0102abcd}");
     }
     source.push('}');
-    let source = Document::parse(&source).unwrap();
+    let source = Package::parse(&source).unwrap();
     let limits = CompositionLimits::new(65, 2, 130, 4);
     let mut composition = Composition::new(&source, limits);
     for position in 0..MAX_PICTURE_PAYLOAD_OPERATIONS {
@@ -412,7 +412,7 @@ fn composition_cannot_bypass_the_picture_specific_batch_ceiling() {
 
 #[test]
 fn durable_patch_is_deterministic_exactly_reversible_and_stale_checked() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let mut edit = source.edit();
     edit.replace_picture_payload(0, PNG_C).unwrap();
     let commit = edit.commit().unwrap();
@@ -435,7 +435,7 @@ fn durable_patch_is_deterministic_exactly_reversible_and_stale_checked() {
     let restored = applied.apply_durable(&decoded.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 
-    let stale = Document::parse(
+    let stale = Package::parse(
         two_picture_source()
             .replace("0102aBcd", "0102abce")
             .as_str(),
@@ -449,7 +449,7 @@ fn durable_patch_is_deterministic_exactly_reversible_and_stale_checked() {
 
 #[test]
 fn durable_patch_rejects_transport_layout_changes_and_unknown_fields() {
-    let source = Document::parse(two_picture_source()).unwrap();
+    let source = Package::parse(two_picture_source()).unwrap();
     let mut edit = source.edit();
     edit.replace_picture_payload(0, PNG_C).unwrap();
     let commit = edit.commit().unwrap();

@@ -8,7 +8,7 @@
 //! This example demonstrates direct streaming of RTF control words through
 //! `write::Writer` plus the higher-level helpers (`write_hyperlink`, `write_note`,
 //! `write_revision`). The resulting file is also re-parsed with
-//! `Document::parse` to round-trip the bytes through the parser.
+//! `Package::parse` to round-trip the bytes through the parser.
 //!
 //! Run from the workspace root:
 //!
@@ -16,7 +16,7 @@
 //! cargo run -p litchi-rtf --example write_rtf
 //! ```
 
-use litchi_rtf::Document;
+use litchi_rtf::Package;
 use litchi_rtf::field::{Field, FieldType};
 use litchi_rtf::review::{Note, Revision};
 use litchi_rtf::write::{Charset, Format, Options, TabWidth, Writer};
@@ -103,7 +103,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Round-trip: parse the output back so the example also exercises the reader.
     let rtf_text = std::str::from_utf8(&output)?;
-    let parsed = Document::parse(rtf_text)?;
+    let parsed = Package::parse(rtf_text)?;
     println!("Round-trip text length    : {}", parsed.text().len());
     println!("Round-trip paragraph count: {}", parsed.paragraph_count());
     println!("Round-trip note count     : {}", parsed.notes().len());

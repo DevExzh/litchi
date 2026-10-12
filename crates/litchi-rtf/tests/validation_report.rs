@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Document, OpenOptions, SourceLimits, ValidationDependency, ValidationStatus,
+    OpenOptions, Package, SourceLimits, ValidationDependency, ValidationStatus,
     validation::{ValidationReport, validate_with_options},
 };
 
@@ -59,7 +59,7 @@ fn external_field_is_present_but_never_resolved_or_exposed_in_report() {
         r#"{\field{\*\fldinst HYPERLINK "https://example.invalid/a"}"#,
         r#"{\fldrslt link}} after}"#,
     );
-    let document = Document::parse(source).unwrap();
+    let document = Package::parse(source).unwrap();
     let before = document.to_bytes().unwrap();
     let report = document.validation_report();
 
@@ -235,7 +235,7 @@ fn known_objects_and_pictures_are_counted_without_inspecting_payload_content() {
 fn linked_objects_are_external_and_unknown_object_kinds_fail_closed() {
     let linked = concat!(
         r#"{\rtf1\ansi"#,
-        r#"{\object\objlink{\*\objclass Package}{\*\objdata 00}}"#,
+        r#"{\object\objlink{\*\objclass Document}{\*\objdata 00}}"#,
         r#"Body}"#,
     );
     let linked_report = ValidationReport::from_str(linked).unwrap();

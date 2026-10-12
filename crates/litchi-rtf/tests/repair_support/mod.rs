@@ -20,11 +20,11 @@ impl Outcome for litchi_rtf::Result<litchi_rtf::RtfDocument<'_>> {
     }
 }
 
-impl Outcome for litchi_rtf::Result<litchi_rtf::Document> {
+impl Outcome for litchi_rtf::Result<litchi_rtf::Package> {
     fn tolerance_report(&self) -> Option<&ToleranceReport> {
         self.as_ref()
             .ok()
-            .map(litchi_rtf::Document::tolerance_report)
+            .map(litchi_rtf::Package::tolerance_report)
     }
 }
 

@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Document, HeaderFooterType, OpenOptions, ProtectionType, SourceLimits,
+    HeaderFooterType, OpenOptions, Package, ProtectionType, SourceLimits,
     edit::{
         Error, HeaderFooterParagraph, Limits, ParagraphTextReplacement, TextSpan, TransferPlan,
     },
@@ -33,7 +33,7 @@ fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
 
 #[test]
 fn paragraph_batch_matches_scalar_bytes_for_first_middle_and_last() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third\par Fourth}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third\par Fourth}").unwrap();
     let batch = replacements(&[(0, "One"), (2, "Three"), (3, "Four")]);
     assert_eq!(batch[0].position(), 0);
     assert_eq!(batch[0].replacement(), "One");
@@ -58,7 +58,7 @@ fn paragraph_batch_matches_scalar_bytes_for_first_middle_and_last() {
 
 #[test]
 fn paragraph_batch_rejects_bad_shape_and_late_selector_atomically() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
 
     let mut empty = source.edit();
     assert!(matches!(
@@ -98,7 +98,7 @@ fn paragraph_batch_rejects_bad_shape_and_late_selector_atomically() {
 
 #[test]
 fn paragraph_batch_preflights_operation_and_replacement_limits_atomically() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
 
     let mut exact = source.edit_with_limits(Limits::new(3));
     exact
@@ -134,7 +134,7 @@ fn paragraph_batch_preflights_operation_and_replacement_limits_atomically() {
         .expect("source-byte limit is representable")
         .build()
         .expect("source profile is consistent");
-    let limited_source = Document::parse_with_options(
+    let limited_source = Package::parse_with_options(
         r"{\rtf1 A\par B}",
         OpenOptions::new().source_limits(limited),
     )
@@ -152,7 +152,7 @@ fn paragraph_batch_preflights_operation_and_replacement_limits_atomically() {
 
 #[test]
 fn paragraph_batch_preserves_noops_and_conflict_rules() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let mut mixed = source.edit();
     mixed
         .replace_body_paragraph_texts(&replacements(&[(0, "First"), (1, "Changed")]))
@@ -199,7 +199,7 @@ fn paragraph_batch_preserves_noops_and_conflict_rules() {
 
 #[test]
 fn paragraph_batch_is_durable_reversible_and_source_checked() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let mut edit = source.edit();
     edit.replace_body_paragraph_texts(&replacements(&[(0, "One"), (2, "Three")]))
         .unwrap();
@@ -213,7 +213,7 @@ fn paragraph_batch_is_durable_reversible_and_source_checked() {
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
 
-    let foreign = Document::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();
+    let foreign = Package::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();
     assert!(matches!(
         foreign.apply_durable(&durable),
         Err(Error::PatchConflict)
@@ -223,7 +223,7 @@ fn paragraph_batch_is_durable_reversible_and_source_checked() {
 #[test]
 fn protected_documents_refuse_changed_body_destination_and_root_publication() {
     let protected_body =
-        Document::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
+        Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
     let mut body = protected_body.edit();
     body.replace_body_paragraph_texts(&replacements(&[(0, "Changed")]))
         .unwrap();
@@ -235,7 +235,7 @@ fn protected_documents_refuse_changed_body_destination_and_root_publication() {
     ));
 
     let protected_destination =
-        Document::parse(r"{\rtf1\ansi\allprot\enforceprot1{\header Head}Body}").unwrap();
+        Package::parse(r"{\rtf1\ansi\allprot\enforceprot1{\header Head}Body}").unwrap();
     let mut destination = protected_destination.edit();
     destination
         .set_header_footer_text(
@@ -250,8 +250,8 @@ fn protected_documents_refuse_changed_body_destination_and_root_publication() {
         })
     ));
 
-    let transfer_source = Document::parse(r"{\rtf1{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
-    let protected_target = Document::parse(r"{\rtf1\ansi\formprot\enforceprot1 Target}").unwrap();
+    let transfer_source = Package::parse(r"{\rtf1{\field{\*\fldinst PAGE}{\fldrslt 1}}}").unwrap();
+    let protected_target = Package::parse(r"{\rtf1\ansi\formprot\enforceprot1 Target}").unwrap();
     let transfer = TransferPlan::field(&transfer_source, 0, &protected_target).unwrap();
     assert!(matches!(
         transfer.commit(),
@@ -270,7 +270,7 @@ fn protected_exact_noops_remain_byte_identical() {
         r"{\rtf1\ansi\formprot\enforceprot1 Same}",
         r"{\rtf1\ansi\allprot\enforceprot1 Same}",
     ] {
-        let source = Document::parse(source).unwrap();
+        let source = Package::parse(source).unwrap();
         let exact = source.to_bytes().unwrap();
         let mut edit = source.edit();
         edit.replace_body_paragraph_texts(&replacements(&[(0, "Same")]))
@@ -282,7 +282,7 @@ fn protected_exact_noops_remain_byte_identical() {
     }
 
     let destination =
-        Document::parse(r"{\rtf1\ansi\allprot\enforceprot1{\header Head}Same}").unwrap();
+        Package::parse(r"{\rtf1\ansi\allprot\enforceprot1{\header Head}Same}").unwrap();
     let exact = destination.to_bytes().unwrap();
     let mut edit = destination.edit();
     edit.set_header_footer_text(
@@ -298,7 +298,7 @@ fn protected_exact_noops_remain_byte_identical() {
 
 #[test]
 fn paragraph_batch_preserves_transport_encoding_and_opaque_guards() {
-    let cp1252 = Document::from_bytes(br"{\rtf1\ansi\ansicpg1252 Caf\'e9\par Suite}").unwrap();
+    let cp1252 = Package::from_bytes(br"{\rtf1\ansi\ansicpg1252 Caf\'e9\par Suite}").unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .replace_body_paragraph_texts(&replacements(&[(0, "Changed")]))
@@ -315,7 +315,7 @@ fn paragraph_batch_preserves_transport_encoding_and_opaque_guards() {
 
     let raw = br"{\rtf1\ansi First\par Second}";
     let compressed = compress(raw, true).unwrap();
-    let compressed = Document::from_bytes(&compressed).unwrap();
+    let compressed = Package::from_bytes(&compressed).unwrap();
     let mut compressed_edit = compressed.edit();
     compressed_edit
         .replace_body_paragraph_texts(&replacements(&[(1, "Changed")]))
@@ -325,7 +325,7 @@ fn paragraph_batch_preserves_transport_encoding_and_opaque_guards() {
         Err(Error::UnsupportedSource(_))
     ));
 
-    let opaque = Document::parse(r"{\rtf1\ansi A\future42 B\par C}").unwrap();
+    let opaque = Package::parse(r"{\rtf1\ansi A\future42 B\par C}").unwrap();
     let exact = opaque.to_bytes().unwrap();
     let mut opaque_edit = opaque.edit();
     opaque_edit
@@ -360,7 +360,7 @@ impl Write for FailAfter {
 
 #[test]
 fn batch_commit_is_immutable_across_partial_sink_failure() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let mut edit = source.edit();
     edit.replace_body_paragraph_texts(&replacements(&[(0, "One"), (2, "Three")]))
         .unwrap();

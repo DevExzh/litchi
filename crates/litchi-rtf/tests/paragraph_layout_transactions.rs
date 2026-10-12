@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Alignment, CharacterBaseline, Document, MAX_PARAGRAPH_FRAME_TWIPS, OpenOptions, ParagraphFrame,
+    Alignment, CharacterBaseline, MAX_PARAGRAPH_FRAME_TWIPS, OpenOptions, Package, ParagraphFrame,
     ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference, ParagraphFrameTextFlow,
     ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference, ParagraphFrameWrap,
     ProtectionType, RtfDocument, SourceLimits,
@@ -27,7 +27,7 @@ fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     )
 }
 
-fn layout(document: &Document, position: usize) -> litchi_rtf::edit::ParagraphLayout {
+fn layout(document: &Package, position: usize) -> litchi_rtf::edit::ParagraphLayout {
     document
         .body()
         .paragraphs()
@@ -39,7 +39,7 @@ fn layout(document: &Document, position: usize) -> litchi_rtf::edit::ParagraphLa
 
 #[test]
 fn first_middle_last_batch_preserves_text_runs_and_unrelated_paragraph_properties() {
-    let source = Document::parse(concat!(
+    let source = Package::parse(concat!(
         r"{\rtf1\ansi ",
         r"\pard\qc\sb120\sa40\li240\ri60\fi-30\keep \b First\b0\par ",
         r"\pard\qr\sb80\sa20\li120\sl300\slmult1 \i Second\i0\par ",
@@ -141,14 +141,14 @@ fn first_middle_last_batch_preserves_text_runs_and_unrelated_paragraph_propertie
         })
         .collect::<Vec<_>>();
     assert_eq!(after_formats, before_formats);
-    let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
     assert_eq!(reopened.text(), before_text);
     assert_eq!(layout(&reopened, 1).left_indent(), 360);
 }
 
 #[test]
 fn batch_preflights_shape_selectors_limits_and_conflicts_atomically() {
-    let source = Document::parse(r"{\rtf1\ansi One\par Two\par Three}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi One\par Two\par Three}").unwrap();
 
     let mut empty = source.edit();
     assert!(matches!(
@@ -227,7 +227,7 @@ fn batch_preflights_shape_selectors_limits_and_conflicts_atomically() {
 
 #[test]
 fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
-    let source = Document::parse(r"{\rtf1\ansi One\par Two}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi One\par Two}").unwrap();
     let mut edit = source.edit();
     edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_keep_together(true))
         .unwrap();
@@ -309,7 +309,7 @@ fn layout_composes_with_alignment_and_disjoint_prepared_work_but_not_text() {
 
 #[test]
 fn durable_layout_patch_is_deterministic_reversible_and_stale_checked() {
-    let source = Document::parse(r"{\rtf1\ansi\sb40 One\par\pard\li80 Two}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\sb40 One\par\pard\li80 Two}").unwrap();
     let mut edit = source.edit();
     edit.patch_body_paragraph_layouts(&[
         ParagraphLayoutUpdate::new(
@@ -389,7 +389,7 @@ fn durable_layout_patch_is_deterministic_reversible_and_stale_checked() {
 
 #[test]
 fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
-    let source = Document::parse(r"{\rtf1\ansi One\par Two}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi One\par Two}").unwrap();
     let frame = ParagraphFrame {
         width_twips: Some(720),
         height_twips: Some(-480),
@@ -417,7 +417,7 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
     let created_text = String::from_utf8(created_bytes.clone()).unwrap();
     assert!(created_text.contains(r"\absw720"));
     assert!(created_text.contains(r"\posnegx-80"));
-    let reopened = Document::from_bytes(&created_bytes).unwrap();
+    let reopened = Package::from_bytes(&created_bytes).unwrap();
     assert_eq!(layout(&reopened, 0).frame(), Some(frame));
     assert_eq!(reopened.text(), source.text());
     assert_eq!(
@@ -469,7 +469,7 @@ fn source_bound_frame_layout_crud_is_reversible_and_source_checked() {
 
 #[test]
 fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
-    let source = Document::parse(r"{\rtf1\ansi One\par Two}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi One\par Two}").unwrap();
     let before = source.to_bytes().unwrap();
     let invalid = ParagraphFrame {
         width_twips: Some(MAX_PARAGRAPH_FRAME_TWIPS as u32 + 1),
@@ -489,8 +489,7 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
     assert_eq!(batch.operation_count(), 0);
     assert_eq!(source.to_bytes().unwrap(), before);
 
-    let unknown =
-        Document::parse(r"{\rtf1\ansi\future42 One{\*\vendor retained}\par Two}").unwrap();
+    let unknown = Package::parse(r"{\rtf1\ansi\future42 One{\*\vendor retained}\par Two}").unwrap();
     let unknown_before = unknown.to_bytes().unwrap();
     let mut unknown_edit = unknown.edit();
     unknown_edit
@@ -532,7 +531,7 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
     );
 
     let metadata =
-        Document::parse(r"{\rtf1\ansi{\info{\*\futuremeta vendor-byte-payload}} One}").unwrap();
+        Package::parse(r"{\rtf1\ansi{\info{\*\futuremeta vendor-byte-payload}} One}").unwrap();
     let metadata_before = metadata.to_bytes().unwrap();
     let mut metadata_edit = metadata.edit();
     metadata_edit
@@ -559,7 +558,7 @@ fn frame_layout_batch_validation_and_unknown_source_spans_are_atomic() {
 
 #[test]
 fn frame_layout_preserves_zero_width_bookmark_events() {
-    let source = Document::parse(r#"{\rtf1\ansi One{\*\bkmkstart bm}two{\*\bkmkend bm}}"#).unwrap();
+    let source = Package::parse(r#"{\rtf1\ansi One{\*\bkmkstart bm}two{\*\bkmkend bm}}"#).unwrap();
     let mut edit = source.edit();
     edit.patch_paragraph_layout(
         0,
@@ -589,7 +588,7 @@ fn frame_layout_preserves_zero_width_bookmark_events() {
 #[test]
 fn frame_layout_does_not_duplicate_leading_zero_width_bookmark_events() {
     let source =
-        Document::parse(r#"{\rtf1\ansi{\*\bkmkstart leading}One{\*\bkmkend leading}}"#).unwrap();
+        Package::parse(r#"{\rtf1\ansi{\*\bkmkstart leading}One{\*\bkmkend leading}}"#).unwrap();
     let before = source.to_bytes().unwrap();
     let mut edit = source.edit();
     edit.patch_paragraph_layout(
@@ -622,8 +621,7 @@ fn frame_layout_does_not_duplicate_leading_zero_width_bookmark_events() {
 
 #[test]
 fn frame_layout_preserves_offset_only_break_events() {
-    let source =
-        Document::parse(r#"{\rtf1\ansi One\page Two\column Three\softline Four}"#).unwrap();
+    let source = Package::parse(r#"{\rtf1\ansi One\page Two\column Three\softline Four}"#).unwrap();
     let mut edit = source.edit();
     edit.patch_paragraph_layout(
         0,
@@ -643,7 +641,7 @@ fn frame_layout_preserves_offset_only_break_events() {
 
 #[test]
 fn frame_layout_preserves_leading_body_opaque_destination() {
-    let source = Document::parse(r#"{\rtf1\ansi{\*\vendor leading}One}"#).unwrap();
+    let source = Package::parse(r#"{\rtf1\ansi{\*\vendor leading}One}"#).unwrap();
     let before = source.to_bytes().unwrap();
     assert_eq!(source.opaque().len(), 1);
     assert!(matches!(
@@ -675,7 +673,7 @@ fn frame_layout_preserves_leading_body_opaque_destination() {
 
 #[test]
 fn exact_noops_and_source_closure_refusals_do_not_publish() {
-    let protected = Document::parse(r"{\rtf1\ansi\readprot\enforceprot1\sb40 Same}").unwrap();
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1\sb40 Same}").unwrap();
     let exact = protected.to_bytes().unwrap();
     let mut noop = protected.edit();
     noop.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(40))
@@ -696,10 +694,10 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     ));
 
     for source in [
-        Document::parse(r"{\rtf1\ansi{\stylesheet{\s1 Named;}}\s1 Styled}").unwrap(),
-        Document::parse(r"{\rtf1\ansi\ls1 Listed}").unwrap(),
-        Document::parse(r"{\rtf1\ansi One\line Two}").unwrap(),
-        Document::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl Cell\cell\row}").unwrap(),
+        Package::parse(r"{\rtf1\ansi{\stylesheet{\s1 Named;}}\s1 Styled}").unwrap(),
+        Package::parse(r"{\rtf1\ansi\ls1 Listed}").unwrap(),
+        Package::parse(r"{\rtf1\ansi One\line Two}").unwrap(),
+        Package::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl Cell\cell\row}").unwrap(),
     ] {
         let exact = source.to_bytes().unwrap();
         let mut edit = source.edit();
@@ -712,7 +710,7 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     }
 
     let raw = br"{\rtf1\ansi One}";
-    let compressed = Document::from_bytes(&compress(raw, true).unwrap()).unwrap();
+    let compressed = Package::from_bytes(&compress(raw, true).unwrap()).unwrap();
     let mut edit = compressed.edit();
     assert!(matches!(
         edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20)),
@@ -722,7 +720,7 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     let mut non_ascii_bytes = br"{\rtf1\ansi\ansicpg1252 Caf".to_vec();
     non_ascii_bytes.push(0xe9);
     non_ascii_bytes.push(b'}');
-    let non_ascii = Document::from_bytes(&non_ascii_bytes).unwrap();
+    let non_ascii = Package::from_bytes(&non_ascii_bytes).unwrap();
     let mut edit = non_ascii.edit();
     assert!(matches!(
         edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20)),
@@ -736,8 +734,7 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
         .build()
         .expect("source profile is consistent");
     let bounded =
-        Document::parse_with_options(source_text, OpenOptions::new().source_limits(limits))
-            .unwrap();
+        Package::parse_with_options(source_text, OpenOptions::new().source_limits(limits)).unwrap();
     let exact = bounded.to_bytes().unwrap();
     let mut edit = bounded.edit();
     edit.patch_paragraph_layout(0, ParagraphLayoutPatch::new().with_space_before(20))

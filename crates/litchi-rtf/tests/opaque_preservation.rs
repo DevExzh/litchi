@@ -9,8 +9,8 @@
 
 use litchi_rtf::opaque::{Anchor, Context, Kind};
 use litchi_rtf::{
-    DefaultTabWidthPolicy, Document, OpenOptions, RtfDocument, RtfError, RtfWriter,
-    SourceLimitKind, SourceLimits, WriterOptions,
+    DefaultTabWidthPolicy, OpenOptions, Package, RtfDocument, RtfError, RtfWriter, SourceLimitKind,
+    SourceLimits, WriterOptions,
 };
 use std::io::{self, Write};
 
@@ -33,7 +33,7 @@ impl Write for WriteProbe {
 #[test]
 fn immutable_snapshot_preserves_unknown_syntax_byte_for_byte() {
     let source = br"{\rtf1\ansi A\future42 {\*\vendor\page1 inert}B}";
-    let document = Document::from_bytes(source).unwrap();
+    let document = Package::from_bytes(source).unwrap();
 
     assert_eq!(document.text(), "AB");
     assert_eq!(document.opaque().len(), 2);
@@ -122,7 +122,7 @@ fn malformed_unknown_destination_is_not_silently_preserved() {
 #[test]
 fn nested_header_syntax_keeps_its_owner_and_refuses_reparenting() {
     let source = br"{\rtf1{\header H\future7 {\*\vendor inert}I}Body}";
-    let snapshot = Document::from_bytes(source).unwrap();
+    let snapshot = Package::from_bytes(source).unwrap();
 
     assert_eq!(snapshot.to_bytes().unwrap(), source);
     assert_eq!(snapshot.opaque().len(), 2);
@@ -158,7 +158,7 @@ fn nested_header_syntax_keeps_its_owner_and_refuses_reparenting() {
 #[test]
 fn nested_table_syntax_keeps_table_context_and_refuses_reparenting() {
     let source = br"{\rtf1\trowd\cellx2000\intbl A\future7 {\*\vendor inert}B\cell\row}";
-    let snapshot = Document::from_bytes(source).unwrap();
+    let snapshot = Package::from_bytes(source).unwrap();
 
     assert_eq!(snapshot.to_bytes().unwrap(), source);
     assert_eq!(snapshot.opaque().len(), 2);
@@ -193,7 +193,7 @@ fn field_and_note_syntax_retain_their_structural_contexts() {
             Context::Note,
         ),
     ] {
-        let snapshot = Document::from_bytes(source).unwrap();
+        let snapshot = Package::from_bytes(source).unwrap();
         assert_eq!(snapshot.to_bytes().unwrap(), source);
         assert_eq!(snapshot.opaque().len(), 2);
         assert!(snapshot.opaque().iter().all(|node| matches!(
@@ -218,7 +218,7 @@ fn field_and_note_syntax_retain_their_structural_contexts() {
 #[test]
 fn default_options_are_the_only_exact_source_passthrough() {
     let structural = br"{\rtf1{\header H{\*\vendor inert}}Body}";
-    let snapshot = Document::from_bytes(structural).unwrap();
+    let snapshot = Package::from_bytes(structural).unwrap();
 
     let mut exact = Vec::new();
     RtfWriter::new(&mut exact).write(&snapshot).unwrap();
@@ -239,7 +239,7 @@ fn default_options_are_the_only_exact_source_passthrough() {
 #[test]
 fn nondefault_options_canonicalize_representable_opaque_syntax() {
     let source = br"{\rtf1 A\future7 B}";
-    let snapshot = Document::from_bytes(source).unwrap();
+    let snapshot = Package::from_bytes(source).unwrap();
     let options = WriterOptions {
         default_font: 3,
         ..WriterOptions::default()
@@ -258,7 +258,7 @@ fn nondefault_options_canonicalize_representable_opaque_syntax() {
 #[test]
 fn default_snapshot_is_exact_without_opaque_syntax() {
     let source = br"{\rtf1\ansi   Plain text}";
-    let snapshot = Document::from_bytes(source).unwrap();
+    let snapshot = Package::from_bytes(source).unwrap();
 
     assert!(snapshot.opaque().is_empty());
     assert_eq!(snapshot.to_bytes().unwrap(), source);
@@ -270,7 +270,7 @@ fn font_and_color_extensions_are_preserved_or_refused_atomically() {
         br"{\rtf1{\fonttbl{\f0\fnil Arial;{\*\vendorfont inert}}}\f0 Body}".as_slice(),
         br"{\rtf1{\colortbl;{\*\vendorcolor inert}\red1\green2\blue3;}Body}".as_slice(),
     ] {
-        let snapshot = Document::from_bytes(source).unwrap();
+        let snapshot = Package::from_bytes(source).unwrap();
         assert_eq!(snapshot.to_bytes().unwrap(), source);
         assert_eq!(snapshot.opaque().len(), 1);
         assert!(matches!(
@@ -300,7 +300,7 @@ fn style_and_list_extensions_are_preserved_or_refused_atomically() {
         br"{\rtf1{\stylesheet{\s0 Normal;{\*\vendorstyle inert}}}\s0 Body}".as_slice(),
         br"{\rtf1{\*\listtable{\*\vendorlist inert}}Body}".as_slice(),
     ] {
-        let snapshot = Document::from_bytes(source).unwrap();
+        let snapshot = Package::from_bytes(source).unwrap();
         assert_eq!(snapshot.to_bytes().unwrap(), source);
         assert_eq!(snapshot.opaque().len(), 1);
         assert!(matches!(

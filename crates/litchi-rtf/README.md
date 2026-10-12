@@ -5,9 +5,10 @@ Parser and writer for the Rich Text Format (RTF), targeting the RTF 1.9.1 specif
 ## Overview
 
 This crate provides a bounded RTF reader and streaming writer with an
-immutable, cheap-to-share `Document` facade. Borrowed semantic views traverse
+immutable, cheap-to-share `Package` owner. `Package::document()` returns an
+owned read-only projection for semantic traversal. Borrowed views traverse
 paragraphs, runs, and structural breaks without first flattening the retained
-document. Borrowed font catalogs and color palettes resolve run formatting
+package. Borrowed font catalogs and color palettes resolve run formatting
 without exposing numeric RTF table IDs. The advanced retained model covers
 tables, lists, sections, fields, pictures, shapes, stylesheets, positioned
 paragraph frames, inert SmartTag/factoid and move-bookmark ranges, and modern
@@ -22,10 +23,11 @@ litchi-rtf = "0.0.1"
 ```
 
 ```rust
-use litchi_rtf::Document;
+use litchi_rtf::Package;
 
 let rtf = r"{\rtf1\ansi{\fonttbl{\f0\fswiss Helvetica;}}\f0\pard Hello World!\par}";
-let doc = Document::parse(rtf)?;
+let package = Package::parse(rtf)?;
+let doc = package.document();
 assert_eq!(doc.text(), "Hello World!\n");
 
 for paragraph in doc.body().paragraphs() {
@@ -51,8 +53,8 @@ ordinary transaction limits, retained-model support, and explicit semantic gaps.
   move-bookmark metadata, and bounded inert `\\passwordhash` records
 - Stylesheet, font table, and color table handling
 - Compressed RTF (`MS-OXRTFCP`) encode/decode
-- Immutable, cheap-to-share `Document` snapshots for ordinary reads
-- Bounded source-checked `Document::edit()` transactions composing disjoint
+- Immutable, cheap-to-share `Package` owners with read-only `Package::document()` projections
+- Bounded source-checked `Package::edit()` transactions composing disjoint
   UTF-8 body spans, paragraph alignment, character bold ranges, ordinary
   character italic ranges,
   paragraph insertion, table-cell text, header/footer text, comment bodies,
@@ -89,19 +91,22 @@ groupings. Existing public modules such as `text`, `field`, `table`, `picture`,
 and `review` remain stable through contextual re-exports.
 
 The attached mutable retained tree is isolated under the explicit advanced
-`raw` module. Ordinary application code reads immutable `Document` snapshots
-and publishes changes only through `Document::edit()` or composed sub-edits.
+`raw` module. Ordinary application code opens immutable `Package` owners,
+reads through the package or a `Package::document()` projection, and publishes
+changes through `Package::edit()` or composed sub-edits. A projection shares
+the package's immutable state and remains valid when its owner is dropped;
+projections do not own lifecycle or publication operations.
 Canonical edits of retained destinations refuse snapshots containing unknown
 syntax; exact body splices preserve unknown destinations byte-for-byte.
 
 `transport::decompress` enforces a finite 256 MiB expansion ceiling before
 allocation. Applications with a different document budget can call
 `transport::decompress_with_limits` with an explicit `transport::DecompressionLimits`
-value. Document parsing and file opening use checked `SourceLimits` profiles
+value. Package parsing and file opening use checked `SourceLimits` profiles
 for input, events, binary payloads, expansion and opaque retention. Build a
 profile with `SourceLimits::builder()` and fallible `max_*` setters, then pass
-`OpenOptions::new().source_limits(profile)` to `Document::parse_with_options`,
-`Document::from_bytes_with_options` or `Document::open_with_options`. Input
+`OpenOptions::new().source_limits(profile)` to `Package::parse_with_options`,
+`Package::from_bytes_with_options` or `Package::open_with_options`. Input
 defaults to 512 MiB; zero explicitly denies a dimension. Explicit repair is
 selected with `OpenOptions::leniency`.
 

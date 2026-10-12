@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Alignment, CharacterBaseline, Document, HeaderFooterType, OpenOptions, SourceLimits,
+    Alignment, CharacterBaseline, HeaderFooterType, OpenOptions, Package, SourceLimits,
     TableCellPath, UnderlineStyle,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, HeaderFooterParagraph, History,
@@ -28,7 +28,7 @@ fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
 #[test]
 fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
     let source =
-        Document::parse(r"{\rtf1\ansi\super\expnd4\charscalex80\kerning8 First Second}").unwrap();
+        Package::parse(r"{\rtf1\ansi\super\expnd4\charscalex80\kerning8 First Second}").unwrap();
     let span = TextSpan::new(0, 5).unwrap();
     let mut edit = source.edit();
     edit.set_text_expansion(span, litchi_rtf::CharacterExpansion::Twips(-12))
@@ -63,7 +63,7 @@ fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
     assert_eq!(second.format().horizontal_scale_percent(), 80);
     assert_eq!(second.format().kerning_half_points(), 8);
 
-    let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
     let reopened_first = reopened
         .body()
         .runs()
@@ -91,7 +91,7 @@ fn ordinary_positioning_crud_preserves_other_facets_and_round_trips() {
 
 #[test]
 fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_resets() {
-    let source = Document::parse(r"{\rtf1\ansi First}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First}").unwrap();
     let span = TextSpan::new(0, 5).unwrap();
 
     let mut quarter_edit = source.edit();
@@ -122,7 +122,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         quarter_inverse.to_bytes().unwrap(),
         source.to_bytes().unwrap()
     );
-    let quarter_document = Document::from_bytes(&quarter_bytes).unwrap();
+    let quarter_document = Package::from_bytes(&quarter_bytes).unwrap();
     let mut twips_edit = quarter_document.edit();
     twips_edit
         .set_text_expansion(span, litchi_rtf::CharacterExpansion::Twips(-15))
@@ -151,7 +151,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         twips_inverse.to_bytes().unwrap(),
         quarter_document.to_bytes().unwrap()
     );
-    let twips_document = Document::from_bytes(&twips_bytes).unwrap();
+    let twips_document = Package::from_bytes(&twips_bytes).unwrap();
     let mut reset_edit = twips_document.edit();
     reset_edit
         .set_text_expansion(span, litchi_rtf::CharacterExpansion::None)
@@ -179,7 +179,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
         reset_inverse.to_bytes().unwrap(),
         twips_document.to_bytes().unwrap()
     );
-    let reopened = Document::from_bytes(&reset_bytes).unwrap();
+    let reopened = Package::from_bytes(&reset_bytes).unwrap();
     assert_eq!(
         reopened.body().runs().next().unwrap().format().expansion(),
         litchi_rtf::CharacterExpansion::None
@@ -188,7 +188,7 @@ fn ordinary_positioning_crud_switches_expansion_units_and_supports_explicit_rese
 
 #[test]
 fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
-    let scale_source = Document::parse(r"{\rtf1\ansi\charscalex80 First}").unwrap();
+    let scale_source = Package::parse(r"{\rtf1\ansi\charscalex80 First}").unwrap();
     let mut scale_edit = scale_source.edit();
     scale_edit
         .set_text_horizontal_scale_percent(TextSpan::new(0, 5).unwrap(), 100)
@@ -200,7 +200,7 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
             .windows(br"\charscalex100 ".len())
             .any(|window| window == br"\charscalex100 ")
     );
-    let scale_reopened = Document::from_bytes(&scale_bytes).unwrap();
+    let scale_reopened = Package::from_bytes(&scale_bytes).unwrap();
     assert_eq!(
         scale_reopened
             .body()
@@ -221,7 +221,7 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
         scale_source.to_bytes().unwrap()
     );
 
-    let kerning_source = Document::parse(r"{\rtf1\ansi\kerning8 First}").unwrap();
+    let kerning_source = Package::parse(r"{\rtf1\ansi\kerning8 First}").unwrap();
     let mut kerning_edit = kerning_source.edit();
     kerning_edit
         .set_text_kerning(TextSpan::new(0, 5).unwrap(), 0)
@@ -233,7 +233,7 @@ fn ordinary_positioning_resets_emit_legacy_controls_and_restore_exact_bytes() {
             .windows(br"\kerning0 ".len())
             .any(|window| window == br"\kerning0 ")
     );
-    let kerning_reopened = Document::from_bytes(&kerning_bytes).unwrap();
+    let kerning_reopened = Package::from_bytes(&kerning_bytes).unwrap();
     assert_eq!(
         kerning_reopened
             .body()
@@ -263,7 +263,7 @@ fn ordinary_positioning_publication_respects_source_limit_atomically() {
         .expect("source-byte limit is representable")
         .build()
         .expect("source profile is consistent");
-    let source = Document::from_bytes_with_options(
+    let source = Package::from_bytes_with_options(
         source_bytes,
         OpenOptions::new().source_limits(source_limits),
     )
@@ -282,7 +282,7 @@ fn ordinary_positioning_publication_respects_source_limit_atomically() {
 
 #[test]
 fn ordinary_positioning_crud_enforces_bounds_and_exact_noops() {
-    let source = Document::parse(r"{\rtf1\ansi\expnd4\charscalex80\kerning8 First}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\expnd4\charscalex80\kerning8 First}").unwrap();
     let span = TextSpan::new(0, 5).unwrap();
 
     for expansion in [
@@ -301,7 +301,7 @@ fn ordinary_positioning_crud_enforces_bounds_and_exact_noops() {
         assert!(edit.set_text_kerning(span, kerning).is_err());
     }
 
-    let max_source = Document::parse(r"{\rtf1\ansi First Second}").unwrap();
+    let max_source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
     let mut max_edit = max_source.edit();
     max_edit
         .set_text_horizontal_scale_percent(span, 600)
@@ -350,7 +350,7 @@ fn ordinary_positioning_crud_enforces_bounds_and_exact_noops() {
 
 #[test]
 fn ordinary_positioning_crud_refuses_mixed_character_ranges() {
-    let expansion_source = Document::parse(r"{\rtf1\ansi\expnd4 First{\expndtw8 Second}}").unwrap();
+    let expansion_source = Package::parse(r"{\rtf1\ansi\expnd4 First{\expndtw8 Second}}").unwrap();
     let span = TextSpan::new(0, 11).unwrap();
     let mut expansion = expansion_source.edit();
     assert!(
@@ -360,18 +360,17 @@ fn ordinary_positioning_crud_refuses_mixed_character_ranges() {
     );
 
     let scale_source =
-        Document::parse(r"{\rtf1\ansi\charscalex80 First{\charscalex120 Second}}").unwrap();
+        Package::parse(r"{\rtf1\ansi\charscalex80 First{\charscalex120 Second}}").unwrap();
     let mut scale = scale_source.edit();
     assert!(scale.set_text_horizontal_scale_percent(span, 100).is_err());
-    let kerning_source =
-        Document::parse(r"{\rtf1\ansi\kerning8 First{\kerning16 Second}}").unwrap();
+    let kerning_source = Package::parse(r"{\rtf1\ansi\kerning8 First{\kerning16 Second}}").unwrap();
     let mut kerning = kerning_source.edit();
     assert!(kerning.set_text_kerning(span, 0).is_err());
 }
 
 #[test]
 fn body_text_commit_is_atomic_reversible_and_source_checked() {
-    let source = Document::parse(r"{\rtf1\ansi Plain\par Body}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Plain\par Body}").unwrap();
     let mut edit = source.edit();
     edit.replace_body_text("Changed\nbody").unwrap();
     let commit = edit.commit().unwrap();
@@ -386,7 +385,7 @@ fn body_text_commit_is_atomic_reversible_and_source_checked() {
     let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
     assert!(restored.same_snapshot(&source));
 
-    let other = Document::parse(r"{\rtf1\ansi Other}").unwrap();
+    let other = Package::parse(r"{\rtf1\ansi Other}").unwrap();
     assert!(matches!(
         commit.patch().apply(&other),
         Err(Error::PatchConflict)
@@ -395,7 +394,7 @@ fn body_text_commit_is_atomic_reversible_and_source_checked() {
 
 #[test]
 fn body_text_noop_shares_the_source_snapshot() {
-    let source = Document::parse(r"{\rtf1\ansi Same}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Same}").unwrap();
     let mut edit = source.edit();
     edit.replace_body_text("Same").unwrap();
     let commit = edit.commit().unwrap();
@@ -406,7 +405,7 @@ fn body_text_noop_shares_the_source_snapshot() {
 
 #[test]
 fn changed_body_text_refuses_opaque_syntax_without_touching_the_source() {
-    let source = Document::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi A\future42 B}").unwrap();
     let before = source.to_bytes().unwrap();
     let mut edit = source.edit();
     edit.replace_body_text("Changed").unwrap();
@@ -418,7 +417,7 @@ fn changed_body_text_refuses_opaque_syntax_without_touching_the_source() {
 
 #[test]
 fn transaction_composes_disjoint_spans_and_a_property() {
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta Gamma}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta Gamma}").unwrap();
     let mut edit = source.edit();
     edit.replace_text(TextSpan::new(11, 16).unwrap(), "G")
         .unwrap();
@@ -444,7 +443,7 @@ fn transaction_composes_disjoint_spans_and_a_property() {
 
 #[test]
 fn overlapping_spans_duplicate_properties_and_operation_bounds_conflict() {
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let mut edit = source.edit();
     edit.replace_text(TextSpan::new(0, 5).unwrap(), "A")
         .unwrap();
@@ -483,7 +482,7 @@ fn overlapping_spans_duplicate_properties_and_operation_bounds_conflict() {
 
 #[test]
 fn structural_and_property_operations_fail_closed() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second}").unwrap();
     let mut edit = source.edit();
     edit.set_paragraph_alignment(1, Alignment::Right).unwrap();
     assert!(matches!(
@@ -496,7 +495,7 @@ fn structural_and_property_operations_fail_closed() {
 fn body_text_splice_preserves_modeled_header_bytes_exactly() {
     let prefix = br"{\rtf1\ansi\ansicpg1252\deff0{\fonttbl{\f0\fswiss Arial;}}{\colortbl;\red1\green2\blue3;}{\stylesheet{\s0 Normal;}}{\info{\title Preserved;}}\f0 ";
     let source = [prefix.as_slice(), b"Original", b"}"].concat();
-    let document = Document::from_bytes(&source).unwrap();
+    let document = Package::from_bytes(&source).unwrap();
     let mut edit = document.edit();
     edit.replace_body_text("Changed\nbody").unwrap();
     let commit = edit.commit().unwrap();
@@ -511,7 +510,7 @@ fn body_text_splice_preserves_modeled_header_bytes_exactly() {
 fn body_splice_preserves_unknown_metadata_group_and_surrounding_writer_bytes() {
     let prefix = br"{\rtf1\ansi{\*\futuremeta vendor-byte-payload}{\info{\title Exact;}}\pard ";
     let source = [prefix.as_slice(), b"Original", b"}\r\n"].concat();
-    let document = Document::from_bytes(&source).unwrap();
+    let document = Package::from_bytes(&source).unwrap();
     let mut edit = document.edit();
     edit.replace_text(TextSpan::new(0, 8).unwrap(), "Changed")
         .unwrap();
@@ -523,7 +522,7 @@ fn body_splice_preserves_unknown_metadata_group_and_surrounding_writer_bytes() {
 
 #[test]
 fn paragraph_text_edit_is_checked_local_and_reversible() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let mut edit = source.edit();
     edit.replace_paragraph_text(1, "Changed").unwrap();
     let commit = edit.commit().unwrap();
@@ -544,7 +543,7 @@ fn paragraph_text_edit_is_checked_local_and_reversible() {
 
 #[test]
 fn paragraph_text_edit_rejects_out_of_range_before_staging() {
-    let source = Document::parse(r"{\rtf1 Only}").unwrap();
+    let source = Package::parse(r"{\rtf1 Only}").unwrap();
     let mut edit = source.edit();
     assert!(matches!(
         edit.replace_paragraph_text(1, "never"),
@@ -559,7 +558,7 @@ fn paragraph_text_edit_rejects_out_of_range_before_staging() {
 
 #[test]
 fn durable_multi_operation_patch_is_deterministic_reversible_and_source_checked() {
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta Gamma}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta Gamma}").unwrap();
     let mut edit = source.edit();
     edit.replace_text(TextSpan::new(11, 16).unwrap(), "G")
         .unwrap();
@@ -596,7 +595,7 @@ fn durable_multi_operation_patch_is_deterministic_reversible_and_source_checked(
         Alignment::Left
     );
 
-    let other = Document::parse(r"{\rtf1\ansi Other}").unwrap();
+    let other = Package::parse(r"{\rtf1\ansi Other}").unwrap();
     assert!(matches!(
         other.apply_durable(&decoded),
         Err(Error::PatchConflict)
@@ -609,7 +608,7 @@ fn durable_patch_reports_a_stale_semantic_precondition() {
     use serde_json::Value;
     use std::collections::BTreeMap;
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let mut overlap = source.edit();
     overlap
         .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
@@ -668,7 +667,7 @@ fn durable_patch_reports_a_stale_semantic_precondition() {
 
 #[test]
 fn no_op_patch_is_empty_durable_and_history_is_budgeted() {
-    let source = Document::parse(r"{\rtf1\ansi Same}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Same}").unwrap();
     let mut edit = source.edit();
     edit.replace_text(TextSpan::new(0, 4).unwrap(), "Same")
         .unwrap();
@@ -697,9 +696,9 @@ fn no_op_patch_is_empty_durable_and_history_is_budgeted() {
 
 #[test]
 fn bold_property_and_paragraph_structure_have_durable_semantics() {
-    let probe = Document::parse(r"{\rtf1\ansi \ql \b Alpha\b0 \par \ql Beta}").unwrap();
+    let probe = Package::parse(r"{\rtf1\ansi \ql \b Alpha\b0 \par \ql Beta}").unwrap();
     assert!(probe.body().runs().next().unwrap().format().bold());
-    let source = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut formatting = source.edit();
     formatting
         .set_text_bold(TextSpan::new(0, 5).unwrap(), true)
@@ -734,7 +733,7 @@ fn bold_property_and_paragraph_structure_have_durable_semantics() {
 
 #[test]
 fn multiple_paragraph_insertions_have_target_relative_durable_inverses() {
-    let source = Document::parse(r"{\rtf1\ansi A\par B\par C}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi A\par B\par C}").unwrap();
     let mut edit = source.edit();
     edit.insert_paragraph_after(0, "X")
         .unwrap()
@@ -777,7 +776,7 @@ fn multiple_paragraph_insertions_have_target_relative_durable_inverses() {
 
 #[test]
 fn italic_property_is_bounded_batch_reversible_and_durable() {
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta Gamma}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta Gamma}").unwrap();
     let mut edit = source.edit();
     edit.set_text_italic(TextSpan::new(0, 5).unwrap(), true)
         .unwrap()
@@ -809,8 +808,7 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
     );
 
     let prefix = br"{\rtf1\ansi{\*\futuremeta retained}\pard ";
-    let enveloped =
-        Document::from_bytes(&[prefix.as_slice(), b"Alpha", b"}\r\n"].concat()).unwrap();
+    let enveloped = Package::from_bytes(&[prefix.as_slice(), b"Alpha", b"}\r\n"].concat()).unwrap();
     let mut enveloped_edit = enveloped.edit();
     enveloped_edit
         .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
@@ -870,7 +868,7 @@ fn italic_property_is_bounded_batch_reversible_and_durable() {
 
 #[test]
 fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
-    let source = Document::parse(r"{\rtf1\ansi {\i Alpha} Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi {\i Alpha} Beta}").unwrap();
     let original = source.to_bytes().unwrap();
     let mut noop = source.edit();
     noop.set_text_italic(TextSpan::new(0, 5).unwrap(), true)
@@ -879,7 +877,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
     assert!(!noop.diagnostics().changed());
     assert_eq!(noop.snapshot().to_bytes().unwrap(), original);
 
-    let plain = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let plain = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let mut overlap = plain.edit();
     overlap
         .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
@@ -903,7 +901,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         })
     ));
 
-    let utf8 = Document::parse(r"{\rtf1\ansi Caf\'e9}").unwrap();
+    let utf8 = Package::parse(r"{\rtf1\ansi Caf\'e9}").unwrap();
     assert_eq!(utf8.text(), "Café");
     let mut utf8_edit = utf8.edit();
     utf8_edit
@@ -916,7 +914,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         Err(Error::SpanNotOnCharacterBoundary { position: 4 })
     ));
 
-    let mixed = Document::parse(r"{\rtf1\ansi {\i Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\i Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_italic(TextSpan::new(0, 10).unwrap(), false),
@@ -925,7 +923,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         ))
     ));
 
-    let unrelated = Document::parse(r"{\rtf1\ansi \b Alpha\b0 Beta}").unwrap();
+    let unrelated = Package::parse(r"{\rtf1\ansi \b Alpha\b0 Beta}").unwrap();
     let mut unrelated_edit = unrelated.edit();
     unrelated_edit
         .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
@@ -938,7 +936,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         ))
     ));
 
-    let protected = Document::parse(r"{\rtf1\ansi\readprot\enforceprot1 Alpha}").unwrap();
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 Alpha}").unwrap();
     let mut protected_edit = protected.edit();
     protected_edit
         .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
@@ -948,7 +946,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         Err(Error::ProtectedDocument { .. })
     ));
 
-    let paragraph_source = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph_source = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph_source.edit();
     assert!(matches!(
         paragraph_edit.set_text_italic(TextSpan::new(0, 6).unwrap(), true),
@@ -957,7 +955,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         ))
     ));
 
-    let opaque = Document::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
+    let opaque = Package::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
     let mut opaque_edit = opaque.edit();
     opaque_edit
         .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
@@ -967,7 +965,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         Err(Error::UnsupportedSource(_))
     ));
 
-    let field = Document::parse(r"{\rtf1\ansi A{\field{\*\fldinst PAGE}{\fldrslt B}}}").unwrap();
+    let field = Package::parse(r"{\rtf1\ansi A{\field{\*\fldinst PAGE}{\fldrslt B}}}").unwrap();
     let mut field_edit = field.edit();
     field_edit
         .set_text_italic(TextSpan::new(0, 1).unwrap(), true)
@@ -977,7 +975,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
         Err(Error::UnsupportedSource(_))
     ));
 
-    let table = Document::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl A\cell\row}").unwrap();
+    let table = Package::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl A\cell\row}").unwrap();
     let mut table_edit = table.edit();
     assert!(matches!(
         table_edit.set_text_italic(TextSpan::new(0, 1).unwrap(), true),
@@ -985,7 +983,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     assert_eq!(cp1252.text(), "Café");
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
@@ -999,7 +997,7 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
     ));
 
     let compressed_bytes = litchi_rtf::transport::compress(br"{\rtf1\ansi Alpha}", true).unwrap();
-    let compressed = Document::from_bytes(&compressed_bytes).unwrap();
+    let compressed = Package::from_bytes(&compressed_bytes).unwrap();
     let mut compressed_edit = compressed.edit();
     compressed_edit
         .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
@@ -1014,12 +1012,12 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
 
 #[test]
 fn underline_edit_preserves_uniform_body_character_baseline_and_inverse() {
-    let source = Document::parse(r"{\rtf1\ansi\b\uldb Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\b\uldb Alpha Beta}").unwrap();
     let mut edit = source.edit();
     edit.set_text_underline(TextSpan::new(6, 10).unwrap(), UnderlineStyle::Single)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
     assert!(reopened.body().runs().all(|run| run.format().bold()));
     assert_eq!(
         reopened
@@ -1073,7 +1071,7 @@ fn underline_property_supports_exact_styles_and_inverse() {
         UnderlineStyle::DoubleWave,
     ];
     for style in styles {
-        let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+        let source = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
         let mut edit = source.edit();
         edit.set_text_underline(TextSpan::new(0, 5).unwrap(), style)
             .unwrap();
@@ -1104,7 +1102,7 @@ fn underline_property_supports_exact_styles_and_inverse() {
 
 #[test]
 fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state() {
-    let mixed = Document::parse(r"{\rtf1\ansi {\ul Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\ul Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_underline(TextSpan::new(0, 10).unwrap(), UnderlineStyle::None),
@@ -1113,7 +1111,7 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
         ))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_underline(TextSpan::new(0, 6).unwrap(), UnderlineStyle::Single),
@@ -1122,7 +1120,7 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
         ))
     ));
 
-    let opaque = Document::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
+    let opaque = Package::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
     let mut opaque_edit = opaque.edit();
     opaque_edit
         .set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
@@ -1133,7 +1131,7 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut misaligned = cp1252.edit();
     assert!(matches!(
         misaligned.set_text_underline(TextSpan::new(4, 5).unwrap(), UnderlineStyle::Single),
@@ -1150,7 +1148,7 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
         ))
     ));
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let limits = durable_limits(1);
     let mut edit = source.edit();
     edit.set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Double)
@@ -1259,7 +1257,7 @@ fn underline_property_refuses_mixed_structure_transport_and_stale_durable_state(
 #[test]
 fn body_opaque_validation_cannot_be_masked_by_duplicate_metadata_bytes() {
     let bytes = br"{\rtf1\ansi{\*\future42 retained}Alpha{\future42 retained}}";
-    let source = Document::from_bytes(bytes).unwrap();
+    let source = Package::from_bytes(bytes).unwrap();
     let mut edit = source.edit();
     edit.set_text_underline(TextSpan::new(0, 5).unwrap(), UnderlineStyle::Single)
         .unwrap();
@@ -1268,7 +1266,7 @@ fn body_opaque_validation_cannot_be_masked_by_duplicate_metadata_bytes() {
 
 #[test]
 fn strike_edit_preserves_double_strike_and_creates_later_run_boundary() {
-    let source = Document::parse(r"{\rtf1\ansi\striked First Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\striked First Second}").unwrap();
     let mut edit = source.edit();
     edit.set_text_strike(TextSpan::new(6, 12).unwrap(), true)
         .unwrap();
@@ -1284,7 +1282,7 @@ fn strike_edit_preserves_double_strike_and_creates_later_run_boundary() {
             .windows(br"\strike ".len())
             .any(|window| window == br"\strike ")
     );
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     assert!(
         reopened
             .body()
@@ -1310,7 +1308,7 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
     use serde_json::Value;
     use std::collections::BTreeMap;
 
-    let mixed = Document::parse(r"{\rtf1\ansi {\strike Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\strike Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_strike(TextSpan::new(0, 10).unwrap(), false),
@@ -1319,7 +1317,7 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
         ))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_strike(TextSpan::new(0, 6).unwrap(), true),
@@ -1329,7 +1327,7 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .set_text_strike(TextSpan::new(0, 5).unwrap(), true)
@@ -1341,7 +1339,7 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
         ))
     ));
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let limits = durable_limits(1);
     let mut edit = source.edit();
     edit.set_text_strike(TextSpan::new(0, 5).unwrap(), true)
@@ -1358,7 +1356,7 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
     assert!(applied.body().runs().all(|run| run.format().strike()));
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert!(restored.body().runs().all(|run| !run.format().strike()));
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -1398,7 +1396,7 @@ fn strike_property_refuses_mixed_structure_transport_and_stale_durable_state() {
 
 #[test]
 fn hidden_edit_is_noop_when_state_is_already_hidden_or_visible() {
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let mut visible = source.edit();
     visible
         .set_text_hidden(TextSpan::new(0, 5).unwrap(), false)
@@ -1419,7 +1417,7 @@ fn hidden_edit_is_noop_when_state_is_already_hidden_or_visible() {
             .windows(br"\v0 ".len())
             .any(|window| window == br"\v0 ")
     );
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     let hidden_text = reopened
         .body()
         .runs()
@@ -1449,13 +1447,13 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
     use serde_json::Value;
     use std::collections::BTreeMap;
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let mut edit = source.edit();
     edit.set_text_hidden(TextSpan::new(6, 10).unwrap(), true)
         .unwrap();
     let commit = edit.commit().unwrap();
     let bytes = commit.snapshot().to_bytes().unwrap();
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     let hidden_text = reopened
         .body()
         .runs()
@@ -1473,7 +1471,7 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
     let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
 
-    let mixed = Document::parse(r"{\rtf1\ansi {\v Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\v Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_hidden(TextSpan::new(0, 10).unwrap(), false),
@@ -1482,7 +1480,7 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
         ))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_hidden(TextSpan::new(0, 6).unwrap(), true),
@@ -1492,7 +1490,7 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .set_text_hidden(TextSpan::new(0, 5).unwrap(), true)
@@ -1521,7 +1519,7 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
     assert!(applied.body().runs().any(|run| run.format().hidden()));
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert!(restored.body().runs().all(|run| !run.format().hidden()));
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -1561,7 +1559,7 @@ fn hidden_property_preserves_run_boundaries_and_refuses_mixed_structure_transpor
 
 #[test]
 fn small_caps_property_preserves_all_caps_and_run_boundaries() {
-    let source = Document::parse(r"{\rtf1\ansi\caps Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\caps Alpha Beta}").unwrap();
     let mut noop = source.edit();
     noop.set_text_small_caps(TextSpan::new(0, 5).unwrap(), false)
         .unwrap();
@@ -1584,7 +1582,7 @@ fn small_caps_property_preserves_all_caps_and_run_boundaries() {
             .windows(br"\scaps0 ".len())
             .any(|window| window == br"\scaps0 ")
     );
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     let small_caps_text = reopened
         .body()
         .runs()
@@ -1603,7 +1601,7 @@ fn small_caps_property_preserves_all_caps_and_run_boundaries() {
 
     let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
     assert!(restored.body().runs().all(|run| !run.format().small_caps()));
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 }
 
 #[test]
@@ -1612,7 +1610,7 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
     use serde_json::Value;
     use std::collections::BTreeMap;
 
-    let associated = Document::parse(r"{\rtf1\ansi\ascaps Alpha}").unwrap();
+    let associated = Package::parse(r"{\rtf1\ansi\ascaps Alpha}").unwrap();
     assert!(
         associated
             .body()
@@ -1620,7 +1618,7 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
             .all(|run| !run.format().small_caps())
     );
 
-    let mixed = Document::parse(r"{\rtf1\ansi {\scaps Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\scaps Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_small_caps(TextSpan::new(0, 10).unwrap(), false),
@@ -1629,7 +1627,7 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
         ))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_small_caps(TextSpan::new(0, 6).unwrap(), true),
@@ -1639,7 +1637,7 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .set_text_small_caps(TextSpan::new(0, 5).unwrap(), true)
@@ -1651,7 +1649,7 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
         ))
     ));
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let limits = durable_limits(1);
     let mut edit = source.edit();
     edit.set_text_small_caps(TextSpan::new(0, 5).unwrap(), true)
@@ -1668,7 +1666,7 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
     assert!(applied.body().runs().any(|run| run.format().small_caps()));
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert!(restored.body().runs().all(|run| !run.format().small_caps()));
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -1710,7 +1708,7 @@ fn small_caps_property_refuses_mixed_structure_transport_and_stale_durable_state
 
 #[test]
 fn all_caps_property_preserves_small_caps_and_both_control_boundaries() {
-    let source = Document::parse(r"{\rtf1\ansi\scaps Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\scaps Alpha Beta}").unwrap();
     let mut noop = source.edit();
     noop.set_text_all_caps(TextSpan::new(0, 5).unwrap(), false)
         .unwrap();
@@ -1734,7 +1732,7 @@ fn all_caps_property_preserves_small_caps_and_both_control_boundaries() {
             .any(|window| window == br"\caps0 ")
     );
 
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     assert_eq!(reopened.text(), source.text());
     let small_caps_text = reopened
         .body()
@@ -1757,7 +1755,7 @@ fn all_caps_property_preserves_small_caps_and_both_control_boundaries() {
     assert_eq!(restored.text(), source.text());
     assert!(restored.body().runs().all(|run| run.format().small_caps()));
     assert!(restored.body().runs().all(|run| !run.format().all_caps()));
-    let reopened_restored = Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    let reopened_restored = Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened_restored.text(), source.text());
 }
 
@@ -1767,10 +1765,10 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
     use serde_json::Value;
     use std::collections::BTreeMap;
 
-    let associated = Document::parse(r"{\rtf1\ansi\acaps Alpha}").unwrap();
+    let associated = Package::parse(r"{\rtf1\ansi\acaps Alpha}").unwrap();
     assert!(associated.body().runs().all(|run| !run.format().all_caps()));
 
-    let mixed = Document::parse(r"{\rtf1\ansi {\caps Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\caps Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_all_caps(TextSpan::new(0, 10).unwrap(), false),
@@ -1779,7 +1777,7 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
         ))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_all_caps(TextSpan::new(0, 6).unwrap(), true),
@@ -1789,7 +1787,7 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .set_text_all_caps(TextSpan::new(0, 5).unwrap(), true)
@@ -1801,7 +1799,7 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
         ))
     ));
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let limits = durable_limits(1);
     let mut edit = source.edit();
     edit.set_text_all_caps(TextSpan::new(0, 5).unwrap(), true)
@@ -1818,7 +1816,7 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
     assert!(applied.body().runs().any(|run| run.format().all_caps()));
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert!(restored.body().runs().all(|run| !run.format().all_caps()));
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -1858,7 +1856,7 @@ fn all_caps_property_refuses_mixed_structure_transport_and_stale_durable_state()
 
 #[test]
 fn double_strike_property_preserves_single_strike_and_both_control_boundaries() {
-    let source = Document::parse(r"{\rtf1\ansi\strike Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\strike Alpha Beta}").unwrap();
     let mut noop = source.edit();
     noop.set_text_double_strike(TextSpan::new(0, 5).unwrap(), false)
         .unwrap();
@@ -1882,7 +1880,7 @@ fn double_strike_property_preserves_single_strike_and_both_control_boundaries() 
             .any(|window| window == br"\striked0 ")
     );
 
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     assert_eq!(reopened.text(), source.text());
     let single_strike_text = reopened
         .body()
@@ -1910,7 +1908,7 @@ fn double_strike_property_preserves_single_strike_and_both_control_boundaries() 
             .runs()
             .all(|run| !run.format().double_strike())
     );
-    let reopened_restored = Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    let reopened_restored = Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened_restored.text(), source.text());
 }
 
@@ -1920,7 +1918,7 @@ fn double_strike_property_refuses_mixed_structure_transport_and_stale_durable_st
     use serde_json::Value;
     use std::collections::BTreeMap;
 
-    let mixed = Document::parse(r"{\rtf1\ansi {\striked Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\striked Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_double_strike(TextSpan::new(0, 10).unwrap(), false),
@@ -1929,7 +1927,7 @@ fn double_strike_property_refuses_mixed_structure_transport_and_stale_durable_st
         ))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_double_strike(TextSpan::new(0, 6).unwrap(), true),
@@ -1939,7 +1937,7 @@ fn double_strike_property_refuses_mixed_structure_transport_and_stale_durable_st
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .set_text_double_strike(TextSpan::new(0, 5).unwrap(), true)
@@ -1951,7 +1949,7 @@ fn double_strike_property_refuses_mixed_structure_transport_and_stale_durable_st
         ))
     ));
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let limits = durable_limits(1);
     let mut edit = source.edit();
     edit.set_text_double_strike(TextSpan::new(0, 5).unwrap(), true)
@@ -1978,7 +1976,7 @@ fn double_strike_property_refuses_mixed_structure_transport_and_stale_durable_st
             .runs()
             .all(|run| !run.format().double_strike())
     );
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -2024,7 +2022,7 @@ fn italic_durable_patch_rejects_stale_property_and_artifact() {
     use serde_json::Value;
     use std::collections::BTreeMap;
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let limits = durable_limits(1);
     let mut preconditions = BTreeMap::new();
     preconditions.insert(
@@ -2061,7 +2059,7 @@ fn italic_durable_patch_rejects_stale_property_and_artifact() {
         Err(Error::StalePrecondition("character italic state differs"))
     ));
 
-    let foreign = Document::parse(r"{\rtf1\ansi Other}").unwrap();
+    let foreign = Package::parse(r"{\rtf1\ansi Other}").unwrap();
     let mut valid_edit = source.edit();
     valid_edit
         .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
@@ -2076,7 +2074,7 @@ fn italic_durable_patch_rejects_stale_property_and_artifact() {
 
 #[test]
 fn core_subedits_compose_and_report_typed_conflicts() {
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let limits = CompositionLimits::new(4, 8, 16, 8);
 
     let mut text_edit = source.edit();
@@ -2128,7 +2126,7 @@ fn core_subedits_compose_and_report_typed_conflicts() {
 
 #[test]
 fn three_way_merge_is_non_mutating_until_resolved_and_committed() {
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let limits = CompositionLimits::new(4, 8, 16, 8);
     let mut left_edit = source.edit();
     left_edit
@@ -2158,7 +2156,7 @@ fn three_way_merge_is_non_mutating_until_resolved_and_committed() {
 
 #[test]
 fn retained_destinations_are_multi_operation_durable_and_reversible() {
-    let source = Document::parse(
+    let source = Package::parse(
         r"{\rtf1\ansi{\header Head}\pard Body\par\trowd\cellx1000\cellx2000\intbl A\cell B\cell\row}",
     )
     .unwrap();
@@ -2199,7 +2197,7 @@ fn retained_destinations_are_multi_operation_durable_and_reversible() {
 
 #[test]
 fn note_and_annotation_text_are_durable_historical_mergeable_and_reopen() {
-    let source = Document::parse(
+    let source = Package::parse(
         r"{\rtf1\ansi A{\footnote\chftn Old note}B{\*\atnid AM}{\*\atnauthor Ada}\chatn{\*\annotation Old comment}C}",
     )
     .unwrap();
@@ -2216,7 +2214,7 @@ fn note_and_annotation_text_are_durable_historical_mergeable_and_reopen() {
     assert!(serialized.contains("\\footnote"));
     assert!(serialized.contains("\\annotation"));
     assert!(serialized.contains("\\atnauthor"));
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     assert_eq!(reopened.notes()[0].content, "Updated note");
     assert!(reopened.notes()[0].is_footnote);
     assert_eq!(reopened.annotations()[0].text, "Updated comment");
@@ -2273,7 +2271,7 @@ fn note_and_annotation_text_are_durable_historical_mergeable_and_reopen() {
 
 #[test]
 fn note_and_annotation_edits_refuse_positioned_or_opaque_dependencies() {
-    let active_note = Document::parse(
+    let active_note = Package::parse(
         r"{\rtf1 A{\footnote\chftn before{\field{\*\fldinst INCLUDETEXT external}{\fldrslt cached}}after}B}",
     )
     .unwrap();
@@ -2283,7 +2281,7 @@ fn note_and_annotation_edits_refuse_positioned_or_opaque_dependencies() {
         Err(Error::UnsupportedSource(_))
     ));
 
-    let opaque_annotation = Document::parse(
+    let opaque_annotation = Package::parse(
         r"{\rtf1{\*\vendor retained}A{\*\atnid AM}{\*\atnauthor Ada}\chatn{\*\annotation Old comment}B}",
     )
     .unwrap();
@@ -2296,7 +2294,7 @@ fn note_and_annotation_edits_refuse_positioned_or_opaque_dependencies() {
 
 #[test]
 fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens() {
-    let source = Document::from_bytes(include_bytes!(
+    let source = Package::from_bytes(include_bytes!(
         "../../../test-data/libreoffice-core/sw/qa/extras/rtfexport/data/relsize.rtf"
     ))
     .unwrap();
@@ -2314,7 +2312,7 @@ fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens(
 
     let output = commit.snapshot().to_bytes().unwrap();
     assert!(String::from_utf8_lossy(&output).contains("\\shptxt Edited frame\\par second line"));
-    let reopened = Document::from_bytes(&output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
     assert_eq!(reopened.shapes()[0].text, "Edited frame\nsecond line");
     assert_eq!(reopened.shapes()[0].geometry, original.geometry);
 
@@ -2348,7 +2346,7 @@ fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens(
         .unwrap();
     assert_eq!(MergePlan::new(left, right).unwrap().conflicts().len(), 1);
 
-    let target = Document::parse(r"{\rtf1 Target}").unwrap();
+    let target = Package::parse(r"{\rtf1 Target}").unwrap();
     let transfer = TransferPlan::shape(&source, 0, &target).unwrap();
     assert!(transfer.is_dependency_free());
     let transferred = transfer.commit().unwrap();
@@ -2359,7 +2357,7 @@ fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens(
         target.text().len()
     );
     let transferred_output = transferred.snapshot().to_bytes().unwrap();
-    let transferred_reopen = Document::from_bytes(&transferred_output).unwrap();
+    let transferred_reopen = Package::from_bytes(&transferred_output).unwrap();
     assert_eq!(transferred_reopen.shapes()[0].geometry, original.geometry);
     let transfer_durable = transferred.patch().to_durable(durable_limits(1)).unwrap();
     let transfer_applied = target.apply_durable(&transfer_durable).unwrap();
@@ -2373,7 +2371,7 @@ fn genuine_libreoffice_shape_text_is_durable_mergeable_transferable_and_reopens(
 
 #[test]
 fn shape_text_edit_and_transfer_refuse_active_links() {
-    let source = Document::parse(concat!(
+    let source = Package::parse(concat!(
         r#"{\rtf1 A{\shp{\*\shpinst{\sp{\sn shapeType}{\sv 202}}"#,
         r#"{\sp{\sn hyperlink}{\sv }{\hl {\hlsrc src}{\hlloc http://example.test/x}{\hlfr Click}}}"#,
         r#"{\shptxt x}}}B}"#,
@@ -2384,7 +2382,7 @@ fn shape_text_edit_and_transfer_refuse_active_links() {
         edit.set_shape_text(0, "changed"),
         Err(Error::UnsupportedSource(_))
     ));
-    let target = Document::parse(r"{\rtf1 Target}").unwrap();
+    let target = Package::parse(r"{\rtf1 Target}").unwrap();
     assert!(matches!(
         TransferPlan::shape(&source, 0, &target),
         Err(Error::UnsupportedSource(_))
@@ -2394,7 +2392,7 @@ fn shape_text_edit_and_transfer_refuse_active_links() {
 #[test]
 fn destination_edit_refuses_unknown_syntax_without_mutating_source() {
     let source =
-        Document::parse(r"{\rtf1\ansi{\*\vendor retained}\trowd\cellx1000\intbl A\cell\row}")
+        Package::parse(r"{\rtf1\ansi{\*\vendor retained}\trowd\cellx1000\intbl A\cell\row}")
             .unwrap();
     let exact = source.to_bytes().unwrap();
     let mut edit = source.edit();
@@ -2408,8 +2406,8 @@ fn destination_edit_refuses_unknown_syntax_without_mutating_source() {
 
 #[test]
 fn transfer_is_dependency_free_and_uses_checked_ordinary_transactions() {
-    let paragraph_source = Document::parse(r"{\rtf1\ansi Imported}").unwrap();
-    let paragraph_target = Document::parse(r"{\rtf1\ansi Existing}").unwrap();
+    let paragraph_source = Package::parse(r"{\rtf1\ansi Imported}").unwrap();
+    let paragraph_target = Package::parse(r"{\rtf1\ansi Existing}").unwrap();
     let paragraph =
         TransferPlan::plain_paragraph(&paragraph_source, 0, &paragraph_target, 0).unwrap();
     assert!(paragraph.is_dependency_free());
@@ -2419,9 +2417,9 @@ fn transfer_is_dependency_free_and_uses_checked_ordinary_transactions() {
     );
 
     let cell_source =
-        Document::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl Source cell\cell\row}").unwrap();
+        Package::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl Source cell\cell\row}").unwrap();
     let cell_target =
-        Document::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl Target\cell\row}").unwrap();
+        Package::parse(r"{\rtf1\ansi\trowd\cellx1000\intbl Target\cell\row}").unwrap();
     let transfer = TransferPlan::table_cell_text(
         &cell_source,
         &TableCellPath::outer(0, 0, 0),
@@ -2439,7 +2437,7 @@ fn transfer_is_dependency_free_and_uses_checked_ordinary_transactions() {
 #[test]
 fn destination_subedits_join_disjointly_and_plan_same_target_conflicts() {
     let source =
-        Document::parse(r"{\rtf1\ansi\trowd\cellx1000\cellx2000\intbl A\cell B\cell\row}").unwrap();
+        Package::parse(r"{\rtf1\ansi\trowd\cellx1000\cellx2000\intbl A\cell B\cell\row}").unwrap();
     let limits = CompositionLimits::new(4, 8, 16, 8);
     let mut first = source.edit();
     first
@@ -2509,7 +2507,7 @@ fn destination_subedits_join_disjointly_and_plan_same_target_conflicts() {
 
 #[test]
 fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
-    let source = Document::parse(r"{\rtf1\ansi\fs24\afs22 Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\fs24\afs22 Alpha Beta}").unwrap();
     assert!(
         source
             .body()
@@ -2533,7 +2531,7 @@ fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
     assert!(encoded.contains(r"\fs23 "));
     assert!(encoded.contains(r"\fs24 "));
     assert!(!encoded.contains(r"\fs0"));
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     assert_eq!(reopened.text(), source.text());
     let size_23_text = reopened
         .body()
@@ -2558,17 +2556,17 @@ fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
             .runs()
             .all(|run| run.format().size().get() == 24)
     );
-    let reopened_restored = Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    let reopened_restored = Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
     assert_eq!(reopened_restored.text(), source.text());
 
-    let plain = Document::parse(r"{\rtf1\ansi Plain}").unwrap();
+    let plain = Package::parse(r"{\rtf1\ansi Plain}").unwrap();
     assert!(
         plain
             .body()
             .runs()
             .all(|run| run.format().size().get() == 24)
     );
-    let defchp = Document::parse(r"{\rtf1\ansi{\*\defchp\fs23} Plain}").unwrap();
+    let defchp = Package::parse(r"{\rtf1\ansi{\*\defchp\fs23} Plain}").unwrap();
     assert!(
         defchp
             .body()
@@ -2584,7 +2582,7 @@ fn font_size_property_preserves_boundaries_defaults_and_inverse_semantics() {
         )
         .unwrap();
     let maximum =
-        Document::from_bytes(&maximum.commit().unwrap().snapshot().to_bytes().unwrap()).unwrap();
+        Package::from_bytes(&maximum.commit().unwrap().snapshot().to_bytes().unwrap()).unwrap();
     assert!(
         maximum
             .body()
@@ -2599,7 +2597,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
     use serde_json::{Number, Value};
     use std::collections::BTreeMap;
 
-    let mixed = Document::parse(r"{\rtf1\ansi {\fs23 Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\fs23 Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_font_size(TextSpan::new(0, 10).unwrap(), NonZeroU16::new(24).unwrap()),
@@ -2608,7 +2606,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
         ))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit
@@ -2619,7 +2617,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .set_text_font_size(TextSpan::new(0, 5).unwrap(), NonZeroU16::new(23).unwrap())
@@ -2631,7 +2629,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
         ))
     ));
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let mut edit = source.edit();
     edit.set_text_font_size(TextSpan::new(0, 5).unwrap(), NonZeroU16::new(23).unwrap())
         .unwrap();
@@ -2664,7 +2662,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
             .runs()
             .all(|run| run.format().size().get() == 24)
     );
-    Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
 
     let artifact = litchi_core::patch::BlobId::of(&source.to_bytes().unwrap()).as_hex();
     let make_patch = |precondition: Value, value: Value| {
@@ -2734,7 +2732,7 @@ fn font_size_property_refuses_mixed_transport_and_malformed_durable_values() {
 
 #[test]
 fn baseline_property_covers_all_states_reopen_noop_and_inverse() {
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let states = [
         CharacterBaseline::Normal,
         CharacterBaseline::Superscript,
@@ -2769,7 +2767,7 @@ fn baseline_property_covers_all_states_reopen_noop_and_inverse() {
             assert!(commit.diagnostics().changed());
         }
 
-        let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+        let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened.body().runs().next().unwrap().format().baseline(),
             baseline
@@ -2795,7 +2793,7 @@ fn baseline_property_respects_ungrouped_legacy_control_boundaries() {
     ];
 
     for (control, initial, target) in cases {
-        let source = Document::parse(&format!(r"{{\rtf1\ansi Alpha\{control} Beta}}")).unwrap();
+        let source = Package::parse(&format!(r"{{\rtf1\ansi Alpha\{control} Beta}}")).unwrap();
         let mut runs = source.body().runs();
         let alpha = runs.next().unwrap();
         let beta = runs.next().unwrap();
@@ -2808,7 +2806,7 @@ fn baseline_property_respects_ungrouped_legacy_control_boundaries() {
         edit.set_text_baseline(TextSpan::new(5, 9).unwrap(), target)
             .unwrap();
         let commit = edit.commit().unwrap();
-        let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+        let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
         assert_eq!(
             reopened
                 .body()
@@ -2835,12 +2833,12 @@ fn baseline_property_respects_ungrouped_legacy_control_boundaries() {
 #[test]
 fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_or_opaque() {
     let source =
-        Document::parse(r"{\rtf1\ansi\b\expndtw20\charscalex120\kerning8 Alpha Beta}").unwrap();
+        Package::parse(r"{\rtf1\ansi\b\expndtw20\charscalex120\kerning8 Alpha Beta}").unwrap();
     let mut edit = source.edit();
     edit.set_text_baseline(TextSpan::new(6, 10).unwrap(), CharacterBaseline::Subscript)
         .unwrap();
     let commit = edit.commit().unwrap();
-    let reopened = Document::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&commit.snapshot().to_bytes().unwrap()).unwrap();
     let alpha = reopened
         .body()
         .runs()
@@ -2882,14 +2880,14 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
         source.to_bytes().unwrap()
     );
 
-    let mixed = Document::parse(r"{\rtf1\ansi {\super Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\super Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_baseline(TextSpan::new(0, 10).unwrap(), CharacterBaseline::Normal),
         Err(Error::UnsupportedSource(_))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit
@@ -2898,7 +2896,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Superscript)
@@ -2910,7 +2908,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
         ))
     ));
 
-    let opaque = Document::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
+    let opaque = Package::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
     let mut opaque_edit = opaque.edit();
     opaque_edit
         .set_text_baseline(
@@ -2926,7 +2924,7 @@ fn baseline_property_preserves_unrelated_formatting_and_refuses_mixed_structure_
 
 #[test]
 fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets() {
-    let source = Document::parse(
+    let source = Package::parse(
         r"{\rtf1\ansi\b\i\uldb\strike\striked\super\scaps\caps\v\shad\embo\impr\outl Alpha \outl0 Beta}",
     )
     .unwrap();
@@ -2939,7 +2937,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
     assert!(!noop_commit.diagnostics().changed());
     assert!(noop_commit.snapshot().same_snapshot(&source));
 
-    let composed_source = Document::parse(r"{\rtf1\ansi\outl Alpha \outl0 Beta}").unwrap();
+    let composed_source = Package::parse(r"{\rtf1\ansi\outl Alpha \outl0 Beta}").unwrap();
     let mut composed = composed_source.edit();
     composed
         .set_text_outline(TextSpan::new(0, 6).unwrap(), true)
@@ -2949,7 +2947,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
         .unwrap();
     let composed_commit = composed.commit().unwrap();
     let composed_reopened =
-        Document::from_bytes(&composed_commit.snapshot().to_bytes().unwrap()).unwrap();
+        Package::from_bytes(&composed_commit.snapshot().to_bytes().unwrap()).unwrap();
     let alpha = composed_reopened
         .body()
         .runs()
@@ -2985,7 +2983,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
         assert!(bytes.windows(control.len()).any(|window| window == control));
     }
 
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     let alpha = reopened
         .body()
         .runs()
@@ -3014,7 +3012,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
 
     let restored = commit.patch().inverse().apply(commit.snapshot()).unwrap();
     assert_eq!(restored.text(), source.text());
-    let reopened_restored = Document::from_bytes(&restored.to_bytes().unwrap()).unwrap();
+    let reopened_restored = Package::from_bytes(&restored.to_bytes().unwrap()).unwrap();
     let restored_alpha = reopened_restored
         .body()
         .runs()
@@ -3033,7 +3031,7 @@ fn outline_property_handles_ungrouped_later_run_boundaries_and_preserves_facets(
 
 #[test]
 fn outline_property_refuses_mixed_structure_opaque_and_non_ascii_sources() {
-    let mixed = Document::parse(r"{\rtf1\ansi {\outl Alpha} Beta}").unwrap();
+    let mixed = Package::parse(r"{\rtf1\ansi {\outl Alpha} Beta}").unwrap();
     let mut mixed_edit = mixed.edit();
     assert!(matches!(
         mixed_edit.set_text_outline(TextSpan::new(0, 10).unwrap(), false),
@@ -3042,7 +3040,7 @@ fn outline_property_refuses_mixed_structure_opaque_and_non_ascii_sources() {
         ))
     ));
 
-    let paragraph = Document::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
+    let paragraph = Package::parse(r"{\rtf1\ansi Alpha\par Beta}").unwrap();
     let mut paragraph_edit = paragraph.edit();
     assert!(matches!(
         paragraph_edit.set_text_outline(TextSpan::new(0, 6).unwrap(), true),
@@ -3051,7 +3049,7 @@ fn outline_property_refuses_mixed_structure_opaque_and_non_ascii_sources() {
         ))
     ));
 
-    let opaque = Document::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
+    let opaque = Package::parse(r"{\rtf1\ansi Alpha{\future42 retained}}").unwrap();
     let mut opaque_edit = opaque.edit();
     opaque_edit
         .set_text_outline(TextSpan::new(0, 5).unwrap(), true)
@@ -3062,7 +3060,7 @@ fn outline_property_refuses_mixed_structure_opaque_and_non_ascii_sources() {
     ));
 
     let cp1252_bytes = [br"{\rtf1\ansi\ansicpg1252 Caf".as_slice(), &[0xe9], b"}"].concat();
-    let cp1252 = Document::from_bytes(&cp1252_bytes).unwrap();
+    let cp1252 = Package::from_bytes(&cp1252_bytes).unwrap();
     let mut cp1252_edit = cp1252.edit();
     cp1252_edit
         .set_text_outline(TextSpan::new(0, 5).unwrap(), true)
@@ -3074,7 +3072,7 @@ fn outline_property_refuses_mixed_structure_opaque_and_non_ascii_sources() {
         ))
     ));
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha Beta}").unwrap();
     let mut conflict = source.edit();
     conflict
         .set_text_outline(TextSpan::new(0, 5).unwrap(), true)
@@ -3093,7 +3091,7 @@ fn outline_property_has_durable_schema_replay_stale_and_malformed_value_guards()
     use litchi_core::patch::Patch;
     use serde_json::Value;
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let mut edit = source.edit();
     edit.set_text_outline(TextSpan::new(0, 5).unwrap(), true)
         .unwrap();
@@ -3173,7 +3171,7 @@ fn baseline_property_has_durable_schema_replay_stale_and_malformed_value_guards(
     use litchi_core::patch::Patch;
     use serde_json::Value;
 
-    let source = Document::parse(r"{\rtf1\ansi Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Alpha}").unwrap();
     let mut edit = source.edit();
     edit.set_text_baseline(
         TextSpan::new(0, 5).unwrap(),
@@ -3277,7 +3275,7 @@ fn baseline_property_has_durable_schema_replay_stale_and_malformed_value_guards(
 
 #[test]
 fn character_property_edits_preserve_paragraph_formatting() {
-    let source = Document::parse(r"{\rtf1\ansi\sb120\pagebb Alpha}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi\sb120\pagebb Alpha}").unwrap();
     let exact = source.to_bytes().unwrap();
     let mut edit = source.edit();
     edit.set_text_baseline(TextSpan::new(0, 5).unwrap(), CharacterBaseline::Superscript)
@@ -3294,7 +3292,7 @@ fn character_property_edits_preserve_paragraph_formatting() {
             .windows(br"\pagebb".len())
             .any(|value| value == br"\pagebb")
     );
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     assert_eq!(
         reopened.body().runs().next().unwrap().format().baseline(),
         CharacterBaseline::Superscript

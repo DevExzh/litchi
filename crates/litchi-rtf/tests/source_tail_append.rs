@@ -8,7 +8,7 @@ use litchi_core::{
     Budget, CancellationSource, ExecutionContext, ExecutionLimits, Limits as CoreLimits, ReadAt,
     Resource, SourceVersion,
 };
-use litchi_rtf::Document;
+use litchi_rtf::Package;
 use litchi_rtf::tail_append::{
     PlainParagraph, PlainRun, TailAppendError, TailAppendLimits, TailAppendOutputProgress,
     TailAppendPublicationError, TailAppendPublicationLimits, TailAppendSourceEdit,
@@ -153,15 +153,15 @@ fn publication_limits() -> TailAppendPublicationLimits {
     TailAppendPublicationLimits::new(3, 2)
 }
 
-fn fixture() -> (Vec<u8>, Document) {
+fn fixture() -> (Vec<u8>, Package) {
     let bytes = br#"{\rtf1\ansi A\par B}"#.to_vec();
-    let document = Document::from_bytes(&bytes).unwrap();
+    let document = Package::from_bytes(&bytes).unwrap();
     (bytes, document)
 }
 
 fn make_plan(
     source: Arc<TestSource>,
-    document: &Document,
+    document: &Package,
     text: &str,
 ) -> litchi_rtf::tail_append::TailAppendSourcePublicationPlan {
     let proof = TailAppendSourceProof::from_document_for_source(
@@ -189,7 +189,7 @@ fn source_plan_is_exact_bounded_and_reopenable_after_document_drop() {
     assert_eq!(report.source_bytes(), bytes.len());
     assert_eq!(report.inserted_bytes(), plan.inserted_bytes());
     assert!(report.largest_write() <= 2);
-    let reopened = Document::from_bytes(&output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap();
     assert_eq!(reopened.text(), "A\nB\nC\n");
 }
 
@@ -217,7 +217,7 @@ fn source_plan_noop_preserves_exact_bytes() {
 #[test]
 fn source_proof_uses_parser_break_tokens_not_raw_suffixes() {
     let escaped = br#"{\rtf1\ansi A \\par}"#.to_vec();
-    let escaped_document = Document::from_bytes(&escaped).unwrap();
+    let escaped_document = Package::from_bytes(&escaped).unwrap();
     let escaped_source = TestSource::new(escaped, 2);
     let escaped_proof = TailAppendSourceProof::from_document_for_source(
         &escaped_document,
@@ -242,12 +242,12 @@ fn source_proof_uses_parser_break_tokens_not_raw_suffixes() {
         .write_to(&mut escaped_output, &execution)
         .unwrap();
     assert_eq!(
-        Document::from_bytes(&escaped_output).unwrap().text(),
+        Package::from_bytes(&escaped_output).unwrap().text(),
         "A \\par\nC\n"
     );
 
     let real = br#"{\rtf1\ansi A\par\b}"#.to_vec();
-    let real_document = Document::from_bytes(&real).unwrap();
+    let real_document = Package::from_bytes(&real).unwrap();
     let real_source = TestSource::new(real, 2);
     let real_proof = TailAppendSourceProof::from_document_for_source(
         &real_document,
@@ -264,7 +264,7 @@ fn source_proof_uses_parser_break_tokens_not_raw_suffixes() {
         .unwrap();
     let mut real_output = Vec::new();
     real_plan.write_to(&mut real_output, &execution).unwrap();
-    assert_eq!(Document::from_bytes(&real_output).unwrap().text(), "A\nC\n");
+    assert_eq!(Package::from_bytes(&real_output).unwrap().text(), "A\nC\n");
 }
 
 #[test]
@@ -751,7 +751,7 @@ fn durable_source_plan_round_trips_and_forged_source_never_grants_proof() {
     let restored = parsed.inverse().apply(&target).unwrap();
     assert_eq!(restored.text(), document.text());
 
-    let foreign = Document::from_bytes(br#"{\rtf1\ansi Foreign}"#).unwrap();
+    let foreign = Package::from_bytes(br#"{\rtf1\ansi Foreign}"#).unwrap();
     assert!(matches!(
         parsed.apply(&foreign),
         Err(TailAppendError::PatchConflict)

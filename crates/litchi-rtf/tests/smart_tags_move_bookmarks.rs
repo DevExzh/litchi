@@ -1,12 +1,12 @@
 mod repair_support;
 
-use litchi_rtf::{Document, RtfResult, SmartTagAttribute};
+use litchi_rtf::{Package, RtfResult, SmartTagAttribute};
 use std::borrow::Cow;
 
 #[test]
 fn parses_smart_tag_and_move_bookmark_metadata() -> RtfResult<()> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0{\xmlattrname Month}{\xmlattrvalue 4}}}4/11{\*\xmlclose}{\*\mvfmf tag 3412D4C3B2A1}m{\*\mvfml tag}{\*\mvtof tag 7856D4C3B2A1}n{\*\mvtol tag}}"#;
-    let document = Document::parse(source)?;
+    let document = Package::parse(source)?;
     assert_eq!(document.text(), "4/11mn");
     assert_eq!(document.smart_tags().len(), 1);
     assert_eq!(document.smart_tags()[0].name, "date");
@@ -32,7 +32,7 @@ fn parses_smart_tag_and_move_bookmark_metadata() -> RtfResult<()> {
 #[test]
 fn smart_tag_accepts_zero_xml_namespace_reference() -> RtfResult<()> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns0{\factoidname date}}x{\*\xmlclose}}"#;
-    let document = Document::parse(source)?;
+    let document = Package::parse(source)?;
     assert_eq!(document.smart_tags().len(), 1);
     assert_eq!(document.smart_tags()[0].namespace, Some(0));
     assert_eq!(document.smart_tags()[0].content, "x");
@@ -44,7 +44,7 @@ fn smart_tag_accepts_zero_xml_namespace_reference() -> RtfResult<()> {
 fn smart_tag_accepts_normative_direct_attribute_pcdata_and_preserves_source()
 -> Result<(), Box<dyn std::error::Error>> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0\xmlattrname Month\xmlattrvalue 4}}4/11{\*\xmlclose}}"#;
-    let document = Document::parse(source)?;
+    let document = Package::parse(source)?;
     assert_eq!(document.smart_tags()[0].attributes[0].namespace, Some(0));
     assert_eq!(document.smart_tags()[0].attributes[0].name, "Month");
     assert_eq!(document.smart_tags()[0].attributes[0].value, "4");
@@ -57,7 +57,7 @@ fn smart_tag_accepts_normative_direct_attribute_pcdata_and_preserves_source()
     edit.set_smart_tag(0, edited_tag.clone())?;
     let commit = edit.commit()?;
     let bytes = commit.snapshot().to_bytes()?;
-    let reopened = Document::from_bytes(&bytes)?;
+    let reopened = Package::from_bytes(&bytes)?;
     assert_eq!(reopened.smart_tags()[0].name, edited_tag.name);
     assert_eq!(reopened.smart_tags()[0].attributes[0].value, "4");
     Ok(())
@@ -67,7 +67,7 @@ fn smart_tag_accepts_normative_direct_attribute_pcdata_and_preserves_source()
 fn unmatched_move_start_is_ignored_in_the_semantic_model() -> Result<(), Box<dyn std::error::Error>>
 {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}{\*\mvfmf orphan 0100EFCDAB00}}"#;
-    let document = Document::parse(source)?;
+    let document = Package::parse(source)?;
     assert_eq!(document.smart_tags().len(), 1);
     assert!(document.move_bookmarks().is_empty());
     assert_eq!(document.text(), "x");
@@ -78,10 +78,10 @@ fn unmatched_move_start_is_ignored_in_the_semantic_model() -> Result<(), Box<dyn
 #[test]
 fn malformed_move_marker_fields_are_rejected() {
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(r#"{\rtf1\ansi{\*\mvfmf bad-tag 0100EFCDAB00}}"#)
+        &Package::parse(r#"{\rtf1\ansi{\*\mvfmf bad-tag 0100EFCDAB00}}"#)
     ));
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(r#"{\rtf1\ansi{\*\mvfml tag trailing}}"#)
+        &Package::parse(r#"{\rtf1\ansi{\*\mvfml tag trailing}}"#)
     ));
     for source in [
         r#"{\rtf1\ansi{\*\mvfmf1 tag 0100EFCDAB00}x{\*\mvfml tag}}"#,
@@ -90,7 +90,7 @@ fn malformed_move_marker_fields_are_rejected() {
         r#"{\rtf1\ansi{\*\mvtol1 tag}}"#,
     ] {
         assert!(repair_support::rejected_or_parameter_repaired(
-            &Document::parse(source)
+            &Package::parse(source)
         ));
     }
 }
@@ -100,10 +100,10 @@ fn smart_tags_and_moves_are_main_body_only() {
     let smart_tag_in_header =
         r#"{\rtf1\ansi{\header{\*\xmlopen\xmlns1{\factoidname date}}x{\*\xmlclose}}body}"#;
     let move_in_footer = r#"{\rtf1\ansi{\footer{\*\mvfmf tag 3412D4C3B2A1}x{\*\mvfml tag}}body}"#;
-    let smart = Document::parse(smart_tag_in_header).unwrap();
+    let smart = Package::parse(smart_tag_in_header).unwrap();
     assert!(smart.smart_tags().is_empty());
     assert_eq!(smart.to_bytes().unwrap(), smart_tag_in_header.as_bytes());
-    let moved = Document::parse(move_in_footer).unwrap();
+    let moved = Package::parse(move_in_footer).unwrap();
     assert!(moved.move_bookmarks().is_empty());
     assert_eq!(moved.to_bytes().unwrap(), move_in_footer.as_bytes());
 }
@@ -112,48 +112,48 @@ fn smart_tags_and_moves_are_main_body_only() {
 fn smart_tag_enforces_page_153_namespace_and_attribute_grammar() {
     let missing_xml_namespace = r#"{\rtf1\ansi{\*\xmlopen{\factoidname date}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(missing_xml_namespace)
+        &Package::parse(missing_xml_namespace)
     ));
 
     let xmlattr_alias = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr1{\xmlattrname Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(xmlattr_alias)
+        &Package::parse(xmlattr_alias)
     ));
 
     let missing_attribute_namespace = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr{\xmlattrname Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(missing_attribute_namespace)
+        &Package::parse(missing_attribute_namespace)
     ));
 
     let value_before_name = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0{\xmlattrvalue 4}{\xmlattrname Month}}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(value_before_name)
+        &Package::parse(value_before_name)
     ));
 
     let direct_value_before_name = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0\xmlattrvalue 4\xmlattrname Month}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(direct_value_before_name)
+        &Package::parse(direct_value_before_name)
     ));
 
     let negative_namespace = r#"{\rtf1\ansi{\*\xmlopen\xmlns-1{\factoidname date}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(negative_namespace)
+        &Package::parse(negative_namespace)
     ));
 
     let negative_attribute_namespace = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns-1{\xmlattrname Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(negative_attribute_namespace)
+        &Package::parse(negative_attribute_namespace)
     ));
 
     let missing_namespace_parameter =
         r#"{\rtf1\ansi{\*\xmlopen\xmlns{\factoidname date}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(missing_namespace_parameter)
+        &Package::parse(missing_namespace_parameter)
     ));
 
     let missing_attribute_namespace_parameter = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns{\xmlattrname Month}{\xmlattrvalue 4}}}x{\*\xmlclose}}"#;
     assert!(repair_support::rejected_or_parameter_repaired(
-        &Document::parse(missing_attribute_namespace_parameter)
+        &Package::parse(missing_attribute_namespace_parameter)
     ));
 
     for source in [
@@ -164,7 +164,7 @@ fn smart_tag_enforces_page_153_namespace_and_attribute_grammar() {
         r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}{\xmlattr\xmlattrns0{\xmlattrname Month}{\xmlattrvalue1 4}}}x{\*\xmlclose}}"#,
     ] {
         assert!(repair_support::rejected_or_parameter_repaired(
-            &Document::parse(source)
+            &Package::parse(source)
         ));
     }
 }
@@ -182,8 +182,8 @@ fn smart_tag_with_attribute_count(count: usize) -> String {
 
 #[test]
 fn smart_tag_attribute_count_is_checked_before_parsing_the_next_attribute() {
-    assert!(Document::parse(&smart_tag_with_attribute_count(1_024)).is_ok());
-    assert!(Document::parse(&smart_tag_with_attribute_count(1_025)).is_err());
+    assert!(Package::parse(&smart_tag_with_attribute_count(1_024)).is_ok());
+    assert!(Package::parse(&smart_tag_with_attribute_count(1_025)).is_err());
 }
 
 #[test]
@@ -193,25 +193,25 @@ fn smart_tag_and_move_aggregate_limits_are_checked_at_the_boundary() -> RtfResul
     let mut smart_source = String::from(r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}"#);
     smart_source.push_str(&"x".repeat(LIMIT - "date".len()));
     smart_source.push_str(r#"{\*\xmlclose}}"#);
-    assert!(Document::parse(&smart_source).is_ok());
+    assert!(Package::parse(&smart_source).is_ok());
     let close = smart_source.len() - r#"{\*\xmlclose}}"#.len();
     smart_source.insert(close, 'x');
-    assert!(Document::parse(&smart_source).is_err());
+    assert!(Package::parse(&smart_source).is_err());
 
     let mut move_source = String::from(r#"{\rtf1\ansi{\*\mvfmf tag 3412D4C3B2A1}"#);
     move_source.push_str(&"x".repeat(LIMIT - "tag".len()));
     move_source.push_str(r#"{\*\mvfml tag}}"#);
-    assert!(Document::parse(&move_source).is_ok());
+    assert!(Package::parse(&move_source).is_ok());
     let close = move_source.len() - r#"{\*\mvfml tag}}"#.len();
     move_source.insert(close, 'x');
-    assert!(Document::parse(&move_source).is_err());
+    assert!(Package::parse(&move_source).is_err());
     Ok(())
 }
 
 #[test]
 fn canonical_writer_emits_metadata_and_reopens() -> RtfResult<()> {
     let source = r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}{\*\mvfmf tag 3412D4C3B2A1}m{\*\mvfml tag}}"#;
-    let document = Document::parse(source)?;
+    let document = Package::parse(source)?;
     let mut output = Vec::new();
     let mut writer = litchi_rtf::write::Writer::with_options(
         &mut output,
@@ -224,7 +224,7 @@ fn canonical_writer_emits_metadata_and_reopens() -> RtfResult<()> {
     let written = String::from_utf8(output).unwrap();
     assert!(written.contains(r#"{\*\xmlopen"#));
     assert!(written.contains(r#"{\*\mvfmf tag 3412D4C3B2A1}"#));
-    let reopened = Document::parse(&written)?;
+    let reopened = Package::parse(&written)?;
     assert_eq!(reopened.smart_tags()[0].content, "x");
     assert_eq!(reopened.move_bookmarks()[0].content, "m");
     Ok(())
@@ -233,7 +233,7 @@ fn canonical_writer_emits_metadata_and_reopens() -> RtfResult<()> {
 #[test]
 fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
 -> Result<(), Box<dyn std::error::Error>> {
-    let source = Document::parse(
+    let source = Package::parse(
         r#"{\rtf1\ansi{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}{\*\mvfmf tag 3412D4C3B2A1}m{\*\mvfml tag}}"#,
     )?;
     let mut smart_tag = source.smart_tags()[0].clone();
@@ -269,7 +269,7 @@ fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
             .apply(commit.snapshot())?
             .same_snapshot(&source)
     );
-    let foreign = Document::parse(r#"{\rtf1\ansi other}"#)?;
+    let foreign = Package::parse(r#"{\rtf1\ansi other}"#)?;
     assert!(matches!(
         commit.patch().apply(&foreign),
         Err(litchi_rtf::edit::Error::PatchConflict)
@@ -279,7 +279,7 @@ fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
     std::fs::write("/var/tmp/litchi-spec-gap-smart-move.rtf", &bytes).map_err(|error| {
         litchi_rtf::Error::MalformedDocument(format!("artifact write failed: {error}"))
     })?;
-    let reopened = Document::from_bytes(&bytes)?;
+    let reopened = Package::from_bytes(&bytes)?;
     assert_eq!(reopened.smart_tags()[0], smart_tag);
     assert_eq!(reopened.move_bookmarks()[0], move_bookmark);
 
@@ -295,7 +295,7 @@ fn source_bound_metadata_edits_are_atomic_reversible_and_library_generated()
 #[test]
 fn changed_publication_refuses_unmatched_move_source() -> Result<(), Box<dyn std::error::Error>> {
     let source_bytes = br#"{\rtf1\ansi{\*\mvfmf orphan 0100EFCDAB00}{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}}"#;
-    let source = Document::parse(std::str::from_utf8(source_bytes)?)?;
+    let source = Package::parse(std::str::from_utf8(source_bytes)?)?;
     let mut noop = source.edit();
     noop.set_smart_tag(0, source.smart_tags()[0].clone())?;
     let noop = noop.commit()?;
@@ -322,7 +322,7 @@ fn changed_publication_refuses_unmatched_move_source() -> Result<(), Box<dyn std
 fn changed_publication_refuses_unmatched_move_end() -> Result<(), Box<dyn std::error::Error>> {
     let source_bytes =
         br#"{\rtf1\ansi{\*\mvfml orphan}{\*\xmlopen\xmlns2{\factoidname date}}x{\*\xmlclose}}"#;
-    let source = Document::parse(std::str::from_utf8(source_bytes)?)?;
+    let source = Package::parse(std::str::from_utf8(source_bytes)?)?;
     let mut edit = source.edit();
     let mut value = source.smart_tags()[0].clone();
     value.name = Cow::Borrowed("time");
@@ -351,10 +351,10 @@ fn raw_canonical_writer_refuses_unmatched_move_source() -> Result<(), Box<dyn st
 #[test]
 fn duplicate_move_tag_within_one_location_is_rejected() {
     let duplicate_open = r#"{\rtf1\ansi{\*\mvfmf tag 3412D4C3B2A1}{\*\mvfmf tag 3412D4C3B2A1}x{\*\mvfml tag}{\*\mvfml tag}}"#;
-    assert!(Document::parse(duplicate_open).is_err());
+    assert!(Package::parse(duplicate_open).is_err());
 
     let duplicate_completed = r#"{\rtf1\ansi{\*\mvfmf tag 3412D4C3B2A1}x{\*\mvfml tag}{\*\mvfmf tag 3412D4C3B2A1}y{\*\mvfml tag}}"#;
-    assert!(Document::parse(duplicate_completed).is_err());
+    assert!(Package::parse(duplicate_completed).is_err());
 }
 
 #[test]
@@ -365,7 +365,7 @@ fn smart_tag_count_is_checked_before_event_growth() {
         source.push_str(r#"{\*\xmlopen\xmlns1{\factoidname x}}{\*\xmlclose}"#);
     }
     source.push('}');
-    assert!(Document::parse(&source).is_err());
+    assert!(Package::parse(&source).is_err());
 }
 
 #[test]
@@ -381,6 +381,6 @@ fn move_bookmark_indexing_handles_the_safety_limit_without_quadratic_scans() {
     }
     source.push('}');
 
-    let document = Document::parse(&source).expect("bounded move-bookmark parse");
+    let document = Package::parse(&source).expect("bounded move-bookmark parse");
     assert_eq!(document.move_bookmarks().len(), COUNT);
 }

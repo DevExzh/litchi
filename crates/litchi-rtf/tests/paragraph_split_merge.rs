@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use litchi_rtf::{Document, ProtectionType, edit::Error};
+use litchi_rtf::{Package, ProtectionType, edit::Error};
 
 fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -19,7 +19,7 @@ fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
 
 #[test]
 fn split_is_lossless_durable_reversible_and_sequential() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let source_bytes = source.to_bytes().unwrap();
 
     let mut edit = source.edit();
@@ -39,13 +39,13 @@ fn split_is_lossless_durable_reversible_and_sequential() {
     let restored = applied.apply_durable(&durable.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source_bytes);
 
-    let foreign = Document::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();
+    let foreign = Package::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();
     assert!(matches!(
         foreign.apply_durable(&durable),
         Err(Error::PatchConflict)
     ));
 
-    let leading_empty = Document::parse(r"{\rtf1\ansi First\par}").unwrap();
+    let leading_empty = Package::parse(r"{\rtf1\ansi First\par}").unwrap();
     let mut leading_edit = leading_empty.edit();
     leading_edit.split_paragraph(0, 0).unwrap();
     let leading_commit = leading_edit.commit().unwrap();
@@ -69,7 +69,7 @@ fn durable_split_rejects_forged_noncanonical_boundary() {
     use litchi_core::patch::{BlobBundle, Patch, ReversibleOperation};
     use serde_json::Value;
 
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let mut edit = source.edit();
     edit.split_paragraph(1, 6).unwrap();
     let durable = edit
@@ -107,7 +107,7 @@ fn durable_split_rejects_forged_noncanonical_boundary() {
 
 #[test]
 fn merge_removes_only_the_adjacent_boundary() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
     let source_bytes = source.to_bytes().unwrap();
     let mut edit = source.edit();
     edit.merge_paragraphs(0, 1).unwrap();
@@ -139,7 +139,7 @@ fn merge_preserves_exact_boundary_bytes_in_durable_inverse() {
     use litchi_core::patch::{BlobBundle, Patch, ReversibleOperation};
     use serde_json::Value;
 
-    let source = Document::parse(r"{\rtf1\ansi First\par\par}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par\par}").unwrap();
     let source_bytes = source.to_bytes().unwrap();
     let mut edit = source.edit();
     edit.merge_paragraphs(0, 1).unwrap();
@@ -187,7 +187,7 @@ fn split_and_merge_refuse_external_and_dynamic_metadata_exactly() {
     ];
 
     for source_text in sources {
-        let source = Document::parse(source_text).unwrap();
+        let source = Package::parse(source_text).unwrap();
         let original = source.to_bytes().unwrap();
 
         let mut split = source.edit();
@@ -210,7 +210,7 @@ fn split_and_merge_refuse_external_and_dynamic_metadata_exactly() {
 
 #[test]
 fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
-    let source = Document::parse(r"{\rtf1\ansi First\par Second}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi First\par Second}").unwrap();
 
     let mut out_of_range = source.edit();
     assert!(matches!(
@@ -233,7 +233,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     ));
     assert_eq!(limited.operation_count(), 0);
 
-    let unicode = Document::parse(r"{\rtf1\ansi Caf\'e9}").unwrap();
+    let unicode = Package::parse(r"{\rtf1\ansi Caf\'e9}").unwrap();
     let mut non_boundary = unicode.edit();
     assert!(matches!(
         non_boundary.split_paragraph(0, 4),
@@ -241,7 +241,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     ));
     assert_eq!(non_boundary.operation_count(), 0);
 
-    let terminal = Document::parse(r"{\rtf1\ansi First}").unwrap();
+    let terminal = Package::parse(r"{\rtf1\ansi First}").unwrap();
     let mut terminal_edit = terminal.edit();
     assert!(matches!(
         terminal_edit.split_paragraph(0, 5),
@@ -253,7 +253,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
         r"{\rtf1\ansi First{\b nested}Second}",
         r"{\rtf1\ansi First\qr Second}",
     ] {
-        let source = Document::parse(unsafe_source).unwrap();
+        let source = Package::parse(unsafe_source).unwrap();
         let mut edit = source.edit();
         let result = edit.split_paragraph(0, 1);
         assert!(
@@ -263,8 +263,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
         assert_eq!(edit.operation_count(), 0);
     }
 
-    let protected =
-        Document::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
+    let protected = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
     let mut edit = protected.edit();
     edit.split_paragraph(0, 1).unwrap();
     assert!(matches!(
@@ -274,7 +273,7 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
         })
     ));
 
-    let undelimited_empty = Document::parse(r"{\rtf1\ansi\par First}").unwrap();
+    let undelimited_empty = Package::parse(r"{\rtf1\ansi\par First}").unwrap();
     let mut undelimited_edit = undelimited_empty.edit();
     assert!(matches!(
         undelimited_edit.merge_paragraphs(0, 1),

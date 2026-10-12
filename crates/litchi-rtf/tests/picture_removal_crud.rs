@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Document,
+    Package,
     edit::{Error, Limits, MAX_PICTURE_REMOVAL_OPERATIONS},
 };
 use serde_json::Value;
@@ -33,7 +33,7 @@ fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
 #[test]
 fn removes_one_exact_group_without_reserializing_surrounding_bytes() {
     let input = source();
-    let document = Document::parse(&input).unwrap();
+    let document = Package::parse(&input).unwrap();
     let retained_first = document.pictures()[0].clone();
     let retained_third = document.pictures()[2].clone();
 
@@ -57,7 +57,7 @@ fn removes_one_exact_group_without_reserializing_surrounding_bytes() {
 #[test]
 fn source_relative_batch_is_atomic_and_exactly_reversible() {
     let input = source();
-    let document = Document::parse(&input).unwrap();
+    let document = Package::parse(&input).unwrap();
     let mut edit = document.edit();
     edit.remove_pictures(&[0, 2]).unwrap();
     let commit = edit.commit().unwrap();
@@ -93,7 +93,7 @@ fn source_relative_batch_is_atomic_and_exactly_reversible() {
 #[test]
 fn adjacent_batch_restores_original_group_order_at_one_collapsed_offset() {
     let input = source();
-    let document = Document::parse(&input).unwrap();
+    let document = Package::parse(&input).unwrap();
     let mut edit = document.edit();
     edit.remove_pictures(&[0, 1, 2]).unwrap();
     let commit = edit.commit().unwrap();
@@ -106,7 +106,7 @@ fn adjacent_batch_restores_original_group_order_at_one_collapsed_offset() {
 
 #[test]
 fn rejects_empty_unordered_duplicate_out_of_range_and_bounded_batches_atomically() {
-    let document = Document::parse(&source()).unwrap();
+    let document = Package::parse(&source()).unwrap();
     assert!(matches!(
         document.edit().remove_pictures(&[]),
         Err(Error::EmptyPictureRemovalBatch)
@@ -157,13 +157,13 @@ fn rejects_empty_unordered_duplicate_out_of_range_and_bounded_batches_atomically
 
 #[test]
 fn refuses_nested_mixed_dependent_unknown_and_protected_picture_sources() {
-    let nested = Document::parse(&format!(r"{{\rtf1{{\*\shppict{FIRST}}}}}")).unwrap();
+    let nested = Package::parse(&format!(r"{{\rtf1{{\*\shppict{FIRST}}}}}")).unwrap();
     assert!(matches!(
         nested.edit().remove_picture(0),
         Err(Error::UnsupportedSource(_))
     ));
 
-    let field = Document::parse(&format!(
+    let field = Package::parse(&format!(
         r"{{\rtf1{{\field{{\*\fldinst INCLUDEPICTURE x}}{{\fldrslt{FIRST}}}}}}}"
     ))
     .unwrap();
@@ -172,13 +172,13 @@ fn refuses_nested_mixed_dependent_unknown_and_protected_picture_sources() {
         Err(Error::UnsupportedSource(_))
     ));
 
-    let unknown = Document::parse(&format!(r"{{\rtf1\future42{FIRST}}}")).unwrap();
+    let unknown = Package::parse(&format!(r"{{\rtf1\future42{FIRST}}}")).unwrap();
     assert!(matches!(
         unknown.edit().remove_picture(0),
         Err(Error::UnsupportedSource(_))
     ));
 
-    let protected = Document::parse(&format!(r"{{\rtf1\allprot\enforceprot1{FIRST}}}")).unwrap();
+    let protected = Package::parse(&format!(r"{{\rtf1\allprot\enforceprot1{FIRST}}}")).unwrap();
     let mut edit = protected.edit();
     edit.remove_picture(0).unwrap();
     assert!(matches!(
@@ -190,14 +190,14 @@ fn refuses_nested_mixed_dependent_unknown_and_protected_picture_sources() {
 #[test]
 fn durable_removal_is_artifact_stale_checked_and_rejects_forged_group_preconditions() {
     let input = source();
-    let document = Document::parse(&input).unwrap();
+    let document = Package::parse(&input).unwrap();
     let mut edit = document.edit();
     edit.remove_picture(1).unwrap();
     let commit = edit.commit().unwrap();
     let limits = durable_limits(1);
     let durable = commit.patch().to_durable(limits).unwrap();
 
-    let stale = Document::parse(input.replace("Before", "Changed").as_str()).unwrap();
+    let stale = Package::parse(input.replace("Before", "Changed").as_str()).unwrap();
     assert!(matches!(
         stale.apply_durable(&durable),
         Err(Error::PatchConflict)
@@ -231,7 +231,7 @@ fn durable_removal_is_artifact_stale_checked_and_rejects_forged_group_preconditi
 #[test]
 fn durable_inverse_refuses_a_foreign_artifact_even_with_the_same_visible_text() {
     let input = source();
-    let document = Document::parse(&input).unwrap();
+    let document = Package::parse(&input).unwrap();
     let mut edit = document.edit();
     edit.remove_picture(1).unwrap();
     let commit = edit.commit().unwrap();
@@ -240,7 +240,7 @@ fn durable_inverse_refuses_a_foreign_artifact_even_with_the_same_visible_text() 
     let foreign_bytes = String::from_utf8(commit.snapshot().to_bytes().unwrap())
         .unwrap()
         .replace("89504E47", "89504e47");
-    let foreign = Document::parse(&foreign_bytes).unwrap();
+    let foreign = Package::parse(&foreign_bytes).unwrap();
     assert_eq!(foreign.text(), commit.snapshot().text());
     assert!(matches!(
         foreign.apply_durable(&durable.inverse()),

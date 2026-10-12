@@ -5,7 +5,7 @@
 )]
 
 use litchi_rtf::{
-    Document,
+    Package,
     edit::{Composition, CompositionError, CompositionLimits, Error, Limits},
     transport::compress,
 };
@@ -22,11 +22,11 @@ fn durable_limits() -> litchi_core::patch::PatchLimits {
     )
 }
 
-fn source() -> Document {
-    Document::parse(r"{\rtf1\ansi First\par Second\par Third\par Fourth}").unwrap()
+fn source() -> Package {
+    Package::parse(r"{\rtf1\ansi First\par Second\par Third\par Fourth}").unwrap()
 }
 
-fn paragraph_texts(document: &Document) -> Vec<String> {
+fn paragraph_texts(document: &Package) -> Vec<String> {
     document
         .body()
         .paragraphs()
@@ -34,9 +34,9 @@ fn paragraph_texts(document: &Document) -> Vec<String> {
         .collect()
 }
 
-fn assert_complete_reopen(document: &Document, expected: &[&str]) {
+fn assert_complete_reopen(document: &Package, expected: &[&str]) {
     let bytes = document.to_bytes().unwrap();
-    let reopened = Document::from_bytes(&bytes).unwrap();
+    let reopened = Package::from_bytes(&bytes).unwrap();
     let expected = expected
         .iter()
         .map(|value| (*value).to_string())
@@ -87,7 +87,7 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
             assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
         }
 
-        let foreign = Document::parse(r"{\rtf1\ansi Foreign}").unwrap();
+        let foreign = Package::parse(r"{\rtf1\ansi Foreign}").unwrap();
         assert!(matches!(
             commit.patch().apply(&foreign),
             Err(Error::PatchConflict)
@@ -97,7 +97,7 @@ fn remove_first_middle_and_last_are_exact_reversible_and_reopen() {
 
 #[test]
 fn removing_the_only_paragraph_yields_an_empty_story_and_durable_inverse_restores_it() {
-    let source = Document::parse(r"{\rtf1\ansi Only}").unwrap();
+    let source = Package::parse(r"{\rtf1\ansi Only}").unwrap();
     let mut edit = source.edit();
     edit.remove_paragraph(0).unwrap();
     let commit = edit.commit().unwrap();
@@ -152,7 +152,7 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
     );
     let restored = moved.apply_durable(&durable.inverse()).unwrap();
     assert_eq!(restored.to_bytes().unwrap(), source.to_bytes().unwrap());
-    let foreign = Document::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();
+    let foreign = Package::parse(r"{\rtf1\ansi Foreign\par Source}").unwrap();
     assert!(matches!(
         foreign.apply_durable(&durable),
         Err(Error::PatchConflict)
@@ -246,10 +246,10 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
 #[test]
 fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports() {
     let cases = [
-        Document::parse(r"{\rtf1\ansi One\future42 Two\par Three}").unwrap(),
-        Document::parse(r"{\rtf1\ansi \b One\par Two}").unwrap(),
-        Document::parse(r"{\rtf1\ansi One\line wrapped\par Two}").unwrap(),
-        Document::parse(r"{\rtf1\ansi One\par\trowd\cellx1000\intbl Cell\cell\row}").unwrap(),
+        Package::parse(r"{\rtf1\ansi One\future42 Two\par Three}").unwrap(),
+        Package::parse(r"{\rtf1\ansi \b One\par Two}").unwrap(),
+        Package::parse(r"{\rtf1\ansi One\line wrapped\par Two}").unwrap(),
+        Package::parse(r"{\rtf1\ansi One\par\trowd\cellx1000\intbl Cell\cell\row}").unwrap(),
     ];
     for source in cases {
         let exact = source.to_bytes().unwrap();
@@ -262,7 +262,7 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
     let mut cp1252 = br"{\rtf1\ansi\ansicpg1252 caf".to_vec();
     cp1252.push(0xe9);
     cp1252.extend_from_slice(br"\par Two}");
-    let source = Document::from_bytes(&cp1252).unwrap();
+    let source = Package::from_bytes(&cp1252).unwrap();
     let mut edit = source.edit();
     edit.remove_paragraph(0).unwrap();
     assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
@@ -270,7 +270,7 @@ fn changed_lifecycle_refuses_opaque_formatted_ambiguous_and_nonplain_transports(
 
     let raw = br"{\rtf1\ansi One\par Two}";
     let compressed = compress(raw, true).unwrap();
-    let source = Document::from_bytes(&compressed).unwrap();
+    let source = Package::from_bytes(&compressed).unwrap();
     let mut edit = source.edit();
     edit.move_paragraph(0, 1).unwrap();
     assert!(matches!(edit.commit(), Err(Error::UnsupportedSource(_))));
