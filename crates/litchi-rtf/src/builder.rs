@@ -16,6 +16,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 
 /// Errors returned while constructing a fresh RTF package.
 #[derive(Debug)]
+#[non_exhaustive]
 pub enum Error {
     /// The source profile rejected an input or the generated source.
     Source(crate::Error),
@@ -63,9 +64,27 @@ impl From<io::Error> for Error {
 /// ```
 /// use litchi_rtf::builder::Builder;
 ///
-/// let package = Builder::new().text("Hello")?.build()?;
+/// let package: litchi_rtf::Package = Builder::new().text("Hello")?.build()?;
 /// assert_eq!(package.text(), "Hello");
 /// # Ok::<(), litchi_rtf::builder::Error>(())
+/// ```
+///
+/// The builder is an authoring configuration.  It has no direct byte or file
+/// publication methods; those belong to the [`Package`] returned by
+/// [`Self::build`].
+///
+/// ```compile_fail
+/// use litchi_rtf::Builder;
+///
+/// let builder = Builder::new();
+/// builder.to_bytes();
+/// ```
+///
+/// ```compile_fail
+/// use litchi_rtf::Builder;
+///
+/// let builder = Builder::new();
+/// builder.save("output.rtf");
 /// ```
 pub struct Builder {
     source_limits: SourceLimits,
@@ -257,7 +276,7 @@ mod tests {
 
     #[test]
     fn empty_builder_round_trips_through_package_owner() {
-        let package = Builder::new().build().expect("empty package");
+        let package: Package = Builder::new().build().expect("empty package");
         assert_eq!(package.text(), "");
         assert_eq!(package.paragraph_count(), 0);
         assert_eq!(package.source_limits(), SourceLimits::default());
