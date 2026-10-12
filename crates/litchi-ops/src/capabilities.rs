@@ -2986,8 +2986,8 @@ const PPT_WRITE_GAPS: &[GapSpec] = &[
             context: "native-write-coalescing",
         },
         code: Code::UnsupportedCapability,
-        follow_up: "M2 PPT shared native edit runs and performance qualification",
-        reason: "consecutive unified sets currently publish separate native transactions under semantic snapshot limits",
+        follow_up: "M2 PPT broader native edit runs and performance qualification",
+        reason: "distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open",
     },
 ];
 

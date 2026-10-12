@@ -500,13 +500,15 @@ mod xls_allocations {
 #[cfg(feature = "ppt")]
 #[test]
 fn ppt_selected_reads_add_constant_allocations_over_native_slide_reads() {
-    fn deck(slides: usize) -> (litchi_ops::File, litchi_ppt::Presentation) {
+    fn deck(slides: usize, shapes: usize) -> (litchi_ops::File, litchi_ppt::Presentation) {
         let mut builder = litchi_ppt::writer::Builder::new();
         for _ in 0..slides {
             let slide = builder.add_slide().expect("slide");
-            builder
-                .add_textbox(slide, 10, 10, 240, 40, "selected text")
-                .expect("textbox");
+            for _ in 0..shapes {
+                builder
+                    .add_textbox(slide, 10, 10, 240, 40, "selected text")
+                    .expect("textbox");
+            }
         }
         let package = builder.build().expect("package");
         let bytes = package.to_bytes().expect("bytes");
@@ -516,8 +518,8 @@ fn ppt_selected_reads_add_constant_allocations_over_native_slide_reads() {
             .expect("presentation");
         (litchi_ops::open_bytes(bytes).expect("PPT"), native)
     }
-    let (small, small_native) = deck(1);
-    let (large, large_native) = deck(100);
+    let (small, small_native) = deck(1, 1);
+    let (large, large_native) = deck(100, 1);
     let path = litchi_ops::path::Path::parse("/slide[1]/shape[1]").expect("path");
     let query = litchi_ops::query::Query::parse("shape").expect("query");
     let plan =
@@ -571,6 +573,17 @@ fn ppt_selected_reads_add_constant_allocations_over_native_slide_reads() {
         overhead(large_get, large_base),
         overhead(small_get, small_base),
         "facade lookup overhead must not scale with unselected slides"
+    );
+    let (many_shapes, many_shapes_native) = deck(1, 1_000);
+    get(&many_shapes);
+    native(&many_shapes_native);
+    assert_eq!(
+        overhead(
+            allocation_measure(|| get(&many_shapes)),
+            allocation_measure(|| native(&many_shapes_native)),
+        ),
+        overhead(small_get, small_base),
+        "first-shape lookup must not allocate a candidate catalog of siblings"
     );
     assert_eq!(
         overhead(large_first, large_base),

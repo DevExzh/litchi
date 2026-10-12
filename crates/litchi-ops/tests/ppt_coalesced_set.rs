@@ -319,6 +319,26 @@ fn query_read_slide_and_structural_commands_are_public_coalescing_barriers() {
 }
 
 #[test]
+fn explicit_raw_ordinal_paths_close_direct_runs() {
+    each_owner(&fixture(), |source| {
+        let raw = litchi_ops::path::raw::path(SECOND).expect("raw ordinal path");
+        let commit = source
+            .edit(|edit| {
+                edit.set(FIRST, props! { "text" => "before raw" })?;
+                edit.set(raw, props! { "text" => "raw target" })?;
+                edit.set("/slide[2]/shape[1]", props! { "text" => "after raw" })
+            })
+            .expect("raw path barrier");
+        assert_eq!(commit.diagnostics.commits(), 3);
+        assert_eq!(commit.diagnostics.operations(), 3);
+        assert_eq!(text(&commit.file, FIRST), "before raw");
+        assert_eq!(text(&commit.file, SECOND), "raw target");
+        assert_eq!(text(&commit.file, "/slide[2]/shape[1]"), "after raw");
+        assert_eq!(text(&source, SECOND), "second");
+    });
+}
+
+#[test]
 fn batch_reports_exact_noop_and_changed_results_without_mutating_input() {
     each_owner(&fixture(), |source| {
         let before = source.to_bytes().expect("source bytes");

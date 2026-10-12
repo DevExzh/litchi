@@ -83,7 +83,7 @@ mod enabled {
         shapes: usize,
         original_bytes: Vec<u8>,
         unified: File,
-        paths: Vec<String>,
+        paths: Vec<litchi_ops::path::Path<'static>>,
         texts: Vec<String>,
         batch_items: Vec<BatchItem<'static>>,
         limits: SemanticLimits,
@@ -299,7 +299,14 @@ mod enabled {
             shapes,
             original_bytes,
             unified,
-            paths,
+            paths: paths
+                .iter()
+                .map(|path| {
+                    litchi_ops::path::Path::parse(path)
+                        .expect("typed path")
+                        .into_owned()
+                })
+                .collect(),
             texts,
             batch_items,
             limits,
@@ -350,16 +357,20 @@ mod enabled {
             .unified
             .edit_with_limits(&fixture.limits, |edit| {
                 for (path, text) in fixture.paths.iter().zip(&fixture.texts) {
-                    edit.set(path.as_str(), props! { "text" => text.as_str() })?;
+                    edit.set(path, props! { "text" => text.as_str() })?;
                 }
                 Ok::<_, litchi_ops::Error>(())
             })
             .expect("unified closure edit");
+        let commits = commit.diagnostics.commits();
+        let operations = commit.diagnostics.operations();
+        let file = commit.file;
+        drop(commit.patch);
         UnifiedRun {
-            file: commit.file,
+            file,
             elapsed_ns: start.elapsed().as_nanos(),
-            commits: commit.diagnostics.commits(),
-            operations: commit.diagnostics.operations(),
+            commits,
+            operations,
         }
     }
 
@@ -373,11 +384,16 @@ mod enabled {
                 &fixture.limits,
             )
             .expect("unified command batch");
+        let commits = commit.diagnostics.commits();
+        let operations = commit.diagnostics.operations();
+        let file = commit.file;
+        drop(commit.patch);
+        drop(commit.results);
         UnifiedRun {
-            file: commit.file,
+            file,
             elapsed_ns: start.elapsed().as_nanos(),
-            commits: commit.diagnostics.commits(),
-            operations: commit.diagnostics.operations(),
+            commits,
+            operations,
         }
     }
 
@@ -450,12 +466,12 @@ mod enabled {
             .expect("output slide exists");
         let scene = slide.shapes().expect("read output scene");
         assert_eq!(scene.len(), shapes);
-        assert_eq!(scene[0].text().expect("first output shape text"), "after-0");
-        let last = format!("after-{}", shapes - 1);
-        assert_eq!(
-            scene[shapes - 1].text().expect("last output shape text"),
-            last
-        );
+        for (index, shape) in scene.iter().enumerate() {
+            assert_eq!(
+                shape.text().expect("output shape text"),
+                format!("after-{index}")
+            );
+        }
     }
 
     fn assert_source_unchanged(fixture: &Fixture) {

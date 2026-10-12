@@ -226,6 +226,8 @@ pub struct Edit {
     xlsb_sheets: Option<crate::format::xlsb::write::sheet_coalesce::Run>,
     #[cfg(feature = "pptx")]
     shapes: Option<crate::format::pptx::write::coalesce::Run>,
+    #[cfg(feature = "ppt")]
+    ppt_shapes: Option<crate::format::ppt::write::coalesce::Run>,
 }
 impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -305,6 +307,8 @@ impl File {
                 xlsb_sheets: None,
                 #[cfg(feature = "pptx")]
                 shapes: None,
+                #[cfg(feature = "ppt")]
+                ppt_shapes: None,
             };
             let value = f(&mut edit);
             if let Some(error) = edit.failure {
@@ -384,8 +388,8 @@ impl Edit {
     /// validation retains sequential semantics.
     /// Distinct direct PPTX shape text/geometry sets also share a native edit.
     /// Repeated PPTX shapes close their run before resolving partial properties.
-    /// Legacy PPT sets each use an isolated native edit and retain its patch;
-    /// coalesced native runs are not yet integrated for that format.
+    /// Distinct direct legacy PPT shape text/geometry sets share a native edit.
+    /// Repeated targets and native operation limits close the run before replanning.
     /// Reads and selectors close pending runs; repeated XLSX cells and font
     /// assignments close the payload run.
     /// A successful call stages its assignments; native commit errors can surface
@@ -1362,6 +1366,60 @@ impl Edit {
             self.operations += 1;
             return Ok(Some(changed));
         }
+        #[cfg(feature = "ppt")]
+        if let File::Ppt(handle) = &self.current {
+            let planned = match &mut self.ppt_shapes {
+                Some(run) => run.shape_plan(_target, _props, &self.limits),
+                None => handle.shape_plan(_target, _props, &self.limits),
+            };
+            if planned.is_err() {
+                // Preserve an earlier deferred native failure's wire index.
+                self.flush_pending()?;
+            }
+            let Some(mut plan) = planned? else {
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .ppt_shapes
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
+            {
+                self.flush_pending()?;
+                // A repeated shape may merge partial geometry with earlier
+                // assignments. Resolve it again against the published run.
+                let File::Ppt(handle) = &self.current else {
+                    return Err(pending());
+                };
+                let Some(replanned) = handle.shape_plan(_target, _props, &self.limits)? else {
+                    return Ok(None);
+                };
+                plan = replanned;
+            }
+            if self.ppt_shapes.is_none() {
+                let File::Ppt(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.ppt_shapes = Some(crate::format::ppt::write::coalesce::Run::new(
+                    handle,
+                    &self.limits,
+                )?);
+            }
+            let run = self
+                .ppt_shapes
+                .as_mut()
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "shape run missing"))?;
+            let changed = run.stage(plan, _index)?;
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
         Ok(None)
     }
 
@@ -1541,6 +1599,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "ppt")]
+        if let Some(run) = self.ppt_shapes.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_ppt(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         Ok(())
     }
 
@@ -1592,6 +1675,10 @@ impl Edit {
                 #[cfg(feature = "pptx")]
                 {
                     self.shapes = None;
+                }
+                #[cfg(feature = "ppt")]
+                {
+                    self.ppt_shapes = None;
                 }
                 self.current = before;
                 self.steps.truncate(start);

@@ -84,59 +84,53 @@ impl<'f> Nav<'f> {
         let Some(source) = source_for(parent)? else {
             return Ok(Lookup::NotApplicable);
         };
-        let mut candidates = Vec::new();
         let mut counters = [0_usize; Kind::COUNT];
         let Some(direct) = source.direct() else {
             return Ok(Lookup::NotApplicable);
         };
-        for (index, shape) in direct.iter().enumerate() {
-            let Some(physical) = physical_kind(shape) else {
-                continue;
-            };
+        // Ordinal/first lookups stop at the selected native shape. Keep only
+        // physical-kind counters rather than allocating a candidate catalog.
+        let mut candidates = direct.iter().enumerate().filter_map(|(index, shape)| {
+            let physical = physical_kind(shape)?;
             let ordinal = counters[physical as usize];
             counters[physical as usize] = ordinal.saturating_add(1);
-            let is_placeholder = matches!(shape, ShapeEnum::Placeholder(_));
             let matches_kind = if kind == Kind::Placeholder {
-                is_placeholder
+                matches!(shape, ShapeEnum::Placeholder(_))
             } else {
                 physical == kind
             };
-            if matches_kind {
-                candidates.push(Candidate {
-                    index,
-                    kind: physical,
-                    ordinal,
-                });
-            }
-        }
+            matches_kind.then_some(Candidate {
+                index,
+                kind: physical,
+                ordinal,
+            })
+        });
 
         let candidate = match select {
-            Select::None => candidates.first().copied(),
-            Select::Ordinal(position) => candidates.get(position.get()).copied(),
-            Select::Last => candidates.last().copied(),
+            Select::None => candidates.next(),
+            Select::Ordinal(position) => candidates.nth(position.get()),
+            Select::Last => candidates.last(),
             Select::Identity(identities) => {
-                let matching: Vec<_> = candidates
-                    .iter()
-                    .copied()
-                    .filter(|candidate| {
-                        identities.iter().all(|(identity, value)| {
-                            identity_matches(&direct[candidate.index], identity, value)
-                        })
-                    })
-                    .collect();
-                if matching.len() > 1 {
-                    return Ok(Lookup::Ambiguous(matching.len()));
+                let mut selected = None;
+                let mut count = 0_usize;
+                for candidate in candidates {
+                    if identities.iter().all(|(identity, value)| {
+                        identity_matches(&direct[candidate.index], identity, value)
+                    }) {
+                        count += 1;
+                        selected = Some(candidate);
+                    }
                 }
-                matching.first().copied()
+                if count > 1 {
+                    return Ok(Lookup::Ambiguous(count));
+                }
+                selected
             },
             Select::Name { name, case } => candidates
-                .iter()
-                .copied()
                 .find(|candidate| name_matches(shape_name(&direct[candidate.index]), name, case)),
-            Select::Token(token) => candidates
-                .iter()
-                .copied()
-                .find(|candidate| placeholder_matches(&direct[candidate.index], token)),
+            Select::Token(token) => {
+                candidates.find(|candidate| placeholder_matches(&direct[candidate.index], token))
+            },
             Select::Number(_) | Select::Cell(_) | Select::Range(_) => {
                 return Ok(Lookup::NotApplicable);
             },
