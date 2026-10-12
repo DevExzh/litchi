@@ -564,6 +564,93 @@ pub struct RunTextReplacement {
     format: Option<RunFormatPatch>,
 }
 
+/// One immutable-source body paragraph/run insertion.
+///
+/// `run` is an insertion boundary rather than an existing run selector: zero
+/// inserts before the first run and `run == paragraph.run_count()` appends.
+/// The insertion is resolved against the immutable source run axis when a
+/// complete batch is staged. An omitted format patch inherits the complete
+/// effective formatting of the run to the right, or the final run when
+/// appending; an empty paragraph inherits the effective character state at
+/// its paragraph boundary, falling back to native RTF defaults when that
+/// state is actually default. The ten
+/// addressable facets in [`RunFormatPatch`] override only their named values,
+/// preserving inherited resources and other character metadata.
+///
+/// ```rust,no_run
+/// use litchi_core::Position;
+/// use litchi_rtf::edit::{RunFormatPatch, RunTextInsertion};
+/// use litchi_rtf::Package;
+///
+/// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+/// let package = Package::parse(r#"{\rtf1\ansi First\par Second}"#)?;
+/// let mut edit = package.edit();
+/// edit.insert_body_runs(&[RunTextInsertion::new(
+///     Position::new(0), Position::new(1), "between",
+/// ).with_format(RunFormatPatch::new().with_bold(true))])?;
+/// let _commit = edit.commit()?;
+/// # Ok(())
+/// # }
+/// ```
+///
+/// ```compile_fail
+/// use litchi_rtf::edit::RunTextInsertion;
+///
+/// let _ = RunTextInsertion::new(0, 0, "text");
+/// ```
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct RunTextInsertion {
+    paragraph: Position,
+    run: Position,
+    text: String,
+    format: Option<RunFormatPatch>,
+}
+
+impl RunTextInsertion {
+    /// Creates one source-relative run insertion at a run boundary.
+    #[must_use]
+    pub fn new(paragraph: Position, run: Position, text: impl Into<String>) -> Self {
+        Self {
+            paragraph,
+            run,
+            text: text.into(),
+            format: None,
+        }
+    }
+
+    /// Applies an omission-preserving character-format patch to the inserted
+    /// run. Omitted facets retain the inherited source formatting.
+    #[must_use]
+    pub const fn with_format(mut self, format: RunFormatPatch) -> Self {
+        self.format = Some(format);
+        self
+    }
+
+    /// Returns the zero-based source paragraph position.
+    #[must_use]
+    pub const fn paragraph(&self) -> Position {
+        self.paragraph
+    }
+
+    /// Returns the source run insertion boundary.
+    #[must_use]
+    pub const fn run(&self) -> Position {
+        self.run
+    }
+
+    /// Returns the inserted text.
+    #[must_use]
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Returns the optional omission-preserving format patch.
+    #[must_use]
+    pub const fn format(&self) -> Option<RunFormatPatch> {
+        self.format
+    }
+}
+
 impl RunTextReplacement {
     /// Creates one source-relative run text replacement.
     #[must_use]
@@ -1194,6 +1281,24 @@ pub enum Error {
         incoming_paragraph: usize,
         incoming_run: usize,
     },
+    /// A run-insertion batch must contain at least one insertion.
+    EmptyRunInsertionBatch,
+    /// Run-insertion boundaries must be nondecreasing; equal boundaries keep
+    /// their input order.
+    RunInsertionBatchOutOfOrder {
+        previous_paragraph: usize,
+        previous_run: usize,
+        incoming_paragraph: usize,
+        incoming_run: usize,
+    },
+    /// An inserted run must contain at least one semantic character.
+    EmptyRunTextInsertion { paragraph: usize, run: usize },
+    /// A run insertion boundary is outside the selected paragraph's run axis.
+    RunInsertionOutOfRange {
+        paragraph: usize,
+        run: usize,
+        count: usize,
+    },
     /// A checked body paragraph/run selector does not exist.
     RunOutOfRange {
         paragraph: usize,
@@ -1351,6 +1456,30 @@ impl fmt::Display for Error {
                 formatter,
                 "RTF run-text selectors must be strictly increasing: ({incoming_paragraph}, {incoming_run}) follows ({previous_paragraph}, {previous_run})"
             ),
+            Self::EmptyRunInsertionBatch => {
+                formatter.write_str("RTF run-insertion batch must not be empty")
+            },
+            Self::RunInsertionBatchOutOfOrder {
+                previous_paragraph,
+                previous_run,
+                incoming_paragraph,
+                incoming_run,
+            } => write!(
+                formatter,
+                "RTF run-insertion boundaries must be nondecreasing: ({incoming_paragraph}, {incoming_run}) follows ({previous_paragraph}, {previous_run})"
+            ),
+            Self::EmptyRunTextInsertion { paragraph, run } => write!(
+                formatter,
+                "RTF run insertion at paragraph {paragraph}, boundary {run} must contain text"
+            ),
+            Self::RunInsertionOutOfRange {
+                paragraph,
+                run,
+                count,
+            } => write!(
+                formatter,
+                "RTF body paragraph {paragraph} run insertion boundary {run} is outside 0..={count}"
+            ),
             Self::RunOutOfRange {
                 paragraph,
                 run,
@@ -1504,6 +1633,15 @@ enum Operation {
         after: RunFormatPatch,
         text_before: Option<String>,
         text_after: Option<String>,
+    },
+    RunInsert {
+        paragraph: usize,
+        run: usize,
+        span: TextSpan,
+        text: String,
+        format: Option<RunFormatPatch>,
+        inherited: crate::types::Formatting,
+        after: crate::types::Formatting,
     },
     Bold {
         span: TextSpan,
@@ -1707,6 +1845,7 @@ impl Operation {
                 0
             },
             Self::RunFormat { text_after, .. } => text_after.as_deref().map_or(0, str::len),
+            Self::RunInsert { text, .. } => text.len(),
             Self::Alignment { .. }
             | Self::Bold { .. }
             | Self::Italic { .. }
@@ -1739,6 +1878,9 @@ impl Operation {
             } => layout_effect_keys(*position, *fields),
             Self::RunFormat { paragraph, run, .. } => {
                 vec![format!("body:paragraph:{paragraph}:run:{run}:format")]
+            },
+            Self::RunInsert { paragraph, run, .. } => {
+                vec![format!("body:paragraph:{paragraph}:run:{run}:insert")]
             },
             Self::Bold { span, .. } => {
                 vec![format!("body:character:{}-{}:bold", span.start, span.end)]
@@ -1839,7 +1981,8 @@ impl Operation {
             | Self::Expansion { span, .. }
             | Self::HorizontalScale { span, .. }
             | Self::Kerning { span, .. }
-            | Self::InsertParagraph { span, .. } => Some(*span),
+            | Self::InsertParagraph { span, .. }
+            | Self::RunInsert { span, .. } => Some(*span),
             Self::Alignment { .. }
             | Self::ParagraphLayout { .. }
             | Self::RunFormat { .. }
@@ -3622,6 +3765,266 @@ impl Edit {
         self.replace_body_run_texts(&[RunTextReplacement::new(paragraph, run, text)])
     }
 
+    /// Stages insertion of one ordinary body run at a checked run boundary.
+    ///
+    /// `run` may equal the selected paragraph's run count to append. The
+    /// supplied patch overrides named local character facets; an empty patch
+    /// inherits the complete effective formatting of the adjacent source run.
+    /// Empty text is rejected because the native model has no addressable
+    /// empty run. Use [`Self::insert_body_runs`] for one atomic batch.
+    ///
+    /// ```rust,no_run
+    /// use litchi_core::Position;
+    /// use litchi_rtf::edit::RunFormatPatch;
+    /// use litchi_rtf::Package;
+    ///
+    /// # fn main() -> Result<(), Box<dyn std::error::Error>> {
+    /// let package = Package::parse(r#"{\rtf1\ansi Text}"#)?;
+    /// let mut edit = package.edit();
+    /// edit.insert_run(Position::new(0), Position::new(0), "prefix", RunFormatPatch::new())?;
+    /// let _commit = edit.commit()?;
+    /// # Ok(())
+    /// # }
+    /// ```
+    ///
+    /// ```compile_fail
+    /// use litchi_rtf::edit::RunFormatPatch;
+    ///
+    /// let _ = litchi_rtf::Package::parse(r#"{\rtf1\ansi Text}"#)
+    ///     .unwrap()
+    ///     .edit()
+    ///     .insert_run(0, 0, "prefix", RunFormatPatch::new());
+    /// ```
+    pub fn insert_run(
+        &mut self,
+        paragraph: Position,
+        run: Position,
+        text: impl Into<String>,
+        patch: RunFormatPatch,
+    ) -> Result<&mut Self, Error> {
+        self.insert_body_runs(&[RunTextInsertion::new(paragraph, run, text).with_format(patch)])
+    }
+
+    /// Atomically stages source-ordered insertions of ordinary body runs.
+    ///
+    /// Selectors resolve against the immutable source paragraph/run axes and
+    /// must be nondecreasing by `(paragraph, run)`; equal boundaries retain
+    /// input order. A boundary is in
+    /// `0..=run_count`; boundary zero inherits the right run, interior
+    /// boundaries inherit the right run, and the append boundary inherits the
+    /// left run. An empty paragraph inherits the effective character state at
+    /// its boundary, including authored resources and character metadata; a
+    /// native default boundary uses native defaults. The insertion
+    /// batch publishes one source splice and preserves all bytes outside the
+    /// new grouped runs. Inserted scalars are emitted as one scoped sequence
+    /// of UTF-16 `\\uN` controls, so Unicode fallback fragmentation cannot
+    /// split the inserted native run or its projected created path.
+    pub fn insert_body_runs(
+        &mut self,
+        insertions: &[RunTextInsertion],
+    ) -> Result<&mut Self, Error> {
+        self.ensure_body_compatible()?;
+        if insertions.is_empty() {
+            return Err(Error::EmptyRunInsertionBatch);
+        }
+        if self
+            .operations
+            .iter()
+            .any(|operation| !matches!(operation, Operation::RunInsert { .. }))
+        {
+            return Err(Error::StructuralPropertyConflict);
+        }
+        for (previous, incoming) in insertions.iter().zip(insertions.iter().skip(1)) {
+            let previous_key = (previous.paragraph.get(), previous.run.get());
+            let incoming_key = (incoming.paragraph.get(), incoming.run.get());
+            if incoming_key < previous_key {
+                return Err(Error::RunInsertionBatchOutOfOrder {
+                    previous_paragraph: previous_key.0,
+                    previous_run: previous_key.1,
+                    incoming_paragraph: incoming_key.0,
+                    incoming_run: incoming_key.1,
+                });
+            }
+        }
+        if let Some(Operation::RunInsert { paragraph, run, .. }) = self.operations.last() {
+            let first = insertions
+                .first()
+                .map(|insertion| (insertion.paragraph.get(), insertion.run.get()))
+                .ok_or(Error::EmptyRunInsertionBatch)?;
+            if first < (*paragraph, *run) {
+                return Err(Error::RunInsertionBatchOutOfOrder {
+                    previous_paragraph: *paragraph,
+                    previous_run: *run,
+                    incoming_paragraph: first.0,
+                    incoming_run: first.1,
+                });
+            }
+        }
+        self.ensure_operation_room_for(insertions.len())?;
+        let replacement_bytes = insertions.iter().try_fold(0usize, |total, insertion| {
+            if insertion.text.is_empty() {
+                return Err(Error::EmptyRunTextInsertion {
+                    paragraph: insertion.paragraph.get(),
+                    run: insertion.run.get(),
+                });
+            }
+            if insertion.text.contains('\n') {
+                return Err(Error::UnsupportedSource(
+                    "run insertions cannot contain paragraph breaks",
+                ));
+            }
+            total
+                .checked_add(insertion.text.len())
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })
+        })?;
+        let observed_replacement_bytes = self.admit_replacement(replacement_bytes)?;
+        let paragraphs = self.source.body().paragraphs().collect::<Vec<_>>();
+        let paragraph_runs = paragraphs
+            .iter()
+            .map(|paragraph| paragraph.runs().collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let mut paragraph_run_offsets = Vec::new();
+        paragraph_run_offsets
+            .try_reserve_exact(paragraph_runs.len())
+            .map_err(|_error| Error::Write("could not reserve run offsets".to_string()))?;
+        for runs in &paragraph_runs {
+            let mut offsets = Vec::new();
+            offsets
+                .try_reserve_exact(runs.len().saturating_add(1))
+                .map_err(|_error| Error::Write("could not reserve run offsets".to_string()))?;
+            offsets.push(0);
+            let mut offset = 0usize;
+            for run in runs {
+                offset = offset
+                    .checked_add(run.text().len())
+                    .ok_or(Error::InputTooLarge {
+                        observed: usize::MAX,
+                        limit: self.source.limits().max_input_bytes(),
+                    })?;
+                offsets.push(offset);
+            }
+            paragraph_run_offsets.push(offsets);
+        }
+        let mut paragraph_starts = Vec::new();
+        paragraph_starts
+            .try_reserve_exact(paragraphs.len())
+            .map_err(|_error| Error::Write("could not reserve paragraph offsets".to_string()))?;
+        let mut paragraph_offset = 0usize;
+        for paragraph in &paragraphs {
+            paragraph_starts.push(paragraph_offset);
+            paragraph_offset = paragraph_offset
+                .checked_add(paragraph.len())
+                .and_then(|value| value.checked_add(1))
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })?;
+        }
+        let mut empty_paragraph_formats = vec![None; paragraphs.len()];
+        if paragraph_runs.iter().any(Vec::is_empty) {
+            let boundaries = ordinary_run_paragraph_source_boundaries(&self.source)?;
+            for (paragraph_index, runs) in paragraph_runs.iter().enumerate() {
+                if runs.is_empty() {
+                    let boundary = *boundaries.get(paragraph_index).ok_or(
+                        Error::ParagraphOutOfRange {
+                            position: paragraph_index,
+                            count: boundaries.len(),
+                        },
+                    )?;
+                    empty_paragraph_formats[paragraph_index] = Some(
+                        empty_paragraph_effective_formatting(
+                            &self.source,
+                            paragraph_index,
+                            boundary,
+                        )?,
+                    );
+                }
+            }
+        }
+        let mut staged = Vec::new();
+        staged.try_reserve_exact(insertions.len()).map_err(|_error| {
+            Error::Write("could not reserve run-insertion operations".to_string())
+        })?;
+        for insertion in insertions {
+            let paragraph_index = insertion.paragraph.get();
+            let runs = paragraph_runs
+                .get(paragraph_index)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: paragraph_index,
+                    count: paragraph_runs.len(),
+                })?;
+            let run_index = insertion.run.get();
+            if run_index > runs.len() {
+                return Err(Error::RunInsertionOutOfRange {
+                    paragraph: paragraph_index,
+                    run: run_index,
+                    count: runs.len(),
+                });
+            }
+            let run_offset = *paragraph_run_offsets
+                .get(paragraph_index)
+                .and_then(|offsets| offsets.get(run_index))
+                .ok_or(Error::RunInsertionOutOfRange {
+                    paragraph: paragraph_index,
+                    run: run_index,
+                    count: runs.len(),
+                })?;
+            let body_offset = paragraph_starts
+                .get(paragraph_index)
+                .copied()
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: paragraph_index,
+                    count: paragraph_starts.len(),
+                })?
+                .checked_add(run_offset)
+                .ok_or(Error::InputTooLarge {
+                    observed: usize::MAX,
+                    limit: self.source.limits().max_input_bytes(),
+                })?;
+            let inherited = if let Some(selected) = runs.get(run_index) {
+                *selected.format().raw()
+            } else if run_index != 0 {
+                *runs
+                    .get(run_index.saturating_sub(1))
+                    .ok_or(Error::RunInsertionOutOfRange {
+                        paragraph: paragraph_index,
+                        run: run_index,
+                        count: runs.len(),
+                    })?
+                    .format()
+                    .raw()
+            } else {
+                empty_paragraph_formats
+                    .get(paragraph_index)
+                    .and_then(|formatting| *formatting)
+                    .unwrap_or_default()
+            };
+            let mut after = inherited;
+            if let Some(patch) = insertion.format {
+                patch.apply_to(&mut after);
+            }
+            let span = TextSpan {
+                start: body_offset,
+                end: body_offset,
+            };
+            staged.push(Operation::RunInsert {
+                paragraph: paragraph_index,
+                run: run_index,
+                span,
+                text: insertion.text.clone(),
+                format: insertion.format,
+                inherited,
+                after,
+            });
+        }
+        self.replacement_bytes = observed_replacement_bytes;
+        self.operations.extend(staged);
+        Ok(self)
+    }
+
     /// Atomically stages source-ordered character-format patches for ordinary
     /// body runs.
     ///
@@ -4055,6 +4458,7 @@ impl Edit {
                 operation,
                 Operation::Text { .. }
                     | Operation::RunFormat { .. }
+                    | Operation::RunInsert { .. }
                     | Operation::Bold { .. }
                     | Operation::Italic { .. }
                     | Operation::Underline { .. }
@@ -4610,6 +5014,13 @@ impl Edit {
         if self
             .operations
             .iter()
+            .all(|operation| matches!(operation, Operation::RunInsert { .. }))
+        {
+            return commit_body_run_insertions(self, operation_count);
+        }
+        if self
+            .operations
+            .iter()
             .all(|operation| matches!(operation, Operation::RunFormat { .. }))
         {
             if self.operations.iter().any(|operation| {
@@ -4995,6 +5406,7 @@ impl Edit {
                 },
                 Operation::Text { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::InsertParagraph { .. }
                 | Operation::RemoveParagraph { .. }
                 | Operation::RestoreParagraph { .. }
@@ -5595,6 +6007,151 @@ fn commit_body_run_formats(edit: Edit, operation_count: usize) -> Result<Commit,
     ))
 }
 
+fn ordinary_run_insertion_source_offsets(
+    source: &Package,
+    operations: &[Operation],
+) -> Result<Vec<usize>, Error> {
+    let source_runs = ordinary_run_source_map(source)?;
+    let paragraph_run_counts = source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.runs().count())
+        .collect::<Vec<_>>();
+    let paragraph_boundaries = ordinary_run_paragraph_source_boundaries(source)?;
+    let mut offsets = Vec::new();
+    offsets
+        .try_reserve_exact(operations.len())
+        .map_err(|_error| Error::Write("could not reserve run-insertion offsets".to_string()))?;
+    let mut source_run_cursor = 0usize;
+    for operation in operations {
+        let Operation::RunInsert {
+            paragraph, run, ..
+        } = operation
+        else {
+            return Err(Error::StructuralPropertyConflict);
+        };
+        let run_count = *paragraph_run_counts
+            .get(*paragraph)
+            .ok_or(Error::ParagraphOutOfRange {
+                position: *paragraph,
+                count: paragraph_run_counts.len(),
+            })?;
+        let source_offset = if *run < run_count {
+            while source_runs
+                .get(source_run_cursor)
+                .is_some_and(|candidate| {
+                    (candidate.paragraph, candidate.run) < (*paragraph, *run)
+                })
+            {
+                source_run_cursor = source_run_cursor.saturating_add(1);
+            }
+            let candidate = source_runs
+                .get(source_run_cursor)
+                .filter(|candidate| candidate.paragraph == *paragraph && candidate.run == *run)
+                .ok_or(Error::RunInsertionOutOfRange {
+                    paragraph: *paragraph,
+                    run: *run,
+                    count: run_count,
+                })?;
+            candidate.source.start
+        } else if *run != 0 {
+            let target_run = run.saturating_sub(1);
+            while source_runs
+                .get(source_run_cursor)
+                .is_some_and(|candidate| {
+                    (candidate.paragraph, candidate.run) < (*paragraph, target_run)
+                })
+            {
+                source_run_cursor = source_run_cursor.saturating_add(1);
+            }
+            let candidate = source_runs
+                .get(source_run_cursor)
+                .filter(|candidate| {
+                    candidate.paragraph == *paragraph && candidate.run == target_run
+                })
+                .ok_or(Error::RunInsertionOutOfRange {
+                    paragraph: *paragraph,
+                    run: *run,
+                    count: run_count,
+                })?;
+            candidate.source.end
+        } else {
+            *paragraph_boundaries
+                .get(*paragraph)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *paragraph,
+                    count: paragraph_boundaries.len(),
+                })?
+        };
+        offsets.push(source_offset);
+    }
+    Ok(offsets)
+}
+
+fn commit_body_run_insertions(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let semantic_delta = semantic_changes(&edit.operations, &[]);
+    if semantic_delta.is_empty() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let source_offsets = ordinary_run_insertion_source_offsets(&edit.source, &edit.operations)?;
+    let paragraph_run_counts = edit
+        .source
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.runs().count())
+        .collect::<Vec<_>>();
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(edit.operations.len())
+        .map_err(|_error| Error::Write("could not reserve run-insertion replacements".to_string()))?;
+    for (operation, source_offset) in edit.operations.iter().zip(&source_offsets) {
+        let Operation::RunInsert {
+            paragraph,
+            text,
+            format,
+            after,
+            ..
+        } = operation
+        else {
+            return Err(Error::StructuralPropertyConflict);
+        };
+        let paragraph_run_count = *paragraph_run_counts
+            .get(*paragraph)
+            .ok_or(Error::ParagraphOutOfRange {
+                position: *paragraph,
+                count: paragraph_run_counts.len(),
+            })?;
+        let encoding_format = if paragraph_run_count == 0 {
+            RunFormatPatch::all_from_format(after)
+        } else {
+            format.unwrap_or_default()
+        };
+        let encoded = encoded_run_insertion(text, encoding_format, edit.source.limits())?;
+        replacements.push((*source_offset..*source_offset, encoded));
+    }
+    replacements.sort_by_key(|replacement| replacement.0.start);
+    let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
+    validate_run_insert_candidate(&edit.source, &snapshot, &edit.operations)?;
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
 fn commit_body_run_texts(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
     let semantic_delta = semantic_changes(&edit.operations, &[]);
     if semantic_delta.is_empty() {
@@ -5735,6 +6292,181 @@ fn terminal_paragraph_becomes_empty(source: &Package, operations: &[Operation]) 
         }
     }
     has_run
+}
+
+fn encoded_run_insertion(
+    text: &str,
+    format: RunFormatPatch,
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let encoded = encoded_unicode_run_text(text, limits)?;
+    let controls = encoded_run_format_controls(format, limits)?;
+    let total = 7usize
+        .saturating_add(controls.len())
+        .saturating_add(encoded.len());
+    if total > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: total,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    output.append(br"{\uc0 ")?;
+    output.append(&controls)?;
+    output.append(&encoded)?;
+    output.append(b"}")?;
+    Ok(output.into_inner())
+}
+
+fn validate_run_insert_candidate(
+    source: &Package,
+    target: &Package,
+    operations: &[Operation],
+) -> Result<(), Error> {
+    let source_paragraphs = source.body().paragraphs().collect::<Vec<_>>();
+    let target_paragraphs = target.body().paragraphs().collect::<Vec<_>>();
+    if source_paragraphs.len() != target_paragraphs.len() {
+        return Err(Error::UnsupportedSource(
+            "candidate run-insertion publication changed paragraph boundaries",
+        ));
+    }
+    let mut operation_index = 0usize;
+    for (paragraph_index, (source_paragraph, target_paragraph)) in
+        source_paragraphs.iter().zip(&target_paragraphs).enumerate()
+    {
+        if source_paragraph.format().raw() != target_paragraph.format().raw() {
+            return Err(Error::UnsupportedSource(
+                "candidate run-insertion publication changed paragraph properties",
+            ));
+        }
+        let source_runs = source_paragraph.runs().collect::<Vec<_>>();
+        let mut expected = Vec::new();
+        for (run_index, source_run) in source_runs.iter().enumerate() {
+            while operations.get(operation_index).is_some_and(|operation| {
+                matches!(
+                    operation,
+                    Operation::RunInsert { paragraph, run, .. }
+                        if *paragraph == paragraph_index && *run <= run_index
+                )
+            }) {
+                let Operation::RunInsert {
+                    text,
+                    after,
+                    run,
+                    inherited,
+                    format,
+                    ..
+                } = operations
+                    .get(operation_index)
+                    .ok_or(Error::UnsupportedSource(
+                        "run-insertion operation cursor disappeared",
+                    ))?
+                else {
+                    return Err(Error::StructuralPropertyConflict);
+                };
+                if *run != run_index {
+                    return Err(Error::UnsupportedSource(
+                        "run-insertion operation order is inconsistent",
+                    ));
+                }
+                if format.is_none() && after != inherited {
+                    return Err(Error::UnsupportedSource(
+                        "run-insertion inheritance precondition changed",
+                    ));
+                }
+                expected.push((text.clone(), *after));
+                operation_index = operation_index.saturating_add(1);
+            }
+            expected.push((source_run.text().to_owned(), *source_run.format().raw()));
+        }
+        while operations.get(operation_index).is_some_and(|operation| {
+            matches!(
+                operation,
+                Operation::RunInsert { paragraph, run, .. }
+                    if *paragraph == paragraph_index && *run == source_runs.len()
+            )
+        }) {
+            let Operation::RunInsert {
+                text,
+                after,
+                inherited,
+                format,
+                ..
+            } = operations
+                .get(operation_index)
+                .ok_or(Error::UnsupportedSource(
+                    "run-insertion append cursor disappeared",
+                ))?
+            else {
+                return Err(Error::StructuralPropertyConflict);
+            };
+            if format.is_none() && after != inherited {
+                return Err(Error::UnsupportedSource(
+                    "run-insertion inheritance precondition changed",
+                ));
+            }
+            expected.push((text.clone(), *after));
+            operation_index = operation_index.saturating_add(1);
+        }
+        let mut expected_index = 0usize;
+        let mut expected_offset = 0usize;
+        for target_run in target_paragraph.runs() {
+            let mut remaining = target_run.text();
+            while !remaining.is_empty() {
+                let (expected_text, expected_format) = expected
+                    .get(expected_index)
+                    .ok_or(Error::UnsupportedSource(
+                        "candidate run-insertion publication has excess text",
+                    ))?;
+                if *expected_format != *target_run.format().raw() {
+                    return Err(Error::UnsupportedSource(
+                        "candidate run-insertion publication changed character formatting",
+                    ));
+                }
+                let expected_remaining = expected_text
+                    .get(expected_offset..)
+                    .ok_or(Error::UnsupportedSource(
+                        "candidate run-insertion expected text boundary is invalid",
+                    ))?;
+                let common_limit = expected_remaining.len().min(remaining.len());
+                let common = expected_remaining
+                    .char_indices()
+                    .map(|(offset, _)| offset)
+                    .chain(std::iter::once(expected_remaining.len()))
+                    .take_while(|offset| *offset <= common_limit)
+                    .last()
+                    .unwrap_or(0);
+                if common == 0
+                    || expected_remaining
+                        .get(..common)
+                        .is_none_or(|prefix| !remaining.starts_with(prefix))
+                {
+                    return Err(Error::UnsupportedSource(
+                        "candidate run-insertion publication changed run text",
+                    ));
+                }
+                expected_offset = expected_offset.saturating_add(common);
+                remaining = remaining.get(common..).ok_or(Error::UnsupportedSource(
+                    "candidate run-insertion suffix is not a character boundary",
+                ))?;
+                if expected_offset == expected_text.len() {
+                    expected_index = expected_index.saturating_add(1);
+                    expected_offset = 0;
+                }
+            }
+        }
+        if expected_index != expected.len() || expected_offset != 0 {
+            return Err(Error::UnsupportedSource(
+                "candidate run-insertion publication dropped expected text",
+            ));
+        }
+    }
+    if operation_index != operations.len() {
+        return Err(Error::UnsupportedSource(
+            "candidate run-insertion publication left an unapplied operation",
+        ));
+    }
+    Ok(())
 }
 
 fn encoded_run_text_replacement(
@@ -6162,7 +6894,9 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                 }];
                 (snapshot, semantic_delta)
             },
-            Operation::Text { .. } | Operation::RunFormat { .. } => {
+            Operation::Text { .. }
+            | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. } => {
                 return Err(Error::BodyDestinationConflict);
             },
             _ => return Err(Error::BodyDestinationConflict),
@@ -6717,6 +7451,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Expansion { .. }
             | Operation::HorizontalScale { .. }
             | Operation::Kerning { .. }
@@ -6820,6 +7555,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Expansion { .. }
             | Operation::HorizontalScale { .. }
             | Operation::Kerning { .. }
@@ -7463,6 +8199,38 @@ fn ordinary_run_body_source_span(
     }
 }
 
+fn empty_paragraph_effective_formatting(
+    source: &Package,
+    paragraph_index: usize,
+    source_offset: usize,
+) -> Result<crate::types::Formatting, Error> {
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let probe = encoded_run_insertion("X", RunFormatPatch::new(), source.limits())?;
+    let bytes = splice_body_ranges(
+        source_bytes,
+        &[(source_offset..source_offset, probe)],
+        source.limits(),
+    )?;
+    let candidate = Package::from_bytes_with_options(&bytes, source.options())?;
+    let paragraph = candidate
+        .body()
+        .paragraphs()
+        .nth(paragraph_index)
+        .ok_or(Error::ParagraphOutOfRange {
+            position: paragraph_index,
+            count: candidate.paragraph_count(),
+        })?;
+    let run = paragraph
+        .runs()
+        .find(|run| run.text() == "X")
+        .ok_or(Error::UnsupportedSource(
+            "empty paragraph boundary has no readable character state",
+        ))?;
+    Ok(*run.format().raw())
+}
+
 fn ordinary_run_group_is_destination(
     tokens: &[crate::lexer::Token<'_>],
     open_index: usize,
@@ -7975,6 +8743,90 @@ fn ordinary_run_source_map(source: &Package) -> Result<Vec<OrdinaryRunSource>, E
     Ok(result)
 }
 
+/// Returns one exact source insertion offset for every ordinary body
+/// paragraph. A non-empty paragraph uses its run source range instead; these
+/// offsets are needed for empty paragraphs, whose only native boundary is the
+/// literal `\\par` control (or the end of the body for an unterminated final
+/// paragraph).
+fn ordinary_run_paragraph_source_boundaries(source: &Package) -> Result<Vec<usize>, Error> {
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    if crate::compressed::is_compressed_rtf(source_bytes) {
+        return Err(Error::UnsupportedSource(
+            "run insertion refuses compressed RTF",
+        ));
+    }
+    let body_span = ordinary_run_body_source_span(source_bytes, source.text(), source.options())?;
+    let body_bytes = source_bytes
+        .get(body_span.clone())
+        .ok_or(Error::UnsupportedSource(
+            "ordinary run source span is outside the source",
+        ))?;
+    let body_input = std::str::from_utf8(body_bytes)
+        .map_err(|_error| Error::UnsupportedSource("ordinary run source is not UTF-8"))?;
+    let arena = Bump::new();
+    let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
+        .with_leniency(source.options().leniency_value());
+    let (tokens, spans) = lexer.tokenize_with_spans()?;
+    let mut boundaries = Vec::new();
+    boundaries
+        .try_reserve_exact(source.paragraph_count())
+        .map_err(|_error| Error::Write("could not reserve run paragraph boundaries".to_string()))?;
+    let mut ignored_group_depth = 0usize;
+    let mut paragraph = 0usize;
+    for (index, (token, relative_span)) in tokens.iter().zip(&spans).enumerate() {
+        let absolute_span = relative_span
+            .start
+            .checked_add(body_span.start)
+            .and_then(|start| {
+                relative_span
+                    .end
+                    .checked_add(body_span.start)
+                    .map(|end| start..end)
+            })
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: source.limits().max_input_bytes(),
+            })?;
+        let ignored_before = ignored_group_depth;
+        match token {
+            crate::lexer::Token::OpenBrace => {
+                if ignored_before != 0 || ordinary_run_group_is_destination(&tokens, index) {
+                    ignored_group_depth = ignored_group_depth.saturating_add(1);
+                }
+            },
+            crate::lexer::Token::CloseBrace => {
+                if ignored_before != 0 {
+                    ignored_group_depth = ignored_group_depth.saturating_sub(1);
+                }
+            },
+            _ => {},
+        }
+        if ignored_before != 0
+            || (matches!(token, crate::lexer::Token::OpenBrace) && ignored_group_depth != 0)
+        {
+            continue;
+        }
+        if matches!(
+            token,
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Par)
+        ) {
+            boundaries.push(absolute_span.start);
+            paragraph = paragraph.saturating_add(1);
+        }
+    }
+    if paragraph < source.paragraph_count() {
+        boundaries.push(body_span.end);
+    }
+    if ignored_group_depth != 0 || boundaries.len() != source.paragraph_count() {
+        return Err(Error::UnsupportedSource(
+            "ordinary run paragraph source boundaries do not cover the body story",
+        ));
+    }
+    Ok(boundaries)
+}
+
 fn run_control_symbol_text(control: &crate::lexer::ControlWord<'_>) -> Option<&'static str> {
     match control {
         crate::lexer::ControlWord::NonBreakingSpace => Some("\u{00a0}"),
@@ -8130,6 +8982,7 @@ fn project_text(
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -8332,6 +9185,7 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }
         | Operation::RunFormat { .. }
+        | Operation::RunInsert { .. }
         | Operation::Bold { .. }
         | Operation::Italic { .. }
         | Operation::Underline { .. }
@@ -8613,6 +9467,7 @@ fn base_bold_for_edit(source: &Package, operations: &[Operation]) -> Result<bool
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
@@ -8679,6 +9534,7 @@ fn base_bold_for_edit(source: &Package, operations: &[Operation]) -> Result<bool
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
@@ -8735,6 +9591,7 @@ fn base_italic_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Underline { .. }
             | Operation::Strike { .. }
@@ -8801,6 +9658,7 @@ fn base_italic_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Underline { .. }
                 | Operation::Strike { .. }
@@ -8860,6 +9718,7 @@ fn base_underline_for_edit(
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Strike { .. }
@@ -8926,6 +9785,7 @@ fn base_underline_for_edit(
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Strike { .. }
@@ -8985,6 +9845,7 @@ fn base_font_size_for_edit(
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -9051,6 +9912,7 @@ fn base_font_size_for_edit(
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -9376,6 +10238,7 @@ fn base_baseline_for_edit(
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -9442,6 +10305,7 @@ fn base_baseline_for_edit(
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -9512,6 +10376,7 @@ fn base_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -9578,6 +10443,7 @@ fn base_strike_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -9620,6 +10486,7 @@ fn base_double_strike_for_edit(source: &Package, operations: &[Operation]) -> Re
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -9686,6 +10553,7 @@ fn base_double_strike_for_edit(source: &Package, operations: &[Operation]) -> Re
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -9742,6 +10610,7 @@ fn base_hidden_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -9808,6 +10677,7 @@ fn base_hidden_for_edit(source: &Package, operations: &[Operation]) -> Result<bo
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -9864,6 +10734,7 @@ fn base_small_caps_for_edit(source: &Package, operations: &[Operation]) -> Resul
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -9930,6 +10801,7 @@ fn base_small_caps_for_edit(source: &Package, operations: &[Operation]) -> Resul
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -9986,6 +10858,7 @@ fn base_all_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<
             | Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
             | Operation::RunFormat { .. }
+            | Operation::RunInsert { .. }
             | Operation::Bold { .. }
             | Operation::Italic { .. }
             | Operation::Underline { .. }
@@ -10052,6 +10925,7 @@ fn base_all_caps_for_edit(source: &Package, operations: &[Operation]) -> Result<
                 | Operation::Alignment { .. }
                 | Operation::ParagraphLayout { .. }
                 | Operation::RunFormat { .. }
+                | Operation::RunInsert { .. }
                 | Operation::Bold { .. }
                 | Operation::Italic { .. }
                 | Operation::Underline { .. }
@@ -10139,6 +11013,7 @@ fn operation_changes_semantics(operation: &Operation) -> bool {
         Operation::SmartTag { before, after, .. } => before != after,
         Operation::MoveBookmark { before, after, .. } => before != after,
         Operation::RootTransfer { before, after, .. } => before != after,
+        Operation::RunInsert { .. } => true,
         Operation::InsertParagraph { .. }
         | Operation::RemoveParagraph { .. }
         | Operation::RestoreParagraph { .. }
@@ -10782,6 +11657,7 @@ struct BasePositionChange {
     span: TextSpan,
     source_end: usize,
     projected_end: usize,
+    shift_start: bool,
 }
 
 /// Collect the semantic body replacements which move positioned body
@@ -10802,9 +11678,9 @@ fn base_position_changes(
         .map_err(|_error| Error::Write("could not reserve body position changes".to_string()))?;
     for operation in operations {
         match operation {
-            Operation::Text { span, after, .. } => raw.push((*span, after.len())),
+            Operation::Text { span, after, .. } => raw.push((*span, after.len(), false)),
             Operation::InsertParagraph { span, text, .. } => {
-                raw.push((*span, text.len().saturating_add(1)));
+                raw.push((*span, text.len().saturating_add(1), false));
             },
             Operation::RunFormat {
                 text_before: Some(_),
@@ -10818,9 +11694,12 @@ fn base_position_changes(
                         .ok_or(Error::UnsupportedSource(
                             "run-text source span cursor disappeared",
                         ))?;
-                    raw.push((span, replacement_len));
+                    raw.push((span, replacement_len, false));
                     run_text_index = run_text_index.saturating_add(1);
                 }
+            },
+            Operation::RunInsert { span, text, .. } => {
+                raw.push((*span, text.len(), true));
             },
             Operation::Alignment { .. }
             | Operation::ParagraphLayout { .. }
@@ -10855,14 +11734,14 @@ fn base_position_changes(
             | Operation::RootTransfer { .. } => {},
         }
     }
-    raw.sort_unstable_by_key(|(span, _)| (span.start, span.end));
+    raw.sort_unstable_by_key(|(span, _, _)| (span.start, span.end));
     let mut changes = Vec::new();
     changes
         .try_reserve_exact(raw.len())
         .map_err(|_error| Error::Write("could not reserve body position changes".to_string()))?;
     let mut source_cursor = 0usize;
     let mut projected_cursor = 0usize;
-    for (span, replacement_len) in raw {
+    for (span, replacement_len, shift_start) in raw {
         projected_cursor = projected_cursor
             .checked_add(span.start.saturating_sub(source_cursor))
             .and_then(|value| value.checked_add(replacement_len))
@@ -10875,6 +11754,7 @@ fn base_position_changes(
             span,
             source_end: source_cursor,
             projected_end: projected_cursor,
+            shift_start,
         });
     }
     Ok(changes)
@@ -10889,7 +11769,10 @@ fn project_base_position_from_changes(
     // node after the replaced span follows the new text.  Binary search keeps
     // validation bounded when a source carries many opaque anchors and run
     // replacements.
-    let change_count = changes.partition_point(|change| change.span.start < position);
+    let change_count = changes.partition_point(|change| {
+        change.span.start < position
+            || (change.shift_start && change.span.start == position)
+    });
     let (source_cursor, projected_cursor) = if change_count == 0 {
         (0, 0)
     } else {
@@ -11012,6 +11895,88 @@ fn ordinary_body_source_span(
     }
 }
 
+fn body_opaque_source_offsets(source: &Package) -> Result<Vec<usize>, Error> {
+    let source_bytes = source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let body_span = ordinary_run_body_source_span(
+        source_bytes,
+        source.text(),
+        source.options(),
+    )?;
+    let mut search_start = body_span.start;
+    let mut offsets = Vec::new();
+    for node in source
+        .opaque()
+        .iter()
+        .filter(|node| matches!(node.anchor(), crate::opaque::Anchor::Body(_)))
+    {
+        let node_source = node.source();
+        if node_source.is_empty() {
+            return Err(Error::UnsupportedSource(
+                "an empty body-anchored opaque node cannot be located",
+            ));
+        }
+        let haystack = source_bytes
+            .get(search_start..body_span.end)
+            .ok_or(Error::UnsupportedSource(
+                "body opaque search range is outside the source",
+            ))?;
+        let relative = haystack
+            .windows(node_source.len())
+            .position(|window| window == node_source)
+            .ok_or(Error::UnsupportedSource(
+                "body-anchored opaque syntax cannot be located in source",
+            ))?;
+        let offset = search_start.saturating_add(relative);
+        offsets.push(offset);
+        search_start = offset.saturating_add(node_source.len());
+    }
+    Ok(offsets)
+}
+
+fn project_run_insertion_opaque_position(
+    source_position: usize,
+    node_source_offset: usize,
+    operations: &[Operation],
+    source_offsets: &[usize],
+) -> Result<usize, Error> {
+    let mut insertions = Vec::new();
+    insertions
+        .try_reserve_exact(operations.len())
+        .map_err(|_error| Error::Write("could not reserve opaque insertion changes".to_string()))?;
+    for (operation, source_offset) in operations.iter().zip(source_offsets) {
+        let Operation::RunInsert { span, text, .. } = operation else {
+            return Err(Error::StructuralPropertyConflict);
+        };
+        insertions.push((span.start, text.len(), *source_offset));
+    }
+    insertions.sort_by_key(|(position, _, _)| *position);
+    let mut source_cursor = 0usize;
+    let mut projected_cursor = 0usize;
+    for (position, replacement_len, insertion_source_offset) in insertions {
+        let follows_insertion = position < source_position
+            || (position == source_position && node_source_offset >= insertion_source_offset);
+        if !follows_insertion {
+            break;
+        }
+        projected_cursor = projected_cursor
+            .checked_add(position.saturating_sub(source_cursor))
+            .and_then(|value| value.checked_add(replacement_len))
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: usize::MAX,
+            })?;
+        source_cursor = position;
+    }
+    projected_cursor
+        .checked_add(source_position.saturating_sub(source_cursor))
+        .ok_or(Error::InputTooLarge {
+            observed: usize::MAX,
+            limit: usize::MAX,
+        })
+}
+
 fn validate_opaque_preservation(
     source: &Package,
     target: &Package,
@@ -11035,8 +12000,19 @@ fn validate_opaque_preservation(
     if source_nodes.is_empty() {
         return Ok(());
     }
-    let position_changes = base_position_changes(Some(source), operations)?;
-    for (source_node, target_node) in source_nodes.iter().zip(&target_nodes) {
+    let run_insert_source_offsets = operations
+        .iter()
+        .any(|operation| matches!(operation, Operation::RunInsert { .. }))
+        .then(|| ordinary_run_insertion_source_offsets(source, operations))
+        .transpose()?;
+    let opaque_source_offsets = run_insert_source_offsets
+        .as_ref()
+        .map(|_| body_opaque_source_offsets(source))
+        .transpose()?;
+    let position_changes = (!run_insert_source_offsets.is_some())
+        .then(|| base_position_changes(Some(source), operations))
+        .transpose()?;
+    for (node_index, (source_node, target_node)) in source_nodes.iter().zip(&target_nodes).enumerate() {
         let crate::opaque::Anchor::Body(source_position) = source_node.anchor() else {
             return Err(Error::UnsupportedSource(
                 "source opaque anchor is not a body position",
@@ -11047,19 +12023,30 @@ fn validate_opaque_preservation(
                 "target opaque anchor is not a body position",
             ));
         };
-        let projected_position =
-            project_base_position_from_changes(source_position, &position_changes)?;
+        let projected_position = if let (Some(source_offsets), Some(opaque_offsets)) =
+            (&run_insert_source_offsets, &opaque_source_offsets)
+        {
+            let node_source_offset = *opaque_offsets.get(node_index).ok_or(
+                Error::UnsupportedSource("body opaque source cursor disappeared"),
+            )?;
+            project_run_insertion_opaque_position(
+                source_position,
+                node_source_offset,
+                operations,
+                source_offsets,
+            )?
+        } else {
+            let changes = position_changes.as_ref().ok_or(Error::UnsupportedSource(
+                "body position changes are unavailable",
+            ))?;
+            project_base_position_from_changes(source_position, changes)?
+        };
         if target_position != projected_position
             || target_node.kind() != source_node.kind()
             || target_node.source() != source_node.source()
         {
             return Err(Error::UnsupportedSource(
                 "body-anchored opaque syntax changed during publication",
-            ));
-        }
-        if source_node.source().is_empty() {
-            return Err(Error::UnsupportedSource(
-                "an empty body-anchored opaque node cannot be located",
             ));
         }
     }
@@ -11072,6 +12059,17 @@ fn encoded_body_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>,
         Ok(()) => Ok(output.into_inner()),
         Err(error) => Err(output.map_io_error(error)),
     }
+}
+
+fn encoded_unicode_run_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
+    for unit in text.encode_utf16() {
+        output.append(br"\u")?;
+        let signed = unit as i16;
+        output.append(signed.to_string().as_bytes())?;
+        output.append(b" ")?;
+    }
+    Ok(output.into_inner())
 }
 
 #[derive(Clone, Copy)]
@@ -12224,6 +13222,13 @@ enum Change {
         before_format: RunFormatPatch,
         after_format: RunFormatPatch,
     },
+    RunInsert {
+        paragraph: usize,
+        run: usize,
+        text: String,
+        format: RunFormatPatch,
+        removing: bool,
+    },
     Bold {
         span: TextSpan,
         after_span: TextSpan,
@@ -12455,6 +13460,19 @@ impl Change {
                 after: before.clone(),
                 before_format: *after_format,
                 after_format: *before_format,
+            },
+            Self::RunInsert {
+                paragraph,
+                run,
+                text,
+                format,
+                removing,
+            } => Self::RunInsert {
+                paragraph: *paragraph,
+                run: *run,
+                text: text.clone(),
+                format: *format,
+                removing: !removing,
             },
             Self::Bold {
                 span,
@@ -12793,6 +13811,7 @@ impl Change {
             | Self::RunText { before, after, .. } => {
                 weight_str(before).saturating_add(weight_str(after))
             },
+            Self::RunInsert { text, .. } => weight_str(text),
             Self::TableCellText {
                 path,
                 before,
@@ -12971,6 +13990,19 @@ fn semantic_changes_with_replacement(
                 after: text_after.clone(),
                 before_format: *before,
                 after_format: *after,
+            }),
+            Operation::RunInsert {
+                paragraph,
+                run,
+                text,
+                format,
+                ..
+            } => Some(Change::RunInsert {
+                paragraph: *paragraph,
+                run: *run,
+                text: text.clone(),
+                format: format.unwrap_or_default(),
+                removing: false,
             }),
             Operation::RunFormat {
                 paragraph,
@@ -13609,6 +14641,9 @@ fn durable_operation(
         }),
         Change::RunText { .. } => Err(litchi_core::patch::PatchError::InvalidText {
             field: "RTF run-text patches are source-bound",
+        }),
+        Change::RunInsert { .. } => Err(litchi_core::patch::PatchError::InvalidText {
+            field: "RTF run-insertion patches are source-bound",
         }),
         Change::Bold {
             span,

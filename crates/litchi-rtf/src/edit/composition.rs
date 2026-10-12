@@ -368,6 +368,7 @@ fn operation_publication_domain(operation: &Operation) -> PublicationDomain {
         | Operation::Alignment { .. }
         | Operation::ParagraphLayout { .. }
         | Operation::RunFormat { .. }
+        | Operation::RunInsert { .. }
         | Operation::Bold { .. }
         | Operation::Italic { .. }
         | Operation::Underline { .. }
@@ -507,6 +508,7 @@ fn body_span(operation: &Operation) -> Option<super::TextSpan> {
         | Operation::AllCaps { span, .. }
         | Operation::Outline { span, .. }
         | Operation::InsertParagraph { span, .. } => Some(*span),
+        Operation::RunInsert { span, .. } => Some(*span),
         _ => None,
     }
 }
