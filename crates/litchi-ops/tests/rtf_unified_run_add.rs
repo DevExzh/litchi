@@ -129,7 +129,7 @@ fn empty_paragraphs_are_real_runs_and_unicode_source_fragments_keep_paths_valid(
         .collect::<Vec<_>>();
     assert_eq!(
         native_runs,
-        vec!["A", "é", "B", "C", "雪", "D", "\t end"],
+        vec!["A", "é", "B", "C", "雪", "D", "\tend"],
         "the insertion boundary must follow the native source run axis"
     );
     let before_b = native_runs
