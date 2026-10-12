@@ -32585,7 +32585,12 @@ fn verify_rtf_paragraph_split_merge_gates(
         },
         _ => false,
     };
-    let mut limited = source.edit_with_limits(litchi_rtf::edit::Limits::new(0));
+    let profile = litchi_rtf::SemanticLimits::builder()
+        .max_operations(0)?
+        .build()?;
+    let mut limited = source.edit_with_options(
+        litchi_rtf::EditOptions::new().semantic_limits(profile),
+    );
     let limit_refusal_verified = match case {
         Case::RtfSemanticSplitParagraphSave => matches!(
             limited.split_paragraph(
@@ -32594,11 +32599,17 @@ fn verify_rtf_paragraph_split_merge_gates(
                     .split_offset
                     .ok_or("RTF split expectation has no offset")?,
             ),
-            Err(litchi_rtf::edit::Error::OperationLimit { .. })
+            Err(litchi_rtf::edit::Error::Limit {
+                kind: litchi_rtf::SemanticLimitKind::Operations,
+                ..
+            })
         ),
         Case::RtfSemanticMergeParagraphSave => matches!(
             limited.merge_paragraphs(expectation.selected_position, expectation.adjacent_position,),
-            Err(litchi_rtf::edit::Error::OperationLimit { .. })
+            Err(litchi_rtf::edit::Error::Limit {
+                kind: litchi_rtf::SemanticLimitKind::Operations,
+                ..
+            })
         ),
         _ => false,
     } && limited.operation_count() == 0;

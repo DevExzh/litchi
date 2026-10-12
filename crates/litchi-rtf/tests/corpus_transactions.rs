@@ -5,11 +5,19 @@
 )]
 
 use litchi_rtf::{
-    Package, UnderlineStyle,
-    edit::{Error, Limits, TextSpan, TransferPlan},
+    EditOptions, Package, SemanticLimitKind, SemanticLimits, UnderlineStyle,
+    edit::{Error, TextSpan, TransferPlan},
 };
 use std::num::NonZeroU16;
 use std::path::{Path, PathBuf};
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn corpus(relative: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -82,16 +90,18 @@ fn lossy_multibyte_tail_retains_text_and_exact_transport() {
 fn hostile_operation_fanout_stops_at_the_caller_bound() {
     let body = "x".repeat(600);
     let source = Package::parse(&format!(r"{{\rtf1\ansi {body}}}")).unwrap();
-    let mut edit = source.edit_with_limits(Limits::new(256));
+    let mut edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(256)));
     for position in 0..256 {
         edit.replace_text(TextSpan::new(position, position).unwrap(), "y")
             .unwrap();
     }
     assert!(matches!(
         edit.replace_text(TextSpan::new(300, 300).unwrap(), "z"),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 257,
-            limit: 256
+            maximum: 256
         })
     ));
 }

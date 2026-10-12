@@ -5,16 +5,25 @@
 )]
 
 use litchi_rtf::{
-    Alignment, CharacterBaseline, MAX_PARAGRAPH_FRAME_TWIPS, OpenOptions, Package, ParagraphFrame,
-    ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference, ParagraphFrameTextFlow,
-    ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference, ParagraphFrameWrap,
-    ProtectionType, RtfDocument, SourceLimits,
+    Alignment, CharacterBaseline, EditOptions, MAX_PARAGRAPH_FRAME_TWIPS, OpenOptions, Package,
+    ParagraphFrame, ParagraphFrameHorizontalPosition, ParagraphFrameHorizontalReference,
+    ParagraphFrameTextFlow, ParagraphFrameVerticalPosition, ParagraphFrameVerticalReference,
+    ParagraphFrameWrap, ProtectionType, RtfDocument, SemanticLimitKind, SemanticLimits,
+    SourceLimits,
     edit::{
-        Composition, CompositionError, CompositionLimits, Error, Limits, ParagraphLayoutPatch,
+        Composition, CompositionError, CompositionLimits, Error, ParagraphLayoutPatch,
         ParagraphLayoutUpdate, TextSpan,
     },
     transport::compress,
 };
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -194,15 +203,17 @@ fn batch_preflights_shape_selectors_limits_and_conflicts_atomically() {
     ));
     assert_eq!(late.operation_count(), 0);
 
-    let mut bounded = source.edit_with_limits(Limits::new(1));
+    let mut bounded =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
     assert!(matches!(
         bounded.patch_body_paragraph_layouts(&[
             ParagraphLayoutUpdate::new(0, ParagraphLayoutPatch::new().with_space_before(20),),
             ParagraphLayoutUpdate::new(2, ParagraphLayoutPatch::new().with_space_after(10),),
         ]),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 2,
-            limit: 1
+            maximum: 1
         })
     ));
     assert_eq!(bounded.operation_count(), 0);

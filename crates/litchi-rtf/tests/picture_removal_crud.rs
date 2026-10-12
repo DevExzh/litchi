@@ -5,10 +5,18 @@
 )]
 
 use litchi_rtf::{
-    Package,
-    edit::{Error, Limits, MAX_PICTURE_REMOVAL_OPERATIONS},
+    EditOptions, Package, SemanticLimitKind, SemanticLimits,
+    edit::{Error, MAX_PICTURE_REMOVAL_OPERATIONS},
 };
 use serde_json::Value;
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 const FIRST: &str = r"{\pict\pngblip\picw1\pich1 89504E47 0d0A1a0A
  0102aBcd}";
@@ -134,12 +142,14 @@ fn rejects_empty_unordered_duplicate_out_of_range_and_bounded_batches_atomically
     ));
     assert_eq!(out_of_range.operation_count(), 0);
 
-    let mut limited = document.edit_with_limits(Limits::new(1));
+    let mut limited =
+        document.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
     assert!(matches!(
         limited.remove_pictures(&[0, 1]),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 2,
-            limit: 1
+            maximum: 1
         })
     ));
     assert_eq!(limited.operation_count(), 0);
@@ -147,9 +157,10 @@ fn rejects_empty_unordered_duplicate_out_of_range_and_bounded_batches_atomically
     let too_many = (0..=MAX_PICTURE_REMOVAL_OPERATIONS).collect::<Vec<_>>();
     assert!(matches!(
         document.edit().remove_pictures(&too_many),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 65,
-            limit: 64
+            maximum: 64
         })
     ));
 }

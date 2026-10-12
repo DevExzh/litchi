@@ -5,13 +5,20 @@
 )]
 
 use litchi_rtf::{
-    HeaderFooterType, OpenOptions, Package, ProtectionType, SourceLimits,
-    edit::{
-        Error, HeaderFooterParagraph, Limits, ParagraphTextReplacement, TextSpan, TransferPlan,
-    },
+    EditOptions, HeaderFooterType, OpenOptions, Package, ProtectionType, SemanticLimitKind,
+    SemanticLimits, SourceLimits,
+    edit::{Error, HeaderFooterParagraph, ParagraphTextReplacement, TextSpan, TransferPlan},
     transport::compress,
 };
 use std::io::{self, Write};
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn replacements(values: &[(usize, &str)]) -> Vec<ParagraphTextReplacement> {
     values
@@ -100,31 +107,36 @@ fn paragraph_batch_rejects_bad_shape_and_late_selector_atomically() {
 fn paragraph_batch_preflights_operation_and_replacement_limits_atomically() {
     let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
 
-    let mut exact = source.edit_with_limits(Limits::new(3));
+    let mut exact =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(3)));
     exact
         .replace_body_paragraph_texts(&replacements(&[(0, "1"), (1, "2"), (2, "3")]))
         .unwrap();
     assert_eq!(exact.operation_count(), 3);
 
-    let mut above = source.edit_with_limits(Limits::new(2));
+    let mut above =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(2)));
     assert!(matches!(
         above.replace_body_paragraph_texts(&replacements(&[(0, "1"), (1, "2"), (2, "3")])),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 3,
-            limit: 2
+            maximum: 2
         })
     ));
     assert_eq!(above.operation_count(), 0);
 
-    let mut existing = source.edit_with_limits(Limits::new(2));
+    let mut existing =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(2)));
     existing
         .replace_text(TextSpan::new(0, 1).unwrap(), "F")
         .unwrap();
     assert!(matches!(
         existing.replace_body_paragraph_texts(&replacements(&[(1, "Two"), (2, "Three")])),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 3,
-            limit: 2
+            maximum: 2
         })
     ));
     assert_eq!(existing.operation_count(), 1);

@@ -4,11 +4,20 @@
     reason = "transaction assertions intentionally panic on failure"
 )]
 
-use litchi_rtf::edit::{
-    CompositionError, DurableComposition, DurableMergePlan, Limits, MergeResolution,
+use litchi_rtf::edit::{CompositionError, DurableComposition, DurableMergePlan, MergeResolution};
+use litchi_rtf::{
+    Alignment, CharacterBaseline, EditOptions, Package, SemanticLimits, UnderlineStyle,
+    edit::TextSpan,
 };
-use litchi_rtf::{Alignment, CharacterBaseline, Package, UnderlineStyle, edit::TextSpan};
 use std::num::NonZeroU16;
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -663,7 +672,8 @@ fn durable_join_preflights_combined_reversible_payload_before_mutation() {
     let source = Package::parse(&input).unwrap();
     let second_start = left_text.len().saturating_add(1);
     let first = {
-        let mut edit = source.edit_with_limits(Limits::new(1));
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
         edit.replace_text(TextSpan::new(0, left_text.len()).unwrap(), "A")
             .unwrap();
         edit.commit()
@@ -673,7 +683,8 @@ fn durable_join_preflights_combined_reversible_payload_before_mutation() {
             .unwrap()
     };
     let second = {
-        let mut edit = source.edit_with_limits(Limits::new(1));
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
         edit.replace_text(
             TextSpan::new(second_start, second_start.saturating_add(right_text.len())).unwrap(),
             "B",
@@ -697,7 +708,8 @@ fn durable_inverse_projects_formatting_through_longer_and_shorter_replacements()
     for (replacement, expected_text, bold) in
         [("Longer", "Longer Second", true), ("X", "X Second", false)]
     {
-        let mut edit = source.edit_with_limits(Limits::new(4));
+        let mut edit =
+            source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(4)));
         edit.replace_text(TextSpan::new(0, 5).unwrap(), replacement)
             .unwrap();
         if bold {
@@ -770,7 +782,8 @@ fn durable_replay_uses_the_exact_patch_operation_limit() {
     const OPERATION_COUNT: usize = 257;
     let input = format!(r"{{\rtf1\ansi {}}}", "a".repeat(OPERATION_COUNT));
     let source = Package::parse(&input).unwrap();
-    let mut edit = source.edit_with_limits(Limits::new(OPERATION_COUNT));
+    let mut edit = source
+        .edit_with_options(EditOptions::new().semantic_limits(semantic_limits(OPERATION_COUNT)));
     for position in 0..OPERATION_COUNT {
         edit.replace_text(TextSpan::new(position, position + 1).unwrap(), "b")
             .unwrap();
@@ -790,7 +803,8 @@ fn durable_replay_uses_the_exact_patch_operation_limit() {
 #[test]
 fn empty_body_boundary_group_still_compares_alignment_conflicts() {
     let source = Package::parse(r"{\rtf1\ansi First Second}").unwrap();
-    let mut left_edit = source.edit_with_limits(Limits::new(2));
+    let mut left_edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(2)));
     left_edit
         .replace_text(TextSpan::new(5, 5).unwrap(), "Inserted")
         .unwrap();
@@ -804,7 +818,8 @@ fn empty_body_boundary_group_still_compares_alignment_conflicts() {
         .to_durable(limits(4))
         .unwrap();
 
-    let mut right_edit = source.edit_with_limits(Limits::new(2));
+    let mut right_edit =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(2)));
     right_edit
         .replace_text(TextSpan::new(0, 5).unwrap(), "Alpha")
         .unwrap();

@@ -5,14 +5,22 @@
 )]
 
 use litchi_rtf::{
-    Alignment, CharacterBaseline, HeaderFooterType, OpenOptions, Package, SourceLimits,
-    TableCellPath, UnderlineStyle,
+    Alignment, CharacterBaseline, EditOptions, HeaderFooterType, OpenOptions, Package,
+    SemanticLimitKind, SemanticLimits, SourceLimits, TableCellPath, UnderlineStyle,
     edit::{
         Composition, CompositionError, CompositionLimits, Error, HeaderFooterParagraph, History,
-        HistoryLimits, Limits, MergePlan, MergeResolution, TextSpan, TransferPlan,
+        HistoryLimits, MergePlan, MergeResolution, TextSpan, TransferPlan,
     },
 };
 use std::num::NonZeroU16;
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -464,15 +472,17 @@ fn overlapping_spans_duplicate_properties_and_operation_bounds_conflict() {
         })
     ));
 
-    let mut bounded = source.edit_with_limits(Limits::new(1));
+    let mut bounded =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
     bounded
         .replace_text(TextSpan::new(0, 1).unwrap(), "a")
         .unwrap();
     assert!(matches!(
         bounded.replace_text(TextSpan::new(2, 3).unwrap(), "p"),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 2,
-            limit: 1
+            maximum: 1
         })
     ));
 }
@@ -884,15 +894,17 @@ fn italic_property_noop_conflict_and_source_closure_refusals_are_atomic() {
             incoming: 1
         })
     ));
-    let mut bounded = plain.edit_with_limits(Limits::new(1));
+    let mut bounded =
+        plain.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
     bounded
         .set_text_italic(TextSpan::new(0, 5).unwrap(), true)
         .unwrap();
     assert!(matches!(
         bounded.set_text_italic(TextSpan::new(6, 10).unwrap(), true),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 2,
-            limit: 1
+            maximum: 1
         })
     ));
 

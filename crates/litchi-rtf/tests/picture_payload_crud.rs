@@ -5,13 +5,21 @@
 )]
 
 use litchi_rtf::{
-    Package,
+    EditOptions, Package, SemanticLimitKind, SemanticLimits,
     edit::{
-        Composition, CompositionLimits, Error, Limits, MAX_PICTURE_PAYLOAD_OPERATIONS,
+        Composition, CompositionLimits, Error, MAX_PICTURE_PAYLOAD_OPERATIONS,
         PicturePayloadReplacement,
     },
 };
 use serde_json::Value;
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 const PNG_A: &[u8] = &[
     0x89, b'P', b'N', b'G', 0x0d, 0x0a, 0x1a, 0x0a, 0x01, 0x02, 0xab, 0xcd,
@@ -169,12 +177,14 @@ fn batch_is_atomic_bounded_and_updates_only_selected_pictures() {
         })
     ));
 
-    let mut bounded = source.edit_with_limits(Limits::new(1));
+    let mut bounded =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(1)));
     assert!(matches!(
         bounded.replace_picture_payloads(&replacements),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 2,
-            limit: 1
+            maximum: 1
         })
     ));
     assert_eq!(bounded.operation_count(), 0);
@@ -352,9 +362,10 @@ fn picture_specific_batch_ceiling_accepts_64_and_refuses_65_atomically() {
     let mut edit = source.edit();
     assert!(matches!(
         edit.replace_picture_payloads(&refused),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 65,
-            limit: 64
+            maximum: 64
         })
     ));
     assert_eq!(edit.operation_count(), 0);
@@ -402,9 +413,10 @@ fn composition_cannot_bypass_the_picture_specific_batch_ceiling() {
     }
     assert!(matches!(
         composition.commit(),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 65,
-            limit: 64
+            maximum: 64
         })
     ));
 }

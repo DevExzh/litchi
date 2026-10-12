@@ -5,11 +5,19 @@
 )]
 
 use litchi_rtf::{
-    Package,
-    edit::{Composition, CompositionError, CompositionLimits, Error, Limits},
+    EditOptions, Package, SemanticLimitKind, SemanticLimits,
+    edit::{Composition, CompositionError, CompositionLimits, Error},
     transport::compress,
 };
 use std::io::{self, Write};
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn durable_limits() -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -189,12 +197,14 @@ fn lifecycle_selectors_limits_and_structural_composition_fail_before_publication
         })
     ));
 
-    let mut bounded = source.edit_with_limits(Limits::new(0));
+    let mut bounded =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
     assert!(matches!(
         bounded.remove_paragraph(0),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 1,
-            limit: 0
+            maximum: 0
         })
     ));
 

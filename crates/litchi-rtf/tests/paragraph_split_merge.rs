@@ -4,7 +4,17 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use litchi_rtf::{Package, ProtectionType, edit::Error};
+use litchi_rtf::{
+    EditOptions, Package, ProtectionType, SemanticLimitKind, SemanticLimits, edit::Error,
+};
+
+fn semantic_limits(max_operations: usize) -> SemanticLimits {
+    SemanticLimits::builder()
+        .max_operations(max_operations)
+        .unwrap()
+        .build()
+        .unwrap()
+}
 
 fn durable_limits(max_operations: usize) -> litchi_core::patch::PatchLimits {
     litchi_core::patch::PatchLimits::new(
@@ -223,12 +233,14 @@ fn split_preflights_boundaries_limits_and_unsafe_sources_atomically() {
     ));
     assert_eq!(out_of_range.operation_count(), 0);
 
-    let mut limited = source.edit_with_limits(litchi_rtf::edit::Limits::new(0));
+    let mut limited =
+        source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
     assert!(matches!(
         limited.split_paragraph(0, 1),
-        Err(Error::OperationLimit {
+        Err(Error::Limit {
+            kind: SemanticLimitKind::Operations,
             observed: 1,
-            limit: 0
+            maximum: 0
         })
     ));
     assert_eq!(limited.operation_count(), 0);
