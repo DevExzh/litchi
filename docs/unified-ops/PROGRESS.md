@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0239 | [Unified RTF paragraph layout](0239-rtf-unified-layout.md) | Eight native-backed layout properties, typed positions and atomic alignment/layout fanout; 1,492 native and 1,697 facade tests/doctests pass; small-document overhead, scaling and full goal remain open |
 | 0238 | [Unified RTF paragraph alignment](0238-rtf-unified-alignment.md) | Typed native alignment batches, read/query/set and atomic mixed text updates; lossless alignment-only publication and boundary readback fix; 1,490 native and 1,688 facade tests/doctests pass; small-query overhead, scaling and full goal remain open |
 | 0237 | [Unified RTF paragraph swaps](0237-rtf-unified-swap.md) | Atomic typed native swap, unified history/batches/save and exact no-ops; 1,485 native and 1,680 facade tests/doctests pass; changed swaps within 10% reference, no-op overhead and durable replay remain open with full goal |
 | 0236 | [Unified RTF paragraph insertion](0236-rtf-unified-add.md) | Positioned native insertion, unified add/created paths/history/batches, empty and Unicode preservation, exact durable admission; 1,481 native and 1,671 facade tests/doctests pass; tiny-document overhead, broader CRUD and full goal remain open |
