@@ -3,8 +3,6 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use litchi_core::Position;
-
 #[cfg(any(
     feature = "doc",
     feature = "docx",
@@ -176,7 +174,7 @@ fn generate_docx(output: &Path) -> Result<()> {
         .text()?;
     println!("docx source paragraph[0]={before}");
     let mut edit = package.edit()?;
-    edit.replace_paragraph_text(Position::new(position), SENTINEL)?;
+    edit.replace_paragraph_text(position, SENTINEL)?;
     package = edit.commit()?.into_package();
     package.save(output)?;
     readback_docx(output)

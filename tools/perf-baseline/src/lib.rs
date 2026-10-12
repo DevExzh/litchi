@@ -67850,7 +67850,7 @@ mod tests {
         let mut edit = source.edit();
         assert!(edit.replace_body_paragraph_texts(&invalid).is_err());
         assert_eq!(edit.operation_count(), 0);
-        assert!(edit.commit().unwrap().snapshot().same_snapshot(&source));
+        assert!(edit.commit().unwrap().package().same_snapshot(&source));
     }
 
     #[test]
@@ -67876,7 +67876,7 @@ mod tests {
             .collect::<Vec<_>>();
         let mut edit = source.edit();
         edit.replace_body_paragraph_texts(&replacements).unwrap();
-        let output = edit.commit().unwrap().snapshot().to_bytes().unwrap();
+        let output = edit.commit().unwrap().package().to_bytes().unwrap();
         assert_eq!(output.len(), 540_151);
         assert_eq!(
             sha256_hex(&output),

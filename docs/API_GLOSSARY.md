@@ -134,7 +134,8 @@ native-backed paragraph reads, text replacement, removal, move, insertion, swap,
 alignment and layout through the unified API. Native primary body paragraph edit
 selectors now consistently use `Position`, including
 `ParagraphTextReplacement`, `ParagraphAlignmentUpdate`,
-`ParagraphLayoutUpdate`, and the paragraph lifecycle/text-property methods;
+`ParagraphLayoutUpdate`, `TransferPlan::plain_paragraph`, and the paragraph
+lifecycle/text-property methods;
 the duplicate `split_paragraph_at` spelling is removed. Other retained-story
 selectors and semantic limit vocabulary still need migration. Richer
 element/property coverage and performance qualification remain pending.

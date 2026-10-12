@@ -3152,6 +3152,11 @@
           "scope": "litchi_rtf::tail_append::SemanticLimits",
           "replacement": "use checked SemanticLimits and EditOptions",
           "recursive": false
+        },
+        {
+          "name": "split_paragraph_at",
+          "scope": "litchi_rtf::edit::Edit",
+          "replacement": "split_paragraph(Position, UTF-8 byte offset)"
         }
       ],
       "families": [

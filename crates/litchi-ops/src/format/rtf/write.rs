@@ -276,10 +276,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
                 .try_reserve_exact(text.len())
                 .map_err(|source| TransactionError::Allocation { source })?;
             replacement.push_str(text);
-            replacements.push(ParagraphTextReplacement::new(
-                Position::new(*position),
-                replacement,
-            ));
+            replacements.push(ParagraphTextReplacement::new(*position, replacement));
         }
     }
 
@@ -289,10 +286,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
             .try_reserve_exact(positions.len())
             .map_err(|source| TransactionError::Allocation { source })?;
         for position in &positions {
-            alignments.push(ParagraphAlignmentUpdate::new(
-                Position::new(*position),
-                alignment,
-            ));
+            alignments.push(ParagraphAlignmentUpdate::new(*position, alignment));
         }
     }
 
@@ -302,7 +296,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
             .try_reserve_exact(positions.len())
             .map_err(|source| TransactionError::Allocation { source })?;
         for position in &positions {
-            layouts.push(ParagraphLayoutUpdate::new(Position::new(*position), layout));
+            layouts.push(ParagraphLayoutUpdate::new(*position, layout));
         }
     }
 
@@ -404,11 +398,9 @@ pub(crate) fn remove_with_limits<'p>(
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
     if let [position] = positions.as_slice() {
-        edit.remove_paragraph(Position::new(*position))
-            .map_err(Error::from)?;
+        edit.remove_paragraph(*position).map_err(Error::from)?;
     } else {
-        let native_positions: Vec<_> = positions.iter().copied().map(Position::new).collect();
-        edit.remove_body_paragraphs(&native_positions)
+        edit.remove_body_paragraphs(&positions)
             .map_err(Error::from)?;
     }
     let native = edit.commit().map_err(Error::from)?;
@@ -858,7 +850,7 @@ fn resolve_paragraph_targets(
     target: &TargetArg<'_>,
     maximum: usize,
     mut selected: impl FnMut(Node<'_>),
-) -> Result<Vec<usize>> {
+) -> Result<Vec<Position>> {
     let mut positions = Vec::new();
     if let Some(path) = target.path() {
         let node = crate::path::resolve::get(&Nav::new(file), path)?;
@@ -900,7 +892,7 @@ fn resolve_paragraph_targets(
     Ok(positions)
 }
 
-fn append_paragraph(positions: &mut Vec<usize>, node: Node<'_>, maximum: usize) -> Result<()> {
+fn append_paragraph(positions: &mut Vec<Position>, node: Node<'_>, maximum: usize) -> Result<()> {
     let Some(position) = node.paragraph_position() else {
         return Err(Error::new(
             Code::UnsupportedCapability,
@@ -919,7 +911,7 @@ fn append_paragraph(positions: &mut Vec<usize>, node: Node<'_>, maximum: usize) 
     positions
         .try_reserve(1)
         .map_err(|source| TransactionError::Allocation { source })?;
-    positions.push(position.get());
+    positions.push(position);
     Ok(())
 }
 

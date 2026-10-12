@@ -135,7 +135,7 @@ fn paragraph_move_matches_the_native_final_position_contract() {
     let actual = source
         .move_to(
             crate::path::PathArg::parse("/body/p[1]").expect("source path"),
-            crate::Placement::Position(litchi_core::Position::new(2)),
+            crate::Placement::Position(Position::new(2)),
         )
         .expect("unified move");
     let mut actual_bytes = Vec::new();

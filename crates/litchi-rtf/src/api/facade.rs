@@ -2,7 +2,6 @@
 
 use crate::document::RtfDocument;
 use crate::{OpenOptions, RtfResult, SourceLimits};
-use litchi_core::Position;
 use std::fmt;
 use std::io::{self, Write};
 use std::path::Path;
@@ -992,7 +991,7 @@ mod tests {
 
         document
             .edit()
-            .replace_paragraph_text(Position::new(1), "changed")
+            .replace_paragraph_text(litchi_core::Position::new(1), "changed")
             .unwrap();
 
         assert_eq!(document.paragraph_count(), 3);

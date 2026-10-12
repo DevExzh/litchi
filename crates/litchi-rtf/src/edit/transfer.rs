@@ -23,17 +23,17 @@ impl TransferPlan {
     /// the checked target cannot accept the structural insertion.
     pub fn plain_paragraph(
         source: &Package,
-        source_position: usize,
+        source_position: Position,
         target: &Package,
-        insert_after: usize,
+        insert_after: Position,
     ) -> Result<Self, Error> {
         let count = source.paragraph_count();
         let text = source
             .body()
             .paragraphs()
-            .nth(source_position)
+            .nth(source_position.get())
             .ok_or(Error::ParagraphOutOfRange {
-                position: source_position,
+                position: source_position.get(),
                 count,
             })?
             .to_text();
@@ -43,7 +43,7 @@ impl TransferPlan {
             ));
         }
         let mut edit = target.edit();
-        edit.insert_paragraph_after(Position::new(insert_after), text)?;
+        edit.insert_paragraph_after(insert_after, text)?;
         Ok(Self {
             edit,
             dependency_count: 0,

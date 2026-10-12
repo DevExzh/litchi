@@ -78,7 +78,7 @@ fn positioned_insert_preserves_empty_paragraphs_and_terminal_boundaries() {
         let count = source.paragraph_count();
         for (position, value) in values.iter().enumerate().take(count.saturating_add(1)) {
             let mut edit = source.edit();
-            edit.insert_paragraph(litchi_core::Position::new(position), *value)
+            edit.insert_paragraph(Position::new(position), *value)
                 .unwrap();
             let commit = edit.commit().unwrap_or_else(|error| {
                 panic!(
@@ -126,8 +126,7 @@ fn positioned_insert_into_an_empty_story_creates_a_real_empty_paragraph() {
     let source = Package::parse(r"{\rtf1\ansi }").unwrap();
     assert_eq!(source.paragraph_count(), 0);
     let mut edit = source.edit();
-    edit.insert_paragraph(litchi_core::Position::new(0), "")
-        .unwrap();
+    edit.insert_paragraph(Position::new(0), "").unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(paragraph_texts(commit.package()), [""]);
     assert_eq!(commit.package().paragraph_count(), 1);
@@ -146,8 +145,7 @@ fn positioned_insert_into_an_empty_story_creates_a_real_empty_paragraph() {
 fn positioned_insert_rejects_protected_sources_after_staging() {
     let source = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
     let mut edit = source.edit();
-    edit.insert_paragraph(litchi_core::Position::new(1), "")
-        .unwrap();
+    edit.insert_paragraph(Position::new(1), "").unwrap();
     assert!(matches!(
         edit.commit(),
         Err(Error::ProtectedDocument {
@@ -290,7 +288,7 @@ fn move_uses_final_list_positions_in_both_directions_and_same_position_is_exact_
 fn swap_is_one_atomic_native_lifecycle_operation_with_exact_inverse() {
     let source = source();
     let mut edit = source.edit();
-    edit.swap_paragraphs(litchi_core::Position::new(0), litchi_core::Position::new(3))
+    edit.swap_paragraphs(Position::new(0), Position::new(3))
         .unwrap();
     let commit = edit.commit().unwrap();
 
@@ -321,7 +319,7 @@ fn swap_preserves_empty_terminal_and_decoded_unicode_paragraphs() {
         let source = Package::from_bytes(input).unwrap();
         let expected = paragraph_texts(&source);
         let mut edit = source.edit();
-        edit.swap_paragraphs(litchi_core::Position::new(0), litchi_core::Position::new(2))
+        edit.swap_paragraphs(Position::new(0), Position::new(2))
             .unwrap();
         let commit = edit.commit().unwrap();
         let mut reordered = expected.clone();
@@ -348,7 +346,7 @@ fn swap_same_position_is_noop_even_for_protected_or_unsupported_sources() {
     ] {
         let exact = source.to_bytes().unwrap();
         let mut edit = source.edit();
-        edit.swap_paragraphs(litchi_core::Position::new(1), litchi_core::Position::new(1))
+        edit.swap_paragraphs(Position::new(1), Position::new(1))
             .unwrap();
         let commit = edit.commit().unwrap();
         assert!(!commit.diagnostics().changed());
@@ -575,18 +573,17 @@ fn positioned_insertion_admits_bounds_before_retaining_payload_and_stays_reusabl
         .unwrap();
     let mut edit = source.edit_with_options(EditOptions::new().semantic_limits(limits));
     assert!(matches!(
-        edit.insert_paragraph(litchi_core::Position::new(0), "abc"),
+        edit.insert_paragraph(Position::new(0), "abc"),
         Err(Error::Limit {
             kind: SemanticLimitKind::ReplacementBytes,
             ..
         })
     ));
     assert!(matches!(
-        edit.insert_paragraph(litchi_core::Position::new(1), "ab"),
+        edit.insert_paragraph(Position::new(1), "ab"),
         Err(Error::ParagraphOutOfRange { .. })
     ));
-    edit.insert_paragraph(litchi_core::Position::new(0), "ab")
-        .unwrap();
+    edit.insert_paragraph(Position::new(0), "ab").unwrap();
     let commit = edit.commit().unwrap();
     assert_eq!(paragraph_texts(commit.package()), ["ab"]);
     assert_eq!(commit.diagnostics().operation_count(), 1);
@@ -594,7 +591,7 @@ fn positioned_insertion_admits_bounds_before_retaining_payload_and_stays_reusabl
     let mut denied =
         source.edit_with_options(EditOptions::new().semantic_limits(semantic_limits(0)));
     assert!(matches!(
-        denied.insert_paragraph(litchi_core::Position::new(0), ""),
+        denied.insert_paragraph(Position::new(0), ""),
         Err(Error::Limit {
             kind: SemanticLimitKind::Operations,
             ..

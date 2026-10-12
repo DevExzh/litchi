@@ -2423,8 +2423,13 @@ fn destination_edit_refuses_unknown_syntax_without_mutating_source() {
 fn transfer_is_dependency_free_and_uses_checked_ordinary_transactions() {
     let paragraph_source = Package::parse(r"{\rtf1\ansi Imported}").unwrap();
     let paragraph_target = Package::parse(r"{\rtf1\ansi Existing}").unwrap();
-    let paragraph =
-        TransferPlan::plain_paragraph(&paragraph_source, 0, &paragraph_target, 0).unwrap();
+    let paragraph = TransferPlan::plain_paragraph(
+        &paragraph_source,
+        Position::new(0),
+        &paragraph_target,
+        Position::new(0),
+    )
+    .unwrap();
     assert!(paragraph.is_dependency_free());
     assert_eq!(
         paragraph.commit().unwrap().package().text(),
