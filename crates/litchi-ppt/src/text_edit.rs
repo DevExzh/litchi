@@ -2936,9 +2936,10 @@ fn index_slide_text_targets<'a>(
     let drawing = find_ppt_record(slide, RecordType::PPDrawing as u16, 0)?
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
     let mut index = BTreeMap::new();
+    let mut active_shape_ids = requested_shape_ids.clone();
     index_officeart_shape_targets(
         drawing_payload(drawing)?,
-        requested_shape_ids,
+        &mut active_shape_ids,
         0,
         &mut index,
     )?;
@@ -2947,7 +2948,7 @@ fn index_slide_text_targets<'a>(
 
 fn index_officeart_shape_targets<'a>(
     record: &'a [u8],
-    active_shape_ids: &BTreeSet<u32>,
+    active_shape_ids: &mut BTreeSet<u32>,
     depth: usize,
     index: &mut BTreeMap<u32, IndexedShapeText<'a>>,
 ) -> Result<()> {
@@ -2979,17 +2980,28 @@ fn index_officeart_shape_targets<'a>(
             if active_shape_ids.len() == 1 {
                 return Ok(());
             }
-            let mut remaining = active_shape_ids.clone();
-            remaining.remove(&shape_id);
-            if remaining.is_empty() {
-                return Ok(());
-            }
-            if record_version(record)? == 0xF {
-                for child_result in children(record)? {
-                    index_officeart_shape_targets(child_result?, &remaining, depth + 1, index)?;
+            active_shape_ids.remove(&shape_id);
+            let result = (|| {
+                if active_shape_ids.is_empty() {
+                    return Ok(());
                 }
-            }
-            return Ok(());
+                if record_version(record)? == 0xF {
+                    for child_result in children(record)? {
+                        index_officeart_shape_targets(
+                            child_result?,
+                            active_shape_ids,
+                            depth + 1,
+                            index,
+                        )?;
+                    }
+                }
+                Ok(())
+            })();
+            // Every independent target scan stops at its own matching
+            // container, so restore this identity before returning even when
+            // nested framing reported an error.
+            active_shape_ids.insert(shape_id);
+            return result;
         }
     }
     if record_version(record)? == 0xF {
