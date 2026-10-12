@@ -8553,10 +8553,43 @@ fn validate_opaque_preservation(
 
 fn encoded_body_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>, Error> {
     let mut output = BoundedVec::new(limits.max_input_bytes());
-    match RtfWriter::new(&mut output).write_text(text) {
+    match write_body_text_with_utf16(&mut RtfWriter::new(&mut output), text) {
         Ok(()) => Ok(output.into_inner()),
         Err(error) => Err(output.map_io_error(error)),
     }
+}
+
+/// Write text using the signed UTF-16 code units required by RTF `\uN`.
+///
+/// [`RtfWriter::write_text`] handles BMP characters correctly, but an astral
+/// scalar value must be represented by its high and low surrogate units. The
+/// parser consequently treats a direct `\u` value for an astral code point as
+/// an unrelated BMP character after truncating it to `u16`.
+fn write_body_text_with_utf16<W: io::Write>(
+    writer: &mut RtfWriter<W>,
+    text: &str,
+) -> io::Result<()> {
+    let mut plain_start = 0usize;
+    for (offset, character) in text.char_indices() {
+        if character.len_utf8() <= 3 {
+            continue;
+        }
+
+        writer.write_text(&text[plain_start..offset])?;
+        let mut units = [0u16; 2];
+        for unit in character.encode_utf16(&mut units) {
+            let value = i32::from(*unit);
+            let signed_value = if value > i32::from(i16::MAX) {
+                value - (i32::from(u16::MAX) + 1)
+            } else {
+                value
+            };
+            writer.write_control_word("u", Some(signed_value))?;
+            writer.write_str("?")?;
+        }
+        plain_start = offset + character.len_utf8();
+    }
+    writer.write_text(&text[plain_start..])
 }
 
 #[derive(Clone, Copy)]
