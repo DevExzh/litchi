@@ -595,7 +595,7 @@ impl Capabilities {
 
     /// Whether the handle retained what an editor is built from
     /// ([`OpenOptions::retain_source`](crate::OpenOptions::retain_source)):
-    /// `None` for the read-only formats (RTF and OpenDocument), a locked
+    /// `None` for formats without retention reporting (RTF and OpenDocument), a locked
     /// file, and a report made by [`Capabilities::of`].
     #[must_use]
     pub const fn retains_source(&self) -> Option<bool> {

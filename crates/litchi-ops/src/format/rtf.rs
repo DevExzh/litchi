@@ -3,6 +3,17 @@
 //! The handle retains the native immutable `Package`. Existing family views
 //! borrow its advanced read-only model; unified editing can use the same owner.
 
+pub(crate) mod children;
+mod nav;
+mod node;
+mod spec;
+pub(crate) mod views;
+
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub use spec::Kind;
+pub(crate) use spec::SPEC;
+
 use std::fmt;
 use std::path::Path;
 use std::sync::Arc;
@@ -116,7 +127,7 @@ impl Rtf {
     ///
     /// None today; see [`Self::text`].
     pub fn paragraph_count(&self) -> Result<usize> {
-        Ok(self.0.package.raw().paragraph_count())
+        Ok(self.0.package.paragraph_count())
     }
 
     /// Document properties projected from the `\info` group and the

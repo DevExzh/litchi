@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0232 | [Unified RTF paragraph reads](0232-rtf-unified-read.md) | Native borrowed root/body/paragraph paths, lazy queries, children and views; truthful element gaps; RTF writes and full goal remain open |
 | 0231 | [Checked RTF tail policy](0231-rtf-tail-policy.md) | Six checked append/wire bounds, EditOptions for retained/source-backed edits, and typed invalid-limit errors; publication-window policy and unified CRUD remain open |
 | 0230 | [Canonical RTF tail family](0230-rtf-tail-family.md) | Focused Edit/Commit/Patch/Diagnostics/Error/LimitKind, edit_tail_append entries and typed limit refusals; redundant aliases removed; checked scoped policies and unified CRUD remain open |
 | 0229 | [RTF logical-tail commit and replay](0229-rtf-tail-contract.md) | Canonical package accessors, owner replay, exact no-ops and recipient-policy admission; remaining scoped vocabulary and unified CRUD stay open |

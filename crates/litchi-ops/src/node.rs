@@ -133,6 +133,7 @@ pub(crate) use view::Project;
 #[cfg(any(
     test,
     feature = "test-support",
+    feature = "rtf",
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",

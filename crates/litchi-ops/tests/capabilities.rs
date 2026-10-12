@@ -3,8 +3,6 @@ use litchi_core::FileFormat;
 #[cfg(any(feature = "docx", feature = "ppt", feature = "pptx", feature = "xls"))]
 use litchi_ops::Code;
 use litchi_ops::capabilities::Capabilities;
-#[cfg(all(feature = "docx", feature = "xlsx"))]
-use litchi_ops::capabilities::Support;
 #[cfg(any(
     feature = "docx",
     feature = "ppt",
@@ -1179,7 +1177,7 @@ fn available_and_pending_reads_have_distinct_reports() {
     let rtf = Capabilities::of(FileFormat::Rtf);
     if cfg!(feature = "rtf") {
         assert!(rtf.verb(Verb::Get).is_supported());
-        assert_eq!(rtf.element("document").unwrap().operations().get, true);
+        assert!(rtf.element("document").unwrap().operations().get);
     } else {
         assert!(!rtf.verb(Verb::Get).is_supported());
     }

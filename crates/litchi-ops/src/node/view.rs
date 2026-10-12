@@ -366,6 +366,9 @@ pub(crate) enum Source<'a> {
     /// The fake format: values aligned with the property table.
     #[cfg(any(test, feature = "test-support"))]
     Fake(&'a [Option<Value<'static>>]),
+    /// A borrowed native RTF paragraph.
+    #[cfg(feature = "rtf")]
+    Rtf(litchi_rtf::text::Paragraph<'a>),
     /// A DOCX node's parsed property set.
     #[cfg(feature = "docx")]
     Docx(crate::format::docx::Props<'a>),
@@ -396,6 +399,10 @@ impl<'a> Source<'a> {
             },
             #[cfg(any(test, feature = "test-support"))]
             Self::Fake(values) => values.get(index)?.as_ref().map(Value::borrowed),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(paragraph) => (index == 0).then(|| Value::Text(
+                paragraph.as_str().map_or_else(|| Cow::Owned(paragraph.to_text()), Cow::Borrowed)
+            )),
             #[cfg(feature = "docx")]
             Self::Docx(ref props) => props.get(index),
             #[cfg(feature = "xlsx")]
@@ -428,7 +435,7 @@ impl<'a> Format<'a> {
     }
 
     /// Omit raw properties from ordinary projection; indexed query access remains explicit.
-    #[cfg(feature = "docx")]
+    #[cfg(any(feature = "docx", feature = "rtf"))]
     pub(crate) const fn without(mut self, hidden: &'static [&'static str]) -> Self {
         self.hidden = hidden;
         self

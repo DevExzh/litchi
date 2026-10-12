@@ -32,7 +32,7 @@ fn handle_is_one_pointer_and_shares_its_state() {
 fn detected_bytes_match_the_leaf_reader() {
     for name in ["rtf/testUnicode.rtf", "rtf/chtoutline.rtf"] {
         let bytes = std::fs::read(fixture(name)).expect("read RTF fixture");
-        let leaf = RtfDocument::from_owned_bytes(bytes.clone()).expect("leaf RTF");
+        let leaf = Package::from_owned_bytes(bytes.clone()).expect("leaf RTF");
         let rtf = open_detected(bytes);
         assert_eq!(rtf.text().expect("text"), leaf.text(), "{name}");
         assert_eq!(
