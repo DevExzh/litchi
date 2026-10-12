@@ -11955,42 +11955,65 @@ fn body_opaque_source_offsets(source: &Package) -> Result<Vec<usize>, Error> {
     Ok(offsets)
 }
 
-fn project_run_insertion_opaque_position(
-    source_position: usize,
-    node_source_offset: usize,
+#[derive(Clone, Copy)]
+struct RunInsertionPositionChange {
+    semantic_position: usize,
+    source_offset: usize,
+    prefix_inserted_len: usize,
+}
+
+fn run_insertion_position_changes(
     operations: &[Operation],
     source_offsets: &[usize],
-) -> Result<usize, Error> {
-    let mut insertions = Vec::new();
-    insertions
+) -> Result<Vec<RunInsertionPositionChange>, Error> {
+    if operations.len() != source_offsets.len() {
+        return Err(Error::UnsupportedSource(
+            "run-insertion source offsets do not cover every operation",
+        ));
+    }
+    let mut changes = Vec::new();
+    changes
         .try_reserve_exact(operations.len())
         .map_err(|_error| Error::Write("could not reserve opaque insertion changes".to_string()))?;
     for (operation, source_offset) in operations.iter().zip(source_offsets) {
         let Operation::RunInsert { span, text, .. } = operation else {
             return Err(Error::StructuralPropertyConflict);
         };
-        insertions.push((span.start, text.len(), *source_offset));
+        changes.push(RunInsertionPositionChange {
+            semantic_position: span.start,
+            source_offset: *source_offset,
+            prefix_inserted_len: text.len(),
+        });
     }
-    insertions.sort_by_key(|(position, _, _)| *position);
-    let mut source_cursor = 0usize;
-    let mut projected_cursor = 0usize;
-    for (position, replacement_len, insertion_source_offset) in insertions {
-        let follows_insertion = position < source_position
-            || (position == source_position && node_source_offset >= insertion_source_offset);
-        if !follows_insertion {
-            break;
-        }
-        projected_cursor = projected_cursor
-            .checked_add(position.saturating_sub(source_cursor))
-            .and_then(|value| value.checked_add(replacement_len))
+    changes.sort_by_key(|change| (change.semantic_position, change.source_offset));
+    let mut prefix_inserted_len = 0usize;
+    for change in &mut changes {
+        prefix_inserted_len = prefix_inserted_len
+            .checked_add(change.prefix_inserted_len)
             .ok_or(Error::InputTooLarge {
                 observed: usize::MAX,
                 limit: usize::MAX,
             })?;
-        source_cursor = position;
+        change.prefix_inserted_len = prefix_inserted_len;
     }
-    projected_cursor
-        .checked_add(source_position.saturating_sub(source_cursor))
+    Ok(changes)
+}
+
+fn project_run_insertion_opaque_position(
+    source_position: usize,
+    node_source_offset: usize,
+    changes: &[RunInsertionPositionChange],
+) -> Result<usize, Error> {
+    let change_count = changes.partition_point(|change| {
+        change.semantic_position < source_position
+            || (change.semantic_position == source_position
+                && change.source_offset <= node_source_offset)
+    });
+    let prefix_inserted_len = changes
+        .get(change_count.saturating_sub(1))
+        .map_or(0, |change| change.prefix_inserted_len);
+    source_position
+        .checked_add(prefix_inserted_len)
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
             limit: usize::MAX,
@@ -12029,10 +12052,16 @@ fn validate_opaque_preservation(
         .as_ref()
         .map(|_| body_opaque_source_offsets(source))
         .transpose()?;
+    let insertion_position_changes = run_insert_source_offsets
+        .as_ref()
+        .map(|source_offsets| run_insertion_position_changes(operations, source_offsets))
+        .transpose()?;
     let position_changes = (!run_insert_source_offsets.is_some())
         .then(|| base_position_changes(Some(source), operations))
         .transpose()?;
-    for (node_index, (source_node, target_node)) in source_nodes.iter().zip(&target_nodes).enumerate() {
+    for (node_index, (source_node, target_node)) in
+        source_nodes.iter().zip(&target_nodes).enumerate()
+    {
         let crate::opaque::Anchor::Body(source_position) = source_node.anchor() else {
             return Err(Error::UnsupportedSource(
                 "source opaque anchor is not a body position",
@@ -12043,17 +12072,19 @@ fn validate_opaque_preservation(
                 "target opaque anchor is not a body position",
             ));
         };
-        let projected_position = if let (Some(source_offsets), Some(opaque_offsets)) =
+        let projected_position = if let (Some(_source_offsets), Some(opaque_offsets)) =
             (&run_insert_source_offsets, &opaque_source_offsets)
         {
             let node_source_offset = *opaque_offsets.get(node_index).ok_or(
                 Error::UnsupportedSource("body opaque source cursor disappeared"),
             )?;
+            let changes = insertion_position_changes.as_ref().ok_or(
+                Error::UnsupportedSource("run-insertion position changes are unavailable"),
+            )?;
             project_run_insertion_opaque_position(
                 source_position,
                 node_source_offset,
-                operations,
-                source_offsets,
+                changes,
             )?
         } else {
             let changes = position_changes.as_ref().ok_or(Error::UnsupportedSource(
