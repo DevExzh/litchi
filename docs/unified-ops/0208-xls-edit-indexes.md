@@ -59,6 +59,57 @@ Reproduce with `cargo test -p litchi-xls --all-features`,
 `cell_values::index_tests` module. No Python/CLI or complete acceptance claim
 is made.
 
+## Paired measurements
+
+The unchanged ascending workload was captured on the preceding source and
+again after indexing. All 20 cases in each five-sample
+[baseline](results/0208-xls-batch-before.json),
+[indexed ascending run](results/0208-xls-batch-after.json), and
+[indexed descending run](results/0208-xls-batch-reverse.json) pass complete
+coordinate/value checks, exact paired output bytes, source immutability and
+native/unified commit-count equivalence. Generation, opening, payload
+construction, serialization and verification are outside timing. The native
+4,096-operation bound remains in force: 1,000 operations use one commit and
+10,000 use three. Medians in milliseconds:
+
+| Owner | Operation | Calls | Batch before | Batch after | Native after | After batch/native |
+|---|---|---:|---:|---:|---:|---:|
+| Eager | set | 1,000 | 6.637 | 5.823 | 4.975 | 1.1706× |
+| Eager | set | 10,000 | 192.758 | 112.320 | 101.029 | 1.1118× |
+| Eager | remove | 1,000 | 5.232 | 4.771 | 4.059 | 1.1753× |
+| Eager | remove | 10,000 | 142.074 | 96.007 | 87.016 | 1.1033× |
+| Filesystem | set | 1,000 | 9.857 | 8.267 | 4.740 | 1.7441× |
+| Filesystem | set | 10,000 | 197.216 | 110.905 | 86.126 | 1.2877× |
+| Filesystem | remove | 1,000 | 8.792 | 7.420 | 4.022 | 1.8449× |
+| Filesystem | remove | 10,000 | 159.265 | 103.129 | 82.490 | 1.2502× |
+
+At 10,000 operations, ascending atomic batches improve by 32–44% in this
+run. Native staging, including edit admission, falls from 35–50 ms to about
+3 ms. Descending staging takes 5.7–5.9 ms at 10,000, exposing the remaining
+vector-shift cost; its full atomic batches take 99–118 ms. There is no
+pre-index descending sample, so no descending speedup claim is made.
+
+Publication still dominates: native 10,000-operation commit time is roughly
+79–98 ms. Whole native edits grow about 18–21× from 1,000 to 10,000 operations,
+which still does not meet general linear scaling. All measured batch/native
+ratios in the ascending run are below 2×, but filesystem 1,000-operation
+batches remain about 1.74–1.84× native. These five-sample synthetic numeric
+workloads do not establish broad performance or peak-memory acceptance.
+Resource/text workloads, repeated targets and arbitrary insertion orders
+remain unqualified.
+
+Baseline source: `ef16b597055e65205da3fb9903a34fb60ccb97ab`;
+binary SHA-256:
+`2160c91fc08c731fc58d63d088b0d5bf8dee62ca9087e0acb130b470935d35ed`.
+Indexed source: `0f0eb7bd2b0e45468f3849083236e49b3f70d34b`;
+binary SHA-256:
+`8c759476a3d9c2c6b45758755c05543228b6be8bb13c5e530675e4f6d696cb3b`.
+Build using `cargo build --release -p litchi-ops --features xls --example
+xls_batch_bench`; run `target/release/examples/xls_batch_bench` with
+`LITCHI_XLS_BENCH_SAMPLES=5`, adding `LITCHI_XLS_BENCH_REVERSE=1` for descending
+order. Each JSON retains its exact source, command and binary checksum.
+No binary is committed.
+
 ## Remaining scope
 
 Source-backed freshness cost, out-of-order insertion cost, resource/formula
