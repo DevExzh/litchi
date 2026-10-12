@@ -6023,13 +6023,15 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
         return Ok(source.text().to_string());
     }
     let is_move = matches!(operation, Operation::MoveParagraph { .. });
-    let mut paragraphs = plain_lifecycle_paragraphs(source, is_move)?;
+    let preserves_terminal_break =
+        is_move || matches!(operation, Operation::RestoreParagraph { .. });
+    let mut paragraphs = plain_lifecycle_paragraphs(source, preserves_terminal_break)?;
     // A terminal `\par` is retained in the story text as one final newline,
     // while the paragraph iterator treats that break as the terminator of the
-    // preceding paragraph.  Keep the same boundary on a reordered candidate;
-    // an empty final paragraph also needs one terminal break to remain
-    // addressable after a move.
-    let preserve_terminal_break = is_move
+    // preceding paragraph. Keep the same boundary on a reordered or restored
+    // candidate; an empty final paragraph also needs one terminal break to
+    // remain addressable after either structural operation.
+    let preserve_terminal_break = preserves_terminal_break
         && source.text().ends_with('\n')
         && paragraphs
             .last()
@@ -6120,7 +6122,9 @@ fn project_lifecycle_text(source: &Package, operation: &Operation) -> Result<Str
         },
     }
     let mut projected = paragraphs.join("\n");
-    if preserve_terminal_break || (is_move && paragraphs.last().is_some_and(String::is_empty)) {
+    if preserve_terminal_break
+        || (preserves_terminal_break && paragraphs.last().is_some_and(String::is_empty))
+    {
         projected.push('\n');
     }
     Ok(projected)
@@ -8612,7 +8616,13 @@ fn write_body_text_with_utf16<W: io::Write>(
             continue;
         }
 
-        writer.write_text(&text[plain_start..offset])?;
+        let plain = text.get(plain_start..offset).ok_or_else(|| {
+            io::Error::new(
+                io::ErrorKind::InvalidInput,
+                "RTF text span is not on UTF-8 boundaries",
+            )
+        })?;
+        writer.write_text(plain)?;
         let mut units = [0u16; 2];
         for unit in character.encode_utf16(&mut units) {
             let value = i32::from(*unit);
@@ -8626,7 +8636,13 @@ fn write_body_text_with_utf16<W: io::Write>(
         }
         plain_start = offset + character.len_utf8();
     }
-    writer.write_text(&text[plain_start..])
+    let plain = text.get(plain_start..).ok_or_else(|| {
+        io::Error::new(
+            io::ErrorKind::InvalidInput,
+            "RTF text span is not on UTF-8 boundaries",
+        )
+    })?;
+    writer.write_text(plain)
 }
 
 #[derive(Clone, Copy)]
