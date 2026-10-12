@@ -7,7 +7,7 @@
 //! Integration tests for legacy PPT slide transitions, slide timings,
 //! comments, and custom slide shows using Apache POI test fixtures.
 
-use litchi_ppt::{AdvanceMode, Package, Presentation, TransitionSpeed, TransitionType};
+use litchi_ppt::{AdvanceMode, Presentation, TransitionSpeed, TransitionType, raw::Reader};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -17,7 +17,7 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn with_presentation<T>(name: &str, f: impl FnOnce(&Presentation) -> T) -> T {
-    let mut package = Package::open(fixture(name)).expect("open POI fixture");
+    let mut package = Reader::open(fixture(name)).expect("open POI fixture");
     let presentation = package.presentation().expect("parse presentation");
     f(&presentation)
 }

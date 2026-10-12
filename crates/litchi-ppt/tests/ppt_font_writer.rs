@@ -11,8 +11,8 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use litchi_ppt::odraw::ShapeExt as _;
 use litchi_ppt::writer::{FontEntity, NotesPage, Paragraph, SmartTagDefinition, TextRun, Writer};
 use litchi_ppt::{
-    EscherTextboxWrapper, Font, FontEmbeddingFlags, FontFacet, FontScope, Package,
-    ProgBinaryTagVersion, ProgTag, ProgTagLimits, ProgTagScope, ProgTags, Record, RecordType,
+    EscherTextboxWrapper, Font, FontEmbeddingFlags, FontFacet, FontScope, ProgBinaryTagVersion,
+    ProgTag, ProgTagLimits, ProgTagScope, ProgTags, Record, RecordType, raw::Reader,
 };
 
 fn configured_writer() -> Writer {
@@ -47,7 +47,7 @@ fn write_to_bytes(writer: &mut Writer) -> Vec<u8> {
 }
 
 fn assert_custom_catalog(bytes: Vec<u8>) {
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     assert!(
         presentation
@@ -85,7 +85,7 @@ fn temporary_path(label: &str) -> PathBuf {
 #[test]
 fn default_writer_retains_arial_without_embedding_flags() {
     let mut writer = Writer::new();
-    let mut package = Package::from_reader(Cursor::new(write_to_bytes(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write_to_bytes(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     assert!(
         !presentation
@@ -326,7 +326,7 @@ fn font_ppt10_and_smart_tag_ppt11_share_one_document_prog_tags_owner() {
             .is_some()
     );
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     assert_eq!(
         presentation.fonts().unwrap().get_base(1).unwrap().name,

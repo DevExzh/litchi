@@ -4,7 +4,7 @@
     reason = "test assertions panic on failure by design"
 )]
 
-use super::model::Presentation;
+use super::model::{Presentation, PresentationData};
 use crate::Error;
 use crate::consts::RecordType;
 use crate::parsers::RecordParser;
@@ -55,7 +55,9 @@ fn presentation_with_vba_storage() -> Presentation {
     let mut persist_mapping = PersistMapping::new();
     persist_mapping.add_mapping(41, storage_offset);
 
-    Presentation {
+    #[cfg(feature = "encryption")]
+    let encryption = None;
+    Presentation::from_data(PresentationData {
         powerpoint_document: std::sync::Arc::new(powerpoint_document),
         parser,
         persist_mapping,
@@ -64,7 +66,10 @@ fn presentation_with_vba_storage() -> Presentation {
         pictures_source: None,
         source_limits: crate::SourceLimits::default(),
         tolerance: crate::leniency::ToleranceReport::default(),
-    }
+        source: None,
+        #[cfg(feature = "encryption")]
+        encryption,
+    })
 }
 
 #[test]
@@ -72,7 +77,9 @@ fn lazy_live_document_reuses_presentation_source_limits() {
     let powerpoint_document = record_bytes(0x0f, 0, RecordType::Document, &[1]);
     let mut persist_mapping = PersistMapping::new();
     persist_mapping.add_mapping(1, 0);
-    let presentation = Presentation {
+    #[cfg(feature = "encryption")]
+    let encryption = None;
+    let presentation = Presentation::from_data(PresentationData {
         powerpoint_document: std::sync::Arc::new(powerpoint_document),
         parser: RecordParser::new(),
         persist_mapping,
@@ -84,7 +91,10 @@ fn lazy_live_document_reuses_presentation_source_limits() {
             ..crate::SourceLimits::default()
         },
         tolerance: crate::leniency::ToleranceReport::default(),
-    };
+        source: None,
+        #[cfg(feature = "encryption")]
+        encryption,
+    });
 
     assert!(matches!(
         presentation.live_document_record(),
@@ -194,31 +204,31 @@ const SHARED_SOURCE_FIXTURES: [&str; 4] = [
 
 fn open_fixture(
     relative: &str,
-) -> Option<(crate::Package<std::io::Cursor<Vec<u8>>>, Presentation)> {
+) -> Option<(crate::raw::Reader<std::io::Cursor<Vec<u8>>>, Presentation)> {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data")
         .join(relative);
     let bytes = std::fs::read(path).ok()?;
-    let mut package = crate::Package::from_reader(std::io::Cursor::new(bytes)).ok()?;
+    let mut package = crate::raw::Reader::from_reader(std::io::Cursor::new(bytes)).ok()?;
     let presentation = package.presentation().ok()?;
     Some((package, presentation))
 }
 
 fn owned_factory(presentation: &Presentation) -> crate::slide::SlideFactory<'_> {
     crate::slide::SlideFactory::new_with_limits(
-        presentation.powerpoint_document.as_slice(),
-        &presentation.persist_mapping,
-        &presentation.slide_directory,
-        presentation.source_limits,
+        presentation.inner.powerpoint_document.as_slice(),
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+        presentation.inner.source_limits,
     )
 }
 
 fn shared_factory(presentation: &Presentation) -> crate::slide::SlideFactory<'_> {
     crate::slide::SlideFactory::new_shared_with_limits(
-        &presentation.powerpoint_document,
-        &presentation.persist_mapping,
-        &presentation.slide_directory,
-        presentation.source_limits,
+        &presentation.inner.powerpoint_document,
+        &presentation.inner.persist_mapping,
+        &presentation.inner.slide_directory,
+        presentation.inner.source_limits,
     )
 }
 
@@ -325,19 +335,19 @@ fn the_shared_slide_factory_charges_the_same_copy_budget() {
         for budget in [total, total - 1] {
             let limits = crate::SourceLimits {
                 max_copied_payload_bytes: budget,
-                ..presentation.source_limits
+                ..presentation.inner.source_limits
             };
             let owned = crate::slide::SlideFactory::new_with_limits(
-                presentation.powerpoint_document.as_slice(),
-                &presentation.persist_mapping,
-                &presentation.slide_directory,
+                presentation.inner.powerpoint_document.as_slice(),
+                &presentation.inner.persist_mapping,
+                &presentation.inner.slide_directory,
                 limits,
             )
             .parse_slide(persist_id);
             let shared = crate::slide::SlideFactory::new_shared_with_limits(
-                &presentation.powerpoint_document,
-                &presentation.persist_mapping,
-                &presentation.slide_directory,
+                &presentation.inner.powerpoint_document,
+                &presentation.inner.persist_mapping,
+                &presentation.inner.slide_directory,
                 limits,
             )
             .parse_slide(persist_id);
@@ -382,7 +392,7 @@ fn editing_a_shared_slide_payload_leaves_the_document_stream_intact() {
         let Ok(mut slide) = shared_factory(&presentation).parse_slide(persist_id) else {
             continue;
         };
-        let stream = presentation.powerpoint_document.as_ref().clone();
+        let stream = presentation.inner.powerpoint_document.as_ref().clone();
         let sibling = slide
             .record
             .children
@@ -390,7 +400,7 @@ fn editing_a_shared_slide_payload_leaves_the_document_stream_intact() {
             .map(|child| child.data.to_vec());
         slide.record.data.to_mut()[0] ^= 0xFF;
         assert_eq!(
-            presentation.powerpoint_document.as_ref(),
+            presentation.inner.powerpoint_document.as_ref(),
             &stream,
             "{relative}: editing a borrowed payload must not reach the stream"
         );

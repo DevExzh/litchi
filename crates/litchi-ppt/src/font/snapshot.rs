@@ -1,6 +1,7 @@
 use super::codec::encode_record;
 use super::{FontCollections, PackageLimits, PackageOptions};
-use crate::package::{Error, Package, Result};
+use crate::package::{Error, Result};
+use crate::raw::Reader;
 use crate::records::Record;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -97,7 +98,7 @@ impl Snapshot {
             .max_package_bytes
             .min(options.limits.max_source_bytes);
         let mut package =
-            Package::from_reader_with_limits(Cursor::new(bytes.clone()), ingress_limits)?;
+            Reader::from_reader_with_limits(Cursor::new(bytes.clone()), ingress_limits)?;
         #[cfg(feature = "encryption")]
         let presentation = package.presentation_with_options_and_limits(
             crate::OpenOptions {

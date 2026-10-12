@@ -10,7 +10,7 @@ use litchi_ppt::writer::{
     Guide, GuideOrientation, Ratio, SlideViewInfo, SlideViewPreferences, ViewKind, ViewOrigin,
     Writer, ZoomViewInfo,
 };
-use litchi_ppt::{Package, Record};
+use litchi_ppt::{Record, raw::Reader};
 
 fn slide_view() -> SlideViewInfo {
     let scale = Ratio::new(3, 4).unwrap();
@@ -96,7 +96,7 @@ fn simultaneous_slide_and_notes_views_round_trip_through_writer_and_reader() {
     writer.set_slide_view_info(slide_view()).unwrap();
     writer.set_notes_view_info(notes_view()).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let information = presentation.slide_view_information().unwrap();
     let slide = information.slide().unwrap();

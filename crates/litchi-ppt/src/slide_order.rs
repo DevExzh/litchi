@@ -17,7 +17,8 @@ pub use litchi_core::Position;
 pub use litchi_core::patch::{CompositionLimits, HistoryLimits, SubEditJoinFailure};
 
 use crate::document_structure;
-use crate::package::{Error as PackageError, Package, SourceLimits};
+use crate::package::{Error as PackageError, SourceLimits};
+use crate::raw::Reader;
 
 /// Explicit bounded undo/redo history for slide-order snapshots.
 pub type History = litchi_core::patch::History<Snapshot>;
@@ -612,7 +613,7 @@ impl Snapshot {
             }
             .into());
         }
-        let mut package = Package::from_reader_with_limits(Cursor::new(bytes.as_slice()), limits)?;
+        let mut package = Reader::from_reader_with_limits(Cursor::new(bytes.as_slice()), limits)?;
         let presentation = package.presentation()?;
         let directory = presentation.slide_directory();
         let (document_persist_id, document_bytes) =
@@ -4923,7 +4924,7 @@ struct PictureInventory {
 }
 
 fn picture_inventory(snapshot: &Snapshot) -> Result<PictureInventory> {
-    let mut package = Package::from_reader(Cursor::new(snapshot.bytes()))?;
+    let mut package = Reader::from_reader(Cursor::new(snapshot.bytes()))?;
     let presentation = package.presentation()?;
     let slots = presentation
         .image_store()?
@@ -6501,7 +6502,7 @@ mod tests {
     }
 
     fn slide_texts(bytes: &[u8]) -> Vec<String> {
-        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
         package
             .presentation()
             .unwrap()
@@ -6558,7 +6559,7 @@ mod tests {
     }
 
     fn shape_text(bytes: &[u8], target: crate::text_edit::Target) -> String {
-        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
         let presentation = package.presentation().unwrap();
         presentation.slides().unwrap()[target.slide().get()]
             .shapes()
@@ -7366,7 +7367,7 @@ mod tests {
             crate::text_edit::inspect_shape_anchor(commit.snapshot().bytes(), target).unwrap(),
             replacement
         );
-        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        let mut reopened = Reader::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
         assert_eq!(
             reopened.presentation().unwrap().slide_count(),
             source.slide_count()
@@ -7436,7 +7437,7 @@ mod tests {
             commit.patch().inverse().apply(commit.snapshot()).unwrap(),
             source
         );
-        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        let mut reopened = Reader::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
         assert_eq!(
             reopened.presentation().unwrap().slide_count(),
             commit.snapshot().slide_count()
@@ -7527,7 +7528,7 @@ mod tests {
             source.slide_count() - 1
         );
         let mut reopened =
-            Package::from_reader(Cursor::new(media_first_commit.snapshot().bytes())).unwrap();
+            Reader::from_reader(Cursor::new(media_first_commit.snapshot().bytes())).unwrap();
         assert_eq!(
             reopened.presentation().unwrap().slide_count(),
             source.slide_count() - 1
@@ -7632,7 +7633,7 @@ mod tests {
             slide_texts(commit.snapshot().bytes())[0],
             slide_texts(commit.snapshot().bytes())[1]
         );
-        let mut reopened = Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+        let mut reopened = Reader::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
         assert_eq!(reopened.presentation().unwrap().slide_count(), 2);
 
         let durable = commit.patch().to_durable(transfer_patch_limits()).unwrap();
@@ -7969,7 +7970,7 @@ mod tests {
             slide_texts(visibility_restored.bytes()),
             slide_texts(source.bytes())
         );
-        let mut reopened = Package::from_reader(Cursor::new(visibility_restored.bytes())).unwrap();
+        let mut reopened = Reader::from_reader(Cursor::new(visibility_restored.bytes())).unwrap();
         assert_eq!(
             reopened.presentation().unwrap().slide_count(),
             source.slide_count()
@@ -8029,8 +8030,7 @@ mod tests {
             let after_atom = advance_atom_data(commit.snapshot(), *position);
             assert_eq!(&after_atom[4..10], &before_atom[4..10], "{family}/{name}");
             assert_eq!(&after_atom[12..16], &before_atom[12..16], "{family}/{name}");
-            let mut reopened =
-                Package::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
+            let mut reopened = Reader::from_reader(Cursor::new(commit.snapshot().bytes())).unwrap();
             assert_eq!(
                 reopened.presentation().unwrap().slide_count(),
                 source.slide_count(),

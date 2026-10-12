@@ -6,7 +6,7 @@
 
 use std::io::Cursor;
 
-use litchi_ppt::Package;
+use litchi_ppt::raw::Reader;
 use litchi_ppt::writer::{Chart, ChartKind, Hyperlink, Table, WriteError, Writer};
 
 fn chart(kind: ChartKind) -> Chart {
@@ -49,7 +49,7 @@ fn valid_chart_requests_write_graph_objects_and_reopen() {
     }
     let after = write_to_bytes(&mut writer);
 
-    let mut package = Package::from_reader(Cursor::new(after)).expect("open presentation");
+    let mut package = Reader::from_reader(Cursor::new(after)).expect("open presentation");
     let presentation = package.presentation().expect("read presentation");
     let inventory = presentation.charts().expect("enumerate charts");
     assert_eq!(inventory.seen(), 3);
@@ -139,7 +139,7 @@ fn graph_cache_limit_refusal_is_atomic_before_chart_storage() {
         }))
     ));
     let bytes = write_to_bytes(&mut writer);
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("open presentation");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("open presentation");
     let inventory = package
         .presentation()
         .expect("presentation")

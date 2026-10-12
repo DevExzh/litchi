@@ -273,6 +273,7 @@ pub(super) struct EncryptedPresentation {
     pub live_offsets: Vec<usize>,
     pub mappings: Vec<(u32, u32)>,
     pub crypto: Context,
+    pub profile: EncryptionProfile,
 }
 
 #[derive(Clone, Copy)]
@@ -413,6 +414,15 @@ pub(super) fn decrypt_powerpoint_document(
         "CryptSession10Container",
     )?;
     let header = office_rc4::parse_header(session_data).map_err(map_crypto_error)?;
+    let key_bits = u16::try_from(header.key_bits()).map_err(|_error| {
+        Error::MalformedEncryptionHeader(
+            "CryptoAPI RC4 key size does not fit in profile".to_string(),
+        )
+    })?;
+    let profile = EncryptionProfile::CryptoApiRc4 { key_bits };
+    profile
+        .validate()
+        .map_err(Error::MalformedEncryptionHeader)?;
     let verified_password = password.ok_or(Error::PasswordRequired)?;
     let crypto = office_rc4::verify(&header, verified_password)
         .map_err(map_crypto_error)?
@@ -501,6 +511,7 @@ pub(super) fn decrypt_powerpoint_document(
         live_offsets,
         mappings,
         crypto,
+        profile,
     }))
 }
 
@@ -749,7 +760,7 @@ fn checked_slice_mut<'a>(
 )]
 mod tests {
     use super::*;
-    use crate::{OpenOptions, Package};
+    use crate::{OpenOptions, raw::Reader};
     use std::path::{Path, PathBuf};
 
     fn poi_fixture(name: &str) -> PathBuf {
@@ -767,7 +778,7 @@ mod tests {
 
     #[test]
     fn encrypted_presentation_requires_password() {
-        let mut package = Package::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
+        let mut package = Reader::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
         assert!(matches!(
             package.presentation(),
             Err(Error::PasswordRequired)
@@ -776,7 +787,7 @@ mod tests {
 
     #[test]
     fn encrypted_presentation_rejects_wrong_password() {
-        let mut package = Package::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
+        let mut package = Reader::open(poi_fixture("Password_Protected-hello.ppt")).unwrap();
         assert!(matches!(
             package.presentation_with_options(OpenOptions {
                 source_limits: SourceLimits::default(),
@@ -795,7 +806,7 @@ mod tests {
             "Password_Protected-56-hello.ppt",
             "Password_Protected-np-hello.ppt",
         ] {
-            let mut package = Package::open(poi_fixture(name)).unwrap();
+            let mut package = Reader::open(poi_fixture(name)).unwrap();
             let presentation = package
                 .presentation_with_options(OpenOptions {
                     source_limits: SourceLimits::default(),
@@ -810,7 +821,7 @@ mod tests {
 
     #[test]
     fn opens_poi_cryptoapi_content_oracle() {
-        let mut package = Package::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap();
+        let mut package = Reader::open(poi_fixture("cryptoapi-proc2356.ppt")).unwrap();
         let presentation = package
             .presentation_with_options(OpenOptions {
                 source_limits: SourceLimits::default(),

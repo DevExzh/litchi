@@ -9,20 +9,17 @@
 //! - the byte route, where detection parsed the input into an in-memory
 //!   [`OleFile`] (`Ppt::from_ole_file`).
 //!
-//! Both build the same [`litchi_ppt::Presentation`] reader the facade builds,
-//! with the same metadata projection. The facade then dropped the package;
-//! the handle keeps it (filesystem route) or seals the parsed bytes and CFB
-//! index into a [`SharedOleFile`] without a copy or a second parse (byte
-//! route), so a text editor can be built at the first edit.
+//! Both retain the canonical immutable PPT owner and its owned presentation
+//! projection. The native owner preserves the original CFB index and source,
+//! so a text editor can be built at the first edit without reopening it.
 
 use std::io::Cursor;
 use std::sync::Arc;
 
-use litchi_cfb::{OleFile, SharedOleFile, SharedOleFileLimits};
-use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt, SourceVersion};
-use litchi_ole_common::property_set::PropertySetReader;
+use litchi_cfb::OleFile;
+use litchi_core::{FileFormat, Metadata, OwnedSource, ReadAt};
 use litchi_ppt::text_edit::{self, SourceSnapshot};
-use litchi_ppt::{SourceBackedPackage, SourceLimits};
+use litchi_ppt::{Package, SourceBackedPackage, SourceLimits};
 
 use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
@@ -32,8 +29,9 @@ use crate::{OpenOptions, Result};
 ///
 /// One `Arc` wide: cloning is one atomic increment, and the handle is
 /// `Send + Sync`. Reads go to the presentation reader built at open. The
-/// handle also retains its source (unless [`OpenOptions::retain_source`] was
-/// `false`), so a later edit needs no second open.
+/// handle retains an edit source unless [`OpenOptions::retain_source`] is false.
+/// Positional reads retain their source for lazy payloads and freshness checks
+/// even when editing is disabled.
 #[derive(Clone)]
 pub struct Ppt(Arc<Opened<PptState>>);
 
@@ -54,11 +52,11 @@ struct PptState {
 /// The two source states of [`Ppt`] (record 0003 §2.3).
 enum PptOwner {
     /// Filesystem route: the positional package detection opened.
-    Source(SourceBackedPackage),
+    Source(Package),
     /// Byte route: the input bytes and the CFB index detection built, sealed
     /// together.
-    Eager(Arc<SharedOleFile>),
-    /// The source was released after open (`retain_source(false)`).
+    Eager(Package),
+    /// Edit ownership was released after open (`retain_source(false)`).
     Released,
 }
 
@@ -101,18 +99,10 @@ impl Ppt {
         package: SourceBackedPackage,
         options: &OpenOptions,
     ) -> Result<Self> {
-        let (presentation, source_limits) = match options.ppt_source_limits {
-            None => (package.presentation()?, package.source_limits()),
-            Some(limits) => {
-                let limits = limits.constrained_by(package.source_limits());
-                (package.presentation_with_limits(limits)?, limits)
-            },
-        };
-        let metadata = package
-            .metadata()
-            .ok()
-            .map(Metadata::from)
-            .filter(Metadata::has_data);
+        let package = Package::from_source(package, native_options(options, None))?;
+        let presentation = package.presentation()?;
+        let source_limits = package.source_limits();
+        let metadata = package.metadata().ok().filter(Metadata::has_data);
         let owner = if options.retain_source {
             PptOwner::Source(package)
         } else {
@@ -145,39 +135,18 @@ impl Ppt {
         options: &OpenOptions,
         password: Option<&str>,
     ) -> Result<LegacyOpen<Self>> {
-        let mut package = match options.ppt_source_limits {
-            None => litchi_ppt::Package::from_ole_file(ole)?,
-            Some(limits) => litchi_ppt::Package::from_ole_file_with_limits(ole, limits)?,
+        let package = match Package::from_ole_file_or_password_required(
+            ole,
+            native_options(options, password),
+        )? {
+            Ok(package) => package,
+            Err(ole) => return Ok(LegacyOpen::PasswordRequired(Box::new(ole))),
         };
-        let metadata = package
-            .ole_file()
-            .get_metadata()
-            .ok()
-            .map(Metadata::from)
-            .filter(Metadata::has_data);
-        let opened = match password {
-            None => package.presentation(),
-            Some(password) => {
-                package.presentation_with_options(litchi_ppt::OpenOptions::new().password(password))
-            },
-        };
-        let presentation = match opened {
-            Ok(presentation) => presentation,
-            Err(error) if password_required(&error) => {
-                return Ok(LegacyOpen::PasswordRequired(Box::new(
-                    package.into_ole_file(),
-                )));
-            },
-            Err(error) => return Err(error.into()),
-        };
+        let presentation = package.presentation()?;
+        let metadata = package.metadata().ok().filter(Metadata::has_data);
         let source_limits = package.source_limits();
         let owner = if options.retain_source {
-            let shared = SharedOleFile::from_owned_ole_file(
-                package.into_ole_file(),
-                sealed_version()?,
-                SharedOleFileLimits::default(),
-            )?;
-            PptOwner::Eager(Arc::new(shared))
+            PptOwner::Eager(package)
         } else {
             PptOwner::Released
         };
@@ -272,8 +241,7 @@ impl Ppt {
         };
         if self.0.signature() == Signature::RemovalAuthorized {
             let shared = match &self.0.owner {
-                PptOwner::Source(package) => package.shared_ole_file(),
-                PptOwner::Eager(shared) => shared.as_ref(),
+                PptOwner::Source(package) | PptOwner::Eager(package) => package.shared_ole_file(),
                 PptOwner::Released => return Ok(None),
             };
             let bytes = signature::unsign_compound_file(
@@ -284,12 +252,9 @@ impl Ppt {
             return Ok(Some(SourceSnapshot::open_with_options(source, options)?));
         }
         Ok(match &self.0.owner {
-            PptOwner::Source(package) => {
-                Some(package.text_edit_snapshot_with_limits(self.0.source_limits)?)
-            },
-            PptOwner::Eager(shared) => {
-                Some(SourceSnapshot::from_shared(Arc::clone(shared), options)?)
-            },
+            PptOwner::Source(package) | PptOwner::Eager(package) => Some(
+                SourceSnapshot::from_shared(package.shared_ole_file_arc(), options)?,
+            ),
             PptOwner::Released => None,
         })
     }
@@ -299,7 +264,7 @@ impl Ppt {
     #[cfg(test)]
     fn retained_input_len(&self) -> Option<u64> {
         match &self.0.owner {
-            PptOwner::Eager(shared) => Some(shared.file_size()),
+            PptOwner::Eager(package) => Some(package.shared_ole_file().file_size()),
             PptOwner::Source(_) | PptOwner::Released => None,
         }
     }
@@ -319,10 +284,15 @@ impl std::fmt::Debug for Ppt {
     }
 }
 
-/// A process-unique identity for a sealed in-memory source, minted by the
-/// same counter as every other [`OwnedSource`].
-fn sealed_version() -> Result<SourceVersion> {
-    Ok(OwnedSource::new(Vec::new()).version()?)
+fn native_options<'a>(
+    options: &OpenOptions,
+    password: Option<&'a str>,
+) -> litchi_ppt::OpenOptions<'a> {
+    let native = litchi_ppt::OpenOptions::new().password(password);
+    match options.ppt_source_limits {
+        Some(limits) => native.source_limits(limits),
+        None => native,
+    }
 }
 
 #[cfg(test)]
@@ -336,7 +306,8 @@ mod tests {
     use super::*;
     use crate::detect::{DetectedFormat, detect_format_smart};
     use litchi_core::Position;
-    use litchi_ppt::Package;
+    use litchi_ole_common::property_set::PropertySetReader;
+    use litchi_ppt::raw::Reader;
     use std::path::PathBuf;
 
     fn fixture_path(name: &str) -> PathBuf {
@@ -379,7 +350,7 @@ mod tests {
 
     /// The leaf pipeline the facade wraps, as an independent oracle.
     fn leaf(name: &str) -> (litchi_ppt::Presentation, Option<Metadata>) {
-        let mut package = Package::from_reader(Cursor::new(fixture(name))).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(fixture(name))).unwrap();
         let metadata = package
             .ole_file()
             .get_metadata()
@@ -439,6 +410,24 @@ mod tests {
             assert!(matches!(ppt.0.owner, PptOwner::Source(_)));
             assert_matches_leaf(&ppt, name);
         }
+    }
+
+    #[test]
+    #[cfg(any(unix, windows))]
+    fn positional_admission_preserves_larger_selected_limits() {
+        let limits = SourceLimits::builder()
+            .max_input_bytes(1024 * 1024 * 1024)
+            .unwrap()
+            .max_aggregate_payload_bytes(2 * 1024 * 1024 * 1024)
+            .unwrap()
+            .build()
+            .unwrap();
+        let ppt = open_path(
+            "SampleShow.ppt",
+            &OpenOptions::new().ppt_source_limits(limits),
+        )
+        .unwrap();
+        assert_eq!(ppt.0.source_limits, limits);
     }
 
     #[test]
@@ -530,7 +519,10 @@ mod tests {
         let PptOwner::Eager(shared) = &from_bytes.0.owner else {
             panic!("byte route did not retain its source");
         };
-        assert_eq!(editor.source_version(), shared.captured_source_version());
+        assert_eq!(
+            editor.source_version(),
+            shared.shared_ole_file().captured_source_version()
+        );
 
         // The corpus is refused by the narrow editor, as by a fresh open.
         let refused = open_bytes(fixture("text_shapes.ppt"), &OpenOptions::default()).unwrap();

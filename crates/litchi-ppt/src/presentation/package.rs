@@ -1,4 +1,4 @@
-use super::model::{LazyPictures, Presentation};
+use super::model::{LazyPictures, Presentation, PresentationData};
 #[cfg(not(feature = "encryption"))]
 use crate::current_user::CurrentUser;
 #[cfg(feature = "encryption")]
@@ -180,7 +180,9 @@ impl Presentation {
         // The metadata streams' repairs follow every record-level repair.
         tolerance.append_property_sets(|path| ole.property_set_stream(path));
 
-        Ok(Self {
+        #[cfg(feature = "encryption")]
+        let encryption_profile = encrypted.as_ref().map(|value| value.profile);
+        Ok(Self::from_data(PresentationData {
             powerpoint_document,
             parser,
             persist_mapping,
@@ -189,7 +191,10 @@ impl Presentation {
             pictures_source: None,
             source_limits,
             tolerance,
-        })
+            source: None,
+            #[cfg(feature = "encryption")]
+            encryption: encryption_profile,
+        }))
     }
 
     /// Build a presentation from one validated positional CFB index.
@@ -344,6 +349,8 @@ impl Presentation {
         )?;
 
         #[cfg(feature = "encryption")]
+        let encryption_profile = encrypted.as_ref().map(|value| value.profile);
+        #[cfg(feature = "encryption")]
         let pictures_crypto = encrypted.map(|value| value.crypto);
         let pictures_source = pictures.map(|(path, length)| {
             LazyPictures::new(
@@ -361,7 +368,7 @@ impl Presentation {
         });
         shared.source_version()?;
 
-        Ok(Self {
+        Ok(Self::from_data(PresentationData {
             powerpoint_document,
             parser,
             persist_mapping,
@@ -370,7 +377,10 @@ impl Presentation {
             pictures_source,
             source_limits,
             tolerance,
-        })
+            source: Some(shared),
+            #[cfg(feature = "encryption")]
+            encryption: encryption_profile,
+        }))
     }
 }
 

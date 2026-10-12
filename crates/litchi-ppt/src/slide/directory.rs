@@ -622,7 +622,7 @@ fn read_u32(data: &[u8], offset: usize, name: &str) -> Result<u32> {
 )]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
 
     fn record(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(8 + data.len());
@@ -1117,7 +1117,7 @@ mod tests {
     fn poi_reordered_and_basic_fixtures_match_normative_ids() {
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/poi/test-data/slideshow");
-        let mut package = Package::open(root.join("incorrect_slide_order.ppt")).unwrap();
+        let mut package = Reader::open(root.join("incorrect_slide_order.ppt")).unwrap();
         let presentation = package.presentation().unwrap();
         let slides = presentation.slides().unwrap();
         assert_eq!(
@@ -1139,7 +1139,7 @@ mod tests {
             assert!(text.contains(title), "expected {title:?}, got {text:?}");
         }
 
-        let mut basic_package = Package::open(root.join("basic_test_ppt_file.ppt")).unwrap();
+        let mut basic_package = Reader::open(root.join("basic_test_ppt_file.ppt")).unwrap();
         let basic_presentation = basic_package.presentation().unwrap();
         let basic_slides = basic_presentation.slides().unwrap();
         assert_eq!(

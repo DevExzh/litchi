@@ -8,7 +8,7 @@ use litchi_ppt::animation::AnimationInfo;
 use litchi_ppt::writer::{Hyperlink, Writer};
 use litchi_ppt::{
     Interaction, InteractionAction, InteractionJump, InteractionLimits, InteractionLinkTarget,
-    InteractionTrigger, Package,
+    InteractionTrigger, raw::Reader,
 };
 use std::io::Cursor;
 
@@ -78,7 +78,7 @@ fn typed_click_hover_and_file_link_round_trip() {
         .set_last_shape_interaction(slide, next.clone())
         .unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let hyperlinks = presentation.hyperlinks().unwrap();
     let entries = presentation.slides().unwrap()[0]
@@ -172,7 +172,7 @@ fn failed_replacement_is_atomic_and_trigger_removal_is_precise() {
             .unwrap()
     );
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let entries = presentation.slides().unwrap()[0]
         .shape_interactions()

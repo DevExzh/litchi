@@ -203,6 +203,7 @@ pub fn parse_presentation<'a>(
     objects: &Objects<'a>,
 ) -> Result<Inventory<'a>> {
     let documents: Vec<&Record> = presentation
+        .inner
         .parser
         .find_records_ref()
         .into_iter()
@@ -214,7 +215,7 @@ pub fn parse_presentation<'a>(
             documents.len()
         )));
     }
-    parse(documents[0], objects, &presentation.persist_mapping)
+    parse(documents[0], objects, &presentation.inner.persist_mapping)
 }
 
 fn validate_children_cover(record: &Record) -> Result<()> {

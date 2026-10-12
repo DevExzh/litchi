@@ -1,7 +1,7 @@
 //! Positional, source-backed access to legacy PowerPoint packages.
 //!
-//! The ordinary [`super::Package`] remains the compatibility path for
-//! `Read + Seek` callers.  This owner adapts an immutable positional source to
+//! The eager [`crate::raw::Reader`] remains the low-level path for `Read + Seek`
+//! callers. This owner adapts an immutable positional source to
 //! the native CFB reader and lets the presentation defer the optional
 //! `Pictures` stream until an image query is made.
 
@@ -198,7 +198,7 @@ impl SourceBackedPackage {
     /// Build a presentation using the default password options.
     ///
     /// Required native streams are materialized and parsed using the same
-    /// semantic pipeline as [`super::Package::presentation`].  `Pictures` is
+    /// semantic pipeline as [`crate::raw::Reader::presentation`]. `Pictures` is
     /// only represented by its validated descriptor.
     pub fn presentation(&self) -> Result<Presentation> {
         self.presentation_with_options(OpenOptions::default())
@@ -263,6 +263,17 @@ impl SourceBackedPackage {
     #[must_use]
     pub fn shared_ole_file(&self) -> &SharedOleFile {
         &self.shared
+    }
+
+    /// Clone the validated compound-file view retained by this source owner.
+    ///
+    /// This is a read-only handoff for a canonical owner that already has a
+    /// source-backed package. The caller must perform its own source-version
+    /// check before adopting the returned view and before each operation that
+    /// depends on source freshness.
+    #[must_use]
+    pub fn shared_ole_file_arc(&self) -> Arc<SharedOleFile> {
+        Arc::clone(&self.shared)
     }
 
     /// Builds the source-backed text editor under stricter record limits.

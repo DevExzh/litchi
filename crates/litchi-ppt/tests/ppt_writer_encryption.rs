@@ -7,7 +7,7 @@
 
 use litchi_cfb::OleFile;
 use litchi_ppt::writer::{EncryptionProfile, PictureKind, Writer};
-use litchi_ppt::{Error, OpenOptions, Package};
+use litchi_ppt::{Error, OpenOptions, raw::Reader};
 use std::collections::BTreeMap;
 use std::io::Cursor;
 
@@ -60,7 +60,7 @@ fn persist_mappings(document: &[u8], offset: usize) -> BTreeMap<u32, u32> {
 
 fn assert_round_trip(profile: EncryptionProfile, password: &str, picture: bool) -> Vec<u8> {
     let bytes = write(profile, password, picture);
-    let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     assert!(matches!(
         package.presentation(),
         Err(Error::PasswordRequired)

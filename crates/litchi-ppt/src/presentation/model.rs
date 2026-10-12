@@ -28,6 +28,9 @@ use litchi_odraw::image::{File as ImageFile, Id as ImageId, Store as ImageStore}
 use std::io::Cursor;
 use std::sync::{Arc, OnceLock};
 
+#[cfg(feature = "encryption")]
+use crate::encryption::EncryptionProfile;
+
 /// Deferred native `Pictures` stream owned by a positional presentation.
 ///
 /// The descriptor is created from the validated CFB directory and is kept
@@ -133,18 +136,24 @@ impl LazyPictures {
 /// }
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
+#[derive(Clone)]
 pub struct Presentation {
+    pub(crate) inner: Arc<PresentationData>,
+}
+
+/// Immutable state shared by cheap [`Presentation`] handles.
+pub(crate) struct PresentationData {
     /// The main document stream data, shared with the record tree whose
     /// payloads span it (owned for lifetime management)
-    pub(super) powerpoint_document: Arc<Vec<u8>>,
+    pub(crate) powerpoint_document: Arc<Vec<u8>>,
     /// Parsed record structure (reserved for future advanced parsing)
     #[allow(dead_code, reason = "reserved for future advanced parsing")]
     pub(crate) parser: RecordParser,
     /// Persist ID to offset mapping
     pub(crate) persist_mapping: PersistMapping,
-    pub(super) slide_directory: SlideDirectory,
+    pub(crate) slide_directory: SlideDirectory,
     /// Pictures stream data (for image extraction)
-    pub(super) pictures_data: Option<Vec<u8>>,
+    pub(crate) pictures_data: Option<Vec<u8>>,
     /// Positional Pictures descriptor and success-only payload cache.
     pub(super) pictures_source: Option<LazyPictures>,
     /// Record limits retained for lazy live-persist parsing.
@@ -153,7 +162,53 @@ pub struct Presentation {
     ///
     /// Aggregated by the constructors in `package.rs`; see
     /// [`crate::leniency`] for where future recording sites plug in.
-    pub(super) tolerance: crate::leniency::ToleranceReport,
+    pub(crate) tolerance: crate::leniency::ToleranceReport,
+    /// Positional source retained for freshness checks on fallible reads.
+    pub(crate) source: Option<Arc<SharedOleFile>>,
+    /// Validated password-to-open profile, when the document was encrypted.
+    #[cfg(feature = "encryption")]
+    pub(crate) encryption: Option<EncryptionProfile>,
+}
+
+impl Presentation {
+    pub(super) fn from_data(data: PresentationData) -> Self {
+        Self {
+            inner: Arc::new(data),
+        }
+    }
+
+    pub(crate) fn ensure_source_current(&self) -> Result<()> {
+        if let Some(source) = self.inner.source.as_ref() {
+            source.source_version()?;
+        }
+        Ok(())
+    }
+
+    /// Limits retained by this immutable presentation projection.
+    #[must_use]
+    pub fn source_limits(&self) -> SourceLimits {
+        self.inner.source_limits
+    }
+
+    /// Whether this presentation was opened with password-to-open encryption.
+    #[must_use]
+    pub fn is_encrypted(&self) -> bool {
+        #[cfg(feature = "encryption")]
+        {
+            self.inner.encryption.is_some()
+        }
+        #[cfg(not(feature = "encryption"))]
+        {
+            false
+        }
+    }
+
+    /// The validated password-to-open encryption profile, if present.
+    #[cfg(feature = "encryption")]
+    #[must_use]
+    pub fn encryption(&self) -> Option<EncryptionProfile> {
+        self.inner.encryption
+    }
 }
 
 impl Presentation {
@@ -175,7 +230,7 @@ impl Presentation {
     /// [`Self::collect_tolerance_report`].
     #[must_use]
     pub fn tolerance_report(&self) -> &crate::leniency::ToleranceReport {
-        &self.tolerance
+        &self.inner.tolerance
     }
 
     /// Every non-structural defect the reader repairs when reading this whole
@@ -197,10 +252,12 @@ impl Presentation {
     /// parsed — the structural failures that stay fatal under every
     /// [`crate::Leniency`] variant.
     pub fn collect_tolerance_report(&self) -> Result<crate::leniency::ToleranceReport> {
-        let mut report = self.tolerance.clone();
+        self.ensure_source_current()?;
+        let mut report = self.inner.tolerance.clone();
         // Main-master drawings are parsed by `Self::header_footers`; their
         // repairs are listed here, before the slides'.
         for master in self
+            .inner
             .parser
             .find_records_ref()
             .iter()
@@ -229,11 +286,12 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn slides(&self) -> Result<Vec<Slide<'_>>> {
+        self.ensure_source_current()?;
         let factory = SlideFactory::new_shared_with_limits(
-            &self.powerpoint_document,
-            &self.persist_mapping,
-            &self.slide_directory,
-            self.source_limits,
+            &self.inner.powerpoint_document,
+            &self.inner.persist_mapping,
+            &self.inner.slide_directory,
+            self.inner.source_limits,
         );
 
         factory
@@ -250,15 +308,16 @@ impl Presentation {
     /// Unlike [`Self::slides`], this method parses only the requested slide
     /// and does not retain the other slides in a temporary collection.
     pub fn slide_at(&self, position: usize) -> Result<Option<Slide<'_>>> {
-        let Some(entry) = self.slide_directory.entries().get(position) else {
+        self.ensure_source_current()?;
+        let Some(entry) = self.inner.slide_directory.entries().get(position) else {
             return Ok(None);
         };
 
         let factory = SlideFactory::new_shared_with_limits(
-            &self.powerpoint_document,
-            &self.persist_mapping,
-            &self.slide_directory,
-            self.source_limits,
+            &self.inner.powerpoint_document,
+            &self.inner.persist_mapping,
+            &self.inner.slide_directory,
+            self.inner.source_limits,
         );
         let slide_data = factory.parse_slide(entry.persist_id())?;
         Ok(Some(Slide::from_slide_data(slide_data, position + 1)))
@@ -268,13 +327,13 @@ impl Presentation {
     #[inline]
     #[must_use]
     pub fn slide_count(&self) -> usize {
-        self.slide_directory.len()
+        self.inner.slide_directory.len()
     }
 
     /// Return the validated logical slide directory.
     #[must_use]
     pub fn slide_directory(&self) -> &SlideDirectory {
-        &self.slide_directory
+        &self.inner.slide_directory
     }
 
     /// Parse `PowerPoint` 12 round-trip metadata for every main master slide.
@@ -287,7 +346,8 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn powerpoint12_main_master_metadata(&self) -> Result<Vec<MainMasterMetadata12>> {
-        self.parser
+        self.inner
+            .parser
             .find_records_ref()
             .into_iter()
             .filter(|record| record.record_type == RecordType::MainMaster)
@@ -320,7 +380,8 @@ impl Presentation {
         &self,
         limits: crate::ProgTagLimits,
     ) -> Result<Vec<crate::ProgTags>> {
-        self.parser
+        self.inner
+            .parser
             .find_records_ref()
             .into_iter()
             .filter(|record| record.record_type == RecordType::MainMaster)
@@ -390,7 +451,7 @@ impl Presentation {
         }
 
         let mut result = Vec::new();
-        for record in self.parser.find_records_ref() {
+        for record in self.inner.parser.find_records_ref() {
             collect(record, &mut result, report)?;
         }
         Ok(result)
@@ -404,7 +465,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn normal_view_set_info(&self) -> Result<Option<crate::view_set_info::NormalViewSet>> {
-        for record in self.parser.find_records_ref() {
+        for record in self.inner.parser.find_records_ref() {
             if record.record_type == RecordType::NormalViewSetInfo9 {
                 return crate::view_set_info::NormalViewSet::parse_record(record).map(Some);
             }
@@ -420,7 +481,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn notes_text_view_info(&self) -> Result<Option<crate::view_set_info::NotesTextViewInfo>> {
-        for record in self.parser.find_records_ref() {
+        for record in self.inner.parser.find_records_ref() {
             if record.record_type == RecordType::NotesTextViewInfo9 {
                 return crate::view_set_info::NotesTextViewInfo::parse_record(record).map(Some);
             }
@@ -437,7 +498,7 @@ impl Presentation {
     pub fn text_special_info_defaults(
         &self,
     ) -> Result<Option<crate::text_si_exception::TextSpecialInfoDefaults>> {
-        for record in self.parser.find_records_ref() {
+        for record in self.inner.parser.find_records_ref() {
             if record.record_type == RecordType::TextSpecialInfoDefaultAtom {
                 return crate::text_si_exception::TextSpecialInfoDefaults::parse_record(record)
                     .map(Some);
@@ -498,7 +559,7 @@ impl Presentation {
         }
 
         let mut result = Vec::new();
-        for record in self.parser.find_records_ref() {
+        for record in self.inner.parser.find_records_ref() {
             collect(record, &mut result, report)?;
         }
         Ok(result)
@@ -511,6 +572,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn powerpoint12_document_properties(&self) -> Result<DocumentProperties12> {
         let mut documents = self
+            .inner
             .parser
             .find_records_ref()
             .into_iter()
@@ -535,7 +597,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn routing_slip(&self) -> Result<Option<Slip>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -571,7 +633,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn embedded_sounds(&self) -> Result<Option<Collection<'_>>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -649,7 +711,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn external_media(&self) -> Result<Option<MediaCollection>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -688,7 +750,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn ole_objects(&self) -> Result<Option<OleCollection>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -703,7 +765,7 @@ impl Presentation {
         let Some(objects) = OleCollection::parse(document)? else {
             return Ok(None);
         };
-        objects.validate_persist_mapping(&self.persist_mapping)?;
+        objects.validate_persist_mapping(&self.inner.persist_mapping)?;
         Ok(Some(objects))
     }
 
@@ -722,15 +784,15 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn ole_storage_as(&self, persist_id: u32, kind: StorageKind) -> Result<Option<Storage>> {
-        let Some(offset) = self.persist_mapping.get_offset(persist_id) else {
+        let Some(offset) = self.inner.persist_mapping.get_offset(persist_id) else {
             return Ok(None);
         };
         let storage_offset = usize::try_from(offset)
             .map_err(|_err| Error::Corrupted("OLE storage offset exceeds usize".to_string()))?;
         let (record, _) = Record::parse_with_limits(
-            &self.powerpoint_document,
+            &self.inner.powerpoint_document,
             storage_offset,
-            self.source_limits,
+            self.inner.source_limits,
         )?;
         if record.record_type != RecordType::ExternalOleObjectStg {
             return Err(Error::Corrupted(format!(
@@ -795,7 +857,7 @@ impl Presentation {
         &self,
         mut limits: crate::font::Limits,
     ) -> Result<crate::font::FontCollections> {
-        limits.records = limits.records.constrained_by(self.source_limits);
+        limits.records = limits.records.constrained_by(self.inner.source_limits);
         crate::font::FontCollections::parse_with_limits(&self.live_document_record()?, limits)
     }
 
@@ -804,16 +866,21 @@ impl Presentation {
     /// Incrementally saved presentations can hold several `DocumentContainer`
     /// records; only the one referenced by the current `UserEditAtom` is live.
     pub(crate) fn live_document_record(&self) -> Result<Record> {
-        let persist_id = self.slide_directory.document_persist_id();
-        let offset = self.persist_mapping.get_offset(persist_id).ok_or_else(|| {
-            Error::Corrupted(format!("document persist ID {persist_id} has no mapping"))
-        })?;
+        self.ensure_source_current()?;
+        let persist_id = self.inner.slide_directory.document_persist_id();
+        let offset = self
+            .inner
+            .persist_mapping
+            .get_offset(persist_id)
+            .ok_or_else(|| {
+                Error::Corrupted(format!("document persist ID {persist_id} has no mapping"))
+            })?;
         let document_offset = usize::try_from(offset)
             .map_err(|_err| Error::Corrupted("document offset exceeds usize".to_string()))?;
         let (record, _) = Record::parse_with_limits(
-            &self.powerpoint_document,
+            &self.inner.powerpoint_document,
             document_offset,
-            self.source_limits,
+            self.inner.source_limits,
         )?;
         if record.record_type != RecordType::Document {
             return Err(Error::Corrupted(
@@ -824,7 +891,7 @@ impl Presentation {
     }
 
     pub(crate) fn document_stream(&self) -> &[u8] {
-        &self.powerpoint_document
+        &self.inner.powerpoint_document
     }
 
     /// Return a payload-free descriptor for the document's VBA project storage.
@@ -837,7 +904,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     #[cfg(feature = "vba-inspection")]
     pub fn vba_project_storage(&self) -> Result<Option<crate::VbaProjectStorage>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let Some(info) = crate::VbaInfo::parse_records(&records)? else {
             return Ok(None);
         };
@@ -888,7 +955,7 @@ impl Presentation {
         &self,
         limits: &crate::VbaProjectLimits,
     ) -> std::result::Result<Option<litchi_vba::project::Project>, crate::VbaProjectError> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let Some(info) = crate::VbaInfo::parse_records(&records)? else {
             return Ok(None);
         };
@@ -923,6 +990,7 @@ impl Presentation {
             return Ok(None);
         }
         let offset = self
+            .inner
             .persist_mapping
             .get_offset(info.persist_id_ref)
             .ok_or_else(|| {
@@ -934,7 +1002,7 @@ impl Presentation {
         let storage_offset = usize::try_from(offset)
             .map_err(|_err| Error::Corrupted("VBA storage offset exceeds usize".to_string()))?;
         StorageRef::parse_at(
-            &self.powerpoint_document,
+            &self.inner.powerpoint_document,
             storage_offset,
             StorageKind::VbaProject,
         )
@@ -951,7 +1019,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn modify_password(&self) -> Result<Option<crate::ModifyPassword>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -974,7 +1042,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn privacy_settings(&self) -> Result<Option<crate::PrivacySettings>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -997,7 +1065,7 @@ impl Presentation {
     pub fn presentation_advisor_settings(
         &self,
     ) -> Result<Option<crate::PresentationAdvisorSettings>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -1020,7 +1088,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn html_document_settings(&self) -> Result<Option<crate::HtmlDocumentSettings>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -1045,7 +1113,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn html_publish_settings(&self) -> Result<Option<crate::HtmlPublishSettings>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -1069,7 +1137,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn broadcasts(&self) -> Result<crate::Broadcasts> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -1093,7 +1161,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn envelope_data(&self) -> Result<Option<crate::EnvelopeData>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -1114,7 +1182,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn document_structure(&self) -> Result<crate::DocumentStructure> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -1166,7 +1234,7 @@ impl Presentation {
     /// Returns an error if the operation fails.
     pub fn color_schemes(&self) -> Result<Vec<crate::ColorSchemeAtom>> {
         let mut schemes = Vec::new();
-        for record in self.parser.find_records_ref() {
+        for record in self.inner.parser.find_records_ref() {
             if matches!(
                 record.record_type,
                 RecordType::Slide
@@ -1189,7 +1257,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn envelope_settings(&self) -> Result<Option<crate::EnvelopeSettings>> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut documents = records
             .into_iter()
             .filter(|record| record.record_type == RecordType::Document);
@@ -1213,7 +1281,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn header_footers(&self) -> Result<HeaderFooters> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         let mut values = HeaderFooters::parse_record_tree(&records)?;
 
         let mut first_master_display = None;
@@ -1292,15 +1360,16 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
+        self.ensure_source_current()?;
         let factory = SlideFactory::new_shared_with_limits(
-            &self.powerpoint_document,
-            &self.persist_mapping,
-            &self.slide_directory,
-            self.source_limits,
+            &self.inner.powerpoint_document,
+            &self.inner.persist_mapping,
+            &self.inner.slide_directory,
+            self.inner.source_limits,
         );
         let mut text = String::new();
 
-        for (idx, entry) in self.slide_directory.entries().iter().enumerate() {
+        for (idx, entry) in self.inner.slide_directory.entries().iter().enumerate() {
             let slide = Slide::from_slide_data(factory.parse_slide(entry.persist_id())?, idx + 1);
             let Ok(slide_text) = slide.text() else {
                 continue;
@@ -1341,14 +1410,15 @@ impl Presentation {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn extract_text_fast(&self) -> Result<Vec<(usize, String)>> {
+        self.ensure_source_current()?;
         let factory = SlideFactory::new_shared_with_limits(
-            &self.powerpoint_document,
-            &self.persist_mapping,
-            &self.slide_directory,
-            self.source_limits,
+            &self.inner.powerpoint_document,
+            &self.inner.persist_mapping,
+            &self.inner.slide_directory,
+            self.inner.source_limits,
         );
 
-        let mut results = Vec::with_capacity(self.slide_directory.len());
+        let mut results = Vec::with_capacity(self.inner.slide_directory.len());
 
         for (idx, slide_result) in factory.slides().enumerate() {
             let slide_data = slide_result?;
@@ -1411,6 +1481,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn images(&self) -> Result<Vec<ImageFile<'_>>> {
+        self.ensure_source_current()?;
         if let Some(store) = self.image_store()? {
             return litchi_odraw::image::all(&store, self.pictures_bytes()?).map_err(Error::from);
         }
@@ -1435,6 +1506,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn image(&self, id: ImageId) -> Result<Option<ImageFile<'_>>> {
+        self.ensure_source_current()?;
         let Some(store) = self.image_store()? else {
             return Ok(None);
         };
@@ -1447,6 +1519,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn image_at(&self, index: u32) -> Result<Option<ImageFile<'_>>> {
+        self.ensure_source_current()?;
         self.image(ImageId::new(index)?)
     }
 
@@ -1459,8 +1532,10 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn image_store(&self) -> Result<Option<ImageStore<'_>>> {
+        self.ensure_source_current()?;
         let mut store = None;
         for record in self
+            .inner
             .parser
             .find_records_ref()
             .into_iter()
@@ -1479,10 +1554,11 @@ impl Presentation {
     }
 
     fn pictures_bytes(&self) -> Result<Option<&[u8]>> {
-        if let Some(data) = self.pictures_data.as_deref() {
+        if let Some(data) = self.inner.pictures_data.as_deref() {
             return Ok(Some(data));
         }
-        self.pictures_source
+        self.inner
+            .pictures_source
             .as_ref()
             .map_or(Ok(None), |source| source.bytes().map(Some))
     }
@@ -1490,7 +1566,7 @@ impl Presentation {
     /// Check if the presentation has a Pictures stream
     #[must_use]
     pub fn has_pictures(&self) -> bool {
-        self.pictures_data.is_some() || self.pictures_source.is_some()
+        self.inner.pictures_data.is_some() || self.inner.pictures_source.is_some()
     }
 
     /// Strictly parse slide and notes editing-view information.
@@ -1499,7 +1575,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn slide_view_information(&self) -> Result<SlideViewInformation> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         SlideViewInformation::parse_records(&records)
     }
 
@@ -1509,7 +1585,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn outline_sorter_view_information(&self) -> Result<OutlineSorterViewInformation> {
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         OutlineSorterViewInformation::parse_records(&records)
     }
 
@@ -1697,7 +1773,7 @@ impl Presentation {
         let mut shows = Vec::new();
 
         // Parse Document record from the stream
-        let records = self.parser.find_records_ref();
+        let records = self.inner.parser.find_records_ref();
         for record in &records {
             if record.record_type == RecordType::Document {
                 // Find NamedShows container in Document

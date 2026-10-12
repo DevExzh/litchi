@@ -7,7 +7,7 @@
 //! Tests for `NormalViewSetInfo9` and `NotesTextViewInfo9` view preferences
 //! against real `PowerPoint` fixtures.
 
-use litchi_ppt::{NormalViewSetPayload, Package};
+use litchi_ppt::{NormalViewSetPayload, raw::Reader};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -28,7 +28,7 @@ fn reads_normal_view_set_info_from_real_presentations() {
         "41246-1.ppt",
         "WithComments.ppt",
     ] {
-        let mut package = Package::open(fixture(name)).unwrap();
+        let mut package = Reader::open(fixture(name)).unwrap();
         let Some(view) = package
             .presentation()
             .unwrap()
@@ -66,7 +66,7 @@ fn reads_notes_text_view_info_from_real_presentations() {
         "basic_test_ppt_file.ppt",
         "datetime.ppt",
     ] {
-        let mut package = Package::open(fixture(name)).unwrap();
+        let mut package = Reader::open(fixture(name)).unwrap();
         if let Some(notes) = package
             .presentation()
             .unwrap()

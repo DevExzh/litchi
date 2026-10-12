@@ -91,7 +91,7 @@ fn read_ppt_shapes(file_path: &str) -> Result<(), Box<dyn Error>> {
     println!("================");
     println!();
 
-    let mut pkg = PptPackage::open(file_path)?;
+    let pkg = PptPackage::open(file_path)?;
     let ppt = pkg.presentation()?;
 
     println!("Total slides: {}", ppt.slide_count());

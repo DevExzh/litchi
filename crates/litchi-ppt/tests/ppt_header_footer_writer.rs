@@ -7,7 +7,7 @@
 use litchi_ppt::writer::Writer;
 use litchi_ppt::{
     HeaderFooter, HeaderFooterOptions, HeaderFooterParent, HeaderFooterParentOrdinal,
-    HeaderFooterScope, Package,
+    HeaderFooterScope, raw::Reader,
 };
 use std::io::Cursor;
 
@@ -52,7 +52,7 @@ fn writer_attaches_header_footers_to_every_supported_parent() {
         .unwrap();
     writer.move_slide(1, 0).unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let values = package.presentation().unwrap().header_footers().unwrap();
 
     assert_eq!(values.entries().len(), 4);

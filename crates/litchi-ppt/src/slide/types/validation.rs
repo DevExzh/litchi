@@ -48,6 +48,7 @@ pub(crate) fn is_isolatable_shape_error(error: &crate::package::Error) -> bool {
         | Error::Limit { .. }
         | Error::ResourceLimit(_)
         | Error::AllocationFailed(_)
+        | Error::EncryptionPolicy
         | Error::PasswordRequired
         | Error::InvalidPassword
         | Error::UnsupportedEncryption(_)

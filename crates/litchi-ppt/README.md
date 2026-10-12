@@ -18,11 +18,16 @@ litchi-ppt = "0.0.1"
 ```rust,no_run
 use litchi_ppt::Package;
 
-let mut package = Package::open("slides.ppt")?;
+let package = Package::open("slides.ppt")?;
 let presentation = package.presentation()?;
 println!("slides: {}", presentation.slide_count());
 # Ok::<(), Box<dyn std::error::Error>>(())
 ```
+
+`Package` and `Presentation` are immutable, cheaply cloned owners. Package
+publication preserves the exact input bytes; encrypted pass-through uses
+`to_encrypted_bytes()` explicitly. Low-level integrations that need the generic
+mutable reader use `litchi_ppt::raw::Reader<R>`.
 
 Use `litchi_ppt` directly or `litchi::ppt` through the umbrella crate. The
 ownership move is intentionally breaking: there is no `litchi_ole::ppt` or

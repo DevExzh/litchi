@@ -5,7 +5,7 @@
 )]
 
 use litchi_ppt::writer::build_sound_collection;
-use litchi_ppt::{Package, Record, sound_collection::Collection};
+use litchi_ppt::{Record, raw::Reader, sound_collection::Collection};
 use std::collections::HashSet;
 
 #[test]
@@ -17,7 +17,7 @@ fn parses_poi_sound_fixture_byte_for_byte_when_available() {
     if !ppt.exists() || !wav.exists() {
         return;
     }
-    let mut package = Package::open(ppt).unwrap();
+    let mut package = Reader::open(ppt).unwrap();
     let presentation = package.presentation().unwrap();
     let collection = presentation.embedded_sounds().unwrap().unwrap();
     let sound = collection

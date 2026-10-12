@@ -532,7 +532,7 @@ fn smart_tags_round_trip_through_both_output_paths() {
 
     let mut output = Cursor::new(Vec::new());
     writer.write_to(&mut output).unwrap();
-    let mut package = crate::Package::from_reader(Cursor::new(output.into_inner())).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(output.into_inner())).unwrap();
     let presentation = package.presentation().unwrap();
     let store = presentation.smart_tags().unwrap().unwrap();
     assert_eq!(store.types.len(), 1);
@@ -567,7 +567,7 @@ fn smart_tags_round_trip_through_both_output_paths() {
             .as_nanos()
     ));
     writer.save(&path).unwrap();
-    let mut file_package = crate::Package::open(&path).unwrap();
+    let mut file_package = crate::raw::Reader::open(&path).unwrap();
     let file_presentation = file_package.presentation().unwrap();
     assert_eq!(file_presentation.smart_tags().unwrap(), Some(store));
     assert_eq!(

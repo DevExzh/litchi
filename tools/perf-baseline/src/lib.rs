@@ -15738,7 +15738,7 @@ fn build_ppt_pictures_corpus() -> Result<Corpus, Box<dyn Error>> {
     if pictures.len() <= 4 * 1024 || pictures.is_empty() {
         return Err("PPT Pictures corpus did not produce a regular stream".into());
     }
-    let mut package = litchi_ppt::Package::from_reader(Cursor::new(archive.clone()))?;
+    let mut package = litchi_ppt::raw::Reader::from_reader(Cursor::new(archive.clone()))?;
     let presentation = package.presentation()?;
     let images = presentation.images()?;
     if images.len() != PPT_PICTURE_COUNT {
@@ -15866,7 +15866,7 @@ fn verify_ppt_picture_limit_gates(
     };
     let pictures_range = ppt_picture_payload_range(archive, &pictures_payload)?;
     let mut eager =
-        litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
+        litchi_ppt::raw::Reader::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
     eager.presentation_with_limits(exact)?;
     let source = litchi_ppt::SourceBackedPackage::from_read_at_with_limits(
         Arc::new(InstrumentedSource::new(archive.to_vec(), Vec::new())),
@@ -15883,8 +15883,11 @@ fn verify_ppt_picture_limit_gates(
         exact.max_entry_bytes(),
         exact.max_aggregate_bytes(),
     )?;
-    if litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), package_under)
-        .is_ok()
+    if litchi_ppt::raw::Reader::from_reader_with_limits(
+        Cursor::new(archive.to_vec()),
+        package_under,
+    )
+    .is_ok()
     {
         return Err("PPT eager package limit accepted one byte under package size".into());
     }
@@ -15907,7 +15910,7 @@ fn verify_ppt_picture_limit_gates(
         exact.max_aggregate_bytes(),
     )?;
     let mut eager =
-        litchi_ppt::Package::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
+        litchi_ppt::raw::Reader::from_reader_with_limits(Cursor::new(archive.to_vec()), exact)?;
     if eager.presentation_with_limits(pictures_under).is_ok() {
         return Err("PPT eager Pictures limit accepted one byte under stream size".into());
     }
@@ -15991,7 +15994,7 @@ fn time_ppt_pictures_eager(
     let cursor = Cursor::new(archive);
     if phase == "presentation_open_no_image_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, source_limits)?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
         let presentation = package.presentation_with_limits(source_limits)?;
         std::hint::black_box(&presentation);
         let duration = started.elapsed();
@@ -16003,7 +16006,7 @@ fn time_ppt_pictures_eager(
 
     if phase == "fresh_open_plus_cold_all_images_query" {
         let started = Instant::now();
-        let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, source_limits)?;
+        let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
         let presentation = package.presentation_with_limits(source_limits)?;
         let images = presentation.images()?;
         std::hint::black_box(&images);
@@ -16012,7 +16015,7 @@ fn time_ppt_pictures_eager(
         return Ok(duration);
     }
 
-    let mut package = litchi_ppt::Package::from_reader_with_limits(cursor, source_limits)?;
+    let mut package = litchi_ppt::raw::Reader::from_reader_with_limits(cursor, source_limits)?;
     let presentation = package.presentation_with_limits(source_limits)?;
     if cached_repeat {
         let first = presentation.images()?;
@@ -31089,7 +31092,7 @@ fn verify_semantic_ppt(
     updated: Option<(usize, usize)>,
 ) -> Result<(), Box<dyn Error>> {
     let (slide_count, boxes_per_slide) = shape.ppt_dimensions();
-    let mut package = litchi_ppt::Package::from_reader(Cursor::new(bytes))?;
+    let mut package = litchi_ppt::raw::Reader::from_reader(Cursor::new(bytes))?;
     let presentation = package.presentation()?;
     let slides = presentation.slides()?;
     if slides.len() != slide_count {
@@ -31234,7 +31237,7 @@ fn run_ppt_selected_shape_text(
         } else if fresh_open {
             let started = Instant::now();
             let mut package =
-                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
             let presentation = package.presentation()?;
             let text = presentation
                 .slides()?
@@ -31249,7 +31252,7 @@ fn run_ppt_selected_shape_text(
             (text, started.elapsed())
         } else {
             let mut package =
-                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
             let presentation = package.presentation()?;
             let started = Instant::now();
             let text = presentation
@@ -31434,7 +31437,7 @@ fn run_ppt_repeated_shape_text(
             started.elapsed()
         } else {
             let mut package =
-                litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
             let presentation = package.presentation()?;
             let started = Instant::now();
             for _ in 0..PPT_REPEATED_QUERY_COUNT {
@@ -31524,7 +31527,7 @@ fn run_semantic_ppt(
             Case::PptSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let mut package = litchi_ppt::Package::from_reader(Cursor::new(owned))?;
+                let mut package = litchi_ppt::raw::Reader::from_reader(Cursor::new(owned))?;
                 let presentation = package.presentation()?;
                 let duration = started.elapsed();
                 verify_semantic_ppt(&corpus.archive, shape, None)?;
@@ -31533,7 +31536,7 @@ fn run_semantic_ppt(
             },
             Case::PptSemanticListSlides => {
                 let mut package =
-                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let presentation = package.presentation()?;
                 let started = Instant::now();
                 let slides = presentation.slides()?;
@@ -31547,7 +31550,7 @@ fn run_semantic_ppt(
             },
             Case::PptSemanticOneShapeText => {
                 let mut package =
-                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let presentation = package.presentation()?;
                 let started = Instant::now();
                 let text = presentation
@@ -31571,7 +31574,7 @@ fn run_semantic_ppt(
             },
             Case::PptSemanticFullText => {
                 let mut package =
-                    litchi_ppt::Package::from_reader(Cursor::new(corpus.archive.as_slice()))?;
+                    litchi_ppt::raw::Reader::from_reader(Cursor::new(corpus.archive.as_slice()))?;
                 let presentation = package.presentation()?;
                 let started = Instant::now();
                 let text = presentation.text()?;

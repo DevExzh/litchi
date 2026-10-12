@@ -466,7 +466,7 @@ fn read_u32(data: &[u8], offset: usize, field: &str) -> Result<u32> {
 )]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
 
     fn record(version: u16, instance: u16, record_type: u16, data: &[u8]) -> Vec<u8> {
         let mut bytes = Vec::with_capacity(8 + data.len());
@@ -540,7 +540,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt"
         );
-        let mut package = Package::open(path).expect("open POI fixture");
+        let mut package = Reader::open(path).expect("open POI fixture");
         let presentation = package.presentation().expect("parse POI fixture");
         let slides = presentation.slides().expect("read slides");
         let mut notes = Vec::new();
@@ -573,7 +573,7 @@ mod tests {
         ));
         writer.save(&path).expect("write presentation");
 
-        let mut package = Package::open(&path).expect("open written presentation");
+        let mut package = Reader::open(&path).expect("open written presentation");
         let presentation = package.presentation().expect("parse written presentation");
         let slides = presentation.slides().expect("read written slides");
         let notes = slides[0]
@@ -595,7 +595,7 @@ mod tests {
             env!("CARGO_MANIFEST_DIR"),
             "/../../test-data/poi/test-data/slideshow/basic_test_ppt_file.ppt"
         );
-        let package = Package::open(path);
+        let package = Reader::open(path);
         assert!(package.is_ok());
         let Ok(mut opened_package) = package else {
             return;

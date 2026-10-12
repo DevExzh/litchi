@@ -474,6 +474,19 @@ mod limit_tests {
         assert_eq!(options.get_source_limits(), limits);
         assert!(options.has_explicit_source_limits());
     }
+
+    #[test]
+    fn encryption_policy_is_a_typed_core_refusal() {
+        let error = Error::EncryptionPolicy;
+        assert!(error.to_string().contains("ordinary PPT publication"));
+        assert!(std::error::Error::source(&error).is_none());
+        let core_error: litchi_core::Error = error.into();
+        assert!(matches!(
+            core_error,
+            litchi_core::Error::Unsupported(message)
+                if message.contains("password-to-open encryption")
+        ));
+    }
 }
 
 /// Options controlling how a legacy `PowerPoint` presentation is opened.
@@ -630,6 +643,9 @@ pub enum Error {
     UnsupportedEncryption(EncryptionKind),
     /// The clear encryption bootstrap or header is malformed.
     MalformedEncryptionHeader(String),
+    /// Ordinary publication cannot preserve the active password-to-open
+    /// encryption state.
+    EncryptionPolicy,
 }
 
 impl From<io::Error> for Error {
@@ -694,6 +710,10 @@ impl std::fmt::Display for Error {
             Error::MalformedEncryptionHeader(s) => {
                 write!(f, "malformed PPT encryption header: {s}")
             },
+            Error::EncryptionPolicy => write!(
+                f,
+                "ordinary PPT publication is refused for a password-to-open encrypted source"
+            ),
         }
     }
 }
@@ -715,7 +735,8 @@ impl std::error::Error for Error {
             | Self::PasswordRequired
             | Self::InvalidPassword
             | Self::UnsupportedEncryption(_)
-            | Self::MalformedEncryptionHeader(_) => None,
+            | Self::MalformedEncryptionHeader(_)
+            | Self::EncryptionPolicy => None,
         }
     }
 }
@@ -723,18 +744,20 @@ impl std::error::Error for Error {
 /// Result type for PPT operations.
 pub type Result<T> = std::result::Result<T, Error>;
 
-/// A `PowerPoint` (.ppt) package.
+/// The low-level `PowerPoint` (.ppt) reader.
 ///
-/// This is the main entry point for working with legacy `PowerPoint` presentations.
-/// It wraps an OLE file and provides PowerPoint-specific functionality.
+/// This reader is the eager, generic `Read + Seek` entry point for working with
+/// legacy `PowerPoint` presentations. The source-preserving package owner is
+/// exposed separately; callers that need this mutable native projection use
+/// [`crate::raw::Reader`].
 ///
 /// # Examples
 ///
 /// ```rust,no_run
-/// use litchi_ppt::Package;
+/// use litchi_ppt::raw::Reader;
 ///
 /// // Open an existing presentation
-/// let mut pkg = Package::open("presentation.ppt")?;
+/// let mut pkg = Reader::open("presentation.ppt")?;
 ///
 /// // Get the main presentation
 /// let pres = pkg.presentation()?;
@@ -744,10 +767,10 @@ pub type Result<T> = std::result::Result<T, Error>;
 /// println!("{}", text);
 /// # Ok::<(), Box<dyn std::error::Error>>(())
 /// ```
-pub struct Package<R: Read + Seek = File> {
+pub struct Reader<R: Read + Seek = File> {
     /// The underlying OLE file
     pub(super) ole: OleFile<R>,
-    /// Limits inherited by [`Package::presentation`](super::Package::presentation).
+    /// Limits inherited by [`Reader::presentation`](super::Reader::presentation).
     pub(super) source_limits: SourceLimits,
 }
 
@@ -806,6 +829,9 @@ impl From<Error> for litchi_core::Error {
             Error::UnsupportedEncryption(kind) => {
                 litchi_core::Error::InvalidFormat(format!("unsupported PPT encryption: {kind:?}"))
             },
+            Error::EncryptionPolicy => litchi_core::Error::Unsupported(
+                "ordinary PPT publication cannot preserve password-to-open encryption".into(),
+            ),
         }
     }
 }

@@ -7,7 +7,7 @@
 //! Integration tests for PPT table authoring: tables written by `Writer`
 //! must round-trip through the table extraction APIs after save/reopen.
 
-use litchi_ppt::Package;
+use litchi_ppt::raw::Reader;
 use litchi_ppt::writer::{Table, Writer};
 use std::io::Cursor;
 
@@ -17,8 +17,8 @@ fn write(writer: &mut Writer) -> Vec<u8> {
     output.into_inner()
 }
 
-fn reopen(bytes: Vec<u8>) -> Package<Cursor<Vec<u8>>> {
-    Package::from_reader(Cursor::new(bytes)).unwrap()
+fn reopen(bytes: Vec<u8>) -> Reader<Cursor<Vec<u8>>> {
+    Reader::from_reader(Cursor::new(bytes)).unwrap()
 }
 
 #[test]

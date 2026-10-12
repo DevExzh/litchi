@@ -663,7 +663,7 @@ fn collect_source_picture_bullet_references(
 ) -> Result<Vec<u16>> {
     let mut references = collect_picture_bullet_references(document, limits)?;
     validate_admitted_picture_bullet_references(&references, collection)?;
-    let mut package = crate::Package::from_reader(std::io::Cursor::new(source.bytes()))?;
+    let mut package = crate::raw::Reader::from_reader(std::io::Cursor::new(source.bytes()))?;
     let presentation = package.presentation_with_limits(limits.records)?;
     let shape_limits = crate::ShapeProgrammableTagLimits {
         max_style_payload_bytes: limits.max_collection_bytes,
@@ -672,6 +672,7 @@ fn collect_source_picture_bullet_references(
     };
     use crate::odraw::ShapeExt;
     for record in presentation
+        .inner
         .parser
         .try_find_records_ref()?
         .into_iter()
@@ -1574,7 +1575,7 @@ fn preflight_picture_bullet_publication(
 }
 
 /// Read the live picture-bullet collection from a cursor-backed package.
-impl<R: std::io::Read + std::io::Seek> crate::Package<R> {
+impl<R: std::io::Read + std::io::Seek> crate::raw::Reader<R> {
     /// Read the live picture-bullet collection under explicit limits.
     pub fn picture_bullets_with_limits(
         &mut self,
@@ -1617,7 +1618,7 @@ impl crate::Presentation {
         &self,
         mut limits: PictureBulletLimits,
     ) -> Result<Option<PictureBulletCollection>> {
-        limits.records = limits.records.constrained_by(self.source_limits);
+        limits.records = limits.records.constrained_by(self.inner.source_limits);
         PictureBulletCollection::parse_from_with_limits(&self.live_document_record()?, limits)
     }
 }
@@ -2104,7 +2105,8 @@ mod tests {
     #[test]
     fn source_transaction_replaces_appends_removes_and_reopens_exactly() {
         let bytes = source_with_bullets(false);
-        let mut package = crate::Package::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
+        let mut package =
+            crate::raw::Reader::from_reader(std::io::Cursor::new(bytes.clone())).unwrap();
         assert_eq!(
             package
                 .picture_bullets()

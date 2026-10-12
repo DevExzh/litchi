@@ -1485,6 +1485,10 @@ impl Classify for litchi_ppt::Error {
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::AllocationFailed(_) => Class::of(Code::InternalError),
             Self::PasswordRequired => Class::suggest(Code::DocumentProtected, PASSWORD_SUGGESTION),
+            Self::EncryptionPolicy => Class::suggest(
+                Code::DocumentProtected,
+                "export the original encrypted source explicitly",
+            ),
             Self::InvalidPassword => {
                 Class::suggest(Code::InvalidArgument, WRONG_PASSWORD_SUGGESTION)
             },

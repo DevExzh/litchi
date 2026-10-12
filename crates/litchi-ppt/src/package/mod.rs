@@ -1,7 +1,10 @@
 //! Package implementation for legacy `PowerPoint` presentations (`.ppt`).
 
 mod codec;
-mod model;
+pub(crate) mod model;
+mod owner;
+pub(crate) use model::Reader;
+pub use owner::Package;
 pub mod property_set;
 mod source;
 
@@ -9,8 +12,7 @@ mod source;
 mod tests;
 
 pub use model::{
-    EncryptionKind, Error, OpenOptions, Package, Result, SourceLimitKind, SourceLimits,
-    SourceLimitsBuilder,
+    EncryptionKind, Error, OpenOptions, Result, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
 };
 pub use property_set::{Commit, Patch, Snapshot, Transaction};
 pub use source::SourceBackedPackage;

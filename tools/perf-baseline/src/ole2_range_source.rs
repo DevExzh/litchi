@@ -612,7 +612,7 @@ pub(crate) fn build_ppt_corpus(path: &Path) -> Result<Ole2Corpus, Box<dyn Error>
     )?;
     let target_entry = target_path.join("/");
 
-    let mut package = litchi_ppt::Package::from_reader(Cursor::new(archive.as_slice()))?;
+    let mut package = litchi_ppt::raw::Reader::from_reader(Cursor::new(archive.as_slice()))?;
     let presentation = package.presentation()?;
     let slides = presentation.slides()?;
     let slide_count = slides.len();

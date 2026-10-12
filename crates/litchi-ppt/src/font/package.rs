@@ -1,5 +1,5 @@
 use super::{FontCollections, Limits};
-use crate::package::{Package, Result};
+use crate::{package::Result, raw::Reader};
 use litchi_cfb::OleFile;
 use std::io::{Cursor, Read, Seek};
 
@@ -26,7 +26,7 @@ pub struct PackageOptions<'a> {
     pub limits: PackageLimits,
 }
 
-impl<R: Read + Seek> Package<R> {
+impl<R: Read + Seek> Reader<R> {
     /// Read font semantics from the exact live persisted document.
     ///
     /// # Errors

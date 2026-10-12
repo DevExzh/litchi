@@ -13,8 +13,8 @@ use std::io::Cursor;
 
 use litchi_ppt::writer::{SlideTiming, WriteError, Writer};
 use litchi_ppt::{
-    AdvanceMode, Package, Record, SoundAction, TransitionDirection, TransitionInfo,
-    TransitionSpeed, TransitionType,
+    AdvanceMode, Record, SoundAction, TransitionDirection, TransitionInfo, TransitionSpeed,
+    TransitionType, raw::Reader,
 };
 
 fn write(writer: &mut Writer) -> Vec<u8> {
@@ -71,7 +71,7 @@ fn authored_transition_round_trips_through_reader() {
     let plain_slide = writer.add_slide().unwrap();
 
     let bytes = write(&mut writer);
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     assert_eq!(slides.len(), 3);
@@ -182,7 +182,7 @@ fn directional_transitions_round_trip() {
     }
 
     let bytes = write(&mut writer);
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
 
@@ -221,7 +221,7 @@ fn hidden_timing_survives_when_transition_set() {
     assert_ne!(flags & (1 << 0), 0, "fManualAdvance from the transition");
     assert_ne!(flags & (1 << 2), 0, "fHidden preserved from the timing");
 
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let timing = slides[0].timing().unwrap();
@@ -240,7 +240,7 @@ fn timing_still_emitted_for_slides_without_transition() {
         .unwrap();
 
     let bytes = write(&mut writer);
-    let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
 

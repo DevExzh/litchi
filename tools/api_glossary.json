@@ -2541,6 +2541,51 @@
           "name": "record_limits",
           "scope": "litchi_ppt::SourceBackedPackage",
           "replacement": "use source_limits()"
+        },
+        {
+          "name": "ole_file",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "into_ole_file",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "from_ole_file_with_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "presentation_with_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "presentation_with_options",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "presentation_with_options_and_limits",
+          "scope": "litchi_ppt::Package",
+          "replacement": "use immutable Package configured ingress; cursor access belongs to raw::Reader"
+        },
+        {
+          "name": "Package",
+          "scope": "litchi_ppt::raw",
+          "replacement": "use raw::Reader for the cursor-based reader"
         }
       ],
       "families": []

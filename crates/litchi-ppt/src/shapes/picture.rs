@@ -38,9 +38,9 @@ pub enum PictureFrameKind {
 /// # Example
 /// ```ignore
 /// use litchi_imgconv::Convert as _;
-/// use litchi_ppt::Package;
+/// use litchi_ppt::raw::Reader;
 ///
-/// let mut pkg = Package::open("presentation.ppt")?;
+/// let mut pkg = Reader::open("presentation.ppt")?;
 /// let mut pres = pkg.presentation()?;
 ///
 /// for slide in pres.slides()? {

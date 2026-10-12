@@ -11,7 +11,7 @@ use litchi_ppt::embedded::storage::{Compression, Kind};
 #[cfg(feature = "encryption")]
 use litchi_ppt::writer::EncryptionProfile;
 use litchi_ppt::writer::Writer;
-use litchi_ppt::{Package, VbaProjectCompression, VbaProjectError, VbaProjectLimits};
+use litchi_ppt::{VbaProjectCompression, VbaProjectError, VbaProjectLimits, raw::Reader};
 use litchi_vba::{
     Limits,
     build::{Module, Project},
@@ -44,7 +44,7 @@ fn compressed_complete_project_round_trips_as_inert_source() {
     writer.set_vba(project).unwrap();
     assert!(writer.has_vba());
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let storage = presentation.vba_project_storage().unwrap().unwrap();
     assert!(storage.persist_id_ref() > 0);
@@ -90,7 +90,7 @@ fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
         .put_vba_with(project, VbaProjectCompression::Uncompressed)
         .unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let storage = presentation.vba_project_storage().unwrap().unwrap();
     assert!(storage.has_macros());
@@ -102,7 +102,7 @@ fn uncompressed_empty_project_round_trips_and_can_be_cleared() {
 
     writer.clear_vba();
     assert!(!writer.has_vba());
-    let mut cleared_package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut cleared_package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let cleared_presentation = cleared_package.presentation().unwrap();
     let cleared_storage = cleared_presentation.vba_project_storage().unwrap().unwrap();
     assert!(!cleared_storage.has_macros());
@@ -127,7 +127,7 @@ fn failed_replacement_is_atomic_and_outer_limits_are_enforced() {
             .is_err()
     );
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let project = presentation.vba().unwrap().unwrap();
     assert_eq!(project.name(), "ExistingProject");
@@ -165,7 +165,7 @@ fn project_remains_available_after_presentation_decryption() {
         .set_password("secret", EncryptionProfile::CryptoApiRc4 { key_bits: 128 })
         .unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package
         .presentation_with_options(OpenOptions::new().password("secret"))
         .unwrap();

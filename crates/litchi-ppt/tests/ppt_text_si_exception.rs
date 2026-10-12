@@ -7,7 +7,7 @@
 //! Tests for `TextSIExceptionAtom` defaults and `OutlineTextRefAtom` references
 //! against real `PowerPoint` fixtures.
 
-use litchi_ppt::Package;
+use litchi_ppt::raw::Reader;
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -18,7 +18,7 @@ fn fixture(name: &str) -> PathBuf {
 
 #[test]
 fn reads_text_special_info_defaults() {
-    let mut package = Package::open(fixture("basic_test_ppt_file.ppt")).unwrap();
+    let mut package = Reader::open(fixture("basic_test_ppt_file.ppt")).unwrap();
     let defaults = package
         .presentation()
         .unwrap()
@@ -32,7 +32,7 @@ fn reads_text_special_info_defaults() {
 
 #[test]
 fn reads_outline_text_refs_from_shape_textboxes() {
-    let mut package = Package::open(fixture("basic_test_ppt_file.ppt")).unwrap();
+    let mut package = Reader::open(fixture("basic_test_ppt_file.ppt")).unwrap();
     let indices: Vec<u32> = package
         .presentation()
         .unwrap()
@@ -47,7 +47,7 @@ fn reads_outline_text_refs_from_shape_textboxes() {
 
 #[test]
 fn slides_without_refs_report_empty() {
-    let mut package = Package::open(fixture("datetime.ppt")).unwrap();
+    let mut package = Reader::open(fixture("datetime.ppt")).unwrap();
     let presentation = package.presentation().unwrap();
     let slides = presentation.slides().unwrap();
     let total: usize = slides

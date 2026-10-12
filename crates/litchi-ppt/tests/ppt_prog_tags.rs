@@ -8,7 +8,7 @@
 //! (MS-PPT 2.4.23 and 2.5.19-2.5.22) reachable through `Presentation`, `Slide`,
 //! `SpeakerNotes`, and the main-master accessor.
 
-use litchi_ppt::{Package, ProgBinaryTagVersion, ProgTagLimits, ProgTagScope, ProgTags};
+use litchi_ppt::{ProgBinaryTagVersion, ProgTagLimits, ProgTagScope, ProgTags, raw::Reader};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -25,7 +25,7 @@ fn poi_fixture(name: &str) -> PathBuf {
 
 #[test]
 fn presentation_exposes_document_prog_tags_with_typed_extensions() {
-    let mut package = Package::open(fixture("SampleShow.ppt")).unwrap();
+    let mut package = Reader::open(fixture("SampleShow.ppt")).unwrap();
     let presentation = package.presentation().unwrap();
 
     let tags = presentation
@@ -77,7 +77,7 @@ fn presentation_prog_tags_cover_poi_fixtures() {
         "WithComments.ppt",
         "datetime.ppt",
     ] {
-        let mut package = Package::open(poi_fixture(name)).unwrap();
+        let mut package = Reader::open(poi_fixture(name)).unwrap();
         let presentation = package.presentation().unwrap();
         if let Some(tags) = presentation.programmable_tags().unwrap() {
             assert_eq!(tags.scope, ProgTagScope::Document);

@@ -16,8 +16,9 @@ use std::sync::Arc;
 pub use litchi_core::Position;
 
 use crate::consts::RecordType;
-use crate::package::{Error as PackageError, Package, Result as PackageResult};
+use crate::package::{Error as PackageError, Result as PackageResult};
 use crate::presentation::Presentation;
+use crate::raw::Reader;
 use crate::shapes::ShapeEnum;
 use litchi_cfb::{
     ArtifactFingerprint, OleError, OverlayError, PublishReport, SameLengthStreamSplice,
@@ -2272,12 +2273,12 @@ enum TextKind {
 }
 
 fn presentation(bytes: &[u8]) -> PackageResult<Presentation> {
-    let mut package = Package::from_reader(Cursor::new(bytes.to_vec()))?;
+    let mut package = Reader::from_reader(Cursor::new(bytes.to_vec()))?;
     package.presentation()
 }
 
 fn presentation_shared(bytes: Arc<[u8]>) -> PackageResult<Presentation> {
-    let mut package = Package::from_reader(Cursor::new(bytes))?;
+    let mut package = Reader::from_reader(Cursor::new(bytes))?;
     package.presentation()
 }
 
@@ -3400,7 +3401,7 @@ fn rebuild(record: &[u8], data: &[u8]) -> PackageResult<Vec<u8>> {
 )]
 mod tests {
     use super::{Error, Position, Refusal, Snapshot, Target};
-    use crate::Package;
+    use crate::raw::Reader;
     use crate::writer::Writer;
     use litchi_cfb::{
         OleFile, OutputProgress, OverlayError, SharedOleFile, SharedOleFileLimits,
@@ -4027,7 +4028,7 @@ mod tests {
             .count();
         assert_eq!(changed, 3);
         let mut package =
-            Package::from_reader(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
+            Reader::from_reader(Cursor::new(commit.snapshot().bytes().to_vec())).unwrap();
         let presentation = package.presentation().unwrap();
         assert_eq!(
             presentation.slides().unwrap()[0].shapes().unwrap()[0]
@@ -4202,7 +4203,7 @@ mod tests {
     #[test]
     fn source_range_resolver_matches_owned_oracle_for_every_shape() {
         let bytes = generated_fixture(6, 4);
-        let mut package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
         let presentation = package.presentation().unwrap();
 
         for (slide_index, slide) in presentation.slides().unwrap().iter().enumerate() {
@@ -4226,7 +4227,7 @@ mod tests {
         let source =
             super::SourceSnapshot::open(Arc::new(OwnedSource::new(bytes.clone()))).unwrap();
 
-        let mut package = Package::from_reader(Cursor::new(bytes)).unwrap();
+        let mut package = Reader::from_reader(Cursor::new(bytes)).unwrap();
         let presentation = package.presentation().unwrap();
         let slides = presentation.slides().unwrap();
         for (slide_index, slide) in slides.iter().enumerate() {

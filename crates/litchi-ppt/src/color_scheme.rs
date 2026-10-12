@@ -339,7 +339,7 @@ mod tests {
     fn presentation_exposes_real_color_schemes() {
         let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
             .join("../../test-data/ole/ppt/SampleShow.ppt");
-        let mut package = crate::Package::open(path).unwrap();
+        let mut package = crate::raw::Reader::open(path).unwrap();
         let presentation = package.presentation().unwrap();
         let schemes = presentation.color_schemes().unwrap();
 

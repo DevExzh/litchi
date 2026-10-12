@@ -24,7 +24,7 @@
 //! use litchi_ppt::{Package, shapes::ShapeEnum};
 //
 // // Open a presentation
-// let mut package = Package::open("presentation.ppt")?;
+// let package = Package::open("presentation.ppt")?;
 // let pres = package.presentation()?;
 //
 // // Extract all text
@@ -68,6 +68,8 @@ pub use consts::RecordType;
 pub mod package;
 pub mod presentation;
 pub mod presentation_advisor;
+/// Explicit cursor-based readers for low-level format integration.
+pub mod raw;
 pub mod sound_collection;
 pub mod view_info;
 

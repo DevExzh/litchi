@@ -8,7 +8,7 @@ use litchi_ppt::writer::text_format::{Paragraph, TextRun};
 use litchi_ppt::writer::{Hyperlink, Writer};
 use litchi_ppt::{
     Interaction, InteractionAction, InteractionJump, InteractionLinkTarget, InteractionTrigger,
-    Package, TextInteraction, TextInteractionLimits, TextRange,
+    TextInteraction, TextInteractionLimits, TextRange, raw::Reader,
 };
 use std::io::Cursor;
 
@@ -81,7 +81,7 @@ fn plain_and_rich_utf16_ranges_round_trip_with_shape_actions() {
         .set_last_shape_text_interaction(slide, rich.clone())
         .unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let hyperlinks = presentation.hyperlinks().unwrap();
     let read_slide = &presentation.slides().unwrap()[0];
@@ -193,7 +193,7 @@ fn invalid_text_ranges_references_and_limits_are_atomic() {
             .unwrap()
     );
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer))).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer))).unwrap();
     let presentation = package.presentation().unwrap();
     let entries = presentation.slides().unwrap()[0]
         .shape_text_interactions()

@@ -1,4 +1,4 @@
-use super::{Error, OpenOptions, Package, Result, SourceLimits};
+use super::{Error, OpenOptions, Reader, Result, SourceLimits};
 use crate::presentation::Presentation;
 use litchi_cfb::{OleError, OleFile};
 use litchi_ole_common::property_set::{
@@ -10,7 +10,7 @@ use std::path::Path;
 
 const POWERPOINT_DOCUMENT_STREAM: &[&str] = &["PowerPoint Document"];
 
-impl Package<File> {
+impl Reader<File> {
     /// Open a .ppt package from a file path.
     ///
     /// # Arguments
@@ -20,9 +20,9 @@ impl Package<File> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ppt::Package;
+    /// use litchi_ppt::raw::Reader;
     ///
-    /// let mut pkg = Package::open("presentation.ppt")?;
+    /// let mut pkg = Reader::open("presentation.ppt")?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -40,12 +40,12 @@ impl Package<File> {
     /// Returns an error if the input cannot be read or is malformed.
     pub fn open_with_limits<P: AsRef<Path>>(path: P, limits: SourceLimits) -> Result<Self> {
         let file = File::open(path)?;
-        Package::from_reader_with_limits(file, limits)
+        Reader::from_reader_with_limits(file, limits)
     }
 }
 
-impl<R: Read + Seek> Package<R> {
-    /// Create a Package from any reader that implements Read + Seek.
+impl<R: Read + Seek> Reader<R> {
+    /// Create a Reader from any source that implements Read + Seek.
     ///
     /// # Arguments
     ///
@@ -55,10 +55,10 @@ impl<R: Read + Seek> Package<R> {
     ///
     /// ```rust,no_run
     /// use std::fs::File;
-    /// use litchi_ppt::Package;
+    /// use litchi_ppt::raw::Reader;
     ///
     /// let file = File::open("presentation.ppt")?;
-    /// let pkg = Package::from_reader(file)?;
+    /// let pkg = Reader::from_reader(file)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -99,7 +99,7 @@ impl<R: Read + Seek> Package<R> {
         Ok(Self { ole, source_limits })
     }
 
-    /// Create a Package from an already-parsed OLE file.
+    /// Create a Reader from an already-parsed OLE file.
     ///
     /// This is used for single-pass parsing where the OLE file has already
     /// been parsed during format detection. It avoids double-parsing.
@@ -112,12 +112,12 @@ impl<R: Read + Seek> Package<R> {
     ///
     /// ```rust,no_run
     /// use litchi_cfb::OleFile;
-    /// use litchi_ppt::Package;
+    /// use litchi_ppt::raw::Reader;
     /// use std::io::Cursor;
     ///
     /// let bytes = std::fs::read("presentation.ppt")?;
     /// let ole = OleFile::open(Cursor::new(bytes))?;
-    /// let pkg = Package::from_ole_file(ole)?;
+    /// let pkg = Reader::from_ole_file(ole)?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     ///
@@ -160,9 +160,9 @@ impl<R: Read + Seek> Package<R> {
     /// # Examples
     ///
     /// ```rust,no_run
-    /// use litchi_ppt::Package;
+    /// use litchi_ppt::raw::Reader;
     ///
-    /// let mut pkg = Package::open("presentation.ppt")?;
+    /// let mut pkg = Reader::open("presentation.ppt")?;
     /// let pres = pkg.presentation()?;
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```

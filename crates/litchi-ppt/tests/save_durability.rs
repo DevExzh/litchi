@@ -11,7 +11,7 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicU64, Ordering};
 
 use litchi_core::Durability;
-use litchi_ppt::Package;
+use litchi_ppt::raw::Reader;
 use litchi_ppt::writer::Writer;
 
 const LEVELS: [Durability; 3] = [Durability::Full, Durability::FileOnly, Durability::NoSync];
@@ -75,6 +75,6 @@ fn every_level_publishes_the_default_save_bytes() {
         );
     }
 
-    Package::open(directory.join("no-sync.ppt")).unwrap();
+    Reader::open(directory.join("no-sync.ppt")).unwrap();
     assert_eq!(std::fs::read_dir(&directory).unwrap().count(), 4);
 }

@@ -371,7 +371,7 @@ fn minimal_live_snapshot() -> Snapshot {
 }
 
 fn document_saves_fonts(bytes: &[u8]) -> bool {
-    let mut package = crate::Package::from_reader(Cursor::new(bytes)).unwrap();
+    let mut package = crate::raw::Reader::from_reader(Cursor::new(bytes)).unwrap();
     package
         .presentation()
         .unwrap()

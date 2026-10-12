@@ -7,7 +7,7 @@
 //! Tests for header/footer metacharacter atoms (MS-PPT 2.9.47-2.9.52)
 //! against real `PowerPoint` fixtures.
 
-use litchi_ppt::{MetacharKind, Package};
+use litchi_ppt::{MetacharKind, raw::Reader};
 use std::path::PathBuf;
 
 fn fixture(name: &str) -> PathBuf {
@@ -17,7 +17,7 @@ fn fixture(name: &str) -> PathBuf {
 }
 
 fn metachars(name: &str) -> Vec<litchi_ppt::TextMetachar> {
-    let mut package = Package::open(fixture(name)).expect("open POI fixture");
+    let mut package = Reader::open(fixture(name)).expect("open POI fixture");
     package
         .presentation()
         .expect("parse presentation")

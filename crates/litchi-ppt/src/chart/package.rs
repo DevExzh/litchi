@@ -19,7 +19,7 @@ pub(crate) fn enumerate(presentation: &Presentation, limits: Limits) -> Result<I
     let Some(objects) = Collection::parse(&document)? else {
         return Ok(Inventory::default());
     };
-    objects.validate_persist_mapping(&presentation.persist_mapping)?;
+    objects.validate_persist_mapping(&presentation.inner.persist_mapping)?;
 
     let mut wanted = Vec::new();
     wanted

@@ -51,7 +51,7 @@ fn office_art(error: litchi_odraw::Error) -> Error {
 /// closed before this function returns. Native image data is not decoded.
 #[cfg(feature = "ppt")]
 pub fn ppt(path: impl AsRef<std::path::Path>) -> Result<Vec<File<'static>>> {
-    let mut package = litchi_ppt::Package::open(path).map_err(Error::from)?;
+    let package = litchi_ppt::Package::open(path).map_err(Error::from)?;
     let presentation = package.presentation().map_err(Error::from)?;
     presentation
         .images()

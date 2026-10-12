@@ -7,8 +7,8 @@
 use litchi_ppt::animation::{AnimationInfo, AnimationSound, BuiltinSound};
 use litchi_ppt::writer::Writer;
 use litchi_ppt::{
-    BuiltinId, Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger, Package,
-    TextInteraction, TextRange,
+    BuiltinId, Interaction, InteractionAction, InteractionLinkTarget, InteractionTrigger,
+    TextInteraction, TextRange, raw::Reader,
 };
 use std::{io::Cursor, num::NonZeroU32};
 
@@ -53,7 +53,7 @@ fn action_only_builtin_sounds_are_collected_remapped_and_repeatable() {
     let second = write(&mut writer).unwrap();
     assert_eq!(first, second, "serialization must not remap writer state");
 
-    let mut package = Package::from_reader(Cursor::new(first)).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(first)).unwrap();
     let presentation = package.presentation().unwrap();
     presentation
         .validate_interaction_sound_references()
@@ -106,7 +106,7 @@ fn embedded_animation_sound_can_be_shared_by_shape_action() {
         .set_last_shape_interaction(slide, interaction)
         .unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer).unwrap())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer).unwrap())).unwrap();
     let presentation = package.presentation().unwrap();
     presentation
         .validate_interaction_sound_references()
@@ -147,7 +147,7 @@ fn action_only_embedded_sound_uses_the_explicit_registry() {
         )
         .unwrap();
 
-    let mut package = Package::from_reader(Cursor::new(write(&mut writer).unwrap())).unwrap();
+    let mut package = Reader::from_reader(Cursor::new(write(&mut writer).unwrap())).unwrap();
     let presentation = package.presentation().unwrap();
     presentation
         .validate_interaction_sound_references()

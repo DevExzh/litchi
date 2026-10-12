@@ -8,7 +8,7 @@ use litchi_cfb::{OleFile, OleWriter};
 use litchi_core::{ReadAt, SourceVersion};
 use litchi_ppt::writer::{PictureKind, Writer};
 use litchi_ppt::{
-    Error, Leniency, OpenOptions, Package, SourceBackedPackage, SourceLimitKind, SourceLimits,
+    Error, Leniency, OpenOptions, SourceBackedPackage, SourceLimitKind, SourceLimits, raw::Reader,
 };
 use std::{
     io::{self, Cursor, Read, Seek, SeekFrom},
@@ -287,7 +287,7 @@ fn every_declared_metadata_or_unrelated_stream_is_entry_bounded_at_admission() {
         let (bytes, range) = unrelated_stream_fixture(stream_name, 8 * 1024);
 
         let (reader, rejected) = RejectingReader::new(bytes.clone(), vec![range]);
-        let error = match Package::from_reader_with_limits(reader, limits) {
+        let error = match Reader::from_reader_with_limits(reader, limits) {
             Ok(_) => panic!("oversized {stream_name} must fail eager admission"),
             Err(error) => error,
         };
@@ -299,7 +299,7 @@ fn every_declared_metadata_or_unrelated_stream_is_entry_bounded_at_admission() {
 
         let (reader, rejected) = RejectingReader::new(bytes.clone(), vec![range]);
         let ole = OleFile::open(reader).expect("directory indexing must not read the payload");
-        let error = match Package::from_ole_file_with_limits(ole, limits) {
+        let error = match Reader::from_ole_file_with_limits(ole, limits) {
             Ok(_) => panic!("oversized {stream_name} must fail pre-parsed admission"),
             Err(error) => error,
         };
@@ -334,7 +334,7 @@ fn all_declared_streams_contribute_to_aggregate_admission_before_payload_reads()
     let (bytes, ranges) = all_streams_fixture();
 
     let (reader, rejected) = RejectingReader::new(bytes.clone(), ranges.clone());
-    let error = match Package::from_reader_with_limits(reader, limits) {
+    let error = match Reader::from_reader_with_limits(reader, limits) {
         Ok(_) => panic!("aggregate stream overflow must fail eager admission"),
         Err(error) => error,
     };
@@ -343,7 +343,7 @@ fn all_declared_streams_contribute_to_aggregate_admission_before_payload_reads()
 
     let (reader, rejected) = RejectingReader::new(bytes.clone(), ranges.clone());
     let ole = OleFile::open(reader).expect("directory indexing must not read payloads");
-    let error = match Package::from_ole_file_with_limits(ole, limits) {
+    let error = match Reader::from_ole_file_with_limits(ole, limits) {
         Ok(_) => panic!("aggregate stream overflow must fail pre-parsed admission"),
         Err(error) => error,
     };
@@ -580,7 +580,7 @@ fn eager_ingress_enforces_input_and_entry_limits_with_exact_boundaries() {
         .unwrap()
         .build()
         .unwrap();
-    let mut package = Package::from_reader_with_limits(Cursor::new(bytes.clone()), exact)
+    let mut package = Reader::from_reader_with_limits(Cursor::new(bytes.clone()), exact)
         .expect("the complete input boundary is inclusive");
     assert_eq!(package.source_limits().max_input_bytes(), bytes.len());
 
@@ -589,7 +589,7 @@ fn eager_ingress_enforces_input_and_entry_limits_with_exact_boundaries() {
         .unwrap()
         .build()
         .unwrap();
-    let error = match Package::from_reader_with_limits(Cursor::new(bytes.clone()), too_small) {
+    let error = match Reader::from_reader_with_limits(Cursor::new(bytes.clone()), too_small) {
         Ok(_) => panic!("complete input overflow must be typed"),
         Err(error) => error,
     };
@@ -649,7 +649,7 @@ fn positional_malformed_pictures_report_typed_officeart_failure() {
 #[test]
 fn positional_and_eager_picture_results_match() {
     let bytes = picture_fixture();
-    let mut eager_package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
+    let mut eager_package = Reader::from_reader(Cursor::new(bytes.clone())).unwrap();
     let eager_presentation = eager_package.presentation().unwrap();
     let eager = eager_presentation.images().unwrap();
     let positional_package =

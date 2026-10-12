@@ -374,7 +374,7 @@ fn parse_photo_album(record: &Record) -> Result<PhotoAlbumSettings> {
 )]
 mod tests {
     use super::*;
-    use crate::Package;
+    use crate::raw::Reader;
     use litchi_opc::{OpcPackage, PackURI, XmlPart};
     use std::io::Cursor;
 
@@ -667,7 +667,7 @@ mod tests {
             let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
                 .join("../../test-data/ole/ppt")
                 .join(name);
-            let mut package = Package::open(path).unwrap();
+            let mut package = Reader::open(path).unwrap();
             let presentation = package.presentation().unwrap();
             let properties = presentation.powerpoint12_document_properties().unwrap();
             assert_eq!(

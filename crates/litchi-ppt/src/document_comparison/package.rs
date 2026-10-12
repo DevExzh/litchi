@@ -10,8 +10,9 @@ use super::transaction::{
     Change, Editor as DocumentEditor, Patch as DocumentPatch, Revision,
     Snapshot as DocumentSnapshot,
 };
-use crate::package::{Error, Package as PresentationPackage, Result};
+use crate::package::{Error, Result};
 use crate::presentation::Presentation;
+use crate::raw::Reader;
 use crate::records::Record;
 use std::io::Cursor;
 use std::sync::Arc;
@@ -59,7 +60,7 @@ impl Snapshot {
                 "PowerPoint package exceeds the bounded package byte limit".into(),
             ));
         }
-        let mut package = PresentationPackage::from_reader(Cursor::new(bytes.clone()))?;
+        let mut package = Reader::from_reader(Cursor::new(bytes.clone()))?;
         let presentation = package.presentation()?;
         let document_persist_id = presentation.slide_directory().document_persist_id();
         let document = snapshot_from_presentation(&presentation, limits)?;

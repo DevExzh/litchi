@@ -20,8 +20,8 @@ use litchi_ppt::text_prop::parse_style_text_prop_atom_strict;
 use litchi_ppt::writer::Writer;
 use litchi_ppt::writer::text_format::Paragraph;
 use litchi_ppt::{
-    Defect, DefectLocation, Package, PersistDefect, Presentation, Shape as _, ShapeDefect,
-    SlideListDefect, SourceBackedPackage, TextPropDefect, ToleranceReport, ToleratedDefect,
+    Defect, DefectLocation, PersistDefect, Presentation, Shape as _, ShapeDefect, SlideListDefect,
+    SourceBackedPackage, TextPropDefect, ToleranceReport, ToleratedDefect, raw::Reader,
 };
 use std::io::Cursor;
 use std::sync::Arc;
@@ -120,7 +120,7 @@ impl Fixture {
 
     /// Open through the default (`Leniency::Strict`) owned-reader path.
     fn open(&self) -> Presentation {
-        Package::from_reader(Cursor::new(self.bytes.clone()))
+        Reader::from_reader(Cursor::new(self.bytes.clone()))
             .unwrap()
             .presentation()
             .unwrap()
@@ -525,7 +525,7 @@ fn style_atom_headers(bytes: &[u8]) -> Vec<usize> {
 
 fn open_both(bytes: &[u8]) -> [Presentation; 2] {
     [
-        Package::from_reader(Cursor::new(bytes.to_vec()))
+        Reader::from_reader(Cursor::new(bytes.to_vec()))
             .unwrap()
             .presentation()
             .unwrap(),
@@ -647,8 +647,7 @@ fn corpus_presentations_report_nothing() {
     assert!(files.len() >= 20, "test-data corpus not found");
     let mut opened = 0;
     for path in &files {
-        let presentation = match Package::open(path).and_then(|mut package| package.presentation())
-        {
+        let presentation = match Reader::open(path).and_then(|mut package| package.presentation()) {
             Ok(presentation) => presentation,
             // Encrypted presentations are out of scope (no password).
             Err(error) => {
@@ -1034,7 +1033,7 @@ fn user_edit_chain_corruption_stays_fatal() {
     let mut deck = deck.patch_u32(at, 0);
     deck.bytes[headers[0] + 2] = 0xF4;
     for result in [
-        Package::from_reader(Cursor::new(deck.bytes.clone()))
+        Reader::from_reader(Cursor::new(deck.bytes.clone()))
             .and_then(|mut package| package.presentation())
             .err(),
         SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(deck.bytes.clone())))
@@ -1193,7 +1192,7 @@ fn truncated_persist_directory_stays_fatal() {
     // A run claiming 0xFFF offsets overruns the directory.
     let edited = edited.with_directory([0xFFF0_0001, 0, 0, 0, 0]);
     for result in [
-        Package::from_reader(Cursor::new(edited.deck.bytes.clone()))
+        Reader::from_reader(Cursor::new(edited.deck.bytes.clone()))
             .and_then(|mut package| package.presentation())
             .err(),
         SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(edited.deck.bytes.clone())))
@@ -1238,7 +1237,7 @@ fn nonconforming_user_edit_length_is_read_and_recorded() {
         &[open_time(PersistDefect::UserEditAtomLength, 30, None)],
     );
     // The older edit is the one read: the second slide's pre-edit text.
-    let presentation = Package::from_reader(Cursor::new(deck.bytes.clone()))
+    let presentation = Reader::from_reader(Cursor::new(deck.bytes.clone()))
         .unwrap()
         .presentation()
         .unwrap();
@@ -1267,7 +1266,7 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
     bytes[older + 8..older + 12].copy_from_slice(&live.to_le_bytes());
 
     for error in [
-        Package::from_reader(Cursor::new(bytes.clone()))
+        Reader::from_reader(Cursor::new(bytes.clone()))
             .and_then(|mut package| package.presentation())
             .err(),
         SourceBackedPackage::from_read_at(Arc::new(OwnedSource::new(bytes.clone())))
@@ -1280,7 +1279,7 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
 
     let options = OpenOptions::new().leniency(Leniency::TolerateUserEditChainDefects);
     for presentation in [
-        Package::from_reader(Cursor::new(bytes.clone()))
+        Reader::from_reader(Cursor::new(bytes.clone()))
             .unwrap()
             .presentation_with_options(options)
             .unwrap(),
@@ -1304,7 +1303,7 @@ fn cyclic_user_edit_chain_is_fatal_by_default_and_cut_when_opted_in() {
     }
 
     // The opted-in control (no cycle) repairs nothing.
-    let control = Package::from_reader(Cursor::new(edited.deck.bytes.clone()))
+    let control = Reader::from_reader(Cursor::new(edited.deck.bytes.clone()))
         .unwrap()
         .presentation_with_options(options)
         .unwrap();
@@ -1573,7 +1572,7 @@ fn current_user_header_and_size_deviations_are_read_and_recorded() {
     let mut bytes = deck.bytes;
     bytes[at + 2..at + 4].copy_from_slice(&0x0FF5u16.to_le_bytes());
     assert!(
-        Package::from_reader(Cursor::new(bytes))
+        Reader::from_reader(Cursor::new(bytes))
             .unwrap()
             .presentation()
             .is_err()

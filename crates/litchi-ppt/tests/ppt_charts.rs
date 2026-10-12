@@ -15,7 +15,7 @@ use litchi_ppt::embedded::object::{
     ExternalObject, Metadata, ObjectSubtype, ObjectType,
 };
 use litchi_ppt::embedded::storage::{Kind as StorageKind, Storage};
-use litchi_ppt::{Editor, Package};
+use litchi_ppt::{Editor, raw::Reader};
 
 const BOF: u16 = 0x0809;
 const EOF: u16 = 0x000A;
@@ -117,7 +117,7 @@ fn uncompressed(data: Vec<u8>) -> Storage {
 
 fn editor_with_seed(seed: u32) -> Editor {
     let original = std::fs::read(fixture("ppt_with_embeded.ppt")).expect("read fixture");
-    let mut package = Package::from_reader(Cursor::new(original.clone())).expect("open fixture");
+    let mut package = Reader::from_reader(Cursor::new(original.clone())).expect("open fixture");
     let presentation = package.presentation().expect("read presentation");
     let mut objects = presentation
         .ole_objects()
@@ -157,7 +157,7 @@ fn graph_and_excel_objects_use_neutral_typed_views() {
         .expect("add corrupt object");
 
     let bytes = editor.finish().expect("finish package edit");
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("reopen package");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("reopen package");
     let presentation = package.presentation().expect("read presentation");
     let inventory = presentation.charts().expect("enumerate charts");
 
@@ -227,7 +227,7 @@ fn program_identifies_chart_when_subtype_is_default() {
         .expect("add chart");
 
     let bytes = editor.finish().expect("finish package edit");
-    let mut package = Package::from_reader(Cursor::new(bytes)).expect("reopen package");
+    let mut package = Reader::from_reader(Cursor::new(bytes)).expect("reopen package");
     let presentation = package.presentation().expect("read presentation");
     let inventory = presentation.charts().expect("enumerate charts");
     assert_eq!(inventory.failures().count(), 0);
@@ -246,7 +246,7 @@ fn graph_package_replacement_uses_typed_host_storage_transaction() {
     let objects = seed.objects().clone();
     let original = seed.finish().expect("finish initial package");
 
-    let mut package = Package::from_reader(Cursor::new(original.clone())).expect("open package");
+    let mut package = Reader::from_reader(Cursor::new(original.clone())).expect("open package");
     let presentation = package.presentation().expect("read presentation");
     let inventory = presentation.charts().expect("enumerate charts");
     let graph = match inventory.get(0).expect("Graph chart") {
@@ -268,7 +268,7 @@ fn graph_package_replacement_uses_typed_host_storage_transaction() {
         .expect("stage typed host replacement");
     let rewritten = host.finish().expect("finish host transaction");
 
-    let mut reopened = Package::from_reader(Cursor::new(rewritten)).expect("reopen package");
+    let mut reopened = Reader::from_reader(Cursor::new(rewritten)).expect("reopen package");
     let rewritten_presentation = reopened
         .presentation()
         .expect("read rewritten presentation");
@@ -291,7 +291,7 @@ fn graph_package_replacement_uses_typed_host_storage_transaction() {
 #[test]
 fn presentation_without_charts_yields_empty_inventory() {
     let path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../test-data/ole/ppt/empty.ppt");
-    let mut package = Package::open(path).expect("open empty fixture");
+    let mut package = Reader::open(path).expect("open empty fixture");
     let presentation = package.presentation().expect("read presentation");
     assert!(presentation.charts().expect("enumerate charts").is_empty());
 }
