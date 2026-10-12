@@ -2499,6 +2499,9 @@ impl Edit {
     /// incompatible staged work, or finite limits.  Changed publication keeps
     /// the same source-closure and protection policy as [`Self::remove_paragraph`].
     pub fn remove_body_paragraphs(&mut self, positions: &[usize]) -> Result<&mut Self, Error> {
+        if let [position] = positions {
+            return self.remove_paragraph(*position);
+        }
         if positions.is_empty() {
             return Err(Error::EmptyParagraphRemovalBatch);
         }
@@ -3525,7 +3528,13 @@ impl Edit {
         }
 
         if self.operations.iter().all(Operation::is_paragraph_removal) {
-            return commit_body_paragraph_removals(self, operation_count);
+            match ordinary_paragraph_source_map(&self.source) {
+                Ok(map) => return commit_body_paragraph_removals(self, operation_count, map),
+                // Keep the established scalar lifecycle path for decoded or
+                // explicitly repaired sources without literal source ranges.
+                Err(Error::UnsupportedSource(_)) if operation_count == 1 => {},
+                Err(error) => return Err(error),
+            }
         }
         if self
             .operations
@@ -4507,13 +4516,16 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
     ))
 }
 
-fn commit_body_paragraph_removals(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+fn commit_body_paragraph_removals(
+    edit: Edit,
+    operation_count: usize,
+    map: OrdinaryParagraphSourceMap,
+) -> Result<Commit, Error> {
     ensure_default_body_formatting(&edit.source)?;
     let source_bytes = edit
         .source
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
-    let map = ordinary_paragraph_source_map(&edit.source)?;
     let mut ranges = Vec::new();
     ranges
         .try_reserve_exact(operation_count)

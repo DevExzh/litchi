@@ -245,3 +245,16 @@ fn removing_empty_paragraph_keeps_numeric_and_space_prefixed_survivors() {
         assert_eq!(paragraphs(&result), ["First", text]);
     }
 }
+
+#[test]
+fn scalar_removal_retains_explicit_native_repair_policy() {
+    let input = br"{\rtf1\ansi First\par caf\'e9 bad\'g1\par Third";
+    let options = litchi_ops::OpenOptions::new().rtf_options(
+        litchi_rtf::OpenOptions::new()
+            .leniency(litchi_rtf::leniency::Leniency::TolerateSyntaxDefects),
+    );
+    let source = litchi_ops::open_bytes_with(input.as_slice(), &options).unwrap();
+    let result = source.remove("/body/p[1]").unwrap();
+    assert_eq!(paragraphs(&result), ["caf\u{e9} bad\u{1}", "Third"]);
+    assert_eq!(source.to_bytes().unwrap(), input);
+}
