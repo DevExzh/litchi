@@ -1,6 +1,6 @@
 //! Checked transfer of ordinary RTF owners and their bounded dependencies.
 
-use super::{Commit, Edit, Error, HeaderFooterParagraph, Snapshot};
+use super::{Commit, Edit, Error, HeaderFooterParagraph, Package};
 use crate::{RtfWriter, TableCellPath};
 use std::borrow::Cow;
 use std::collections::{BTreeMap, BTreeSet};
@@ -21,9 +21,9 @@ impl TransferPlan {
     /// Returns an error when the source contains an inline line break or when
     /// the checked target cannot accept the structural insertion.
     pub fn plain_paragraph(
-        source: &Snapshot,
+        source: &Package,
         source_position: usize,
-        target: &Snapshot,
+        target: &Package,
         insert_after: usize,
     ) -> Result<Self, Error> {
         let count = source.paragraph_count();
@@ -55,9 +55,9 @@ impl TransferPlan {
     /// Returns an error when either path is invalid or the target cell's
     /// dependent positional content cannot survive the replacement.
     pub fn table_cell_text(
-        source: &Snapshot,
+        source: &Package,
         source_path: &TableCellPath,
-        target: &Snapshot,
+        target: &Package,
         target_path: TableCellPath,
     ) -> Result<Self, Error> {
         let text = super::table_cell(source, source_path)?.text().to_string();
@@ -75,9 +75,9 @@ impl TransferPlan {
     /// Returns an error when either selector is invalid or the target story
     /// owns positioned content that would acquire stale offsets.
     pub fn header_footer_text(
-        source: &Snapshot,
+        source: &Package,
         source_target: HeaderFooterParagraph,
-        target: &Snapshot,
+        target: &Package,
         target_destination: HeaderFooterParagraph,
     ) -> Result<Self, Error> {
         let text = super::header_footer(source, source_target)?
@@ -103,7 +103,7 @@ impl TransferPlan {
     /// # Errors
     /// Returns an error for an invalid selector, active field, unresolved
     /// result-story dependency, opaque syntax, or invalid candidate readback.
-    pub fn field(source: &Snapshot, source_index: usize, target: &Snapshot) -> Result<Self, Error> {
+    pub fn field(source: &Package, source_index: usize, target: &Package) -> Result<Self, Error> {
         let source_field = source
             .fields()
             .get(source_index)
@@ -150,7 +150,7 @@ impl TransferPlan {
     /// # Errors
     /// Returns an error for an invalid selector, active or unresolved drawing
     /// dependency, opaque syntax, or invalid candidate readback.
-    pub fn shape(source: &Snapshot, source_index: usize, target: &Snapshot) -> Result<Self, Error> {
+    pub fn shape(source: &Package, source_index: usize, target: &Package) -> Result<Self, Error> {
         require_equal_text_resources(source, target)?;
         let shape = source
             .shapes()
@@ -191,10 +191,10 @@ impl TransferPlan {
     /// Returns an error for invalid paths, unresolved dependencies, opaque
     /// syntax, or invalid candidate readback.
     pub fn nested_table(
-        source: &Snapshot,
+        source: &Package,
         source_cell: &TableCellPath,
         source_nested_index: usize,
-        target: &Snapshot,
+        target: &Package,
         target_cell: TableCellPath,
     ) -> Result<Self, Error> {
         let nested = super::table_cell(source, source_cell)?
@@ -296,10 +296,10 @@ impl TransferPlan {
     /// Returns an error for missing or conflicting dependencies, opaque syntax,
     /// or invalid candidate readback.
     pub fn style(
-        source: &Snapshot,
+        source: &Package,
         kind: crate::style::Kind,
         id: u16,
-        target: &Snapshot,
+        target: &Package,
     ) -> Result<Self, Error> {
         refuse_feature_opaque(source, crate::opaque::Context::Metadata, usize::MAX)?;
         require_equal_text_resources(source, target)?;
@@ -311,12 +311,12 @@ impl TransferPlan {
                 .stylesheet()
                 .get_typed(style.style_type, style.id)
             {
-                Some(existing) if existing == style => {},
+                Some(existing) if existing == style => {}
                 Some(_) => {
                     return Err(Error::UnsupportedSource(
                         "style transfer found a conflicting typed style ID",
                     ));
-                },
+                }
                 None => additions.push(owned_style(style)),
             }
         }
@@ -340,7 +340,7 @@ impl TransferPlan {
     /// # Errors
     /// Returns an error for missing or conflicting dependencies, opaque syntax,
     /// or invalid candidate readback.
-    pub fn list(source: &Snapshot, id: i32, target: &Snapshot) -> Result<Self, Error> {
+    pub fn list(source: &Package, id: i32, target: &Package) -> Result<Self, Error> {
         refuse_feature_opaque(source, crate::opaque::Context::Metadata, usize::MAX)?;
         require_equal_text_resources(source, target)?;
         let list = source
@@ -354,7 +354,7 @@ impl TransferPlan {
                 return Err(Error::UnsupportedSource(
                     "list transfer found a conflicting list ID",
                 ));
-            },
+            }
             None => true,
         };
         let mut overrides = Vec::new();
@@ -366,12 +366,12 @@ impl TransferPlan {
             .filter(|entry| entry.list_id == id)
         {
             match target.model().list_override_table().get(entry.index) {
-                Some(existing) if existing == entry => {},
+                Some(existing) if existing == entry => {}
                 Some(_) => {
                     return Err(Error::UnsupportedSource(
                         "list transfer found a conflicting override index",
                     ));
-                },
+                }
                 None => overrides.push(entry.clone()),
             }
         }
@@ -451,11 +451,7 @@ impl TransferPlan {
     /// # Errors
     /// Returns an error for invalid selectors, active/external dependencies,
     /// opaque syntax, or invalid candidate readback.
-    pub fn object(
-        source: &Snapshot,
-        source_index: usize,
-        target: &Snapshot,
-    ) -> Result<Self, Error> {
+    pub fn object(source: &Package, source_index: usize, target: &Package) -> Result<Self, Error> {
         let object = source
             .model()
             .objects()
@@ -533,7 +529,7 @@ impl TransferPlan {
 }
 
 fn root_plan(
-    target: &Snapshot,
+    target: &Package,
     vocabulary: &'static str,
     effect: &str,
     after: Vec<u8>,
@@ -548,7 +544,7 @@ fn root_plan(
 }
 
 fn canonical_candidate(
-    target: &Snapshot,
+    target: &Package,
     mutation: impl FnOnce(&mut crate::document::RtfDocument<'static>) -> crate::RtfResult<()>,
 ) -> Result<Vec<u8>, Error> {
     if !target.opaque().is_empty() {
@@ -579,7 +575,7 @@ fn canonical_candidate(
             limit,
         });
     }
-    let reopened = Snapshot::from_bytes_with_options(&output, target.options())?;
+    let reopened = Package::from_bytes_with_options(&output, target.options())?;
     if !reopened.opaque().is_empty() {
         return Err(Error::UnsupportedSource(
             "ordinary-root transfer produced unknown destinations",
@@ -637,7 +633,7 @@ impl io::Write for BoundedOutput {
 }
 
 fn refuse_feature_opaque(
-    source: &Snapshot,
+    source: &Package,
     context: crate::opaque::Context,
     body_position: usize,
 ) -> Result<(), Error> {
@@ -652,7 +648,7 @@ fn refuse_feature_opaque(
     Ok(())
 }
 
-fn require_equal_text_resources(source: &Snapshot, target: &Snapshot) -> Result<(), Error> {
+fn require_equal_text_resources(source: &Package, target: &Package) -> Result<(), Error> {
     if source.model().font_table() != target.model().font_table()
         || !equal_color_tables(source.model().color_table(), target.model().color_table())
     {
@@ -700,20 +696,20 @@ fn field_transfer_class(field: &crate::Field<'_>) -> FieldTransferClass {
             } else {
                 FieldTransferClass::Unknown
             }
-        },
+        }
         FieldType::Reference if matches!(&parsed_code, crate::ParsedFieldCode::Reference(_)) => {
             FieldTransferClass::Passive
-        },
+        }
         FieldType::PageReference
             if matches!(&parsed_code, crate::ParsedFieldCode::PageReference(_)) =>
         {
             FieldTransferClass::Passive
-        },
+        }
         FieldType::NoteReference
             if matches!(&parsed_code, crate::ParsedFieldCode::NoteReference(_)) =>
         {
             FieldTransferClass::Passive
-        },
+        }
         FieldType::ReferencedDocument
         | FieldType::Dde
         | FieldType::DdeAuto
@@ -763,7 +759,7 @@ fn field_transfer_class(field: &crate::Field<'_>) -> FieldTransferClass {
             } else {
                 FieldTransferClass::Passive
             }
-        },
+        }
         _ => FieldTransferClass::Unknown,
     }
 }
@@ -1202,7 +1198,7 @@ fn owned_transfer_table(
 }
 
 fn validate_table_transfer(
-    source: &Snapshot,
+    source: &Package,
     table: &crate::Table<'_>,
     depth: usize,
 ) -> Result<usize, Error> {
@@ -1211,7 +1207,7 @@ fn validate_table_transfer(
 }
 
 fn validate_table_transfer_at_depth(
-    source: &Snapshot,
+    source: &Package,
     table: &crate::Table<'_>,
     depth: usize,
     node_count: &mut usize,
@@ -1346,10 +1342,7 @@ fn remap_table_field_indices(
     Ok(())
 }
 
-fn validate_transferable_field(
-    source: &Snapshot,
-    field: &crate::Field<'_>,
-) -> Result<usize, Error> {
+fn validate_transferable_field(source: &Package, field: &crate::Field<'_>) -> Result<usize, Error> {
     if !matches!(field.owner, crate::FieldOwner::TableCell(_)) {
         return Err(Error::UnsupportedSource(
             "nested-table story field has an incompatible owner",
@@ -1569,7 +1562,7 @@ fn count_styled_rows(table: &crate::Table<'_>) -> usize {
 }
 
 fn style_closure(
-    source: &Snapshot,
+    source: &Package,
     kind: crate::style::Kind,
     id: u16,
 ) -> Result<Vec<&crate::style::Style<'_>>, Error> {

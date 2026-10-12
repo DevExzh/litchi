@@ -244,11 +244,11 @@ impl<W: Write> RtfWriter<W> {
         }
     }
 
-    /// Serialize an immutable document snapshot.
+    /// Serialize an immutable package snapshot.
     ///
     /// # Errors
     /// Returns an error when writing to the underlying output fails.
-    pub fn write(&mut self, document: &crate::Document) -> io::Result<()> {
+    pub fn write(&mut self, document: &crate::Package) -> io::Result<()> {
         if self.options == WriterOptions::default()
             && let Some(source) = document.model().preserved_source()
         {

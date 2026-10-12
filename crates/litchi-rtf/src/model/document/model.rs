@@ -42,7 +42,7 @@ fn read_limited_source<R: Read>(mut reader: R, limit: usize) -> RtfResult<Vec<u8
                     return Err(RtfError::ParserError(format!(
                         "Failed to read file: {error}"
                     )));
-                },
+                }
             }
         };
         if read == 0 {
@@ -5200,35 +5200,35 @@ impl<'a> RtfDocument<'a> {
         Some(match event {
             crate::BodyStoryEvent::Drawing(crate::StoryDrawing::Shape(index)) => {
                 self.shapes.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::Drawing(crate::StoryDrawing::ShapeGroup(index)) => {
                 self.shape_groups.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::Field(index) => self.fields.get(index)?.position,
             crate::BodyStoryEvent::PageBreak(page_break) => page_break.position,
             crate::BodyStoryEvent::ColumnBreak(column_break) => column_break.position,
             crate::BodyStoryEvent::SectionBreak(section_break) => section_break.position,
             crate::BodyStoryEvent::BookmarkStart(index) => {
                 self.bookmarks.bookmarks().get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::BookmarkEnd(index) => {
                 let bookmark = self.bookmarks.bookmarks().get(index)?;
                 bookmark.position.checked_add(bookmark.content.len())?
-            },
+            }
             crate::BodyStoryEvent::MoveBookmarkStart(index) => {
                 self.move_bookmarks.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::MoveBookmarkEnd(index) => {
                 let bookmark = self.move_bookmarks.get(index)?;
                 bookmark.position.checked_add(bookmark.content.len())?
-            },
+            }
             crate::BodyStoryEvent::AnnotationStart(index) => self.annotations.get(index)?.position,
             crate::BodyStoryEvent::AnnotationEnd(index) => self.annotations.get(index)?.range_end,
             crate::BodyStoryEvent::Note(index) => self.notes.get(index)?.position,
             crate::BodyStoryEvent::Object(index) => self.objects.get(index)?.position,
             crate::BodyStoryEvent::PictureCompatibility(index) => {
                 self.picture_compatibility_records.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::FormFieldStart(index) => self.form_fields.get(index)?.position,
             crate::BodyStoryEvent::FormFieldEnd(index) => self.form_fields.get(index)?.range_end,
             crate::BodyStoryEvent::RevisionStart(index)
@@ -5236,44 +5236,44 @@ impl<'a> RtfDocument<'a> {
             crate::BodyStoryEvent::RevisionEnd(index) => self.revisions.get(index)?.range_end,
             crate::BodyStoryEvent::GeneratedListMarker(index) => {
                 self.generated_list_markers.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::LegacyTextBox(index) => {
                 self.legacy_text_boxes.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::LegacyDrawing(index) => {
                 self.legacy_drawings.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::NavigationEntry(index) => {
                 self.navigation_entries.get(index)?.position()
-            },
+            }
             crate::BodyStoryEvent::CustomXmlOpen(index) => {
                 self.custom_xml_tags.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::CustomXmlClose(index) => {
                 let tag = self.custom_xml_tags.get(index)?;
                 tag.position.checked_add(tag.content.len())?
-            },
+            }
             crate::BodyStoryEvent::SmartTagOpen(index) => self.smart_tags.get(index)?.position,
             crate::BodyStoryEvent::SmartTagClose(index) => {
                 let tag = self.smart_tags.get(index)?;
                 tag.position.checked_add(tag.content.len())?
-            },
+            }
             crate::BodyStoryEvent::MathZone(index) => self.math_zones.get(index)?.position,
             crate::BodyStoryEvent::SoftBreak(soft_break) => soft_break.position,
             crate::BodyStoryEvent::ProtectionRangeStart(index) => {
                 self.protection_ranges.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::ProtectionRangeEnd(index) => {
                 let range = self.protection_ranges.get(index)?;
                 range.position.checked_add(range.content.len())?
-            },
+            }
             crate::BodyStoryEvent::EditableRegionStart(index) => {
                 self.editable_regions.get(index)?.position
-            },
+            }
             crate::BodyStoryEvent::EditableRegionEnd(index) => {
                 let region = self.editable_regions.get(index)?;
                 region.position.checked_add(region.content.len())?
-            },
+            }
         })
     }
 
@@ -6062,7 +6062,7 @@ impl<'a> RtfDocument<'a> {
                         "RTF insertion ranges cannot overlap".to_string(),
                     ));
                 }
-            },
+            }
             super::super::annotation::RevisionType::Deletion => {
                 if body.get(..revision.position).is_none() {
                     return Err(RtfError::MalformedDocument(
@@ -6070,14 +6070,14 @@ impl<'a> RtfDocument<'a> {
                             .to_string(),
                     ));
                 }
-            },
+            }
             super::super::annotation::RevisionType::FormatChange
             | super::super::annotation::RevisionType::MovedFrom
             | super::super::annotation::RevisionType::MovedTo => {
                 return Err(RtfError::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
-            },
+            }
         }
         let total = self
             .revisions
@@ -6100,10 +6100,10 @@ impl<'a> RtfDocument<'a> {
             super::super::annotation::RevisionType::Insertion => {
                 self.insert_body_story_event(crate::BodyStoryEvent::RevisionStart(index))?;
                 self.insert_body_story_event(crate::BodyStoryEvent::RevisionEnd(index))?;
-            },
+            }
             super::super::annotation::RevisionType::Deletion => {
                 self.insert_body_story_event(crate::BodyStoryEvent::RevisionDeletion(index))?;
-            },
+            }
             super::super::annotation::RevisionType::FormatChange
             | super::super::annotation::RevisionType::MovedFrom
             | super::super::annotation::RevisionType::MovedTo => {
@@ -6111,7 +6111,7 @@ impl<'a> RtfDocument<'a> {
                 return Err(RtfError::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
-            },
+            }
         }
         Ok(())
     }
@@ -6174,26 +6174,26 @@ impl<'a> RtfDocument<'a> {
         let cell = self.table_cell_mut(path)?;
         match kind {
             super::super::annotation::RevisionType::Insertion
-                if cell.text().get(position..range_end) == Some(revision.content.as_ref()) => {},
+                if cell.text().get(position..range_end) == Some(revision.content.as_ref()) => {}
             super::super::annotation::RevisionType::Deletion
-                if cell.text().get(position..position).is_some() => {},
+                if cell.text().get(position..position).is_some() => {}
             super::super::annotation::RevisionType::Insertion => {
                 return Err(RtfError::MalformedDocument(
                     "RTF insertion revision does not match its table-cell range".to_string(),
                 ));
-            },
+            }
             super::super::annotation::RevisionType::Deletion => {
                 return Err(RtfError::MalformedDocument(
                     "RTF deletion revision is outside its table-cell story".to_string(),
                 ));
-            },
+            }
             super::super::annotation::RevisionType::FormatChange
             | super::super::annotation::RevisionType::MovedFrom
             | super::super::annotation::RevisionType::MovedTo => {
                 return Err(RtfError::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
-            },
+            }
         }
         let index = self.push_cell_revision_metadata(revision)?;
         let result = match kind {
@@ -6210,7 +6210,7 @@ impl<'a> RtfDocument<'a> {
                 return Err(RtfError::MalformedDocument(
                     "this RTF revision kind has no lossless scoped-run representation".to_string(),
                 ));
-            },
+            }
         };
         if let Err(error) = result {
             self.revisions.pop();
@@ -6323,7 +6323,7 @@ mod source_tests {
             ("mela", mela.as_slice()),
         ] {
             let file = TempRtf::new(label, bytes);
-            let document = crate::Document::open_with_limits(&file.path, SourceLimits::default())
+            let document = crate::Package::open_with_limits(&file.path, SourceLimits::default())
                 .expect("open RTF");
             assert_eq!(document.to_bytes().expect("write exact RTF"), bytes);
         }
@@ -6414,7 +6414,7 @@ mod source_tests {
     #[test]
     fn non_default_edit_still_uses_the_canonical_writer() {
         let source = br"{\rtf1\ansi original}";
-        let document = crate::Document::from_bytes(source).expect("parse RTF");
+        let document = crate::Package::from_bytes(source).expect("parse RTF");
         let mut edit = document.edit();
         edit.replace_paragraph_text(0, "changed")
             .expect("replace paragraph text");
@@ -6426,7 +6426,7 @@ mod source_tests {
             .expect("write canonical RTF");
         assert_ne!(changed, source);
         assert_eq!(
-            crate::Document::from_bytes(&changed).unwrap().text(),
+            crate::Package::from_bytes(&changed).unwrap().text(),
             "changed"
         );
     }

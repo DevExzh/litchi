@@ -6,7 +6,7 @@
 //! whose inserted bytes are placed immediately before the exact root closing
 //! group.  The source is never normalized or mutated.
 
-use crate::{Document, RtfError};
+use crate::{Package, RtfError};
 use litchi_core::{
     ExecutionContext, ExecutionError, ReadAt, Reservation, Resource, SourceVersion, patch::BlobId,
 };
@@ -337,21 +337,21 @@ impl fmt::Display for TailAppendPublicationError {
             Self::Plan(error) => write!(formatter, "RTF tail publication plan failed: {error}"),
             Self::InvalidLimits(reason) => {
                 write!(formatter, "invalid RTF tail publication limits: {reason}")
-            },
+            }
             Self::SourceVersionChanged { expected, observed } => write!(
                 formatter,
                 "RTF tail publication source version changed from {expected:?} to {observed:?}"
             ),
             Self::SourceFingerprintChanged { .. } => {
                 formatter.write_str("RTF tail publication source fingerprint changed")
-            },
+            }
             Self::SourceLengthChanged { expected, observed } => write!(
                 formatter,
                 "RTF source length changed from {expected} to {observed}"
             ),
             Self::SourceDigestChanged { .. } => {
                 formatter.write_str("RTF source-backed publication source digest changed")
-            },
+            }
             Self::Source { error, written } => write!(
                 formatter,
                 "RTF tail publication source failed ({}) after {written} bytes: {error}",
@@ -508,23 +508,23 @@ impl fmt::Display for TailAppendError {
         match self {
             Self::UnsupportedSelector => {
                 formatter.write_str("RTF logical-tail selector is not supported")
-            },
+            }
             Self::UnsupportedSource(reason) => {
                 write!(
                     formatter,
                     "RTF logical-tail source is unsupported: {reason}"
                 )
-            },
+            }
             Self::ProtectedDocument(protection) => {
                 write!(
                     formatter,
                     "RTF protected document refuses logical-tail publication ({protection:?})"
                 )
-            },
+            }
             Self::EmptyInput => formatter.write_str("RTF logical-tail input must not be empty"),
             Self::AlreadyStaged => {
                 formatter.write_str("RTF logical-tail edit already has a staged batch")
-            },
+            }
             Self::LimitExceeded {
                 resource,
                 observed,
@@ -535,7 +535,7 @@ impl fmt::Display for TailAppendError {
             ),
             Self::InvalidText(reason) => {
                 write!(formatter, "invalid RTF logical-tail text: {reason}")
-            },
+            }
             Self::AllocationFailed {
                 resource,
                 requested,
@@ -546,7 +546,7 @@ impl fmt::Display for TailAppendError {
             Self::Rtf(error) => error.fmt(formatter),
             Self::DurablePatch(reason) => {
                 write!(formatter, "invalid RTF logical-tail patch: {reason}")
-            },
+            }
             Self::PatchConflict => formatter.write_str(
                 "RTF logical-tail patch source does not match its exact expected artifact",
             ),
@@ -555,7 +555,7 @@ impl fmt::Display for TailAppendError {
                     formatter,
                     "RTF logical-tail sink failed ({kind}) after {written} bytes"
                 )
-            },
+            }
         }
     }
 }
@@ -575,7 +575,7 @@ struct OwnedParagraph {
 
 /// A detached, selector-first append transaction.
 pub struct TailAppendEdit {
-    source: Document,
+    source: Package,
     selector: TailSelector,
     limits: TailAppendLimits,
     paragraphs: Vec<OwnedParagraph>,
@@ -586,7 +586,7 @@ pub struct TailAppendEdit {
 impl TailAppendEdit {
     /// Starts a bounded body-tail transaction rooted at an immutable snapshot.
     #[must_use]
-    pub fn new(source: &Document, selector: TailSelector) -> Self {
+    pub fn new(source: &Package, selector: TailSelector) -> Self {
         Self {
             source: source.clone(),
             selector,
@@ -599,11 +599,7 @@ impl TailAppendEdit {
 
     /// Starts a transaction with explicit append and wire bounds.
     #[must_use]
-    pub fn with_limits(
-        source: &Document,
-        selector: TailSelector,
-        limits: TailAppendLimits,
-    ) -> Self {
+    pub fn with_limits(source: &Package, selector: TailSelector, limits: TailAppendLimits) -> Self {
         let mut edit = Self::new(source, selector);
         edit.limits = limits;
         edit
@@ -611,7 +607,7 @@ impl TailAppendEdit {
 
     /// Immutable snapshot against which selectors and source bytes resolve.
     #[must_use]
-    pub const fn source(&self) -> &Document {
+    pub const fn source(&self) -> &Package {
         &self.source
     }
 
@@ -797,7 +793,7 @@ impl TailAppendEdit {
                     TailAppendError::UnsupportedSource(
                         "publication planning failed outside the source proof",
                     )
-                },
+                }
             })
     }
 
@@ -1081,7 +1077,7 @@ impl TailAppendEdit {
         output.extend_from_slice(&inserted);
         output.extend_from_slice(suffix);
 
-        let candidate = Document::from_bytes_with_options(&output, self.source.options())?;
+        let candidate = Package::from_bytes_with_options(&output, self.source.options())?;
         verify_candidate(
             &self.source,
             &candidate,
@@ -1121,7 +1117,7 @@ impl TailAppendEdit {
 /// bounded windows after rechecking source version and exact bytes.
 #[derive(Debug, Clone)]
 pub struct TailAppendPublicationPlan {
-    source: Document,
+    source: Package,
     selector: TailSelector,
     append_limits: TailAppendLimits,
     publication_limits: TailAppendPublicationLimits,
@@ -1139,7 +1135,7 @@ pub struct TailAppendPublicationPlan {
 impl TailAppendPublicationPlan {
     /// Immutable source snapshot retained by this plan.
     #[must_use]
-    pub const fn source(&self) -> &Document {
+    pub const fn source(&self) -> &Package {
         &self.source
     }
 
@@ -1237,7 +1233,7 @@ impl TailAppendPublicationPlan {
     /// authorization boundary explicit at the call site.
     pub fn publish_to_source<W: Write>(
         &self,
-        source: &Document,
+        source: &Package,
         sink: &mut W,
         context: &ExecutionContext,
     ) -> Result<TailAppendPublicationReport, TailAppendPublicationError> {
@@ -1251,7 +1247,7 @@ impl TailAppendPublicationPlan {
     /// write, even when its bytes happen to be equal.
     pub fn write_to_source<W: Write>(
         &self,
-        source: &Document,
+        source: &Package,
         sink: &mut W,
         context: &ExecutionContext,
     ) -> Result<TailAppendPublicationReport, TailAppendPublicationError> {
@@ -1532,7 +1528,7 @@ impl TailAppendSourceProof {
     /// Issues a proof for the exact source retained by an already parsed
     /// document.
     pub fn from_document(
-        source: &Document,
+        source: &Package,
         selector: TailSelector,
     ) -> Result<Self, TailAppendError> {
         Self::from_document_with_source_version(source, selector, source.source_version())
@@ -1544,7 +1540,7 @@ impl TailAppendSourceProof {
     /// planning and publication, so supplying a token never authorizes bytes
     /// from a different source.
     pub fn from_document_with_source_version(
-        source: &Document,
+        source: &Package,
         selector: TailSelector,
         source_version: SourceVersion,
     ) -> Result<Self, TailAppendError> {
@@ -1579,7 +1575,7 @@ impl TailAppendSourceProof {
     /// content/revision, not object identity; equal-byte providers with the
     /// same declared version are intentionally equivalent.
     pub fn from_document_for_source(
-        document: &Document,
+        document: &Package,
         selector: TailSelector,
         source: &dyn ReadAt,
     ) -> Result<Self, TailAppendPublicationError> {
@@ -1589,7 +1585,7 @@ impl TailAppendSourceProof {
     /// Issues a source proof while charging the bounded digest scan to
     /// `context` and checking cancellation between positional reads.
     pub fn from_document_for_source_with_context(
-        document: &Document,
+        document: &Package,
         selector: TailSelector,
         source: &dyn ReadAt,
         context: &ExecutionContext,
@@ -1598,7 +1594,7 @@ impl TailAppendSourceProof {
     }
 
     fn from_document_for_source_inner(
-        document: &Document,
+        document: &Package,
         selector: TailSelector,
         source: &dyn ReadAt,
         scan_context: Option<&ExecutionContext>,
@@ -1662,7 +1658,7 @@ impl TailAppendSourceProof {
                     let _ = work.commit(units);
                 }
                 return Err(source_scan_publication_error(error, 0));
-            },
+            }
         };
         if let Some((memory, input, work)) = scan_reservations {
             let _ = memory.commit(0);
@@ -1710,7 +1706,7 @@ impl TailAppendSourceProof {
 
     /// Alias emphasizing that the proof binds an external positional source.
     pub fn from_document_and_source(
-        document: &Document,
+        document: &Package,
         selector: TailSelector,
         source: &dyn ReadAt,
     ) -> Result<Self, TailAppendPublicationError> {
@@ -1719,7 +1715,7 @@ impl TailAppendSourceProof {
 
     /// Context-aware alias for [`Self::from_document_for_source_with_context`].
     pub fn from_document_and_source_with_context(
-        document: &Document,
+        document: &Package,
         selector: TailSelector,
         source: &dyn ReadAt,
         context: &ExecutionContext,
@@ -1765,7 +1761,7 @@ impl TailAppendSourceProof {
 }
 
 /// A source-backed append transaction that never retains the parsed
-/// [`Document`] or a complete source/target candidate.
+/// [`Package`] or a complete source/target candidate.
 pub struct TailAppendSourceEdit {
     source: Arc<dyn ReadAt>,
     proof: TailAppendSourceProof,
@@ -2197,7 +2193,7 @@ impl TailAppendSourceEdit {
                     let _ = reservation.commit(source_scan_units(source_scanned, inserted_scanned));
                 }
                 return Err(source_scan_publication_error(error, 0));
-            },
+            }
         };
         if let Some(reservation) = planning_input.take() {
             let _ = reservation.commit(
@@ -2664,7 +2660,7 @@ impl TailAppendSourcePublicationPlan {
                     0,
                 );
                 return Err(source_scan_publication_error(error, 0));
-            },
+            }
         };
         if observed_digest != self.source_digest {
             settle_source_publication_reservations(
@@ -2709,7 +2705,7 @@ impl TailAppendSourcePublicationPlan {
                     0,
                 );
                 return Err(error);
-            },
+            }
         };
         if stable_version != self.proof.source_version {
             settle_source_publication_reservations(
@@ -2740,7 +2736,7 @@ impl TailAppendSourcePublicationPlan {
                     0,
                 );
                 return Err(error);
-            },
+            }
         };
         if stable_length != expected {
             settle_source_publication_reservations(
@@ -2887,7 +2883,7 @@ impl TailAppendSourcePublicationPlan {
                     u64::try_from(accepted).unwrap_or(u64::MAX),
                 );
                 return Err(incomplete_source_failure(error, expected_output));
-            },
+            }
         };
         if final_version != self.proof.source_version {
             settle_source_publication_reservations(
@@ -2920,7 +2916,7 @@ impl TailAppendSourcePublicationPlan {
                     u64::try_from(accepted).unwrap_or(u64::MAX),
                 );
                 return Err(incomplete_source_failure(error, expected_output));
-            },
+            }
         };
         if final_length != expected {
             settle_source_publication_reservations(
@@ -2992,7 +2988,7 @@ impl TailAppendSourcePublicationPlan {
                     });
                 }
                 digest
-            },
+            }
             Err(SourceScanFailure::Execution(error)) => {
                 settle_source_publication_reservations(
                     &mut memory,
@@ -3008,7 +3004,7 @@ impl TailAppendSourcePublicationPlan {
                     },
                     source: Box::new(publication_execution(error, expected_output)),
                 });
-            },
+            }
             Err(SourceScanFailure::Io(error)) => {
                 settle_source_publication_reservations(
                     &mut memory,
@@ -3019,7 +3015,7 @@ impl TailAppendSourcePublicationPlan {
                     u64::try_from(accepted).unwrap_or(u64::MAX),
                 );
                 return Err(incomplete_source_failure(error, expected_output));
-            },
+            }
             Err(SourceScanFailure::Allocation {
                 resource,
                 requested,
@@ -3043,7 +3039,7 @@ impl TailAppendSourcePublicationPlan {
                         },
                     )),
                 });
-            },
+            }
         };
         settle_source_publication_reservations(
             &mut memory,
@@ -3300,18 +3296,18 @@ fn read_source_window(
                     io::ErrorKind::UnexpectedEof,
                     "positional source ended before the requested range",
                 )));
-            },
+            }
             Ok(count) if count > remaining.len() => {
                 return Err(SourceScanFailure::Io(io::Error::new(
                     io::ErrorKind::InvalidData,
                     "positional source reported more bytes than requested",
                 )));
-            },
+            }
             Ok(count) => {
                 filled = filled.saturating_add(count);
                 *source_scanned = (*source_scanned).saturating_add(count);
-            },
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
             Err(error) => return Err(SourceScanFailure::Io(error)),
         }
     }
@@ -3530,10 +3526,10 @@ fn write_publication_segment<W: Write>(
                         kind: io::ErrorKind::WriteZero,
                         message: "publication sink returned zero progress".to_string(),
                     });
-                },
+                }
                 Ok(count) if count > remaining.len() => {
                     return Err(PublicationWriteFailure::Overreported);
-                },
+                }
                 Ok(count) => {
                     window_offset = window_offset.saturating_add(count);
                     *accepted = accepted.saturating_add(count);
@@ -3543,14 +3539,14 @@ fn write_publication_segment<W: Write>(
                     context
                         .check()
                         .map_err(PublicationWriteFailure::Execution)?;
-                },
-                Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
+                }
+                Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
                 Err(error) => {
                     return Err(PublicationWriteFailure::Sink {
                         kind: error.kind(),
                         message: error.to_string(),
                     });
-                },
+                }
             }
         }
         offset = end;
@@ -3708,7 +3704,7 @@ impl TailAppendDiagnostics {
 
 /// Result of a validated logical-tail append.
 pub struct TailAppendCommit {
-    snapshot: Document,
+    snapshot: Package,
     patch: TailAppendPatch,
     diagnostics: TailAppendDiagnostics,
 }
@@ -3716,7 +3712,7 @@ pub struct TailAppendCommit {
 impl TailAppendCommit {
     /// Published immutable candidate snapshot.
     #[must_use]
-    pub const fn snapshot(&self) -> &Document {
+    pub const fn snapshot(&self) -> &Package {
         &self.snapshot
     }
 
@@ -3760,8 +3756,8 @@ impl TailAppendCommit {
 /// Exact-source-checked reversible logical-tail patch.
 #[derive(Clone)]
 pub struct TailAppendPatch {
-    before: Document,
-    after: Document,
+    before: Package,
+    after: Package,
     selector: TailSelector,
     root_close: usize,
     inserted: Box<[u8]>,
@@ -3769,7 +3765,7 @@ pub struct TailAppendPatch {
 }
 
 impl TailAppendPatch {
-    fn no_op(source: Document, selector: TailSelector) -> Self {
+    fn no_op(source: Package, selector: TailSelector) -> Self {
         Self {
             before: source.clone(),
             after: source,
@@ -3781,7 +3777,7 @@ impl TailAppendPatch {
     }
 
     /// Applies this patch only to the exact source artifact that created it.
-    pub fn apply(&self, source: &Document) -> Result<Document, TailAppendError> {
+    pub fn apply(&self, source: &Package) -> Result<Package, TailAppendError> {
         if source.source_bytes() != self.before.source_bytes() {
             return Err(TailAppendError::PatchConflict);
         }
@@ -4040,7 +4036,7 @@ impl DurableTailAppendPatch {
     }
 
     /// Applies this patch to an exact source artifact and reopens the result.
-    pub fn apply(&self, source: &Document) -> Result<Document, TailAppendError> {
+    pub fn apply(&self, source: &Package) -> Result<Package, TailAppendError> {
         if self.selector != TailSelector::Body {
             return Err(TailAppendError::UnsupportedSelector);
         }
@@ -4137,7 +4133,7 @@ impl DurableTailAppendPatch {
                 output.extend_from_slice(&self.inserted);
                 output.extend_from_slice(suffix);
                 output
-            },
+            }
             Direction::Remove => {
                 let end = self
                     .root_close
@@ -4178,15 +4174,12 @@ impl DurableTailAppendPatch {
                 output.extend_from_slice(prefix);
                 output.extend_from_slice(suffix);
                 output
-            },
+            }
         };
         if BlobId::of(&output).as_hex() != self.after_digest {
             return Err(TailAppendError::PatchConflict);
         }
-        Ok(Document::from_bytes_with_options(
-            &output,
-            source.options(),
-        )?)
+        Ok(Package::from_bytes_with_options(&output, source.options())?)
     }
 }
 
@@ -4289,7 +4282,7 @@ fn validate_wire_bounds(
                     "append offset exceeds before artifact size",
                 ));
             }
-        },
+        }
         Direction::Remove => {
             let expected_before =
                 after_bytes
@@ -4309,7 +4302,7 @@ fn validate_wire_bounds(
                     "remove offset exceeds after artifact size",
                 ));
             }
-        },
+        }
     }
     let end = root_close
         .checked_add(inserted_len)
@@ -4405,7 +4398,7 @@ fn validate_artifact_splice(
                     "append artifacts do not contain the exact inserted span",
                 ));
             }
-        },
+        }
         Direction::Remove => {
             let expected_before =
                 after
@@ -4440,7 +4433,7 @@ fn validate_artifact_splice(
                     "remove artifacts do not contain the exact inserted span",
                 ));
             }
-        },
+        }
     }
     Ok(())
 }
@@ -4504,7 +4497,7 @@ struct SpliceProof {
 }
 
 fn prove_splice_source(
-    source: &Document,
+    source: &Package,
     selector: TailSelector,
 ) -> Result<SpliceProof, TailAppendError> {
     if selector != TailSelector::Body {
@@ -4552,7 +4545,7 @@ fn prove_splice_source(
     })
 }
 
-fn reject_active_or_external_surfaces(source: &Document) -> Result<(), TailAppendError> {
+fn reject_active_or_external_surfaces(source: &Package) -> Result<(), TailAppendError> {
     let model = source.model();
     if !model.external_references().is_empty()
         || model.mail_merge().is_some()
@@ -4579,7 +4572,7 @@ fn reject_active_or_external_surfaces(source: &Document) -> Result<(), TailAppen
     }
     for safety in model.field_safety() {
         match safety {
-            crate::validation::FieldSafety::Neutral => {},
+            crate::validation::FieldSafety::Neutral => {}
             crate::validation::FieldSafety::External
             | crate::validation::FieldSafety::ExternalUnknown
             | crate::validation::FieldSafety::ExternalAndActive
@@ -4587,13 +4580,13 @@ fn reject_active_or_external_surfaces(source: &Document) -> Result<(), TailAppen
                 return Err(TailAppendError::UnsupportedSource(
                     "external field content is present",
                 ));
-            },
+            }
             crate::validation::FieldSafety::Active
             | crate::validation::FieldSafety::ActiveUnknown => {
                 return Err(TailAppendError::UnsupportedSource(
                     "active field content is present",
                 ));
-            },
+            }
         }
     }
     Ok(())
@@ -4622,7 +4615,7 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, TailAppendError> {
                         "root nesting depth overflowed",
                     ))?;
                 index += 1;
-            },
+            }
             b'}' => {
                 depth = depth
                     .checked_sub(1)
@@ -4645,10 +4638,10 @@ fn scan_root_close(bytes: &[u8]) -> Result<usize, TailAppendError> {
                     return Ok(index);
                 }
                 index += 1;
-            },
+            }
             b'\\' => {
                 index = skip_control(bytes, index)?;
-            },
+            }
             _ => index += 1,
         }
     }
@@ -4724,7 +4717,7 @@ fn skip_control(bytes: &[u8], slash: usize) -> Result<usize, TailAppendError> {
     Ok(end)
 }
 
-fn ends_with_parameterless_par(source: &Document) -> bool {
+fn ends_with_parameterless_par(source: &Package) -> bool {
     matches!(
         source.body().inlines().last(),
         Some(crate::text::Inline::Break(crate::text::Break::Paragraph))
@@ -4748,7 +4741,7 @@ fn validate_plain_text(text: &str) -> Result<(), TailAppendError> {
 }
 
 fn encode_inserted(
-    source: &Document,
+    source: &Package,
     paragraphs: &[OwnedParagraph],
     ends_with_par: bool,
     estimated: usize,
@@ -4798,7 +4791,7 @@ fn encode_inserted_for_body(
 }
 
 fn encoded_inserted_len(
-    source: &Document,
+    source: &Package,
     paragraphs: &[OwnedParagraph],
     ends_with_par: bool,
 ) -> Result<usize, TailAppendError> {
@@ -4862,7 +4855,7 @@ fn encoded_plain_text_len(text: &str) -> Result<usize, TailAppendError> {
                         })?;
                 }
                 units_length
-            },
+            }
         };
         length = length
             .checked_add(addition)
@@ -4883,7 +4876,7 @@ fn encode_plain_text(text: &str, output: &mut Vec<u8>) {
             '\t' => output.extend_from_slice(b"\\tab "),
             character if character.is_ascii() && !character.is_control() => {
                 output.push(character as u8)
-            },
+            }
             character => {
                 let mut units = [0u16; 2];
                 let count = character.encode_utf16(&mut units).len();
@@ -4899,7 +4892,7 @@ fn encode_plain_text(text: &str, output: &mut Vec<u8>) {
                 for _ in 0..count {
                     output.push(b'?');
                 }
-            },
+            }
         }
     }
 }
@@ -4945,8 +4938,8 @@ fn decimal_len(value: i32) -> usize {
 }
 
 fn verify_candidate(
-    source: &Document,
-    candidate: &Document,
+    source: &Package,
+    candidate: &Package,
     paragraphs: &[OwnedParagraph],
     ends_with_par: bool,
 ) -> Result<(), TailAppendError> {
@@ -5019,7 +5012,7 @@ fn write_sequential<W: Write>(sink: &mut W, bytes: &[u8]) -> Result<usize, TailA
                     kind: io::ErrorKind::WriteZero,
                     written,
                 });
-            },
+            }
             Ok(count) => {
                 if count > bytes.len().saturating_sub(written) {
                     return Err(TailAppendError::Sink {
@@ -5028,14 +5021,14 @@ fn write_sequential<W: Write>(sink: &mut W, bytes: &[u8]) -> Result<usize, TailA
                     });
                 }
                 written = written.saturating_add(count);
-            },
-            Err(error) if error.kind() == io::ErrorKind::Interrupted => {},
+            }
+            Err(error) if error.kind() == io::ErrorKind::Interrupted => {}
             Err(error) => {
                 return Err(TailAppendError::Sink {
                     kind: error.kind(),
                     written,
                 });
-            },
+            }
         }
     }
     sink.flush().map_err(|error| TailAppendError::Sink {

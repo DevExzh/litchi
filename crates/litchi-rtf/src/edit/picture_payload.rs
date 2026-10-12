@@ -1,6 +1,6 @@
 //! Exact-source updates for conservative standalone hexadecimal picture payloads.
 
-use super::{Commit, Edit, Error, Operation, Snapshot};
+use super::{Commit, Edit, Error, Operation, Package};
 use crate::lexer::{ControlWord, Lexer, Token};
 use crate::{ImageType, RtfError};
 use bumpalo::Bump;
@@ -380,7 +380,7 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
         target.copy_from_slice(&operation.after_transport);
     }
 
-    let snapshot = Snapshot::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
+    let snapshot = Package::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
     verify_candidate(&edit.source, &snapshot, &edit.operations)?;
     Ok(Commit::new(
         edit.source,
@@ -446,7 +446,7 @@ pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Comm
         Error::UnsupportedSource("picture group provenance leaves the source"),
     )?);
 
-    let snapshot = Snapshot::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
+    let snapshot = Package::from_bytes_with_options(&candidate_bytes, edit.source.options())?;
     verify_removal_candidate(&edit.source, &snapshot, &edit.operations)?;
     let changes = super::semantic_changes(&edit.operations, &[]);
     Ok(Commit::new(
@@ -531,10 +531,10 @@ pub(super) fn durable_removal_operation(
 }
 
 pub(super) fn apply_durable_removal_patch(
-    source: &Snapshot,
+    source: &Package,
     operations: &[litchi_core::patch::PatchOperation],
     source_hash: &str,
-) -> Result<Snapshot, Error> {
+) -> Result<Package, Error> {
     if operations.is_empty() || operations.len() > MAX_PICTURE_REMOVAL_OPERATIONS {
         return Err(Error::OperationLimit {
             observed: operations.len(),
@@ -583,10 +583,10 @@ pub(super) fn apply_durable_removal_patch(
 }
 
 pub(super) fn apply_durable_insertion_patch(
-    source: &Snapshot,
+    source: &Package,
     operations: &[litchi_core::patch::PatchOperation],
     source_hash: &str,
-) -> Result<Snapshot, Error> {
+) -> Result<Package, Error> {
     if operations.is_empty() || operations.len() > MAX_PICTURE_REMOVAL_OPERATIONS {
         return Err(Error::OperationLimit {
             observed: operations.len(),
@@ -675,7 +675,7 @@ pub(super) fn apply_durable_insertion_patch(
             Error::DurablePatch("picture insertion cursor is invalid".to_string())
         })?,
     );
-    let snapshot = Snapshot::from_bytes_with_options(&candidate, source.options())?;
+    let snapshot = Package::from_bytes_with_options(&candidate, source.options())?;
     verify_insertion_candidate(source, &snapshot, &insertions)?;
     let mut removal_positions = insertions
         .iter()
@@ -709,8 +709,8 @@ fn require_artifact_hash(
 }
 
 fn verify_insertion_candidate(
-    source: &Snapshot,
-    candidate: &Snapshot,
+    source: &Package,
+    candidate: &Package,
     insertions: &[(usize, usize, Vec<u8>)],
 ) -> Result<(), Error> {
     if source.text() != candidate.text() {
@@ -763,7 +763,7 @@ fn verify_insertion_candidate(
 }
 
 pub(super) fn apply_durable_operation(
-    source: &Snapshot,
+    source: &Package,
     edit: &mut Edit,
     operation: &litchi_core::patch::PatchOperation,
 ) -> Result<(), Error> {
@@ -776,10 +776,10 @@ pub(super) fn apply_durable_operation(
 }
 
 pub(super) fn apply_durable_patch(
-    source: &Snapshot,
+    source: &Package,
     operations: &[litchi_core::patch::PatchOperation],
     source_hash: &str,
-) -> Result<Snapshot, Error> {
+) -> Result<Package, Error> {
     if operations.len() > MAX_PICTURE_PAYLOAD_OPERATIONS {
         return Err(Error::OperationLimit {
             observed: operations.len(),
@@ -876,7 +876,7 @@ fn decode_durable_operation(
     Ok((PicturePayloadReplacement::new(position, payload), transport))
 }
 
-fn locate_standalone_pictures(source: &Snapshot) -> Result<Vec<LocatedPicture>, Error> {
+fn locate_standalone_pictures(source: &Package) -> Result<Vec<LocatedPicture>, Error> {
     let source_bytes = source
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
@@ -941,13 +941,13 @@ fn locate_standalone_pictures(source: &Snapshot) -> Result<Vec<LocatedPicture>, 
                     cursor = close_index;
                     depth = depth.saturating_sub(1);
                 }
-            },
+            }
             Token::CloseBrace => {
                 depth = depth.checked_sub(1).ok_or(Error::UnsupportedSource(
                     "picture source has an unmatched closing group",
                 ))?;
-            },
-            Token::Control(_) | Token::Text(_) | Token::Binary(_) => {},
+            }
+            Token::Control(_) | Token::Text(_) | Token::Binary(_) => {}
         }
         cursor = cursor.saturating_add(1);
     }
@@ -992,7 +992,7 @@ fn locate_picture_group(
         match token {
             Token::Control(control) if payload_start.is_none() => {
                 seen_controls.accept(control)?;
-            },
+            }
             Token::Text(text) => {
                 let span = spans.get(cursor).ok_or(Error::UnsupportedSource(
                     "picture token has no source provenance",
@@ -1008,23 +1008,23 @@ fn locate_picture_group(
                 }
                 payload_start.get_or_insert(span.start);
                 payload_end = Some(span.end);
-            },
+            }
             Token::CloseBrace => break,
             Token::Binary(_) => {
                 return Err(Error::UnsupportedSource(
                     "binary picture payloads are outside the exact hexadecimal closure",
                 ));
-            },
+            }
             Token::OpenBrace => {
                 return Err(Error::UnsupportedSource(
                     "nested picture destinations are outside the exact payload closure",
                 ));
-            },
+            }
             Token::Control(_) => {
                 return Err(Error::UnsupportedSource(
                     "picture controls after payload bytes are ambiguous",
                 ));
-            },
+            }
         }
         cursor = cursor.saturating_add(1);
     }
@@ -1077,8 +1077,8 @@ fn locate_picture_group(
 }
 
 fn verify_removal_candidate(
-    source: &Snapshot,
-    candidate: &Snapshot,
+    source: &Package,
+    candidate: &Package,
     operations: &[Operation],
 ) -> Result<(), Error> {
     if source.text() != candidate.text() {
@@ -1118,7 +1118,7 @@ fn validate_supported_image(image_type: ImageType, payload: &[u8]) -> Result<(),
             return Err(Error::UnsupportedSource(
                 "exact picture payload editing currently supports PNG and JPEG only",
             ));
-        },
+        }
     };
     if !supported {
         return Err(Error::UnsupportedSource(
@@ -1166,7 +1166,7 @@ impl PictureControlSet {
                 return Err(Error::UnsupportedSource(
                     "picture payload editing refuses unknown or dependent picture controls",
                 ));
-            },
+            }
         };
         let mask = 1u32 << slot;
         if self.slots & mask != 0 {
@@ -1303,8 +1303,8 @@ fn parse_picture_target(target: &str) -> Result<usize, Error> {
 }
 
 fn verify_candidate(
-    source: &Snapshot,
-    candidate: &Snapshot,
+    source: &Package,
+    candidate: &Package,
     operations: &[Operation],
 ) -> Result<(), Error> {
     if source.text() != candidate.text() || source.pictures().len() != candidate.pictures().len() {
@@ -1322,7 +1322,7 @@ fn verify_candidate(
         if let Some(operation) = operations.iter().find_map(|operation| match operation {
             Operation::PicturePayload(operation) if operation.position == position => {
                 Some(operation)
-            },
+            }
             _ => None,
         }) {
             expected.data = Cow::Owned(operation.after.clone());

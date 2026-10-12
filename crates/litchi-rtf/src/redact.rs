@@ -7,7 +7,7 @@
 //! remain explicit diagnostics and make strict planning fail closed.
 
 use crate::edit::Error;
-use crate::{Document, RtfError};
+use crate::{Package, RtfError};
 use litchi_core::patch::{BlobBundle, BlobId, ForwardOnly, Patch, PatchLimits, PatchOperation};
 use serde_json::Value;
 use std::collections::BTreeMap;
@@ -168,14 +168,14 @@ impl Diagnostics {
 /// Exact immutable source inventory for the narrow external-reference closure.
 #[derive(Debug, Clone)]
 pub struct Snapshot {
-    source: Document,
+    source: Package,
     references: Vec<ReferenceOccurrence>,
     unsupported: Box<[UnsupportedReference]>,
 }
 
 impl Snapshot {
     /// Capture a bounded inventory from one immutable document snapshot.
-    pub(crate) fn from_document(source: &Document) -> Result<Self, Error> {
+    pub(crate) fn from_document(source: &Package) -> Result<Self, Error> {
         let model = source.model();
         let references = model.external_references();
         let spans = model.external_reference_source_spans();
@@ -296,7 +296,7 @@ impl Plan {
 /// Ordinary document plus an intentionally irreversible forward-only patch.
 #[derive(Debug, Clone)]
 pub struct Commit {
-    document: Document,
+    document: Package,
     patch: Patch<ForwardOnly>,
     diagnostics: Diagnostics,
 }
@@ -306,13 +306,13 @@ impl Commit {
     /// type; callers must inspect [`Self::diagnostics`] before treating the
     /// result as complete.
     #[must_use]
-    pub const fn document(&self) -> &Document {
+    pub const fn document(&self) -> &Package {
         &self.document
     }
 
     /// Consume the commit and return its ordinary candidate document.
     #[must_use]
-    pub fn into_document(self) -> Document {
+    pub fn into_document(self) -> Package {
         self.document
     }
 
@@ -409,17 +409,17 @@ fn collect_unsupported(
     } else {
         for item in safety {
             match item {
-                crate::validation::FieldSafety::Neutral => {},
+                crate::validation::FieldSafety::Neutral => {}
                 crate::validation::FieldSafety::External
                 | crate::validation::FieldSafety::Active
                 | crate::validation::FieldSafety::ExternalAndActive => {
                     push_unique(unsupported, UnsupportedReference::Field)?;
-                },
+                }
                 crate::validation::FieldSafety::ExternalUnknown
                 | crate::validation::FieldSafety::ActiveUnknown
                 | crate::validation::FieldSafety::ExternalAndActiveUnknown => {
                     push_unique(unsupported, UnsupportedReference::UnknownField)?;
-                },
+                }
             }
         }
     }
@@ -572,11 +572,11 @@ fn selected_entries(entries: &[ReferenceOccurrence]) -> Result<Vec<&ReferenceOcc
 }
 
 fn rewrite_candidate(
-    source: &Document,
+    source: &Package,
     selected: &[&ReferenceOccurrence],
     mode: Mode,
     unsupported: &[UnsupportedReference],
-) -> Result<(Document, Diagnostics), Error> {
+) -> Result<(Package, Diagnostics), Error> {
     if matches!(mode, Mode::Strict) && !unsupported.is_empty() {
         return Err(Error::UnsupportedSource(
             "external-reference redaction has unsupported remaining surfaces",
@@ -597,7 +597,7 @@ fn rewrite_candidate(
         return Ok((source.clone(), diagnostics));
     }
     let candidate =
-        Document::from_bytes_with_options(&output, source.options()).map_err(Error::Rtf)?;
+        Package::from_bytes_with_options(&output, source.options()).map_err(Error::Rtf)?;
     if candidate.text() != source.text() {
         return Err(Error::UnsupportedSource(
             "external-reference redaction changed visible text",
@@ -741,7 +741,7 @@ fn needs_control_delimiter_before_suffix(source: &[u8], selected: &[&ReferenceOc
 }
 
 fn build_patch(
-    source: &Document,
+    source: &Package,
     selected: &[&ReferenceOccurrence],
     mode: Mode,
     limits: PatchLimits,
@@ -816,9 +816,9 @@ fn build_patch(
 
 /// Apply a previously sealed forward-only external-reference patch.
 pub(crate) fn apply_forward(
-    source: &Document,
+    source: &Package,
     patch: &Patch<ForwardOnly>,
-) -> Result<Document, Error> {
+) -> Result<Package, Error> {
     if patch.format() != REDACTION_FORMAT {
         return Err(Error::DurablePatch(
             "external-reference patch format is not litchi-rtf".to_string(),
@@ -869,7 +869,7 @@ pub(crate) fn apply_forward(
                 return Err(Error::DurablePatch(
                     "unknown external-reference redaction target".to_string(),
                 ));
-            },
+            }
         };
         let selected_kind = match kind {
             ReferenceKind::NextFile => &mut selected_next_file,
@@ -905,7 +905,7 @@ pub(crate) fn apply_forward(
                 return Err(Error::DurablePatch(
                     "invalid external-reference redaction mode".to_string(),
                 ));
-            },
+            }
         };
         if let Some(existing) = mode
             && existing != operation_mode

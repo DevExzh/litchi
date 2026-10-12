@@ -1,6 +1,6 @@
 //! Core-backed composition and non-applying merge plans for RTF edits.
 
-use super::{Edit, Error, Limits, Operation, Snapshot};
+use super::{Edit, Error, Limits, Operation, Package};
 use litchi_core::patch as core;
 use serde_json::Value;
 use std::cmp::Ordering;
@@ -10,7 +10,7 @@ pub use core::CompositionLimits;
 pub use core::MergeChoice as MergeResolution;
 
 #[derive(Clone)]
-struct Lineage(Snapshot);
+struct Lineage(Package);
 
 impl PartialEq for Lineage {
     fn eq(&self, other: &Self) -> bool {
@@ -65,7 +65,7 @@ impl fmt::Display for CompositionError {
                     "RTF composition has {} conflict(s)",
                     conflicts.len()
                 )
-            },
+            }
             Self::Edit(error) => error.fmt(formatter),
             Self::Durable(reason) => write!(formatter, "RTF durable composition failed: {reason}"),
         }
@@ -101,7 +101,7 @@ impl Prepared {
 
 /// A bounded deterministic collection of provably disjoint RTF sub-edits.
 pub struct Composition {
-    source: Snapshot,
+    source: Package,
     inner: core::JoinedSubEdits<Lineage, Vec<Operation>>,
 }
 
@@ -118,7 +118,7 @@ impl fmt::Debug for Composition {
 impl Composition {
     /// Starts an empty composition for one exact snapshot.
     #[must_use]
-    pub fn new(source: &Snapshot, limits: CompositionLimits) -> Self {
+    pub fn new(source: &Package, limits: CompositionLimits) -> Self {
         let lineage = Lineage(source.clone());
         Self {
             source: source.clone(),
@@ -166,13 +166,13 @@ impl Composition {
             match failure {
                 core::SubEditJoinFailure::Overlap(conflicts) => {
                     CompositionError::Conflicts(map_conflicts(&conflicts))
-                },
+                }
                 core::SubEditJoinFailure::DifferentLineage
                 | core::SubEditJoinFailure::DifferentLimits
                 | core::SubEditJoinFailure::DuplicateId
                 | core::SubEditJoinFailure::Limit(_) => {
                     CompositionError::Core("common join refusal".to_string())
-                },
+                }
                 _ => CompositionError::Core("unknown common join failure".to_string()),
             }
         })?;
@@ -209,7 +209,7 @@ impl Composition {
 
 /// A non-mutating bounded three-way plan for two branches from one exact base.
 pub struct MergePlan {
-    source: Snapshot,
+    source: Package,
     inner: core::ThreeWayMergePlan<Lineage, Vec<Operation>>,
     conflicts: ConflictSet,
 }
@@ -528,7 +528,7 @@ fn map_conflicts(conflicts: &core::ConflictSet<core::SubEditConflict>) -> Confli
             .map(|conflict| match conflict {
                 core::SubEditConflict::DuplicateId(id) => {
                     CompositionConflict::DuplicateId(id.clone())
-                },
+                }
                 core::SubEditConflict::Effect(effect) => CompositionConflict::Effect {
                     effect: effect.effect().to_string(),
                     left: effect.left_id().to_string(),
@@ -552,7 +552,7 @@ type DurableOperation = core::PatchOperation;
 /// RTF patch is derived from that combined commit, so its inverse preconditions
 /// refer to the combined target rather than to an individual branch.
 pub struct DurableComposition {
-    source: Snapshot,
+    source: Package,
     limits: core::PatchLimits,
     operations: Vec<DurableOperation>,
     domain: Option<DurableDomain>,
@@ -571,7 +571,7 @@ impl fmt::Debug for DurableComposition {
 impl DurableComposition {
     /// Starts an empty durable composition for one exact base snapshot.
     #[must_use]
-    pub fn new(source: &Snapshot, limits: core::PatchLimits) -> Self {
+    pub fn new(source: &Package, limits: core::PatchLimits) -> Self {
         Self {
             source: source.clone(),
             limits,
@@ -582,7 +582,7 @@ impl DurableComposition {
 
     /// Exact immutable base snapshot used by this composition.
     #[must_use]
-    pub const fn source(&self) -> &Snapshot {
+    pub const fn source(&self) -> &Package {
         &self.source
     }
 
@@ -708,7 +708,7 @@ impl DurableComposition {
 /// A non-applying durable three-way plan for two independently validated
 /// branches rooted at one exact RTF base.
 pub struct DurableMergePlan {
-    source: Snapshot,
+    source: Package,
     limits: core::PatchLimits,
     automatic: Vec<DurableOperation>,
     left_conflicts: Vec<DurableOperation>,
@@ -853,8 +853,8 @@ impl DurableMergePlan {
         match resolution {
             Some(MergeResolution::Left) => automatic.extend(left_conflicts),
             Some(MergeResolution::Right) => automatic.extend(right_conflicts),
-            Some(MergeResolution::Neither) | None => {},
-            Some(_) => {},
+            Some(MergeResolution::Neither) | None => {}
+            Some(_) => {}
         }
         automatic.sort_by(compare_durable_operations);
         Ok(DurableComposition {
@@ -1043,7 +1043,7 @@ fn plan_durable_conflicts(
                         (true, true, _) | (_, _, Ordering::Equal) => {
                             left_index += 1;
                             right_index += 1;
-                        },
+                        }
                         (_, _, Ordering::Less) => left_index += 1,
                         (_, _, Ordering::Greater) => right_index += 1,
                     }
@@ -1084,12 +1084,12 @@ fn plan_durable_conflicts(
                         )?;
                         left_index += 1;
                         right_index += 1;
-                    },
+                    }
                     Ordering::Less => left_index += 1,
                     Ordering::Greater => right_index += 1,
                 }
             }
-        },
+        }
         Some(DurableDomain::Destination) => {
             let mut left_targets = Vec::new();
             let mut right_targets = Vec::new();
@@ -1128,13 +1128,13 @@ fn plan_durable_conflicts(
                         )?;
                         left_index += 1;
                         right_index += 1;
-                    },
+                    }
                     Ordering::Less => left_index += 1,
                     Ordering::Greater => right_index += 1,
                 }
             }
-        },
-        None => {},
+        }
+        None => {}
     }
     Ok((left_conflicting, right_conflicting, conflicts))
 }
@@ -1237,12 +1237,12 @@ fn durable_domain(operations: &[DurableOperation]) -> Result<DurableDomain, Comp
                 return Err(CompositionError::Durable(
                     "paragraph lifecycle/layout durable operations are not composable".to_string(),
                 ));
-            },
+            }
             "picture-payload.replace" | "picture.remove" | "picture.insert-exact" => {
                 return Err(CompositionError::Durable(
                     "picture durable operations are not composable".to_string(),
                 ));
-            },
+            }
             "field.transfer"
             | "nested-table.transfer"
             | "list.transfer"
@@ -1252,12 +1252,12 @@ fn durable_domain(operations: &[DurableOperation]) -> Result<DurableDomain, Comp
                 return Err(CompositionError::Durable(
                     "root-transfer durable operations are not composable".to_string(),
                 ));
-            },
+            }
             _ => {
                 return Err(CompositionError::Durable(
                     "unknown durable operation vocabulary".to_string(),
                 ));
-            },
+            }
         };
         if domain.is_some_and(|existing| existing != current) {
             return Err(CompositionError::Durable(
@@ -1340,7 +1340,7 @@ fn validate_durable_operation_set(operations: &[DurableOperation]) -> Result<(),
                     ])));
                 }
             }
-        },
+        }
         DurableDomain::Destination => {
             let mut targets = Vec::new();
             targets.try_reserve(operations.len()).map_err(|_error| {
@@ -1368,7 +1368,7 @@ fn validate_durable_operation_set(operations: &[DurableOperation]) -> Result<(),
                     ])));
                 }
             }
-        },
+        }
     }
     Ok(())
 }
@@ -1397,7 +1397,7 @@ fn durable_target_key(operation: &DurableOperation) -> Result<DurableTargetKey, 
                 ),
                 nested,
             })
-        },
+        }
         "header-footer-text.replace" => {
             let target = super::parse_header_footer_target(&operation.target)
                 .map_err(CompositionError::Edit)?;
@@ -1406,7 +1406,7 @@ fn durable_target_key(operation: &DurableOperation) -> Result<DurableTargetKey, 
                 kind: header_footer_kind_key(target.kind()),
                 paragraph: target.paragraph(),
             })
-        },
+        }
         "annotation-text.replace" => Ok(DurableTargetKey::Indexed {
             kind: 0,
             index: super::parse_annotation_target(&operation.target)
@@ -1459,7 +1459,7 @@ fn validate_durable_forward_limit(
 }
 
 fn durable_merge_limit_ok(
-    source: &Snapshot,
+    source: &Package,
     limits: core::PatchLimits,
     automatic: &[DurableOperation],
     selected: Option<&[DurableOperation]>,
@@ -1482,7 +1482,7 @@ fn durable_merge_limit_ok(
 }
 
 fn preflight_durable_reversible(
-    source: &Snapshot,
+    source: &Package,
     limits: core::PatchLimits,
     operations: &[DurableOperation],
 ) -> Result<(), CompositionError> {
@@ -1505,7 +1505,7 @@ fn durable_domain_conflict(left: DurableDomain, right: DurableDomain) -> Composi
 }
 
 fn validate_durable_branch(
-    source: &Snapshot,
+    source: &Package,
     limits: core::PatchLimits,
     patch: &DurablePatch,
 ) -> Result<Vec<DurableOperation>, CompositionError> {
@@ -1704,38 +1704,38 @@ fn durable_targets_equal(left: &DurableOperation, right: &DurableOperation) -> b
         | ("character-outline.set", "character-outline.set") => {
             super::parse_text_target(&left.target).ok()
                 == super::parse_text_target(&right.target).ok()
-        },
+        }
         ("paragraph-alignment.set", "paragraph-alignment.set") => {
             super::parse_paragraph_target(&left.target).ok()
                 == super::parse_paragraph_target(&right.target).ok()
-        },
+        }
         ("table-cell-text.replace", "table-cell-text.replace") => {
             super::parse_table_cell_target(&left.target).ok()
                 == super::parse_table_cell_target(&right.target).ok()
-        },
+        }
         ("header-footer-text.replace", "header-footer-text.replace") => {
             super::parse_header_footer_target(&left.target).ok()
                 == super::parse_header_footer_target(&right.target).ok()
-        },
+        }
         ("annotation-text.replace", "annotation-text.replace") => {
             super::parse_annotation_target(&left.target).ok()
                 == super::parse_annotation_target(&right.target).ok()
-        },
+        }
         ("note-text.replace", "note-text.replace") => {
             super::parse_note_target(&left.target).ok()
                 == super::parse_note_target(&right.target).ok()
-        },
+        }
         ("shape-text.replace", "shape-text.replace") => {
             super::parse_shape_target(&left.target).ok()
                 == super::parse_shape_target(&right.target).ok()
-        },
+        }
         _ => false,
     }
 }
 
 fn verify_durable_inverse_semantics(
-    source: &Snapshot,
-    restored: &Snapshot,
+    source: &Package,
+    restored: &Package,
     operations: &[DurableOperation],
 ) -> Result<(), CompositionError> {
     // Character/property rewrites are intentionally semantic: the RTF writer
@@ -1777,7 +1777,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore bold state".to_string(),
                     ));
                 }
-            },
+            }
             "character-italic.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1797,7 +1797,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore italic state".to_string(),
                     ));
                 }
-            },
+            }
             "character-underline.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1818,7 +1818,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore underline state".to_string(),
                     ));
                 }
-            },
+            }
             "character-strike.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1838,7 +1838,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore strike state".to_string(),
                     ));
                 }
-            },
+            }
             "character-double-strike.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1858,7 +1858,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore double-strike state".to_string(),
                     ));
                 }
-            },
+            }
             "character-hidden.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1878,7 +1878,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore hidden state".to_string(),
                     ));
                 }
-            },
+            }
             "character-small-caps.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1898,7 +1898,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore small-caps state".to_string(),
                     ));
                 }
-            },
+            }
             "character-all-caps.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1918,7 +1918,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore all-caps state".to_string(),
                     ));
                 }
-            },
+            }
             "character-outline.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1938,7 +1938,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore outline state".to_string(),
                     ));
                 }
-            },
+            }
             "character-font-size.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1960,7 +1960,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore font-size state".to_string(),
                     ));
                 }
-            },
+            }
             "character-baseline.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -1981,7 +1981,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore baseline state".to_string(),
                     ));
                 }
-            },
+            }
             "character-expansion.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2002,7 +2002,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore expansion state".to_string(),
                     ));
                 }
-            },
+            }
             "character-horizontal-scale.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2025,7 +2025,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore horizontal-scale state".to_string(),
                     ));
                 }
-            },
+            }
             "character-kerning.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2047,7 +2047,7 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore kerning state".to_string(),
                     ));
                 }
-            },
+            }
             "table-cell-text.replace"
             | "header-footer-text.replace"
             | "annotation-text.replace"
@@ -2062,21 +2062,21 @@ fn verify_durable_inverse_semantics(
                         "durable branch inverse did not restore destination text".to_string(),
                     ));
                 }
-            },
-            "body-text.replace" | "paragraph-alignment.set" => {},
+            }
+            "body-text.replace" | "paragraph-alignment.set" => {}
             _ => {
                 return Err(CompositionError::Durable(
                     "unsupported operation escaped durable inverse verification".to_string(),
                 ));
-            },
+            }
         }
     }
     Ok(())
 }
 
 fn verify_durable_character_properties(
-    source: &Snapshot,
-    restored: &Snapshot,
+    source: &Package,
+    restored: &Package,
 ) -> Result<(), CompositionError> {
     let mut body_position = 0usize;
     for paragraph in source.body().paragraphs() {
@@ -2135,14 +2135,14 @@ fn verify_durable_character_properties(
 }
 
 fn durable_destination_text<'a>(
-    source: &'a Snapshot,
+    source: &'a Package,
     operation: &DurableOperation,
 ) -> Result<&'a str, Error> {
     match operation.op.as_str() {
         "table-cell-text.replace" => {
             let path = super::parse_table_cell_target(&operation.target)?;
             Ok(super::table_cell(source, &path)?.text())
-        },
+        }
         "header-footer-text.replace" => {
             let target = super::parse_header_footer_target(&operation.target)?;
             Ok(super::header_footer(source, target)?
@@ -2151,19 +2151,19 @@ fn durable_destination_text<'a>(
                 .ok_or(Error::DestinationOutOfRange("header/footer paragraph"))?
                 .text
                 .as_ref())
-        },
+        }
         "annotation-text.replace" => {
             let index = super::parse_annotation_target(&operation.target)?;
             Ok(super::annotation(source, index)?.text.as_ref())
-        },
+        }
         "note-text.replace" => {
             let index = super::parse_note_target(&operation.target)?;
             Ok(super::note(source, index)?.content.as_ref())
-        },
+        }
         "shape-text.replace" => {
             let index = super::parse_shape_target(&operation.target)?;
             Ok(super::shape(source, index)?.text.as_ref())
-        },
+        }
         _ => Err(Error::DurablePatch(
             "invalid durable destination operation".to_string(),
         )),
@@ -2171,7 +2171,7 @@ fn durable_destination_text<'a>(
 }
 
 fn validate_durable_operation_shape(
-    source: &Snapshot,
+    source: &Package,
     operation: &DurableOperation,
 ) -> Result<(), CompositionError> {
     let expected_preconditions = match operation.op.as_str() {
@@ -2221,7 +2221,7 @@ fn validate_durable_operation_shape(
                     "body durable replacements cannot contain paragraph breaks".to_string(),
                 ));
             }
-        },
+        }
         "character-bold.set"
         | "character-italic.set"
         | "character-underline.set"
@@ -2249,14 +2249,14 @@ fn validate_durable_operation_shape(
                     "character durable ranges must be non-empty and paragraph-local".to_string(),
                 ));
             }
-        },
+        }
         "paragraph-alignment.set"
         | "table-cell-text.replace"
         | "header-footer-text.replace"
         | "annotation-text.replace"
         | "note-text.replace"
-        | "shape-text.replace" => {},
-        _ => {},
+        | "shape-text.replace" => {}
+        _ => {}
     }
     Ok(())
 }
@@ -2277,7 +2277,7 @@ fn durable_operation_conflict(
             } else {
                 None
             }
-        },
+        }
         DurableDomain::Ordinary => ordinary_durable_conflict(left, right),
     }
 }
@@ -2372,7 +2372,7 @@ fn compare_conflicts(left: &CompositionConflict, right: &CompositionConflict) ->
     match (left, right) {
         (CompositionConflict::DuplicateId(left), CompositionConflict::DuplicateId(right)) => {
             left.cmp(right)
-        },
+        }
         (
             CompositionConflict::Effect {
                 effect: left_effect,
@@ -2415,7 +2415,7 @@ const fn conflict_kind(conflict: &CompositionConflict) -> &'static str {
 }
 
 fn commit_durable_operations(
-    source: &Snapshot,
+    source: &Package,
     operations: &[DurableOperation],
 ) -> Result<super::Commit, CompositionError> {
     let operation_limit = operations.len().max(1);
@@ -2430,7 +2430,7 @@ fn commit_durable_operations(
                 })?;
                 edit.replace_text(span, replacement)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "paragraph-alignment.set" => {
                 let position = super::parse_paragraph_target(&operation.target)
                     .map_err(CompositionError::Edit)?;
@@ -2443,7 +2443,7 @@ fn commit_durable_operations(
                     })?;
                 edit.set_paragraph_alignment(position, alignment)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-bold.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2452,7 +2452,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_text_bold(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-italic.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2461,7 +2461,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_text_italic(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-underline.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2474,7 +2474,7 @@ fn commit_durable_operations(
                     })?;
                 edit.set_text_underline(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-font-size.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2488,7 +2488,7 @@ fn commit_durable_operations(
                     })?;
                 edit.set_text_font_size(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-baseline.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2501,7 +2501,7 @@ fn commit_durable_operations(
                     })?;
                 edit.set_text_baseline(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-expansion.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2514,7 +2514,7 @@ fn commit_durable_operations(
                     })?;
                 edit.set_text_expansion(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-horizontal-scale.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2528,7 +2528,7 @@ fn commit_durable_operations(
                     })?;
                 edit.set_text_horizontal_scale_percent(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-kerning.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2542,7 +2542,7 @@ fn commit_durable_operations(
                     })?;
                 edit.set_text_kerning(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-strike.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2552,7 +2552,7 @@ fn commit_durable_operations(
                     .ok_or_else(|| CompositionError::Durable("invalid strike value".to_string()))?;
                 edit.set_text_strike(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-double-strike.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2561,7 +2561,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_text_double_strike(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-hidden.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2571,7 +2571,7 @@ fn commit_durable_operations(
                     .ok_or_else(|| CompositionError::Durable("invalid hidden value".to_string()))?;
                 edit.set_text_hidden(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-small-caps.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2580,7 +2580,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_text_small_caps(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-all-caps.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2589,7 +2589,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_text_all_caps(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "character-outline.set" => {
                 let span =
                     super::parse_text_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2598,7 +2598,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_text_outline(span, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "table-cell-text.replace" => {
                 let path = super::parse_table_cell_target(&operation.target)
                     .map_err(CompositionError::Edit)?;
@@ -2607,7 +2607,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_table_cell_text(path, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "header-footer-text.replace" => {
                 let target = super::parse_header_footer_target(&operation.target)
                     .map_err(CompositionError::Edit)?;
@@ -2616,7 +2616,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_header_footer_text(target, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "annotation-text.replace" => {
                 let index = super::parse_annotation_target(&operation.target)
                     .map_err(CompositionError::Edit)?;
@@ -2625,7 +2625,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_annotation_text(index, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "note-text.replace" => {
                 let index =
                     super::parse_note_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2634,7 +2634,7 @@ fn commit_durable_operations(
                 })?;
                 edit.set_note_text(index, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             "shape-text.replace" => {
                 let index =
                     super::parse_shape_target(&operation.target).map_err(CompositionError::Edit)?;
@@ -2643,12 +2643,12 @@ fn commit_durable_operations(
                 })?;
                 edit.set_shape_text(index, value)
                     .map_err(CompositionError::Edit)?;
-            },
+            }
             _ => {
                 return Err(CompositionError::Durable(
                     "unsupported operation escaped durable admission".to_string(),
                 ));
-            },
+            }
         }
     }
     edit.commit().map_err(CompositionError::Edit)
