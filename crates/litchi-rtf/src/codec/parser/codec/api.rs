@@ -1,7 +1,7 @@
 use super::{
     Bump, ColorTable, ControlWord, Cow, DrawingStoryCapture, FontTable, HashMap, HashSet,
-    MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParseLimits, ParsedDocument, Parser, Range, RefCell,
-    RtfError, RtfResult, SmallVec, State, Token, control_symbol_text,
+    MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParsedDocument, Parser, Range, RefCell, RtfError,
+    RtfResult, SmallVec, SourceLimits, State, Token, control_symbol_text,
     disables_body_block_reservation, initial_body_block_capacity,
 };
 
@@ -11,7 +11,7 @@ impl<'a> Parser<'a> {
         token_spans: &'a [Range<usize>],
         source: &'a str,
         arena: &'a Bump,
-        limits: ParseLimits,
+        limits: SourceLimits,
     ) -> Self {
         Self::new_inner(tokens, Some(token_spans), Some(source), arena, limits)
     }
@@ -31,7 +31,7 @@ impl<'a> Parser<'a> {
         token_spans: Option<&'a [Range<usize>]>,
         source: Option<&'a str>,
         arena: &'a Bump,
-        limits: ParseLimits,
+        limits: SourceLimits,
     ) -> Self {
         Self {
             tokens,
@@ -544,7 +544,7 @@ impl<'a> Parser<'a> {
             self.body_block_capacity_hint = initial_body_block_capacity(
                 self.source.map(str::len),
                 potential_root_body_blocks,
-                self.limits.max_tokens(),
+                self.limits.max_events(),
             );
         }
 

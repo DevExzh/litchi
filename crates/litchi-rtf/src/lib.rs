@@ -123,7 +123,9 @@ use text::{
 /// Concise document-opening facade.
 pub mod read {
     pub use crate::api::Document;
-    pub use crate::codec::limits::{ParseLimits as Limits, ParseOptions as Options};
+    pub use crate::codec::limits::{
+        OpenOptions, SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+    };
     pub use crate::leniency::{Leniency, ToleranceReport};
 }
 
@@ -142,7 +144,7 @@ pub mod write {
 /// Bounded Outlook/MAPI compressed-RTF transport codec.
 pub mod transport {
     pub use crate::codec::compressed::{
-        DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits as Limits, compress, decompress,
+        DEFAULT_MAX_DECOMPRESSED_RTF_BYTES, DecompressionLimits, compress, decompress,
         decompress_with_limits, is_compressed_rtf,
     };
 }
@@ -360,7 +362,7 @@ mod native {
     pub use legacy_text_box::{
         LegacyHorizontalAnchor, LegacyTextBox, LegacyTextDirection, LegacyVerticalAnchor,
     };
-    pub use limits::{ParseLimits, ParseOptions};
+    pub use limits::{OpenOptions, SourceLimitKind, SourceLimits, SourceLimitsBuilder};
     pub use list::{
         List, ListFollow, ListJustification, ListLevel, ListLevelType, ListOverride,
         ListOverrideLevel, ListOverrideTable, ListTable,

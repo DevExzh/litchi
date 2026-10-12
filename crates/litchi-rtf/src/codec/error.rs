@@ -7,6 +7,8 @@
 use std::fmt;
 use std::hash::{BuildHasher, Hash};
 
+use super::limits::SourceLimitKind;
+
 /// Result type for RTF operations.
 pub type RtfResult<T> = Result<T, RtfError>;
 
@@ -75,6 +77,24 @@ pub enum RtfError {
     InvalidControlWord(String),
     /// Malformed document
     MalformedDocument(String),
+    /// A source-limit value was invalid at profile construction.
+    InvalidLimit {
+        /// Stable physical ingress dimension.
+        kind: SourceLimitKind,
+        /// Caller-provided value.
+        value: usize,
+        /// Maximum addressable value for the dimension.
+        maximum: usize,
+    },
+    /// A configured physical ingress budget was exceeded.
+    Limit {
+        /// Stable physical ingress dimension.
+        kind: SourceLimitKind,
+        /// Value observed by the parser or transport decoder.
+        observed: usize,
+        /// Configured maximum value.
+        maximum: usize,
+    },
     /// A finite resource budget was exceeded.
     LimitExceeded {
         /// Stable name of the exhausted resource.
@@ -103,6 +123,22 @@ impl fmt::Display for RtfError {
             RtfError::UnexpectedEof => write!(f, "Unexpected end of input"),
             RtfError::InvalidControlWord(msg) => write!(f, "Invalid control word: {msg}"),
             RtfError::MalformedDocument(msg) => write!(f, "Malformed RTF document: {msg}"),
+            RtfError::InvalidLimit {
+                kind,
+                value,
+                maximum,
+            } => write!(
+                f,
+                "invalid RTF source limit for {kind}: value {value}, maximum {maximum}"
+            ),
+            RtfError::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "RTF source limit exceeded for {kind}: observed {observed}, maximum {maximum}"
+            ),
             RtfError::LimitExceeded {
                 resource,
                 observed,

@@ -10,10 +10,10 @@ impl<'a> Parser<'a> {
     /// parser encounters syntax it cannot safely interpret.
     pub(super) fn mark_unknown_syntax(&mut self) -> RtfResult<()> {
         if self.unknown_syntax_markers >= self.limits.max_opaque_nodes() {
-            return Err(RtfError::LimitExceeded {
-                resource: "unknown syntax markers",
+            return Err(RtfError::Limit {
+                kind: crate::SourceLimitKind::OpaqueNodes,
                 observed: self.unknown_syntax_markers.saturating_add(1),
-                limit: self.limits.max_opaque_nodes(),
+                maximum: self.limits.max_opaque_nodes(),
             });
         }
         self.unknown_syntax_markers += 1;
@@ -551,33 +551,33 @@ impl<'a> Parser<'a> {
         })?;
         let observed = fragment.chars().count();
         if observed > self.limits.max_opaque_node_bytes() {
-            return Err(RtfError::LimitExceeded {
-                resource: "opaque node bytes",
+            return Err(RtfError::Limit {
+                kind: crate::SourceLimitKind::OpaqueNodeBytes,
                 observed,
-                limit: self.limits.max_opaque_node_bytes(),
+                maximum: self.limits.max_opaque_node_bytes(),
             });
         }
         let node_count = self.opaque_nodes.len().saturating_add(1);
         if node_count > self.limits.max_opaque_nodes() {
-            return Err(RtfError::LimitExceeded {
-                resource: "opaque nodes",
+            return Err(RtfError::Limit {
+                kind: crate::SourceLimitKind::OpaqueNodes,
                 observed: node_count,
-                limit: self.limits.max_opaque_nodes(),
+                maximum: self.limits.max_opaque_nodes(),
             });
         }
-        let total =
-            self.opaque_bytes
-                .checked_add(observed)
-                .ok_or_else(|| RtfError::LimitExceeded {
-                    resource: "opaque bytes",
-                    observed: usize::MAX,
-                    limit: self.limits.max_total_opaque_bytes(),
-                })?;
-        if total > self.limits.max_total_opaque_bytes() {
-            return Err(RtfError::LimitExceeded {
-                resource: "opaque bytes",
+        let total = self
+            .opaque_bytes
+            .checked_add(observed)
+            .ok_or_else(|| RtfError::Limit {
+                kind: crate::SourceLimitKind::AggregateOpaqueBytes,
+                observed: usize::MAX,
+                maximum: self.limits.max_aggregate_opaque_bytes(),
+            })?;
+        if total > self.limits.max_aggregate_opaque_bytes() {
+            return Err(RtfError::Limit {
+                kind: crate::SourceLimitKind::AggregateOpaqueBytes,
                 observed: total,
-                limit: self.limits.max_total_opaque_bytes(),
+                maximum: self.limits.max_aggregate_opaque_bytes(),
             });
         }
         let mut bytes = Vec::new();

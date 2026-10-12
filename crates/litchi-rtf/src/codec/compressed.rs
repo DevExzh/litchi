@@ -210,10 +210,10 @@ pub fn decompress_with_limits(data: &[u8], limits: DecompressionLimits) -> RtfRe
         RtfError::InvalidStructure("RTF RAWSIZE is not representable on this target".to_string())
     })?;
     if raw_size > limits.max_output_bytes {
-        return Err(RtfError::LimitExceeded {
-            resource: "decompressed bytes",
+        return Err(RtfError::Limit {
+            kind: crate::SourceLimitKind::DecompressedBytes,
             observed: raw_size,
-            limit: limits.max_output_bytes,
+            maximum: limits.max_output_bytes,
         });
     }
 
@@ -993,10 +993,10 @@ mod tests {
         assert_eq!(limits.max_output_bytes(), 1024);
         assert!(matches!(
             decompress_with_limits(&stored, limits),
-            Err(RtfError::LimitExceeded {
-                resource: "decompressed bytes",
+            Err(RtfError::Limit {
+                kind: crate::SourceLimitKind::DecompressedBytes,
                 observed,
-                limit: 1024,
+                maximum: 1024,
             }) if observed == u32::MAX as usize
         ));
     }

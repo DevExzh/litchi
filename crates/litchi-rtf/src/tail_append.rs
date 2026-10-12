@@ -900,11 +900,11 @@ impl TailAppendEdit {
             }
             .into());
         }
-        if output_length > self.source.limits().max_source_bytes() {
+        if output_length > self.source.limits().max_input_bytes() {
             return Err(TailAppendError::LimitExceeded {
                 resource: "source bytes",
                 observed: output_length,
-                limit: self.source.limits().max_source_bytes(),
+                limit: self.source.limits().max_input_bytes(),
             }
             .into());
         }
@@ -1045,11 +1045,11 @@ impl TailAppendEdit {
                 limit: self.limits.max_output_bytes,
             });
         }
-        if output_len > self.source.limits().max_source_bytes() {
+        if output_len > self.source.limits().max_input_bytes() {
             return Err(TailAppendError::LimitExceeded {
                 resource: "source bytes",
                 observed: output_len,
-                limit: self.source.limits().max_source_bytes(),
+                limit: self.source.limits().max_input_bytes(),
             });
         }
         let inserted = encode_inserted(
@@ -1313,11 +1313,11 @@ impl TailAppendPublicationPlan {
                 written: 0,
             });
         }
-        if output_length > source.limits().max_source_bytes() {
+        if output_length > source.limits().max_input_bytes() {
             return Err(TailAppendPublicationError::LimitExceeded {
                 resource: "source bytes",
                 observed: u64::try_from(output_length).unwrap_or(u64::MAX),
-                limit: u64::try_from(source.limits().max_source_bytes()).unwrap_or(u64::MAX),
+                limit: u64::try_from(source.limits().max_input_bytes()).unwrap_or(u64::MAX),
                 written: 0,
             });
         }
@@ -1562,7 +1562,7 @@ impl TailAppendSourceProof {
             root_close: splice.root_close,
             ends_with_par: splice.ends_with_par,
             body_nonempty: !source.body().is_empty(),
-            source_limit: source.limits().max_source_bytes(),
+            source_limit: source.limits().max_input_bytes(),
             capability: TailAppendSourceCapability,
         })
     }
@@ -1703,7 +1703,7 @@ impl TailAppendSourceProof {
             root_close: splice.root_close,
             ends_with_par: splice.ends_with_par,
             body_nonempty: !document.body().is_empty(),
-            source_limit: document.limits().max_source_bytes(),
+            source_limit: document.limits().max_input_bytes(),
             capability: TailAppendSourceCapability,
         })
     }
@@ -4107,11 +4107,11 @@ impl DurableTailAppendPatch {
                 if output_len != self.after_bytes {
                     return Err(TailAppendError::PatchConflict);
                 }
-                if output_len > source.limits().max_source_bytes() {
+                if output_len > source.limits().max_input_bytes() {
                     return Err(TailAppendError::LimitExceeded {
                         resource: "source bytes",
                         observed: output_len,
-                        limit: source.limits().max_source_bytes(),
+                        limit: source.limits().max_input_bytes(),
                     });
                 }
                 if output_len > self.limits.max_output_bytes {

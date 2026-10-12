@@ -8,7 +8,7 @@
 )]
 use super::super::error::{RtfError, RtfResult};
 use super::super::lexer::{ControlWord, Token};
-use super::super::limits::ParseLimits;
+use super::super::limits::SourceLimits;
 use super::super::types::{
     Alignment, AnimatedTextEffect, AssociatedCharacterFormatting, CharacterGrid, CharacterType,
     Color, ColorRef, ColorTable, EmbeddedFont, EmbeddedFontFormat, EmphasisMark, FitText, Font,
@@ -36,7 +36,7 @@ const MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES: usize = 64 * 1_024;
 fn initial_body_block_capacity(
     source_len: Option<usize>,
     potential_blocks: usize,
-    max_tokens: usize,
+    max_events: usize,
 ) -> usize {
     let source_len = source_len.unwrap_or(0);
     if source_len < MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES {
@@ -45,7 +45,7 @@ fn initial_body_block_capacity(
     let source_relative_bytes = source_len.saturating_mul(BODY_BLOCK_RESERVE_SOURCE_MULTIPLIER);
     let capacity_ceiling =
         source_relative_bytes.min(MAX_BODY_BLOCK_RESERVE_BYTES) / size_of::<StyleBlock<'static>>();
-    potential_blocks.min(capacity_ceiling).min(max_tokens)
+    potential_blocks.min(capacity_ceiling).min(max_events)
 }
 
 fn disables_body_block_reservation(control: &ControlWord<'_>) -> bool {
@@ -1497,7 +1497,7 @@ pub(crate) struct Parser<'a> {
     tokens: &'a [Token<'a>],
     token_spans: Option<&'a [Range<usize>]>,
     source: Option<&'a str>,
-    limits: ParseLimits,
+    limits: SourceLimits,
     parse_provenance: crate::validation::ParseProvenance,
     /// Repairs applied while tokenizing and parsing, in discovery order.
     tolerance: crate::leniency::ToleranceReport,
@@ -2330,7 +2330,7 @@ mod unicode;
 mod tests {
     use super::{
         BODY_BLOCK_RESERVE_SOURCE_MULTIPLIER, ControlWord, MAX_BODY_BLOCK_RESERVE_BYTES,
-        MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, ParseLimits, Parser, RtfError, StyleBlock,
+        MIN_BODY_BLOCK_RESERVE_SOURCE_BYTES, Parser, RtfError, SourceLimits, StyleBlock,
         append_transport_bytes, disables_body_block_reservation, initial_body_block_capacity,
     };
     use crate::codec::lexer::Lexer;
@@ -2441,7 +2441,7 @@ mod tests {
         source.push('}');
 
         let arena = Bump::new();
-        let limits = ParseLimits::default();
+        let limits = SourceLimits::default();
         let (tokens, spans) = Lexer::new_with_limits(&source, &arena, limits)
             .tokenize_with_spans()
             .expect("dense body tokens");
@@ -2471,7 +2471,7 @@ mod tests {
     fn oversized_optional_hint_falls_back_to_one_block() {
         let source = r"{\rtf1 body}";
         let arena = Bump::new();
-        let limits = ParseLimits::default();
+        let limits = SourceLimits::default();
         let (tokens, spans) = Lexer::new_with_limits(source, &arena, limits)
             .tokenize_with_spans()
             .expect("body tokens");
@@ -2505,7 +2505,7 @@ mod tests {
         source.push_str("\\row\\pard body}");
 
         let arena = Bump::new();
-        let limits = ParseLimits::default();
+        let limits = SourceLimits::default();
         let (tokens, spans) = Lexer::new_with_limits(&source, &arena, limits)
             .tokenize_with_spans()
             .expect("table-heavy tokens");
@@ -2536,7 +2536,7 @@ mod tests {
         source.push_str("\\deleted0 body}");
 
         let arena = Bump::new();
-        let limits = ParseLimits::default();
+        let limits = SourceLimits::default();
         let (tokens, spans) = Lexer::new_with_limits(&source, &arena, limits)
             .tokenize_with_spans()
             .expect("deletion-heavy tokens");

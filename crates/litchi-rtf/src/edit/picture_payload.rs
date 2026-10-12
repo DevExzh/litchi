@@ -308,7 +308,7 @@ impl Edit {
                 after_transport,
             }));
         }
-        let replacement_limit = self.source.limits().max_source_bytes();
+        let replacement_limit = self.source.limits().max_input_bytes();
         let observed_replacement_bytes = self.replacement_bytes.saturating_add(replacement_bytes);
         if observed_replacement_bytes > replacement_limit {
             return Err(Error::InputTooLarge {
@@ -652,10 +652,10 @@ pub(super) fn apply_durable_insertion_patch(
         total.saturating_add(insertion.2.len())
     });
     let candidate_len = source_bytes.len().saturating_add(inserted_bytes);
-    if candidate_len > source.limits().max_source_bytes() {
+    if candidate_len > source.limits().max_input_bytes() {
         return Err(Error::InputTooLarge {
             observed: candidate_len,
-            limit: source.limits().max_source_bytes(),
+            limit: source.limits().max_input_bytes(),
         });
     }
     let mut candidate = Vec::new();
@@ -911,7 +911,7 @@ fn locate_standalone_pictures(source: &Snapshot) -> Result<Vec<LocatedPicture>, 
     })?;
     let arena = Bump::new();
     let mut lexer = Lexer::new_with_limits(input, &arena, source.limits())
-        .for_document(source.options().leniency());
+        .for_document(source.options().leniency_value());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut located = Vec::new();
     located

@@ -8,7 +8,7 @@
 )]
 
 use super::super::error::RtfError;
-use super::super::limits::ParseLimits;
+use super::super::limits::SourceLimits;
 use super::codec::{CharacterSet, ControlWord, Lexer, Token};
 use bumpalo::Bump;
 use std::borrow::Cow;
@@ -601,9 +601,13 @@ fn test_rejects_truncated_binary_data() {
 #[test]
 fn binary_declaration_is_validated_before_allocation() {
     let arena = Bump::new();
-    let limits = ParseLimits::default()
-        .with_max_binary_bytes(usize::MAX)
-        .with_max_total_binary_bytes(usize::MAX);
+    let limits = SourceLimits::builder()
+        .max_binary_bytes(SourceLimits::MAX_VALUE)
+        .expect("binary limit")
+        .max_aggregate_binary_bytes(SourceLimits::MAX_VALUE)
+        .expect("aggregate binary limit")
+        .build()
+        .expect("source limits");
     let mut lexer = Lexer::new_with_limits(r"\bin2147483647 x", &arena, limits);
     assert!(matches!(lexer.tokenize(), Err(RtfError::UnexpectedEof)));
 }
@@ -611,28 +615,36 @@ fn binary_declaration_is_validated_before_allocation() {
 #[test]
 fn binary_limits_report_per_payload_and_aggregate_usage() {
     let arena = Bump::new();
-    let limits = ParseLimits::default().with_max_binary_bytes(3);
+    let limits = SourceLimits::builder()
+        .max_binary_bytes(3)
+        .expect("binary limit")
+        .build()
+        .expect("source limits");
     let mut lexer = Lexer::new_with_limits(r"\bin4 ABCD", &arena, limits);
     assert!(matches!(
         lexer.tokenize(),
-        Err(RtfError::LimitExceeded {
-            resource: "binary payload bytes",
+        Err(RtfError::Limit {
+            kind: crate::SourceLimitKind::BinaryBytes,
             observed: 4,
-            limit: 3,
+            maximum: 3,
         })
     ));
 
     let arena = Bump::new();
-    let limits = ParseLimits::default()
-        .with_max_binary_bytes(2)
-        .with_max_total_binary_bytes(3);
+    let limits = SourceLimits::builder()
+        .max_binary_bytes(2)
+        .expect("binary limit")
+        .max_aggregate_binary_bytes(3)
+        .expect("aggregate binary limit")
+        .build()
+        .expect("source limits");
     let mut lexer = Lexer::new_with_limits(r"\bin2 ab\bin2 cd", &arena, limits);
     assert!(matches!(
         lexer.tokenize(),
-        Err(RtfError::LimitExceeded {
-            resource: "aggregate binary payload bytes",
+        Err(RtfError::Limit {
+            kind: crate::SourceLimitKind::AggregateBinaryBytes,
             observed: 4,
-            limit: 3,
+            maximum: 3,
         })
     ));
 }
@@ -640,14 +652,18 @@ fn binary_limits_report_per_payload_and_aggregate_usage() {
 #[test]
 fn token_limit_is_checked_before_emitting_an_extra_token() {
     let arena = Bump::new();
-    let limits = ParseLimits::default().with_max_tokens(1);
+    let limits = SourceLimits::builder()
+        .max_events(1)
+        .expect("event limit")
+        .build()
+        .expect("source limits");
     let mut lexer = Lexer::new_with_limits("{}", &arena, limits);
     assert!(matches!(
         lexer.tokenize(),
-        Err(RtfError::LimitExceeded {
-            resource: "lexer tokens",
+        Err(RtfError::Limit {
+            kind: crate::SourceLimitKind::Events,
             observed: 2,
-            limit: 1,
+            maximum: 1,
         })
     ));
 }

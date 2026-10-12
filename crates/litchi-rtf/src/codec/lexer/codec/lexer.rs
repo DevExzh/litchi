@@ -1,6 +1,6 @@
 use super::model::Token;
 use crate::codec::error::{RtfError, RtfResult};
-use crate::codec::limits::ParseLimits;
+use crate::codec::limits::SourceLimits;
 use bumpalo::Bump;
 use std::mem::size_of;
 use std::ops::Range;
@@ -24,7 +24,7 @@ pub(crate) struct Lexer<'a> {
     /// Arena allocator for temporary strings
     pub(super) arena: &'a Bump,
     /// Finite token and binary-payload ceilings.
-    pub(super) limits: ParseLimits,
+    pub(super) limits: SourceLimits,
     /// Aggregate bytes claimed by accepted `binN` payloads.
     pub(super) total_binary_bytes: usize,
     /// Destination markers for open groups.  Keeping this small and bounded
@@ -45,12 +45,12 @@ impl<'a> Lexer<'a> {
     #[cfg(test)]
     #[inline]
     pub(crate) fn new(input: &'a str, arena: &'a Bump) -> Self {
-        Self::new_with_limits(input, arena, ParseLimits::default())
+        Self::new_with_limits(input, arena, SourceLimits::default())
     }
 
     /// Create a lexer with an explicit finite resource profile.
     #[inline]
-    pub(crate) fn new_with_limits(input: &'a str, arena: &'a Bump, limits: ParseLimits) -> Self {
+    pub(crate) fn new_with_limits(input: &'a str, arena: &'a Bump, limits: SourceLimits) -> Self {
         Self {
             input,
             pos: 0,
@@ -170,11 +170,11 @@ impl<'a> Lexer<'a> {
 
         while self.pos < self.input.len() {
             let observed = tokens.len().saturating_add(1);
-            if observed > self.limits.max_tokens() {
-                return Err(RtfError::LimitExceeded {
-                    resource: "lexer tokens",
+            if observed > self.limits.max_events() {
+                return Err(RtfError::Limit {
+                    kind: crate::SourceLimitKind::Events,
                     observed,
-                    limit: self.limits.max_tokens(),
+                    maximum: self.limits.max_events(),
                 });
             }
             // `Vec::try_reserve` grows geometrically, so calling it for every
@@ -250,11 +250,11 @@ impl<'a> Lexer<'a> {
             return Ok(());
         }
         let observed = tokens.len().saturating_add(open);
-        if observed > self.limits.max_tokens() {
-            return Err(RtfError::LimitExceeded {
-                resource: "lexer tokens",
+        if observed > self.limits.max_events() {
+            return Err(RtfError::Limit {
+                kind: crate::SourceLimitKind::Events,
                 observed,
-                limit: self.limits.max_tokens(),
+                maximum: self.limits.max_events(),
             });
         }
         let allocation_failed = |_err| RtfError::AllocationFailed {

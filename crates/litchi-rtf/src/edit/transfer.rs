@@ -567,7 +567,7 @@ fn canonical_candidate(
     let mut model =
         crate::document::RtfDocument::parse_bytes_with_options(bytes, target.options())?;
     mutation(&mut model)?;
-    let limit = target.limits().max_source_bytes();
+    let limit = target.limits().max_input_bytes();
     let mut output = BoundedOutput::new(limit);
     RtfWriter::new(&mut output)
         .write_document(&model)
@@ -785,7 +785,7 @@ fn validate_transferable_field_kind(field: &crate::Field<'_>) -> Result<(), Erro
 
 fn owned_field(
     field: &crate::Field<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
 ) -> Result<crate::Field<'static>, Error> {
     let instruction = super::clone_bounded_text(
         field.instruction.as_ref(),
@@ -847,14 +847,14 @@ const MAX_TRANSFER_SHAPE_NESTING_DEPTH: usize = 64;
 
 fn owned_shape(
     shape: &crate::Shape<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
 ) -> Result<crate::Shape<'static>, Error> {
     owned_shape_at_depth(shape, limits, 0)
 }
 
 fn owned_shape_at_depth(
     shape: &crate::Shape<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
     depth: usize,
 ) -> Result<crate::Shape<'static>, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
@@ -957,14 +957,14 @@ fn owned_shape_at_depth(
 
 fn owned_shape_group(
     group: &crate::ShapeGroup<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
 ) -> Result<crate::ShapeGroup<'static>, Error> {
     owned_shape_group_at_depth(group, limits, 0)
 }
 
 fn owned_shape_group_at_depth(
     group: &crate::ShapeGroup<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
     depth: usize,
 ) -> Result<crate::ShapeGroup<'static>, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {
@@ -1038,7 +1038,7 @@ fn owned_shape_group_at_depth(
 
 fn owned_shape_property(
     property: &crate::ShapeProperty<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
 ) -> Result<crate::ShapeProperty<'static>, Error> {
     let name = super::clone_bounded_text(
         property.name.as_ref(),
@@ -1078,7 +1078,7 @@ fn owned_shape_property(
 
 fn owned_shape_hyperlink(
     hyperlink: &crate::ShapeHyperlink<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
 ) -> Result<crate::ShapeHyperlink<'static>, Error> {
     Ok(crate::ShapeHyperlink {
         location: owned_optional_shape_text(
@@ -1101,7 +1101,7 @@ fn owned_shape_hyperlink(
 
 fn owned_optional_shape_text(
     value: Option<&Cow<'_, str>>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
     context: &'static str,
 ) -> Result<Option<Cow<'static, str>>, Error> {
     value
@@ -1112,7 +1112,7 @@ fn owned_optional_shape_text(
 
 fn owned_transfer_table(
     table: &crate::Table<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
     depth: usize,
 ) -> Result<crate::Table<'static>, Error> {
     if depth >= MAX_TRANSFER_SHAPE_NESTING_DEPTH {

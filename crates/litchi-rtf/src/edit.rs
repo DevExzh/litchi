@@ -1484,7 +1484,7 @@ impl Edit {
             total.saturating_add(replacement.replacement.len())
         });
         let observed_replacement_bytes = self.replacement_bytes.saturating_add(replacement_bytes);
-        let replacement_limit = self.source.limits().max_source_bytes();
+        let replacement_limit = self.source.limits().max_input_bytes();
         if observed_replacement_bytes > replacement_limit {
             return Err(Error::InputTooLarge {
                 observed: observed_replacement_bytes,
@@ -2574,7 +2574,7 @@ impl Edit {
                 .checked_add(offset)
                 .ok_or(Error::InputTooLarge {
                     observed: usize::MAX,
-                    limit: self.source.limits().max_source_bytes(),
+                    limit: self.source.limits().max_input_bytes(),
                 })?;
         if source_offset > paragraph.source.end {
             return Err(Error::UnsupportedSource(
@@ -3381,7 +3381,7 @@ impl Edit {
 
     fn charge_replacement(&mut self, bytes: usize) -> Result<(), Error> {
         let observed = self.replacement_bytes.saturating_add(bytes);
-        let limit = self.source.limits().max_source_bytes();
+        let limit = self.source.limits().max_input_bytes();
         if observed > limit {
             return Err(Error::InputTooLarge { observed, limit });
         }
@@ -4279,7 +4279,7 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
                         .checked_add(*offset)
                         .ok_or(Error::InputTooLarge {
                             observed: usize::MAX,
-                            limit: edit.source.limits().max_source_bytes(),
+                            limit: edit.source.limits().max_input_bytes(),
                         })?;
                 if expected_source_offset != *source_offset
                     || source_bytes.get(*source_offset..*source_offset) != Some(&[])
@@ -4385,19 +4385,19 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
 fn merged_paragraph_text(
     left: &str,
     right: &str,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
 ) -> Result<String, Error> {
     let length = left
         .len()
         .checked_add(right.len())
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
-            limit: limits.max_source_bytes(),
+            limit: limits.max_input_bytes(),
         })?;
-    if length > limits.max_source_bytes() {
+    if length > limits.max_input_bytes() {
         return Err(Error::InputTooLarge {
             observed: length,
-            limit: limits.max_source_bytes(),
+            limit: limits.max_input_bytes(),
         });
     }
     let mut merged = String::new();
@@ -4411,13 +4411,13 @@ fn merged_paragraph_text(
 
 fn clone_bounded_text(
     text: &str,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
     allocation_context: &'static str,
 ) -> Result<String, Error> {
-    if text.len() > limits.max_source_bytes() {
+    if text.len() > limits.max_input_bytes() {
         return Err(Error::InputTooLarge {
             observed: text.len(),
-            limit: limits.max_source_bytes(),
+            limit: limits.max_input_bytes(),
         });
     }
     let mut owned = String::new();
@@ -4430,13 +4430,13 @@ fn clone_bounded_text(
 
 fn clone_bounded_bytes(
     bytes: &[u8],
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
     allocation_context: &'static str,
 ) -> Result<Vec<u8>, Error> {
-    if bytes.len() > limits.max_source_bytes() {
+    if bytes.len() > limits.max_input_bytes() {
         return Err(Error::InputTooLarge {
             observed: bytes.len(),
-            limit: limits.max_source_bytes(),
+            limit: limits.max_input_bytes(),
         });
     }
     let mut owned = Vec::new();
@@ -4554,7 +4554,7 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
     RtfWriter::new(&mut bytes)
         .write_document(&model)
         .map_err(|error| Error::Write(error.to_string()))?;
-    let limit = edit.source.limits().max_source_bytes();
+    let limit = edit.source.limits().max_input_bytes();
     if bytes.len() > limit {
         return Err(Error::InputTooLarge {
             observed: bytes.len(),
@@ -5034,7 +5034,7 @@ fn ordinary_paragraph_source_map(source: &Snapshot) -> Result<OrdinaryParagraphS
         .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
     let arena = Bump::new();
     let mut lexer = crate::lexer::Lexer::new_with_limits(body_input, &arena, source.limits())
-        .with_leniency(source.options().leniency());
+        .with_leniency(source.options().leniency_value());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut paragraphs = Vec::new();
     paragraphs
@@ -5058,7 +5058,7 @@ fn ordinary_paragraph_source_map(source: &Snapshot) -> Result<OrdinaryParagraphS
             })
             .ok_or(Error::InputTooLarge {
                 observed: usize::MAX,
-                limit: source.limits().max_source_bytes(),
+                limit: source.limits().max_input_bytes(),
             })?;
         if absolute_span.start < previous_boundary_end {
             return Err(Error::UnsupportedSource(
@@ -5094,7 +5094,7 @@ fn ordinary_paragraph_source_map(source: &Snapshot) -> Result<OrdinaryParagraphS
                         .checked_add(value.len())
                         .ok_or(Error::InputTooLarge {
                             observed: usize::MAX,
-                            limit: source.limits().max_source_bytes(),
+                            limit: source.limits().max_input_bytes(),
                         })?;
             },
             crate::lexer::Token::Control(crate::lexer::ControlWord::Par) => {
@@ -5120,7 +5120,7 @@ fn ordinary_paragraph_source_map(source: &Snapshot) -> Result<OrdinaryParagraphS
                         .checked_add(1)
                         .ok_or(Error::InputTooLarge {
                             observed: usize::MAX,
-                            limit: source.limits().max_source_bytes(),
+                            limit: source.limits().max_input_bytes(),
                         })?;
                 paragraph_start = semantic_position;
                 source_text_start = None;
@@ -5176,13 +5176,14 @@ fn semantic_text_starts_with_empty_paragraph(text: &str) -> bool {
 fn ordinary_paragraph_body_source_span(
     source: &[u8],
     semantic_text: &str,
-    options: crate::ParseOptions,
+    options: crate::OpenOptions,
 ) -> Result<Range<usize>, Error> {
     let lexical = std::str::from_utf8(source)
         .map_err(|_error| Error::UnsupportedSource("ordinary paragraph source is not UTF-8"))?;
     let arena = Bump::new();
-    let mut lexer = crate::lexer::Lexer::new_with_limits(lexical, &arena, options.limits())
-        .for_document(options.leniency());
+    let mut lexer =
+        crate::lexer::Lexer::new_with_limits(lexical, &arena, options.source_limits_value())
+            .for_document(options.leniency_value());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut depth = 0usize;
     let mut start = None;
@@ -5243,14 +5244,14 @@ fn paragraph_range(source: &Snapshot, position: usize) -> Result<Range<usize>, E
             .checked_add(paragraph.len())
             .ok_or(Error::InputTooLarge {
                 observed: usize::MAX,
-                limit: source.limits().max_source_bytes(),
+                limit: source.limits().max_input_bytes(),
             })?;
         if paragraph_position == position {
             return Ok(start..end);
         }
         start = end.checked_add(1).ok_or(Error::InputTooLarge {
             observed: usize::MAX,
-            limit: source.limits().max_source_bytes(),
+            limit: source.limits().max_input_bytes(),
         })?;
     }
     let count = source.paragraph_count();
@@ -5335,10 +5336,10 @@ fn project_text(
             .and_then(|length| length.checked_add(replacement_len))
             .ok_or(Error::InputTooLarge {
                 observed: usize::MAX,
-                limit: source.limits().max_source_bytes(),
+                limit: source.limits().max_input_bytes(),
             })?;
     }
-    let limit = source.limits().max_source_bytes();
+    let limit = source.limits().max_input_bytes();
     if final_len > limit {
         return Err(Error::InputTooLarge {
             observed: final_len,
@@ -7825,7 +7826,7 @@ fn retained_or_located_layout_body_source_span(
 fn ordinary_body_source_span(
     source: &[u8],
     semantic_text: &str,
-    options: crate::ParseOptions,
+    options: crate::OpenOptions,
     allow_nested_root_groups: bool,
 ) -> Result<Range<usize>, Error> {
     let lexical = if source.is_ascii() {
@@ -7836,8 +7837,9 @@ fn ordinary_body_source_span(
         source.iter().map(|byte| char::from(*byte)).collect()
     };
     let arena = Bump::new();
-    let mut lexer = crate::lexer::Lexer::new_with_limits(&lexical, &arena, options.limits())
-        .for_document(options.leniency());
+    let mut lexer =
+        crate::lexer::Lexer::new_with_limits(&lexical, &arena, options.source_limits_value())
+            .for_document(options.leniency_value());
     let (tokens, spans) = lexer.tokenize_with_spans()?;
     let mut depth = 0usize;
     let mut start = None;
@@ -7937,8 +7939,8 @@ fn validate_opaque_preservation(
     Ok(())
 }
 
-fn encoded_body_text(text: &str, limits: crate::ParseLimits) -> Result<Vec<u8>, Error> {
-    let mut output = BoundedVec::new(limits.max_source_bytes());
+fn encoded_body_text(text: &str, limits: crate::SourceLimits) -> Result<Vec<u8>, Error> {
+    let mut output = BoundedVec::new(limits.max_input_bytes());
     match RtfWriter::new(&mut output).write_text(text) {
         Ok(()) => Ok(output.into_inner()),
         Err(error) => Err(output.map_io_error(error)),
@@ -7999,16 +8001,16 @@ fn encoded_body_with_properties(
     alignments: &[Alignment],
     baseline: crate::types::Formatting,
     overlays: CharacterPropertyOverlays<'_>,
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
 ) -> Result<Vec<u8>, Error> {
     let encoded_text_length = encoded_body_len(text)?;
-    if encoded_text_length > limits.max_source_bytes() {
+    if encoded_text_length > limits.max_input_bytes() {
         return Err(Error::InputTooLarge {
             observed: encoded_text_length,
-            limit: limits.max_source_bytes(),
+            limit: limits.max_input_bytes(),
         });
     }
-    let mut output = BoundedVec::new(limits.max_source_bytes());
+    let mut output = BoundedVec::new(limits.max_input_bytes());
     let mut paragraph = 0usize;
     let mut paragraph_start = 0usize;
     loop {
@@ -8290,10 +8292,10 @@ fn encoded_body_with_properties(
 fn encoded_body_with_paragraph_properties(
     source: &Snapshot,
     properties: &[crate::types::Paragraph],
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
     source_span: &Range<usize>,
 ) -> Result<Vec<u8>, Error> {
-    let mut output = BoundedVec::new(limits.max_source_bytes());
+    let mut output = BoundedVec::new(limits.max_input_bytes());
     let opaque_nodes = body_opaque_nodes(source, source_span)?;
     let mut opaque_index = 0usize;
     let layout_events = body_layout_events(source)?;
@@ -8309,7 +8311,7 @@ fn encoded_body_with_paragraph_properties(
                 .checked_add(paragraph.len())
                 .ok_or(Error::InputTooLarge {
                     observed: usize::MAX,
-                    limit: limits.max_source_bytes(),
+                    limit: limits.max_input_bytes(),
                 })?;
         let terminated = source.text().as_bytes().get(paragraph_end) == Some(&b'\n');
         let mut runs = paragraph.runs().peekable();
@@ -8343,7 +8345,7 @@ fn encoded_body_with_paragraph_properties(
                         .checked_add(run.text().len())
                         .ok_or(Error::InputTooLarge {
                             observed: usize::MAX,
-                            limit: limits.max_source_bytes(),
+                            limit: limits.max_input_bytes(),
                         })?;
                 if run_end > paragraph_end {
                     return Err(Error::StructuralPropertyConflict);
@@ -8808,7 +8810,7 @@ fn splice_body(
     source: &[u8],
     span: Range<usize>,
     replacement: &[u8],
-    limits: crate::ParseLimits,
+    limits: crate::SourceLimits,
 ) -> Result<Vec<u8>, Error> {
     let retained = source
         .len()
@@ -8818,12 +8820,12 @@ fn splice_body(
         .checked_add(replacement.len())
         .ok_or(Error::InputTooLarge {
             observed: usize::MAX,
-            limit: limits.max_source_bytes(),
+            limit: limits.max_input_bytes(),
         })?;
-    if total > limits.max_source_bytes() {
+    if total > limits.max_input_bytes() {
         return Err(Error::InputTooLarge {
             observed: total,
-            limit: limits.max_source_bytes(),
+            limit: limits.max_input_bytes(),
         });
     }
     let mut output = Vec::new();
@@ -11094,7 +11096,7 @@ pub(crate) fn apply_durable<Mode>(
                     .ok_or_else(|| {
                         Error::DurablePatch("missing split paragraph boundary".to_string())
                     })?;
-                let boundary = hex_decode(encoded_boundary, source.limits().max_source_bytes())?;
+                let boundary = hex_decode(encoded_boundary, source.limits().max_input_bytes())?;
                 let result_hash = operation
                     .preconditions
                     .get("result_artifact_sha256")
@@ -11191,7 +11193,7 @@ pub(crate) fn apply_durable<Mode>(
                     .ok_or_else(|| {
                         Error::DurablePatch("missing merge paragraph boundary".to_string())
                     })?;
-                let boundary = hex_decode(encoded_boundary, source.limits().max_source_bytes())?;
+                let boundary = hex_decode(encoded_boundary, source.limits().max_input_bytes())?;
                 let result_hash = operation
                     .preconditions
                     .get("result_artifact_sha256")
@@ -11347,7 +11349,7 @@ pub(crate) fn apply_durable<Mode>(
                 let encoded = operation.value.as_str().ok_or_else(|| {
                     Error::DurablePatch("ordinary-root value must be hexadecimal".to_string())
                 })?;
-                let after = hex_decode(encoded, source.limits().max_source_bytes())?;
+                let after = hex_decode(encoded, source.limits().max_input_bytes())?;
                 edit.stage_root_transfer(
                     root_transfer_vocabulary(vocabulary)?,
                     operation.target.clone(),

@@ -13,25 +13,25 @@ impl<'a> Lexer<'a> {
         })?;
         let binary_limit = self.binary_destination_limit();
         if size > binary_limit {
-            return Err(RtfError::LimitExceeded {
-                resource: "binary payload bytes",
+            return Err(RtfError::Limit {
+                kind: crate::SourceLimitKind::BinaryBytes,
                 observed: size,
-                limit: binary_limit,
+                maximum: binary_limit,
             });
         }
         let total_binary_bytes =
             self.total_binary_bytes
                 .checked_add(size)
-                .ok_or(RtfError::LimitExceeded {
-                    resource: "aggregate binary payload bytes",
+                .ok_or(RtfError::Limit {
+                    kind: crate::SourceLimitKind::AggregateBinaryBytes,
                     observed: usize::MAX,
-                    limit: self.limits.max_total_binary_bytes(),
+                    maximum: self.limits.max_aggregate_binary_bytes(),
                 })?;
-        if total_binary_bytes > self.limits.max_total_binary_bytes() {
-            return Err(RtfError::LimitExceeded {
-                resource: "aggregate binary payload bytes",
+        if total_binary_bytes > self.limits.max_aggregate_binary_bytes() {
+            return Err(RtfError::Limit {
+                kind: crate::SourceLimitKind::AggregateBinaryBytes,
                 observed: total_binary_bytes,
-                limit: self.limits.max_total_binary_bytes(),
+                maximum: self.limits.max_aggregate_binary_bytes(),
             });
         }
 
