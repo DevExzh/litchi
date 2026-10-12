@@ -8,6 +8,8 @@
 //! and OOXML (modern) implementations, ensuring a consistent API for users.
 
 // Submodule declarations
+/// Format-neutral sibling-temporary atomic filesystem publication.
+pub mod atomic;
 pub mod binary;
 pub mod bom;
 pub mod bounded;
