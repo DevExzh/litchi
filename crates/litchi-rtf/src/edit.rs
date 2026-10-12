@@ -540,23 +540,12 @@ fn first_layout_conflict(
     position: usize,
     fields: LayoutFields,
 ) -> Option<usize> {
-    let mut start = 0;
-    let mut end = operations.len();
-    while start < end {
-        let middle = start + (end - start) / 2;
-        if operations[middle].0 < position {
-            start = middle + 1;
-        } else {
-            end = middle;
-        }
-    }
-    while start < operations.len() && operations[start].0 == position {
-        if operations[start].1.overlaps(fields) {
-            return Some(operations[start].2);
-        }
-        start += 1;
-    }
-    None
+    let start = operations.partition_point(|entry| entry.0 < position);
+    operations
+        .iter()
+        .skip(start)
+        .take_while(|entry| entry.0 == position)
+        .find_map(|entry| entry.1.overlaps(fields).then_some(entry.2))
 }
 
 fn ensure_paragraph_layout_source(source: &Package) -> Result<(), Error> {

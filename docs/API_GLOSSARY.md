@@ -128,8 +128,14 @@ This migration does not rename the separate semantic edit limits or structural
 `LimitExceeded` errors. Record 0223 adds the concrete immutable `Package` and owned read-only
 `Document` projection. Record 0224 aligns primary transaction vocabulary, and
 0225 adds native `Builder`, `Package::new()` and unified RTF creation. Record
-0226 adds native atomic publication and unified save/stream dispatch. Focused
-transaction vocabulary and the unified CRUD adapter remain pending.
+0226 adds native atomic publication and unified save/stream dispatch. Records
+0227–0231 migrate the focused transaction families. Records 0232–0239 add
+native-backed paragraph reads, text replacement, removal, move, insertion, swap,
+alignment and layout through the unified API. Native layout updates now take
+`Position`, including `ParagraphLayoutUpdate::{new, position}` and
+`Edit::patch_paragraph_layout`; remaining raw ordinal entry points and semantic
+limit vocabulary still need migration. Richer element/property coverage and
+performance qualification remain pending.
 
 ### PPT source dimensions
 

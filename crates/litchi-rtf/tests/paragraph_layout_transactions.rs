@@ -831,3 +831,52 @@ fn exact_noops_and_source_closure_refusals_do_not_publish() {
     assert!(matches!(edit.commit(), Err(Error::InputTooLarge { .. })));
     assert_eq!(bounded.to_bytes().unwrap(), exact);
 }
+
+#[test]
+fn layout_refuses_each_exclusive_lifecycle_without_poisoning_it() {
+    let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
+    for case in 0..4 {
+        let mut edit = source.edit();
+        match case {
+            0 => {
+                edit.remove_paragraph(0).unwrap();
+            },
+            1 => {
+                edit.move_paragraph(0, 2).unwrap();
+            },
+            2 => {
+                edit.swap_paragraphs(Position::new(0), Position::new(2))
+                    .unwrap();
+            },
+            _ => {
+                edit.insert_paragraph(Position::new(0), "Added").unwrap();
+            },
+        }
+        assert!(matches!(
+            edit.patch_paragraph_layout(
+                Position::new(0),
+                ParagraphLayoutPatch::new().with_space_before(40)
+            ),
+            Err(Error::Conflict {
+                existing: 0,
+                incoming: 1
+            })
+        ));
+        assert_eq!(edit.operation_count(), 1);
+        let commit = edit.commit().unwrap();
+        assert_eq!(commit.diagnostics().operation_count(), 1);
+        let expected = match case {
+            0 => vec!["Second", "Third"],
+            1 => vec!["Second", "Third", "First"],
+            2 => vec!["Third", "Second", "First"],
+            _ => vec!["Added", "First", "Second", "Third"],
+        };
+        let actual: Vec<_> = commit
+            .package()
+            .body()
+            .paragraphs()
+            .map(|p| p.to_text())
+            .collect();
+        assert_eq!(actual, expected);
+    }
+}

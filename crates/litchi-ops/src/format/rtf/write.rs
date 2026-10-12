@@ -190,8 +190,8 @@ fn paragraph_path(position: usize) -> Path<'static> {
     ])
 }
 
-/// Admit one paragraph-text assignment and publish all selected paragraphs in
-/// one native edit.
+/// Admit paragraph-property assignments and publish all selected paragraphs
+/// in one native edit.
 pub(crate) fn set_with_limits<'p, 'v>(
     file: &Rtf,
     target: TargetArg<'p>,
