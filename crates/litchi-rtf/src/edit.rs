@@ -689,6 +689,10 @@ pub enum Error {
     EmptyParagraphBatch,
     /// Paragraph batch selectors must be strictly increasing and unique.
     ParagraphBatchOutOfOrder { previous: usize, incoming: usize },
+    /// A paragraph-removal batch must contain at least one selector.
+    EmptyParagraphRemovalBatch,
+    /// Paragraph-removal selectors must be strictly increasing and unique.
+    ParagraphRemovalBatchOutOfOrder { previous: usize, incoming: usize },
     /// A paragraph-layout batch must contain at least one update.
     EmptyParagraphLayoutBatch,
     /// A paragraph-layout delta must name at least one field.
@@ -792,6 +796,13 @@ impl fmt::Display for Error {
             Self::ParagraphBatchOutOfOrder { previous, incoming } => write!(
                 formatter,
                 "RTF paragraph replacement positions must be strictly increasing: {incoming} follows {previous}"
+            ),
+            Self::EmptyParagraphRemovalBatch => {
+                formatter.write_str("RTF paragraph removal batch must not be empty")
+            },
+            Self::ParagraphRemovalBatchOutOfOrder { previous, incoming } => write!(
+                formatter,
+                "RTF paragraph removal positions must be strictly increasing: {incoming} follows {previous}"
             ),
             Self::EmptyParagraphLayoutBatch => {
                 formatter.write_str("RTF paragraph-layout update batch must not be empty")
@@ -920,6 +931,7 @@ pub struct Edit {
     operations: Vec<Operation>,
     replacement_bytes: usize,
     paragraph_batch_len: Option<usize>,
+    paragraph_removal_batch_len: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -1344,6 +1356,10 @@ impl Operation {
         )
     }
 
+    const fn is_paragraph_removal(&self) -> bool {
+        matches!(self, Self::RemoveParagraph { .. })
+    }
+
     const fn is_raw_paragraph_structure(&self) -> bool {
         matches!(
             self,
@@ -1373,6 +1389,7 @@ impl Edit {
             operations: Vec::new(),
             replacement_bytes: 0,
             paragraph_batch_len: None,
+            paragraph_removal_batch_len: None,
         }
     }
 
@@ -2471,6 +2488,77 @@ impl Edit {
         Ok(self)
     }
 
+    /// Atomically stages removal of several ordinary body paragraphs.
+    ///
+    /// Positions are zero-based ordinals in the immutable source snapshot and
+    /// must be strictly increasing.  The complete selection is preflighted
+    /// before any operation is appended, so an invalid late position leaves
+    /// this edit unchanged.  Publication removes each selected paragraph and
+    /// its exact source boundary while retaining every unrelated source byte.
+    ///
+    /// # Errors
+    /// Returns an error for an empty or unordered batch, an invalid selector,
+    /// incompatible staged work, or finite limits.  Changed publication keeps
+    /// the same source-closure and protection policy as [`Self::remove_paragraph`].
+    pub fn remove_body_paragraphs(&mut self, positions: &[usize]) -> Result<&mut Self, Error> {
+        if positions.is_empty() {
+            return Err(Error::EmptyParagraphRemovalBatch);
+        }
+        for (previous, incoming) in positions.iter().zip(positions.iter().skip(1)) {
+            if incoming <= previous {
+                return Err(Error::ParagraphRemovalBatchOutOfOrder {
+                    previous: *previous,
+                    incoming: *incoming,
+                });
+            }
+        }
+        let count = self.source.paragraph_count();
+        for position in positions {
+            if *position >= count {
+                return Err(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count,
+                });
+            }
+        }
+        self.ensure_lifecycle_room_for(positions.len())?;
+        let map = ordinary_paragraph_source_map(&self.source)?;
+        let semantic_text = self.source.text();
+        let mut texts = Vec::new();
+        texts
+            .try_reserve_exact(positions.len())
+            .map_err(|_| Error::Write("could not reserve paragraph removals".to_string()))?;
+        for position in positions {
+            let paragraph = map
+                .paragraphs
+                .get(*position)
+                .ok_or(Error::ParagraphOutOfRange {
+                    position: *position,
+                    count,
+                })?;
+            let text =
+                semantic_text
+                    .get(paragraph.text.clone())
+                    .ok_or(Error::UnsupportedSource(
+                        "ordinary paragraph source map has an invalid semantic range",
+                    ))?;
+            texts.push(clone_bounded_text(
+                text,
+                self.source.limits(),
+                "could not reserve ordinary paragraph text",
+            )?);
+        }
+        self.operations
+            .try_reserve(positions.len())
+            .map_err(|_| Error::Write("could not reserve paragraph operations".to_string()))?;
+        for (position, text) in positions.iter().copied().zip(texts) {
+            self.operations
+                .push(Operation::RemoveParagraph { position, text });
+        }
+        self.paragraph_removal_batch_len = Some(positions.len());
+        Ok(self)
+    }
+
     /// Moves one ordinary body paragraph to a final zero-based position.
     ///
     /// Both positions resolve against the immutable base paragraph list.
@@ -2767,8 +2855,12 @@ impl Edit {
     }
 
     fn ensure_lifecycle_room(&self) -> Result<(), Error> {
+        self.ensure_lifecycle_room_for(1)
+    }
+
+    fn ensure_lifecycle_room_for(&self, additional: usize) -> Result<(), Error> {
         self.ensure_body_compatible()?;
-        self.ensure_operation_room()?;
+        self.ensure_operation_room_for(additional)?;
         if self.operations.iter().any(Operation::is_property) {
             return Err(Error::StructuralPropertyConflict);
         }
@@ -3435,6 +3527,14 @@ impl Edit {
             return Ok(Commit::new(self.source.clone(), self.source, 0, Vec::new()));
         }
 
+        if self.operations.iter().all(Operation::is_paragraph_removal) {
+            let preserve_batch_boundaries = self.paragraph_removal_batch_len.is_some();
+            return commit_body_paragraph_removals(
+                self,
+                operation_count,
+                preserve_batch_boundaries,
+            );
+        }
         if self
             .operations
             .iter()
@@ -4407,6 +4507,146 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
             Operation::Text { .. } => return Err(Error::BodyDestinationConflict),
             _ => return Err(Error::BodyDestinationConflict),
         };
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
+fn commit_body_paragraph_removals(
+    edit: Edit,
+    operation_count: usize,
+    preserve_batch_boundaries: bool,
+) -> Result<Commit, Error> {
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let map = ordinary_paragraph_source_map(&edit.source)?;
+    let mut ranges = Vec::new();
+    ranges
+        .try_reserve_exact(operation_count)
+        .map_err(|_| Error::Write("could not reserve paragraph removal ranges".to_string()))?;
+
+    for operation in &edit.operations {
+        let Operation::RemoveParagraph { position, text } = operation else {
+            return Err(Error::BodyDestinationConflict);
+        };
+        let paragraph = map
+            .paragraphs
+            .get(*position)
+            .ok_or(Error::ParagraphOutOfRange {
+                position: *position,
+                count: map.paragraphs.len(),
+            })?;
+        if edit.source.text().get(paragraph.text.clone()) != Some(text.as_str()) {
+            return Err(Error::StalePrecondition("paragraph text differs"));
+        }
+        let range = if preserve_batch_boundaries {
+            let end = paragraph
+                .boundary_after
+                .as_ref()
+                .map_or(paragraph.source.end, |boundary| boundary.end);
+            paragraph.source.start..end
+        } else if let Some(boundary) = &paragraph.boundary_after {
+            paragraph.source.start..boundary.end
+        } else if *position == 0 {
+            paragraph.source.clone()
+        } else {
+            let previous = map.paragraphs.get(position.saturating_sub(1)).ok_or(
+                Error::ParagraphOutOfRange {
+                    position: position.saturating_sub(1),
+                    count: map.paragraphs.len(),
+                },
+            )?;
+            let boundary = previous
+                .boundary_after
+                .as_ref()
+                .ok_or(Error::UnsupportedSource(
+                    "ordinary paragraph has no exact source boundary",
+                ))?;
+            boundary.start..paragraph.source.end
+        };
+        ranges.push((range, Vec::new()));
+    }
+
+    // Scalar lifecycle removal owns the preceding boundary of a final
+    // paragraph.  Batch removal owns each selected paragraph's following
+    // boundary instead, which leaves controls belonging to unselected empty
+    // paragraphs intact.  Merge only overlapping batch ranges so an empty
+    // survivor between two selections is never consumed.
+    ranges.sort_unstable_by_key(|(range, _)| (range.start, range.end));
+    let mut merged = Vec::with_capacity(ranges.len());
+    for (range, replacement) in ranges {
+        if let Some((previous, _)) = merged.last_mut()
+            && if preserve_batch_boundaries {
+                range.start < previous.end
+            } else {
+                range.start <= previous.end
+            }
+        {
+            previous.end = previous.end.max(range.end);
+            continue;
+        }
+        merged.push((range, replacement));
+    }
+
+    let bytes = splice_body_ranges(source_bytes, &merged, edit.source.limits())?;
+    let semantic_delta = {
+        let mut changes = semantic_changes(&edit.operations, &[]);
+        // Keep removals high-to-low for any future batch-aware durable
+        // projection; the current wire adapter refuses multi-removal batches
+        // until it can carry their source-bound preconditions.
+        changes.reverse();
+        changes
+    };
+    if bytes == source_bytes {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    let selected = edit
+        .operations
+        .iter()
+        .filter_map(|operation| match operation {
+            Operation::RemoveParagraph { position, .. } => Some(*position),
+            _ => None,
+        })
+        .collect::<Vec<_>>();
+    let mut actual = snapshot.body().paragraphs();
+    for (position, expected) in edit.source.body().paragraphs().enumerate() {
+        if selected.binary_search(&position).is_ok() {
+            continue;
+        }
+        let Some(observed) = actual.next() else {
+            return Err(Error::UnsupportedSource(
+                "candidate paragraph removal dropped an unselected paragraph",
+            ));
+        };
+        if expected.to_text() != observed.to_text() {
+            return Err(Error::UnsupportedSource(
+                "candidate paragraph removal changed an unselected paragraph",
+            ));
+        }
+    }
+    if actual.next().is_some()
+        || snapshot.paragraph_count()
+            != edit
+                .source
+                .paragraph_count()
+                .saturating_sub(operation_count)
+    {
+        return Err(Error::UnsupportedSource(
+            "candidate paragraph removal failed ordinary-story readback",
+        ));
+    }
     Ok(Commit::new(
         edit.source,
         snapshot,
@@ -10310,6 +10550,16 @@ impl Patch {
         {
             return Err(litchi_core::patch::PatchError::InvalidText {
                 field: "RTF paragraph-layout durable patches are not supported",
+            });
+        }
+        if self.changes.len() > 1
+            && self
+                .changes
+                .iter()
+                .all(|change| matches!(change, Change::RemoveParagraph { .. }))
+        {
+            return Err(litchi_core::patch::PatchError::InvalidText {
+                field: "RTF multi-paragraph removal durable patches require source-bound batch preconditions",
             });
         }
 

@@ -623,7 +623,8 @@ impl Edit {
                 feature = "xlsb",
                 feature = "xls",
                 feature = "pptx",
-                feature = "ppt"
+                feature = "ppt",
+                feature = "rtf"
             ))]
             let limits = self.limits;
             self.execute(|file| match file {
@@ -655,6 +656,12 @@ impl Edit {
                 ),
                 #[cfg(feature = "pptx")]
                 File::Pptx(handle) => wrap_pptx(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "rtf")]
+                File::Rtf(handle) => wrap_rtf(
                     handle,
                     handle.remove_with_limits(target.clone(), &limits)?,
                     (),

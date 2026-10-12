@@ -1621,6 +1621,8 @@ impl Classify for litchi_rtf::edit::Error {
             Self::InvalidLimit { .. } => Class::of(Code::InvalidArgument),
             Self::EmptyParagraphBatch
             | Self::ParagraphBatchOutOfOrder { .. }
+            | Self::EmptyParagraphRemovalBatch
+            | Self::ParagraphRemovalBatchOutOfOrder { .. }
             | Self::EmptyParagraphLayoutBatch
             | Self::EmptyParagraphLayoutPatch { .. }
             | Self::ParagraphLayoutBatchOutOfOrder { .. }

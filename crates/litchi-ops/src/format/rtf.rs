@@ -109,6 +109,21 @@ impl Rtf {
         write::set_with_limits(self, target, props, limits)
     }
 
+    /// Remove one paragraph or every paragraph selected by a scoped query.
+    pub(crate) fn remove<'p>(&self, target: TargetArg<'p>) -> Result<write::Commit> {
+        let limits = SemanticLimits::default();
+        self.remove_with_limits(target, &limits)
+    }
+
+    /// Remove selected body paragraphs through one bounded native transaction.
+    pub(crate) fn remove_with_limits<'p>(
+        &self,
+        target: TargetArg<'p>,
+        limits: &SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::remove_with_limits(self, target, limits)
+    }
+
     pub(crate) fn write_to(&self, sink: impl std::io::Write) -> Result<()> {
         self.0
             .package

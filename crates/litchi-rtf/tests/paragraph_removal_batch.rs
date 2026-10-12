@@ -1,0 +1,166 @@
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    reason = "test assertions panic on failure by design"
+)]
+
+use litchi_rtf::{Package, ProtectionType, edit::Error};
+
+fn source() -> Package {
+    Package::parse(r"{\rtf1\ansi First\par Second\par Third\par Fourth}").unwrap()
+}
+
+fn paragraphs(document: &Package) -> Vec<String> {
+    document
+        .body()
+        .paragraphs()
+        .map(|paragraph| paragraph.to_text())
+        .collect()
+}
+
+fn assert_paragraphs(document: &Package, expected: &[&str]) {
+    assert_eq!(
+        paragraphs(document),
+        expected
+            .iter()
+            .map(|text| (*text).to_owned())
+            .collect::<Vec<_>>()
+    );
+}
+
+#[test]
+fn batch_positions_are_relative_to_the_original_snapshot() {
+    let source = source();
+    let mut edit = source.edit();
+    edit.remove_body_paragraphs(&[0, 2]).unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_paragraphs(commit.package(), &["Second", "Fourth"]);
+    assert_eq!(
+        commit.package().to_bytes().unwrap(),
+        br"{\rtf1\ansi Second\par Fourth}"
+    );
+    assert!(
+        source
+            .apply(commit.patch())
+            .unwrap()
+            .same_snapshot(commit.package())
+    );
+    assert!(
+        commit
+            .package()
+            .apply(&commit.patch().inverse())
+            .unwrap()
+            .same_snapshot(&source)
+    );
+}
+
+#[test]
+fn first_middle_last_and_all_removals_preserve_the_unselected_story() {
+    for (positions, expected) in [
+        (&[0][..], &["Second", "Third", "Fourth"][..]),
+        (&[1][..], &["First", "Third", "Fourth"][..]),
+        (&[3][..], &["First", "Second", "Third"][..]),
+        (&[0, 1, 2, 3][..], &[][..]),
+    ] {
+        let source = source();
+        let mut edit = source.edit();
+        edit.remove_body_paragraphs(positions).unwrap();
+        let commit = edit.commit().unwrap();
+        assert_paragraphs(commit.package(), expected);
+        assert_eq!(commit.diagnostics().operation_count(), positions.len());
+    }
+}
+
+#[test]
+fn adjacent_empty_paragraph_removal_is_one_atomic_source_splice() {
+    let source = Package::parse(r"{\rtf1\ansi First\par\par Third}").unwrap();
+    let mut edit = source.edit();
+    edit.remove_body_paragraphs(&[1]).unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_paragraphs(commit.package(), &["First", "Third"]);
+    assert_eq!(
+        commit.package().to_bytes().unwrap(),
+        br"{\rtf1\ansi First\par Third}"
+    );
+}
+
+#[test]
+fn batch_removal_keeps_an_unselected_empty_paragraph() {
+    let source = Package::parse(r"{\rtf1\ansi First\par\par Third}").unwrap();
+
+    let mut ends = source.edit();
+    ends.remove_body_paragraphs(&[2]).unwrap();
+    let ends = ends.commit().unwrap();
+    assert_paragraphs(ends.package(), &["First", ""]);
+
+    let mut separated = source.edit();
+    separated.remove_body_paragraphs(&[0, 2]).unwrap();
+    let separated = separated.commit().unwrap();
+    assert_paragraphs(separated.package(), &[""]);
+}
+
+#[test]
+fn removal_batch_validates_empty_order_and_bounds_without_staging() {
+    let source = source();
+
+    let mut empty = source.edit();
+    assert!(matches!(
+        empty.remove_body_paragraphs(&[]),
+        Err(Error::EmptyParagraphRemovalBatch)
+    ));
+    assert_eq!(empty.operation_count(), 0);
+
+    let mut unordered = source.edit();
+    assert!(matches!(
+        unordered.remove_body_paragraphs(&[2, 1]),
+        Err(Error::ParagraphRemovalBatchOutOfOrder { .. })
+    ));
+    assert_eq!(unordered.operation_count(), 0);
+
+    let mut late = source.edit();
+    assert!(matches!(
+        late.remove_body_paragraphs(&[0, 99]),
+        Err(Error::ParagraphOutOfRange {
+            position: 99,
+            count: 4
+        })
+    ));
+    assert_eq!(late.operation_count(), 0);
+}
+
+#[test]
+fn protected_batch_refuses_publication_and_leaves_source_unchanged() {
+    let source = Package::parse(r"{\rtf1\ansi\readprot\enforceprot1 First\par Second}").unwrap();
+    let exact = source.to_bytes().unwrap();
+    let mut edit = source.edit();
+    edit.remove_body_paragraphs(&[0, 1]).unwrap();
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::ProtectedDocument {
+            protection_type: ProtectionType::ReadOnly
+        })
+    ));
+    assert_eq!(source.to_bytes().unwrap(), exact);
+}
+
+#[test]
+fn batch_patch_inverse_is_exact_and_durable_projection_is_source_bound() {
+    let source = source();
+    let mut edit = source.edit();
+    edit.remove_body_paragraphs(&[1, 3]).unwrap();
+    let commit = edit.commit().unwrap();
+    let limits = litchi_core::patch::PatchLimits::new(
+        litchi_core::patch::BlobLimits::new(0, 0, 0),
+        1024 * 1024,
+        8,
+        8,
+        256 * 1024,
+        512 * 1024,
+    );
+    assert!(matches!(
+        commit.patch().to_durable(limits),
+        Err(litchi_core::patch::PatchError::InvalidText { .. })
+    ));
+}

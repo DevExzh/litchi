@@ -114,6 +114,87 @@ pub(crate) fn set_with_limits<'p, 'v>(
     })
 }
 
+/// Remove every selected ordinary body paragraph in one native transaction.
+pub(crate) fn remove_with_limits<'p>(
+    file: &Rtf,
+    target: TargetArg<'p>,
+    limits: &SemanticLimits,
+) -> Result<Commit> {
+    file.admit_edit()?;
+    let positions = resolve_paragraph_targets(file, &target, limits.max_expanded_targets())?;
+    let operations = positions.len();
+    if operations > limits.max_operations() {
+        return Err(TransactionError::Limit {
+            kind: LimitKind::Operations,
+            observed: operations,
+            maximum: limits.max_operations(),
+        }
+        .into());
+    }
+
+    // Native removal retains each selected paragraph's text for stale-source
+    // checks and reversible history. Charge that retained payload before the
+    // native operation allocates its owned copies.
+    let mut removed_bytes = 0usize;
+    let mut selected = positions.iter().copied();
+    let mut next = selected.next();
+    for (position, paragraph) in file.0.package.body().paragraphs().enumerate() {
+        if next == Some(position) {
+            removed_bytes = removed_bytes
+                .checked_add(paragraph.len())
+                .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+            next = selected.next();
+        }
+        if next.is_none() {
+            break;
+        }
+    }
+    let action_bytes = operations
+        .checked_mul(size_of::<usize>() + size_of::<String>())
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    let staged_bytes = removed_bytes
+        .checked_add(action_bytes)
+        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+    if staged_bytes > limits.max_staged_bytes() {
+        return Err(staged_limit(staged_bytes, limits.max_staged_bytes()));
+    }
+
+    let native_limits = NativeLimits::builder()
+        .max_operations(limits.max_operations())
+        .map_err(Error::from)?
+        .max_replacement_bytes(limits.max_staged_bytes())
+        .map_err(Error::from)?
+        .build()
+        .map_err(Error::from)?;
+    let options = EditOptions::new().semantic_limits(native_limits);
+    let mut edit = file.0.package.edit_with_options(options);
+    edit.remove_body_paragraphs(&positions)
+        .map_err(Error::from)?;
+    let native = edit.commit().map_err(Error::from)?;
+
+    let changed = native.diagnostics().changed();
+    let operation_count = native.diagnostics().operation_count();
+    let (package, patch) = native.into_parts();
+    let snapshot_bytes = patch_snapshot_bytes(&patch);
+    if snapshot_bytes > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(snapshot_bytes, limits.max_snapshot_bytes()));
+    }
+    let before = file.clone();
+    let after = if changed {
+        file.with_package(package)
+    } else {
+        file.clone()
+    };
+    file.check_source()?;
+    Ok(Commit {
+        before,
+        after,
+        patch,
+        operations: operation_count,
+        snapshot_bytes,
+    })
+}
+
 fn paragraph_text<'a>(props: &'a Props<'_>) -> Result<&'a str> {
     if props.len() != 1 {
         return Err(Error::new(

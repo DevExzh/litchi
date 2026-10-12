@@ -189,6 +189,10 @@ impl File {
             Self::Pptx(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Pptx(commit.into_file())),
+            #[cfg(feature = "rtf")]
+            Self::Rtf(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Rtf(commit.after)),
             Self::Signed(_) => Err(protected(self)),
             Self::Locked(locked) => Err(locked.read_error()),
             #[allow(unreachable_patterns)]

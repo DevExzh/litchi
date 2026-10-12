@@ -790,7 +790,7 @@ impl Capabilities {
                 return Support::Supported;
             }
             #[cfg(feature = "rtf")]
-            if matches!(verb, Verb::Set | Verb::Edit | Verb::Batch)
+            if matches!(verb, Verb::Set | Verb::Remove | Verb::Edit | Verb::Batch)
                 && self.adapter() == Some(Adapter::Rtf)
             {
                 return Support::Supported;
@@ -1230,9 +1230,9 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
     },
 ];
 
-/// RTF's first write adapter intentionally admits only existing main-story
-/// paragraph text.  Keep the remaining mutation verbs visible instead of
-/// making the format-level `set`/`edit`/`batch` support look like general CRUD.
+/// RTF's write adapter admits existing main-story paragraph text and removal.
+/// Keep the remaining mutation verbs visible instead of making the format-level
+/// `set`/`remove`/`edit`/`batch` support look like general CRUD.
 #[cfg(feature = "rtf")]
 static RTF_WRITE_GAPS: [GapSpec; 5] = [
     GapSpec {
@@ -1247,6 +1247,16 @@ static RTF_WRITE_GAPS: [GapSpec; 5] = [
     },
     GapSpec {
         subject: Subject::Operation {
+            verb: "remove",
+            element: "paragraph",
+            context: "native-source-closure",
+        },
+        code: Code::UnsupportedCapability,
+        follow_up: "M6 RTF rich paragraph preservation",
+        reason: "paragraph removal requires the native editor to prove an ordinary literal body and retain every unselected source boundary",
+    },
+    GapSpec {
+        subject: Subject::Operation {
             verb: "add",
             element: "body",
             context: "paragraph-text-only",
@@ -1254,16 +1264,6 @@ static RTF_WRITE_GAPS: [GapSpec; 5] = [
         code: Code::UnsupportedCapability,
         follow_up: "M6 RTF structural body editing",
         reason: "the RTF write adapter replaces existing ordinary paragraph text and does not add elements",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "body",
-            context: "paragraph-text-only",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF structural body editing",
-        reason: "the RTF write adapter does not expose element removal",
     },
     GapSpec {
         subject: Subject::Operation {
@@ -2757,6 +2757,9 @@ impl Element {
                 && self.retains_source != Some(false)
                 && self.data().canonical == "slide"
                 && readable);
+        #[cfg(feature = "rtf")]
+        let remove =
+            remove || (self.adapter == Adapter::Rtf && self.data().canonical == "p" && readable);
         Operations {
             add,
             set: settable,
