@@ -529,8 +529,10 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
     def test_unified_ops_routes_are_opt_in_named_and_paired(self):
         # Plan 0003 section 5.3: every re-measured scenario gets a `unified_`
         # route through `litchi::open*` and `litchi::File`, and a `leaf_` twin
-        # that makes the same leaf calls directly. Both names are the
-        # predecessor's with the leg infix inserted. M0a step S9 deleted the 47
+        # that makes the same leaf calls directly. The PPT text batch routes
+        # are a separate native/unified pair because they measure the shared
+        # batch implementation rather than a leaf facade. Both legacy route
+        # families use the predecessor's leg infix. M0a step S9 deleted the 47
         # predecessors that timed the deleted facade types (their frozen
         # records keep the names); the 15 others stay registered.
         from tools.validate_crud_coverage_index import _selector_registry_names
@@ -539,8 +541,24 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         registry = set(names)
         unified = [name for name in names if "_unified_" in name]
         leaf = [name for name in names if "_leaf_" in name]
-        self.assertEqual(len(unified), 62)
+        batch_unified = [
+            name for name in unified if name.startswith("ppt_text_batch_")
+        ]
+        batch_native = [
+            name
+            for name in names
+            if name.startswith("ppt_text_batch_") and "_native_" in name
+        ]
+        self.assertEqual(len(unified), 76)
         self.assertEqual(len(leaf), 56)
+        self.assertEqual(len(batch_unified), 14)
+        self.assertEqual(len(batch_native), 14)
+        self.assertEqual(
+            sorted(name.replace("_unified_", "_native_", 1) for name in batch_unified),
+            sorted(batch_native),
+        )
+        legacy_unified = [name for name in unified if name not in batch_unified]
+        self.assertEqual(len(legacy_unified), 62)
         guard_start = self.library.index(
             "fn m0a_s9_deleted_the_facade_predecessor_selectors()"
         )
@@ -553,7 +571,7 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         self.assertEqual(len(deleted), 47)
         self.assertFalse(deleted & registry)
         kept = set()
-        for name in unified + leaf:
+        for name in legacy_unified + leaf:
             infix = "_unified_" if "_unified_" in name else "_leaf_"
             predecessor = name.replace(infix, "_", 1)
             if predecessor not in registry and predecessor not in deleted:
@@ -577,7 +595,7 @@ class PerfBaselineSourcePolicyTests(unittest.TestCase):
         self.assertEqual(
             sorted(
                 name
-                for name in unified
+                for name in legacy_unified
                 if name.replace("_unified_", "_leaf_", 1) not in registry
             ),
             sorted(
