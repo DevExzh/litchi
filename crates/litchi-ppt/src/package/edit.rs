@@ -471,6 +471,36 @@ impl Edit {
         self.stage(charge, |inner| inner.set_shape_texts(replacements))
     }
 
+    /// Set shape texts from several bounded chunks as one atomic publication.
+    ///
+    /// Every chunk retains the 256-replacement contract of
+    /// [`Self::set_shape_texts`]. The native owner admits at most 4096 chunks,
+    /// including empty chunks, and at most 4096 replacements across the whole
+    /// call. Targets must be globally distinct. The operation count charged
+    /// to this primary edit is the aggregate replacement count, so a valid
+    /// chunked call consumes the same finite operation budget as its flattened
+    /// equivalent. Empty plans consume no operations.
+    ///
+    /// # Errors
+    ///
+    /// Returns the canonical operation-limit error before native work when
+    /// the aggregate charge exceeds this edit's selected budget. Native
+    /// chunk, replacement-byte, duplicate-target, encoding, dependency,
+    /// signed-source, and publication refusals leave this edit unchanged.
+    pub fn set_shape_text_chunks<'a>(
+        &mut self,
+        chunks: &[&'a [ShapeTextReplacement]],
+    ) -> Result<usize> {
+        let charge = chunks.iter().try_fold(0usize, |total, chunk| {
+            total.checked_add(chunk.len()).ok_or_else(|| {
+                Error::Package(PackageError::ResourceLimit(
+                    "PPT shape-text aggregate operation count overflow".into(),
+                ))
+            })
+        })?;
+        self.stage(charge, |inner| inner.set_shape_text_chunks(chunks))
+    }
+
     /// Set one existing shape's complete checked client anchor.
     pub fn set_shape_anchor(&mut self, target: Target, anchor: crate::Anchor) -> Result<()> {
         self.stage(1, |inner| inner.set_shape_anchor(target, anchor))

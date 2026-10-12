@@ -32,6 +32,16 @@ pub const MAX_SLIDE_ADVANCE_MS: u32 = 86_399_000;
 /// package parsing, or replacement encoding.
 pub const MAX_SHAPE_TEXT_REPLACEMENTS: usize = 256;
 
+/// Maximum number of chunks accepted by one aggregate shape-text operation.
+///
+/// The bound includes empty chunks. It is checked before the source
+/// presentation or any selected target is resolved.
+pub const MAX_SHAPE_TEXT_CHUNKS: usize = 4096;
+
+/// Maximum number of globally selected shapes accepted by one aggregate
+/// shape-text operation.
+pub const MAX_SHAPE_TEXT_CHUNK_SELECTIONS: usize = 4096;
+
 /// Fixed-width manual and automatic advance state from one
 /// `SlideShowSlideInfoAtom`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
@@ -1265,6 +1275,70 @@ impl ShapeTextReplacement {
     }
 }
 
+/// Flattens an aggregate shape-text plan only after all finite admission
+/// dimensions have been checked.
+///
+/// The returned descriptors borrow the caller's replacement strings. Keeping
+/// this admission separate from target resolution means an oversized or
+/// malformed chunk plan cannot trigger package parsing or proportional native
+/// work. The byte count is checked here as well as in the native publisher so
+/// a future caller cannot accidentally turn an aggregate sum into a wrapping
+/// counter.
+fn flatten_shape_text_chunks<'a>(
+    chunks: &[&'a [ShapeTextReplacement]],
+) -> Result<(Vec<(crate::text_edit::Target, &'a str)>, usize)> {
+    if chunks.len() > MAX_SHAPE_TEXT_CHUNKS {
+        return Err(PackageError::ResourceLimit(format!(
+            "PPT shape-text chunk count {} exceeds limit {}",
+            chunks.len(),
+            MAX_SHAPE_TEXT_CHUNKS
+        ))
+        .into());
+    }
+
+    let mut selection_count = 0usize;
+    let mut replacement_bytes = 0usize;
+    for chunk in chunks {
+        if chunk.len() > MAX_SHAPE_TEXT_REPLACEMENTS {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT shape-text chunk operation count {} exceeds limit {}",
+                chunk.len(),
+                MAX_SHAPE_TEXT_REPLACEMENTS
+            ))
+            .into());
+        }
+        selection_count = selection_count.checked_add(chunk.len()).ok_or_else(|| {
+            PackageError::ResourceLimit("PPT shape-text aggregate operation count overflow".into())
+        })?;
+        if selection_count > MAX_SHAPE_TEXT_CHUNK_SELECTIONS {
+            return Err(PackageError::ResourceLimit(format!(
+                "PPT shape-text aggregate operation count {} exceeds limit {}",
+                selection_count, MAX_SHAPE_TEXT_CHUNK_SELECTIONS
+            ))
+            .into());
+        }
+        for replacement in *chunk {
+            replacement_bytes = replacement_bytes
+                .checked_add(replacement.text().len())
+                .ok_or_else(|| {
+                    PackageError::ResourceLimit(
+                        "PPT shape-text aggregate replacement byte count overflow".into(),
+                    )
+                })?;
+        }
+    }
+
+    let mut flattened = Vec::with_capacity(selection_count);
+    for chunk in chunks {
+        flattened.extend(
+            chunk
+                .iter()
+                .map(|replacement| (replacement.target(), replacement.text())),
+        );
+    }
+    Ok((flattened, replacement_bytes))
+}
+
 impl ShapeTextChange {
     /// Semantic source-order shape target.
     #[must_use]
@@ -1943,14 +2017,30 @@ impl Transaction {
             return Ok(0);
         }
 
+        let mapped = replacements
+            .iter()
+            .map(|replacement| (replacement.target(), replacement.text()))
+            .collect::<Vec<_>>();
+        self.set_shape_texts_mapped(&mapped)
+    }
+
+    fn set_shape_texts_mapped<'a>(
+        &mut self,
+        replacements: &[(crate::text_edit::Target, &'a str)],
+    ) -> Result<usize> {
+        if replacements.is_empty() {
+            return Ok(0);
+        }
+
         let projected = self.document.slides()?;
         let mut seen = BTreeSet::new();
         let mut mapped = Vec::with_capacity(replacements.len());
         let mut expected_persist_ids = BTreeMap::new();
-        for replacement in replacements {
-            let target = replacement.target();
+        for (target, replacement) in replacements {
             if !seen.insert((target.slide().get(), target.shape().get())) {
-                return Err(Error::Refused(Refusal::DuplicateShapeTextTarget { target }));
+                return Err(Error::Refused(Refusal::DuplicateShapeTextTarget {
+                    target: *target,
+                }));
             }
             let selected = projected.get(target.slide().get()).ok_or(Error::Refused(
                 Refusal::SlideNotFound {
@@ -1967,7 +2057,7 @@ impl Transaction {
                 .map(Position::new)
                 .ok_or(Error::Refused(Refusal::UncommittedSlideDependency))?;
             let source_target = crate::text_edit::Target::new(source_position, target.shape());
-            mapped.push((source_target, replacement.text()));
+            mapped.push((source_target, *replacement));
             expected_persist_ids.insert(
                 (source_target.slide().get(), source_target.shape().get()),
                 persist_id,
@@ -2027,6 +2117,36 @@ impl Transaction {
         self.formatting
             .extend(changes.into_iter().map(FormattingChange::Text));
         Ok(changed)
+    }
+
+    /// Atomically replaces shape text from several bounded replacement
+    /// chunks.
+    ///
+    /// Each inner chunk retains the 256-target contract of
+    /// [`Self::set_shape_texts`]. The aggregate accepts at most
+    /// [`MAX_SHAPE_TEXT_CHUNKS`] chunks, including empty chunks, and at most
+    /// [`MAX_SHAPE_TEXT_CHUNK_SELECTIONS`] selected shapes. Targets must be
+    /// globally distinct across all chunks. The complete flattened plan is
+    /// admitted before target resolution, then all changed slide records are
+    /// grouped into one native publication and one candidate reopen/readback.
+    /// Exact no-ops retain the working allocation, and a failed call leaves
+    /// this transaction unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns a resource-limit error for a chunk, aggregate selection, or
+    /// replacement-byte limit; duplicate semantic targets, missing targets,
+    /// incompatible encodings, unsafe dependency closures, signed changes,
+    /// and publication failures are returned without partial state.
+    pub fn set_shape_text_chunks<'a>(
+        &mut self,
+        chunks: &[&'a [ShapeTextReplacement]],
+    ) -> Result<usize> {
+        let (flattened, _replacement_bytes) = flatten_shape_text_chunks(chunks)?;
+        if flattened.is_empty() {
+            return Ok(0);
+        }
+        self.set_shape_texts_mapped(&flattened)
     }
 
     /// Replaces an existing shape's complete checked `PowerPoint` client anchor.
