@@ -79,6 +79,21 @@ fn paragraph_batch_preserves_inline_line_breaks_outside_selected_paragraphs() {
 }
 
 #[test]
+fn paragraph_batch_ascii_fanout_delimits_empty_paragraph_replacements() {
+    let source = Package::parse(r"{\rtf1\ansi First\line second\par\par Third}").unwrap();
+    let mut edit = source.edit();
+    edit.replace_body_paragraph_texts(&replacements(&[(0, "same"), (1, "same"), (2, "same")]))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(commit.package().text(), "same\nsame\nsame");
+    assert_eq!(
+        commit.package().to_bytes().unwrap(),
+        br"{\rtf1\ansi same\par same\par same}"
+    );
+}
+
+#[test]
 fn paragraph_batch_rejects_bad_shape_and_late_selector_atomically() {
     let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
 

@@ -4460,7 +4460,21 @@ fn commit_body_paragraph_batch(edit: Edit, operation_count: usize) -> Result<Com
         if edit.source.text().get(span.clone()) != Some(before.as_str()) {
             return Err(Error::StalePrecondition("paragraph text differs"));
         }
-        let encoded = encoded_body_text(after, edit.source.limits())?;
+        let mut encoded = encoded_body_text(after, edit.source.limits())?;
+        let previous_is_alpha = paragraph
+            .source
+            .start
+            .checked_sub(1)
+            .and_then(|index| source_bytes.get(index))
+            .is_some_and(u8::is_ascii_alphabetic);
+        if paragraph.source.start == paragraph.source.end
+            && encoded
+                .first()
+                .is_some_and(|byte| byte.is_ascii_alphanumeric())
+            && previous_is_alpha
+        {
+            encoded.insert(0, b' ');
+        }
         replacements.push((paragraph.source.clone(), encoded));
     }
     let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
