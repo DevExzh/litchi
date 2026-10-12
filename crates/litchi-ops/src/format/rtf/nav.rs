@@ -92,13 +92,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 };
                 let run = position.and_then(|position| {
                     paragraph.runs().nth(position).map(|run| {
-                        Node::run(
-                            self.doc,
-                            paragraph_position,
-                            Position::new(position),
-                            paragraph,
-                            run,
-                        )
+                        Node::run(self.doc, paragraph_position, Position::new(position), run)
                     })
                 });
                 Ok(run.map_or(Lookup::Missing, Lookup::Found))

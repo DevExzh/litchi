@@ -21,7 +21,7 @@ pub struct Node<'f> {
     pub(super) paragraph_position: Option<Position>,
     /// The run's zero-based position within its containing paragraph.
     pub(super) run_position: Option<Position>,
-    /// Borrowed native paragraph retained by paragraph and run nodes.
+    /// Borrowed native paragraph retained by paragraph nodes.
     pub(super) paragraph: Option<litchi_rtf::text::Paragraph<'f>>,
     /// Borrowed native run retained by run nodes.
     pub(super) run: Option<litchi_rtf::text::Run<'f>>,
@@ -85,7 +85,6 @@ impl<'f> Node<'f> {
         doc: &'f Rtf,
         paragraph_position: Position,
         run_position: Position,
-        paragraph: litchi_rtf::text::Paragraph<'f>,
         run: litchi_rtf::text::Run<'f>,
     ) -> Self {
         Self {
@@ -93,7 +92,7 @@ impl<'f> Node<'f> {
             kind: Kind::Run,
             paragraph_position: Some(paragraph_position),
             run_position: Some(run_position),
-            paragraph: Some(paragraph),
+            paragraph: None,
             run: Some(run),
             steps: [
                 PathStep::new("body"),
