@@ -56,6 +56,42 @@ positional owners use identical input bytes. Setup, opening, serialization
 and verification are outside timing. Every remaining coordinate/value,
 output bytes and source immutability are checked.
 
+## Paired removal measurements
+
+The [initial five-sample run](results/0206-xls-remove.json) passed output
+byte equality, complete coordinate/value checks and source immutability in
+every case. Eager overhead ranged from -6.5% to 5.1%. The one-cell filesystem
+case measured 15.2% overhead (46.190 versus 53.200 microseconds), exceeding
+the 10% target; the other filesystem cases were within 0.1% or faster.
+
+A [15-sample repeat](results/0206-xls-remove-repeat.json) retained all
+correctness checks and produced these medians in microseconds:
+
+| Owner | Cells | Native | Unified | Unified/native |
+|---|---:|---:|---:|---:|
+| Eager | 1 | 45.750 | 46.580 | 1.0181× |
+| Eager | 100 | 120.591 | 117.640 | 0.9755× |
+| Eager | 1,000 | 875.584 | 894.934 | 1.0221× |
+| Eager | 10,000 | 8270.058 | 8577.320 | 1.0372× |
+| Filesystem | 1 | 45.150 | 49.340 | 1.0928× |
+| Filesystem | 100 | 97.481 | 100.460 | 1.0306× |
+| Filesystem | 1,000 | 610.603 | 614.033 | 1.0056× |
+| Filesystem | 10,000 | 5604.636 | 5616.716 | 1.0022× |
+
+The repeat is within 10% for each scenario, but the initial small-source miss
+means stable qualification of that case remains open. Its absolute overhead
+is 4–7 microseconds; the facade resolves the target and enforces admission
+before the native edit. No profiling attribution is claimed. Ratios below
+1.0 are measurement variation, not a claimed speedup. These single-cell
+numeric cases do not qualify packed/text removal, memory or batch scaling.
+
+Measured source commit: `2a49422eb7198b178deefb74870d1dfa60ec8dbb`.
+Build with `cargo build --release -p litchi-ops --features xls --example
+xls_remove_bench`; run with `LITCHI_XLS_BENCH_SAMPLES=5` or `15` and
+`target/release/examples/xls_remove_bench`. Binary SHA-256:
+`9c79cb0af73e9e004252afde4ef783e6fe852572e680800c910e9ab4f628fc81`.
+No binary is committed.
+
 ## Remaining scope
 
 XLS add/move/swap, worksheet and axis removal, formula/style authoring,

@@ -1,0 +1,248 @@
+{
+  "schema": "litchi.xls_remove_bench.v1",
+  "samples": 5,
+  "warmup_passes": 1,
+  "generation_included": false,
+  "opening_included": false,
+  "path_construction_included": false,
+  "serialization_included": false,
+  "verification_included": false,
+  "python_required": false,
+  "cases": [
+    {
+      "cells": 1,
+      "source_backed": false,
+      "xls_bytes": 4096,
+      "target_row": 0,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_checksum": 14695981039346656037,
+      "native_output_bytes": 4096,
+      "unified_output_bytes": 4096,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_remove_ns": [
+        61570,
+        52100,
+        49580,
+        47470,
+        46621
+      ],
+      "unified_remove_ns": [
+        57011,
+        53430,
+        48680,
+        47720,
+        47570
+      ]
+    },
+    {
+      "cells": 100,
+      "source_backed": false,
+      "xls_bytes": 7168,
+      "target_row": 50,
+      "expected_checksum": 11623209917866462269,
+      "native_checksum": 11623209917866462269,
+      "unified_checksum": 11623209917866462269,
+      "native_output_bytes": 7168,
+      "unified_output_bytes": 7168,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_remove_ns": [
+        135790,
+        130481,
+        126711,
+        120020,
+        119211
+      ],
+      "unified_remove_ns": [
+        134901,
+        123511,
+        118490,
+        117321,
+        117230
+      ]
+    },
+    {
+      "cells": 1000,
+      "source_backed": false,
+      "xls_bytes": 43520,
+      "target_row": 500,
+      "expected_checksum": 5914010917817284061,
+      "native_checksum": 5914010917817284061,
+      "unified_checksum": 5914010917817284061,
+      "native_output_bytes": 43520,
+      "unified_output_bytes": 43520,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_remove_ns": [
+        939674,
+        873694,
+        870244,
+        858184,
+        865064
+      ],
+      "unified_remove_ns": [
+        941874,
+        895685,
+        895964,
+        855954,
+        852424
+      ]
+    },
+    {
+      "cells": 10000,
+      "source_backed": false,
+      "xls_bytes": 410112,
+      "target_row": 5000,
+      "expected_checksum": 13793360184105136669,
+      "native_checksum": 13793360184105136669,
+      "unified_checksum": 13793360184105136669,
+      "native_output_bytes": 410112,
+      "unified_output_bytes": 410112,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_remove_ns": [
+        9539334,
+        8809501,
+        8315829,
+        8239508,
+        8262758
+      ],
+      "unified_remove_ns": [
+        10394738,
+        8737890,
+        8211879,
+        8594250,
+        8739431
+      ]
+    },
+    {
+      "cells": 1,
+      "source_backed": true,
+      "xls_bytes": 4096,
+      "target_row": 0,
+      "expected_checksum": 14695981039346656037,
+      "native_checksum": 14695981039346656037,
+      "unified_checksum": 14695981039346656037,
+      "native_output_bytes": 4096,
+      "unified_output_bytes": 4096,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_remove_ns": [
+        52330,
+        48580,
+        46190,
+        46101,
+        45840
+      ],
+      "unified_remove_ns": [
+        57080,
+        53231,
+        50520,
+        53200,
+        50150
+      ]
+    },
+    {
+      "cells": 100,
+      "source_backed": true,
+      "xls_bytes": 7168,
+      "target_row": 50,
+      "expected_checksum": 11623209917866462269,
+      "native_checksum": 11623209917866462269,
+      "unified_checksum": 11623209917866462269,
+      "native_output_bytes": 7168,
+      "unified_output_bytes": 7168,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_remove_ns": [
+        108251,
+        128021,
+        101811,
+        100070,
+        104871
+      ],
+      "unified_remove_ns": [
+        179591,
+        105381,
+        101680,
+        100421,
+        101250
+      ]
+    },
+    {
+      "cells": 1000,
+      "source_backed": true,
+      "xls_bytes": 43520,
+      "target_row": 500,
+      "expected_checksum": 5914010917817284061,
+      "native_checksum": 5914010917817284061,
+      "unified_checksum": 5914010917817284061,
+      "native_output_bytes": 43520,
+      "unified_output_bytes": 43520,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_remove_ns": [
+        634373,
+        624943,
+        628503,
+        616883,
+        603152
+      ],
+      "unified_remove_ns": [
+        648843,
+        612343,
+        649133,
+        620063,
+        613273
+      ]
+    },
+    {
+      "cells": 10000,
+      "source_backed": true,
+      "xls_bytes": 410112,
+      "target_row": 5000,
+      "expected_checksum": 13793360184105136669,
+      "native_checksum": 13793360184105136669,
+      "unified_checksum": 13793360184105136669,
+      "native_output_bytes": 410112,
+      "unified_output_bytes": 410112,
+      "output_bytes_equal": true,
+      "original_native_unchanged": true,
+      "original_unified_unchanged": true,
+      "filesystem_source_unchanged": true,
+      "native_remove_ns": [
+        5628427,
+        5624906,
+        5601186,
+        5604616,
+        5613836
+      ],
+      "unified_remove_ns": [
+        5893168,
+        5613656,
+        5598376,
+        5617766,
+        5630226
+      ]
+    }
+  ],
+  "source_commit": "2a49422eb7198b178deefb74870d1dfa60ec8dbb",
+  "build_command": "cargo build --release -p litchi-ops --features xls --example xls_remove_bench",
+  "binary_sha256": "9c79cb0af73e9e004252afde4ef783e6fe852572e680800c910e9ab4f628fc81"
+}
