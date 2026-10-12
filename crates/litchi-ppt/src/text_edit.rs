@@ -8,7 +8,7 @@
 //! bookmark, metacharacter, and special-information records with UTF-16
 //! positions; their presence remains a typed dependency-closure refusal.
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 use std::fmt;
 use std::io::{Cursor, Write};
 use std::sync::Arc;
@@ -2422,14 +2422,30 @@ fn resolve_shape_target_in_presentation(
     Ok((slide.persist_id(), native_shape_id(shape)))
 }
 
+#[derive(Debug)]
+struct BatchTextTarget {
+    target: Target,
+    replacement: String,
+    slide_persist_id: u32,
+    native_shape_id: u32,
+    slide_record: Arc<[u8]>,
+}
+
+#[derive(Debug)]
+struct PreparedBatchText {
+    resolved: Resolved,
+    replacement: String,
+    encoded: Vec<u8>,
+}
+
 /// Replaces a bounded caller-preflighted set of semantic shape targets through
 /// one persisted-record editor and one full candidate reopen.
 ///
 /// Callers retain the hard operation-count bound. This owner resolves every
 /// target and validates every encoding/dependency closure before staging any
-/// record in the editor. Distinct shapes on one slide are rewritten against
-/// the progressively staged slide record, while each rewrite retains the
-/// original atom payload as its exact source precondition.
+/// record in the editor. Targets sharing a persisted slide are indexed and
+/// rewritten in one drawing pass, while each rewrite retains the original
+/// atom payload as its exact source precondition.
 pub(crate) fn replace_shape_texts_batch(
     source: Arc<[u8]>,
     replacements: &[(Target, &str)],
@@ -2453,12 +2469,13 @@ pub(crate) fn replace_shape_texts_batch(
     )?;
     let presentation = presentation_shared(source.clone())?;
     let slides = presentation.slides()?;
-    let mut prepared = Vec::with_capacity(replacements.len());
+    let mut targets = Vec::with_capacity(replacements.len());
     let mut original_slides = BTreeMap::<u32, Arc<[u8]>>::new();
-    let mut encoded_bytes = 0usize;
-
-    // Complete semantic resolution and replacement validation before the
-    // editor receives its first staged mutation.
+    let mut requested_shapes = BTreeMap::<u32, BTreeSet<u32>>::new();
+    // Resolve the semantic slide and shape positions once per request, but
+    // defer text inspection until each persisted slide's drawing has been
+    // indexed.  This keeps the public positional/error order while avoiding a
+    // complete drawing walk for every target on a large slide.
     for (target, replacement) in replacements {
         let slide =
             slides
@@ -2470,24 +2487,99 @@ pub(crate) fn replace_shape_texts_batch(
             .shapes()?
             .get(target.shape.get())
             .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
-        let persist_id = slide.persist_id();
-        let shape_id = native_shape_id(shape);
-        let slide_record = match original_slides.get(&persist_id) {
+        let slide_persist_id = slide.persist_id();
+        let native_shape_id = native_shape_id(shape);
+        let slide_record = match original_slides.get(&slide_persist_id) {
             Some(record) => record.clone(),
             None => {
-                let record: Arc<[u8]> =
-                    Arc::from(editor.persisted_record(persist_id)?.into_boxed_slice());
-                original_slides.insert(persist_id, record.clone());
+                let record: Arc<[u8]> = Arc::from(
+                    editor
+                        .persisted_record(slide_persist_id)?
+                        .into_boxed_slice(),
+                );
+                original_slides.insert(slide_persist_id, record.clone());
                 record
             },
         };
-        let resolved = resolved_from_shared_location(*target, persist_id, shape_id, slide_record)?;
-        let encoded_len = encoded_replacement_len(replacement, resolved.kind)?;
+        targets.push(BatchTextTarget {
+            target: *target,
+            replacement: (*replacement).to_string(),
+            slide_persist_id,
+            native_shape_id,
+            slide_record,
+        });
+        requested_shapes
+            .entry(slide_persist_id)
+            .or_default()
+            .insert(native_shape_id);
+    }
+    drop(slides);
+    drop(presentation);
+
+    let mut indexed_shapes = BTreeMap::new();
+    let mut prepared = Vec::with_capacity(targets.len());
+    let mut encoded_bytes = 0usize;
+    let mut inspected_shapes = BTreeMap::<(u32, u32), TextAtom>::new();
+
+    // Complete text/dependency resolution and replacement validation before
+    // the editor receives its first staged mutation.  The index was built by
+    // one framing walk per drawing; this loop retains the caller's request
+    // order for all typed shape/text errors.
+    for target in targets {
+        if !indexed_shapes.contains_key(&target.slide_persist_id) {
+            let shape_ids = requested_shapes
+                .get(&target.slide_persist_id)
+                .ok_or_else(|| {
+                    PackageError::Corrupted(
+                        "PPT batch shape-text indexing lost its requested identities".into(),
+                    )
+                })?;
+            let slide_record = original_slides
+                .get(&target.slide_persist_id)
+                .ok_or_else(|| {
+                    PackageError::Corrupted(
+                        "PPT batch shape-text indexing lost its original slide record".into(),
+                    )
+                })?;
+            indexed_shapes.insert(
+                target.slide_persist_id,
+                index_slide_text_targets(slide_record, shape_ids)?,
+            );
+        }
+        let index = indexed_shapes
+            .get(&target.slide_persist_id)
+            .ok_or_else(|| {
+                PackageError::Corrupted(
+                    "PPT batch shape-text validation lost its drawing index".into(),
+                )
+            })?;
+        let text = match inspected_shapes.get(&(target.slide_persist_id, target.native_shape_id)) {
+            Some(text) => text.clone(),
+            None => {
+                let text = inspect_indexed_shape_text(index, target.native_shape_id)?;
+                inspected_shapes.insert(
+                    (target.slide_persist_id, target.native_shape_id),
+                    text.clone(),
+                );
+                text
+            },
+        };
+        let resolved = Resolved {
+            target: target.target,
+            slide_persist_id: target.slide_persist_id,
+            native_shape_id: target.native_shape_id,
+            slide_record: target.slide_record,
+            kind: text.kind,
+            payload: text.payload,
+            text: text.text,
+            can_resize: text.can_resize,
+        };
+        let encoded_len = encoded_replacement_len(&target.replacement, resolved.kind)?;
         encoded_bytes = encoded_bytes.checked_add(encoded_len).ok_or_else(|| {
             PackageError::ResourceLimit("PPT shape-text batch encoded byte count overflow".into())
         })?;
         require_batch_text_budget(replacement_bytes, encoded_bytes, max_output_bytes)?;
-        let encoded = encode_replacement(replacement, resolved.kind)?;
+        let encoded = encode_replacement(&target.replacement, resolved.kind)?;
         if encoded.len() != encoded_len {
             return Err(PackageError::Corrupted(
                 "PPT shape-text batch replacement size preflight disagrees with encoding".into(),
@@ -2497,32 +2589,46 @@ pub(crate) fn replace_shape_texts_batch(
         if encoded.len() != resolved.payload.len() && !resolved.can_resize {
             return Err(Error::Refused(Refusal::DependencyClosure));
         }
-        if *replacement != resolved.text {
-            prepared.push((resolved, (*replacement).to_string(), encoded));
+        if target.replacement != resolved.text {
+            prepared.push(PreparedBatchText {
+                resolved,
+                replacement: target.replacement,
+                encoded,
+            });
         }
     }
-    drop(slides);
-    drop(presentation);
 
     if prepared.is_empty() {
         return Ok(None);
     }
 
     // Input order is retained in the semantic change list. Each native slide
-    // record is progressively rewritten in memory and staged in the editor
-    // exactly once after all of its shape replacements succeed.
+    // drawing is rewritten exactly once after all of its shape replacements
+    // succeed; the rewrite itself visits the OfficeArt tree once and applies
+    // every selected textbox while preserving wire order.
+    let mut grouped = BTreeMap::<u32, Vec<ShapeTextRewrite<'_>>>::new();
+    for prepared in &prepared {
+        grouped
+            .entry(prepared.resolved.slide_persist_id)
+            .or_default()
+            .push(ShapeTextRewrite {
+                shape_id: prepared.resolved.native_shape_id,
+                kind: prepared.resolved.kind,
+                before: &prepared.resolved.payload,
+                after: &prepared.encoded,
+            });
+    }
     let mut staged_slides = BTreeMap::<u32, Vec<u8>>::new();
-    for (resolved, _replacement, encoded) in &prepared {
-        let staged = staged_slides
-            .entry(resolved.slide_persist_id)
-            .or_insert_with(|| resolved.slide_record.to_vec());
-        *staged = rewrite_slide(
-            staged,
-            resolved.native_shape_id,
-            resolved.kind,
-            &resolved.payload,
-            encoded,
-        )?;
+    for (slide_persist_id, replacements) in grouped {
+        let original = original_slides.get(&slide_persist_id).ok_or_else(|| {
+            PackageError::Corrupted(
+                "PPT batch shape-text rewrite lost its original slide record".into(),
+            )
+        })?;
+        staged_slides.insert(
+            slide_persist_id,
+            rewrite_slide_grouped(original, &replacements)?,
+        );
     }
 
     for (persist_id, staged) in staged_slides {
@@ -2549,7 +2655,9 @@ pub(crate) fn replace_shape_texts_batch(
     let reopened = presentation_shared(output.clone())?;
     let reopened_slides = reopened.slides()?;
     let mut changes = Vec::with_capacity(prepared.len());
-    for (resolved, replacement, _encoded) in prepared {
+    for prepared in prepared {
+        let resolved = prepared.resolved;
+        let replacement = prepared.replacement;
         let slide = reopened_slides
             .get(resolved.target.slide.get())
             .ok_or(Error::Refused(Refusal::SlideNotFound {
@@ -2768,12 +2876,113 @@ fn native_shape_id(selected: &ShapeEnum<'_>) -> u32 {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 struct TextAtom {
     kind: TextKind,
     payload: Vec<u8>,
     text: String,
     can_resize: bool,
+}
+
+#[derive(Debug)]
+struct IndexedShapeText<'a> {
+    containers: Vec<&'a [u8]>,
+}
+
+/// Index only the requested OfficeArt shape containers in one drawing walk.
+///
+/// The index deliberately records raw containers instead of eagerly parsing
+/// their text.  This lets the caller inspect targets in the original request
+/// order, retaining the single-target error precedence while ensuring that
+/// an unrelated textbox is never validated merely because it shares a
+/// drawing with a requested shape.
+fn index_slide_text_targets<'a>(
+    slide: &'a [u8],
+    requested_shape_ids: &BTreeSet<u32>,
+) -> Result<BTreeMap<u32, IndexedShapeText<'a>>> {
+    let (_, consumed) = crate::Record::parse_strict(slide, 0)?;
+    if consumed != slide.len() {
+        return Err(PackageError::Corrupted("selected slide has trailing bytes".into()).into());
+    }
+    let drawing = find_ppt_record(slide, RecordType::PPDrawing as u16, 0)?
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let mut index = BTreeMap::new();
+    index_officeart_shape_targets(
+        drawing_payload(drawing)?,
+        requested_shape_ids,
+        0,
+        &mut index,
+    )?;
+    Ok(index)
+}
+
+fn index_officeart_shape_targets<'a>(
+    record: &'a [u8],
+    requested_shape_ids: &BTreeSet<u32>,
+    depth: usize,
+    index: &mut BTreeMap<u32, IndexedShapeText<'a>>,
+) -> Result<()> {
+    if depth >= 128 {
+        return Err(PackageError::Corrupted(
+            "OfficeArt nesting exceeds shape-inspection limit".into(),
+        )
+        .into());
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER {
+        if let Some(shape_id) = shape_id_of(record)?
+            && requested_shape_ids.contains(&shape_id)
+        {
+            index
+                .entry(shape_id)
+                .or_insert_with(|| IndexedShapeText {
+                    containers: Vec::new(),
+                })
+                .containers
+                .push(record);
+            return Ok(());
+        }
+    }
+    if record_version(record)? == 0xF {
+        for child_result in children(record)? {
+            index_officeart_shape_targets(child_result?, requested_shape_ids, depth + 1, index)?;
+        }
+    }
+    Ok(())
+}
+
+fn inspect_indexed_shape_text(
+    index: &BTreeMap<u32, IndexedShapeText<'_>>,
+    shape_id: u32,
+) -> Result<TextAtom> {
+    let indexed = index
+        .get(&shape_id)
+        .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
+    let mut matches = 0usize;
+    let mut text = None;
+    for container in &indexed.containers {
+        matches = matches.saturating_add(1);
+        let atom = inspect_shape_container_text(container)?;
+        if text.replace(atom).is_some() {
+            return Err(Error::Refused(Refusal::AmbiguousShape));
+        }
+    }
+    match matches {
+        0 => Err(Error::Refused(Refusal::ShapeNotFound)),
+        1 => text.ok_or(Error::Refused(Refusal::NoTextbox)),
+        _ => Err(Error::Refused(Refusal::AmbiguousShape)),
+    }
+}
+
+fn inspect_shape_container_text(container: &[u8]) -> Result<TextAtom> {
+    let mut textbox = None;
+    for child_result in children(container)? {
+        let child = child_result?;
+        if record_type(child)? == OFFICEART_CLIENT_TEXTBOX && textbox.replace(child).is_some() {
+            return Err(Error::Refused(Refusal::AmbiguousTextbox));
+        }
+    }
+    let selected_textbox = textbox.ok_or(Error::Refused(Refusal::NoTextbox))?;
+    inspect_textbox(selected_textbox)
 }
 
 fn inspect_slide(slide: &[u8], shape_id: u32) -> Result<TextAtom> {
@@ -2974,6 +3183,139 @@ fn rewrite_slide(
         .into());
     }
     rewritten.ok_or(Error::Refused(Refusal::ShapeNotFound))
+}
+
+#[derive(Debug, Clone, Copy)]
+struct ShapeTextRewrite<'a> {
+    shape_id: u32,
+    kind: TextKind,
+    before: &'a [u8],
+    after: &'a [u8],
+}
+
+fn rewrite_slide_grouped(slide: &[u8], replacements: &[ShapeTextRewrite<'_>]) -> Result<Vec<u8>> {
+    let mut drawing_count = 0usize;
+    let mut match_counts = BTreeMap::<u32, usize>::new();
+    for replacement in replacements {
+        match_counts.entry(replacement.shape_id).or_insert(0);
+    }
+    let rewritten = rewrite_ppt_record(slide, 0, &mut |record| {
+        if record_type(record)? != RecordType::PPDrawing as u16 {
+            return Ok(None);
+        }
+        drawing_count += 1;
+        let drawing = rewrite_drawing_grouped(record, replacements, &mut match_counts)?;
+        Ok(Some(drawing))
+    })?;
+    if drawing_count != 1 {
+        return Err(PackageError::Corrupted(
+            "selected slide has ambiguous PPDrawing ownership".into(),
+        )
+        .into());
+    }
+    for (shape_id, matches) in match_counts {
+        match matches {
+            0 => return Err(Error::Refused(Refusal::ShapeNotFound)),
+            1 => {},
+            _ => return Err(Error::Refused(Refusal::AmbiguousShape)),
+        }
+        // Keep the binding above explicit: the count is checked for every
+        // requested identity even when the drawing visitor found another
+        // target first in wire order.
+        let _ = shape_id;
+    }
+    rewritten.ok_or(Error::Refused(Refusal::ShapeNotFound))
+}
+
+fn rewrite_drawing_grouped(
+    drawing: &[u8],
+    replacements: &[ShapeTextRewrite<'_>],
+    match_counts: &mut BTreeMap<u32, usize>,
+) -> Result<Vec<u8>> {
+    let mut replacements_by_shape = BTreeMap::<u32, Vec<ShapeTextRewrite<'_>>>::new();
+    for replacement in replacements {
+        replacements_by_shape
+            .entry(replacement.shape_id)
+            .or_default()
+            .push(*replacement);
+    }
+    let data = rewrite_officeart_grouped(
+        drawing_payload(drawing)?,
+        &replacements_by_shape,
+        match_counts,
+        0,
+    )?;
+    rebuild(drawing, &data).map_err(Into::into)
+}
+
+fn rewrite_officeart_grouped(
+    record: &[u8],
+    replacements: &BTreeMap<u32, Vec<ShapeTextRewrite<'_>>>,
+    match_counts: &mut BTreeMap<u32, usize>,
+    depth: usize,
+) -> Result<Vec<u8>> {
+    if depth >= 128 {
+        return Err(
+            PackageError::Corrupted("OfficeArt nesting exceeds text-edit limit".into()).into(),
+        );
+    }
+    if record_type(record)? == OFFICEART_SP_CONTAINER {
+        if let Some(shape_id) = shape_id_of(record)?
+            && let Some(shape_replacements) = replacements.get(&shape_id)
+        {
+            let count = match_counts.get_mut(&shape_id).ok_or_else(|| {
+                PackageError::Corrupted("PPT grouped rewrite lost shape identity".into())
+            })?;
+            *count = count.saturating_add(1);
+            return rewrite_shape_container_grouped(record, shape_replacements);
+        }
+    }
+    if record_version(record)? != 0xF {
+        return Ok(record.to_vec());
+    }
+    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    for child_result in children(record)? {
+        data.extend_from_slice(&rewrite_officeart_grouped(
+            child_result?,
+            replacements,
+            match_counts,
+            depth + 1,
+        )?);
+    }
+    rebuild(record, &data).map_err(Into::into)
+}
+
+fn rewrite_shape_container_grouped(
+    record: &[u8],
+    replacements: &[ShapeTextRewrite<'_>],
+) -> Result<Vec<u8>> {
+    let mut textbox_count = 0usize;
+    let mut data = Vec::with_capacity(drawing_payload(record)?.len());
+    for child_result in children(record)? {
+        let child = child_result?;
+        if record_type(child)? != OFFICEART_CLIENT_TEXTBOX {
+            data.extend_from_slice(child);
+            continue;
+        }
+        textbox_count += 1;
+        let mut rewritten = child.to_vec();
+        for replacement in replacements {
+            rewritten = rewrite_textbox(
+                &rewritten,
+                replacement.kind,
+                replacement.before,
+                replacement.after,
+            )?;
+        }
+        data.extend_from_slice(&rewritten);
+    }
+    if textbox_count == 0 {
+        return Err(Error::Refused(Refusal::NoTextbox));
+    }
+    if textbox_count > 1 {
+        return Err(Error::Refused(Refusal::AmbiguousTextbox));
+    }
+    rebuild(record, &data).map_err(Into::into)
 }
 
 fn rewrite_anchor(slide: &[u8], shape_id: u32, before: &[u8], after: &[u8]) -> Result<Vec<u8>> {
@@ -3510,6 +3852,52 @@ mod tests {
         let mut output = Cursor::new(Vec::new());
         crate::raw::encode(&mut writer, &mut output).unwrap();
         output.into_inner()
+    }
+
+    #[test]
+    fn grouped_shape_rewrite_matches_sequential_wire_output() {
+        let source = generated_fixture(1, 4);
+        let presentation = super::presentation(&source).unwrap();
+        let slide = &presentation.slides().unwrap()[0];
+        let slide_record = super::resolve(&source, Target::new(Position::new(0), Position::new(0)))
+            .unwrap()
+            .slide_record;
+        let mut plans = Vec::new();
+        let mut sequential = slide_record.to_vec();
+
+        for (shape_position, shape) in slide.shapes().unwrap().iter().enumerate() {
+            let target = Target::new(Position::new(0), Position::new(shape_position));
+            let resolved = super::resolve(&source, target).unwrap();
+            let mut after = resolved.payload.clone();
+            assert!(!after.is_empty());
+            after[0] = b'X';
+            sequential = super::rewrite_slide(
+                &sequential,
+                super::native_shape_id(shape),
+                resolved.kind,
+                &resolved.payload,
+                &after,
+            )
+            .unwrap();
+            plans.push((
+                super::native_shape_id(shape),
+                resolved.kind,
+                resolved.payload,
+                after,
+            ));
+        }
+
+        let grouped_plans = plans
+            .iter()
+            .map(|(shape_id, kind, before, after)| super::ShapeTextRewrite {
+                shape_id: *shape_id,
+                kind: *kind,
+                before,
+                after,
+            })
+            .collect::<Vec<_>>();
+        let grouped = super::rewrite_slide_grouped(&slide_record, &grouped_plans).unwrap();
+        assert_eq!(grouped, sequential);
     }
 
     #[derive(Debug, Default)]
