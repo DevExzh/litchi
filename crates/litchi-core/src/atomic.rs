@@ -428,10 +428,37 @@ impl Drop for TemporaryCleanupGuard {
         // This remains best-effort and therefore requires a trusted/private
         // parent directory; a portable path check and unlink cannot close
         // every hostile-directory race.
-        if path_identity(&self.path).is_ok_and(|observed| observed == self.identity) {
-            drop(fs::remove_file(&self.path));
+        cleanup_owned_temp(&self.path, self.identity);
+    }
+}
+
+fn cleanup_owned_temp(path: &Path, expected: TempIdentity) {
+    if !path_identity(path).is_ok_and(|observed| observed == expected) {
+        return;
+    }
+
+    #[cfg(windows)]
+    {
+        // A replacement can inherit read-only permissions from its original
+        // destination.  Windows refuses to unlink that authenticated file
+        // until the bit is cleared.  Recheck identity after changing the
+        // metadata so a pathname substitution is still preserved.
+        let Ok(metadata) = fs::metadata(path) else {
+            return;
+        };
+        let mut permissions = metadata.permissions();
+        if permissions.readonly() {
+            permissions.set_readonly(false);
+            if fs::set_permissions(path, permissions).is_err() {
+                return;
+            }
+            if !path_identity(path).is_ok_and(|observed| observed == expected) {
+                return;
+            }
         }
     }
+
+    drop(fs::remove_file(path));
 }
 
 #[cfg(not(windows))]
@@ -858,5 +885,67 @@ mod tests {
             || Ok(()),
         );
         assert_eq!(result, Err(CallerError::Stage));
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 0);
+    }
+
+    #[test]
+    fn verify_error_preserves_destination_and_cleans_staging() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("document.rtf");
+        fs::write(&destination, b"old").expect("seed destination");
+        let mut steps = CountingSteps::default();
+
+        let result: Result<(), Error> = save_with_steps(
+            &destination,
+            Durability::NoSync,
+            Overwrite::Replace,
+            &mut steps,
+            |staging| {
+                staging.write_all(b"new")?;
+                Ok(())
+            },
+            || Err(Error::Io(io::Error::other("injected verify failure"))),
+        );
+
+        assert!(matches!(
+            result,
+            Err(Error::Io(source)) if source.to_string().contains("injected verify failure")
+        ));
+        assert_eq!(fs::read(destination).unwrap(), b"old");
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn read_only_owned_temporary_is_cleaned_after_precommit_failure() {
+        let directory = tempfile::tempdir().expect("temporary directory");
+        let destination = directory.path().join("document.rtf");
+        fs::write(&destination, b"old").expect("seed destination");
+        let mut destination_permissions = fs::metadata(&destination)
+            .expect("destination metadata")
+            .permissions();
+        destination_permissions.set_readonly(true);
+        fs::set_permissions(&destination, destination_permissions)
+            .expect("make destination readonly");
+        let mut steps = CountingSteps::default();
+
+        let result: Result<(), Error> = save_with_steps(
+            &destination,
+            Durability::NoSync,
+            Overwrite::Replace,
+            &mut steps,
+            |staging| {
+                staging.write_all(b"new")?;
+                Ok(())
+            },
+            || Err(Error::Io(io::Error::other("injected verify failure"))),
+        );
+
+        assert!(
+            matches!(result, Err(Error::Io(source)) if source.to_string().contains("injected verify failure"))
+        );
+        assert_eq!(fs::read(&destination).unwrap(), b"old");
+        assert!(fs::metadata(destination).unwrap().permissions().readonly());
+        assert_eq!(fs::read_dir(directory.path()).unwrap().count(), 1);
     }
 }
