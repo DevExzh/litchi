@@ -919,6 +919,7 @@ pub struct Edit {
     limits: SemanticLimits,
     operations: Vec<Operation>,
     replacement_bytes: usize,
+    paragraph_batch_len: Option<usize>,
 }
 
 #[derive(Debug, Clone)]
@@ -1371,6 +1372,7 @@ impl Edit {
             limits: options.semantic_limits_value(),
             operations: Vec::new(),
             replacement_bytes: 0,
+            paragraph_batch_len: None,
         }
     }
 
@@ -1491,6 +1493,7 @@ impl Edit {
         let observed_replacement_bytes = self.admit_replacement(replacement_bytes)?;
         let replacement_limit = self.source.limits().max_input_bytes();
 
+        let batch_len = replacements.len();
         let has_property_operation = self.operations.iter().any(Operation::is_property);
         let mut staged = Vec::with_capacity(replacements.len());
         let mut replacements = replacements.iter().peekable();
@@ -1552,8 +1555,12 @@ impl Edit {
             });
         }
 
+        let starts_empty = self.operations.is_empty();
         self.replacement_bytes = observed_replacement_bytes;
         self.operations.append(&mut staged);
+        if starts_empty {
+            self.paragraph_batch_len = Some(batch_len);
+        }
         Ok(self)
     }
 
@@ -3438,6 +3445,13 @@ impl Edit {
             }
             return commit_raw_paragraph_structure(self, operation_count);
         }
+        if self.paragraph_batch_len == Some(operation_count)
+            && self.source.body().inlines().any(|inline| {
+                matches!(inline, crate::text::Inline::Break(crate::text::Break::Line))
+            })
+        {
+            return commit_body_paragraph_batch(self, operation_count);
+        }
 
         let destination_count = self
             .operations
@@ -4401,6 +4415,70 @@ fn commit_raw_paragraph_structure(edit: Edit, operation_count: usize) -> Result<
     ))
 }
 
+fn commit_body_paragraph_batch(edit: Edit, operation_count: usize) -> Result<Commit, Error> {
+    let (replacement, projected_spans) = project_text(&edit.source, &edit.operations)?;
+    let semantic_delta =
+        semantic_changes_with_replacement(&edit.operations, &projected_spans, &replacement);
+    if replacement == edit.source.text() {
+        return Ok(Commit::new(
+            edit.source.clone(),
+            edit.source,
+            operation_count,
+            semantic_delta,
+        ));
+    }
+    ensure_changed_publication_allowed(&edit.source)?;
+    let source_bytes = edit
+        .source
+        .source_bytes()
+        .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
+    let map = ordinary_paragraph_source_map_with_lines(&edit.source)?;
+    let mut replacements = Vec::new();
+    replacements
+        .try_reserve_exact(operation_count)
+        .map_err(|_error| {
+            Error::Write("could not reserve paragraph source replacements".to_string())
+        })?;
+    for operation in &edit.operations {
+        let Operation::Text {
+            span,
+            before,
+            after,
+            raw_structure: None,
+            ..
+        } = operation
+        else {
+            return Err(Error::BodyDestinationConflict);
+        };
+        let paragraph = map
+            .paragraphs
+            .iter()
+            .find(|paragraph| paragraph.text == *span)
+            .ok_or(Error::UnsupportedSource(
+                "paragraph batch selector lost its source range",
+            ))?;
+        if edit.source.text().get(span.clone()) != Some(before.as_str()) {
+            return Err(Error::StalePrecondition("paragraph text differs"));
+        }
+        let encoded = encoded_body_text(after, edit.source.limits())?;
+        replacements.push((paragraph.source.clone(), encoded));
+    }
+    let bytes = splice_body_ranges(source_bytes, &replacements, edit.source.limits())?;
+    let snapshot = Package::from_bytes_with_options(&bytes, edit.source.options())?;
+    validate_opaque_preservation(&edit.source, &snapshot, &edit.operations)?;
+    if snapshot.text() != replacement {
+        return Err(Error::UnsupportedSource(
+            "candidate body text did not survive RTF paragraph publication",
+        ));
+    }
+    Ok(Commit::new(
+        edit.source,
+        snapshot,
+        operation_count,
+        semantic_delta,
+    ))
+}
+
 fn merged_paragraph_text(
     left: &str,
     right: &str,
@@ -4947,6 +5025,19 @@ struct OrdinaryParagraphSourceMap {
 /// encoded characters, visible control symbols, nested groups, and all other
 /// controls fail closed rather than being guessed around.
 fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSourceMap, Error> {
+    ordinary_paragraph_source_map_inner(source, false)
+}
+
+fn ordinary_paragraph_source_map_with_lines(
+    source: &Package,
+) -> Result<OrdinaryParagraphSourceMap, Error> {
+    ordinary_paragraph_source_map_inner(source, true)
+}
+
+fn ordinary_paragraph_source_map_inner(
+    source: &Package,
+    allow_inline_line: bool,
+) -> Result<OrdinaryParagraphSourceMap, Error> {
     let source_bytes = source
         .source_bytes()
         .ok_or(Error::UnsupportedSource("snapshot has no exact RTF source"))?;
@@ -5056,6 +5147,7 @@ fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSo
     let mut semantic_position = 0usize;
     let mut paragraph_start = 0usize;
     let mut source_text_start = None;
+    let mut paragraph_has_inline_line = false;
     let mut previous_boundary_end = body_span.start;
 
     for (token, relative_span) in tokens.iter().zip(&spans) {
@@ -5109,15 +5201,33 @@ fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSo
                             limit: source.limits().max_input_bytes(),
                         })?;
             },
+            crate::lexer::Token::Control(crate::lexer::ControlWord::Line) if allow_inline_line => {
+                if source_text_start.is_none() {
+                    source_text_start = Some(absolute_span.start);
+                }
+                if semantic_text.as_bytes().get(semantic_position) != Some(&b'\n') {
+                    return Err(Error::UnsupportedSource(
+                        "ordinary paragraph line boundary does not match semantic text",
+                    ));
+                }
+                semantic_position =
+                    semantic_position
+                        .checked_add(1)
+                        .ok_or(Error::InputTooLarge {
+                            observed: usize::MAX,
+                            limit: source.limits().max_input_bytes(),
+                        })?;
+                paragraph_has_inline_line = true;
+            },
             crate::lexer::Token::Control(crate::lexer::ControlWord::Par) => {
                 let source_start = source_text_start.unwrap_or(absolute_span.start);
                 let source_end = absolute_span.start;
                 let text_range = paragraph_start..semantic_position;
                 let source_range = source_start..source_end;
-                if source_range.len() != text_range.len()
-                    || source_bytes.get(source_range.clone())
-                        != semantic_text.as_bytes().get(text_range.clone())
-                {
+                let literal_source = source_range.len() == text_range.len()
+                    && source_bytes.get(source_range.clone())
+                        == semantic_text.as_bytes().get(text_range.clone());
+                if !literal_source && !paragraph_has_inline_line {
                     return Err(Error::UnsupportedSource(
                         "ordinary paragraph boundary is not a literal source boundary",
                     ));
@@ -5136,6 +5246,7 @@ fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSo
                         })?;
                 paragraph_start = semantic_position;
                 source_text_start = None;
+                paragraph_has_inline_line = false;
                 previous_boundary_end = absolute_span.end;
             },
             crate::lexer::Token::OpenBrace
@@ -5152,10 +5263,10 @@ fn ordinary_paragraph_source_map(source: &Package) -> Result<OrdinaryParagraphSo
     if let Some(source_start) = source_text_start {
         let text_range = paragraph_start..semantic_position;
         let source_range = source_start..body_span.end;
-        if source_range.len() != text_range.len()
-            || source_bytes.get(source_range.clone())
-                != semantic_text.as_bytes().get(text_range.clone())
-        {
+        let literal_source = source_range.len() == text_range.len()
+            && source_bytes.get(source_range.clone())
+                == semantic_text.as_bytes().get(text_range.clone());
+        if !literal_source && !paragraph_has_inline_line {
             return Err(Error::UnsupportedSource(
                 "ordinary paragraph final source range is not literal text",
             ));
@@ -8850,6 +8961,52 @@ fn splice_body(
     output.extend_from_slice(replacement);
     output.extend_from_slice(source.get(span.end..).ok_or(Error::UnsupportedSource(
         "body source span ends outside the document",
+    ))?);
+    Ok(output)
+}
+
+fn splice_body_ranges(
+    source: &[u8],
+    replacements: &[(Range<usize>, Vec<u8>)],
+    limits: crate::SourceLimits,
+) -> Result<Vec<u8>, Error> {
+    let mut retained = source.len();
+    let mut previous_end = 0usize;
+    for (span, replacement) in replacements {
+        if span.start < previous_end || span.end < span.start || span.end > source.len() {
+            return Err(Error::UnsupportedSource(
+                "paragraph source replacement ranges overlap",
+            ));
+        }
+        retained = retained
+            .checked_sub(span.end - span.start)
+            .and_then(|length| length.checked_add(replacement.len()))
+            .ok_or(Error::InputTooLarge {
+                observed: usize::MAX,
+                limit: limits.max_input_bytes(),
+            })?;
+        previous_end = span.end;
+    }
+    if retained > limits.max_input_bytes() {
+        return Err(Error::InputTooLarge {
+            observed: retained,
+            limit: limits.max_input_bytes(),
+        });
+    }
+    let mut output = Vec::new();
+    output.try_reserve_exact(retained).map_err(|_error| {
+        Error::Write("could not reserve paragraph candidate bytes".to_string())
+    })?;
+    let mut cursor = 0usize;
+    for (span, replacement) in replacements {
+        output.extend_from_slice(source.get(cursor..span.start).ok_or(
+            Error::UnsupportedSource("paragraph source replacement starts outside the source"),
+        )?);
+        output.extend_from_slice(replacement);
+        cursor = span.end;
+    }
+    output.extend_from_slice(source.get(cursor..).ok_or(Error::UnsupportedSource(
+        "paragraph source replacement ends outside the source",
     ))?);
     Ok(output)
 }

@@ -64,6 +64,21 @@ fn paragraph_batch_matches_scalar_bytes_for_first_middle_and_last() {
 }
 
 #[test]
+fn paragraph_batch_preserves_inline_line_breaks_outside_selected_paragraphs() {
+    let source = Package::parse(r"{\rtf1\ansi First\line second\par\par Third}").unwrap();
+    let mut edit = source.edit();
+    edit.replace_body_paragraph_texts(&replacements(&[(1, "Saved")]))
+        .unwrap();
+    let commit = edit.commit().unwrap();
+
+    assert_eq!(commit.package().text(), "First\nsecond\nSaved\nThird");
+    assert_eq!(
+        commit.package().to_bytes().unwrap(),
+        br"{\rtf1\ansi First\line second\par Saved\par Third}"
+    );
+}
+
+#[test]
 fn paragraph_batch_rejects_bad_shape_and_late_selector_atomically() {
     let source = Package::parse(r"{\rtf1\ansi First\par Second\par Third}").unwrap();
 
