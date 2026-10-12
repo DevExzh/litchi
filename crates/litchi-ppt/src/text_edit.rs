@@ -4624,10 +4624,14 @@ mod tests {
         let drawing =
             find_nested_record_offset(&first.slide_record, 0, crate::RecordType::PPDrawing as u16)
                 .unwrap();
-        assert!(find_officeart_shape_offset(&first.slide_record, drawing, first.native_shape_id)
-            .is_some());
-        assert!(find_officeart_shape_offset(&first.slide_record, drawing, second.native_shape_id)
-            .is_some());
+        assert!(
+            find_officeart_shape_offset(&first.slide_record, drawing, first.native_shape_id)
+                .is_some()
+        );
+        assert!(
+            find_officeart_shape_offset(&first.slide_record, drawing, second.native_shape_id)
+                .is_some()
+        );
         let slide = mutate_batch_corruption_slide(
             &first.slide_record,
             early_shape_error.then_some(first.native_shape_id),
@@ -4708,8 +4712,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         let legacy = super::inspect_slide(&slide, first_shape_id)
-            .err()
-            .expect("legacy first-target inspection must reject malformed sibling framing");
+            .expect_err("legacy first-target inspection must reject malformed sibling framing");
         assert!(matches!(
             &legacy,
             Error::Package(crate::package::Error::Corrupted(message))
@@ -4726,8 +4729,7 @@ mod tests {
             Err(_index_error) => super::inspect_slide(&slide, first_shape_id),
             Ok(index) => super::inspect_indexed_shape_text(&index, first_shape_id),
         }
-        .err()
-        .expect("the batch admission path must reject");
+        .expect_err("the batch admission path must reject");
         assert_eq!(format!("{batch:?}"), format!("{legacy:?}"));
     }
 
@@ -4739,8 +4741,7 @@ mod tests {
             .collect::<BTreeSet<_>>();
 
         let legacy = super::inspect_slide(&slide, first_shape_id)
-            .err()
-            .expect("legacy first-target inspection must reject the malformed textbox");
+            .expect_err("legacy first-target inspection must reject the malformed textbox");
         assert!(matches!(legacy, Error::Refused(Refusal::MultipleTextAtoms)));
 
         let indexed = super::index_slide_text_targets(&slide, &requested);
@@ -4753,8 +4754,7 @@ mod tests {
             Err(_index_error) => super::inspect_slide(&slide, first_shape_id),
             Ok(index) => super::inspect_indexed_shape_text(&index, first_shape_id),
         }
-        .err()
-        .expect("the batch admission path must reject");
+        .expect_err("the batch admission path must reject");
         assert!(matches!(batch, Error::Refused(Refusal::MultipleTextAtoms)));
     }
 

@@ -51,9 +51,11 @@ fn write_fixture(slide_count: usize, textboxes_per_slide: usize) -> Vec<u8> {
             .expect("add unrelated fixture rectangle");
     }
 
-    let mut output = Cursor::new(Vec::new());
-    litchi_ppt::raw::encode(&mut writer, &mut output).expect("encode fixture");
-    output.into_inner()
+    writer
+        .build()
+        .expect("build fixture")
+        .to_bytes()
+        .expect("serialize fixture")
 }
 
 fn package(slide_count: usize, textboxes_per_slide: usize) -> Package {
@@ -197,11 +199,8 @@ fn grouped_batch_publishes_exact_256_targets_across_slides() {
     assert_eq!(target_texts.len(), source_texts.len());
     for slide in 0..2 {
         assert_eq!(target_texts[slide].len(), 129);
-        for shape in 0..128 {
-            assert_eq!(
-                target_texts[slide][shape],
-                format!("target-{slide:02}-{shape:03}")
-            );
+        for (shape, text) in target_texts[slide].iter().enumerate().take(128) {
+            assert_eq!(*text, format!("target-{slide:02}-{shape:03}"));
         }
         assert_eq!(target_texts[slide][128], source_texts[slide][128]);
     }
@@ -226,7 +225,7 @@ fn grouped_batch_chunks_allow_out_of_order_repeated_targets() {
 
     // The first chunk walks one slide in reverse order.  The second walks the
     // other slide in reverse order and deliberately repeats its first chunk's
-    // final target across the chunk boundary.
+    // target across the chunk boundary.
     let first_chunk = (0..128)
         .rev()
         .map(|shape| {
@@ -265,9 +264,9 @@ fn grouped_batch_chunks_allow_out_of_order_repeated_targets() {
     let target = commit.package();
     let texts = shape_texts(target);
 
-    for shape in 0..127 {
-        assert_eq!(texts[0][shape], format!("first-{shape:03}"));
-        assert_eq!(texts[1][shape], format!("second-{shape:03}"));
+    for (shape, (first, second)) in texts[0].iter().zip(&texts[1]).enumerate().take(127) {
+        assert_eq!(*first, format!("first-{shape:03}"));
+        assert_eq!(*second, format!("second-{shape:03}"));
     }
     assert_eq!(texts[0][127], "second-repeat-127");
     assert_eq!(texts[1][127], "source-01-127");

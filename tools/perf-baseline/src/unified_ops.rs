@@ -1143,7 +1143,7 @@ struct PptTextBatchEntry {
 /// Opt-in, named native/unified legacy-PPT write routes.  These are kept
 /// outside the M0a read-pair catalog: their stable identities compare two
 /// write implementations rather than a deleted facade predecessor.
-const PPT_TEXT_BATCH_CATALOG: [PptTextBatchEntry; 20] = [
+const PPT_TEXT_BATCH_CATALOG: [PptTextBatchEntry; 28] = [
     PptTextBatchEntry {
         case: Case::PptTextBatchEagerNative1,
         twin: Case::PptTextBatchEagerUnified1,
@@ -1166,11 +1166,25 @@ const PPT_TEXT_BATCH_CATALOG: [PptTextBatchEntry; 20] = [
         count: 100,
     },
     PptTextBatchEntry {
+        case: Case::PptTextBatchEagerNative256,
+        twin: Case::PptTextBatchEagerUnified256,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Native,
+        count: 256,
+    },
+    PptTextBatchEntry {
         case: Case::PptTextBatchEagerNative1000,
         twin: Case::PptTextBatchEagerUnified1000,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Native,
         count: 1_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerNative4096,
+        twin: Case::PptTextBatchEagerUnified4096,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Native,
+        count: 4_096,
     },
     PptTextBatchEntry {
         case: Case::PptTextBatchEagerNative10000,
@@ -1201,11 +1215,25 @@ const PPT_TEXT_BATCH_CATALOG: [PptTextBatchEntry; 20] = [
         count: 100,
     },
     PptTextBatchEntry {
+        case: Case::PptTextBatchEagerUnified256,
+        twin: Case::PptTextBatchEagerNative256,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Unified,
+        count: 256,
+    },
+    PptTextBatchEntry {
         case: Case::PptTextBatchEagerUnified1000,
         twin: Case::PptTextBatchEagerNative1000,
         owner: PptTextBatchOwner::Eager,
         leg: PptTextBatchLeg::Unified,
         count: 1_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchEagerUnified4096,
+        twin: Case::PptTextBatchEagerNative4096,
+        owner: PptTextBatchOwner::Eager,
+        leg: PptTextBatchLeg::Unified,
+        count: 4_096,
     },
     PptTextBatchEntry {
         case: Case::PptTextBatchEagerUnified10000,
@@ -1236,11 +1264,25 @@ const PPT_TEXT_BATCH_CATALOG: [PptTextBatchEntry; 20] = [
         count: 100,
     },
     PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalNative256,
+        twin: Case::PptTextBatchPositionalUnified256,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Native,
+        count: 256,
+    },
+    PptTextBatchEntry {
         case: Case::PptTextBatchPositionalNative1000,
         twin: Case::PptTextBatchPositionalUnified1000,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Native,
         count: 1_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalNative4096,
+        twin: Case::PptTextBatchPositionalUnified4096,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Native,
+        count: 4_096,
     },
     PptTextBatchEntry {
         case: Case::PptTextBatchPositionalNative10000,
@@ -1271,11 +1313,25 @@ const PPT_TEXT_BATCH_CATALOG: [PptTextBatchEntry; 20] = [
         count: 100,
     },
     PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalUnified256,
+        twin: Case::PptTextBatchPositionalNative256,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Unified,
+        count: 256,
+    },
+    PptTextBatchEntry {
         case: Case::PptTextBatchPositionalUnified1000,
         twin: Case::PptTextBatchPositionalNative1000,
         owner: PptTextBatchOwner::Positional,
         leg: PptTextBatchLeg::Unified,
         count: 1_000,
+    },
+    PptTextBatchEntry {
+        case: Case::PptTextBatchPositionalUnified4096,
+        twin: Case::PptTextBatchPositionalNative4096,
+        owner: PptTextBatchOwner::Positional,
+        leg: PptTextBatchLeg::Unified,
+        count: 4_096,
     },
     PptTextBatchEntry {
         case: Case::PptTextBatchPositionalUnified10000,
@@ -1755,7 +1811,9 @@ const fn ppt_text_batch_shape_name(count: usize) -> &'static str {
         1 => "1",
         10 => "10",
         100 => "100",
+        256 => "256",
         1_000 => "1000",
+        4_096 => "4096",
         10_000 => "10000",
         _ => "custom",
     }
@@ -3411,7 +3469,7 @@ mod tests {
 
     #[test]
     fn ppt_text_batch_routes_are_named_paired_and_opt_in() {
-        assert_eq!(PPT_TEXT_BATCH_CATALOG.len(), 20);
+        assert_eq!(PPT_TEXT_BATCH_CATALOG.len(), 28);
         for entry in PPT_TEXT_BATCH_CATALOG {
             assert_eq!(crate::parse_case(entry.case.name()), Some(entry.case));
             assert_eq!(crate::parse_case(entry.twin.name()), Some(entry.twin));
@@ -3430,7 +3488,10 @@ mod tests {
             assert_eq!(twin.owner, entry.owner);
             assert_eq!(twin.count, entry.count);
             assert_ne!(twin.leg, entry.leg);
-            assert!(matches!(entry.count, 1 | 10 | 100 | 1_000 | 10_000));
+            assert!(matches!(
+                entry.count,
+                1 | 10 | 100 | 256 | 1_000 | 4_096 | 10_000
+            ));
             assert!(entry.case.name().ends_with("_v1"));
         }
         for invalid in [

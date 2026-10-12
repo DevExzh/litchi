@@ -1341,22 +1341,30 @@ enum Case {
     PptTextBatchEagerNative1,
     PptTextBatchEagerNative10,
     PptTextBatchEagerNative100,
+    PptTextBatchEagerNative256,
     PptTextBatchEagerNative1000,
+    PptTextBatchEagerNative4096,
     PptTextBatchEagerNative10000,
     PptTextBatchEagerUnified1,
     PptTextBatchEagerUnified10,
     PptTextBatchEagerUnified100,
+    PptTextBatchEagerUnified256,
     PptTextBatchEagerUnified1000,
+    PptTextBatchEagerUnified4096,
     PptTextBatchEagerUnified10000,
     PptTextBatchPositionalNative1,
     PptTextBatchPositionalNative10,
     PptTextBatchPositionalNative100,
+    PptTextBatchPositionalNative256,
     PptTextBatchPositionalNative1000,
+    PptTextBatchPositionalNative4096,
     PptTextBatchPositionalNative10000,
     PptTextBatchPositionalUnified1,
     PptTextBatchPositionalUnified10,
     PptTextBatchPositionalUnified100,
+    PptTextBatchPositionalUnified256,
     PptTextBatchPositionalUnified1000,
+    PptTextBatchPositionalUnified4096,
     PptTextBatchPositionalUnified10000,
     PptPicturesEagerOpen,
     PptPicturesSourceBackedOpen,
@@ -2103,22 +2111,30 @@ impl Case {
             Self::PptTextBatchEagerNative1 => "ppt_text_batch_eager_native_1_v1",
             Self::PptTextBatchEagerNative10 => "ppt_text_batch_eager_native_10_v1",
             Self::PptTextBatchEagerNative100 => "ppt_text_batch_eager_native_100_v1",
+            Self::PptTextBatchEagerNative256 => "ppt_text_batch_eager_native_256_v1",
             Self::PptTextBatchEagerNative1000 => "ppt_text_batch_eager_native_1000_v1",
+            Self::PptTextBatchEagerNative4096 => "ppt_text_batch_eager_native_4096_v1",
             Self::PptTextBatchEagerNative10000 => "ppt_text_batch_eager_native_10000_v1",
             Self::PptTextBatchEagerUnified1 => "ppt_text_batch_eager_unified_1_v1",
             Self::PptTextBatchEagerUnified10 => "ppt_text_batch_eager_unified_10_v1",
             Self::PptTextBatchEagerUnified100 => "ppt_text_batch_eager_unified_100_v1",
+            Self::PptTextBatchEagerUnified256 => "ppt_text_batch_eager_unified_256_v1",
             Self::PptTextBatchEagerUnified1000 => "ppt_text_batch_eager_unified_1000_v1",
+            Self::PptTextBatchEagerUnified4096 => "ppt_text_batch_eager_unified_4096_v1",
             Self::PptTextBatchEagerUnified10000 => "ppt_text_batch_eager_unified_10000_v1",
             Self::PptTextBatchPositionalNative1 => "ppt_text_batch_positional_native_1_v1",
             Self::PptTextBatchPositionalNative10 => "ppt_text_batch_positional_native_10_v1",
             Self::PptTextBatchPositionalNative100 => "ppt_text_batch_positional_native_100_v1",
+            Self::PptTextBatchPositionalNative256 => "ppt_text_batch_positional_native_256_v1",
             Self::PptTextBatchPositionalNative1000 => "ppt_text_batch_positional_native_1000_v1",
+            Self::PptTextBatchPositionalNative4096 => "ppt_text_batch_positional_native_4096_v1",
             Self::PptTextBatchPositionalNative10000 => "ppt_text_batch_positional_native_10000_v1",
             Self::PptTextBatchPositionalUnified1 => "ppt_text_batch_positional_unified_1_v1",
             Self::PptTextBatchPositionalUnified10 => "ppt_text_batch_positional_unified_10_v1",
             Self::PptTextBatchPositionalUnified100 => "ppt_text_batch_positional_unified_100_v1",
+            Self::PptTextBatchPositionalUnified256 => "ppt_text_batch_positional_unified_256_v1",
             Self::PptTextBatchPositionalUnified1000 => "ppt_text_batch_positional_unified_1000_v1",
+            Self::PptTextBatchPositionalUnified4096 => "ppt_text_batch_positional_unified_4096_v1",
             Self::PptTextBatchPositionalUnified10000 => {
                 "ppt_text_batch_positional_unified_10000_v1"
             },
@@ -3610,22 +3626,30 @@ impl Case {
                 | Self::PptTextBatchEagerNative1
                 | Self::PptTextBatchEagerNative10
                 | Self::PptTextBatchEagerNative100
+                | Self::PptTextBatchEagerNative256
                 | Self::PptTextBatchEagerNative1000
+                | Self::PptTextBatchEagerNative4096
                 | Self::PptTextBatchEagerNative10000
                 | Self::PptTextBatchEagerUnified1
                 | Self::PptTextBatchEagerUnified10
                 | Self::PptTextBatchEagerUnified100
+                | Self::PptTextBatchEagerUnified256
                 | Self::PptTextBatchEagerUnified1000
+                | Self::PptTextBatchEagerUnified4096
                 | Self::PptTextBatchEagerUnified10000
                 | Self::PptTextBatchPositionalNative1
                 | Self::PptTextBatchPositionalNative10
                 | Self::PptTextBatchPositionalNative100
+                | Self::PptTextBatchPositionalNative256
                 | Self::PptTextBatchPositionalNative1000
+                | Self::PptTextBatchPositionalNative4096
                 | Self::PptTextBatchPositionalNative10000
                 | Self::PptTextBatchPositionalUnified1
                 | Self::PptTextBatchPositionalUnified10
                 | Self::PptTextBatchPositionalUnified100
+                | Self::PptTextBatchPositionalUnified256
                 | Self::PptTextBatchPositionalUnified1000
+                | Self::PptTextBatchPositionalUnified4096
                 | Self::PptTextBatchPositionalUnified10000
                 | Self::RtfFileUnifiedOpen
                 | Self::RtfFileUnifiedOpenLifecycle
@@ -13671,25 +13695,35 @@ fn parse_case(value: &str) -> Option<Case> {
         "ppt_text_batch_eager_native_1_v1" => Some(Case::PptTextBatchEagerNative1),
         "ppt_text_batch_eager_native_10_v1" => Some(Case::PptTextBatchEagerNative10),
         "ppt_text_batch_eager_native_100_v1" => Some(Case::PptTextBatchEagerNative100),
+        "ppt_text_batch_eager_native_256_v1" => Some(Case::PptTextBatchEagerNative256),
         "ppt_text_batch_eager_native_1000_v1" => Some(Case::PptTextBatchEagerNative1000),
+        "ppt_text_batch_eager_native_4096_v1" => Some(Case::PptTextBatchEagerNative4096),
         "ppt_text_batch_eager_native_10000_v1" => Some(Case::PptTextBatchEagerNative10000),
         "ppt_text_batch_eager_unified_1_v1" => Some(Case::PptTextBatchEagerUnified1),
         "ppt_text_batch_eager_unified_10_v1" => Some(Case::PptTextBatchEagerUnified10),
         "ppt_text_batch_eager_unified_100_v1" => Some(Case::PptTextBatchEagerUnified100),
+        "ppt_text_batch_eager_unified_256_v1" => Some(Case::PptTextBatchEagerUnified256),
         "ppt_text_batch_eager_unified_1000_v1" => Some(Case::PptTextBatchEagerUnified1000),
+        "ppt_text_batch_eager_unified_4096_v1" => Some(Case::PptTextBatchEagerUnified4096),
         "ppt_text_batch_eager_unified_10000_v1" => Some(Case::PptTextBatchEagerUnified10000),
         "ppt_text_batch_positional_native_1_v1" => Some(Case::PptTextBatchPositionalNative1),
         "ppt_text_batch_positional_native_10_v1" => Some(Case::PptTextBatchPositionalNative10),
         "ppt_text_batch_positional_native_100_v1" => Some(Case::PptTextBatchPositionalNative100),
+        "ppt_text_batch_positional_native_256_v1" => Some(Case::PptTextBatchPositionalNative256),
         "ppt_text_batch_positional_native_1000_v1" => Some(Case::PptTextBatchPositionalNative1000),
+        "ppt_text_batch_positional_native_4096_v1" => Some(Case::PptTextBatchPositionalNative4096),
         "ppt_text_batch_positional_native_10000_v1" => {
             Some(Case::PptTextBatchPositionalNative10000)
         },
         "ppt_text_batch_positional_unified_1_v1" => Some(Case::PptTextBatchPositionalUnified1),
         "ppt_text_batch_positional_unified_10_v1" => Some(Case::PptTextBatchPositionalUnified10),
         "ppt_text_batch_positional_unified_100_v1" => Some(Case::PptTextBatchPositionalUnified100),
+        "ppt_text_batch_positional_unified_256_v1" => Some(Case::PptTextBatchPositionalUnified256),
         "ppt_text_batch_positional_unified_1000_v1" => {
             Some(Case::PptTextBatchPositionalUnified1000)
+        },
+        "ppt_text_batch_positional_unified_4096_v1" => {
+            Some(Case::PptTextBatchPositionalUnified4096)
         },
         "ppt_text_batch_positional_unified_10000_v1" => {
             Some(Case::PptTextBatchPositionalUnified10000)
@@ -14600,15 +14634,19 @@ fn usage_text() -> String {
                                        ppt_semantic_noop_edit_save,ppt_semantic_one_edit_save,\n\
                                        ppt_text_batch_eager_native_1_v1,ppt_text_batch_eager_native_10_v1,\n\
                                        ppt_text_batch_eager_native_100_v1,ppt_text_batch_eager_native_1000_v1,\n\
+                                       ppt_text_batch_eager_native_256_v1,ppt_text_batch_eager_native_4096_v1,\n\
                                        ppt_text_batch_eager_native_10000_v1,\n\
                                        ppt_text_batch_eager_unified_1_v1,ppt_text_batch_eager_unified_10_v1,\n\
                                        ppt_text_batch_eager_unified_100_v1,ppt_text_batch_eager_unified_1000_v1,\n\
+                                       ppt_text_batch_eager_unified_256_v1,ppt_text_batch_eager_unified_4096_v1,\n\
                                        ppt_text_batch_eager_unified_10000_v1,\n\
                                        ppt_text_batch_positional_native_1_v1,ppt_text_batch_positional_native_10_v1,\n\
                                        ppt_text_batch_positional_native_100_v1,ppt_text_batch_positional_native_1000_v1,\n\
+                                       ppt_text_batch_positional_native_256_v1,ppt_text_batch_positional_native_4096_v1,\n\
                                        ppt_text_batch_positional_native_10000_v1,\n\
                                        ppt_text_batch_positional_unified_1_v1,ppt_text_batch_positional_unified_10_v1,\n\
                                        ppt_text_batch_positional_unified_100_v1,ppt_text_batch_positional_unified_1000_v1,\n\
+                                       ppt_text_batch_positional_unified_256_v1,ppt_text_batch_positional_unified_4096_v1,\n\
                                        ppt_text_batch_positional_unified_10000_v1,\n\
                                        ppt_pictures_eager_open,\n\
                                        ppt_pictures_source_backed_open,\n\
@@ -25647,22 +25685,30 @@ fn run_case_with_config(
         Case::PptTextBatchEagerNative1
         | Case::PptTextBatchEagerNative10
         | Case::PptTextBatchEagerNative100
+        | Case::PptTextBatchEagerNative256
         | Case::PptTextBatchEagerNative1000
+        | Case::PptTextBatchEagerNative4096
         | Case::PptTextBatchEagerNative10000
         | Case::PptTextBatchEagerUnified1
         | Case::PptTextBatchEagerUnified10
         | Case::PptTextBatchEagerUnified100
+        | Case::PptTextBatchEagerUnified256
         | Case::PptTextBatchEagerUnified1000
+        | Case::PptTextBatchEagerUnified4096
         | Case::PptTextBatchEagerUnified10000
         | Case::PptTextBatchPositionalNative1
         | Case::PptTextBatchPositionalNative10
         | Case::PptTextBatchPositionalNative100
+        | Case::PptTextBatchPositionalNative256
         | Case::PptTextBatchPositionalNative1000
+        | Case::PptTextBatchPositionalNative4096
         | Case::PptTextBatchPositionalNative10000
         | Case::PptTextBatchPositionalUnified1
         | Case::PptTextBatchPositionalUnified10
         | Case::PptTextBatchPositionalUnified100
+        | Case::PptTextBatchPositionalUnified256
         | Case::PptTextBatchPositionalUnified1000
+        | Case::PptTextBatchPositionalUnified4096
         | Case::PptTextBatchPositionalUnified10000 => {
             Err("PPT text-batch cases use the dedicated paired unified-ops runner".into())
         },
