@@ -334,7 +334,6 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
         return Ok(Commit::new(
             edit.source.clone(),
             edit.source,
-            false,
             operation_count,
             changes,
         ));
@@ -385,7 +384,6 @@ pub(super) fn commit(edit: Edit, operation_count: usize) -> Result<Commit, Error
     Ok(Commit::new(
         edit.source,
         snapshot,
-        true,
         operation_count,
         changes,
     ))
@@ -452,7 +450,6 @@ pub(super) fn commit_removals(edit: Edit, operation_count: usize) -> Result<Comm
     Ok(Commit::new(
         edit.source,
         snapshot,
-        true,
         operation_count,
         changes,
     ))
@@ -579,7 +576,7 @@ pub(super) fn apply_durable_removal_patch(
     }
     let mut edit = source.edit();
     edit.remove_pictures(&positions)?;
-    Ok(edit.commit()?.into_snapshot())
+    Ok(edit.commit()?.into_package())
 }
 
 pub(super) fn apply_durable_insertion_patch(
@@ -684,7 +681,7 @@ pub(super) fn apply_durable_insertion_patch(
     removal_positions.sort_unstable();
     let mut inverse_proof = snapshot.edit();
     inverse_proof.remove_pictures(&removal_positions)?;
-    let round_trip = inverse_proof.commit()?.into_snapshot();
+    let round_trip = inverse_proof.commit()?.into_package();
     if round_trip.source_bytes() != source.source_bytes() {
         return Err(Error::DurablePatch(
             "exact picture insertion is not the inverse of a supported removal".to_string(),
@@ -835,7 +832,7 @@ pub(super) fn apply_durable_patch(
     }
     let mut edit = source.edit();
     edit.stage_picture_payloads(&replacements, Some(&transports))?;
-    Ok(edit.commit()?.into_snapshot())
+    Ok(edit.commit()?.into_package())
 }
 
 fn decode_durable_operation(
