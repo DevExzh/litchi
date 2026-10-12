@@ -19,6 +19,8 @@ use super::spec::{
 };
 use super::{Nav, Ppt};
 use crate::error::{Code, Error, Result};
+use crate::path::PathArg;
+use crate::placement::Placement;
 use crate::props::{IntoProps, Props};
 use crate::registry::Operation;
 use crate::target::TargetArg;
@@ -88,6 +90,11 @@ enum TargetIdentity {
     Shape { slide: usize, shape: usize },
 }
 
+/// The bounded staging charge for one selected slide position.  The native
+/// edit retains the complete before/after artifacts separately; this charge
+/// covers only the resolved structural target list.
+const STRUCTURAL_TARGET_BYTES: usize = size_of::<usize>();
+
 /// Admit one PPT shape or slide property call and publish it through the
 /// native immutable package owner.
 pub(crate) fn set_with_limits<'p, 'v>(
@@ -101,6 +108,97 @@ pub(crate) fn set_with_limits<'p, 'v>(
     let nodes = resolve_nodes(file, &target, limits)?;
     let plans = build_plans(nodes, &props, limits)?;
     let native = stage_plans(file, plans, limits)?;
+    file.check_source()?;
+    finish_commit(file, native, limits)
+}
+
+/// Remove one slide or every slide selected by a scoped query.
+///
+/// Resolution is completed against the immutable source before the native edit
+/// is created.  Positions are then removed in descending order so each native
+/// position still refers to the source catalog selected by the caller.  The
+/// native transaction remains failure-atomic and owns all slide-list and
+/// outline-record dependency handling.
+pub(crate) fn remove_with_limits(
+    file: &Ppt,
+    target: TargetArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    file.admit_edit()?;
+    let mut positions = resolve_slide_targets(file, &target, limits)?;
+    admit_structural_targets(positions.len(), limits)?;
+    positions.sort_unstable_by(|left, right| right.cmp(left));
+    let native = stage_structural(file, positions.len(), limits, move |edit| {
+        for position in positions {
+            edit.remove_slide(Position::new(position))?;
+        }
+        Ok(())
+    })?;
+    file.check_source()?;
+    finish_commit(file, native, limits)
+}
+
+/// Move one slide to a final sibling position or relative to another slide.
+///
+/// Positional destinations are interpreted after detaching the moving slide,
+/// matching the common placement contract.  Relative destinations are adjusted
+/// against the source position before the native transaction is staged.
+pub(crate) fn move_to_with_limits<'p, 'q>(
+    file: &Ppt,
+    path: PathArg<'p>,
+    placement: Placement<'q>,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    file.admit_edit()?;
+    let from = resolve_slide_path(file, &path)?;
+    let count = file.slide_count()?;
+    let destination = move_destination(file, from, count, &placement)?;
+    admit_structural_targets(1, limits)?;
+    let native = stage_structural(file, 1, limits, move |edit| {
+        if from != destination {
+            edit.move_slide(Position::new(from), Position::new(destination))?;
+        }
+        Ok(())
+    })?;
+    file.check_source()?;
+    finish_commit(file, native, limits)
+}
+
+/// Exchange two slides in one native edit.
+///
+/// The legacy native owner exposes slide movement rather than a dedicated
+/// exchange operation.  A non-adjacent exchange therefore stages two moves;
+/// adjacent slides need only the first move.  Both positions are resolved
+/// before staging, and selecting the same slide is an exact no-op.
+pub(crate) fn swap_with_limits<'p, 'q>(
+    file: &Ppt,
+    left: PathArg<'p>,
+    right: PathArg<'q>,
+    limits: &SemanticLimits,
+) -> Result<WriteCommit> {
+    file.admit_edit()?;
+    let left = resolve_slide_path(file, &left)?;
+    let right = resolve_slide_path(file, &right)?;
+    let operations = if left == right {
+        0
+    } else if left.abs_diff(right) == 1 {
+        1
+    } else {
+        2
+    };
+    admit_structural_targets(usize::from(left != right).saturating_add(1), limits)?;
+    let native = stage_structural(file, operations, limits, move |edit| {
+        if left == right {
+            return Ok(());
+        }
+        edit.move_slide(Position::new(left), Position::new(right))?;
+        if left < right {
+            edit.move_slide(Position::new(right - 1), Position::new(left))?;
+        } else if right + 1 != left {
+            edit.move_slide(Position::new(right + 1), Position::new(left))?;
+        }
+        Ok(())
+    })?;
     file.check_source()?;
     finish_commit(file, native, limits)
 }
@@ -139,6 +237,156 @@ fn resolve_nodes<'f>(
         );
     }
     Ok(nodes)
+}
+
+fn resolve_slide_targets(
+    file: &Ppt,
+    target: &TargetArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Vec<usize>> {
+    let mut positions = Vec::new();
+    let mut seen = HashSet::new();
+    let nav = Nav::new(file);
+    if let Some(path) = target.path() {
+        append_slide_target(
+            &mut positions,
+            &mut seen,
+            crate::path::resolve::get(&nav, path)?,
+            limits,
+        )?;
+    } else if let Some(query) = target.query() {
+        let walk = crate::query::run(nav, query.clone())?;
+        if !walk.plan().diagnostics().is_empty() {
+            return Err(invalid_query());
+        }
+        for node in walk {
+            append_slide_target(&mut positions, &mut seen, node?, limits)?;
+        }
+    } else {
+        return Err(empty_target());
+    }
+    file.check_source()?;
+    if positions.is_empty() {
+        return Err(
+            Error::new(Code::ZeroMatches, "mutation selector matched no slide")
+                .with_format(FileFormat::Ppt),
+        );
+    }
+    Ok(positions)
+}
+
+fn append_slide_target(
+    positions: &mut Vec<usize>,
+    seen: &mut HashSet<usize>,
+    node: Node<'_>,
+    limits: &SemanticLimits,
+) -> Result<()> {
+    let position = resolve_slide_node(&node)?;
+    if seen.contains(&position) {
+        return Ok(());
+    }
+    let count = positions
+        .len()
+        .checked_add(1)
+        .ok_or_else(|| expanded_limit(usize::MAX, limits.max_expanded_targets()))?;
+    if count > limits.max_expanded_targets() {
+        return Err(expanded_limit(count, limits.max_expanded_targets()));
+    }
+    positions
+        .try_reserve(1)
+        .map_err(|source| allocation(source, "PPT structural targets"))?;
+    seen.try_reserve(1)
+        .map_err(|source| allocation(source, "PPT structural target identities"))?;
+    seen.insert(position);
+    positions.push(position);
+    Ok(())
+}
+
+fn resolve_slide_path(file: &Ppt, path: &PathArg<'_>) -> Result<usize> {
+    resolve_slide_node(&crate::path::resolve::get(&Nav::new(file), path)?)
+}
+
+fn resolve_slide_node(node: &Node<'_>) -> Result<usize> {
+    if node.element() != Kind::Slide {
+        return Err(Error::new(
+            Code::UnsupportedType,
+            "PPT structural ordering requires slide targets",
+        )
+        .with_format(FileFormat::Ppt));
+    }
+    node.slide_position().ok_or_else(|| {
+        Error::new(Code::InternalError, "PPT slide target has no position")
+            .with_format(FileFormat::Ppt)
+    })
+}
+
+fn move_destination(
+    file: &Ppt,
+    from: usize,
+    count: usize,
+    placement: &Placement<'_>,
+) -> Result<usize> {
+    if count == 0 {
+        return Err(
+            Error::new(Code::NotFound, "the PPT presentation has no slides")
+                .with_format(FileFormat::Ppt),
+        );
+    }
+    let last = count - 1;
+    let destination = match placement {
+        Placement::Start => 0,
+        Placement::End => last,
+        Placement::Position(position) => position.get(),
+        Placement::Before(path) => {
+            let anchor = resolve_slide_path(file, path)?;
+            if from == anchor {
+                from
+            } else if from < anchor {
+                anchor - 1
+            } else {
+                anchor
+            }
+        },
+        Placement::After(path) => {
+            let anchor = resolve_slide_path(file, path)?;
+            if from == anchor {
+                from
+            } else if from < anchor {
+                anchor
+            } else {
+                anchor
+                    .checked_add(1)
+                    .ok_or_else(|| out_of_range("PPT slide position overflow"))?
+            }
+        },
+        Placement::Into(path, position) => {
+            let parent = crate::path::resolve::get(&Nav::new(file), path)?;
+            if parent.element() != Kind::Presentation {
+                return Err(Error::new(
+                    Code::UnsupportedType,
+                    "PPT slides can only be reordered within the presentation root",
+                )
+                .with_format(FileFormat::Ppt));
+            }
+            position.map_or(last, Position::get)
+        },
+    };
+    if destination >= count {
+        return Err(out_of_range(
+            "the PPT slide move position is outside the presentation",
+        ));
+    }
+    Ok(destination)
+}
+
+fn admit_structural_targets(count: usize, limits: &SemanticLimits) -> Result<()> {
+    bound(
+        LimitKind::ExpandedTargets,
+        count,
+        limits.max_expanded_targets(),
+    )?;
+    let staged = count.saturating_mul(STRUCTURAL_TARGET_BYTES);
+    bound(LimitKind::StagedBytes, staged, limits.max_staged_bytes())
 }
 
 fn append_node<'f>(
@@ -514,6 +762,38 @@ fn master_from_emu(value: i64, property: &'static str) -> Result<i64> {
         .map_err(|_| invalid_geometry("PPT length conversion overflow").with_property(property))
 }
 
+fn stage_structural<F>(
+    file: &Ppt,
+    operations: usize,
+    limits: &SemanticLimits,
+    stage: F,
+) -> Result<litchi_ppt::Commit>
+where
+    F: FnOnce(
+        &mut litchi_ppt::package::edit::Edit,
+    ) -> std::result::Result<(), litchi_ppt::package::edit::Error>,
+{
+    let maximum = litchi_ppt::package::edit::MAX_OPERATIONS;
+    if operations > maximum {
+        return Err(native_edit_error(litchi_ppt::package::edit::Error::Limit {
+            kind: litchi_ppt::package::edit::LimitKind::Operations,
+            observed: operations,
+            maximum,
+        }));
+    }
+    let package = file.editable_package()?;
+    // The before image alone is a lower bound; reject before the native edit
+    // captures it. The complete before/after charge is checked after commit.
+    let before_bytes = usize::try_from(package.shared_ole_file().file_size()).unwrap_or(usize::MAX);
+    let minimum = before_bytes.saturating_add(size_of::<litchi_ppt::Patch>());
+    if minimum > limits.max_snapshot_bytes() {
+        return Err(snapshot_limit(minimum, limits.max_snapshot_bytes()));
+    }
+    let mut edit = package.edit().map_err(native_edit_error)?;
+    stage(&mut edit).map_err(native_edit_error)?;
+    edit.commit().map_err(native_edit_error)
+}
+
 fn stage_plans(
     file: &Ppt,
     plans: Vec<Plan>,
@@ -709,6 +989,10 @@ fn invalid_query() -> Error {
 
 fn unsupported_target(message: &'static str) -> Error {
     Error::new(Code::UnsupportedCapability, message).with_format(FileFormat::Ppt)
+}
+
+fn out_of_range(message: &'static str) -> Error {
+    Error::new(Code::OutOfRange, message).with_format(FileFormat::Ppt)
 }
 
 fn invalid_geometry(message: &'static str) -> Error {

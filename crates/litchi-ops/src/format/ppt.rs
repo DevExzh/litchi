@@ -252,6 +252,72 @@ impl Ppt {
         result
     }
 
+    /// Remove slides selected by a path or a scoped query through the native
+    /// primary PPT transaction.
+    pub(crate) fn remove<'p>(&self, target: crate::target::TargetArg<'p>) -> Result<WriteCommit> {
+        self.remove_with_limits(target, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Remove slides under an explicit semantic expansion and snapshot budget.
+    pub(crate) fn remove_with_limits<'p>(
+        &self,
+        target: crate::target::TargetArg<'p>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<WriteCommit> {
+        self.check_source()?;
+        let result = write::remove_with_limits(self, target, limits);
+        self.check_source()?;
+        result
+    }
+
+    /// Move one slide to a final sibling position or relative placement.
+    pub(crate) fn move_to<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::placement::Placement<'q>,
+    ) -> Result<WriteCommit> {
+        self.move_to_with_limits(
+            path,
+            placement,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Move one slide under an explicit semantic expansion and snapshot budget.
+    pub(crate) fn move_to_with_limits<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::placement::Placement<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<WriteCommit> {
+        self.check_source()?;
+        let result = write::move_to_with_limits(self, path, placement, limits);
+        self.check_source()?;
+        result
+    }
+
+    /// Exchange two slides through one native primary PPT transaction.
+    pub(crate) fn swap<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+    ) -> Result<WriteCommit> {
+        self.swap_with_limits(left, right, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Exchange two slides under an explicit semantic expansion and snapshot budget.
+    pub(crate) fn swap_with_limits<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<WriteCommit> {
+        self.check_source()?;
+        let result = write::swap_with_limits(self, left, right, limits);
+        self.check_source()?;
+        result
+    }
+
     /// Opens the presentation over the positional package filesystem
     /// detection opened (the facade's `from_native_ppt_package`).
     ///
