@@ -177,7 +177,21 @@ impl Presentation {
         }
     }
 
-    pub(crate) fn ensure_source_current(&self) -> Result<()> {
+    /// Verify that the retained positional source still matches this projection.
+    ///
+    /// Owned in-memory projections always pass. This also fences cached reads
+    /// after the package's edit ownership has been released.
+    ///
+    /// # Errors
+    /// Returns the typed source error if the source changed or cannot be read.
+    ///
+    /// ```
+    /// let package = litchi_ppt::Package::new()?;
+    /// let presentation = package.presentation()?;
+    /// presentation.check_source()?;
+    /// # Ok::<(), litchi_ppt::Error>(())
+    /// ```
+    pub fn check_source(&self) -> Result<()> {
         if let Some(source) = self.inner.source.as_ref() {
             source.source_version()?;
         }
@@ -252,7 +266,7 @@ impl Presentation {
     /// parsed — the structural failures that stay fatal under every
     /// [`crate::Leniency`] variant.
     pub fn collect_tolerance_report(&self) -> Result<crate::leniency::ToleranceReport> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let mut report = self.inner.tolerance.clone();
         // Main-master drawings are parsed by `Self::header_footers`; their
         // repairs are listed here, before the slides'.
@@ -286,7 +300,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn slides(&self) -> Result<Vec<Slide<'_>>> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let factory = SlideFactory::new_shared_with_limits(
             &self.inner.powerpoint_document,
             &self.inner.persist_mapping,
@@ -308,7 +322,7 @@ impl Presentation {
     /// Unlike [`Self::slides`], this method parses only the requested slide
     /// and does not retain the other slides in a temporary collection.
     pub fn slide_at(&self, position: usize) -> Result<Option<Slide<'_>>> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let Some(entry) = self.inner.slide_directory.entries().get(position) else {
             return Ok(None);
         };
@@ -866,7 +880,7 @@ impl Presentation {
     /// Incrementally saved presentations can hold several `DocumentContainer`
     /// records; only the one referenced by the current `UserEditAtom` is live.
     pub(crate) fn live_document_record(&self) -> Result<Record> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let persist_id = self.inner.slide_directory.document_persist_id();
         let offset = self
             .inner
@@ -1360,7 +1374,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn text(&self) -> Result<String> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let factory = SlideFactory::new_shared_with_limits(
             &self.inner.powerpoint_document,
             &self.inner.persist_mapping,
@@ -1410,7 +1424,7 @@ impl Presentation {
     ///
     /// Returns an error if the input cannot be read or is malformed.
     pub fn extract_text_fast(&self) -> Result<Vec<(usize, String)>> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let factory = SlideFactory::new_shared_with_limits(
             &self.inner.powerpoint_document,
             &self.inner.persist_mapping,
@@ -1481,7 +1495,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn images(&self) -> Result<Vec<ImageFile<'_>>> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         if let Some(store) = self.image_store()? {
             return litchi_odraw::image::all(&store, self.pictures_bytes()?).map_err(Error::from);
         }
@@ -1506,7 +1520,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn image(&self, id: ImageId) -> Result<Option<ImageFile<'_>>> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let Some(store) = self.image_store()? else {
             return Ok(None);
         };
@@ -1519,7 +1533,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn image_at(&self, index: u32) -> Result<Option<ImageFile<'_>>> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         self.image(ImageId::new(index)?)
     }
 
@@ -1532,7 +1546,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn image_store(&self) -> Result<Option<ImageStore<'_>>> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let mut store = None;
         for record in self
             .inner

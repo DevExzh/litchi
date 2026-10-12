@@ -22,6 +22,7 @@ use crate::slide_extension::SlideExtension;
 use crate::slide_round_trip::SlideRoundTripMetadata12;
 use crate::slide_sync::Synchronization;
 use once_cell::unsync::OnceCell;
+use std::sync::Arc;
 
 pub use model::{ParsedComment, ParsedSlideTiming};
 pub(crate) use validation::is_isolatable_shape_error;
@@ -52,7 +53,7 @@ pub struct Slide<'doc> {
     source: crate::records::PayloadStore<'doc>,
     /// Lazily-loaded shapes stored as owned values, together with the
     /// non-structural defects repaired while they were parsed.
-    shapes: OnceCell<(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)>,
+    shapes: OnceCell<(Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport)>,
     /// Cached text content.
     text_cache: OnceCell<String>,
     /// Lazily parsed, inert shape animation metadata.

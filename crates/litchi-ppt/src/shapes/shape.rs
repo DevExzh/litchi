@@ -1,4 +1,5 @@
 use super::super::package::Error;
+use super::ShapeEnum;
 /// Base shape trait and common shape functionality.
 ///
 /// This module defines the core Shape trait that all shape types implement,
@@ -208,9 +209,6 @@ pub trait Shape: std::any::Any {
         (props.x, props.y, props.width, props.height)
     }
 
-    /// Clone the shape as a boxed trait object.
-    fn clone_box(&self) -> Box<dyn Shape>;
-
     /// Check if the shape has text content.
     fn has_text(&self) -> bool;
 
@@ -277,12 +275,6 @@ pub trait Shape: std::any::Any {
     fn text(&self) -> Result<String, Error>;
 }
 
-impl Clone for Box<dyn Shape> {
-    fn clone(&self) -> Self {
-        self.clone_box()
-    }
-}
-
 /// Shape container that holds shape data and provides common operations.
 ///
 /// This container includes Escher text properties extracted from the shape's
@@ -291,7 +283,7 @@ impl Clone for Box<dyn Shape> {
 /// Uses `Cow<'a, [u8]>` for zero-copy optimization when parsing shapes,
 /// allowing the raw data to be borrowed from the original source when possible.
 ///
-/// Note: Child shapes use `'static` lifetime to maintain trait object safety,
+/// Child shapes own their payloads with a `'static` lifetime,
 /// while `raw_data` can be borrowed with lifetime `'a`.
 #[derive(Clone)]
 #[allow(
@@ -305,8 +297,8 @@ pub struct ShapeContainer<'a> {
     pub(crate) raw_data: Cow<'a, [u8]>,
     /// Text content (if applicable)
     pub(crate) text_content: Option<String>,
-    /// Child shapes (for group shapes) - must have 'static lifetime for trait object safety
-    pub(crate) children: Vec<Box<dyn Shape>>,
+    /// Concrete child shapes with owned payloads
+    pub(crate) children: Vec<ShapeEnum<'static>>,
 
     // Escher text properties (from OfficeArtFOPT records)
     /// Text left margin in EMUs
@@ -592,7 +584,7 @@ impl<'a> ShapeContainer<'a> {
     /// # Errors
     ///
     /// Returns an error if the operation fails.
-    pub fn add_child(&mut self, shape: Box<dyn Shape>) -> Result<(), MutationError> {
+    pub fn add_child(&mut self, shape: ShapeEnum<'static>) -> Result<(), MutationError> {
         self.ensure_mutable(Mutation::Structure)?;
         self.children.push(shape);
         Ok(())
@@ -600,7 +592,7 @@ impl<'a> ShapeContainer<'a> {
 
     /// Get all child shapes.
     #[must_use]
-    pub fn children(&self) -> &[Box<dyn Shape>] {
+    pub fn children(&self) -> &[ShapeEnum<'static>] {
         &self.children
     }
 
@@ -788,10 +780,6 @@ where
         self.text_content.is_some()
     }
 
-    fn clone_box(&self) -> Box<dyn Shape> {
-        Box::new(self.clone())
-    }
-
     fn as_any(&self) -> &dyn std::any::Any {
         self
     }
@@ -804,7 +792,7 @@ where
     reason = "test assertions panic on failure by design"
 )]
 mod persistence_tests {
-    use super::{Mutation, MutationError, Shape, ShapeContainer, ShapeProperties};
+    use super::{Mutation, MutationError, Shape, ShapeContainer, ShapeEnum, ShapeProperties};
 
     #[derive(Clone)]
     struct ExternalShape {
@@ -826,10 +814,6 @@ mod persistence_tests {
 
         fn has_text(&self) -> bool {
             false
-        }
-
-        fn clone_box(&self) -> Box<dyn Shape> {
-            Box::new(self.clone())
         }
 
         fn as_any(&self) -> &dyn std::any::Any {
@@ -901,7 +885,7 @@ mod persistence_tests {
         let before = shape.clone();
 
         assert_eq!(
-            shape.add_child(Box::new(ShapeContainer::new(
+            shape.add_child(ShapeEnum::TextBox(super::super::TextBox::new(
                 ShapeProperties::default(),
                 Vec::new(),
             ))),

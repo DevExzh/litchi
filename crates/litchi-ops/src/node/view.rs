@@ -374,6 +374,8 @@ pub(crate) enum Source<'a> {
     Xlsx(crate::format::xlsx::Props<'a>),
     #[cfg(feature = "pptx")]
     Pptx(crate::format::pptx::Props<'a>),
+    #[cfg(feature = "ppt")]
+    Ppt(crate::format::ppt::Props<'a>),
     #[cfg(feature = "xlsb")]
     Xlsb(crate::format::xlsb::Props<'a>),
     /// An XLS node's leaf values.
@@ -400,6 +402,8 @@ impl<'a> Source<'a> {
             Self::Xlsx(ref props) => props.get(index),
             #[cfg(feature = "pptx")]
             Self::Pptx(ref props) => props.get(index),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(ref props) => props.get(index),
             #[cfg(feature = "xlsb")]
             Self::Xlsb(ref props) => props.get(index),
             #[cfg(feature = "xls")]
@@ -591,6 +595,8 @@ enum Inner<'n, 'f> {
     Xlsx(crate::format::xlsx::Children<'f>),
     #[cfg(feature = "pptx")]
     Pptx(crate::format::pptx::Children<'f>),
+    #[cfg(feature = "ppt")]
+    Ppt(crate::format::ppt::Children<'f>),
     #[cfg(feature = "xlsb")]
     Xlsb(crate::format::xlsb::Children<'f>),
     #[cfg(feature = "xls")]
@@ -653,6 +659,12 @@ impl<'n, 'f> Children<'n, 'f> {
             inner: Inner::Pptx(children),
         }
     }
+    #[cfg(feature = "ppt")]
+    pub(crate) const fn ppt(children: crate::format::ppt::Children<'f>) -> Self {
+        Self {
+            inner: Inner::Ppt(children),
+        }
+    }
     #[cfg(feature = "xlsb")]
     pub(crate) const fn xlsb(children: crate::format::xlsb::Children<'f>) -> Self {
         Self {
@@ -684,6 +696,8 @@ impl<'f> Iterator for Children<'_, 'f> {
             Inner::Xlsx(children) => children.next().map(|child| child.map(Node::Xlsx)),
             #[cfg(feature = "pptx")]
             Inner::Pptx(children) => children.next().map(|child| child.map(Node::Pptx)),
+            #[cfg(feature = "ppt")]
+            Inner::Ppt(children) => children.next().map(|child| child.map(Node::Ppt)),
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(children) => children.next().map(|child| child.map(Node::Xlsb)),
             #[cfg(feature = "xls")]

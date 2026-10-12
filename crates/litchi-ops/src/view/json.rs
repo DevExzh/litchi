@@ -9,6 +9,7 @@
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
+        feature = "ppt",
         feature = "xlsb",
         feature = "xls"
     )),
@@ -57,6 +58,8 @@ enum Inner<'f> {
     Xlsx(crate::format::xlsx::ViewJson),
     #[cfg(feature = "pptx")]
     Pptx(crate::format::pptx::ViewJson),
+    #[cfg(feature = "ppt")]
+    Ppt(crate::format::ppt::ViewJson),
     #[cfg(feature = "xlsb")]
     Xlsb(crate::format::xlsb::ViewJson),
     #[cfg(feature = "xls")]
@@ -96,6 +99,12 @@ impl Json<'_> {
             inner: Inner::Pptx(json),
         }
     }
+    #[cfg(feature = "ppt")]
+    pub(crate) fn ppt(json: crate::format::ppt::ViewJson) -> Self {
+        Self {
+            inner: Inner::Ppt(json),
+        }
+    }
     #[cfg(feature = "xlsb")]
     pub(crate) fn xlsb(json: crate::format::xlsb::ViewJson) -> Self {
         Self {
@@ -121,6 +130,8 @@ impl Serialize for Json<'_> {
             Inner::Xlsx(json) => json.serialize(serializer),
             #[cfg(feature = "pptx")]
             Inner::Pptx(json) => json.serialize(serializer),
+            #[cfg(feature = "ppt")]
+            Inner::Ppt(json) => json.serialize(serializer),
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(json) => json.serialize(serializer),
             #[cfg(feature = "xls")]

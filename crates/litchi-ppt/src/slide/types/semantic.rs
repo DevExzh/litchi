@@ -13,6 +13,7 @@ use crate::slide_extension::SlideExtension;
 use crate::slide_round_trip::SlideRoundTripMetadata12;
 use crate::slide_sync::Synchronization;
 use crate::transition::{TransitionInfo, parse_transition};
+use std::sync::Arc;
 
 impl Slide<'_> {
     /// Get the slide number (1-based).
@@ -50,7 +51,29 @@ impl Slide<'_> {
     ///
     /// Returns an error if the operation fails.
     pub fn shapes(&self) -> Result<&[ShapeEnum<'static>]> {
-        self.parsed_shapes().map(|(shapes, _)| shapes.as_slice())
+        self.parsed_shapes().map(|(shapes, _)| shapes.as_ref())
+    }
+
+    /// Share the cached native shape array without cloning shapes or text.
+    ///
+    /// The array owns its payloads and can outlive this slide. All handles
+    /// returned by this slide share the same immutable allocation.
+    ///
+    /// # Errors
+    /// Returns the same typed parse errors as [`Self::shapes`].
+    ///
+    /// ```
+    /// let mut builder = litchi_ppt::Builder::new();
+    /// builder.add_slide()?;
+    /// let package = builder.build()?;
+    /// let presentation = package.presentation()?;
+    /// let slide = presentation.slide_at(0)?.expect("authored slide");
+    /// let shapes = slide.shared_shapes()?;
+    /// assert!(shapes.is_empty());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    pub fn shared_shapes(&self) -> Result<Arc<[ShapeEnum<'static>]>> {
+        self.parsed_shapes().map(|(shapes, _)| Arc::clone(shapes))
     }
 
     /// Get shapes on this slide (lazy-loaded), appending every non-structural
@@ -76,7 +99,7 @@ impl Slide<'_> {
     ) -> Result<&[ShapeEnum<'static>]> {
         let (shapes, tolerance) = self.parsed_shapes()?;
         report.append(tolerance);
-        Ok(shapes.as_slice())
+        Ok(shapes.as_ref())
     }
 
     /// Every non-structural defect repaired while this slide's shapes were
@@ -93,8 +116,11 @@ impl Slide<'_> {
 
     fn parsed_shapes(
         &self,
-    ) -> Result<&(Vec<ShapeEnum<'static>>, crate::leniency::ToleranceReport)> {
-        self.shapes.get_or_try_init(|| self.parse_shapes())
+    ) -> Result<&(Arc<[ShapeEnum<'static>]>, crate::leniency::ToleranceReport)> {
+        self.shapes.get_or_try_init(|| {
+            let (shapes, report) = self.parse_shapes()?;
+            Ok((Arc::from(shapes), report))
+        })
     }
 
     /// Get the number of shapes (triggers parsing if not yet loaded).

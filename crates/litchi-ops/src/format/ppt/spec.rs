@@ -104,29 +104,8 @@ impl Kind {
         &SPEC.elements[self as usize]
     }
 
-    pub(crate) const fn type_name(self) -> &'static str {
-        self.spec().name
-    }
-
     pub(crate) const fn name(self) -> &'static str {
         self.spec().name
-    }
-
-    pub(crate) const fn is_tree_kind(self) -> bool {
-        matches!(
-            self,
-            Self::Shape
-                | Self::Picture
-                | Self::Table
-                | Self::Chart
-                | Self::Group
-                | Self::Connector
-                | Self::SmartArt
-                | Self::Ole
-                | Self::Video
-                | Self::Audio
-                | Self::Media
-        )
     }
 }
 
@@ -289,7 +268,7 @@ const TREE_PARENTS: &[Kind] = &[
     Kind::SlideLayout,
 ];
 
-const SHAPE_IDS: &[&str] = &["id", "name"];
+const SHAPE_IDS: &[&str] = &["id"];
 
 const fn element(
     kind: Kind,
@@ -418,8 +397,16 @@ static VIDEO_GAP: GapSpec = element_gap(
     "M1-extended",
     "media frames are retained as native picture metadata only",
 );
-static AUDIO_GAP: GapSpec = VIDEO_GAP;
-static MEDIA_GAP: GapSpec = VIDEO_GAP;
+static AUDIO_GAP: GapSpec = element_gap(
+    "audio",
+    "M1-extended",
+    "media frames are retained as native picture metadata only",
+);
+static MEDIA_GAP: GapSpec = element_gap(
+    "media",
+    "M1-extended",
+    "media frames are retained as native picture metadata only",
+);
 static EQUATION_GAP: GapSpec = element_gap(
     "equation",
     "M1-extended",
@@ -500,7 +487,7 @@ static PICTURE_ALT_GAP: GapSpec = property_gap(
     "picture",
     "alt",
     "M1-extended",
-    "legacy PPT picture records have no alternate-text field",
+    "the native PPT picture projection does not expose alternate text",
 );
 static PICTURE_MEDIA_GAP: GapSpec = property_gap(
     "picture",
@@ -587,7 +574,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             Kind::Shape,
             "shape",
             &["shape", "textbox", "title"],
-            &[Kind::Slide, Kind::Group],
+            TREE_PARENTS,
             &[
                 Kind::Paragraph,
                 Kind::Equation,
@@ -602,9 +589,9 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             Kind::Placeholder,
             "placeholder",
             &["ph", "placeholder"],
-            &[Kind::Slide, Kind::Group],
+            TREE_PARENTS,
             &[Kind::Paragraph],
-            &["type", "idx", "id", "name"],
+            &["type", "idx", "id"],
             &["/slide[N]/placeholder[N]", "/slide[N]/placeholder[TYPE]"],
             PLACEHOLDER_PROPS,
         ),
@@ -612,9 +599,9 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             Kind::Picture,
             "picture",
             &["image", "img", "pic", "picture"],
-            &[Kind::Slide, Kind::Group],
+            TREE_PARENTS,
             &[],
-            SHAPE_IDS,
+            &["id", "name"],
             &["/slide[N]/picture[N]"],
             PICTURE_PROPS,
         ),
@@ -622,7 +609,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             Kind::Table,
             "table",
             &["table"],
-            &[Kind::Slide, Kind::Group],
+            TREE_PARENTS,
             &[Kind::Row, Kind::Col],
             SHAPE_IDS,
             &["/slide[N]/table[N]"],
@@ -650,7 +637,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             Kind::Chart,
             "chart",
             &["chart"],
-            &[Kind::Slide, Kind::Group],
+            TREE_PARENTS,
             &[Kind::Series, Kind::Axis, Kind::Animation],
             &["/slide[N]/chart[N]"],
             &CHART_GAP,
@@ -659,7 +646,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             Kind::Group,
             "group",
             &["group"],
-            &[Kind::Slide, Kind::Group],
+            TREE_PARENTS,
             TREE,
             SHAPE_IDS,
             &["/slide[N]/group[N]"],
@@ -669,7 +656,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             Kind::Connector,
             "connector",
             &["connection", "connector"],
-            &[Kind::Slide, Kind::Group],
+            TREE_PARENTS,
             &[],
             SHAPE_IDS,
             &["/slide[N]/connector[N]"],
@@ -699,7 +686,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["p", "paragraph"],
             &[Kind::Shape, Kind::Placeholder],
             &[Kind::Run, Kind::LineBreak],
-            &[],
             &["/slide[N]/shape[N]/paragraph[N]"],
             &PARAGRAPH_GAP,
         ),
@@ -709,7 +695,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["r", "run"],
             &[Kind::Paragraph],
             &[Kind::Hyperlink],
-            &[],
             &["/slide[N]/shape[N]/run[N]"],
             &RUN_GAP,
         ),
@@ -718,7 +703,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "linebreak",
             &["br", "linebreak"],
             &[Kind::Paragraph],
-            &[],
             &[],
             &["/slide[N]/shape[N]/linebreak[N]"],
             &LINEBREAK_GAP,
@@ -729,7 +713,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["notes"],
             &[Kind::Slide],
             &[],
-            &[],
             &["/slide[N]/notes"],
             &NOTES_GAP,
         ),
@@ -738,7 +721,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "comment",
             &["comment"],
             &[Kind::Slide],
-            &[],
             &[],
             &["/slide[N]/comment[N]"],
             &COMMENT_GAP,
@@ -803,7 +785,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["slidemaster"],
             &[Kind::Presentation],
             TREE,
-            &[],
             &["/slidemaster[N]"],
             &MASTER_GAP,
         ),
@@ -813,7 +794,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["layout", "slidelayout"],
             &[Kind::SlideMaster],
             TREE,
-            &[],
             &["/slidemaster[N]/slidelayout[N]", "/slidelayout[N]"],
             &LAYOUT_GAP,
         ),
@@ -822,7 +802,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "theme",
             &["theme"],
             &[Kind::Presentation],
-            &[],
             &[],
             &["/theme"],
             &THEME_GAP,
@@ -838,7 +817,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             ],
             &[Kind::Slide],
             &[Kind::Reply],
-            &[],
             &["/slide[N]/moderncomment[N]"],
             &MODERN_COMMENT_GAP,
         ),
@@ -847,7 +825,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "reply",
             &["reply"],
             &[Kind::ModernComment],
-            &[],
             &[],
             &["/slide[N]/moderncomment[N]/reply[N]"],
             &REPLY_GAP,
@@ -858,7 +835,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["hlink", "hyperlink"],
             &[Kind::Shape, Kind::Run],
             &[],
-            &[],
             &["/slide[N]/shape[N]/hyperlink"],
             &HYPERLINK_GAP,
         ),
@@ -867,7 +843,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "animation",
             &["animate", "animation"],
             &[Kind::Shape, Kind::Chart],
-            &[],
             &[],
             &["/slide[N]/shape[N]/animation[N]"],
             &ANIMATION_GAP,
@@ -878,7 +853,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["series"],
             &[Kind::Chart],
             &[],
-            &[],
             &["/slide[N]/chart[N]/series[N]"],
             &SERIES_GAP,
         ),
@@ -887,7 +861,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "axis",
             &["axis"],
             &[Kind::Chart],
-            &[],
             &[],
             &["/slide[N]/chart[N]/axis[@role=ROLE]"],
             &AXIS_GAP,
@@ -898,7 +871,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["col", "column"],
             &[Kind::Table],
             &[],
-            &[],
             &["/slide[N]/table[N]/col[N]"],
             &COL_GAP,
         ),
@@ -908,7 +880,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["noteslide"],
             &[Kind::Slide],
             &[],
-            &[],
             &["/slide[N]/noteSlide"],
             &NOTE_SLIDE_GAP,
         ),
@@ -917,7 +888,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "notesMaster",
             &["notesmaster"],
             &[Kind::Presentation],
-            &[],
             &[],
             &["/notesMaster"],
             &NOTES_MASTER_GAP,

@@ -305,3 +305,26 @@ fn cloned_projections_share_successful_picture_materialization() {
     assert_eq!(second.images().unwrap().len(), images.len());
     assert_eq!(source.reads.load(Ordering::Acquire), reads);
 }
+
+#[test]
+fn shared_shapes_reuse_the_native_cache_and_outlive_the_slide() {
+    let mut builder = litchi_ppt::Builder::new();
+    let position = builder.add_slide().unwrap();
+    builder
+        .add_textbox(position, 10, 10, 240, 40, "shared text")
+        .unwrap();
+    let package = builder.build().unwrap();
+    let presentation = package.presentation().unwrap();
+    let shapes = {
+        let slide = presentation.slide_at(0).unwrap().unwrap();
+        let first = slide.shared_shapes().unwrap();
+        let second = slide.shared_shapes().unwrap();
+        assert!(Arc::ptr_eq(&first, &second));
+        assert_eq!(first.as_ptr(), slide.shapes().unwrap().as_ptr());
+        assert!(slide.tolerance_report().unwrap().is_clean());
+        first
+    };
+    drop(presentation);
+    drop(package);
+    assert_eq!(shapes[0].text().unwrap(), "shared text");
+}

@@ -22,6 +22,10 @@ pub(crate) struct Children<'f> {
     state: State,
 }
 
+// Only physical kinds through Connector are emitted by this iterator.
+// Gap-only vocabulary kinds need no counters in every traversal frame.
+const COUNTER_COUNT: usize = Kind::Connector as usize + 1;
+
 enum State {
     Done,
     Slides {
@@ -33,7 +37,7 @@ enum State {
         parent: Arc<[crate::node::PathStep<'static>]>,
         source: ShapeSource,
         next: usize,
-        counters: [usize; Kind::COUNT],
+        counters: [usize; COUNTER_COUNT],
     },
 }
 
@@ -118,7 +122,7 @@ impl<'f> Children<'f> {
                 parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
                 source: ShapeSource::Slide(slide.position),
                 next: 0,
-                counters: [0; Kind::COUNT],
+                counters: [0; COUNTER_COUNT],
             },
             Item::Slide(_) => State::Done,
             Item::Shape(shape) if shape.kind == Kind::Group => {
@@ -136,7 +140,7 @@ impl<'f> Children<'f> {
                         parent: Arc::from(parent.steps().to_vec().into_boxed_slice()),
                         source,
                         next: 0,
-                        counters: [0; Kind::COUNT],
+                        counters: [0; COUNTER_COUNT],
                     }
                 } else {
                     State::Done
@@ -148,6 +152,13 @@ impl<'f> Children<'f> {
     }
 
     fn step(&mut self) -> Result<Option<Node<'f>>> {
+        // Once the iterator reaches EOF or reports an error, it is terminal.
+        // In particular, do not perform another source check on a later pull:
+        // a source that changes after EOF/error must not make this iterator
+        // yield a second result.
+        if matches!(self.state, State::Done) {
+            return Ok(None);
+        }
         self.file.check_source()?;
         let result = self.step_unfenced();
         self.file.check_source().and(result)

@@ -261,6 +261,7 @@ impl Ppt {
     /// immutable owned source and therefore have a stable revision too;
     /// released read projections deliberately have no publication owner.
     pub(crate) fn check_source(&self) -> Result<()> {
+        self.0.presentation.check_source()?;
         match &self.0.owner {
             PptOwner::Source(package) | PptOwner::Eager(package) => {
                 package.source_version().map(drop).map_err(Into::into)

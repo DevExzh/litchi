@@ -144,12 +144,6 @@ impl<'f> Node<'f> {
         }
     }
 
-    /// The native shape id, where the leaf exposes one.
-    #[must_use]
-    pub(crate) fn shape_id(&self) -> Option<u32> {
-        self.shape().and_then(shape_id)
-    }
-
     /// The native picture name, where the leaf exposes one.
     #[must_use]
     pub fn shape_name(&self) -> Option<&str> {
@@ -162,6 +156,15 @@ impl<'f> Node<'f> {
             Item::Presentation => Kind::Presentation,
             Item::Slide(_) => Kind::Slide,
             Item::Shape(shape) => shape.kind,
+        }
+    }
+
+    /// The semantic kind used by query inspection.  Placeholders retain
+    /// their physical shape node and path, but are a distinct query subject.
+    pub(crate) fn semantic_kind(&self) -> Kind {
+        match self.shape() {
+            Some(ShapeEnum::Placeholder(_)) => Kind::Placeholder,
+            _ => self.element(),
         }
     }
 
@@ -188,10 +191,12 @@ impl<'f> Node<'f> {
     /// leaf provides it.
     pub(crate) fn text_member(&self) -> Result<Option<Cow<'_, str>>> {
         match self.shape() {
-            Some(shape) if matches!(self.element(), Kind::Shape) => shape
-                .text()
-                .map(|text| Cow::Owned(text))
-                .map_err(Error::from),
+            Some(shape) if matches!(self.element(), Kind::Shape | Kind::Table | Kind::Group) => {
+                shape
+                    .text()
+                    .map(|text| Some(Cow::Owned(text)))
+                    .map_err(Error::from)
+            },
             _ => Ok(None),
         }
     }
@@ -217,7 +222,7 @@ impl<'f> Node<'f> {
                 .ok_or_else(|| missing_slide(slide.position))?
                 .shape_count()?,
             Item::Shape(shape) => match resolve_shape(&shape.source, &shape.path) {
-                ShapeEnum::Group(group) => group.children().len(),
+                Some(ShapeEnum::Group(group)) => group.children().len(),
                 _ => 0,
             },
         };
@@ -340,7 +345,7 @@ impl<'a> Props<'a> {
     pub(crate) fn get(&self, index: usize) -> Option<Value<'a>> {
         match &self.kind {
             PropKind::Root { slide_count } => {
-                match super::spec::PRESENTATION_PROPS.get(index)?.name {
+                match Kind::Presentation.spec().props.get(index)?.name {
                     "slideCount" => {
                         Some(Value::Int(i64::try_from(*slide_count).unwrap_or(i64::MAX)))
                     },
@@ -351,7 +356,7 @@ impl<'a> Props<'a> {
                 number,
                 slide_id,
                 persist_id,
-            } => match super::spec::SLIDE_PROPS.get(index)?.name {
+            } => match Kind::Slide.spec().props.get(index)?.name {
                 "slideNumber" => Some(Value::Int(i64::try_from(*number).unwrap_or(i64::MAX))),
                 "slideId" => Some(Value::Int(i64::from(*slide_id))),
                 "persistId" => Some(Value::Int(i64::from(*persist_id))),
@@ -471,7 +476,7 @@ fn connector_value<'a>(shape: &'a ShapeEnum<'static>, key: &str) -> Option<Value
     }
 }
 
-fn common_properties(shape: &ShapeEnum<'static>) -> Option<&ShapeProperties> {
+fn common_properties<'a>(shape: &'a ShapeEnum<'static>) -> Option<&'a ShapeProperties> {
     match shape {
         ShapeEnum::TextBox(shape) => Some(shape.properties()),
         ShapeEnum::Placeholder(shape) => Some(shape.properties()),
@@ -505,15 +510,16 @@ fn shape_id(shape: &ShapeEnum<'static>) -> Option<u32> {
     }
 }
 
-fn shape_name(shape: &ShapeEnum<'static>) -> Option<&str> {
+fn shape_name<'a>(shape: &'a ShapeEnum<'static>) -> Option<&'a str> {
     match shape {
         ShapeEnum::Picture(picture) => picture.name(),
         _ => None,
     }
 }
 
-fn length(emu: i32) -> Value<'static> {
-    Value::Length(Length::from_emu(i64::from(emu)))
+fn length(master: i32) -> Value<'static> {
+    // Native PPT anchors use 1/576 inch; one master unit is 3175/2 EMUs.
+    Value::Length(Length::from_emu(i64::from(master) * 3175 / 2))
 }
 
 fn count(value: usize) -> Value<'static> {
@@ -585,4 +591,10 @@ fn missing_slide(position: usize) -> Error {
         format!("slide {} vanished from the catalog", position + 1),
     )
     .with_format(FileFormat::Ppt)
+}
+
+impl fmt::Debug for Props<'_> {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter.write_str("Props { .. }")
+    }
 }

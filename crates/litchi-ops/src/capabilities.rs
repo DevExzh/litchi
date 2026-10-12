@@ -91,6 +91,7 @@
     not(any(
         feature = "doc",
         feature = "docx",
+        feature = "ppt",
         feature = "xlsx",
         feature = "pptx",
         feature = "xlsb",
@@ -804,7 +805,8 @@ impl Capabilities {
 
     /// Whether this report's format has an integrated publisher.
     fn publication_support(&self) -> Support {
-        if self.format == Some(FileFormat::Ppt) && cfg!(feature = "ppt") {
+        #[cfg(feature = "ppt")]
+        if self.format == Some(FileFormat::Ppt) {
             if self.retains_source == Some(false) {
                 return RETAINED_SOURCE.support();
             }
@@ -835,7 +837,8 @@ impl Capabilities {
 
     /// Whether this report's format has an integrated creator.
     fn creation_support(&self) -> Support {
-        if self.format == Some(FileFormat::Ppt) && cfg!(feature = "ppt") {
+        #[cfg(feature = "ppt")]
+        if self.format == Some(FileFormat::Ppt) {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Xls) && cfg!(feature = "xls") {
@@ -963,10 +966,6 @@ fn refused(format: FileFormat) -> Refusal {
         FileFormat::Doc if cfg!(feature = "doc") => pending(
             "M1 R6a",
             "the DOC adapter of record 0010 §4.8 has not landed",
-        ),
-        FileFormat::Ppt if cfg!(feature = "ppt") => pending(
-            "M1 R6c",
-            "the PPT adapter of record 0010 §4.8 has not landed",
         ),
         FileFormat::Rtf if cfg!(feature = "rtf") => pending(
             "M1 R7",
@@ -2159,6 +2158,8 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Xls => m1_view_gap(mode),
         #[cfg(feature = "pptx")]
         Adapter::Pptx => m1_view_gap(mode),
+        #[cfg(feature = "ppt")]
+        Adapter::Ppt => m1_view_gap(mode),
     }
 }
 
@@ -2288,6 +2289,9 @@ check_capabilities!(crate::format::xls::SPEC);
 
 #[cfg(feature = "pptx")]
 check_capabilities!(crate::format::pptx::SPEC);
+
+#[cfg(feature = "ppt")]
+check_capabilities!(crate::format::ppt::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {

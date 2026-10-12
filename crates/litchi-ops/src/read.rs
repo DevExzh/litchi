@@ -13,6 +13,7 @@ use litchi_core::FileFormat;
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
+        feature = "ppt",
         feature = "xlsb",
         feature = "xls"
     )),
@@ -89,6 +90,12 @@ impl File {
                 crate::path::resolve::get(&crate::format::pptx::Nav::new(handle), &path)
                     .map(Node::Pptx)
             },
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::get(&crate::format::ppt::Nav::new(handle), &path)
+                    .map(Node::Ppt)
+            },
             #[cfg(feature = "xlsb")]
             Self::Xlsb(handle) => {
                 let path = path.into_path()?;
@@ -137,6 +144,12 @@ impl File {
                 let path = path.into_path()?;
                 crate::path::resolve::find(&crate::format::pptx::Nav::new(handle), &path)
                     .map(|node| node.map(Node::Pptx))
+            },
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => {
+                let path = path.into_path()?;
+                crate::path::resolve::find(&crate::format::ppt::Nav::new(handle), &path)
+                    .map(|node| node.map(Node::Ppt))
             },
             #[cfg(feature = "xlsb")]
             Self::Xlsb(handle) => {
@@ -194,6 +207,10 @@ impl File {
                 crate::query::run(crate::format::pptx::Nav::new(handle), selector)
                     .map(Matches::pptx)
             },
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => {
+                crate::query::run(crate::format::ppt::Nav::new(handle), selector).map(Matches::ppt)
+            },
             #[cfg(feature = "xlsb")]
             Self::Xlsb(handle) => {
                 crate::query::run(crate::format::xlsb::Nav::new(handle), selector)
@@ -248,6 +265,11 @@ impl File {
                 crate::format::pptx::view_json(handle, mode, &crate::view::mode::Options::default())
                     .map(crate::view::Json::pptx)
             },
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => {
+                crate::format::ppt::view_json(handle, mode, &crate::view::mode::Options::default())
+                    .map(crate::view::Json::ppt)
+            },
             #[cfg(feature = "xlsb")]
             Self::Xlsb(handle) => {
                 crate::format::xlsb::view_json(handle, mode, &crate::view::mode::Options::default())
@@ -289,6 +311,13 @@ impl File {
             ),
             #[cfg(feature = "pptx")]
             Self::Pptx(handle) => crate::format::pptx::view_to(
+                handle,
+                mode,
+                &crate::view::mode::Options::default(),
+                output,
+            ),
+            #[cfg(feature = "ppt")]
+            Self::Ppt(handle) => crate::format::ppt::view_to(
                 handle,
                 mode,
                 &crate::view::mode::Options::default(),
@@ -337,6 +366,8 @@ pub(crate) enum Adapter {
     Xlsx,
     #[cfg(feature = "pptx")]
     Pptx,
+    #[cfg(feature = "ppt")]
+    Ppt,
     #[cfg(feature = "xlsb")]
     Xlsb,
     #[cfg(feature = "xls")]
@@ -356,6 +387,8 @@ impl Adapter {
             FileFormat::Xlsx => Some(Self::Xlsx),
             #[cfg(feature = "pptx")]
             FileFormat::Pptx => Some(Self::Pptx),
+            #[cfg(feature = "ppt")]
+            FileFormat::Ppt => Some(Self::Ppt),
             #[cfg(feature = "xlsb")]
             FileFormat::Xlsb => Some(Self::Xlsb),
             #[cfg(feature = "xls")]
@@ -375,6 +408,8 @@ impl Adapter {
             Self::Xlsx => FileFormat::Xlsx,
             #[cfg(feature = "pptx")]
             Self::Pptx => FileFormat::Pptx,
+            #[cfg(feature = "ppt")]
+            Self::Ppt => FileFormat::Ppt,
             #[cfg(feature = "xlsb")]
             Self::Xlsb => FileFormat::Xlsb,
             #[cfg(feature = "xls")]
@@ -413,6 +448,11 @@ macro_rules! with_spec {
             #[cfg(feature = "pptx")]
             $crate::read::Adapter::Pptx => {
                 let $spec = &$crate::format::pptx::SPEC;
+                $body
+            },
+            #[cfg(feature = "ppt")]
+            $crate::read::Adapter::Ppt => {
+                let $spec = &$crate::format::ppt::SPEC;
                 $body
             },
             #[cfg(feature = "xlsb")]

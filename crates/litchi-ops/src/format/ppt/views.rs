@@ -9,8 +9,8 @@
 
 use std::fmt;
 
-use litchi_ppt::shapes::ShapeEnum;
-use litchi_ppt::{PictureFrameKind, TextBox};
+use litchi_ppt::TextBox;
+use litchi_ppt::shapes::{PictureFrameKind, ShapeEnum};
 use serde::Serialize;
 
 use super::Ppt;
@@ -174,13 +174,6 @@ fn is_blank(text: &str) -> bool {
     text.trim().is_empty()
 }
 
-fn is_text_shape(shape: &ShapeEnum<'_>) -> bool {
-    matches!(
-        shape,
-        ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)
-    )
-}
-
 fn shape_text(shape: &ShapeEnum<'static>) -> Result<String> {
     shape.text().map_err(Error::from)
 }
@@ -205,7 +198,7 @@ fn emit_text_shape<W: fmt::Write>(
 ) -> Result<()> {
     enter_shape(depth, seen)?;
     match shape {
-        shape if is_text_shape(shape) => {
+        shape @ (ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)) => {
             let text = shape_text(shape)?;
             if !is_blank(&text) {
                 writeln!(out, "{text}").map_err(sink)?;
@@ -266,7 +259,7 @@ fn collect_texts(
 ) -> Result<()> {
     enter_shape(depth, seen)?;
     match shape {
-        shape if is_text_shape(shape) => {
+        shape @ (ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)) => {
             let text = shape_text(shape)?;
             if !is_blank(&text) {
                 texts.push(text);
@@ -377,7 +370,7 @@ fn annotate_shape<W: fmt::Write>(
 ) -> Result<()> {
     enter_shape(depth, seen)?;
     match shape {
-        shape if is_text_shape(shape) => {
+        shape @ (ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)) => {
             let text = shape_text(shape)?;
             if is_blank(&text) {
                 return Ok(());
@@ -449,7 +442,7 @@ fn outline_shape(
 ) -> Result<()> {
     enter_shape(depth, seen)?;
     match shape {
-        shape if is_text_shape(shape) => {
+        shape @ (ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)) => {
             let text = shape_text(shape)?;
             if is_title(shape) {
                 if title.is_none() && !is_blank(&text) {
@@ -608,7 +601,7 @@ fn walk_shape(
     enter_shape(depth, seen)?;
     stats.shapes += 1;
     match shape {
-        shape if is_text_shape(shape) => {
+        shape @ (ShapeEnum::TextBox(_) | ShapeEnum::Placeholder(_) | ShapeEnum::AutoShape(_)) => {
             stats.text_boxes += 1;
             let text = shape_text(shape)?;
             stats.words += words(&text);

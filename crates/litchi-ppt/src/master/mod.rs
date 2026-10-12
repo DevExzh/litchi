@@ -30,7 +30,7 @@ impl Presentation {
     ///
     /// Returns an error if the operation fails.
     pub fn masters(&self) -> Result<Inventory<'_>> {
-        self.ensure_source_current()?;
+        self.check_source()?;
         let records = self.inner.parser.try_find_records_ref()?;
         let mut persisted = Vec::new();
         for (&persist_id, &offset) in self.inner.persist_mapping.iter() {

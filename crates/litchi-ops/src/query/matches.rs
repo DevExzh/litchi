@@ -10,6 +10,7 @@
         feature = "docx",
         feature = "xlsx",
         feature = "pptx",
+        feature = "ppt",
         feature = "xlsb",
         feature = "xls"
     )),
@@ -34,6 +35,7 @@ use super::plan::{Diagnostic, Plan};
     feature = "docx",
     feature = "xlsx",
     feature = "pptx",
+    feature = "ppt",
     feature = "xlsb",
     feature = "xls"
 ))]
@@ -85,6 +87,8 @@ enum Inner<'f, 'q> {
     Xlsx(Walk<'q, 'f, crate::format::xlsx::Nav<'f>>),
     #[cfg(feature = "pptx")]
     Pptx(Walk<'q, 'f, crate::format::pptx::Nav<'f>>),
+    #[cfg(feature = "ppt")]
+    Ppt(Walk<'q, 'f, crate::format::ppt::Nav<'f>>),
     #[cfg(feature = "xlsb")]
     Xlsb(Walk<'q, 'f, crate::format::xlsb::Nav<'f>>),
     #[cfg(feature = "xls")]
@@ -124,6 +128,12 @@ impl<'f, 'q> Matches<'f, 'q> {
             inner: Inner::Pptx(walk),
         }
     }
+    #[cfg(feature = "ppt")]
+    pub(crate) fn ppt(walk: Walk<'q, 'f, crate::format::ppt::Nav<'f>>) -> Self {
+        Self {
+            inner: Inner::Ppt(walk),
+        }
+    }
     #[cfg(feature = "xlsb")]
     pub(crate) fn xlsb(walk: Walk<'q, 'f, crate::format::xlsb::Nav<'f>>) -> Self {
         Self {
@@ -159,6 +169,10 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Pptx(walk) => Self {
                 inner: Inner::Pptx(walk.limit(n)),
             },
+            #[cfg(feature = "ppt")]
+            Inner::Ppt(walk) => Self {
+                inner: Inner::Ppt(walk.limit(n)),
+            },
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(walk) => Self {
                 inner: Inner::Xlsb(walk.limit(n)),
@@ -193,6 +207,8 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Xlsx(walk) => walk.plan(),
             #[cfg(feature = "pptx")]
             Inner::Pptx(walk) => walk.plan(),
+            #[cfg(feature = "ppt")]
+            Inner::Ppt(walk) => walk.plan(),
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(walk) => walk.plan(),
             #[cfg(feature = "xls")]
@@ -222,6 +238,8 @@ impl<'f> Iterator for Matches<'f, '_> {
             Inner::Xlsx(walk) => walk.next().map(|node| node.map(Node::Xlsx)),
             #[cfg(feature = "pptx")]
             Inner::Pptx(walk) => walk.next().map(|node| node.map(Node::Pptx)),
+            #[cfg(feature = "ppt")]
+            Inner::Ppt(walk) => walk.next().map(|node| node.map(Node::Ppt)),
             #[cfg(feature = "xlsb")]
             Inner::Xlsb(walk) => walk.next().map(|node| node.map(Node::Xlsb)),
             #[cfg(feature = "xls")]

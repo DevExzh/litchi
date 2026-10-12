@@ -496,3 +496,85 @@ mod xls_allocations {
         );
     }
 }
+
+#[cfg(feature = "ppt")]
+#[test]
+fn ppt_selected_reads_add_constant_allocations_over_native_slide_reads() {
+    fn deck(slides: usize) -> (litchi_ops::File, litchi_ppt::Presentation) {
+        let mut builder = litchi_ppt::writer::Builder::new();
+        for _ in 0..slides {
+            let slide = builder.add_slide().expect("slide");
+            builder
+                .add_textbox(slide, 10, 10, 240, 40, "selected text")
+                .expect("textbox");
+        }
+        let package = builder.build().expect("package");
+        let bytes = package.to_bytes().expect("bytes");
+        let native = litchi_ppt::Package::from_bytes(&bytes)
+            .expect("native")
+            .presentation()
+            .expect("presentation");
+        (litchi_ops::open_bytes(bytes).expect("PPT"), native)
+    }
+    let (small, small_native) = deck(1);
+    let (large, large_native) = deck(100);
+    let path = litchi_ops::path::Path::parse("/slide[1]/shape[1]").expect("path");
+    let query = litchi_ops::query::Query::parse("shape").expect("query");
+    let plan =
+        litchi_ops::query::Plan::compile(&query, litchi_core::FileFormat::Ppt).expect("plan");
+    let get = |file: &litchi_ops::File| {
+        let node = file.get(&path).expect("shape");
+        assert_eq!(
+            node.view().text().expect("text").as_deref(),
+            Some("selected text")
+        );
+    };
+    let first = |file: &litchi_ops::File| {
+        let node = file
+            .query(&plan)
+            .expect("query")
+            .first()
+            .expect("first")
+            .expect("shape");
+        assert_eq!(
+            node.view().text().expect("text").as_deref(),
+            Some("selected text")
+        );
+    };
+    let node = large.get(&path).expect("shared shape");
+    let typed = node.as_ppt().expect("PPT node");
+    assert_eq!(
+        allocation_measure(|| typed.clone()),
+        (0, 0),
+        "node clones share native data"
+    );
+    get(&small);
+    get(&large);
+    first(&small);
+    first(&large);
+    let small_get = allocation_measure(|| get(&small));
+    let large_get = allocation_measure(|| get(&large));
+    let small_first = allocation_measure(|| first(&small));
+    let large_first = allocation_measure(|| first(&large));
+    let native = |presentation: &litchi_ppt::Presentation| {
+        let slide = presentation.slide_at(0).expect("slide").expect("first");
+        assert_eq!(
+            slide.shapes().expect("shapes")[0].text().expect("text"),
+            "selected text"
+        );
+    };
+    let small_base = allocation_measure(|| native(&small_native));
+    let large_base = allocation_measure(|| native(&large_native));
+    let overhead =
+        |total: (usize, usize), base: (usize, usize)| (total.0 - base.0, total.1 - base.1);
+    assert_eq!(
+        overhead(large_get, large_base),
+        overhead(small_get, small_base),
+        "facade lookup overhead must not scale with unselected slides"
+    );
+    assert_eq!(
+        overhead(large_first, large_base),
+        overhead(small_first, small_base),
+        "facade first-match overhead must not scale with unselected slides"
+    );
+}

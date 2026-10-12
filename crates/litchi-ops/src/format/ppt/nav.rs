@@ -17,9 +17,9 @@ use super::children::{Children, physical_kind, source_for};
 use super::node::{Item, Node};
 use super::spec::{Kind, SPEC};
 use crate::Result;
-use crate::node::spec::FormatSpec;
+use crate::node::spec::{FormatSpec, GapSpec};
 use crate::node::{Format, PathStep};
-use crate::path::navigate::{Available, ElementKind, KindSet, Lookup, Navigate, Resolved, Select};
+use crate::path::navigate::{Available, KindSet, Lookup, Navigate, Resolved, Select};
 use crate::path::vocabulary::{Case, Identity};
 use crate::query::inspect::Inspect;
 
@@ -44,7 +44,7 @@ impl<'f> Nav<'f> {
         &self,
         parent: &Node<'f>,
         step: &Resolved<'_, Kind>,
-    ) -> Result<Lookup<Node<'f>, super::spec::GapSpec>> {
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
         let kind = step.kind;
         if let Some(gap) = kind.spec().gap {
             return Ok(Lookup::Gap(gap));
@@ -61,7 +61,7 @@ impl<'f> Nav<'f> {
         }
     }
 
-    fn slide(&self, select: Select<'_>) -> Result<Lookup<Node<'f>, super::spec::GapSpec>> {
+    fn slide(&self, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
         let count = self.file.reader().slide_count();
         let position = match select {
             Select::None => (count > 0).then_some(0),
@@ -80,7 +80,7 @@ impl<'f> Nav<'f> {
         parent: &Node<'f>,
         kind: Kind,
         select: Select<'_>,
-    ) -> Result<Lookup<Node<'f>, super::spec::GapSpec>> {
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
         let Some(source) = source_for(parent)? else {
             return Ok(Lookup::NotApplicable);
         };
@@ -216,7 +216,7 @@ struct Candidate {
 impl<'f> Navigate<'f> for Nav<'f> {
     type Kind = Kind;
     type Node = Node<'f>;
-    type Gap = super::spec::GapSpec;
+    type Gap = GapSpec;
     type Children = Children<'f>;
 
     const FORMAT: FileFormat = FileFormat::Ppt;
@@ -252,7 +252,10 @@ impl<'f> Inspect<'f> for Nav<'f> {
     const TOP: &'static [Kind] = &[Kind::Slide];
 
     fn kind(&self, node: &Node<'f>) -> Kind {
-        node.element()
+        // A legacy placeholder is stored in the native scene as a physical
+        // shape.  Queries use the semantic placeholder kind, while the node
+        // itself keeps its physical `/shape[N]` address and ordinal.
+        node.semantic_kind()
     }
 
     fn type_name(&self, node: &Node<'f>) -> &'static str {
@@ -267,7 +270,8 @@ impl<'f> Inspect<'f> for Nav<'f> {
                     .reader()
                     .slide_at(slide.position)?
                     .ok_or_else(|| missing_slide(slide.position))?
-                    .text()?;
+                    .text()?
+                    .to_owned();
                 Ok(Some(Cow::Owned(text)))
             },
             _ => node.text_member(),
@@ -307,7 +311,7 @@ fn identity_matches(shape: &ShapeEnum<'static>, identity: Identity, wanted: &str
     }
 }
 
-fn shape_id(shape: &ShapeEnum<'_>) -> Option<u32> {
+fn shape_id(shape: &ShapeEnum<'static>) -> Option<u32> {
     match shape {
         ShapeEnum::TextBox(shape) => Some(shape.properties().id),
         ShapeEnum::Placeholder(shape) => Some(shape.properties().id),
@@ -319,7 +323,7 @@ fn shape_id(shape: &ShapeEnum<'_>) -> Option<u32> {
     }
 }
 
-fn shape_name(shape: &ShapeEnum<'_>) -> Option<&str> {
+fn shape_name<'a>(shape: &'a ShapeEnum<'static>) -> Option<&'a str> {
     match shape {
         ShapeEnum::Picture(picture) => picture.name(),
         _ => None,

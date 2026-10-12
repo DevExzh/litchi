@@ -1,12 +1,13 @@
 //! Reports are generated from the same tables as production reads.
 use litchi_core::FileFormat;
-#[cfg(any(feature = "docx", feature = "pptx", feature = "xls"))]
+#[cfg(any(feature = "docx", feature = "ppt", feature = "pptx", feature = "xls"))]
 use litchi_ops::Code;
 use litchi_ops::capabilities::Capabilities;
 #[cfg(all(feature = "docx", feature = "xlsx"))]
 use litchi_ops::capabilities::Support;
 #[cfg(any(
     feature = "docx",
+    feature = "ppt",
     feature = "xlsx",
     feature = "pptx",
     feature = "xlsb",
@@ -22,6 +23,7 @@ fn capability_goldens_follow_enabled_formats() {
         (FileFormat::Docx, "docx", cfg!(feature = "docx")),
         (FileFormat::Xlsx, "xlsx", cfg!(feature = "xlsx")),
         (FileFormat::Xlsb, "xlsb", cfg!(feature = "xlsb")),
+        (FileFormat::Ppt, "ppt", cfg!(feature = "ppt")),
         (FileFormat::Pptx, "pptx", cfg!(feature = "pptx")),
     ] {
         if !enabled {
@@ -713,6 +715,66 @@ fn pptx_reports_selection_and_structural_writes() {
     }
 }
 
+#[cfg(feature = "ppt")]
+#[test]
+fn ppt_reports_unified_reads_and_keeps_writes_granular() {
+    let format = Capabilities::of(FileFormat::Ppt);
+    for verb in [Verb::Get, Verb::Find, Verb::Query, Verb::View] {
+        assert!(format.verb(verb).is_supported(), "PPT {verb:?}");
+    }
+    assert!(format.verb(Verb::Save).is_supported());
+    assert!(format.verb(Verb::Create).is_supported());
+    for verb in [
+        Verb::Set,
+        Verb::Add,
+        Verb::Remove,
+        Verb::Move,
+        Verb::Swap,
+        Verb::Edit,
+        Verb::Batch,
+    ] {
+        assert_eq!(
+            format.verb(verb).code(),
+            Some(Code::UnsupportedCapability),
+            "PPT {verb:?} remains a write gap"
+        );
+    }
+    for name in ["presentation", "slide", "shape"] {
+        let element = format
+            .element(name)
+            .unwrap_or_else(|| panic!("missing PPT {name}"));
+        let operations = element.operations();
+        assert!(operations.get, "PPT {name} is readable");
+        assert!(!operations.set, "PPT {name} is not settable");
+        assert!(!operations.add, "PPT {name} is not addable");
+        assert!(!operations.remove, "PPT {name} is not removable");
+    }
+
+    let bytes = std::fs::read(concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../../test-data/ole/ppt/SampleShow.ppt"
+    ))
+    .unwrap();
+    let released = litchi_ops::open_bytes_with(
+        bytes,
+        &litchi_ops::OpenOptions::default().retain_source(false),
+    )
+    .unwrap();
+    assert_eq!(released.capabilities().retains_source(), Some(false));
+    for verb in [Verb::Get, Verb::Find, Verb::Query, Verb::View] {
+        assert!(
+            released.capabilities().verb(verb).is_supported(),
+            "PPT {verb:?}"
+        );
+    }
+    assert_eq!(
+        released.capabilities().verb(Verb::Save).code(),
+        Some(Code::UnsupportedCapability)
+    );
+    assert!(released.capabilities().verb(Verb::Create).is_supported());
+    assert!(released.root().is_ok());
+}
+
 #[cfg(feature = "pptx")]
 #[test]
 fn pptx_structural_capabilities_follow_owner_and_retention_policy() {
@@ -1049,10 +1111,10 @@ fn available_and_pending_reads_have_distinct_reports() {
             .verb(Verb::Get)
             .is_supported()
     );
-    // Keep this check on a legacy format whose adapter remains pending; its
+    // Keep this check on a tier-3 format whose adapter remains pending; its
     // feature may be disabled in a focused build, so the report's declared
     // refusal is authoritative.
-    let pending = Capabilities::of(FileFormat::Ppt);
+    let pending = Capabilities::of(FileFormat::Rtf);
     assert!(!pending.verb(Verb::Get).is_supported());
     #[cfg(feature = "pptx")]
     {

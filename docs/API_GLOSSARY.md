@@ -1340,3 +1340,14 @@ XF styles; native SST closure owns string-table publication. Formula-cell
 replacement and unrepresented dependency/inverse closures remain explicit
 element-level gaps. No parallel mutable workbook model or transaction family
 is introduced.
+
+## Unified PPT navigation (0215)
+
+The PPT adapter now supports unified `get`, `find`, `query` and semantic views
+using native `Presentation` and `Slide::shared_shapes` projections.
+`Presentation::check_source` fences cached positional reads, including reads
+after `retain_source(false)`. `ShapeContainer` accepts concrete `ShapeEnum`
+children; `Shape::clone_box` is removed. Unified nodes retain shared native
+arrays and index trails. Native identities require raw paths or queries;
+unimplemented stories and properties remain explicit capability gaps.
+Unified PPT mutations and full API/ADR migration remain open.
