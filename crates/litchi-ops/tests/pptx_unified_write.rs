@@ -665,7 +665,8 @@ fn slide_addition_refuses_properties_placements_and_limits_atomically() {
     for (node, code) in [
         (NewNode::new("slide"), Code::MissingProperty),
         (NewNode::new("picture"), Code::UnsupportedType),
-        (NewNode::new("chart"), Code::UnsupportedElement),
+        (NewNode::new("chart"), Code::UnsupportedType),
+        (NewNode::new("smartart"), Code::UnsupportedElement),
         (
             NewNode::new("slide").prop("layout", "missing"),
             Code::NotFound,

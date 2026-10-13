@@ -1213,7 +1213,16 @@ impl Edit {
         Ok(shape_id)
     }
 
-    /// Add an ordinary chart part, relationship, and visible graphic frame.
+    /// Add an authored chart: its chart part, an embedded workbook holding
+    /// the chart data, both relationships, and a visible graphic frame.
+    ///
+    /// The chart refers to the workbook's `Sheet1` in the layout of
+    /// [`Spec::sheet_layout`](litchi_drawingml::chart::authoring::Spec::sheet_layout),
+    /// whatever binding `chart` carries, so PowerPoint can edit the data.
+    /// `bounds` is `(x, y, width, height)` in EMU. The parts are named
+    /// `/ppt/charts/chartN.xml` and `/ppt/embeddings/Microsoft_Excel_WorksheetN.xlsx`
+    /// with the first free `N`, and both are generated deterministically.
+    /// Returns the new frame's shape ID.
     ///
     /// Staging a change to a signed package is refused with
     /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
@@ -1223,20 +1232,58 @@ impl Edit {
     ///
     /// # Errors
     ///
-    /// Returns an error for a missing slide, malformed shape tree, invalid
-    /// chart, or exhausted non-visual shape IDs.
+    /// Returns an error for a missing slide, an invalid chart spec,
+    /// non-positive extents, invalid name text, a malformed shape tree, or
+    /// exhausted shape IDs.
     pub fn add_chart<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
-        chart: &crate::chart::Chart,
-    ) -> Result<String> {
+        chart: &litchi_drawingml::chart::authoring::Spec,
+        name: &str,
+        bounds: (i64, i64, i64, i64),
+    ) -> Result<u32> {
+        use litchi_drawingml::chart::authoring::Binding;
+        use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+
+        if bounds.2 <= 0 || bounds.3 <= 0 {
+            return Err(invalid("chart frame extents must be positive"));
+        }
+        if name.contains('\0') || name.len() > 32_767 {
+            return Err(invalid("chart frame name is not valid text"));
+        }
         let selected = self.resolve_slide(slide.into())?;
+        let spec = chart.clone().with_binding(Binding::sheet("Sheet1"));
+        let workbook =
+            crate::presentation::embedded::excel::Workbook::from_spec(&spec)?.into_bytes();
         let mut candidate = self.working.clone();
+        crate::package::signature::refuse_signed_change(&candidate)?;
         let scene = crate::shape::Scene::read(candidate.get_part(&selected.part_name)?.blob())?;
         let shape_id = next_shape_id(&scene, "chart")?;
-        let relationship_id =
-            crate::chart::add(&mut candidate, selected.part_name.as_str(), chart)?;
-        let fragment = crate::chart::write_graphic_frame(shape_id, &relationship_id, chart);
+        let chart_name = free_part_name(&candidate, "/ppt/charts/chart", ".xml")?;
+        let workbook_name = free_part_name(
+            &candidate,
+            "/ppt/embeddings/Microsoft_Excel_Worksheet",
+            ".xlsx",
+        )?;
+        let mut chart_part =
+            BlobPart::new(chart_name.clone(), ct::DML_CHART.to_owned(), Vec::new());
+        let workbook_ref = workbook_name.relative_ref(chart_name.base_uri());
+        let workbook_rel = chart_part.relate_to(&workbook_ref, rt::PACKAGE);
+        let xml = spec
+            .to_xml(Some(&workbook_rel))
+            .map_err(|error| invalid(format!("authored chart: {error}")))?;
+        chart_part.set_blob(xml);
+        candidate.add_part(Box::new(BlobPart::new(
+            workbook_name,
+            ct::SML_SHEET.to_owned(),
+            workbook,
+        )));
+        candidate.add_part(Box::new(chart_part));
+        let chart_ref = chart_name.relative_ref(selected.part_name.base_uri());
+        let relationship_id = candidate
+            .get_part_mut(&selected.part_name)?
+            .relate_to(&chart_ref, rt::CHART);
+        let fragment = chart_frame(shape_id, &relationship_id, name, bounds);
         let owner = candidate.get_part(&selected.part_name)?;
         let xml = super::xml::append_shape(owner.blob(), fragment.as_bytes())?;
         let scene = crate::shape::Scene::read(&xml)?;
@@ -1246,8 +1293,88 @@ impl Edit {
             ));
         }
         candidate.get_part_mut(&selected.part_name)?.set_blob(xml);
+        crate::package::signature::settle_unsigned_change(&mut candidate)?;
         self.working = candidate;
-        Ok(relationship_id)
+        Ok(shape_id)
+    }
+
+    /// The chart-space XML of the chart frame at a depth-first shape
+    /// position of a slide, with the bytes of its embedded workbook when the
+    /// chart has one.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing slide or shape, a shape that is not a
+    /// chart frame, or a broken chart relationship.
+    pub fn chart<'s, 'k>(
+        &self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+    ) -> Result<(Vec<u8>, Option<Vec<u8>>)> {
+        let selected = self.resolve_slide(slide.into())?;
+        let (chart_name, workbook_name) =
+            chart_targets(&self.working, &selected.part_name, shape.into())?;
+        let xml = self.working.get_part(&chart_name)?.blob().to_vec();
+        let workbook = match workbook_name {
+            Some(name) => Some(self.working.get_part(&name)?.blob().to_vec()),
+            None => None,
+        };
+        Ok((xml, workbook))
+    }
+
+    /// Replace the chart-space XML of the chart frame at a depth-first shape
+    /// position of a slide and, when `workbook` is given, the bytes of the
+    /// embedded workbook the chart already refers to. The frame, the chart's
+    /// relationships and every other part are kept.
+    ///
+    /// The new XML must read back as a chart. Returns whether anything
+    /// changed; identical bytes are an exact no-op.
+    ///
+    /// Staging a change to a signed package is refused with
+    /// [`OpcError::SignedSourceRequiresExplicitPolicy`](litchi_opc::OpcError::SignedSourceRequiresExplicitPolicy)
+    /// (ADR 0006).
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a missing slide or shape, a shape that is not a
+    /// chart frame, XML that is not a chart, or a workbook for a chart that
+    /// has none.
+    pub fn set_chart<'s, 'k>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        shape: impl Into<crate::shape::Key<'k>>,
+        xml: Vec<u8>,
+        workbook: Option<Vec<u8>>,
+    ) -> Result<bool> {
+        let selected = self.resolve_slide(slide.into())?;
+        let (chart_name, workbook_name) =
+            chart_targets(&self.working, &selected.part_name, shape.into())?;
+        litchi_drawingml::chart::reader::read(&xml[..])
+            .map_err(|error| invalid(format!("replacement chart XML: {error}")))?;
+        let chart_changed = self.working.get_part(&chart_name)?.blob() != xml.as_slice();
+        let workbook_change = match (workbook, workbook_name) {
+            (None, _) => None,
+            (Some(_), None) => {
+                return Err(invalid("the chart has no embedded workbook to replace"));
+            },
+            (Some(bytes), Some(name)) => {
+                (self.working.get_part(&name)?.blob() != bytes.as_slice()).then_some((name, bytes))
+            },
+        };
+        if !chart_changed && workbook_change.is_none() {
+            return Ok(false);
+        }
+        let mut candidate = self.working.clone();
+        crate::package::signature::refuse_signed_change(&candidate)?;
+        if chart_changed {
+            candidate.get_part_mut(&chart_name)?.set_blob(xml);
+        }
+        if let Some((name, bytes)) = workbook_change {
+            candidate.get_part_mut(&name)?.set_blob(bytes);
+        }
+        crate::package::signature::settle_unsigned_change(&mut candidate)?;
+        self.working = candidate;
+        Ok(true)
     }
 
     /// Store bounded slide media, its visible picture frames, and inert resources.
@@ -2133,6 +2260,100 @@ fn remove_unreferenced_dependencies(package: &mut OpcPackage, roots: Vec<PackURI
         }
     }
     Ok(())
+}
+
+/// The first `{prefix}N{suffix}` part name not in the package.
+fn free_part_name(package: &OpcPackage, prefix: &str, suffix: &str) -> Result<PackURI> {
+    for index in 1_u32..=1_000_000 {
+        let candidate = PackURI::new(format!("{prefix}{index}{suffix}")).map_err(Error::Uri)?;
+        if !package.contains_part(&candidate) {
+            return Ok(candidate);
+        }
+    }
+    Err(invalid("no free part name is left"))
+}
+
+/// The chart part, and its embedded workbook part when it has one, of the
+/// chart frame at `shape` on the slide part `slide`.
+fn chart_targets(
+    package: &OpcPackage,
+    slide: &PackURI,
+    shape: crate::shape::Key<'_>,
+) -> Result<(PackURI, Option<PackURI>)> {
+    use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+
+    let owner = package.get_part(slide)?;
+    let scene = crate::shape::Scene::read(owner.blob())?;
+    let shape = scene
+        .get(shape)
+        .map_err(|error| invalid(format!("chart frame lookup: {error}")))?
+        .ok_or_else(|| invalid("the chart frame was not found"))?;
+    if !matches!(shape, crate::shape::Shape::Chart(_)) {
+        return Err(invalid("the shape is not a chart frame"));
+    }
+    let relationship_id = crate::shape::raw::payload(shape)
+        .map_err(|error| invalid(format!("chart frame relationship: {error}")))?
+        .ok_or_else(|| invalid("the chart frame names no chart part"))?
+        .relationship_id()
+        .map_err(|error| invalid(format!("chart frame relationship: {error}")))?
+        .into_owned();
+    let relationship = owner
+        .rels()
+        .get(&relationship_id)
+        .ok_or_else(|| invalid("the chart frame relationship is missing"))?;
+    if relationship.is_external()
+        || !crate::parts::is_relationship_type(relationship.reltype(), rt::CHART, "chart")
+    {
+        return Err(invalid(
+            "the chart frame relationship is not an internal chart",
+        ));
+    }
+    let chart = relationship.target_partname()?;
+    let part = package.get_part(&chart)?;
+    if part.content_type() != ct::DML_CHART {
+        return Err(invalid("the chart frame target is not a chart part"));
+    }
+    let mut workbook = None;
+    for relationship in part.rels().iter() {
+        if relationship.is_external()
+            || !crate::parts::is_relationship_type(relationship.reltype(), rt::PACKAGE, "package")
+        {
+            continue;
+        }
+        if workbook.is_some() {
+            return Err(invalid("the chart has more than one embedded workbook"));
+        }
+        workbook = Some(relationship.target_partname()?);
+    }
+    Ok((chart, workbook))
+}
+
+/// The graphic frame of an authored chart.
+fn chart_frame(
+    shape_id: u32,
+    relationship_id: &str,
+    name: &str,
+    bounds: (i64, i64, i64, i64),
+) -> String {
+    use litchi_core::xml::escape_xml;
+    let (x, y, width, height) = bounds;
+    format!(
+        concat!(
+            r#"<p:graphicFrame><p:nvGraphicFramePr><p:cNvPr id="{id}" name="{name}"/>"#,
+            r#"<p:cNvGraphicFramePr><a:graphicFrameLocks noGrp="1"/></p:cNvGraphicFramePr><p:nvPr/></p:nvGraphicFramePr>"#,
+            r#"<p:xfrm><a:off x="{x}" y="{y}"/><a:ext cx="{width}" cy="{height}"/></p:xfrm>"#,
+            r#"<a:graphic><a:graphicData uri="http://schemas.openxmlformats.org/drawingml/2006/chart">"#,
+            r#"<c:chart xmlns:c="http://schemas.openxmlformats.org/drawingml/2006/chart" r:id="{rel}"/>"#,
+            r#"</a:graphicData></a:graphic></p:graphicFrame>"#
+        ),
+        id = shape_id,
+        name = escape_xml(name),
+        x = x,
+        y = y,
+        width = width,
+        height = height,
+        rel = escape_xml(relationship_id),
+    )
 }
 
 pub(crate) fn next_shape_id(scene: &crate::shape::Scene<'_>, label: &str) -> Result<u32> {

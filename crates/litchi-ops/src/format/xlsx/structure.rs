@@ -51,6 +51,10 @@ impl Xlsx {
         // an addable kind under the wrong parent is `unsupported_type`.
         new_kind(node.kind())?;
         let parent = resolve_path(self, &parent)?;
+        if node.kind().eq_ignore_ascii_case("chart") {
+            drop(source);
+            return self.add_chart(&parent, node);
+        }
         if parent.element() != Kind::Workbook {
             return Err(Error::new(
                 Code::UnsupportedType,
@@ -109,6 +113,9 @@ impl Xlsx {
     }
 
     fn remove_inner<'p>(&self, target: TargetArg<'p>, limits: &SemanticLimits) -> Result<Commit> {
+        if let Some(commit) = self.try_remove_chart(&target)? {
+            return Ok(commit);
+        }
         let source = self.editor()?;
         let positions = super::sheet_write::resolve_sheet_targets(self, &target, limits)?
             .ok_or_else(unsupported_removal_target)?;

@@ -1781,11 +1781,11 @@
       "element": "chart",
       "parent": "sheet",
       "operations": {
-        "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "add": true,
+        "set": true,
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
@@ -1802,11 +1802,374 @@
           "pathSegment": "axis"
         }
       ],
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-XLSX-R7",
-        "reason": "the XLSX leaf reads chart presence only, not chart parts"
+      "properties": {
+        "chartType": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "legend": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "catTitle": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "seriesCount": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "data": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "dataRange": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "axisTitle": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "x": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "y": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "width": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "height": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "colors": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "dataLabels": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "labelPos": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "varyColors": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "gapWidth": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "overlap": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "holeSize": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "firstSliceAngle": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "scatterStyle": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "radarStyle": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "smooth": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "explosion": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "legend.overlay": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "autoTitleDeleted": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "axisMin": {
+          "type": "number",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "axisMax": {
+          "type": "number",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "majorUnit": {
+          "type": "number",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "gridlines": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "minorGridlines": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "comboTypes": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "comboSplit": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "marker": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "markerSize": {
+          "type": "int",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "showMarkers": {
+          "type": "bool",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "lineWidth": {
+          "type": "number",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "view3d": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series1": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series2": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series3": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series4": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series5": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series6": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series7": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series8": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series9": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series10": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series11": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series12": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series13": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series14": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series15": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series16": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series17": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series18": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series19": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        },
+        "series20": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1815,9 +2178,9 @@
       "parent": "chart",
       "operations": {
         "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
+        "set": true,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -1825,11 +2188,32 @@
           "/<sheet>/chart[N]/series[K]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-XLSX-R7",
-        "reason": "chart series need the chart reader"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "values": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "categories": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1838,21 +2222,37 @@
       "parent": "chart",
       "operations": {
         "add": false,
-        "set": false,
-        "get": false,
-        "query": false,
+        "set": true,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
         "positional": [
-          "/<sheet>/chart[N]/axis[@role=<role>]"
+          "/<sheet>/chart[N]/axis[@role=<role>]",
+          "/<sheet>/chart[N]/axis[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-XLSX-R7",
-        "reason": "chart axes need the chart reader"
+      "properties": {
+        "role": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "title": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2207,27 +2607,6 @@
       "code": "unsupported_capability",
       "followUp": "L-XLSX-R5",
       "reason": "the XLSX leaf has no comments accessor on either owner yet"
-    },
-    {
-      "subject": "element",
-      "element": "chart",
-      "code": "unsupported_capability",
-      "followUp": "L-XLSX-R7",
-      "reason": "the XLSX leaf reads chart presence only, not chart parts"
-    },
-    {
-      "subject": "element",
-      "element": "series",
-      "code": "unsupported_capability",
-      "followUp": "L-XLSX-R7",
-      "reason": "chart series need the chart reader"
-    },
-    {
-      "subject": "element",
-      "element": "axis",
-      "code": "unsupported_capability",
-      "followUp": "L-XLSX-R7",
-      "reason": "chart axes need the chart reader"
     },
     {
       "subject": "element",

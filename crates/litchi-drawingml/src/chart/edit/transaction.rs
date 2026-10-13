@@ -4,7 +4,7 @@ use super::model::DataLabelFlag;
 use super::{codec, validation};
 use crate::chart::data::TitleText;
 use crate::chart::model::Chart;
-use crate::chart::types::{AxisPosition, DisplayBlanks};
+use crate::chart::types::{AxisPosition, DisplayBlanks, LegendPosition};
 use crate::{Error, Result};
 use std::sync::Arc;
 
@@ -211,6 +211,58 @@ impl Transaction {
     /// bound, or an underlying XML, MCE, I/O, or formatting operation fails.
     pub fn set_axis_position(&mut self, axis_id: u32, position: AxisPosition) -> Result<&mut Self> {
         let candidate = codec::set_axis_position(&self.working_xml, axis_id, position)?;
+        self.apply(candidate)
+    }
+
+    /// Show the legend at a position (`Some`) or remove it (`None`).
+    ///
+    /// An existing legend keeps its overlay, layout, entries and formatting;
+    /// only its position changes.
+    /// # Errors
+    ///
+    /// Returns an error when the chart XML is malformed or the edited
+    /// chart fails to read back.
+    pub fn set_legend(&mut self, position: Option<LegendPosition>) -> Result<&mut Self> {
+        let candidate = codec::set_legend(&self.working_xml, position)?;
+        self.apply(candidate)
+    }
+
+    /// Set or clear the title of an axis selected by its ID.
+    /// # Errors
+    ///
+    /// Returns an error for a missing axis, a title whose representation
+    /// would change (literal to reference or back), or malformed XML.
+    pub fn set_axis_title(&mut self, axis_id: u32, title: Option<TitleText>) -> Result<&mut Self> {
+        let candidate = codec::set_axis_title(&self.working_xml, axis_id, title.as_ref())?;
+        drop(title);
+        self.apply(candidate)
+    }
+
+    /// Replace the values of a series selected by its stable index (its Y
+    /// values for a scatter or bubble series).
+    ///
+    /// A literal is rewritten; a reference keeps its formula and gets a new
+    /// cache. When the number of points changes, a single-column reference
+    /// is resized from its first cell; any other reference is refused,
+    /// because the cache would no longer match the range.
+    /// # Errors
+    ///
+    /// Returns an error for a missing series, an empty or non-finite value
+    /// list, a reference that cannot be resized, or malformed XML.
+    pub fn set_series_values(&mut self, series_index: u32, values: &[f64]) -> Result<&mut Self> {
+        let candidate = codec::set_series_values(&self.working_xml, series_index, values)?;
+        self.apply(candidate)
+    }
+
+    /// Replace the category labels of every series (the X values of
+    /// scatter and bubble series), following the rules of
+    /// [`Self::set_series_values`].
+    /// # Errors
+    ///
+    /// Returns an error for an empty label list, a text label in numeric
+    /// data, a reference that cannot be resized, or malformed XML.
+    pub fn set_categories(&mut self, labels: &[String]) -> Result<&mut Self> {
+        let candidate = codec::set_categories(&self.working_xml, labels)?;
         self.apply(candidate)
     }
 

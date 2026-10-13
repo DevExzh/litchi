@@ -31,8 +31,8 @@ use litchi_pptx::shape::owned::{Handle as ShapeHandle, Handles};
 use super::Pptx;
 use super::children::{Children, Listing};
 use super::node::{
-    CommentItem, Item, LayoutItem, MasterItem, ModernCommentItem, Node, NotesItem, ReplyItem,
-    SlideItem, TableItem, TextItem, TreeContainer, TreeItem, placeholder_type,
+    ChartItem, CommentItem, Item, LayoutItem, MasterItem, ModernCommentItem, Node, NotesItem,
+    ReplyItem, SlideItem, TableItem, TextItem, TreeContainer, TreeItem, placeholder_type,
 };
 use super::spec::{CELL_TEXT_GAP, Kind, NOTES_TEXT_GAP, PLACEHOLDER_TYPE, SPEC};
 use super::{steps, text};
@@ -454,6 +454,74 @@ impl<'f> Nav<'f> {
         }
     }
 
+    /// A chart's series (by position) or axis (by position or `@role`).
+    fn chart_child(
+        self,
+        chart: &TreeItem,
+        kind: Kind,
+        select: Select<'_>,
+    ) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let Some(summary) = chart.chart(self.file)? else {
+            return Ok(Lookup::Missing);
+        };
+        let make = |index: usize| {
+            let item = ChartItem {
+                chart: chart.clone(),
+                summary: Arc::clone(&summary),
+                index: to_u32(index),
+            };
+            Node::new(
+                self.file,
+                if kind == Kind::Series {
+                    Item::Series(item)
+                } else {
+                    Item::Axis(item)
+                },
+            )
+        };
+        if kind == Kind::Axis
+            && let Select::Identity(identities) = select
+        {
+            let mut found = None;
+            for (identity, value) in identities.iter() {
+                if !identity.key.eq_ignore_ascii_case("role") {
+                    return Ok(Lookup::NotApplicable);
+                }
+                let Some(role) = crate::format::chart::Role::parse(value) else {
+                    return Ok(Lookup::Missing);
+                };
+                found = summary.axes.iter().position(|axis| axis.role == role);
+            }
+            return Ok(found.map_or(Lookup::Missing, |index| Lookup::Found(make(index))));
+        }
+        if kind == Kind::Series
+            && let Select::Identity(identities) = select
+        {
+            // `@id` is the series' stable `c:idx`.
+            let mut found = None;
+            for (identity, value) in identities.iter() {
+                if !identity.key.eq_ignore_ascii_case("id") {
+                    return Ok(Lookup::NotApplicable);
+                }
+                let Ok(id) = value.trim().parse::<u32>() else {
+                    return Ok(Lookup::Missing);
+                };
+                found = summary.series.iter().position(|series| series.index == id);
+            }
+            return Ok(found.map_or(Lookup::Missing, |index| Lookup::Found(make(index))));
+        }
+        let count = if kind == Kind::Series {
+            summary.series.len()
+        } else {
+            summary.axes.len()
+        };
+        Ok(match pick_index(count, select) {
+            Pick::Index(index) => Lookup::Found(make(index as usize)),
+            Pick::Missing => Lookup::Missing,
+            Pick::NotApplicable => Lookup::NotApplicable,
+        })
+    }
+
     fn row(self, table: &TreeItem, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
         let (rows, _) = text::table_shape(&table.handle)?;
         Ok(match pick_index(rows, select) {
@@ -523,6 +591,9 @@ impl<'f> Nav<'f> {
                 nav.shape_run(tree, select)
             },
             (Item::Tree(tree), Kind::Row) if tree.kind == Kind::Table => nav.row(tree, select),
+            (Item::Tree(tree), Kind::Series | Kind::Axis) if tree.kind == Kind::Chart => {
+                nav.chart_child(tree, kind, select)
+            },
             (Item::Row(row), Kind::Cell) => nav.cell(row, select),
             (Item::Paragraph(text), Kind::Run | Kind::LineBreak) => Ok(nav.run(text, kind, select)),
             (Item::Cell(_), Kind::Paragraph) => Ok(Lookup::Gap(&CELL_TEXT_GAP)),
@@ -766,6 +837,16 @@ fn available_unfenced<'f>(nav: Nav<'f>, parent: &Node<'f>, out: &mut Available) 
         Item::Tree(tree) if tree.kind == Kind::Table => {
             for _ in 0..text::table_shape(&tree.handle)?.0 {
                 note(Kind::Row);
+            }
+        },
+        Item::Tree(tree) if tree.kind == Kind::Chart => {
+            if let Some(summary) = tree.chart(nav.file)? {
+                for _ in &summary.series {
+                    note(Kind::Series);
+                }
+                for _ in &summary.axes {
+                    note(Kind::Axis);
+                }
             }
         },
         Item::Row(row) => {

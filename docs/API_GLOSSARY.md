@@ -1891,3 +1891,31 @@ clear (`None`) a slide's direct transition, mirroring
 | `litchi_pptx::opened::ShapeFill` | adopted (0269) |
 | `TextProperties::{with_shape_fill, with_geometry}` | adopted (0269) |
 | `opened::Edit::set_slide_transition`, `source::Edit::set_slide_transition` | adopted (0269) |
+
+## Typed chart CRUD (record 0270)
+
+`litchi_drawingml::chart::authoring` is the host-neutral way to author a
+chart: a `Spec` (a `Variant` — `Kind`, `Grouping`, 3D flag — with title,
+categories, `Series`, legend, axis titles, an `Appearance` and a `Binding`)
+writes a deterministic chart-space part (`Spec::to_xml`) and describes the
+worksheet its references use (`Spec::sheet_layout`, `Cell`). Hosts place
+it: PPTX through the primary `opened::Edit::add_chart` (chart part,
+deterministic embedded workbook, relationships and frame) and replace it
+through `Edit::set_chart`; XLSX through the scoped family
+`chart::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` with
+`Package::{edit_charts, apply_charts}` and the reads
+`Package::{chart_count, chart_xml}` and `SourceWorksheet::{chart_count,
+chart_xml}`. The source-preserving chart editor gains
+`set_legend`, `set_axis_title`, `set_series_values` and `set_categories`
+on the existing `chart::edit::Transaction` (a pre-W2 name, unchanged here).
+
+| Name | Status |
+|---|---|
+| `litchi_drawingml::chart::authoring::{Spec, Variant, Kind, Grouping, Series, Binding, Cell, Appearance, Labels, Line}` | adopted (0270) |
+| `litchi_drawingml::chart::edit::Transaction::{set_legend, set_axis_title, set_series_values, set_categories}` | adopted (0270) |
+| `litchi_pptx::opened::Edit::{add_chart, chart, set_chart}` | adopted (0270); `add_chart` takes a `Spec`, the old `crate::chart::Chart` argument is removed |
+| `litchi_pptx::presentation::embedded::excel::Workbook::from_spec` | adopted (0270) |
+| `litchi_pptx::slide::Slide::chart_xml`, `SourceSlide::chart_xml`, `source::Slide::chart_xml` | adopted (0270) |
+| `litchi_xlsx::chart::edit::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | adopted (0270); family registered in the gate |
+| `litchi_xlsx::Package::{edit_charts, apply_charts, chart_count, chart_xml}` | adopted (0270) |
+| `litchi_xlsx::SourceWorksheet::{chart_count, chart_xml}` | adopted (0270) |

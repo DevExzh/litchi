@@ -61,6 +61,12 @@ use validation::{
 mod tests;
 
 pub use family::{Diagnostics, LimitKind};
+
+/// Insert a `drawing` element naming `relationship_id` into worksheet XML
+/// that has none, at its schema position.
+pub(crate) fn attach_worksheet_drawing(xml: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
+    drawing_transfer::attach_worksheet(xml, relationship_id)
+}
 pub use model::{
     ActiveTab, Change, Commit, Conflict, ConflictSet, JoinError, JoinFailure, PackageChange, Patch,
     State,

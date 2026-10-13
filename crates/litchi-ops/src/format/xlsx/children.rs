@@ -29,7 +29,9 @@ use litchi_xlsx::workbook::worksheet::TablePart;
 use litchi_xlsx::{self as xlsx, Address, Rect};
 
 use super::Xlsx;
-use super::node::{CellSource, Grid, Item, Node, Sheet, SheetHandle, defined_names, has_content};
+use super::node::{
+    CellSource, ChartItem, Grid, Item, Node, Sheet, SheetHandle, defined_names, has_content,
+};
 use super::spec::Kind;
 use crate::error::{Code, Error, Result};
 use crate::node::ViewOptions;
@@ -65,6 +67,11 @@ enum State {
         grid: Grid,
         rect: Rect,
         next: Option<Address>,
+    },
+    /// A worksheet's charts, or a chart's series and axes (record 0270).
+    Charts {
+        sheet: usize,
+        items: std::vec::IntoIter<(Kind, ChartItem)>,
     },
 }
 
@@ -178,7 +185,12 @@ impl<'f> Children<'f> {
                     cursor: Box::new(Cursor::new(range.rect, false)),
                 },
             },
-            Item::Cell(_) | Item::Table(_) | Item::NamedRange(_) => State::Done,
+            Item::Chart(chart) => chart_parts(node, chart, true, true),
+            Item::Cell(_)
+            | Item::Table(_)
+            | Item::NamedRange(_)
+            | Item::Series(_)
+            | Item::Axis(_) => State::Done,
         };
         Ok(Self::new(file, state))
     }
@@ -199,6 +211,34 @@ impl<'f> Children<'f> {
                 names: kinds.contains(Kind::NamedRange),
                 name: 0,
             },
+            Item::Sheet(sheet)
+                if kinds.contains(Kind::Chart)
+                    && !(cells
+                        || kinds.contains(Kind::Column)
+                        || kinds.contains(Kind::Row)
+                        || kinds.contains(Kind::Table)) =>
+            {
+                // A walk scoped to charts lists them; a mixed walk keeps
+                // the grid phases (charts are reached by path there).
+                let count = file.sheet_chart_count(sheet.position)?;
+                let mut items = Vec::with_capacity(count);
+                for index in 0..count {
+                    if let Some(summary) = file.sheet_chart(sheet.position, index)? {
+                        items.push((
+                            Kind::Chart,
+                            ChartItem {
+                                chart: u32::try_from(index).unwrap_or(u32::MAX),
+                                summary,
+                                child: 0,
+                            },
+                        ));
+                    }
+                }
+                State::Charts {
+                    sheet: sheet.position,
+                    items: items.into_iter(),
+                }
+            },
             Item::Sheet(sheet) => sheet_items(
                 sheet,
                 Want {
@@ -209,6 +249,12 @@ impl<'f> Children<'f> {
                 },
                 false,
             )?,
+            Item::Chart(chart) => chart_parts(
+                node,
+                chart,
+                kinds.contains(Kind::Series),
+                kinds.contains(Kind::Axis),
+            ),
             // Rows, columns and ranges hold cells when a query is scoped to
             // them; the spec's walk tree does not enter them otherwise.
             Item::Row(row) if cells => State::Cells {
@@ -250,6 +296,15 @@ impl<'f> Children<'f> {
         loop {
             match &mut self.state {
                 State::Done => return Ok(None),
+                State::Charts { sheet, items } => {
+                    return Ok(items.next().map(|(kind, item)| match kind {
+                        Kind::Chart => {
+                            let index = item.chart as usize;
+                            Node::new_chart(file, *sheet, index, item.summary)
+                        },
+                        kind => Node::new_chart_part(file, *sheet, kind, item),
+                    }));
+                },
                 State::Workbook {
                     next,
                     count,
@@ -652,4 +707,23 @@ fn dense_too_large(cells: u64, budget: u32) -> Error {
         format!("the range has {cells} cells, more than the dense view budget of {budget}"),
     )
     .with_suggestion("raise the `dense` budget, view a smaller range, or list stored cells only")
+}
+
+/// A chart's series and axes, as wanted.
+fn chart_parts(node: &Node<'_>, chart: &ChartItem, series: bool, axes: bool) -> State {
+    let mut items = Vec::new();
+    if series {
+        items.extend(
+            (0..chart.summary.series.len()).map(|index| (Kind::Series, chart.with_child(index))),
+        );
+    }
+    if axes {
+        items.extend(
+            (0..chart.summary.axes.len()).map(|index| (Kind::Axis, chart.with_child(index))),
+        );
+    }
+    State::Charts {
+        sheet: node.sheet_position(),
+        items: items.into_iter(),
+    }
 }

@@ -3622,15 +3622,8 @@ fn one_opened_transaction_spans_complex_ordinary_domains_and_full_reopen() -> Re
         (100, 100, 2_000_000, 1_000_000),
     )?;
 
-    let chart =
-        crate::chart::Chart::new(crate::chart::Type::Column, 100, 200, 3_000_000, 2_000_000)
-            .with_title("Quarterly chart")
-            .add_series(
-                crate::chart::Series::new("Revenue")
-                    .with_categories(vec!["Q1".into(), "Q2".into()])
-                    .with_values(vec![10.0, 12.0]),
-            );
-    edit.add_chart(0_usize, &chart)?;
+    let chart = authored_chart("Quarterly chart", &["Q1", "Q2"], vec![10.0, 12.0]);
+    edit.add_chart(0_usize, &chart, "Chart 1", (100, 200, 3_000_000, 2_000_000))?;
 
     let media = crate::media_parts::List {
         pictures: vec![crate::media_parts::Picture {
@@ -4193,14 +4186,9 @@ fn grouped_connector_transfer_remaps_identity_closure_and_is_durable() -> Result
         &[vec!["Transfer".into(), "Table".into()]],
         (0, 0, 1_000_000, 500_000),
     )?;
-    let chart = crate::chart::Chart::new(crate::chart::Type::Column, 0, 0, 1_000_000, 1_000_000)
-        .with_title("Transfer chart")
-        .add_series(
-            crate::chart::Series::new("Series")
-                .with_categories(vec!["A".into()])
-                .with_values(vec![1.0]),
-        );
-    let _chart_relationship_id = authored_shapes.add_chart(0_usize, &chart)?;
+    let chart = authored_chart("Transfer chart", &["A"], vec![1.0]);
+    let _chart_shape_id =
+        authored_shapes.add_chart(0_usize, &chart, "Chart", (0, 0, 1_000_000, 1_000_000))?;
     let authored_patch = authored_shapes.commit()?.into_patch();
     source_package = source_package.apply(&authored_patch)?;
     add_group_connector_transfer_fixture(&mut source_package)?;
@@ -5758,6 +5746,98 @@ fn assert_publication_keeps_no_copy(
         facade_memo_len(package),
         package.opc.part_count() - 1,
         "{stage}: every entry but the caller-defined part's is kept"
+    );
+    Ok(())
+}
+
+fn authored_chart(
+    title: &str,
+    categories: &[&str],
+    values: Vec<f64>,
+) -> litchi_drawingml::chart::authoring::Spec {
+    use litchi_drawingml::chart::authoring::{Kind, Series, Spec, Variant};
+    Spec::new(Variant::new(Kind::Column))
+        .with_title(title)
+        .with_categories(categories.iter().copied())
+        .with_series(Series::new("Revenue", values))
+}
+
+#[test]
+fn authored_charts_carry_a_deterministic_embedded_workbook_and_edit_in_place() -> Result<()> {
+    use litchi_drawingml::chart::authoring::{Kind, Variant};
+    let package = opened_two_slide_package()?;
+    let source = package.opened_presentation()?;
+    let chart = authored_chart("Sales", &["Q1", "Q2", "Q3"], vec![1.0, 2.0, 3.0]);
+    let mut edit = source.edit();
+    let id = edit.add_chart(
+        0_usize,
+        &chart,
+        "Sales chart",
+        (10, 20, 3_000_000, 2_000_000),
+    )?;
+    let mut committed = edit.commit()?.into_package();
+    let mut again = source.edit();
+    again.add_chart(
+        0_usize,
+        &chart,
+        "Sales chart",
+        (10, 20, 3_000_000, 2_000_000),
+    )?;
+    // Deterministic: the same input produces the same package bytes.
+    let mut repeated = again.commit()?.into_package();
+    assert_eq!(committed.to_bytes()?, repeated.to_bytes()?);
+
+    let reopened = Package::from_bytes(&committed.to_bytes()?)?;
+    let root = reopened.opened_presentation()?;
+    let slide = reopened.opc.get_part(root.slides()[0].part_name())?;
+    let scene = crate::shape::Scene::read(slide.blob())?;
+    let position = scene
+        .iter()
+        .position(|shape| shape.id() == Some(id))
+        .expect("chart frame");
+    assert!(matches!(
+        scene.at(position).expect("frame"),
+        crate::shape::Shape::Chart(_)
+    ));
+    let mut edit = root.edit();
+    let (xml, workbook) = edit.chart(0_usize, position)?;
+    let workbook = workbook.expect("embedded workbook");
+    assert!(workbook.starts_with(b"PK"));
+    let parsed = litchi_drawingml::chart::reader::read(&xml[..]).expect("chart");
+    assert_eq!(Variant::of(&parsed), Some(Variant::new(Kind::Column)));
+    assert!(parsed.external_data.is_some());
+    // Identical bytes are an exact no-op; a new title changes only the chart part.
+    assert!(!edit.set_chart(0_usize, position, xml.clone(), None)?);
+    let snapshot = litchi_drawingml::chart::edit::Snapshot::from_xml(xml)
+        .map_err(|error| Error::Invalid(error.to_string()))?;
+    let mut chart_edit = snapshot.edit();
+    chart_edit
+        .set_title(Some(litchi_drawingml::chart::TitleText::from_string(
+            "Revenue",
+        )))
+        .map_err(|error| Error::Invalid(error.to_string()))?;
+    let retitled = chart_edit
+        .commit()
+        .map_err(|error| Error::Invalid(error.to_string()))?
+        .into_snapshot();
+    assert!(edit.set_chart(0_usize, position, retitled.xml_bytes().to_vec(), None)?);
+    assert!(
+        edit.set_chart(0_usize, position, b"<x/>".to_vec(), None)
+            .is_err()
+    );
+    let after = edit.commit()?.into_package();
+    let mut check = after.opened_presentation()?.edit();
+    let (xml, _) = check.chart(0_usize, position)?;
+    assert!(String::from_utf8_lossy(&xml).contains("Revenue"));
+    // Removing the frame removes the chart part and its workbook.
+    check.remove_shape(0_usize, position)?;
+    let removed = check.commit()?.into_package();
+    assert!(
+        !removed
+            .opc
+            .iter_parts()
+            .any(|part| part.partname().as_str().starts_with("/ppt/charts/")
+                || part.partname().as_str().starts_with("/ppt/embeddings/"))
     );
     Ok(())
 }

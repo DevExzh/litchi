@@ -104,6 +104,29 @@ pub(super) enum Item {
     Column(ColumnItem),
     Table(TableItem),
     NamedRange(usize),
+    /// A worksheet chart, its series and its axes (record 0270).
+    Chart(ChartItem),
+    Series(ChartItem),
+    Axis(ChartItem),
+}
+
+/// A worksheet chart read from its part: the chart's position on the sheet,
+/// and, for a series or axis, the child's position in the summary.
+#[derive(Clone)]
+pub(crate) struct ChartItem {
+    pub(super) chart: u32,
+    pub(super) summary: Arc<crate::format::chart::Summary>,
+    pub(super) child: u32,
+}
+
+impl ChartItem {
+    pub(super) fn with_child(&self, child: usize) -> Self {
+        Self {
+            chart: self.chart,
+            summary: Arc::clone(&self.summary),
+            child: position_u32(child),
+        }
+    }
 }
 
 /// A sheet: its position, its leaf handle, and its parsed grid once a read
@@ -606,6 +629,36 @@ impl<'f> Node<'f> {
         Self::in_sheet(file, sheet, item)
     }
 
+    /// The chart at `index` of the worksheet at `sheet`.
+    pub(super) fn new_chart(
+        file: &'f Xlsx,
+        sheet: usize,
+        index: usize,
+        summary: Arc<crate::format::chart::Summary>,
+    ) -> Self {
+        let item = Item::Chart(ChartItem {
+            chart: position_u32(index),
+            summary,
+            child: 0,
+        });
+        Self::in_sheet(file, sheet, item)
+    }
+
+    /// A series or axis of a worksheet chart.
+    pub(super) fn new_chart_part(
+        file: &'f Xlsx,
+        sheet: usize,
+        kind: Kind,
+        item: ChartItem,
+    ) -> Self {
+        let item = if kind == Kind::Series {
+            Item::Series(item)
+        } else {
+            Item::Axis(item)
+        };
+        Self::in_sheet(file, sheet, item)
+    }
+
     /// The defined name at `index`, `/namedrange[N]`.
     pub(super) fn new_named_range(file: &'f Xlsx, index: usize) -> Self {
         Self {
@@ -666,6 +719,9 @@ impl<'f> Node<'f> {
             Item::Column(column) => PathStep::column("col", column.index),
             Item::Table(table) => PathStep::at("table", Position::new(table.index)),
             Item::NamedRange(index) => PathStep::at("namedrange", Position::new(*index)),
+            Item::Chart(chart) => PathStep::at("chart", Position::new(chart.chart as usize)),
+            Item::Series(chart) => PathStep::at("series", Position::new(chart.child as usize)),
+            Item::Axis(chart) => PathStep::at("axis", Position::new(chart.child as usize)),
         })
     }
 
@@ -697,6 +753,9 @@ impl<'f> Node<'f> {
             Item::Column(_) => Kind::Column,
             Item::Table(_) => Kind::Table,
             Item::NamedRange(_) => Kind::NamedRange,
+            Item::Chart(_) => Kind::Chart,
+            Item::Series(_) => Kind::Series,
+            Item::Axis(_) => Kind::Axis,
         }
     }
 
@@ -866,6 +925,12 @@ impl<'f> Node<'f> {
                 Props::Column(column.grid.column(column.index)?),
             ),
             Item::Table(table) => (TABLE_PROPS, Props::Table(table.part.table())),
+            Item::Chart(chart) => (
+                super::chart::CHART_PROPS,
+                Props::Chart(Arc::clone(&chart.summary)),
+            ),
+            Item::Series(chart) => (super::chart::SERIES_PROPS, Props::Series(chart.clone())),
+            Item::Axis(chart) => (super::chart::AXIS_PROPS, Props::Axis(chart.clone())),
             Item::NamedRange(index) => match defined_names(file).get(*index) {
                 Some(name) => (
                     NAMED_RANGE_PROPS,
@@ -1021,6 +1086,12 @@ impl<'f> Project<'f> for Node<'f> {
         match (&self.item, self.last_step()) {
             (_, None) => NodePath::ROOT,
             (Item::Sheet(_) | Item::NamedRange(_), Some(step)) => NodePath::short(step, None),
+            (Item::Series(chart) | Item::Axis(chart), Some(step)) => NodePath::inline(&[
+                PathStep::at("sheet", Position::new(self.sheet_position())),
+                PathStep::at("chart", Position::new(chart.chart as usize)),
+                step,
+            ])
+            .unwrap_or(NodePath::ROOT),
             (_, Some(step)) => NodePath::short(
                 PathStep::at("sheet", Position::new(self.sheet_position())),
                 Some(step),
@@ -1043,7 +1114,13 @@ impl<'f> Project<'f> for Node<'f> {
                         name.reference.as_str()
                     })
                 }),
-                Item::Workbook | Item::Sheet(_) | Item::Range(_) | Item::Column(_) => None,
+                Item::Workbook
+                | Item::Sheet(_)
+                | Item::Range(_)
+                | Item::Column(_)
+                | Item::Chart(_)
+                | Item::Series(_)
+                | Item::Axis(_) => None,
             })
         })
     }
@@ -1076,6 +1153,12 @@ impl<'f> Project<'f> for Node<'f> {
                     .get(*index)
                     .filter(|name| !name.reference.is_empty())
                     .map(|name| Preview::Text(Cow::Borrowed(name.reference.as_str()))),
+                Item::Chart(chart) => chart
+                    .summary
+                    .title
+                    .as_deref()
+                    .map(|title| Preview::Text(Cow::Borrowed(title))),
+                Item::Series(_) | Item::Axis(_) => None,
             })
         })
     }
@@ -1087,7 +1170,12 @@ impl<'f> Project<'f> for Node<'f> {
                 // Counting a sheet's rows decodes its part: only when the view
                 // lists them anyway (M1-Δ1).
                 Item::Sheet(_) if options.depth == 0 => return Ok(None),
-                Item::Cell(_) | Item::Table(_) | Item::NamedRange(_) => 0,
+                Item::Cell(_)
+                | Item::Table(_)
+                | Item::NamedRange(_)
+                | Item::Series(_)
+                | Item::Axis(_) => 0,
+                Item::Chart(chart) => chart.summary.series.len() + chart.summary.axes.len(),
                 Item::Sheet(_) | Item::Row(_) | Item::Column(_) | Item::Range(_) => {
                     Children::count(self, options)?
                 },
@@ -1239,6 +1327,9 @@ pub(crate) enum Props<'a> {
         name: &'a xlsx::raw::DefinedName,
         scope: Option<&'a str>,
     },
+    Chart(Arc<crate::format::chart::Summary>),
+    Series(ChartItem),
+    Axis(ChartItem),
 }
 
 /// What a cell's keys read.
@@ -1259,6 +1350,9 @@ impl fmt::Debug for Props<'_> {
             Self::Column(_) => "Column",
             Self::Table(_) => "Table",
             Self::NamedRange { .. } => "NamedRange",
+            Self::Chart(_) => "Chart",
+            Self::Series(_) => "Series",
+            Self::Axis(_) => "Axis",
         };
         f.debug_tuple("Props").field(&name).finish()
     }
@@ -1287,6 +1381,11 @@ impl<'a> Props<'a> {
             Self::Row(row) => row_value(row, RowKey::at(index)?),
             Self::Column(column) => column_value(column, ColumnKey::at(index)?),
             Self::Table(table) => table_value(table, TableKey::at(index)?),
+            Self::Chart(ref summary) => {
+                super::chart::chart_value(summary, super::chart::ChartKey::at(index)?)
+            },
+            Self::Series(ref item) => super::chart::series_value(item, index).map(owned),
+            Self::Axis(ref item) => super::chart::axis_value(item, index).map(owned),
             Self::NamedRange { name, scope } => match NamedRangeKey::at(index)? {
                 NamedRangeKey::Name => Some(Value::Text(Cow::Borrowed(&name.name))),
                 NamedRangeKey::Ref => Some(Value::Text(Cow::Borrowed(&name.reference))),
@@ -1742,4 +1841,17 @@ fn range_text(range: Rect) -> String {
         range.end().0.saturating_sub(1),
     );
     Label::range(first, last).as_str().to_owned()
+}
+
+/// Detach a value from the node it was read from.
+fn owned(value: Value<'_>) -> Value<'static> {
+    match value {
+        Value::Text(text) => Value::Text(Cow::Owned(text.into_owned())),
+        Value::Bool(value) => Value::Bool(value),
+        Value::Int(value) => Value::Int(value),
+        Value::Number(value) => Value::Number(value),
+        Value::Token(value) => Value::Token(value),
+        Value::Length(value) => Value::Length(value),
+        Value::Color(value) => Value::Color(value),
+    }
 }

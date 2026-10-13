@@ -226,6 +226,9 @@ impl Xlsx {
         if let Some(commit) = self.try_set_metadata(&target, &props)? {
             return Ok(commit);
         }
+        if let Some(commit) = self.try_set_chart(&target, &props)? {
+            return Ok(commit);
+        }
         if let Some(commit) = self.try_set_merge(&target, &props, limits)? {
             return Ok(commit);
         }

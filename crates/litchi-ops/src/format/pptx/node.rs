@@ -43,14 +43,16 @@ use super::Pptx;
 use super::children::{Children, Listing};
 use super::owner::SlideFacts;
 use super::spec::{
-    CELL_PROPS, COMMENT_PROPS, CellKey, CommentKey, FRAME_PROPS, FrameKey, Kind, NOTES_PROPS,
-    NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, RUN_PROPS,
-    RootKey, RunKey, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, ShapeKey, SlideKey,
-    SmartArtKey, TABLE_PROPS, TableKey,
+    AXIS_PROPS, AxisKey, CELL_PROPS, CHART_PROPS, COMMENT_PROPS, CellKey, ChartKey, CommentKey,
+    FRAME_PROPS, FrameKey, Kind, NOTES_PROPS, NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE,
+    PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey, RunKey, SERIES_PROPS, SHAPE_PROPS,
+    SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, SeriesKey, ShapeKey, SlideKey, SmartArtKey,
+    TABLE_PROPS, TableKey,
 };
 use super::steps::{self, Builder};
 use super::text;
 use crate::error::{Error, Result};
+use crate::format::chart::Summary;
 use crate::node::{
     Children as ViewChildren, Format, NodePath, PathStep, Preview, Project, Source, Value,
     ViewOptions,
@@ -104,6 +106,8 @@ pub(super) enum Item {
     LineBreak(TextItem),
     Row(TableItem),
     Cell(TableItem),
+    Series(ChartItem),
+    Axis(ChartItem),
     Notes(NotesItem),
     Comment(CommentItem),
     ModernComment(ModernCommentItem),
@@ -308,6 +312,8 @@ pub(super) struct TreeItem {
     pub(super) handle: Handle,
     pub(super) ordinal: u32,
     body: OnceLock<std::result::Result<Option<Arc<Body>>, Error>>,
+    /// A chart frame's chart part, read on first use (record 0270).
+    chart: OnceLock<std::result::Result<Option<Arc<Summary>>, Error>>,
 }
 
 impl TreeItem {
@@ -318,6 +324,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
+            chart: OnceLock::new(),
         }
     }
 
@@ -328,6 +335,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
+            chart: OnceLock::new(),
         }
     }
 
@@ -344,6 +352,7 @@ impl TreeItem {
             handle,
             ordinal,
             body: OnceLock::new(),
+            chart: OnceLock::new(),
         }
     }
 
@@ -365,6 +374,17 @@ impl TreeItem {
             Ok(body) => Ok(body.as_ref()),
             Err(error) => Err(error.clone()),
         }
+    }
+
+    /// A chart frame's chart, read from its chart part on first use; `None`
+    /// for another element, a master or layout chart, or a frame that names
+    /// no chart part.
+    pub(super) fn chart(&self, file: &Pptx) -> Result<Option<Arc<Summary>>> {
+        if self.kind != Kind::Chart {
+            return Ok(None);
+        }
+        let read = self.chart.get_or_init(|| super::chart::summary(file, self));
+        read.clone()
     }
 
     /// The placeholder type token of a `p:sp` with a `p:ph`, as OfficeCLI
@@ -474,6 +494,15 @@ pub(super) struct TableItem {
     pub(super) column: u32,
 }
 
+/// A series or axis of a chart: the chart frame, its chart summary and the
+/// position in the summary's series or axes (record 0270).
+#[derive(Clone)]
+pub(super) struct ChartItem {
+    pub(super) chart: TreeItem,
+    pub(super) summary: Arc<Summary>,
+    pub(super) index: u32,
+}
+
 /// A slide's speaker notes.
 #[derive(Clone)]
 pub(super) struct NotesItem {
@@ -561,6 +590,10 @@ impl<'f> Node<'f> {
                 .table
                 .slide_position()
                 .map(|position| position as usize),
+            Item::Series(item) | Item::Axis(item) => item
+                .chart
+                .slide_position()
+                .map(|position| position as usize),
             Item::Notes(notes) => Some(notes.slide as usize),
             Item::Comment(comment) => Some(comment.slide as usize),
             Item::ModernComment(comment) => Some(comment.slide as usize),
@@ -578,6 +611,7 @@ impl<'f> Node<'f> {
                 Some(&text.shape.handle)
             },
             Item::Row(table) | Item::Cell(table) => Some(&table.table.handle),
+            Item::Series(item) | Item::Axis(item) => Some(&item.chart.handle),
             _ => None,
         }
     }
@@ -614,6 +648,8 @@ impl<'f> Node<'f> {
             Item::LineBreak(_) => Kind::LineBreak,
             Item::Row(_) => Kind::Row,
             Item::Cell(_) => Kind::Cell,
+            Item::Series(_) => Kind::Series,
+            Item::Axis(_) => Kind::Axis,
             Item::Notes(_) => Kind::Notes,
             Item::Comment(_) => Kind::Comment,
             Item::ModernComment(_) => Kind::ModernComment,
@@ -646,6 +682,8 @@ impl<'f> Node<'f> {
             Item::LineBreak(_) => "linebreak",
             Item::Row(_) => "tr",
             Item::Cell(_) => "tc",
+            Item::Series(_) => "series",
+            Item::Axis(_) => "axis",
             Item::Notes(_) => "notes",
             Item::Comment(_) => "comment",
             Item::ModernComment(_) => "modernComment",
@@ -712,6 +750,16 @@ impl<'f> Node<'f> {
                 out.push(at("tc", table.column));
                 out
             },
+            Item::Series(item) => {
+                let mut out = item.chart.steps(canonical);
+                out.push(at("series", item.index));
+                out
+            },
+            Item::Axis(item) => {
+                let mut out = item.chart.steps(canonical);
+                out.push(at("axis", item.index));
+                out
+            },
             Item::Notes(notes) => {
                 let mut out = Builder::new();
                 out.push(steps::slide(notes.slide));
@@ -747,7 +795,9 @@ impl<'f> Node<'f> {
             | Item::Slide(_)
             | Item::Master(_)
             | Item::Layout(_)
-            | Item::Row(_) => None,
+            | Item::Row(_)
+            | Item::Series(_)
+            | Item::Axis(_) => None,
             // OfficeCLI's `GetShapeText` is "" for a shape without text.
             Item::Tree(tree) if tree.kind == Kind::Shape => {
                 Some(Cow::Borrowed(tree.handle.view().text().unwrap_or("")))
@@ -825,6 +875,9 @@ impl<'f> Node<'f> {
                 Kind::Shape => tree.body()?.map_or(0, |body| body.paragraphs.len()),
                 Kind::Group => listed_tree(tree.handle.children()),
                 Kind::Table => text::table_shape(&tree.handle)?.0,
+                Kind::Chart => tree
+                    .chart(self.file)?
+                    .map_or(0, |chart| chart.series.len() + chart.axes.len()),
                 _ => 0,
             },
             Item::Paragraph(text) => text.paragraph().map_or(0, |paragraph| {
@@ -838,6 +891,8 @@ impl<'f> Node<'f> {
             Item::Run(_)
             | Item::LineBreak(_)
             | Item::Cell(_)
+            | Item::Series(_)
+            | Item::Axis(_)
             | Item::Notes(_)
             | Item::Comment(_)
             | Item::Reply(_) => 0,
@@ -863,7 +918,7 @@ impl<'f> Node<'f> {
                 Some(key) => TreeProps::read_for(tree, Needs::shape(tree, key))?.shape(key),
                 None => None,
             },
-            Kind::Table => self.format_member()?.get(index),
+            Kind::Table | Kind::Chart => self.format_member()?.get(index),
             Kind::SmartArt => match SmartArtKey::at(index) {
                 Some(key) => TreeProps::read_for(tree, Needs::smartart(tree, key))?.smartart(key),
                 None => None,
@@ -948,6 +1003,13 @@ impl<'f> Node<'f> {
                     SMARTART_PROPS,
                     PropKind::SmartArt(Box::new(TreeProps::read(tree, false)?)),
                 ),
+                Kind::Chart => (
+                    CHART_PROPS,
+                    PropKind::Chart(Box::new(ChartProps {
+                        tree: TreeProps::read(tree, false)?,
+                        chart: tree.chart(self.file)?,
+                    })),
+                ),
                 _ => (
                     FRAME_PROPS,
                     PropKind::Frame(Box::new(TreeProps::read(tree, false)?)),
@@ -963,6 +1025,8 @@ impl<'f> Node<'f> {
             },
             Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_fill(cell)?)),
             Item::LineBreak(_) | Item::Row(_) => (&[][..], PropKind::Empty),
+            Item::Series(item) => (SERIES_PROPS, PropKind::Series(item)),
+            Item::Axis(item) => (AXIS_PROPS, PropKind::Axis(item)),
             Item::Notes(notes) => (NOTES_PROPS, PropKind::Notes(&notes.text)),
             Item::Comment(comment) => match comment.comment() {
                 Some(record) => (COMMENT_PROPS, PropKind::Comment(record)),
@@ -1123,6 +1187,9 @@ enum PropKind<'a> {
     Shape(Box<TreeProps<'a>>),
     Frame(Box<TreeProps<'a>>),
     SmartArt(Box<TreeProps<'a>>),
+    Chart(Box<ChartProps<'a>>),
+    Series(&'a ChartItem),
+    Axis(&'a ChartItem),
     Table(Box<TableProps<'a>>),
     Paragraph(&'a Paragraph),
     Run(&'a RunProperties),
@@ -1582,6 +1649,9 @@ impl<'a> Props<'a> {
             PropKind::Shape(props) => props.shape(ShapeKey::at(index)?),
             PropKind::Frame(props) => props.frame(FrameKey::at(index)?),
             PropKind::SmartArt(props) => props.smartart(SmartArtKey::at(index)?),
+            PropKind::Chart(props) => props.value(ChartKey::at(index)?),
+            PropKind::Series(item) => series_value(item, SeriesKey::at(index)?),
+            PropKind::Axis(item) => axis_value(item, AxisKey::at(index)?),
             PropKind::Table(props) => props.value(TableKey::at(index)?),
             PropKind::Paragraph(paragraph) => {
                 text::paragraph_value(paragraph, ParagraphKey::at(index)?)
@@ -1618,6 +1688,65 @@ impl<'a> Props<'a> {
             PropKind::Reply(reply) => reply_value(reply, index),
             PropKind::Empty => None,
         }
+    }
+}
+
+/// A chart frame's values: its frame properties, then its chart's.
+struct ChartProps<'a> {
+    tree: TreeProps<'a>,
+    chart: Option<Arc<Summary>>,
+}
+
+impl<'a> ChartProps<'a> {
+    fn value(&self, key: ChartKey) -> Option<Value<'a>> {
+        if let Some(frame) = FrameKey::at(key as usize) {
+            return self.tree.frame(frame);
+        }
+        let chart = self.chart.as_ref()?;
+        match key {
+            ChartKey::ChartType => chart.chart_type().map(|name| Value::Text(Cow::Owned(name))),
+            ChartKey::Title => chart
+                .title
+                .clone()
+                .map(|title| Value::Text(Cow::Owned(title))),
+            ChartKey::Legend => Some(Value::Text(Cow::Borrowed(
+                crate::format::chart::legend_name(chart.legend),
+            ))),
+            ChartKey::Categories => chart
+                .categories()
+                .map(|categories| Value::Text(Cow::Owned(categories.join(",")))),
+            ChartKey::CatTitle => chart
+                .axis(crate::format::chart::Role::Category)
+                .and_then(|axis| axis.title.clone())
+                .map(|title| Value::Text(Cow::Owned(title))),
+            _ => None,
+        }
+    }
+}
+
+fn series_value(item: &ChartItem, key: SeriesKey) -> Option<Value<'_>> {
+    let series = item.summary.series.get(item.index as usize)?;
+    match key {
+        SeriesKey::Name => series
+            .name
+            .as_deref()
+            .map(|name| Value::Text(Cow::Borrowed(name))),
+        SeriesKey::Values => Some(Value::Text(Cow::Owned(crate::format::chart::join_values(
+            &series.values,
+        )))),
+        SeriesKey::Categories => (!series.categories.is_empty())
+            .then(|| Value::Text(Cow::Owned(series.categories.join(",")))),
+    }
+}
+
+fn axis_value(item: &ChartItem, key: AxisKey) -> Option<Value<'_>> {
+    let axis = item.summary.axes.get(item.index as usize)?;
+    match key {
+        AxisKey::Role => Some(Value::Text(Cow::Borrowed(axis.role.name()))),
+        AxisKey::Title => axis
+            .title
+            .as_deref()
+            .map(|title| Value::Text(Cow::Borrowed(title))),
     }
 }
 

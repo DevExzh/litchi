@@ -846,6 +846,29 @@ impl SourceWorksheet {
         self.data.kind
     }
 
+    /// The number of ordinary charts on this worksheet, in drawing order
+    /// (see [`crate::chart::edit`]). Only the worksheet's relationships and
+    /// its drawing part are read.
+    pub fn chart_count(&self) -> Result<usize> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::chart::edit::source_chart_count(&self.owner.package, &self.data.part_uri)
+    }
+
+    /// The chart-space XML of the ordinary chart at `index` (drawing order)
+    /// on this worksheet, or `None` past the last chart.
+    pub fn chart_xml(&self, index: usize) -> Result<Option<Vec<u8>>> {
+        if self.data.kind != WorksheetKind::Worksheet {
+            return Err(Error::NotWorksheet {
+                sheet: self.data.name.clone(),
+            });
+        }
+        crate::chart::edit::source_chart_xml(&self.owner.package, &self.data.part_uri, index)
+    }
+
     /// Read the worksheet's admitted SpreadsheetML form controls.
     pub fn form_controls(&self) -> Result<crate::form_control::FormControlCollection> {
         if self.data.kind != WorksheetKind::Worksheet {
