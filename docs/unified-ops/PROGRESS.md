@@ -428,6 +428,34 @@ Cut from `395d0ffa9f`:
   - 1.03–1.04× the leaf.
   - Open: F1–F10 (other formats, PPTX notes and tables, merge-field pictures, consolidation with find/replace).
 
+- Merged `s23-ods` (0277):
+  - ODS reads, views and queries over content cells; flat `.fods` opens read-only;
+  - writes cover cells, named styles, merges, sheets, rows, named ranges, comments, `/metadata`, `create` and atomic save;
+  - leaf: LibreOffice-produced ODS is now editable without losing untouched bytes;
+  - 1.00–1.02× the leaf, and 1.42× for 10k batches (within 2×).
+  - Provisional: the leaf's `Edit::set_metadata` is not the glossary's `metadata` family (follow-up M1).
+  - Sheet and row structure edits are refused on LibreOffice-saved files (leaf rule R1).
+- Merged `s20-find` (0273):
+  - `find=`/`replace=` (with `matchCase`, `wholeWord`) on `set` for DOCX, PPTX, XLSX and RTF; regex refused (record 0010 Q3);
+  - `Applied::matched`; new `Verb::Replace`.
+  - Miss: DOCX 1.10–1.13× (leaf prefilter follow-up). PPTX ≤1.04×.
+  - Merge fixes: `Verb::ALL` is now 17 with `Merge`; the catch-all arm is allowed for no-format builds; the PPTX-only prefilter is gated.
+- Merged `s21-rtf` (0275):
+  - leaf: story text edits are spliced into the retained source, so tables no longer move to the end; batches are linear;
+  - unified reads: tables, header/footer, notes, comments, hyperlinks, pictures, styles, lists;
+  - unified writes: story text and picture removal;
+  - single inserts are now within budget.
+  - Misses left: single layout set 1.15×, edit-closure singles 1.09–1.14×, single-target fan-out 1.33–1.53×, repeated direct removes.
+  - Merge fix: RTF find refuses the new element kinds.
+- Merged `s23-odt` (0276):
+  - leaf `body` index with lossless typed body edits;
+  - a `litchi_odt::metadata` family registered in the gate;
+  - unified get/query/view plus set/add/remove/move/swap/create/save;
+  - open +1 µs, set ±1%, 1k batch 1.16–1.39×.
+  - Merge: 21 files conflicted with 0277's parallel dispatch arms. Files whose hunks split a block were rebuilt from trunk plus the branch's diff, and each file keeps all `ods`/`odt` cfg uses of both parents.
+- Gate note: the non-encryption capability goldens come only from an all-features-but-`encryption` run; plain `cargo test -p litchi-ops` has no formats (`default = []`).
+- `s23-odp` (0278) was sent back to its agent to merge trunk: its dispatch hunks would not reconcile mechanically with ODS and ODT.
+
 Queued next: field/TOC `refresh` (engine 3), DOCX charts (0270a), the other ODF leaves (0268 G1), the performance misses (full queries, DOCX set and cell writes, PPTX add, `Warn` batches) and iWork M6.
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
