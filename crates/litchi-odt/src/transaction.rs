@@ -417,6 +417,25 @@ impl Package {
         }
     }
 
+    /// Starts a detached edit of the document properties in `meta.xml`.
+    #[must_use]
+    pub fn edit_metadata(&self) -> crate::metadata::Edit {
+        crate::metadata::Edit::new(self)
+    }
+
+    /// Applies a metadata patch to the exact snapshot it was made from.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Core`] when this package is not the patch's
+    /// source snapshot.
+    pub fn apply_metadata(
+        &self,
+        patch: &crate::metadata::Patch,
+    ) -> std::result::Result<Self, PackageError> {
+        self.apply(patch.primary())
+    }
+
     /// Starts a bounded deterministic collection of independently prepared edits.
     #[must_use]
     pub fn joined_edit(&self) -> JoinedEdit {
@@ -1612,15 +1631,10 @@ impl Edit {
     }
 
     /// Stages setting (`Some`) or removing (`None`) one `meta.xml`
-    /// property. Keywords are written as one `meta:keyword` per
-    /// comma-separated entry. No date or generator is touched.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error for text XML cannot carry.
-    pub fn set_metadata(
+    /// property; the public route is [`crate::metadata::Edit`].
+    pub(crate) fn set_metadata(
         &mut self,
-        field: crate::body::MetadataField,
+        field: crate::metadata::Field,
         value: Option<&str>,
     ) -> Result<&mut Self> {
         let value = value.map(str::to_owned);

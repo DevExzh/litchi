@@ -146,6 +146,7 @@ pub mod list_label_alignment;
 pub mod list_style;
 pub mod master_page;
 pub mod media;
+pub mod metadata;
 pub mod notes_configuration;
 pub mod outline_style;
 pub mod package;

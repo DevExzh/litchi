@@ -781,3 +781,167 @@ pub(crate) const ABSENT: &[&str] = &[
     "theme",
     "watermark",
 ];
+
+/// Canonical element names whose properties `set` writes.
+pub(crate) const SETTABLE: &[&str] = &[
+    "bookmark",
+    "comment",
+    "endnote",
+    "footnote",
+    "frame",
+    "h",
+    "hyperlink",
+    "listItem",
+    "metadata",
+    "p",
+    "r",
+    "section",
+    "tbl",
+    "tc",
+    "textbox",
+];
+
+/// Canonical element names `add` creates.
+pub(crate) const ADDABLE: &[&str] = &[
+    "bookmark",
+    "comment",
+    "endnote",
+    "footnote",
+    "h",
+    "hyperlink",
+    "list",
+    "listItem",
+    "p",
+    "r",
+    "section",
+    "tbl",
+    "tr",
+];
+
+/// Canonical element names `remove` deletes (rows without vertical merges).
+pub(crate) const REMOVABLE: &[&str] = &[
+    "bookmark",
+    "comment",
+    "endnote",
+    "footnote",
+    "frame",
+    "h",
+    "hyperlink",
+    "list",
+    "listItem",
+    "p",
+    "picture",
+    "r",
+    "section",
+    "tbl",
+    "textbox",
+    "tr",
+];
+
+const fn operation_gap(
+    verb: &'static str,
+    element: &'static str,
+    context: &'static str,
+    follow_up: &'static str,
+    reason: &'static str,
+) -> GapSpec {
+    GapSpec {
+        subject: Subject::Operation {
+            verb,
+            element,
+            context,
+        },
+        code: crate::Code::UnsupportedCapability,
+        follow_up,
+        reason,
+    }
+}
+
+/// The write operations the ODT adapter refuses, with their follow-ups
+/// (record 0276 §gaps).
+pub(crate) static WRITE_GAPS: [GapSpec; 12] = [
+    operation_gap(
+        "remove",
+        "cell",
+        "table-grid",
+        "M6 ODT table grid edits",
+        "cells keep the table grid: remove or move the whole row, or set the cell's text",
+    ),
+    operation_gap(
+        "add",
+        "cell",
+        "table-grid",
+        "M6 ODT table grid edits",
+        "adding a cell would break the table grid; add a row, which spans the first row's columns",
+    ),
+    operation_gap(
+        "move",
+        "cell",
+        "table-grid",
+        "M6 ODT table grid edits",
+        "cells move only with their row",
+    ),
+    operation_gap(
+        "remove",
+        "row",
+        "vertical-merge",
+        "M6 ODT table grid edits",
+        "a row holding vertically merged or covered cells cannot leave the table",
+    ),
+    operation_gap(
+        "add",
+        "picture",
+        "image-resources",
+        "M6 ODT drawing and media edits",
+        "adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable",
+    ),
+    operation_gap(
+        "add",
+        "frame",
+        "drawing-resources",
+        "M6 ODT drawing and media edits",
+        "frames are created with their content (image or text box), which the body edits do not author yet",
+    ),
+    operation_gap(
+        "set",
+        "style",
+        "common-styles",
+        "M6 ODT style definitions",
+        "common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead",
+    ),
+    operation_gap(
+        "set",
+        "run",
+        "clear-formatting",
+        "M6 ODT formatting removal",
+        "a null value cannot remove a character or paragraph property; set the property's off value instead",
+    ),
+    operation_gap(
+        "set",
+        "cell",
+        "typed-values",
+        "M6 ODT typed cell values",
+        "cell text writes a string cell; numeric, date and formula cell values are not authored",
+    ),
+    operation_gap(
+        "set",
+        "document",
+        "signed-or-encrypted-package",
+        "ADR 0034 ODF security vocabulary (record 0268 G5)",
+        "the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused",
+    ),
+    operation_gap(
+        "get",
+        "document",
+        "flat-odf-input",
+        "M6 flat ODF owner",
+        "single-XML .fodt input is detected but refused; the leaf flat snapshot has no body index or package owner the adapter can publish through",
+    ),
+    operation_gap(
+        "create",
+        "document",
+        "template",
+        "use Flavor::Document",
+        "ODT template creation (.ott) is not supported",
+    ),
+];

@@ -46,8 +46,7 @@ use litchi_core::Result;
 pub(crate) use edit::{BodyEdits, apply as apply_body_edits};
 pub use edit::{Location, NewNode, Placement, admits};
 pub use properties::{
-    CellProperties, Metadata as MetadataField, ParagraphProperties, ParagraphPropertyEdit,
-    TextProperties, TextPropertyEdit,
+    CellProperties, ParagraphProperties, ParagraphPropertyEdit, TextProperties, TextPropertyEdit,
 };
 use xml::{Ns, Prefixes};
 
@@ -486,6 +485,19 @@ impl<'a> Node<'a> {
             body: self.body,
             next: self.body.data(self.id).first_child,
         }
+    }
+
+    /// Whether another indexed node starts inside this node's bytes: its
+    /// children, or nodes the index attached to an ancestor (notes or
+    /// bookmarks inside a run).
+    #[must_use]
+    pub fn encloses_indexed(self) -> bool {
+        let end = self.body.data(self.id).end;
+        self.id
+            .0
+            .checked_add(1)
+            .and_then(|next| self.body.tree.nodes.get(next as usize))
+            .is_some_and(|next| next.start < end)
     }
 
     /// The next indexed sibling.

@@ -124,6 +124,8 @@ enum Leaf {
     Docx(Box<litchi_docx::document::Patch>),
     #[cfg(feature = "rtf")]
     Rtf(Box<litchi_rtf::edit::Patch>),
+    #[cfg(feature = "odt")]
+    Odt(Box<crate::format::odt::write::Patch>),
     #[cfg(feature = "xlsx")]
     Xlsx {
         source: litchi_xlsx::Package,
@@ -221,6 +223,8 @@ pub struct Edit {
     formatting: Option<crate::format::docx::write::coalesce::Run>,
     #[cfg(feature = "rtf")]
     rtf: Option<crate::format::rtf::write::coalesce::Run>,
+    #[cfg(feature = "odt")]
+    odt: Option<crate::format::odt::write::coalesce::Run>,
     #[cfg(feature = "xlsx")]
     cells: Option<crate::format::xlsx::write::coalesce::Run>,
     #[cfg(feature = "xlsb")]
@@ -304,6 +308,8 @@ impl File {
                 formatting: None,
                 #[cfg(feature = "rtf")]
                 rtf: None,
+                #[cfg(feature = "odt")]
+                odt: None,
                 #[cfg(feature = "xlsx")]
                 cells: None,
                 #[cfg(feature = "xlsb")]
@@ -468,7 +474,8 @@ impl Edit {
                 feature = "pptx",
                 feature = "xlsb",
                 feature = "xls",
-                feature = "rtf"
+                feature = "rtf",
+                feature = "odt"
             ))]
             let limits = self.limits;
             self.execute(|file| match file {
@@ -509,6 +516,10 @@ impl Edit {
                 File::Rtf(handle) => {
                     wrap_rtf(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
+                #[cfg(feature = "odt")]
+                File::Odt(handle) => {
+                    wrap_odt(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
                 #[allow(unreachable_patterns)]
                 _ => Err(pending()),
             })
@@ -532,7 +543,8 @@ impl Edit {
             feature = "xlsb",
             feature = "rtf",
             feature = "ppt",
-            feature = "xls"
+            feature = "xls",
+            feature = "odt"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -570,6 +582,12 @@ impl Edit {
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_rtf(handle, commit, path)
             },
+            #[cfg(feature = "odt")]
+            File::Odt(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_odt(handle, commit, path)
+            },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
                 let (commit, path) =
@@ -597,7 +615,8 @@ impl Edit {
             feature = "xlsb",
             feature = "rtf",
             feature = "ppt",
-            feature = "xls"
+            feature = "xls",
+            feature = "odt"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -635,6 +654,12 @@ impl Edit {
                 let (commit, path) =
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_rtf(handle, commit, path)
+            },
+            #[cfg(feature = "odt")]
+            File::Odt(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_odt(handle, commit, path)
             },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
@@ -695,7 +720,8 @@ impl Edit {
                 feature = "xls",
                 feature = "pptx",
                 feature = "ppt",
-                feature = "rtf"
+                feature = "rtf",
+                feature = "odt"
             ))]
             let limits = self.limits;
             self.execute(|file| match file {
@@ -733,6 +759,12 @@ impl Edit {
                 ),
                 #[cfg(feature = "rtf")]
                 File::Rtf(handle) => wrap_rtf(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "odt")]
+                File::Odt(handle) => wrap_odt(
                     handle,
                     handle.remove_with_limits(target.clone(), &limits)?,
                     (),
@@ -900,7 +932,8 @@ impl Edit {
             feature = "xlsb",
             feature = "xls",
             feature = "ppt",
-            feature = "rtf"
+            feature = "rtf",
+            feature = "odt"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -946,6 +979,12 @@ impl Edit {
                 handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
             ),
+            #[cfg(feature = "odt")]
+            File::Odt(handle) => wrap_odt(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                (),
+            ),
             #[cfg(feature = "doc")]
             File::Doc(handle) => wrap_doc(
                 handle,
@@ -967,7 +1006,8 @@ impl Edit {
             feature = "xlsb",
             feature = "xls",
             feature = "ppt",
-            feature = "rtf"
+            feature = "rtf",
+            feature = "odt"
         ))]
         let limits = self.limits;
         self.execute(|file| match file {
@@ -1003,6 +1043,12 @@ impl Edit {
             ),
             #[cfg(feature = "rtf")]
             File::Rtf(handle) => wrap_rtf(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "odt")]
+            File::Odt(handle) => wrap_odt(
                 handle,
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
                 (),
@@ -1267,6 +1313,67 @@ impl Edit {
                 .rtf
                 .as_mut()
                 .ok_or_else(|| crate::Error::new(Code::InternalError, "RTF run missing"))?;
+            let changed = match run.stage(plan, _index) {
+                Ok(changed) => changed,
+                Err(error) => {
+                    self.flush_pending()?;
+                    return Err(error);
+                },
+            };
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
+        #[cfg(feature = "odt")]
+        if let File::Odt(handle) = self.current.clone() {
+            // A run plans every set against its base handle (the current
+            // candidate until the run is flushed). A set the run cannot plan
+            // runs on its own after the run is published.
+            let plan = match crate::format::odt::write::plan(&handle, _target, _props) {
+                Ok(Some(plan)) => plan,
+                Ok(None) => return Ok(None),
+                Err(_) => {
+                    // Resolve and report against the published candidate.
+                    self.flush_pending()?;
+                    return Ok(None);
+                },
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            let plan = if self
+                .odt
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan))
+            {
+                self.flush_pending()?;
+                let File::Odt(handle) = self.current.clone() else {
+                    return Err(pending());
+                };
+                match crate::format::odt::write::plan(&handle, _target, _props) {
+                    Ok(Some(plan)) => plan,
+                    Ok(None) | Err(_) => return Ok(None),
+                }
+            } else {
+                plan
+            };
+            if self.odt.is_none() {
+                let File::Odt(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.odt = Some(crate::format::odt::write::coalesce::Run::new(
+                    handle,
+                    &self.limits,
+                )?);
+            }
+            let run = self
+                .odt
+                .as_mut()
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "ODT run missing"))?;
             let changed = match run.stage(plan, _index) {
                 Ok(changed) => changed,
                 Err(error) => {
@@ -1754,6 +1861,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "odt")]
+        if let Some(run) = self.odt.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_odt(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "xlsb")]
         if let Some(run) = self.xlsb_sheets.take() {
             let index = run.first_index();
@@ -1942,6 +2074,10 @@ impl Edit {
                 #[cfg(feature = "rtf")]
                 {
                     self.rtf = None;
+                }
+                #[cfg(feature = "odt")]
+                {
+                    self.odt = None;
                 }
                 #[cfg(feature = "xlsx")]
                 {
@@ -2220,6 +2356,31 @@ fn wrap_rtf<T>(
     ))
 }
 
+#[cfg(feature = "odt")]
+fn wrap_odt<T>(
+    _before: &crate::format::odt::Odt,
+    commit: crate::format::odt::write::Commit,
+    value: T,
+) -> Result<(Step, T)> {
+    let crate::format::odt::write::Commit {
+        before,
+        after,
+        patch,
+        operations,
+        snapshot_bytes,
+    } = commit;
+    Ok((
+        Step {
+            before: File::Odt(before),
+            after: File::Odt(after),
+            leaf: Leaf::Odt(Box::new(patch)),
+            leaf_operations: operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
 fn changed(steps: &[Step]) -> Result<bool> {
     let (Some(first), Some(last)) = (steps.first(), steps.last()) else {
         return Ok(false);
@@ -2229,6 +2390,19 @@ fn changed(steps: &[Step]) -> Result<bool> {
         if let [
             Step {
                 leaf: Leaf::Rtf(patch),
+                ..
+            },
+        ] = steps
+        {
+            return Ok(!patch.is_noop());
+        }
+        return Ok(!before.same_content(after)?);
+    }
+    #[cfg(feature = "odt")]
+    if let (File::Odt(before), File::Odt(after)) = (&first.before, &last.after) {
+        if let [
+            Step {
+                leaf: Leaf::Odt(patch),
                 ..
             },
         ] = steps
@@ -2277,6 +2451,8 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         (File::Xlsx(left), File::Xlsx(right)) => left.same_snapshot(right),
         #[cfg(feature = "rtf")]
         (File::Rtf(left), File::Rtf(right)) => left.same_snapshot(right),
+        #[cfg(feature = "odt")]
+        (File::Odt(left), File::Odt(right)) => left.same_snapshot(right),
         _ => false,
     }
 }
@@ -2319,6 +2495,8 @@ fn admit(file: &File) -> Result<()> {
         File::Ppt(handle) => handle.admit_edit(),
         #[cfg(feature = "rtf")]
         File::Rtf(handle) => handle.admit_edit(),
+        #[cfg(feature = "odt")]
+        File::Odt(handle) => handle.admit_edit(),
         _ => check_source(file),
     }
 }
@@ -2352,6 +2530,8 @@ fn check_source(file: &File) -> Result<()> {
         File::Ppt(handle) => handle.check_source(),
         #[cfg(feature = "rtf")]
         File::Rtf(_) => Ok(()),
+        #[cfg(feature = "odt")]
+        File::Odt(handle) => handle.check_source(),
         File::Signed(signed) => Err(crate::Error::signed(signed.format())),
         File::Locked(locked) => Err(locked.read_error()),
         #[allow(unreachable_patterns)]

@@ -23,6 +23,7 @@ fn capability_goldens_follow_enabled_formats() {
         (FileFormat::Xlsb, "xlsb", cfg!(feature = "xlsb")),
         (FileFormat::Ppt, "ppt", cfg!(feature = "ppt")),
         (FileFormat::Pptx, "pptx", cfg!(feature = "pptx")),
+        (FileFormat::Odt, "odt", cfg!(feature = "odt")),
     ] {
         if !enabled {
             continue;

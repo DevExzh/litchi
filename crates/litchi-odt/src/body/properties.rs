@@ -629,37 +629,3 @@ fn check_color(value: &str, transparent: bool) -> Result<()> {
         )))
     }
 }
-
-/// A document property of `meta.xml` the metadata edit writes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum Metadata {
-    /// `dc:title`.
-    Title,
-    /// `dc:subject`.
-    Subject,
-    /// `dc:description`.
-    Description,
-    /// `meta:initial-creator`, the original author.
-    Author,
-    /// `dc:creator`, who saved the document last.
-    LastModifiedBy,
-    /// `dc:language`.
-    Language,
-    /// The `meta:keyword` elements, written from a comma-separated list.
-    Keywords,
-}
-
-impl Metadata {
-    pub(crate) const fn qualified(self) -> (Ns, &'static str) {
-        match self {
-            Self::Title => (Ns::Dc, "title"),
-            Self::Subject => (Ns::Dc, "subject"),
-            Self::Description => (Ns::Dc, "description"),
-            Self::Author => (Ns::Meta, "initial-creator"),
-            Self::LastModifiedBy => (Ns::Dc, "creator"),
-            Self::Language => (Ns::Dc, "language"),
-            Self::Keywords => (Ns::Meta, "keyword"),
-        }
-    }
-}

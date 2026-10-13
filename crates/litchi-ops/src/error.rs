@@ -680,7 +680,7 @@ impl Error {
     /// its collection. A leaf crate reports such input with the same error it
     /// reports for malformed file content, so only the call site that
     /// received the argument can tell the two apart.
-    #[cfg(any(feature = "xlsx", feature = "xlsb"))]
+    #[cfg(any(feature = "xlsx", feature = "xlsb", feature = "odt"))]
     pub(crate) fn caused_by_argument(mut self, code: Code) -> Self {
         debug_assert!(matches!(
             code,

@@ -150,7 +150,6 @@ impl<'f> Node<'f> {
         }
     }
 
-    #[allow(dead_code, reason = "TEMP-0276: used by the write adapter")]
     pub(crate) fn id(&self) -> Option<NodeId> {
         match self.target {
             Target::Body(_, id) => Some(id),

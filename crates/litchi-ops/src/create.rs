@@ -208,6 +208,11 @@ pub fn create_with(format: FileFormat, options: &CreateOptions) -> Result<File> 
         return crate::format::rtf::Rtf::create(options).map(File::Rtf);
     }
 
+    #[cfg(feature = "odt")]
+    if format == FileFormat::Odt {
+        return crate::format::odt::Odt::create(options).map(File::Odt);
+    }
+
     let _ = options;
     if format_feature_enabled(format) {
         Err(unsupported_capability(format))

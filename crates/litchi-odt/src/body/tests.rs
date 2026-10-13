@@ -253,15 +253,18 @@ fn overlapping_edits_are_refused_at_staging() {
 
 #[test]
 fn metadata_edits() {
+    use crate::metadata::Field;
     let package = built();
-    let mut edit = package.edit();
-    edit.set_metadata(MetadataField::Title, Some("A & B"))
-        .unwrap();
-    edit.set_metadata(MetadataField::Keywords, Some("x, y"))
-        .unwrap();
-    let after = edit.commit().unwrap().into_package();
+    let mut edit = package.edit_metadata();
+    edit.set(Field::Title, Some("A & B")).unwrap();
+    edit.set(Field::Keywords, Some("x, y")).unwrap();
+    let commit = edit.commit().unwrap();
+    assert!(commit.diagnostics().changed());
+    let (after, patch) = commit.into_parts();
     let metadata = after.document().unwrap().metadata().unwrap();
     assert_eq!(metadata.title.as_deref(), Some("A & B"));
+    let restored = after.apply_metadata(&patch.inverse()).unwrap();
+    assert_eq!(restored.as_bytes(), package.as_bytes());
 }
 
 #[test]

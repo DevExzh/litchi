@@ -20,7 +20,7 @@ pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use props::Props;
 pub use spec::Kind;
-pub(crate) use spec::SPEC;
+pub(crate) use spec::{ADDABLE, REMOVABLE, SETTABLE, SPEC, WRITE_GAPS};
 
 use std::fmt;
 use std::path::Path;
@@ -38,7 +38,6 @@ use crate::{Error, OpenOptions, Result};
 #[derive(Clone)]
 pub struct Odt(Arc<OdtState>);
 
-#[allow(dead_code, reason = "TEMP-0276: read by the write adapter")]
 struct OdtState {
     owner: OdtOwner,
     /// The immutable leaf package: set for eager owners, materialized on
@@ -83,7 +82,6 @@ pub(crate) fn core_error(error: litchi_core::Error) -> Error {
     Error::from(error).with_format(FileFormat::Odt)
 }
 
-#[allow(dead_code, reason = "TEMP-0276: used by the write adapter")]
 impl Odt {
     /// Adopts the package detection prepared (`DetectedFormat::Odt`) without
     /// a second ZIP index. The ODF limits were applied when the package was
@@ -133,37 +131,16 @@ impl Odt {
         }))
     }
 
-    /// The same document, saving to `origin`.
+    /// The same document, saving to `origin`. Called on a handle the open
+    /// route just built, which no other handle shares yet.
     pub(crate) fn with_origin(self, origin: Option<Arc<Path>>) -> Self {
-        let state = match Arc::try_unwrap(self.0) {
+        match Arc::try_unwrap(self.0) {
             Ok(mut state) => {
                 state.origin = origin;
-                state
+                Self(Arc::new(state))
             },
-            Err(shared) => {
-                let owner = match &shared.owner {
-                    OdtOwner::Eager(document) => OdtOwner::Eager(document.clone()),
-                    #[cfg(any(unix, windows))]
-                    OdtOwner::Source(_) => {
-                        // A shared filesystem-backed owner cannot be cloned;
-                        // keep sharing it and only record the origin on a
-                        // fresh eager state when one exists.
-                        return Self(shared);
-                    },
-                };
-                OdtState {
-                    owner,
-                    package: shared
-                        .package
-                        .get()
-                        .cloned()
-                        .map_or_else(OnceLock::new, OnceLock::from),
-                    tree: OnceLock::new(),
-                    origin,
-                }
-            },
-        };
-        Self(Arc::new(state))
+            Err(shared) => Self(shared),
+        }
     }
 
     /// The path the document was opened from, if any.
@@ -290,25 +267,158 @@ impl Odt {
         self.package()?.write_to(sink).map_err(odf_error)
     }
 
-    /// Atomically save the document's package to `path`.
+    /// Atomically save the document's package to `path`: a sibling
+    /// temporary file renamed over the destination, or published only when
+    /// the destination is still absent under [`crate::Overwrite::Refuse`].
     pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
         let package = self.package()?;
-        if options.overwrite == crate::Overwrite::Refuse && path.exists() {
-            return Err(Error::new(
-                crate::Code::FileExists,
-                "the destination exists and the save options refuse to overwrite it",
-            )
-            .with_format(FileFormat::Odt));
-        }
-        package
-            .save_with_durability(path, options.durability)
-            .map_err(odf_error)?;
-        Ok(u64::try_from(package.as_bytes().len()).unwrap_or(u64::MAX))
+        let bytes = package.as_bytes();
+        let overwrite = match options.overwrite {
+            crate::Overwrite::Replace => litchi_core::atomic::Overwrite::Replace,
+            crate::Overwrite::Refuse => litchi_core::atomic::Overwrite::Refuse,
+        };
+        litchi_core::atomic::save(
+            path,
+            options.durability,
+            overwrite,
+            |writer| {
+                use std::io::Write as _;
+                writer.write_all(bytes).map_err(|error| {
+                    litchi_odf_common::Error::from(litchi_core::atomic::Error::from(error))
+                })
+            },
+            || Ok(()),
+        )
+        .map_err(odf_error)?;
+        self.check_source()?;
+        Ok(u64::try_from(bytes.len()).unwrap_or(u64::MAX))
     }
 
     /// A fresh empty text document.
     pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
         write::create(options)
+    }
+
+    /// Admit a leaf edit before a unified transaction starts: the source is
+    /// current and the package is available.
+    pub(crate) fn admit_edit(&self) -> Result<()> {
+        self.check_source()?;
+        self.package().map(drop)
+    }
+
+    /// Whether two handles publish the same package bytes.
+    pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
+        Ok(self.same_snapshot(other) || self.package()?.as_bytes() == other.package()?.as_bytes())
+    }
+
+    /// Set properties with the default unified limits.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: crate::TargetArg<'p>,
+        props: impl crate::IntoProps<'v>,
+    ) -> Result<write::Commit> {
+        write::set_with_limits(
+            self,
+            target,
+            props,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Set properties with the caller's transaction limits.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: crate::TargetArg<'p>,
+        props: impl crate::IntoProps<'v>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::set_with_limits(self, target, props, limits)
+    }
+
+    /// Add one element with the default unified limits.
+    pub(crate) fn add<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+    ) -> Result<(write::Commit, crate::path::Path<'static>)> {
+        write::add_with_limits(
+            self,
+            parent,
+            node,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Add one element with the caller's transaction limits.
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<(write::Commit, crate::path::Path<'static>)> {
+        write::add_with_limits(self, parent, node, limits)
+    }
+
+    /// Remove targets with the default unified limits.
+    pub(crate) fn remove<'p>(&self, target: crate::TargetArg<'p>) -> Result<write::Commit> {
+        write::remove_with_limits(self, target, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Remove targets with the caller's transaction limits.
+    pub(crate) fn remove_with_limits<'p>(
+        &self,
+        target: crate::TargetArg<'p>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::remove_with_limits(self, target, limits)
+    }
+
+    /// Move one element with the default unified limits.
+    pub(crate) fn move_to<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::Placement<'q>,
+    ) -> Result<write::Commit> {
+        write::move_to_with_limits(
+            self,
+            path,
+            placement,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Move one element with the caller's transaction limits.
+    pub(crate) fn move_to_with_limits<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::Placement<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::move_to_with_limits(self, path, placement, limits)
+    }
+
+    /// Exchange two elements with the default unified limits.
+    pub(crate) fn swap<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+    ) -> Result<write::Commit> {
+        write::swap_with_limits(
+            self,
+            left,
+            right,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Exchange two elements with the caller's transaction limits.
+    pub(crate) fn swap_with_limits<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::swap_with_limits(self, left, right, limits)
     }
 }
 

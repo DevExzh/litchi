@@ -87,8 +87,7 @@ pub(super) fn build(content: &str, styles: Option<&str>) -> Result<Tree> {
     if let Some(styles_xml) = styles {
         let first = styles_out.len();
         common_styles(styles_xml, &style_prefixes, &mut styles_out)?;
-        for index in first..styles_out.len() {
-            let style = &styles_out[index];
+        for (index, style) in styles_out.iter().enumerate().skip(first) {
             let tag = &styles_xml[style.start as usize..style.open_end as usize];
             if let Some(name) = attribute(tag, &style_prefixes, Ns::Style, "name") {
                 common_names.push((name.into_owned().into_boxed_str(), index as u32));

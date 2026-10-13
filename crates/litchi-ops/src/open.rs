@@ -382,6 +382,8 @@ pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
     match file {
         #[cfg(feature = "rtf")]
         File::Rtf(rtf) => File::Rtf(rtf.with_origin(Some(origin))),
+        #[cfg(feature = "odt")]
+        File::Odt(odt) => File::Odt(odt.with_origin(Some(origin))),
         #[cfg(feature = "doc")]
         File::Doc(doc) => File::Doc(doc.with_origin(Some(origin))),
         #[cfg(feature = "xls")]

@@ -848,6 +848,20 @@ impl Capabilities {
             {
                 return Support::Supported;
             }
+            #[cfg(feature = "odt")]
+            if matches!(
+                verb,
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Odt)
+            {
+                return Support::Supported;
+            }
             return EDITS.support();
         }
         match verb {
@@ -878,6 +892,9 @@ impl Capabilities {
     /// Whether this report's format has an integrated publisher.
     fn publication_support(&self) -> Support {
         if self.format == Some(FileFormat::Rtf) && cfg!(feature = "rtf") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
             return Support::Supported;
         }
         #[cfg(feature = "ppt")]
@@ -913,6 +930,9 @@ impl Capabilities {
     /// Whether this report's format has an integrated creator.
     fn creation_support(&self) -> Support {
         if self.format == Some(FileFormat::Rtf) && cfg!(feature = "rtf") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
             return Support::Supported;
         }
 
@@ -2697,6 +2717,11 @@ impl Element {
             || (self.adapter == Adapter::Rtf
                 && matches!(self.data().canonical, "p" | "r")
                 && readable);
+        #[cfg(feature = "odt")]
+        let settable = settable
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::SETTABLE.contains(&self.data().canonical)
+                && readable);
         let structural = {
             #[cfg(feature = "docx")]
             {
@@ -2767,6 +2792,11 @@ impl Element {
             || (self.adapter == Adapter::Rtf
                 && matches!(self.data().canonical, "body" | "p" | "r")
                 && readable);
+        #[cfg(feature = "odt")]
+        let add = add
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::ADDABLE.contains(&self.data().canonical)
+                && readable);
         #[cfg(feature = "pptx")]
         let remove = structural
             || (self.adapter == Adapter::Pptx
@@ -2823,6 +2853,11 @@ impl Element {
         let remove = remove
             || (self.adapter == Adapter::Rtf
                 && matches!(self.data().canonical, "p" | "r")
+                && readable);
+        #[cfg(feature = "odt")]
+        let remove = remove
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         Operations {
             add,
@@ -3277,6 +3312,10 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     #[cfg(feature = "rtf")]
     if adapter == Adapter::Rtf {
         return RTF_WRITE_GAPS.get(index).map(Some);
+    }
+    #[cfg(feature = "odt")]
+    if adapter == Adapter::Odt {
+        return crate::format::odt::WRITE_GAPS.get(index).map(Some);
     }
     let _ = (adapter, index);
     None

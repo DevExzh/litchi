@@ -18,11 +18,12 @@ use litchi_core::{Error, Result};
 use quick_xml::Reader;
 use quick_xml::events::Event;
 
-use super::properties::{Metadata, ParagraphPropertyEdit, TextPropertyEdit, check_length};
+use super::properties::{ParagraphPropertyEdit, TextPropertyEdit, check_length};
 use super::xml::{self, Ns, Prefixes};
 use super::{Attribute, AutomaticInsert, Body, Kind, Node, NodeId, Style};
 use crate::Document;
 use crate::core::{AuthoredXmlFragment, XmlSourcePart, XmlSplicePublication};
+use crate::metadata::Field as Metadata;
 
 /// The largest number of cells one inserted table may create.
 const MAX_GENERATED_CELLS: usize = 16_384;
