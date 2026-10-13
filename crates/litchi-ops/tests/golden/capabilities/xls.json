@@ -832,8 +832,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -845,11 +845,44 @@
           "/namedrange[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "M1-extended (R6b)",
-        "reason": "the legacy XLS Package read bridge does not project defined names into unified nodes yet"
+      "properties": {
+        "name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "scope": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "comment": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "volatile": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -1312,13 +1345,6 @@
     },
     {
       "subject": "element",
-      "element": "namedrange",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "the legacy XLS Package read bridge does not project defined names into unified nodes yet"
-    },
-    {
-      "subject": "element",
       "element": "comment",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R6b)",
@@ -1609,6 +1635,15 @@
       "code": "unsupported_capability",
       "followUp": "M2 XLS outline and default-layout setters",
       "reason": "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "namedrange",
+      "context": "native-editor",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS defined-name editor",
+      "reason": "defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have"
     },
     {
       "subject": "operation",

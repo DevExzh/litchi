@@ -25,6 +25,12 @@ enum State<'f> {
     Sheets {
         next: usize,
         count: usize,
+        /// Continue with the defined names once the tabs are exhausted.
+        names: bool,
+    },
+    Names {
+        next: usize,
+        count: usize,
     },
     Coordinates {
         sheet: usize,
@@ -185,6 +191,7 @@ impl<'f> Children<'f> {
             Item::Workbook => State::Sheets {
                 next: 0,
                 count: super::nav::tab_count(file)?,
+                names: false,
             },
             Item::Sheet(sheet) => {
                 if !sheet.handle.is_grid() {
@@ -226,7 +233,7 @@ impl<'f> Children<'f> {
                     }
                 }
             },
-            Item::Cell(_) => State::Done,
+            Item::Cell(_) | Item::NamedRange(_) => State::Done,
         };
         Ok(Self::new(file, state))
     }
@@ -237,6 +244,11 @@ impl<'f> Children<'f> {
             Item::Workbook if kinds.contains(Kind::Sheet) => State::Sheets {
                 next: 0,
                 count: super::nav::tab_count(file)?,
+                names: kinds.contains(Kind::NamedRange),
+            },
+            Item::Workbook if kinds.contains(Kind::NamedRange) => State::Names {
+                next: 0,
+                count: super::node::defined_names(file)?.len(),
             },
             Item::Sheet(sheet) => {
                 let want = SheetWant {
@@ -306,10 +318,17 @@ impl<'f> Children<'f> {
                 )))
             },
             State::Done => Ok(None),
-            State::Sheets { next, count } => {
+            State::Sheets { next, count, names } => {
                 if *next >= *count {
-                    self.state = State::Done;
-                    return Ok(None);
+                    self.state = if *names {
+                        State::Names {
+                            next: 0,
+                            count: super::node::defined_names(self.file)?.len(),
+                        }
+                    } else {
+                        State::Done
+                    };
+                    return self.step();
                 }
                 let position = *next;
                 *next += 1;
@@ -320,6 +339,15 @@ impl<'f> Children<'f> {
                     self.file,
                     Sheet::new(position, handle),
                 )))
+            },
+            State::Names { next, count } => {
+                if *next >= *count {
+                    self.state = State::Done;
+                    return Ok(None);
+                }
+                let index = *next;
+                *next += 1;
+                Ok(Some(Node::new_named_range(self.file, index)))
             },
             State::Rows { sheet, grid, rows } => {
                 let Some(index) = rows.next() else {

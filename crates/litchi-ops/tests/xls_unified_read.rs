@@ -250,11 +250,15 @@ fn unsupported_legacy_axes_return_typed_capability_gaps() {
         "/sheet[1]/table[1]",
         "/sheet[1]/chart[1]",
         "/sheet[1]/comment[1]",
-        "/namedrange[1]",
     ] {
         let error = file.get(path).expect_err(path);
         assert_code(&error, Code::UnsupportedCapability);
     }
+    // Defined names are readable (record 0259); this fixture has none.
+    assert_code(
+        &file.get("/namedrange[1]").expect_err("no defined name"),
+        Code::PathNotFound,
+    );
 }
 
 #[test]
@@ -440,5 +444,41 @@ fn formula_cached_errors_are_counted_and_annotated_on_both_owners() {
         let outline = serde_json::to_value(file.view_json(Mode::Outline).unwrap()).unwrap();
         assert_eq!(outline["sheets"][0]["errorCells"], 1);
         assert!(file.view(Mode::Annotated).unwrap().contains("⚠ error"));
+    }
+}
+
+#[test]
+fn defined_names_are_readable_on_both_owner_routes() {
+    let bytes = std::fs::read(
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../../test-data/ole/xls/SimpleWithPrintArea.xls"),
+    )
+    .expect("print-area fixture");
+    let (temporary, source) = source_file(&bytes);
+    let eager = eager(&bytes);
+    let _keep_source_alive = temporary;
+    for file in [&source, &eager] {
+        let name = file.get("/namedrange[1]").expect("first defined name");
+        assert_eq!(name.kind(), "namedrange");
+        assert_eq!(name.path().to_string(), "/namedrange[1]");
+        assert_eq!(property_text(&name, "name").as_deref(), Some("Print_Area"));
+        assert_eq!(
+            property_text(&name, "ref").as_deref(),
+            Some("'Sheet1'!$A$1:$C$5")
+        );
+        assert_eq!(property_text(&name, "scope").as_deref(), Some("Sheet1"));
+        assert_eq!(
+            name.view().text().expect("name text").as_deref(),
+            Some("'Sheet1'!$A$1:$C$5")
+        );
+        assert!(file.get("/namedrange[2]").is_err());
+        assert_eq!(
+            file.get("/namedrange[Print_Area]")
+                .expect("named lookup")
+                .path()
+                .to_string(),
+            "/namedrange[1]"
+        );
+        assert_eq!(query_paths(file, "namedrange"), ["/namedrange[1]"]);
     }
 }

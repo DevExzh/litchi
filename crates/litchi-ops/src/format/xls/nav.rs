@@ -65,6 +65,37 @@ impl<'f> Nav<'f> {
         }))
     }
 
+    /// A defined name: the Nth in workbook order, or by unique name.
+    fn named_range(self, select: Select<'_>) -> Result<Lookup<Node<'f>, GapSpec>> {
+        let names = super::node::defined_names(self.file)?;
+        let index = match select {
+            Select::Ordinal(position) => Some(position.get()),
+            Select::None => Some(0),
+            Select::Last => names.len().checked_sub(1),
+            Select::Name { name, case } => {
+                let mut found = None;
+                for (index, held) in names.iter().enumerate() {
+                    if case.matches(&held.name, name) {
+                        if found.is_some() {
+                            return Err(Error::new(
+                                Code::InvalidPath,
+                                "the defined-name selector matches more than one name",
+                            )
+                            .with_format(FileFormat::Xls));
+                        }
+                        found = Some(index);
+                    }
+                }
+                found
+            },
+            _ => return Ok(Lookup::NotApplicable),
+        };
+        Ok(match index.filter(|index| *index < names.len()) {
+            Some(index) => Self::found(Node::new_named_range(self.file, index)),
+            None => Lookup::Missing,
+        })
+    }
+
     fn in_sheet(
         self,
         sheet: &Sheet,
@@ -171,7 +202,6 @@ impl<'f> Navigate<'f> for Nav<'f> {
     const FORMAT: FileFormat = FileFormat::Xls;
     const ABSENT: &'static [&'static str] = &[
         "table",
-        "namedrange",
         "comment",
         "chart",
         "series",
@@ -211,6 +241,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
             }
             match (parent.item(), step.kind) {
                 (Item::Workbook, Kind::Sheet) => self.sheet(step.select),
+                (Item::Workbook, Kind::NamedRange) => self.named_range(step.select),
                 (Item::Sheet(sheet), kind) => self.in_sheet(sheet, kind, step.select),
                 _ => Ok(Lookup::NotApplicable),
             }
@@ -230,6 +261,9 @@ impl<'f> Navigate<'f> for Nav<'f> {
         finish(self.file, || {
             match (parent.item(), step.kind) {
                 (Item::Workbook, Kind::Sheet) => out.kind("sheet", tab_count(self.file)?),
+                (Item::Workbook, Kind::NamedRange) => {
+                    out.kind("namedrange", super::node::defined_names(self.file)?.len());
+                },
                 (Item::Sheet(sheet), Kind::Row) => {
                     out.kind("row", sheet.grid()?.row_indices().len())
                 },
@@ -273,6 +307,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
                     column_rect(column.index),
                 ))),
                 Item::Sheet(_) => node.sheet_name()?.map(Cow::Owned),
+                Item::NamedRange(_) => node.named_range_text()?.map(Cow::Owned),
                 Item::Workbook | Item::Range(_) => None,
             })
         })

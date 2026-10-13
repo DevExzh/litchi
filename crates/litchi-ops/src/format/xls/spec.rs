@@ -14,8 +14,8 @@ use crate::node::spec::{
 use crate::registry::{Access, Constraint, Entry, Table};
 use crate::value::ValueType;
 pub(crate) use workbook::{
-    CELL_PROPS as SHARED_CELL_PROPS, ColumnKey, Kind, RowKey, SHEET_PROPS, SheetKey,
-    WORKBOOK_PROPS as SHARED_WORKBOOK_PROPS, WorkbookKey,
+    CELL_PROPS as SHARED_CELL_PROPS, ColumnKey, Kind, NAMED_RANGE_PROPS, NamedRangeKey, RowKey,
+    SHEET_PROPS, SheetKey, WORKBOOK_PROPS as SHARED_WORKBOOK_PROPS, WorkbookKey,
 };
 
 /// The cell properties projected by the native BIFF reader: the type, the
@@ -465,11 +465,6 @@ static TABLE_GAP: GapSpec = gap(
     "M1-extended (R6b)",
     "the legacy XLS Package read bridge does not project ListObject records into unified nodes yet",
 );
-static NAMED_RANGE_GAP: GapSpec = gap(
-    "namedrange",
-    "M1-extended (R6b)",
-    "the legacy XLS Package read bridge does not project defined names into unified nodes yet",
-);
 static COMMENT_GAP: GapSpec = gap(
     "comment",
     "M1-extended (R6b)",
@@ -600,7 +595,7 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_props(&workbook::SPEC.elements[4], ROW_PROPS),
     with_props(&workbook::SPEC.elements[5], COLUMN_PROPS),
     with_gap(&workbook::SPEC.elements[6], &TABLE_GAP),
-    with_gap(&workbook::SPEC.elements[7], &NAMED_RANGE_GAP),
+    with_props(&workbook::SPEC.elements[7], NAMED_RANGE_PROPS),
     with_gap(&workbook::SPEC.elements[8], &COMMENT_GAP),
     with_gap(&workbook::SPEC.elements[9], &CHART_GAP),
     with_gap(&workbook::SPEC.elements[10], &SERIES_GAP),
@@ -695,7 +690,7 @@ const fn operation_gap(
 /// verbs are listed by [`SETTABLE`], [`ADDABLE`] and [`REMOVABLE`]; these rows
 /// keep the remaining families visible so a format-level report never implies
 /// more than the adapter implements.
-pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
+pub(crate) static WRITE_GAPS: [GapSpec; 11] = [
     operation_gap(
         "get",
         "metadata",
@@ -758,6 +753,13 @@ pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
         "outline-and-defaults",
         "M2 XLS outline and default-layout setters",
         "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only",
+    ),
+    operation_gap(
+        "set",
+        "namedrange",
+        "native-editor",
+        "M2 XLS defined-name editor",
+        "defined names are read from the workbook's Lbl records; adding, changing and removing them needs a native Lbl/ExternSheet editor the leaf does not have",
     ),
     operation_gap(
         "add",

@@ -12,8 +12,8 @@ use super::Xls;
 use super::children::Children;
 use super::owner::{CellData, ColumnLayout, Grid, LayoutLookup as _, RowLayout, SheetHandle};
 use super::spec::{
-    CELL_PROPS, COLUMN_PROPS, CellKey, ColumnKey, Kind, ROW_PROPS, RowKey, SHEET_PROPS,
-    WORKBOOK_PROPS, WorkbookKey,
+    CELL_PROPS, COLUMN_PROPS, CellKey, ColumnKey, Kind, NAMED_RANGE_PROPS, NamedRangeKey,
+    ROW_PROPS, RowKey, SHEET_PROPS, WORKBOOK_PROPS, WorkbookKey,
 };
 use crate::error::Result;
 use crate::format::workbook::Label;
@@ -41,6 +41,17 @@ pub(super) enum Item {
     Range(RangeItem),
     Row(RowItem),
     Column(ColumnItem),
+    /// The defined name at this index of the workbook's non-macro names.
+    NamedRange(usize),
+}
+
+/// The workbook's non-macro defined names, through the eager reader.
+///
+/// The positional owner does not parse `Lbl` records, so a source-backed
+/// workbook materializes its eager reader once (cached by the native owner)
+/// when a path, query or view first reaches a defined name.
+pub(super) fn defined_names(file: &Xls) -> Result<&[litchi_xls::DefinedName]> {
+    Ok(file.owner().reader_ref()?.defined_names())
 }
 
 #[derive(Clone)]
@@ -173,6 +184,33 @@ impl<'f> Node<'f> {
         )
     }
 
+    pub(super) fn new_named_range(file: &'f Xls, index: usize) -> Self {
+        Self {
+            file,
+            item: Item::NamedRange(index),
+            steps: [PathStep::at("namedrange", Position::new(index)), NO_STEP],
+            depth: 1,
+            sheet: 0,
+        }
+    }
+
+    /// The name's reference without its leading `=`, else the name.
+    pub(super) fn named_range_text(&self) -> Result<Option<String>> {
+        let Item::NamedRange(index) = &self.item else {
+            return Ok(None);
+        };
+        Ok(defined_names(self.file)?.get(*index).map(|name| {
+            match name
+                .formula
+                .as_deref()
+                .map(|formula| formula.strip_prefix('=').unwrap_or(formula))
+            {
+                Some(reference) if !reference.is_empty() => reference.to_owned(),
+                _ => name.name.clone(),
+            }
+        }))
+    }
+
     pub(super) fn new_row(file: &'f Xls, sheet: usize, grid: Grid, index: u32) -> Self {
         Self::in_sheet(
             file,
@@ -225,6 +263,7 @@ impl<'f> Node<'f> {
             Item::Range(_) => Kind::Range,
             Item::Row(_) => Kind::Row,
             Item::Column(_) => Kind::Column,
+            Item::NamedRange(_) => Kind::NamedRange,
         }
     }
 
@@ -332,6 +371,20 @@ impl<'f> Node<'f> {
                 COLUMN_PROPS,
                 Props::Column(self.sheet_handle()?.and_then_column(column.index)?),
             ),
+            Item::NamedRange(index) => {
+                let names = defined_names(self.file)?;
+                let Some(name) = names.get(*index) else {
+                    return Ok(Format::empty());
+                };
+                let scope = match name.scope {
+                    litchi_xls::NameScope::Workbook => None,
+                    litchi_xls::NameScope::Worksheet(position) => {
+                        SheetHandle::at(self.file, position)?
+                            .map(|handle| Cow::Owned(handle.name().to_owned()))
+                    },
+                };
+                (NAMED_RANGE_PROPS, Props::NamedRange { name, scope })
+            },
         };
         Ok(Format::new(table, Source::Xls(props)))
     }
@@ -365,6 +418,10 @@ pub(crate) enum Props<'a> {
     Cell(CellProps<'a>),
     Row(Option<RowLayout>),
     Column(Option<ColumnLayout>),
+    NamedRange {
+        name: &'a litchi_xls::DefinedName,
+        scope: Option<Cow<'a, str>>,
+    },
 }
 
 pub(crate) struct CellProps<'a> {
@@ -391,6 +448,7 @@ impl fmt::Debug for Props<'_> {
             Self::Cell(_) => "Cell",
             Self::Row(_) => "Row",
             Self::Column(_) => "Column",
+            Self::NamedRange { .. } => "NamedRange",
         };
         formatter.debug_tuple("Props").field(&name).finish()
     }
@@ -420,6 +478,25 @@ impl<'a> Props<'a> {
             Self::Row(row) => row.and_then(|layout| row_value(layout, RowKey::at(index)?)),
             Self::Column(column) => {
                 column.and_then(|layout| column_value(layout, ColumnKey::at(index)?))
+            },
+            Self::NamedRange { name, scope } => match NamedRangeKey::at(index)? {
+                NamedRangeKey::Name => Some(Value::Text(Cow::Borrowed(&name.name))),
+                NamedRangeKey::Ref => name
+                    .formula
+                    .as_deref()
+                    .map(|formula| formula.strip_prefix('=').unwrap_or(formula))
+                    .filter(|reference| !reference.is_empty())
+                    .map(|reference| Value::Text(Cow::Borrowed(reference))),
+                NamedRangeKey::Scope => match name.scope {
+                    litchi_xls::NameScope::Workbook => Some(Value::Text(Cow::Borrowed("workbook"))),
+                    litchi_xls::NameScope::Worksheet(_) => scope.clone().map(Value::Text),
+                },
+                NamedRangeKey::Comment => name
+                    .comment
+                    .as_deref()
+                    .filter(|comment| !comment.is_empty())
+                    .map(|comment| Value::Text(Cow::Borrowed(comment))),
+                NamedRangeKey::Volatile => name.function.then_some(Value::Bool(true)),
             },
         }
     }
@@ -576,6 +653,7 @@ impl<'f> Project<'f> for Node<'f> {
                     column_rect(column.index)?,
                 )?)),
                 Item::Sheet(_) => self.sheet_name()?.map(Cow::Owned),
+                Item::NamedRange(_) => self.named_range_text()?.map(Cow::Owned),
                 Item::Workbook | Item::Range(_) => None,
             })
         })
@@ -590,6 +668,9 @@ impl<'f> Project<'f> for Node<'f> {
                 Item::Range(range) => Some(Preview::Text(Cow::Borrowed(range.label.as_str()))),
                 Item::Row(row) => Some(Preview::Text(Cow::Borrowed(row.label.as_str()))),
                 Item::Column(column) => Some(Preview::Text(Cow::Borrowed(column.label.as_str()))),
+                Item::NamedRange(_) => self
+                    .named_range_text()?
+                    .map(|text| Preview::Text(Cow::Owned(text))),
             })
         })
     }
@@ -598,6 +679,7 @@ impl<'f> Project<'f> for Node<'f> {
         self.file.finish(|| {
             let count = match &self.item {
                 Item::Workbook => super::nav::tab_count(self.file)?,
+                Item::NamedRange(_) => 0,
                 Item::Cell(_) | Item::Range(_) | Item::Column(_) => {
                     if matches!(self.item, Item::Range(_)) {
                         Children::count(self, options)?
