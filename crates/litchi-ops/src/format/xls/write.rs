@@ -80,6 +80,8 @@ pub(crate) fn set_with_limits<'p, 'v>(
         file.set_metadata(&props, limits)
     } else if is_sheet_property(&props) {
         set_sheet_with_limits(file, target, &props, limits)
+    } else if let Some(commit) = super::layout::set_layout(file, &target, &props, limits)? {
+        Ok(commit)
     } else {
         set_cells_with_limits(file, target, &props, limits)
     };

@@ -430,7 +430,7 @@
       "parent": "sheet",
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -443,7 +443,38 @@
           "/<sheet>/row[N]"
         ]
       },
-      "properties": {},
+      "properties": {
+        "height": {
+          "type": "length",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "customHeight": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
       "predicates": {
         "keys": [
           "style",
@@ -461,7 +492,7 @@
       ],
       "operations": {
         "add": true,
-        "set": false,
+        "set": true,
         "get": true,
         "query": true,
         "remove": true
@@ -475,7 +506,38 @@
           "/<sheet>/col[N]"
         ]
       },
-      "properties": {},
+      "properties": {
+        "width": {
+          "type": "number",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "hidden": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "customWidth": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "outlineLevel": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "collapsed": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        }
+      },
       "predicates": {
         "keys": [
           "style",
@@ -1198,86 +1260,6 @@
       "reason": "array-formula ranges are not projected by the Package read bridge"
     },
     {
-      "subject": "property",
-      "element": "row",
-      "key": "height",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF ROW layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "row",
-      "key": "hidden",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF ROW layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "row",
-      "key": "outlineLevel",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF ROW layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "row",
-      "key": "collapsed",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF ROW layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "row",
-      "key": "customHeight",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF ROW layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "column",
-      "key": "width",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF COLINFO layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "column",
-      "key": "hidden",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF COLINFO layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "column",
-      "key": "customWidth",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF COLINFO layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "column",
-      "key": "outlineLevel",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF COLINFO layout is not projected"
-    },
-    {
-      "subject": "property",
-      "element": "column",
-      "key": "collapsed",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "BIFF COLINFO layout is not projected"
-    },
-    {
       "subject": "operation",
       "verb": "create",
       "element": "workbook",
@@ -1375,6 +1357,15 @@
       "code": "unsupported_capability",
       "followUp": "M2 XLS 3-D range rewriting",
       "reason": "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move"
+    },
+    {
+      "subject": "operation",
+      "verb": "set",
+      "element": "row",
+      "context": "outline-and-defaults",
+      "code": "unsupported_capability",
+      "followUp": "M2 XLS outline and default-layout setters",
+      "reason": "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only"
     },
     {
       "subject": "operation",

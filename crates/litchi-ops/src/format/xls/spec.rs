@@ -203,11 +203,105 @@ pub(crate) static WORKBOOK_PROPS: &[PropSpec] = &[
     SHARED_WORKBOOK_PROPS[10],
 ];
 
-/// BIFF row and column layout is kept by the native reader, but the
-/// source-backed Package bridge currently has no immutable layout accessor.
-/// Keep these tables empty until both owner routes can answer them.
-pub(crate) static ROW_PROPS: &[PropSpec] = &[];
-pub(crate) static COLUMN_PROPS: &[PropSpec] = &[];
+/// Row and column layout read through the eager reader's `Row` and `ColInfo`
+/// projection (a source-backed workbook materializes it on first use).
+pub(crate) use workbook::{COLUMN_PROPS, ROW_PROPS};
+
+/// Row assignments: height (points, written as twips) and hidden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum RowSetter {
+    Height,
+    Hidden,
+}
+
+pub(crate) const ROW_WRITE_TABLE: Table<RowSetter, 2, 0> = Table::new(
+    [
+        Entry {
+            spec: ROW_PROPS[0],
+            access: Access::Set(RowSetter::Height),
+            constraint: Constraint::Length {
+                min: crate::value::Length::from_points(0),
+                max: crate::value::Length::from_points(409),
+            },
+            clear: false,
+        },
+        Entry {
+            spec: ROW_PROPS[1],
+            access: Access::Set(RowSetter::Hidden),
+            constraint: Constraint::None,
+            clear: false,
+        },
+    ],
+    [],
+);
+
+pub(crate) const ROW_WRITE_PROPS: &[PropSpec] = &ROW_WRITE_TABLE.readable();
+
+/// Column assignments: width (characters, written as 1/256 character) and
+/// hidden.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ColumnSetter {
+    Width,
+    Hidden,
+}
+
+pub(crate) const COLUMN_WRITE_TABLE: Table<ColumnSetter, 2, 0> = Table::new(
+    [
+        Entry {
+            spec: COLUMN_PROPS[0],
+            access: Access::Set(ColumnSetter::Width),
+            constraint: Constraint::Number {
+                min: 0.0,
+                max: 255.0,
+            },
+            clear: false,
+        },
+        Entry {
+            spec: COLUMN_PROPS[1],
+            access: Access::Set(ColumnSetter::Hidden),
+            constraint: Constraint::None,
+            clear: false,
+        },
+    ],
+    [],
+);
+
+pub(crate) const COLUMN_WRITE_PROPS: &[PropSpec] = &COLUMN_WRITE_TABLE.readable();
+
+/// A read table with the set and add flags of a write table merged in.
+const fn merged<const N: usize>(read: &[PropSpec], write: &[PropSpec]) -> [PropSpec; N] {
+    let mut props = [PropSpec::new("", ValueType::Text); N];
+    let mut index = 0;
+    while index < N {
+        let mut prop = read[index];
+        let mut write_index = 0;
+        while write_index < write.len() {
+            if same_name(prop.name, write[write_index].name) {
+                prop.access.set = write[write_index].access.set;
+                prop.access.add = write[write_index].access.add;
+            }
+            write_index += 1;
+        }
+        props[index] = prop;
+        index += 1;
+    }
+    props
+}
+
+static ROW_CAPABILITY_PROPS: [PropSpec; 5] = merged(ROW_PROPS, ROW_WRITE_PROPS);
+static COLUMN_CAPABILITY_PROPS: [PropSpec; 5] = merged(COLUMN_PROPS, COLUMN_WRITE_PROPS);
+
+/// The capability projection of one element's properties, when it differs
+/// from the read table.
+pub(crate) fn capability_props(element: &str) -> Option<&'static [PropSpec]> {
+    match element {
+        "cell" => Some(CELL_CAPABILITY_PROPS),
+        "sheet" => Some(SHEET_CAPABILITY_PROPS),
+        "row" => Some(&ROW_CAPABILITY_PROPS),
+        "col" => Some(&COLUMN_CAPABILITY_PROPS),
+        _ => None,
+    }
+}
 
 const fn gap(element: &'static str, follow_up: &'static str, reason: &'static str) -> GapSpec {
     GapSpec {
@@ -394,7 +488,7 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_props(&workbook::SPEC.elements[1], SHEET_PROPS),
     with_props(&workbook::SPEC.elements[2], CELL_PROPS),
     with_props(&workbook::SPEC.elements[3], &[]),
-    with_props(&workbook::SPEC.elements[4], &[]),
+    with_props(&workbook::SPEC.elements[4], ROW_PROPS),
     with_props(&workbook::SPEC.elements[5], COLUMN_PROPS),
     with_gap(&workbook::SPEC.elements[6], &TABLE_GAP),
     with_gap(&workbook::SPEC.elements[7], &NAMED_RANGE_GAP),
@@ -456,73 +550,13 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
         EVALUATED_GAP,
         ARRAY_FORMULA_GAP,
         ARRAY_REF_GAP,
-        property_gap(
-            "row",
-            "height",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "row",
-            "hidden",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "row",
-            "outlineLevel",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "row",
-            "collapsed",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "row",
-            "customHeight",
-            "M1-extended (R6b)",
-            "BIFF ROW layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "width",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "hidden",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "customWidth",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "outlineLevel",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
-        property_gap(
-            "column",
-            "collapsed",
-            "M1-extended (R6b)",
-            "BIFF COLINFO layout is not projected",
-        ),
     ],
 };
 
 check_format_spec!(SPEC);
 
 /// Elements whose properties the unified XLS writer sets.
-pub(crate) const SETTABLE: &[&str] = &["cell", "sheet"];
+pub(crate) const SETTABLE: &[&str] = &["cell", "sheet", "row", "col"];
 /// Elements the unified XLS writer adds: worksheet tabs, and empty rows and
 /// columns inserted under a sheet.
 pub(crate) const ADDABLE: &[&str] = &["sheet", "row", "col"];
@@ -552,7 +586,7 @@ const fn operation_gap(
 /// verbs are listed by [`SETTABLE`], [`ADDABLE`] and [`REMOVABLE`]; these rows
 /// keep the remaining families visible so a format-level report never implies
 /// more than the adapter implements.
-pub(crate) static WRITE_GAPS: [GapSpec; 9] = [
+pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
     operation_gap(
         "get",
         "metadata",
@@ -608,6 +642,13 @@ pub(crate) static WRITE_GAPS: [GapSpec; 9] = [
         "native-dependency-closure",
         "M2 XLS 3-D range rewriting",
         "tab order changes that would make an internal 3-D reference range noncontiguous, or that a protected or shared workbook structure forbids, are refused; cells, rows and columns do not move",
+    ),
+    operation_gap(
+        "set",
+        "row",
+        "outline-and-defaults",
+        "M2 XLS outline and default-layout setters",
+        "row height and hidden and column width and hidden are written; outline level, collapsed state, clearing a custom size and worksheet default sizes are read-only",
     ),
     operation_gap(
         "add",

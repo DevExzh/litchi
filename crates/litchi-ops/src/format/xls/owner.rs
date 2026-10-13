@@ -116,6 +116,55 @@ impl SheetHandle {
         Ok(worksheet.get_cell(at.0, at.1).map(CellData::from_eager))
     }
 
+    /// The row's `Row` record layout, through the eager reader.
+    ///
+    /// The positional owner does not project layout records, so a
+    /// source-backed workbook materializes its eager reader once (cached by
+    /// the native owner) on the first layout read.
+    pub(super) fn row_layout(&self, row: u32) -> Result<Option<RowLayout>> {
+        let Ok(row) = u16::try_from(row) else {
+            return Ok(None);
+        };
+        let worksheet = self.eager_worksheet()?;
+        Ok(worksheet.row_layout(row).map(|layout| RowLayout {
+            height_twips: layout.height_twips(),
+            hidden: layout.is_hidden(),
+            custom_height: layout.has_custom_height(),
+            outline_level: layout.outline_level(),
+            collapsed: layout.is_collapsed(),
+        }))
+    }
+
+    /// The `ColInfo` range layout covering one column, through the eager
+    /// reader (see [`Self::row_layout`]).
+    pub(super) fn column_layout(&self, column: u32) -> Result<Option<ColumnLayout>> {
+        let Ok(column) = u8::try_from(column) else {
+            return Ok(None);
+        };
+        let worksheet = self.eager_worksheet()?;
+        Ok(worksheet.column_layout(column).map(|layout| ColumnLayout {
+            width_256ths: layout.width_256ths(),
+            hidden: layout.is_hidden(),
+            user_set: layout.is_user_set(),
+            outline_level: layout.outline_level(),
+            collapsed: layout.is_collapsed(),
+        }))
+    }
+
+    fn eager_worksheet(&self) -> Result<&litchi_xls::Worksheet> {
+        let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
+            Error::new(
+                Code::UnsupportedCapability,
+                "the selected XLS tab has no worksheet grid",
+            )
+            .with_format(litchi_core::FileFormat::Xls)
+        })?;
+        self.package
+            .reader_ref()?
+            .xls_worksheet(worksheet_index)
+            .map_err(|error| worksheet_error(error.to_string()))
+    }
+
     /// Borrow the eager worksheet's native cell iterator when the owner has
     /// already parsed its cells. Returning `None` preserves the source-backed
     /// fallback until a resumable positional cell cursor is available.
@@ -136,6 +185,26 @@ impl SheetHandle {
             .map_err(|error| worksheet_error(error.to_string()))?;
         Ok(Some(Box::new(worksheet.stored_cells())))
     }
+}
+
+/// One row's layout record.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct RowLayout {
+    pub(super) height_twips: u16,
+    pub(super) hidden: bool,
+    pub(super) custom_height: bool,
+    pub(super) outline_level: u8,
+    pub(super) collapsed: bool,
+}
+
+/// One column's covering `ColInfo` layout.
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ColumnLayout {
+    pub(super) width_256ths: u16,
+    pub(super) hidden: bool,
+    pub(super) user_set: bool,
+    pub(super) outline_level: u8,
+    pub(super) collapsed: bool,
 }
 
 /// One owned sparse cell snapshot: the semantic (cached) value, the formula
@@ -311,4 +380,20 @@ fn missing_sheet(position: usize) -> Error {
 
 fn worksheet_error(message: String) -> Error {
     Error::new(Code::CorruptFile, message).with_format(litchi_core::FileFormat::Xls)
+}
+
+/// Optional-handle conveniences for node projections.
+pub(super) trait LayoutLookup {
+    fn and_then_row(self, row: u32) -> Result<Option<RowLayout>>;
+    fn and_then_column(self, column: u32) -> Result<Option<ColumnLayout>>;
+}
+
+impl LayoutLookup for Option<SheetHandle> {
+    fn and_then_row(self, row: u32) -> Result<Option<RowLayout>> {
+        self.map_or(Ok(None), |handle| handle.row_layout(row))
+    }
+
+    fn and_then_column(self, column: u32) -> Result<Option<ColumnLayout>> {
+        self.map_or(Ok(None), |handle| handle.column_layout(column))
+    }
 }

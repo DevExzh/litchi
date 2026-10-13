@@ -23,6 +23,7 @@
     )
 )]
 
+mod layout;
 mod structural;
 mod tabs;
 
@@ -1093,6 +1094,7 @@ impl Snapshot {
             fixed_index: FixedChangeIndex::default(),
             structural_index: StructuralChangeIndex::default(),
             tab_change: None,
+            layout_changes: Vec::new(),
         }
     }
 
@@ -1667,6 +1669,8 @@ pub struct Edit {
     /// carrying one stages nothing else, because every other staged
     /// operation addresses tabs by their source catalog position.
     tab_change: Option<Box<tabs::TabChange>>,
+    /// Row and column layout transitions, one per row or column.
+    layout_changes: Vec<layout::LayoutChange>,
 }
 
 /// One exact cell targeted differently by independently prepared transactions.
@@ -1783,6 +1787,13 @@ impl Edit {
     pub fn join(&mut self, incoming: Self) -> std::result::Result<&mut Self, JoinError> {
         if self.source.bytes() != incoming.source.bytes() {
             return Err(JoinError::DifferentSource);
+        }
+        if !self.layout_changes.is_empty() || !incoming.layout_changes.is_empty() {
+            return Err(JoinError::StructuralConflicts(Box::new([
+                OperationConflict {
+                    target: "layout".to_string(),
+                },
+            ])));
         }
         if self.tab_change.is_some() || incoming.tab_change.is_some() {
             // A tab-structure change renumbers every catalog position the
@@ -3374,6 +3385,232 @@ impl Edit {
         })
     }
 
+    /// Sets one row's height in twips (1/20 point) and marks it custom.
+    ///
+    /// The row need not hold cells: a missing `Row` record is created. Row
+    /// layout composes with cell edits of the same worksheet but not with an
+    /// axis shift.
+    ///
+    /// ```
+    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// edit.set_row_height(Selector::Position(0), 4, 600)?;
+    /// edit.set_row_hidden(Selector::Position(0), 5, true)?;
+    /// let committed = edit.commit()?;
+    /// assert!(committed.diagnostics().changed());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed range, selector, axis-overlap, or bound refusal
+    /// without staging.
+    pub fn set_row_height(&mut self, selector: Selector<'_>, row: u16, twips: u16) -> Result<()> {
+        if twips == 0 || twips > layout::MAX_ROW_TWIPS {
+            return Err(Error::InvalidData(
+                "row height must be 1 through 8,180 twips (409 pt)".into(),
+            ));
+        }
+        self.stage_row_layout(selector, row, |state| {
+            state.present = true;
+            state.height = twips;
+            state.custom = true;
+        })
+    }
+
+    /// Hides or shows one row, keeping its height.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, axis-overlap, or bound refusal without
+    /// staging.
+    pub fn set_row_hidden(&mut self, selector: Selector<'_>, row: u16, hidden: bool) -> Result<()> {
+        self.stage_row_layout(selector, row, |state| {
+            if state.present || hidden {
+                state.present = true;
+                state.hidden = hidden;
+            }
+        })
+    }
+
+    /// Sets one column's width in 1/256 of a character and marks it user-set.
+    /// A `ColInfo` range covering other columns is split around it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed range, selector, record-layout, axis-overlap, or bound
+    /// refusal without staging.
+    pub fn set_column_width(
+        &mut self,
+        selector: Selector<'_>,
+        column: u8,
+        width: u16,
+    ) -> Result<()> {
+        if width > layout::MAX_COLUMN_WIDTH {
+            return Err(Error::InvalidData(
+                "column width must be at most 255 characters".into(),
+            ));
+        }
+        self.stage_column_layout(selector, column, |state| {
+            state.present = true;
+            state.width = width;
+            state.user_set = true;
+        })
+    }
+
+    /// Hides or shows one column, keeping its width.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, record-layout, axis-overlap, or bound
+    /// refusal without staging.
+    pub fn set_column_hidden(
+        &mut self,
+        selector: Selector<'_>,
+        column: u8,
+        hidden: bool,
+    ) -> Result<()> {
+        let default_width = self.default_column_width(selector)?;
+        self.stage_column_layout(selector, column, |state| {
+            if state.present || hidden {
+                if !state.present {
+                    state.width = default_width;
+                }
+                state.present = true;
+                state.hidden = hidden;
+            }
+        })
+    }
+
+    /// The source substream of one editable worksheet.
+    fn sheet_stream(&self, sheet: usize) -> Result<&[u8]> {
+        let workbook_index = self.source.inner.sheets[sheet].workbook_index;
+        let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
+        let tab = catalog
+            .get(workbook_index)
+            .ok_or_else(|| Error::UnsafeEdit("worksheet tab position is stale".into()))?;
+        self.source
+            .inner
+            .workbook_stream
+            .get(tab.start..tab.end)
+            .ok_or_else(|| Error::InvalidData("worksheet substream is outside Workbook".into()))
+    }
+
+    /// The `DefColWidth` width in 1/256 character, for a newly covered column.
+    fn default_column_width(&self, selector: Selector<'_>) -> Result<u16> {
+        let sheet = self.require_sheet(selector, "column layout")?;
+        let stream = self.sheet_stream(sheet)?;
+        let mut width = 8_u16;
+        for item in Records::new(stream) {
+            let record = item?;
+            match record.kind().get() {
+                0x0055 if record.payload().len() >= 2 => {
+                    width = binary::read_u16_le_at(record.payload(), 0)?;
+                    break;
+                },
+                EOF => break,
+                _ => {},
+            }
+        }
+        Ok(width.saturating_mul(256))
+    }
+
+    fn require_layout_sheet(&self, selector: Selector<'_>, context: &str) -> Result<usize> {
+        self.require_no_tab_change()?;
+        let sheet = self.require_sheet(selector, context)?;
+        if self.structural_index.axis(sheet).is_some() {
+            return Err(Error::UnsafeEdit(
+                "a row or column layout change cannot follow an axis shift of its worksheet".into(),
+            ));
+        }
+        Ok(sheet)
+    }
+
+    fn stage_row_layout(
+        &mut self,
+        selector: Selector<'_>,
+        row: u16,
+        update: impl FnOnce(&mut layout::RowState),
+    ) -> Result<()> {
+        let sheet = self.require_layout_sheet(selector, "row layout")?;
+        let existing = self.layout_changes.iter().position(|change| {
+            matches!(change, layout::LayoutChange::Row { sheet: owner, row: target, .. } if *owner == sheet && *target == row)
+        });
+        match existing {
+            Some(index) => {
+                if let layout::LayoutChange::Row { after, .. } = &mut self.layout_changes[index] {
+                    update(after);
+                }
+                Ok(())
+            },
+            None => {
+                let before = layout::row_state(self.sheet_stream(sheet)?, row)?;
+                let mut after = before;
+                update(&mut after);
+                self.push_layout(layout::LayoutChange::Row {
+                    sheet,
+                    row,
+                    before,
+                    after,
+                })
+            },
+        }
+    }
+
+    fn stage_column_layout(
+        &mut self,
+        selector: Selector<'_>,
+        column: u8,
+        update: impl FnOnce(&mut layout::ColumnState),
+    ) -> Result<()> {
+        let sheet = self.require_layout_sheet(selector, "column layout")?;
+        let existing = self.layout_changes.iter().position(|change| {
+            matches!(change, layout::LayoutChange::Column { sheet: owner, column: target, .. } if *owner == sheet && *target == column)
+        });
+        match existing {
+            Some(index) => {
+                if let layout::LayoutChange::Column { after, .. } = &mut self.layout_changes[index]
+                {
+                    update(after);
+                }
+                Ok(())
+            },
+            None => {
+                let before = layout::column_state(self.sheet_stream(sheet)?, column)?;
+                let mut after = before;
+                update(&mut after);
+                self.push_layout(layout::LayoutChange::Column {
+                    sheet,
+                    column,
+                    before,
+                    after,
+                })
+            },
+        }
+    }
+
+    fn push_layout(&mut self, change: layout::LayoutChange) -> Result<()> {
+        let observed = self
+            .changes
+            .len()
+            .saturating_add(self.structural_changes.len())
+            .saturating_add(self.resource_changes.len())
+            .saturating_add(self.layout_changes.len());
+        if observed >= MAX_STAGED_CHANGES {
+            return Err(Error::StagedChangeLimit {
+                observed: observed.saturating_add(1),
+                maximum: MAX_STAGED_CHANGES,
+            });
+        }
+        self.layout_changes
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("staging XLS layout changes"))?;
+        self.layout_changes.push(change);
+        Ok(())
+    }
+
     /// Reorders the complete workbook tab catalog.
     ///
     /// `order` names every tab exactly once, chart, macro and dialog tabs
@@ -3531,6 +3768,7 @@ impl Edit {
         if !self.changes.is_empty()
             || !self.structural_changes.is_empty()
             || !self.resource_changes.is_empty()
+            || !self.layout_changes.is_empty()
         {
             return Err(Error::UnsafeEdit(
                 "a worksheet tab-structure change must be the only operation of its edit".into(),
@@ -3648,6 +3886,18 @@ impl Edit {
 
     fn stage_structural(&mut self, change: StructuralChange) -> Result<()> {
         self.require_no_tab_change()?;
+        if matches!(
+            change,
+            StructuralChange::Rows { .. } | StructuralChange::Columns { .. }
+        ) && self
+            .layout_changes
+            .iter()
+            .any(|layout| layout.sheet() == operation_sheet_index(&change))
+        {
+            return Err(Error::UnsafeEdit(
+                "an axis shift cannot follow a row or column layout change of its worksheet".into(),
+            ));
+        }
         let sheet = operation_sheet_index(&change);
         // An authored Formula is placed after the worksheet's cell operations
         // in one row-block rebuild. Axis shifts would move it, and a cell
@@ -3872,15 +4122,22 @@ impl Edit {
                     .filter(|change| matches!(change, ResourceChange::FormulaCell { .. }))
                     .count(),
             );
+        let layout: Vec<&layout::LayoutChange> = self
+            .layout_changes
+            .iter()
+            .filter(|change| !change.is_noop())
+            .collect();
         let semantic = SemanticPatch::from_transaction(
             &self.source,
             &self.changes,
             &self.structural_changes,
             &self.resource_changes,
+            &layout,
         )?;
         if changed_cells == 0
             && self.structural_changes.is_empty()
             && self.resource_changes.is_empty()
+            && layout.is_empty()
         {
             let patch = Patch::new(
                 Arc::clone(&self.source.inner.bytes),
@@ -3954,6 +4211,7 @@ impl Edit {
             });
         if !self.structural_changes.is_empty()
             || !self.resource_changes.is_empty()
+            || !layout.is_empty()
             || fixed_sst_change
         {
             workbook_bytes = structural::apply(
@@ -3962,6 +4220,7 @@ impl Edit {
                 &self.structural_changes,
                 &self.changes,
                 &self.resource_changes,
+                &layout,
                 &shared_strings,
             )?;
         }
@@ -3993,6 +4252,7 @@ impl Edit {
         let snapshot = if fixed_cells != 0
             && self.structural_changes.is_empty()
             && self.resource_changes.is_empty()
+            && layout.is_empty()
             && changes_are_fixed_numeric(&self.source, &self.changes)
         {
             Snapshot::from_fixed_numeric_package_editor(
@@ -4012,6 +4272,7 @@ impl Edit {
             &self.resource_changes,
         )?;
         verify_resource_readback(&snapshot, &self.resource_changes)?;
+        verify_layout_readback(&snapshot, &layout)?;
         let patch = Patch::new(
             Arc::clone(&self.source.inner.bytes),
             Arc::clone(&snapshot.inner.bytes),
@@ -4901,6 +5162,7 @@ impl SemanticPatch {
         changes: &[Change],
         structural_changes: &[StructuralChange],
         resource_changes: &[ResourceChange],
+        layout_changes: &[&layout::LayoutChange],
     ) -> Result<Self> {
         let limits = semantic_patch_limits();
         let mut operations = Vec::new();
@@ -4976,6 +5238,9 @@ impl SemanticPatch {
         }
         for change in resource_changes {
             append_resource_semantic(snapshot, resource_changes, change, limits, &mut operations)?;
+        }
+        for change in layout_changes {
+            append_layout_semantic(snapshot, change, limits, &mut operations)?;
         }
         operations.sort_by(|left, right| {
             semantic_operation_order(left.forward())
@@ -6024,6 +6289,9 @@ fn apply_semantic_operation(
         "sheet.reorder" | "sheet.insert" | "sheet.remove" | "sheet.restore" => {
             apply_tab_semantic(source, transaction, operation)
         },
+        "row.layout" | "column.layout" => {
+            apply_layout_semantic(source, transaction, operation, sheet_names)
+        },
         "sheet.rename" => {
             let sheet = parse_sheet_target(&operation.target, "name")?;
             let sheet_index = verify_semantic_sheet(source, sheet_names, sheet, operation)?;
@@ -6132,6 +6400,202 @@ fn apply_tab_semantic(
             "restoring a removed worksheet requires the exact artifact patch".into(),
         )),
     }
+}
+
+fn row_state_json(state: layout::RowState) -> serde_json::Value {
+    serde_json::json!({
+        "present": state.present,
+        "height": state.height,
+        "custom": state.custom,
+        "hidden": state.hidden,
+    })
+}
+
+fn column_state_json(state: layout::ColumnState) -> serde_json::Value {
+    serde_json::json!({
+        "present": state.present,
+        "width": state.width,
+        "user_set": state.user_set,
+        "hidden": state.hidden,
+    })
+}
+
+fn json_bool(value: &serde_json::Value, key: &str) -> Result<bool> {
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| Error::InvalidData("layout patch state is malformed".into()))
+}
+
+fn json_u16(value: &serde_json::Value, key: &str) -> Result<u16> {
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|value| u16::try_from(value).ok())
+        .ok_or_else(|| Error::InvalidData("layout patch state is malformed".into()))
+}
+
+fn parse_row_state(value: &serde_json::Value) -> Result<layout::RowState> {
+    Ok(layout::RowState {
+        present: json_bool(value, "present")?,
+        height: json_u16(value, "height")?,
+        custom: json_bool(value, "custom")?,
+        hidden: json_bool(value, "hidden")?,
+    })
+}
+
+fn parse_column_state(value: &serde_json::Value) -> Result<layout::ColumnState> {
+    Ok(layout::ColumnState {
+        present: json_bool(value, "present")?,
+        width: json_u16(value, "width")?,
+        user_set: json_bool(value, "user_set")?,
+        hidden: json_bool(value, "hidden")?,
+    })
+}
+
+fn append_layout_semantic(
+    snapshot: &Snapshot,
+    change: &layout::LayoutChange,
+    limits: PatchLimits,
+    operations: &mut Vec<ReversibleOperation>,
+) -> Result<()> {
+    let sheet_data = &snapshot.inner.sheets[change.sheet()];
+    let (op, target, before, after) = match change {
+        layout::LayoutChange::Row {
+            row, before, after, ..
+        } => (
+            "row.layout",
+            format!("sheet/{}/row/{row}", sheet_data.workbook_index),
+            row_state_json(*before),
+            row_state_json(*after),
+        ),
+        layout::LayoutChange::Column {
+            column,
+            before,
+            after,
+            ..
+        } => (
+            "column.layout",
+            format!("sheet/{}/column/{column}", sheet_data.workbook_index),
+            column_state_json(*before),
+            column_state_json(*after),
+        ),
+    };
+    let preconditions = |state: serde_json::Value| {
+        let mut map = BTreeMap::new();
+        map.insert(
+            "sheet_name".to_string(),
+            serde_json::Value::String(sheet_data.name.clone()),
+        );
+        map.insert("state".to_string(), state);
+        map
+    };
+    let forward = PatchOperation::new(
+        limits,
+        op,
+        target.clone(),
+        preconditions(before.clone()),
+        after.clone(),
+    )
+    .map_err(patch_error)?;
+    let inverse = PatchOperation::new(limits, op, target, preconditions(after), before)
+        .map_err(patch_error)?;
+    operations.push(ReversibleOperation::new(forward, inverse));
+    Ok(())
+}
+
+fn apply_layout_semantic(
+    source: &Snapshot,
+    transaction: &mut Edit,
+    operation: &PatchOperation,
+    sheet_names: &[String],
+) -> Result<()> {
+    let mut parts = operation.target.split('/');
+    let sheet_position = (parts.next() == Some("sheet"))
+        .then(|| parts.next()?.parse::<usize>().ok())
+        .flatten()
+        .ok_or_else(|| Error::InvalidData("layout patch target is malformed".into()))?;
+    let axis = parts.next();
+    let index = parts
+        .next()
+        .and_then(|value| value.parse::<u16>().ok())
+        .ok_or_else(|| Error::InvalidData("layout patch target is malformed".into()))?;
+    if parts.next().is_some() {
+        return Err(Error::InvalidData(
+            "layout patch target has trailing data".into(),
+        ));
+    }
+    let sheet = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
+    let expected = operation
+        .preconditions
+        .get("state")
+        .ok_or_else(|| Error::InvalidData("layout patch has no state".into()))?;
+    let stream = transaction.sheet_stream(sheet)?;
+    let selector = Selector::Position(sheet_position);
+    match (operation.op.as_str(), axis) {
+        ("row.layout", Some("row")) => {
+            if layout::row_state(stream, index)? != parse_row_state(expected)? {
+                return Err(Error::UnsafeEdit(
+                    "row layout patch precondition is stale".into(),
+                ));
+            }
+            let after = parse_row_state(&operation.value)?;
+            transaction.stage_row_layout(selector, index, |state| *state = after)
+        },
+        ("column.layout", Some("column")) => {
+            let column = u8::try_from(index)
+                .map_err(|_error| Error::InvalidData("layout patch column exceeds u8".into()))?;
+            if layout::column_state(stream, column)? != parse_column_state(expected)? {
+                return Err(Error::UnsafeEdit(
+                    "column layout patch precondition is stale".into(),
+                ));
+            }
+            let after = parse_column_state(&operation.value)?;
+            transaction.stage_column_layout(selector, column, |state| *state = after)
+        },
+        _ => Err(Error::InvalidData(
+            "layout patch target is malformed".into(),
+        )),
+    }
+}
+
+/// Every non-no-op layout change reads back from the published candidate.
+fn verify_layout_readback(snapshot: &Snapshot, changes: &[&layout::LayoutChange]) -> Result<()> {
+    if changes.is_empty() {
+        return Ok(());
+    }
+    let catalog = tabs::catalog(&snapshot.inner.workbook_stream)?;
+    for change in changes {
+        let workbook_index = snapshot
+            .inner
+            .sheets
+            .get(change.sheet())
+            .ok_or_else(|| Error::UnsafeEdit("layout worksheet disappeared".into()))?
+            .workbook_index;
+        let tab = catalog
+            .get(workbook_index)
+            .ok_or_else(|| Error::UnsafeEdit("layout worksheet tab disappeared".into()))?;
+        let stream = &snapshot.inner.workbook_stream[tab.start..tab.end];
+        let matches = match change {
+            layout::LayoutChange::Row { row, after, .. } => {
+                let observed = layout::row_state(stream, *row)?;
+                if after.present {
+                    observed == *after
+                } else {
+                    !observed.present || (!observed.custom && !observed.hidden)
+                }
+            },
+            layout::LayoutChange::Column { column, after, .. } => {
+                layout::column_state(stream, *column)? == *after
+            },
+        };
+        if !matches {
+            return Err(Error::UnsafeEdit(
+                "row or column layout failed semantic readback".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn apply_sst_semantic(transaction: &mut Edit, operation: &PatchOperation) -> Result<()> {
@@ -6890,10 +7354,15 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
         structural_changes,
         resource_changes,
         tab_change,
+        layout_changes,
         ..
     } = transaction;
 
-    if !structural_changes.is_empty() || !resource_changes.is_empty() || tab_change.is_some() {
+    if !structural_changes.is_empty()
+        || !resource_changes.is_empty()
+        || tab_change.is_some()
+        || !layout_changes.is_empty()
+    {
         return Err(Error::UnsupportedFeature(
             "source-backed numeric plan accepts no structural or resource edits".into(),
         ));
@@ -7010,10 +7479,15 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         structural_changes,
         resource_changes,
         tab_change,
+        layout_changes,
         ..
     } = transaction;
 
-    if !structural_changes.is_empty() || !resource_changes.is_empty() || tab_change.is_some() {
+    if !structural_changes.is_empty()
+        || !resource_changes.is_empty()
+        || tab_change.is_some()
+        || !layout_changes.is_empty()
+    {
         return Err(Error::UnsupportedFeature(
             "source-backed numeric publication accepts no structural or resource edits".into(),
         ));
@@ -7025,7 +7499,7 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         ));
     }
 
-    let semantic = SemanticPatch::from_transaction(&source, &changes, &[], &[])?;
+    let semantic = SemanticPatch::from_transaction(&source, &changes, &[], &[], &[])?;
     // The complete source Workbook validation already ran when this immutable
     // snapshot was opened, over the same sealed bytes under the same limits,
     // and `SourcePolicyFacts` recorded its three verdicts with their exact
@@ -9347,3 +9821,6 @@ mod tab_tests;
 
 #[cfg(test)]
 mod formula_tests;
+
+#[cfg(test)]
+mod layout_tests;

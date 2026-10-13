@@ -10,7 +10,7 @@ use litchi_core::sheet::CellValue;
 
 use super::Xls;
 use super::children::Children;
-use super::owner::{CellData, Grid, SheetHandle};
+use super::owner::{CellData, ColumnLayout, Grid, LayoutLookup as _, RowLayout, SheetHandle};
 use super::spec::{
     CELL_PROPS, COLUMN_PROPS, CellKey, ColumnKey, Kind, ROW_PROPS, RowKey, SHEET_PROPS,
     WORKBOOK_PROPS, WorkbookKey,
@@ -266,6 +266,10 @@ impl<'f> Node<'f> {
         }
     }
 
+    fn sheet_handle(&self) -> Result<Option<SheetHandle>> {
+        SheetHandle::at(self.file, self.sheet)
+    }
+
     pub(super) fn cell_state(&self) -> Result<CellState<'_>> {
         let Item::Cell(cell) = &self.item else {
             return Ok(CellState::Missing);
@@ -318,8 +322,14 @@ impl<'f> Node<'f> {
                 }),
             ),
             Item::Range(_) => return Ok(Format::empty()),
-            Item::Row(_) => (ROW_PROPS, Props::Row(None)),
-            Item::Column(_) => (COLUMN_PROPS, Props::Column(None)),
+            Item::Row(row) => (
+                ROW_PROPS,
+                Props::Row(self.sheet_handle()?.and_then_row(row.index)?),
+            ),
+            Item::Column(column) => (
+                COLUMN_PROPS,
+                Props::Column(self.sheet_handle()?.and_then_column(column.index)?),
+            ),
         };
         Ok(Format::new(table, Source::Xls(props)))
     }
@@ -351,8 +361,8 @@ pub(crate) enum Props<'a> {
         visibility: litchi_xls::SheetVisibility,
     },
     Cell(CellProps<'a>),
-    Row(Option<u32>),
-    Column(Option<(u32, u32)>),
+    Row(Option<RowLayout>),
+    Column(Option<ColumnLayout>),
 }
 
 pub(crate) struct CellProps<'a> {
@@ -393,9 +403,9 @@ impl<'a> Props<'a> {
                 },
             },
             Self::Cell(cell) => cell.get(CellKey::at(index)?),
-            Self::Row(row) => row.and_then(|row_index| row_value(row_index, RowKey::at(index)?)),
+            Self::Row(row) => row.and_then(|layout| row_value(layout, RowKey::at(index)?)),
             Self::Column(column) => {
-                column.and_then(|range| column_value(range, ColumnKey::at(index)?))
+                column.and_then(|layout| column_value(layout, ColumnKey::at(index)?))
             },
         }
     }
@@ -461,12 +471,30 @@ impl<'a> CellProps<'a> {
     }
 }
 
-fn row_value(_index: u32, _key: RowKey) -> Option<Value<'static>> {
-    None
+fn row_value(layout: RowLayout, key: RowKey) -> Option<Value<'static>> {
+    match key {
+        RowKey::Height => Some(Value::Length(crate::value::Length::from_emu(
+            i64::from(layout.height_twips) * 635,
+        ))),
+        RowKey::Hidden => layout.hidden.then_some(Value::Bool(true)),
+        RowKey::OutlineLevel => {
+            (layout.outline_level > 0).then_some(Value::Int(i64::from(layout.outline_level)))
+        },
+        RowKey::Collapsed => layout.collapsed.then_some(Value::Bool(true)),
+        RowKey::CustomHeight => layout.custom_height.then_some(Value::Bool(true)),
+    }
 }
 
-fn column_value(_range: (u32, u32), _key: ColumnKey) -> Option<Value<'static>> {
-    None
+fn column_value(layout: ColumnLayout, key: ColumnKey) -> Option<Value<'static>> {
+    match key {
+        ColumnKey::Width => Value::number(f64::from(layout.width_256ths) / 256.0),
+        ColumnKey::Hidden => layout.hidden.then_some(Value::Bool(true)),
+        ColumnKey::CustomWidth => layout.user_set.then_some(Value::Bool(true)),
+        ColumnKey::OutlineLevel => {
+            (layout.outline_level > 0).then_some(Value::Int(i64::from(layout.outline_level)))
+        },
+        ColumnKey::Collapsed => layout.collapsed.then_some(Value::Bool(true)),
+    }
 }
 
 pub(super) fn display_value(value: &CellValue) -> Cow<'_, str> {

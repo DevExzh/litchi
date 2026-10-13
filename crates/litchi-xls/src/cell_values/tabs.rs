@@ -88,8 +88,8 @@ pub(super) struct Tab {
     pub(super) kind: u8,
     body_start: usize,
     body_end: usize,
-    start: usize,
-    end: usize,
+    pub(super) start: usize,
+    pub(super) end: usize,
 }
 
 struct RawRecord {

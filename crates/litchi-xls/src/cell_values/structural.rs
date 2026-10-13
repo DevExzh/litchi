@@ -70,6 +70,7 @@ pub(super) fn apply(
     changes: &[StructuralChange],
     fixed_changes: &[super::Change],
     resources: &[super::ResourceChange],
+    layout: &[&super::layout::LayoutChange],
     shared_strings: &[String],
 ) -> Result<Vec<u8>> {
     let rebuild_sst = needs_sst_rebuild(source, changes, fixed_changes, resources);
@@ -113,15 +114,24 @@ pub(super) fn apply(
             by_sheet.entry(*sheet).or_default();
         }
     }
+    for change in layout {
+        by_sheet.entry(change.sheet()).or_default();
+    }
     // Rewriting later streams first keeps earlier absolute offsets stable and
     // minimizes the number of BoundSheet position adjustments.
     for (sheet, operations) in by_sheet.into_iter().rev() {
+        let sheet_layout: Vec<&super::layout::LayoutChange> = layout
+            .iter()
+            .copied()
+            .filter(|change| change.sheet() == sheet)
+            .collect();
         rewrite_worksheet(
             &mut workbook,
             source,
             sheet,
             &operations,
             resources,
+            &sheet_layout,
             shared_strings,
         )?;
     }
@@ -1944,6 +1954,7 @@ fn rewrite_worksheet(
     sheet: usize,
     operations: &[&StructuralChange],
     resources: &[super::ResourceChange],
+    layout: &[&super::layout::LayoutChange],
     shared_strings: &[String],
 ) -> Result<()> {
     if operations.iter().any(|operation| {
@@ -1984,6 +1995,7 @@ fn rewrite_worksheet(
         source,
         operations,
         resources,
+        layout,
         shared_strings,
     )?;
     replace_range_and_adjust_bounds(workbook, start, end, &replacement)
@@ -2040,6 +2052,7 @@ fn rebuild_sheet(
     source: &super::Snapshot,
     operations: &[&StructuralChange],
     resources: &[super::ResourceChange],
+    layout: &[&super::layout::LayoutChange],
     shared_strings: &[String],
 ) -> Result<Vec<u8>> {
     let records = raw_records(worksheet)?;
@@ -2137,12 +2150,17 @@ fn rebuild_sheet(
             }
         }
     }
+    apply_row_layout(&mut rows, layout)?;
     patch_row_extents(&mut rows)?;
 
     let index_record = &records[index];
-    let between = worksheet
+    let source_between = worksheet
         .get(index_record.end..row_table_start)
         .ok_or_else(|| Error::InvalidData("INDEX-to-row range is invalid".into()))?;
+    // Column layout rewrites the ColInfo run after DefColWidth, which can
+    // change the length of this region; DIMENSIONS is located again below.
+    let between = super::layout::apply_columns(source_between, layout)?;
+    let between = between.as_slice();
     let def_offset = records[def_col]
         .start
         .checked_sub(index_record.end)
@@ -2191,7 +2209,10 @@ fn rebuild_sheet(
     let dimensions_relative = records[dimensions]
         .start
         .checked_sub(index_record.end)
-        .ok_or_else(|| Error::InvalidData("DIMENSIONS precedes INDEX".into()))?;
+        .ok_or_else(|| Error::InvalidData("DIMENSIONS precedes INDEX".into()))?
+        .checked_add(between.len())
+        .and_then(|value| value.checked_sub(source_between.len()))
+        .ok_or_else(|| Error::InvalidData("DIMENSIONS offset adjustment overflows".into()))?;
     let dimensions_end = dimensions_relative
         .checked_add(new_dimensions.len())
         .ok_or_else(|| Error::InvalidData("DIMENSIONS range overflow".into()))?;
@@ -2208,6 +2229,57 @@ fn rebuild_sheet(
     result.extend_from_slice(&worksheet[row_table_end..]);
     patch_coordinate_dependencies(&mut result, operations)?;
     Ok(result)
+}
+
+/// Patch, create or reset `Row` records for staged row layout changes.
+fn apply_row_layout(
+    rows: &mut BTreeMap<u16, RowData>,
+    layout: &[&super::layout::LayoutChange],
+) -> Result<()> {
+    for change in layout {
+        let super::layout::LayoutChange::Row {
+            row, before, after, ..
+        } = change
+        else {
+            continue;
+        };
+        match rows.get_mut(row) {
+            Some(data) => {
+                let observed = super::layout::row_record_state(&data.row_record)?;
+                // A cell insertion may have created this record in the same
+                // edit; it then carries the default layout.
+                if before.present && observed != *before {
+                    return Err(Error::UnsafeEdit("row layout precondition is stale".into()));
+                }
+                if !after.present && data.cell_records.is_empty() {
+                    rows.remove(row);
+                } else {
+                    let mut state = *after;
+                    if !after.present {
+                        state.custom = false;
+                        state.hidden = false;
+                    }
+                    super::layout::patch_row_record(&mut data.row_record, state)?;
+                }
+            },
+            None if before.present => {
+                return Err(Error::UnsafeEdit(
+                    "row layout precondition names a missing Row record".into(),
+                ));
+            },
+            None if after.present => {
+                rows.insert(
+                    *row,
+                    RowData {
+                        row_record: super::layout::new_row_record(*row, *after)?,
+                        cell_records: Vec::new(),
+                    },
+                );
+            },
+            None => {},
+        }
+    }
+    Ok(())
 }
 
 fn apply_rebuild_operation(

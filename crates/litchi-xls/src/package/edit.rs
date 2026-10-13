@@ -648,6 +648,74 @@ impl Edit {
             .map_err(Error::from)
     }
 
+    /// Set one row's height in twips and mark it custom; see
+    /// [`cell_values::Edit::set_row_height`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed range, selector, axis-overlap or bound refusal.
+    pub fn set_row_height<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        row: u16,
+        twips: u16,
+    ) -> Result<()> {
+        self.inner
+            .set_row_height(selector.into(), row, twips)
+            .map_err(Error::from)
+    }
+
+    /// Hide or show one row; see [`cell_values::Edit::set_row_hidden`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, axis-overlap or bound refusal.
+    pub fn set_row_hidden<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        row: u16,
+        hidden: bool,
+    ) -> Result<()> {
+        self.inner
+            .set_row_hidden(selector.into(), row, hidden)
+            .map_err(Error::from)
+    }
+
+    /// Set one column's width in 1/256 character; see
+    /// [`cell_values::Edit::set_column_width`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed range, selector, record-layout, axis-overlap or bound
+    /// refusal.
+    pub fn set_column_width<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        column: u8,
+        width: u16,
+    ) -> Result<()> {
+        self.inner
+            .set_column_width(selector.into(), column, width)
+            .map_err(Error::from)
+    }
+
+    /// Hide or show one column; see [`cell_values::Edit::set_column_hidden`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, record-layout, axis-overlap or bound
+    /// refusal.
+    pub fn set_column_hidden<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        column: u8,
+        hidden: bool,
+    ) -> Result<()> {
+        self.inner
+            .set_column_hidden(selector.into(), column, hidden)
+            .map_err(Error::from)
+    }
+
     /// Remove one supported cell record.
     pub fn remove_cell<'a>(
         &mut self,

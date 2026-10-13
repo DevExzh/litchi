@@ -216,3 +216,236 @@ pub(crate) fn remove_axis(
     let native = edit.commit().map_err(native_edit_error)?;
     finish_commit(file, native, 1, limits).map(Some)
 }
+
+/// One resolved layout target.
+enum LayoutTarget {
+    Row { sheet: usize, row: u16 },
+    Column { sheet: usize, column: u8 },
+}
+
+/// Admitted row or column layout assignments.
+#[derive(Default)]
+struct LayoutAssignments {
+    /// Row height in twips, or column width in 1/256 character.
+    size: Option<u16>,
+    hidden: Option<bool>,
+}
+
+fn resolve_layout_targets(
+    file: &Xls,
+    target: &TargetArg<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<(Axis, Vec<LayoutTarget>)>> {
+    let mut nodes = Vec::new();
+    if let Some(path) = target.path() {
+        nodes.push(crate::path::resolve::get(&Nav::new(file), path)?);
+    } else if let Some(query) = target.query() {
+        let walk = crate::query::run(Nav::new(file), query.clone())?;
+        if !walk.plan().diagnostics().is_empty() {
+            return Err(refusal(
+                Code::InvalidSelector,
+                "the mutation selector contains an unsupported predicate",
+            ));
+        }
+        for node in walk {
+            let node = node?;
+            if nodes.len() >= limits.max_expanded_targets() {
+                return Err(Error::from(TransactionError::Limit {
+                    kind: LimitKind::ExpandedTargets,
+                    observed: nodes.len().saturating_add(1),
+                    maximum: limits.max_expanded_targets(),
+                })
+                .with_format(FileFormat::Xls));
+            }
+            nodes.push(node);
+        }
+    } else {
+        return Ok(None);
+    }
+    let Some(first) = nodes.first() else {
+        return Ok(None);
+    };
+    let axis = match first.element() {
+        Kind::Row => Axis::Row,
+        Kind::Column => Axis::Column,
+        _ => return Ok(None),
+    };
+    let mut targets = Vec::new();
+    for node in nodes {
+        if node.element() != axis.kind() {
+            return Err(refusal(
+                Code::InvalidArgument,
+                "an XLS layout selector must match only rows or only columns",
+            ));
+        }
+        let index = node
+            .number()
+            .and_then(|number| number.checked_sub(1))
+            .ok_or_else(|| refusal(Code::InvalidPath, "the XLS axis path has no index"))?;
+        let sheet = node.sheet_position();
+        targets.push(match axis {
+            Axis::Row => LayoutTarget::Row {
+                sheet,
+                row: u16::try_from(index)
+                    .map_err(|_| refusal(Code::OutOfRange, "the XLS row is outside BIFF8"))?,
+            },
+            Axis::Column => LayoutTarget::Column {
+                sheet,
+                column: u8::try_from(index)
+                    .map_err(|_| refusal(Code::OutOfRange, "the XLS column is outside BIFF8"))?,
+            },
+        });
+    }
+    file.check_source()?;
+    Ok(Some((axis, targets)))
+}
+
+fn admit_layout(axis: Axis, props: &crate::props::Props<'_>) -> Result<LayoutAssignments> {
+    use super::spec::{COLUMN_WRITE_TABLE, ColumnSetter, ROW_WRITE_TABLE, RowSetter};
+    use crate::registry::Operation;
+    use crate::value::Scalar;
+
+    let mut assignments = LayoutAssignments::default();
+    let duplicate = |name: &'static str| {
+        refusal(
+            Code::InvalidArgument,
+            "the same XLS layout property was supplied more than once",
+        )
+        .with_property(name)
+    };
+    for (key, value) in props.iter() {
+        let with_key = |error: Error| {
+            error
+                .with_format(FileFormat::Xls)
+                .with_property(key.as_str().to_owned())
+        };
+        match axis {
+            Axis::Row => {
+                let (_, entry) = ROW_WRITE_TABLE.resolve(key.as_str()).map_err(with_key)?;
+                let entry = *entry;
+                entry
+                    .prepare(Operation::Set, value, |setter, value| match (setter, value) {
+                        (RowSetter::Height, Some(Scalar::Length(length))) => {
+                            let twips = (length.points() * 20.0).round();
+                            if !(1.0..=8_180.0).contains(&twips) {
+                                return Err(refusal(
+                                    Code::InvalidValue,
+                                    "an XLS row height must be greater than zero and at most 409 points",
+                                )
+                                .with_property("height"));
+                            }
+                            if assignments.size.replace(twips as u16).is_some() {
+                                return Err(duplicate("height"));
+                            }
+                            Ok(())
+                        },
+                        (RowSetter::Hidden, Some(Scalar::Bool(hidden))) => {
+                            if assignments.hidden.replace(hidden).is_some() {
+                                return Err(duplicate("hidden"));
+                            }
+                            Ok(())
+                        },
+                        _ => Err(refusal(Code::InvalidValue, "invalid XLS row layout value")),
+                    })
+                    .map_err(with_key)?;
+            },
+            Axis::Column => {
+                let (_, entry) = COLUMN_WRITE_TABLE.resolve(key.as_str()).map_err(with_key)?;
+                let entry = *entry;
+                entry
+                    .prepare(Operation::Set, value, |setter, value| {
+                        match (setter, value) {
+                            (ColumnSetter::Width, Some(Scalar::Number(width))) => {
+                                let units = (width * 256.0).round();
+                                if assignments.size.replace(units as u16).is_some() {
+                                    return Err(duplicate("width"));
+                                }
+                                Ok(())
+                            },
+                            (ColumnSetter::Width, Some(Scalar::Int(width)))
+                                if (0..=255).contains(&width) =>
+                            {
+                                if assignments.size.replace((width * 256) as u16).is_some() {
+                                    return Err(duplicate("width"));
+                                }
+                                Ok(())
+                            },
+                            (ColumnSetter::Hidden, Some(Scalar::Bool(hidden))) => {
+                                if assignments.hidden.replace(hidden).is_some() {
+                                    return Err(duplicate("hidden"));
+                                }
+                                Ok(())
+                            },
+                            _ => Err(refusal(
+                                Code::InvalidValue,
+                                "invalid XLS column layout value",
+                            )),
+                        }
+                    })
+                    .map_err(with_key)?;
+            },
+        }
+    }
+    Ok(assignments)
+}
+
+/// Set row heights, column widths and hidden flags selected by a row or
+/// column path or a homogeneous row/column query.  Returns `None` when the
+/// target is not a row or column.
+pub(crate) fn set_layout(
+    file: &Xls,
+    target: &TargetArg<'_>,
+    props: &crate::props::Props<'_>,
+    limits: &SemanticLimits,
+) -> Result<Option<WriteCommit>> {
+    let Some((axis, targets)) = resolve_layout_targets(file, target, limits)? else {
+        return Ok(None);
+    };
+    let assignments = admit_layout(axis, props)?;
+    if assignments.size.is_none() && assignments.hidden.is_none() || targets.is_empty() {
+        let native = file
+            .editable_package()?
+            .edit()
+            .map_err(native_edit_error)?
+            .commit()
+            .map_err(native_edit_error)?;
+        return finish_commit(file, native, 0, limits).map(Some);
+    }
+    admit(limits)?;
+    let staged = targets.len().saturating_mul(16);
+    if staged > limits.max_staged_bytes() {
+        return Err(Error::from(TransactionError::Limit {
+            kind: LimitKind::StagedBytes,
+            observed: staged,
+            maximum: limits.max_staged_bytes(),
+        })
+        .with_format(FileFormat::Xls));
+    }
+    let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    for target in targets {
+        match target {
+            LayoutTarget::Row { sheet, row } => {
+                if let Some(twips) = assignments.size {
+                    edit.set_row_height(Selector::Position(sheet), row, twips)
+                        .map_err(native_edit_error)?;
+                }
+                if let Some(hidden) = assignments.hidden {
+                    edit.set_row_hidden(Selector::Position(sheet), row, hidden)
+                        .map_err(native_edit_error)?;
+                }
+            },
+            LayoutTarget::Column { sheet, column } => {
+                if let Some(width) = assignments.size {
+                    edit.set_column_width(Selector::Position(sheet), column, width)
+                        .map_err(native_edit_error)?;
+                }
+                if let Some(hidden) = assignments.hidden {
+                    edit.set_column_hidden(Selector::Position(sheet), column, hidden)
+                        .map_err(native_edit_error)?;
+                }
+            },
+        }
+    }
+    let native = edit.commit().map_err(native_edit_error)?;
+    finish_commit(file, native, 1, limits).map(Some)
+}

@@ -2812,11 +2812,10 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         };
         #[cfg(feature = "xls")]
         let props = if adapter == Adapter::Xls {
-            match crate::path::navigate::ElementKind::name(element.kind) {
-                "cell" => crate::format::xls::CELL_CAPABILITY_PROPS,
-                "sheet" => crate::format::xls::SHEET_CAPABILITY_PROPS,
-                _ => props,
-            }
+            crate::format::xls::capability_props(crate::path::navigate::ElementKind::name(
+                element.kind,
+            ))
+            .unwrap_or(props)
         } else {
             props
         };
