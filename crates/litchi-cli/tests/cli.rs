@@ -843,3 +843,98 @@ fn officecli_smoke_script_replays() {
         run.stdout, run.stderr
     );
 }
+
+/// OfficeCLI's `add --from`, `set --find/--replace` and `remove --prop`
+/// reach the command channel, which refuses them with typed errors instead
+/// of a usage error (record 0265).
+#[test]
+fn officecli_option_spellings_reach_the_command_channel() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = scratch(dir.path(), "o.docx", None);
+    expect(
+        0,
+        [
+            "add",
+            arg(&path),
+            "/body",
+            "--type",
+            "paragraph",
+            "--prop",
+            "text=fox",
+        ],
+    );
+    let before = std::fs::read(&path).expect("read");
+
+    let run = expect(
+        5,
+        ["add", arg(&path), "/body", "--from", "/body/p[1]", "--json"],
+    );
+    let error: Value = serde_json::from_str(&run.stderr).expect("JSON error");
+    assert_eq!(error["code"], "unsupported_capability");
+    // Exactly one of --type and --from.
+    expect(2, ["add", arg(&path), "/body"]);
+    expect(
+        2,
+        [
+            "add",
+            arg(&path),
+            "/body",
+            "--type",
+            "paragraph",
+            "--from",
+            "/body/p[1]",
+        ],
+    );
+
+    // `--find T` is `--prop find=T`: the strict default names the property.
+    let run = expect(
+        4,
+        [
+            "set",
+            arg(&path),
+            "/body/p[1]",
+            "--find",
+            "fox",
+            "--replace",
+            "cat",
+            "--json",
+        ],
+    );
+    let error: Value = serde_json::from_str(&run.stderr).expect("JSON error");
+    assert_eq!(error["property"], "find");
+    let run = expect(
+        4,
+        [
+            "set",
+            arg(&path),
+            "/body/p[1]",
+            "--replace",
+            "cat",
+            "--json",
+        ],
+    );
+    let error: Value = serde_json::from_str(&run.stderr).expect("JSON error");
+    assert_eq!(error["property"], "replace");
+    // `set` still needs something to set.
+    expect(2, ["set", arg(&path), "/body/p[1]"]);
+
+    let run = expect(
+        4,
+        [
+            "remove",
+            arg(&path),
+            "/body/p[1]",
+            "--prop",
+            "revision.author=Bob",
+            "--json",
+        ],
+    );
+    let error: Value = serde_json::from_str(&run.stderr).expect("JSON error");
+    assert_eq!(error["code"], "invalid_argument");
+
+    assert_eq!(
+        std::fs::read(&path).expect("read"),
+        before,
+        "refusals write nothing"
+    );
+}

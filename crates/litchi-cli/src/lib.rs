@@ -12,9 +12,9 @@
 //! | `get <file> [<path>] [--depth N]` | `open`, `File::get`, `Node::view_with` |
 //! | `query <file> <selector> [--limit N] [--depth N]` | `File::query`, `Matches::limit` |
 //! | `view <file> [<mode> \| --mode M]` | `File::view` or `File::view_json` |
-//! | `set <file> <path> --prop k=v...` | `File::apply` with a `set` item |
-//! | `add <file> <parent> --type T [--prop k=v...] [--index N \| --after P \| --before P]` | `File::apply` with an `add` item |
-//! | `remove <file> <path>` | `File::apply` with a `remove` item |
+//! | `set <file> <path> --prop k=v... [--find T] [--replace T]` | `File::apply` with a `set` item (`--find T` is `--prop find=T`, `--replace T` is `--prop replace=T`) |
+//! | `add <file> <parent> (--type T \| --from P) [--prop k=v...] [--index N \| --after P \| --before P]` | `File::apply` with an `add` item |
+//! | `remove <file> <path> [--prop k=v...]` | `File::apply` with a `remove` item |
 //! | `move <file> <path> [--to P] [--index N \| --after P \| --before P]` | `File::apply` with a `move` item |
 //! | `swap <file> <path1> <path2>` | `File::apply` with a `swap` item |
 //! | `batch <file> (--input F \| --commands JSON) [--atomic \| --best-effort]` | `batch::from_bytes_with_limits`, `File::batch` |
