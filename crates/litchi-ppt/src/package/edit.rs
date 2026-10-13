@@ -29,7 +29,9 @@ pub enum LimitKind {
 }
 
 /// The default and hard bound for one primary PPT edit.
-pub const DEFAULT_MAX_OPERATIONS: usize = 4096;
+///
+/// 16384 since record 0264 (owner approved 2026-10-14; it was 4096).
+pub const DEFAULT_MAX_OPERATIONS: usize = 16384;
 /// The maximum operation budget accepted by [`EditOptions`].
 pub const MAX_OPERATIONS: usize = DEFAULT_MAX_OPERATIONS;
 
@@ -484,8 +486,8 @@ impl Edit {
     ///
     /// Every chunk retains the 256-replacement contract of
     /// [`Self::set_shape_texts`]. The native owner admits at most 4096 chunks,
-    /// including empty chunks, and at most 4096 replacements across the whole
-    /// call. Targets must be globally distinct. The operation count charged
+    /// including empty chunks, and at most 16384 replacements across the
+    /// whole call. Targets must be globally distinct. The operation count charged
     /// to this primary edit is the aggregate replacement count, so a valid
     /// chunked call consumes the same finite operation budget as its flattened
     /// equivalent. Empty plans consume no operations.

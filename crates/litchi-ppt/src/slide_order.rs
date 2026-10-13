@@ -40,7 +40,11 @@ pub const MAX_SHAPE_TEXT_CHUNKS: usize = 4096;
 
 /// Maximum number of globally selected shapes accepted by one aggregate
 /// shape-text operation.
-pub const MAX_SHAPE_TEXT_CHUNK_SELECTIONS: usize = 4096;
+///
+/// Raised from 4096 with the primary edit bound (record 0264, owner approved
+/// 2026-10-14): verification no longer re-parses the slide, so one larger
+/// publication is linear where several smaller ones each rewrote the slide.
+pub const MAX_SHAPE_TEXT_CHUNK_SELECTIONS: usize = 16384;
 
 /// Fixed-width manual and automatic advance state from one
 /// `SlideShowSlideInfoAtom`.
