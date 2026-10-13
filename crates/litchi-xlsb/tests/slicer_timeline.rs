@@ -308,7 +308,7 @@ fn workbook_facade_round_trips_and_removes_both_inert_owners() {
 
     let mut bytes = Cursor::new(Vec::new());
     workbook.to_package().write_to(&mut bytes).unwrap();
-    let reopened = Package::from_bytes(bytes.into_inner())
+    let reopened = Package::from_bytes(&bytes.into_inner())
         .unwrap()
         .into_workbook()
         .unwrap();

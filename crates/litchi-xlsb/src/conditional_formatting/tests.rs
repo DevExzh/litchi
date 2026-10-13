@@ -6,7 +6,7 @@
 //! Public-facade regression coverage for the conditional-formatting owner.
 
 use super::*;
-use crate::raw::Writer;
+use crate::raw::Encoder;
 
 #[test]
 fn canonical_facade_builds_a_classic_rule() {
@@ -26,7 +26,7 @@ fn canonical_facade_exposes_owner_result_and_codec() {
     let mut bytes = Vec::new();
 
     let result: Result<()> =
-        write_conditional_formattings(&mut Writer::new(&mut bytes), &[formatting]);
+        write_conditional_formattings(&mut Encoder::new(&mut bytes), &[formatting]);
 
     result.expect("canonical owner codec should write the rule");
     assert!(!bytes.is_empty());

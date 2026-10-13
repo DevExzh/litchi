@@ -15,7 +15,7 @@ use litchi_ops::transaction::SemanticLimits;
 use litchi_ops::{
     BatchItem, BatchMode, Code, File, ItemResult, OpenOptions, Props, SourceMode, props,
 };
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 
 const FIRST: &str = "/sheet[1]";
 const SECOND: &str = "/sheet[2]";
@@ -153,7 +153,7 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
     let mut in_views = false;
     let mut removed = false;
     {
-        let mut writer = Writer::new(&mut rewritten);
+        let mut writer = Encoder::new(&mut rewritten);
         for item in Records::new(&original) {
             let record = item.expect("chart record");
             if record.kind() == kind::BEGIN_CS_VIEWS {

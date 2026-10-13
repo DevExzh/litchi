@@ -3,7 +3,7 @@
 use litchi_opc::{BlobPart, OpcPackage};
 
 use super::codec;
-use super::model::{Dependencies, ReadLimits};
+use super::model::{Dependencies, SemanticLimits};
 use super::package::{self, CONTENT_TYPE, Graph, RELATIONSHIP_TYPE};
 use super::snapshot::Snapshot;
 use crate::package::error::{Error, Result};
@@ -50,7 +50,7 @@ impl Patch {
         }
     }
 
-    pub(crate) fn limits(&self) -> ReadLimits {
+    pub(crate) fn limits(&self) -> SemanticLimits {
         self.before.limits()
     }
 
@@ -232,7 +232,7 @@ fn add_owner(
     workbook: &litchi_opc::PackURI,
     graph: &Graph,
     after: &Snapshot,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let owner = after.source().owner.as_ref().ok_or_else(|| {
         Error::InvalidFormat("Volatile Dependencies target source is missing".to_string())

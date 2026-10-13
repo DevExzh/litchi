@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, OwnedContentTypes, OwnedRelationships};
 
-use super::model::{ChainPart, ReadLimits};
+use super::model::{ChainPart, SemanticLimits};
 use super::package::{self, Graph};
 use crate::package::error::{Error, Result};
 
@@ -12,14 +12,14 @@ use crate::package::error::{Error, Result};
 #[derive(Clone, Debug)]
 pub struct Snapshot {
     part: Option<Arc<ChainPart>>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     source: SourceState,
     package: Arc<OpcPackage>,
 }
 
 impl Snapshot {
     /// Read a snapshot with explicit finite limits.
-    pub(crate) fn read_with_limits(package: &OpcPackage, limits: ReadLimits) -> Result<Self> {
+    pub(crate) fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
         Self::read_with_probe(package, limits, None)
     }
 
@@ -27,7 +27,7 @@ impl Snapshot {
     /// no hidden inbound relationship when the current owner is absent.
     pub(crate) fn read_with_probe(
         package: &OpcPackage,
-        limits: ReadLimits,
+        limits: SemanticLimits,
         probe_target: Option<&litchi_opc::PackURI>,
     ) -> Result<Self> {
         let limits = limits.validate()?;
@@ -97,7 +97,7 @@ impl Snapshot {
 
     /// Exact finite limits retained by this snapshot.
     #[must_use]
-    pub const fn limits(&self) -> ReadLimits {
+    pub const fn limits(&self) -> SemanticLimits {
         self.limits
     }
 
@@ -151,7 +151,7 @@ impl SourceState {
         package: &OpcPackage,
         workbook_name: &litchi_opc::PackURI,
         graph: Option<&Graph>,
-        limits: ReadLimits,
+        limits: SemanticLimits,
     ) -> Result<Self> {
         let workbook = package.get_part(workbook_name)?;
         let root_name =
@@ -209,7 +209,7 @@ impl SourceState {
     }
 }
 
-pub(crate) fn opc_capture_limits(limits: ReadLimits) -> Result<litchi_opc::SourceLimits> {
+pub(crate) fn opc_capture_limits(limits: SemanticLimits) -> Result<litchi_opc::SourceLimits> {
     if limits.max_part_bytes == 0 {
         return Err(Error::LimitExceeded {
             resource: "Calculation Chain source closure bytes",

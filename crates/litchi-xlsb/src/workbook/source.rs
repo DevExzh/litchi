@@ -8,14 +8,11 @@ use std::sync::{Arc, Mutex};
 
 use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet as SheetWorksheet};
 use litchi_core::{
-    ExecutionContext, ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind, TextOutputError,
+    ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind, TextOutputError,
     TextOutputOptions, TextOutputReport,
 };
 use litchi_opc::constants::{content_type, relationship_type};
-use litchi_opc::{
-    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
-    SourceLimits,
-};
+use litchi_opc::{PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics};
 use once_cell::sync::OnceCell;
 
 use super::cache::{Limits as WorksheetCacheLimits, Stats, WorksheetCache};
@@ -447,181 +444,67 @@ impl SourceBackedWorkbook {
     /// deferred until their selected semantic reads require them. The owned
     /// source has stable freshness identity for this immutable snapshot.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            SourceLimits::default(),
-            ExternalLinkLimits::default(),
-        )
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Open an XLSB package from a sequential reader with explicit OPC
-    /// resource limits.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            limits,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Open an XLSB package from a sequential reader with explicit
-    /// external-link resource limits and the default OPC policy.
-    pub fn from_reader_with_external_link_limits<R: Read>(
+    /// Open an XLSB package from a sequential reader under explicit source
+    /// limits, external-link limits and leniency.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedOpenPolicy`] for skipped drawing decoding
+    /// and for cache or execution policies (the owned sequential source keeps
+    /// its bytes in memory and has no deferred-payload session; open through
+    /// [`Self::from_read_at_with_options`] to use them), the OPC limit and
+    /// archive errors, and the catalog validation errors.
+    pub fn from_reader_with_options<R: Read>(
         reader: R,
-        external_link_limits: ExternalLinkLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            SourceLimits::default(),
-            external_link_limits,
+        options.check_source()?;
+        options.check_owning()?;
+        Self::build(
+            SourceBackedPackage::from_reader_with_limits(reader, options.source_limits)?,
+            options.external_link_limits,
+            options.leniency,
         )
     }
 
-    /// Open an XLSB package from a sequential reader with explicit OPC and
-    /// external-link resource limits.
-    pub fn from_reader_with_limits_and_external_link_limits<R: Read>(
-        reader: R,
-        limits: SourceLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with an explicit bounded OPC read policy.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
-    }
-
-    /// Open with the default bounded OPC policy and explicit external-link
-    /// semantic resource limits.
-    pub fn from_read_at_with_external_link_limits(
+    /// Open a positional source under explicit ingress policies: source,
+    /// cache and external-link limits, an execution context and leniency.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedOpenPolicy`] for skipped drawing decoding
+    /// (this owner defers every drawing on its own), the OPC limit, archive
+    /// and execution errors, and the catalog validation errors.
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        external_link_limits: ExternalLinkLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_read_at(source)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with explicit bounded OPC and external-link semantic policies.
-    pub fn from_read_at_with_limits_and_external_link_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_read_at_with_limits(source, limits)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit bounded OPC read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+        options.check_source()?;
+        let cache_limits = options.cache_limits.unwrap_or_default();
+        let package = match options.execution_context {
+            Some(context) => {
+                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                    source,
+                    options.source_limits,
+                    cache_limits,
+                    context,
+                )?
+            },
+            None => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
                 source,
-                limits,
+                options.source_limits,
                 cache_limits,
             )?,
-        )
-    }
-
-    /// Open with explicit read and caller-owned execution policies.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source, limits, context,
-        )?)
-    }
-
-    /// Open with explicit read, cache, and caller-owned execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context,
-            )?,
-        )
+        };
+        Self::build(package, options.external_link_limits, options.leniency)
     }
 
     /// Build a lazy XLSB catalog from an already validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            package,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Open an XLSB package from a sequential reader with the default bounded
-    /// policies under an explicit [`Leniency`].
-    ///
-    /// The Excel-compatible repairs are applied under every variant; see
-    /// [`crate::leniency`]. [`Leniency::TolerateCachedNumbers`] additionally
-    /// repairs non-normal cached numbers read by worksheet materialization
-    /// (recorded on the [`Worksheet`]) and by indexed lookups (recorded in
-    /// [`Self::tolerance_report`]).
-    pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_reader_with_limits(reader, SourceLimits::default())?,
-            leniency,
-        )
-    }
-
-    /// Open with the default bounded OPC read and cache policies under an
-    /// explicit [`Leniency`]; see [`Self::from_reader_with_leniency`].
-    pub fn from_read_at_with_leniency(source: Arc<dyn ReadAt>, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_read_at(source)?,
-            leniency,
-        )
-    }
-
-    /// Build a lazy XLSB catalog under an explicit [`Leniency`]; see
-    /// [`Self::from_reader_with_leniency`].
-    pub fn from_source_backed_package_with_leniency(
-        package: SourceBackedPackage,
-        leniency: Leniency,
-    ) -> Result<Self> {
-        Self::build(package, ExternalLinkLimits::default(), leniency)
-    }
-
-    /// Build a lazy XLSB catalog with explicit external-link semantic limits.
-    pub fn from_source_backed_package_with_external_link_limits(
-        package: SourceBackedPackage,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::build(package, external_link_limits, Leniency::Strict)
+        Self::build(package, ExternalLinkLimits::default(), Leniency::Strict)
     }
 
     fn build(

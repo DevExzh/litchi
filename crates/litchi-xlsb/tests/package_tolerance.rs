@@ -86,7 +86,7 @@ fn duplicate_relationship_id_is_listed_in_the_workbook_report_on_every_route() {
     let worksheet = eager.worksheet(0).unwrap();
     assert_clean(worksheet.tolerance_report(), "eager worksheet");
 
-    let owned = Package::from_bytes(bytes.clone()).unwrap();
+    let owned = Package::from_bytes(&bytes).unwrap();
     assert_duplicate_recorded(owned.tolerance_report(), "owned package");
     let adopted = owned.into_workbook().unwrap();
     assert_duplicate_recorded(adopted.tolerance_report(), "owned package workbook");
@@ -115,9 +115,7 @@ fn conformant_package_contributes_no_packaging_repairs() {
         "eager",
     );
     assert_clean(
-        Package::from_bytes(bytes.clone())
-            .unwrap()
-            .tolerance_report(),
+        Package::from_bytes(&bytes).unwrap().tolerance_report(),
         "owned package",
     );
     assert_clean(

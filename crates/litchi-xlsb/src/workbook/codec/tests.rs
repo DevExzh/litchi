@@ -8,7 +8,7 @@
 use super::super::super::Workbook;
 use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
-use crate::raw::{Kind, Records, Writer, kind};
+use crate::raw::{Encoder, Kind, Records, kind};
 
 fn wide_string(value: &str) -> Vec<u8> {
     let mut data = Vec::new();
@@ -29,7 +29,7 @@ fn bundle_sheet_payload(id: u32, relationship_id: &str, name: &str) -> Vec<u8> {
 
 fn record_stream(records: &[(Kind, Vec<u8>)]) -> Result<Vec<u8>> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     for (record_kind, payload) in records {
         writer.write_record(*record_kind, payload)?;
     }

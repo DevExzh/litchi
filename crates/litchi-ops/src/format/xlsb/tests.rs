@@ -268,7 +268,7 @@ fn workbook_trait_surface_matches_across_owner_states() {
     assert!(format!("{eager:?}").contains("worksheet_count: 3"));
 }
 
-// --- Writer-built workbooks (xlsb_facade.rs) -----------------------------
+// --- Builder-built workbooks (xlsb_facade.rs) -----------------------------
 
 fn mixed_chart_tabs() -> Vec<u8> {
     use xlsb::chart::{Anchor, Chart};
@@ -308,7 +308,7 @@ fn rewrite_active_book_view(bytes: &[u8], active_catalog_position: u32) -> Vec<u
     let original = package.get_part(&workbook_uri).unwrap().blob().to_vec();
     let mut rewritten = Vec::new();
     {
-        let mut writer = xlsb::raw::Writer::new(&mut rewritten);
+        let mut writer = xlsb::raw::Encoder::new(&mut rewritten);
         for record in xlsb::raw::Records::new(&original) {
             let record = record.unwrap();
             let mut payload = record.payload().to_vec();

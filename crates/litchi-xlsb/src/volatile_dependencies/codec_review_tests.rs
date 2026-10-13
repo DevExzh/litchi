@@ -14,17 +14,17 @@
 
 use super::codec;
 use super::model::{
-    CachedValue, CellReference, Dependencies, DependencyKind, ErrorCode, MainTopic, ReadLimits,
+    CachedValue, CellReference, Dependencies, DependencyKind, ErrorCode, MainTopic, SemanticLimits,
     Topic, VolatileType,
 };
 use crate::package::error::Error;
-use crate::raw::{Kind, Writer, kind};
+use crate::raw::{Encoder, Kind, kind};
 
 type Record = (Kind, Vec<u8>);
 
 fn encode(records: &[Record]) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes);
     for (record_kind, payload) in records {
         writer
             .write_record(*record_kind, payload)
@@ -330,7 +330,7 @@ fn malformed_known_payload_lengths_and_trailing_bytes_are_rejected() {
             replace_payload(&mut records, case.target, case.payload);
         }
         assert_wire_or_format_error(
-            codec::read(&encode(&records), ReadLimits::DEFAULT, 1),
+            codec::read(&encode(&records), SemanticLimits::DEFAULT, 1),
             case.name,
         );
     }
@@ -356,9 +356,9 @@ fn cached_scalar_domains_round_trip_and_reject_invalid_wire_values() {
     ];
     for value in values {
         let dependencies = dependencies_for(value);
-        let bytes = codec::write(&dependencies, ReadLimits::DEFAULT, 1).expect("valid scalar");
+        let bytes = codec::write(&dependencies, SemanticLimits::DEFAULT, 1).expect("valid scalar");
         assert_eq!(
-            codec::read(&bytes, ReadLimits::DEFAULT, 1)
+            codec::read(&bytes, SemanticLimits::DEFAULT, 1)
                 .expect("read valid scalar")
                 .dependencies,
             dependencies
@@ -368,7 +368,7 @@ fn cached_scalar_domains_round_trip_and_reject_invalid_wire_values() {
     for invalid_bool in [2_u8, 0xff] {
         let result = codec::read(
             &encode(&value_records(kind::VOL_BOOL, vec![invalid_bool])),
-            ReadLimits::DEFAULT,
+            SemanticLimits::DEFAULT,
             1,
         );
         assert!(
@@ -379,7 +379,7 @@ fn cached_scalar_domains_round_trip_and_reject_invalid_wire_values() {
     for invalid_error in [1_u8, 2, 0xff] {
         let result = codec::read(
             &encode(&value_records(kind::VOL_ERR, vec![invalid_error])),
-            ReadLimits::DEFAULT,
+            SemanticLimits::DEFAULT,
             1,
         );
         assert!(
@@ -399,7 +399,7 @@ fn cached_scalar_domains_round_trip_and_reject_invalid_wire_values() {
                 kind::VOL_NUM,
                 invalid_number.to_le_bytes().to_vec(),
             )),
-            ReadLimits::DEFAULT,
+            SemanticLimits::DEFAULT,
             1,
         );
         assert!(
@@ -410,7 +410,7 @@ fn cached_scalar_domains_round_trip_and_reject_invalid_wire_values() {
         assert!(
             codec::write(
                 &dependencies_for(CachedValue::Number(invalid_number)),
-                ReadLimits::DEFAULT,
+                SemanticLimits::DEFAULT,
                 1
             )
             .is_err()
@@ -434,7 +434,7 @@ fn strict_utf16_and_length_sentinels_are_not_accepted() {
     for (name, payload, is_limit) in cases {
         let mut records = valid_records();
         replace_payload(&mut records, kind::BEGIN_VOL_MAIN, payload);
-        let result = codec::read(&encode(&records), ReadLimits::DEFAULT, 1);
+        let result = codec::read(&encode(&records), SemanticLimits::DEFAULT, 1);
         if is_limit {
             assert!(matches!(result, Err(Error::LimitExceeded { .. })), "{name}");
         } else {
@@ -502,35 +502,38 @@ fn nesting_duplicate_values_and_type_kinds_are_rejected() {
     cases.push(("known record after end", record_after_end));
 
     for (name, records) in cases {
-        assert_wire_or_format_error(codec::read(&encode(&records), ReadLimits::DEFAULT, 1), name);
+        assert_wire_or_format_error(
+            codec::read(&encode(&records), SemanticLimits::DEFAULT, 1),
+            name,
+        );
     }
 }
 
-fn set_max_types(limits: &mut ReadLimits, value: usize) {
+fn set_max_types(limits: &mut SemanticLimits, value: usize) {
     limits.max_types = value;
 }
 
-fn set_max_mains(limits: &mut ReadLimits, value: usize) {
+fn set_max_mains(limits: &mut SemanticLimits, value: usize) {
     limits.max_mains = value;
 }
 
-fn set_max_topics(limits: &mut ReadLimits, value: usize) {
+fn set_max_topics(limits: &mut SemanticLimits, value: usize) {
     limits.max_topics = value;
 }
 
-fn set_max_subtopics(limits: &mut ReadLimits, value: usize) {
+fn set_max_subtopics(limits: &mut SemanticLimits, value: usize) {
     limits.max_subtopics = value;
 }
 
-fn set_max_references(limits: &mut ReadLimits, value: usize) {
+fn set_max_references(limits: &mut SemanticLimits, value: usize) {
     limits.max_references = value;
 }
 
-fn set_max_string_units(limits: &mut ReadLimits, value: usize) {
+fn set_max_string_units(limits: &mut SemanticLimits, value: usize) {
     limits.max_string_units = value;
 }
 
-fn set_max_total_string_units(limits: &mut ReadLimits, value: usize) {
+fn set_max_total_string_units(limits: &mut SemanticLimits, value: usize) {
     limits.max_total_string_units = value;
 }
 
@@ -540,7 +543,7 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
         name: &'static str,
         boundary: usize,
         resource: &'static str,
-        set_limit: fn(&mut ReadLimits, usize),
+        set_limit: fn(&mut SemanticLimits, usize),
         records: fn() -> Vec<Record>,
         dependencies: fn() -> Dependencies,
     }
@@ -607,22 +610,22 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
     for case in cases {
         let records = (case.records)();
         let bytes = encode(&records);
-        let mut accepted = ReadLimits::DEFAULT;
+        let mut accepted = SemanticLimits::DEFAULT;
         (case.set_limit)(&mut accepted, case.boundary);
         codec::read(&bytes, accepted, 1)
             .unwrap_or_else(|error| panic!("{} boundary rejected: {error:?}", case.name));
-        let mut refused = ReadLimits::DEFAULT;
+        let mut refused = SemanticLimits::DEFAULT;
         (case.set_limit)(&mut refused, case.boundary - 1);
         let error =
             codec::read(&bytes, refused, 1).expect_err("quota plus-one source must be refused");
         assert_limit(error, case.resource, case.boundary, case.boundary - 1);
 
         let dependencies = (case.dependencies)();
-        let mut write_accepted = ReadLimits::DEFAULT;
+        let mut write_accepted = SemanticLimits::DEFAULT;
         (case.set_limit)(&mut write_accepted, case.boundary);
         codec::write(&dependencies, write_accepted, 1)
             .unwrap_or_else(|error| panic!("{} write boundary rejected: {error:?}", case.name));
-        let mut write_refused = ReadLimits::DEFAULT;
+        let mut write_refused = SemanticLimits::DEFAULT;
         (case.set_limit)(&mut write_refused, case.boundary - 1);
         let error = codec::write(&dependencies, write_refused, 1)
             .expect_err("quota plus-one model must be refused");
@@ -642,10 +645,10 @@ fn aggregate_quotas_are_global_with_exact_boundary_and_plus_one_refusal() {
     let records = aggregate_records();
     let bytes = encode(&records);
     let boundary = records.len();
-    let mut accepted = ReadLimits::DEFAULT;
+    let mut accepted = SemanticLimits::DEFAULT;
     accepted.max_records = boundary;
     codec::read(&bytes, accepted, 1).expect("record quota boundary");
-    let mut refused = ReadLimits::DEFAULT;
+    let mut refused = SemanticLimits::DEFAULT;
     refused.max_records = boundary - 1;
     let error = codec::read(&bytes, refused, 1).expect_err("record quota plus-one");
     assert_limit(
@@ -665,7 +668,7 @@ fn quota_checks_precede_later_malformed_or_oversized_strings() {
         (kind::END_VOL_MAIN, Vec::new()),
         (kind::BEGIN_VOL_MAIN, u32::MAX.to_le_bytes().to_vec()),
     ];
-    let mut limits = ReadLimits::DEFAULT;
+    let mut limits = SemanticLimits::DEFAULT;
     limits.max_mains = 1;
     let error = codec::read(&encode(&main_count_records), limits, 1)
         .expect_err("main count must fail before sentinel string");
@@ -678,7 +681,7 @@ fn quota_checks_precede_later_malformed_or_oversized_strings() {
         (kind::END_VOL_MAIN, Vec::new()),
         (kind::BEGIN_VOL_MAIN, 1_u32.to_le_bytes().to_vec()),
     ];
-    let mut limits = ReadLimits::DEFAULT;
+    let mut limits = SemanticLimits::DEFAULT;
     limits.max_total_string_units = 1;
     let error = codec::read(&encode(&malformed_later_string), limits, 1)
         .expect_err("aggregate string count must fail before truncated payload");
@@ -688,11 +691,11 @@ fn quota_checks_precede_later_malformed_or_oversized_strings() {
 #[test]
 fn writer_preflights_record_quota_for_empty_streams() {
     let dependencies = Dependencies::new(Vec::new());
-    let mut exact = ReadLimits::DEFAULT;
+    let mut exact = SemanticLimits::DEFAULT;
     exact.max_records = 2;
     codec::write(&dependencies, exact, 1).expect("empty stream has begin and end records");
 
-    let mut too_small = ReadLimits::DEFAULT;
+    let mut too_small = SemanticLimits::DEFAULT;
     too_small.max_records = 1;
     let error = codec::write(&dependencies, too_small, 1)
         .expect_err("writer must reject the second record before allocation");

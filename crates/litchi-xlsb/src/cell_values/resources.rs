@@ -22,7 +22,7 @@
 use super::StyleIndex;
 use crate::package::error::{Error, Result};
 use crate::package::shared_strings::SharedString;
-use crate::raw::{Header, Kind, Limits as RawLimits, Records, Writer, kind};
+use crate::raw::{Encoder, Header, Kind, Limits as RawLimits, Records, kind};
 use litchi_core::binary;
 use litchi_opc::{BlobPart, OpcError, OpcPackage, PackURI};
 
@@ -88,7 +88,7 @@ fn encode_authored_border(border: &crate::styles::Border) -> Result<Vec<u8>> {
         ));
     }
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     writer.write_u8(u8::from(border.diagonal_down) | (u8::from(border.diagonal_up) << 1))?;
     write_authored_border_side(&mut writer, border.top.as_ref())?;
     write_authored_border_side(&mut writer, border.bottom.as_ref())?;
@@ -99,7 +99,7 @@ fn encode_authored_border(border: &crate::styles::Border) -> Result<Vec<u8>> {
 }
 
 fn write_authored_border_side<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     side: Option<&crate::styles::BorderSide>,
 ) -> Result<()> {
     if let Some(side) = side {
@@ -133,7 +133,7 @@ const fn border_style_bits(style: crate::styles::BorderStyle) -> u8 {
 }
 
 fn write_authored_color<W: std::io::Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     color: Option<u32>,
 ) -> Result<()> {
     if let Some(argb) = color {
@@ -234,7 +234,7 @@ fn ensure_styles_part(package: &mut OpcPackage) -> Result<()> {
     };
     if missing {
         let mut bytes = Vec::new();
-        crate::writer::StylesWriter::new().write(&mut Writer::new(&mut bytes))?;
+        crate::writer::StylesWriter::new().write(&mut Encoder::new(&mut bytes))?;
         package.try_add_part(Box::new(BlobPart::new(
             uri,
             "application/vnd.ms-excel.styles".to_string(),
@@ -332,7 +332,7 @@ fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u16> {
         .find(|id| !used.contains(id))
         .ok_or_else(|| Error::UnsupportedFeature("no custom number-format ID remains".into()))?;
     let mut payload = id.to_le_bytes().to_vec();
-    Writer::new(&mut payload).write_wide_string(code)?;
+    Encoder::new(&mut payload).write_wide_string(code)?;
     *styles = append_collection_item(
         styles,
         kind::BEGIN_FMTS,
@@ -584,9 +584,9 @@ fn append_or_reuse_sst(
 fn new_sst(encoded: &[u8]) -> Result<Vec<u8>> {
     let mut bytes = Vec::new();
     let mut header = Vec::new();
-    Writer::new(&mut header).write_u32(1)?;
-    Writer::new(&mut header).write_u32(1)?;
-    let mut writer = Writer::new(&mut bytes);
+    Encoder::new(&mut header).write_u32(1)?;
+    Encoder::new(&mut header).write_u32(1)?;
+    let mut writer = Encoder::new(&mut bytes);
     writer.write_record(kind::BEGIN_SST, &header)?;
     writer.write_record(kind::SST_ITEM, encoded)?;
     writer.write_record(kind::END_SST, &[])?;
@@ -602,11 +602,11 @@ fn rewrite_sst(source: &[u8], total: u32, unique: u32, appended: Option<&[u8]>) 
                 let mut payload = record.payload().to_vec();
                 payload[..4].copy_from_slice(&total.to_le_bytes());
                 payload[4..8].copy_from_slice(&unique.to_le_bytes());
-                Writer::new(&mut output).write_record(kind::BEGIN_SST, &payload)?;
+                Encoder::new(&mut output).write_record(kind::BEGIN_SST, &payload)?;
             },
             kind::END_SST => {
                 if let Some(payload) = appended {
-                    Writer::new(&mut output).write_record(kind::SST_ITEM, payload)?;
+                    Encoder::new(&mut output).write_record(kind::SST_ITEM, payload)?;
                 }
                 copy_record(source, &record, &mut output)?;
             },
@@ -822,10 +822,10 @@ fn append_collection_item(
                     Error::UnsupportedFeature("style collection count overflow".to_string())
                 })?;
             count[..4].copy_from_slice(&next.to_le_bytes());
-            Writer::new(&mut output).write_record(begin, &count)?;
+            Encoder::new(&mut output).write_record(begin, &count)?;
             in_collection = true;
         } else if record.kind() == end && in_collection {
-            Writer::new(&mut output).write_record(item, payload)?;
+            Encoder::new(&mut output).write_record(item, payload)?;
             copy_record(source, &record, &mut output)?;
             in_collection = false;
             inserted = true;

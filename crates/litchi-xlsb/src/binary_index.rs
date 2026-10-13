@@ -1538,7 +1538,7 @@ fn write_record(
     output
         .try_reserve(record_len)
         .map_err(|source| allocation("binary-index output bytes", source))?;
-    let mut writer = raw::Writer::with_limits(output, limits.raw);
+    let mut writer = raw::Encoder::with_limits(output, limits.raw);
     writer.write_record(kind_value, payload)?;
     Ok(())
 }
@@ -1605,7 +1605,7 @@ mod tests {
 
     fn worksheet_with_cells(cells: &[(u32, u32)]) -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mut writer = raw::Writer::new(&mut bytes);
+        let mut writer = raw::Encoder::new(&mut bytes);
         writer
             .write_record(kind::BEGIN_SHEET_DATA, &[])
             .expect("begin");
@@ -1685,7 +1685,7 @@ mod tests {
         let worksheet = worksheet_with_cells(&[(0, 0), (0, 1)]);
         let index = encode_for_worksheet(&worksheet, Limits::DEFAULT).expect("index");
         let mut shifted = Vec::new();
-        let mut writer = raw::Writer::new(&mut shifted);
+        let mut writer = raw::Encoder::new(&mut shifted);
         writer.write_record(kind::FRT_BEGIN, &[0; 4]).expect("frt");
         shifted.extend_from_slice(&worksheet);
 
@@ -1723,7 +1723,7 @@ mod tests {
             .expect("second anchor")
             .offset;
         let mut index = Vec::new();
-        let mut writer = raw::Writer::new(&mut index);
+        let mut writer = raw::Encoder::new(&mut index);
         let mut block = Vec::new();
         block.extend_from_slice(&2_u32.to_le_bytes());
         block.extend_from_slice(&4_u32.to_le_bytes());
@@ -1752,7 +1752,7 @@ mod tests {
         drop(writer);
 
         let mut shifted = Vec::new();
-        raw::Writer::new(&mut shifted)
+        raw::Encoder::new(&mut shifted)
             .write_record(kind::FRT_BEGIN, &[0; 4])
             .expect("prefix");
         shifted.extend_from_slice(&worksheet);
@@ -1775,7 +1775,7 @@ mod tests {
         let worksheet = worksheet_with_cells(&[(0, 0)]);
         let canonical = encode_for_worksheet(&worksheet, Limits::DEFAULT).expect("index");
         let mut opaque = Vec::new();
-        raw::Writer::new(&mut opaque)
+        raw::Encoder::new(&mut opaque)
             .write_record(
                 raw::Kind::new(0x1234).expect("opaque kind"),
                 b"extension bytes",

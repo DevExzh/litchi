@@ -13,12 +13,12 @@ use super::cursor::decode_rk;
 use super::{Error, Kind, Limits, Result};
 
 /// Forward-only BIFF12 writer.
-pub struct Writer<W: Write> {
+pub struct Encoder<W: Write> {
     writer: W,
     limits: Limits,
 }
 
-impl<W: Write> Writer<W> {
+impl<W: Write> Encoder<W> {
     /// Write with safe default limits.
     #[must_use]
     pub const fn new(writer: W) -> Self {

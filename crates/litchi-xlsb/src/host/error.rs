@@ -162,6 +162,20 @@ pub enum Error {
     },
     /// Workbook is password protected
     PasswordProtected,
+    /// A caller-selected cell-values transaction bound was exceeded.
+    Limit {
+        /// The bounded dimension.
+        kind: crate::cell_values::LimitKind,
+        /// The observed (or first refused) amount.
+        observed: usize,
+        /// The configured maximum.
+        maximum: usize,
+    },
+    /// An open route was given a policy that its owner kind cannot honour.
+    UnsupportedOpenPolicy {
+        /// The refused policy.
+        policy: crate::OpenPolicy,
+    },
 }
 
 impl fmt::Display for Error {
@@ -265,6 +279,17 @@ impl fmt::Display for Error {
             Error::PasswordProtected => {
                 write!(f, "Workbook is password protected")
             },
+            Error::Limit {
+                kind,
+                observed,
+                maximum,
+            } => write!(
+                f,
+                "XLSB {kind} limit exceeded: {observed} exceeds the maximum {maximum}"
+            ),
+            Error::UnsupportedOpenPolicy { policy } => {
+                write!(f, "this XLSB open route does not support {policy}")
+            },
         }
     }
 }
@@ -309,7 +334,9 @@ impl std::error::Error for Error {
             | Error::ExternalLinkLimitExceeded { .. }
             | Error::WideStringLength { .. }
             | Error::Unrecognized { .. }
-            | Error::PasswordProtected => None,
+            | Error::PasswordProtected
+            | Error::Limit { .. }
+            | Error::UnsupportedOpenPolicy { .. } => None,
             Error::PatchConflict { .. } | Error::Signed | Error::CustomDataReferenced { .. } => {
                 None
             },

@@ -9,9 +9,10 @@ use crate::formula::Range;
 use crate::leniency::{
     CachedNumber, Leniency, ReservedFieldDefect, Tolerance, ToleranceReport, ValueEncodingDefect,
 };
-use crate::package::error::{Error, Result};
+pub use crate::package::error::Error;
+use crate::package::error::Result;
 use crate::package::shared_strings::SharedString;
-use crate::raw::{Cursor, Header, Limits as RawLimits, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Header, Limits as RawLimits, Records, kind};
 use litchi_core::binary;
 use std::collections::{BTreeMap, BTreeSet};
 use std::sync::Arc;
@@ -22,6 +23,42 @@ const MAX_STYLE_INDEX: u32 = 0x00ff_ffff;
 pub(crate) const MAX_CELL_STRING_UNITS: usize = 32_767;
 const MAX_FORMULA_BYTES: usize = crate::formula::MAX_CELL_FORMULA_BYTES;
 const PATCH_MAGIC: &[u8; 8] = b"LCXBCLP1";
+
+/// A caller-selected dimension of the cell-values families: the fields of
+/// [`Limits`] and [`TransferLimits`].
+///
+/// An exceeded bound is reported as
+/// [`Error::Limit`] with this kind.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[non_exhaustive]
+pub enum LimitKind {
+    /// Bytes of one worksheet part ([`Limits::source_bytes`]).
+    SourceBytes,
+    /// Stored cell records of one worksheet snapshot ([`Limits::cells`]).
+    Cells,
+    /// Bytes of one retained or encoded patch ([`TransferLimits::bytes`]).
+    PatchBytes,
+    /// Semantic changes or staged operations of one patch
+    /// ([`TransferLimits::changes`]).
+    Changes,
+    /// Retained undo/redo entries ([`TransferLimits::history_entries`]).
+    HistoryEntries,
+    /// Aggregate bytes retained by history ([`TransferLimits::history_bytes`]).
+    HistoryBytes,
+}
+
+impl std::fmt::Display for LimitKind {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        formatter.write_str(match self {
+            Self::SourceBytes => "worksheet source bytes",
+            Self::Cells => "cell records",
+            Self::PatchBytes => "patch bytes",
+            Self::Changes => "patch changes",
+            Self::HistoryEntries => "history entries",
+            Self::HistoryBytes => "history bytes",
+        })
+    }
+}
 
 /// Finite resource policy for one worksheet cell-value snapshot.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -1222,9 +1259,10 @@ impl Edit {
             )));
         }
         if self.inserted.len() >= self.limits.cells {
-            return Err(Error::InvalidLength {
-                expected: self.limits.cells,
-                found: self.inserted.len().saturating_add(1),
+            return Err(Error::Limit {
+                kind: LimitKind::Cells,
+                observed: self.inserted.len().saturating_add(1),
+                maximum: self.limits.cells,
             });
         }
         self.inserted.insert(
@@ -1260,9 +1298,10 @@ impl Edit {
                     resource: "structural cell count",
                 })?;
         if final_cells > self.limits.cells {
-            return Err(Error::InvalidLength {
-                expected: self.limits.cells,
-                found: final_cells,
+            return Err(Error::Limit {
+                kind: LimitKind::Cells,
+                observed: final_cells,
+                maximum: self.limits.cells,
             });
         }
         let changed = self.entries.iter().any(Entry::changed)
@@ -1293,6 +1332,20 @@ impl Edit {
     }
 }
 
+/// Publication diagnostics for a worksheet-stream commit.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct Diagnostics {
+    changed: bool,
+}
+
+impl Diagnostics {
+    /// Whether the commit changes the worksheet stream.
+    #[must_use]
+    pub const fn changed(self) -> bool {
+        self.changed
+    }
+}
+
 /// Successful immutable cell-value commit.
 #[derive(Debug, Clone)]
 pub struct Commit {
@@ -1301,6 +1354,14 @@ pub struct Commit {
 }
 
 impl Commit {
+    /// What the commit changed.
+    #[must_use]
+    pub fn diagnostics(&self) -> Diagnostics {
+        Diagnostics {
+            changed: !self.patch.is_noop(),
+        }
+    }
+
     /// Planned immutable worksheet snapshot.
     #[must_use]
     pub const fn snapshot(&self) -> &Snapshot {
@@ -1796,9 +1857,10 @@ pub(super) fn read_with_limits_and_leniency(
 fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<Snapshot> {
     limits.validate()?;
     if source.len() > limits.source_bytes {
-        return Err(Error::InvalidLength {
-            expected: limits.source_bytes,
-            found: source.len(),
+        return Err(Error::Limit {
+            kind: LimitKind::SourceBytes,
+            observed: source.len(),
+            maximum: limits.source_bytes,
         });
     }
 
@@ -1855,9 +1917,10 @@ fn read_shared(source: Arc<[u8]>, limits: Limits, leniency: Leniency) -> Result<
             },
             cell_kind if in_sheet_data && frt_depth == 0 && is_supported_cell(cell_kind) => {
                 if entries.len() >= limits.cells {
-                    return Err(Error::InvalidLength {
-                        expected: limits.cells,
-                        found: entries.len().saturating_add(1),
+                    return Err(Error::Limit {
+                        kind: LimitKind::Cells,
+                        observed: entries.len().saturating_add(1),
+                        maximum: limits.cells,
                     });
                 }
                 let row = current_row.ok_or_else(|| {
@@ -1956,9 +2019,10 @@ fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata>
                 })?;
                 let reference = Reference::new(row, binary::read_u32_le_at(record.payload(), 0)?)?;
                 if source_cells.insert(reference) && source_cells.len() > limits.cells {
-                    return Err(Error::InvalidLength {
-                        expected: limits.cells,
-                        found: source_cells.len(),
+                    return Err(Error::Limit {
+                        kind: LimitKind::Cells,
+                        observed: source_cells.len(),
+                        maximum: limits.cells,
                     });
                 }
             },
@@ -1995,9 +2059,10 @@ fn scan_source_metadata(source: &[u8], limits: Limits) -> Result<SourceMetadata>
                             }
                         }
                         if formula_groups.len() >= limits.cells {
-                            return Err(Error::InvalidLength {
-                                expected: limits.cells,
-                                found: formula_groups.len().saturating_add(1),
+                            return Err(Error::Limit {
+                                kind: LimitKind::Cells,
+                                observed: formula_groups.len().saturating_add(1),
+                                maximum: limits.cells,
                             });
                         }
                         formula_groups.try_reserve(1).map_err(|allocation_error| {
@@ -2543,7 +2608,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
                 )?;
                 if structural_rows.contains(&row) {
                     let payload = encode_row_header(record.payload(), final_columns.get(&row))?;
-                    Writer::with_limits(&mut output, edit.limits.raw)
+                    Encoder::with_limits(&mut output, edit.limits.raw)
                         .write_record(kind::ROW_HDR, &payload)?;
                 } else {
                     copy_record(&edit.source, &record, edit.limits.raw, &mut output)?;
@@ -2600,7 +2665,7 @@ fn rebuild_stream(edit: &Edit) -> Result<Vec<u8>> {
                     edit.inserted.values(),
                     source_has_cells,
                 )?;
-                Writer::with_limits(&mut output, edit.limits.raw)
+                Encoder::with_limits(&mut output, edit.limits.raw)
                     .write_record(kind::WS_DIM, &payload)?;
             },
             _ => copy_record(&edit.source, &record, edit.limits.raw, &mut output)?,
@@ -2722,9 +2787,9 @@ fn encode_row_header(source: &[u8], columns: Option<&BTreeSet<u32>>) -> Result<V
 
 fn synthetic_row_header(row: u32, columns: Option<&BTreeSet<u32>>) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    Writer::new(&mut payload).write_u32(row)?;
-    Writer::new(&mut payload).write_u32(0)?;
-    Writer::new(&mut payload).write_u16(300)?;
+    Encoder::new(&mut payload).write_u32(row)?;
+    Encoder::new(&mut payload).write_u32(0)?;
+    Encoder::new(&mut payload).write_u16(300)?;
     payload.extend_from_slice(&[0, 0, 0]);
     append_spans(&mut payload, columns)?;
     Ok(payload)
@@ -2768,7 +2833,7 @@ fn emit_absent_rows_before(
             continue;
         }
         let payload = synthetic_row_header(*row, final_columns.get(row))?;
-        Writer::new(&mut *output).write_record(kind::ROW_HDR, &payload)?;
+        Encoder::new(&mut *output).write_record(kind::ROW_HDR, &payload)?;
         for cell in cells {
             output.extend_from_slice(&encoded_cell(cell)?);
         }
@@ -2812,7 +2877,7 @@ fn emit_remaining_insertions(
 
 fn encoded_cell(cell: &StoredCell) -> Result<Vec<u8>> {
     let mut payload = Vec::new();
-    Writer::new(&mut payload).write_u32(cell.reference.column())?;
+    Encoder::new(&mut payload).write_u32(cell.reference.column())?;
     let style = cell.style.get().to_le_bytes();
     payload.extend_from_slice(&style[..3]);
     payload.push(u8::from(cell.show_phonetic));
@@ -2827,7 +2892,7 @@ fn encoded_cell(cell: &StoredCell) -> Result<Vec<u8>> {
         },
     }
     let mut record = Vec::new();
-    Writer::new(&mut record).write_record(value_kind(&cell.value), &payload)?;
+    Encoder::new(&mut record).write_record(value_kind(&cell.value), &payload)?;
     Ok(record)
 }
 
@@ -2844,7 +2909,7 @@ fn encode_value_into(output: &mut Vec<u8>, value: &Value) -> Result<()> {
             output.extend_from_slice(&number.to_le_bytes());
         },
         Value::InlineString(string) | Value::FormulaStringCache(string) => {
-            Writer::new(output).write_wide_string(string)?;
+            Encoder::new(output).write_wide_string(string)?;
         },
         Value::SharedStringIndex(index) => output.extend_from_slice(&index.to_le_bytes()),
         Value::RichString(string) => output.extend_from_slice(&string.encode()?),
@@ -3010,9 +3075,9 @@ fn semantic_changes(
         let destination = after_by_reference.get(&reference);
         if before != destination {
             if changes.len() == maximum {
-                return Err(Error::LimitExceeded {
-                    resource: "cell-values patch changes",
-                    actual: changes.len().saturating_add(1),
+                return Err(Error::Limit {
+                    kind: LimitKind::Changes,
+                    observed: changes.len().saturating_add(1),
                     maximum,
                 });
             }
@@ -3200,7 +3265,7 @@ impl Patch {
 fn encode_rk(value: f64) -> Result<Vec<u8>> {
     validate_finite(value, "BrtCellRk")?;
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes).write_rk(value)?;
+    Encoder::new(&mut bytes).write_rk(value)?;
     Ok(bytes)
 }
 
@@ -3253,7 +3318,7 @@ fn storage_error(reference: Reference, expected: &'static str) -> Error {
 )]
 mod tests {
     use super::*;
-    use crate::raw::{Kind, Writer};
+    use crate::raw::{Encoder, Kind};
 
     fn append_empty_formula(payload: &mut Vec<u8>) {
         payload.extend_from_slice(&0_u16.to_le_bytes());
@@ -3263,7 +3328,7 @@ mod tests {
 
     fn stream() -> Vec<u8> {
         let mut bytes = Vec::new();
-        let mut writer = Writer::new(&mut bytes);
+        let mut writer = Encoder::new(&mut bytes);
         writer
             .write_record(kind::BEGIN_SHEET_DATA, &[])
             .expect("begin");
@@ -3295,7 +3360,7 @@ mod tests {
 
         let mut rk = vec![0; 8];
         rk[..4].copy_from_slice(&5_u32.to_le_bytes());
-        Writer::new(&mut rk).write_rk(25.0).expect("rk value");
+        Encoder::new(&mut rk).write_rk(25.0).expect("rk value");
         writer.write_record(kind::CELL_RK, &rk).expect("rk");
 
         let mut formula = vec![0; 16];

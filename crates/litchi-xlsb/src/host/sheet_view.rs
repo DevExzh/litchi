@@ -9,7 +9,7 @@
 //! model lives in `litchi_sheet::view`.
 
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Writer, kind};
+use crate::raw::{Cursor, Encoder, kind};
 use litchi_sheet::view::{
     Color, Display, Mode, Pane, Position, Scale, Selection, Split, State, View, Window, Zoom,
 };
@@ -204,7 +204,7 @@ pub fn write_view_payload(view: Option<&View>) -> Result<Vec<u8>> {
     }
 
     let mut payload = Vec::with_capacity(WS_VIEW_LEN);
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u16(flags)?;
     writer.write_u32(mode_to_u32(view.mode))?;
     writer.write_u32(view.origin.row().get())?;
@@ -267,7 +267,7 @@ pub fn parse_pane(data: &[u8]) -> Result<Pane> {
 /// Serialize a `BrtPane` payload.
 pub fn write_pane_payload(pane: &Pane) -> Result<Vec<u8>> {
     let mut payload = Vec::with_capacity(PANE_LEN);
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_f64(pane.horizontal.map_or(0.0, Split::get))?;
     writer.write_f64(pane.vertical.map_or(0.0, Split::get))?;
     writer.write_u32(pane.top_left.row().get())?;
@@ -357,7 +357,7 @@ pub fn write_selection_payload(selection: &Selection) -> Result<Vec<u8>> {
         .checked_add(ranges_len)
         .ok_or_else(|| malformed(context, "selection payload length overflows"))?;
     let mut payload = Vec::with_capacity(capacity);
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u32(position_to_u32(selection.position()))?;
     writer.write_u32(selection.active_cell().row().get())?;
     writer.write_u32(selection.active_cell().column().get())?;

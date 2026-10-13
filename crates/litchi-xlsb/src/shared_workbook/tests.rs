@@ -3,7 +3,7 @@ use super::model::{
     UserNames,
 };
 use super::{apply, read, store};
-use crate::raw::{Kind, Records, Writer};
+use crate::raw::{Encoder, Kind, Records};
 use litchi_opc::constants::{content_type, relationship_type};
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 
@@ -25,7 +25,7 @@ fn snapshot_noop_preserves_exact_owner_bytes() {
 fn typed_metadata_edit_preserves_unknown_revision_header_records() {
     let (mut package, header_part) = fixture();
     let mut bytes = package.get_part(&header_part).unwrap().blob().to_vec();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes);
     writer
         .write_record(Kind::new(FUTURE_KIND).unwrap(), b"future-header")
         .unwrap();
@@ -102,7 +102,7 @@ fn malformed_biff12_records_are_rejected_without_partial_metadata() {
     assert!(super::codec::parse_log(&[0x80]).is_err());
 
     let mut users = Vec::new();
-    let mut writer = Writer::new(&mut users);
+    let mut writer = Encoder::new(&mut users);
     writer.write_record(Kind::new(401).unwrap(), &[]).unwrap();
     assert!(super::codec::parse_users(&users).is_err());
 }

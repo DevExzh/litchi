@@ -3,7 +3,7 @@
 use std::io::Write;
 
 use crate::leniency::{ReservedFieldDefect, Tolerance};
-use crate::raw::{Cursor, Writer, kind};
+use crate::raw::{Cursor, Encoder, kind};
 
 use super::{Error, Mode, Opts, Props, Result, Threads};
 
@@ -67,11 +67,11 @@ pub(crate) fn read_with(payload: &[u8], mut tolerance: Tolerance<'_>) -> Result<
     Ok(Props::from_wire(id, mode, iters, delta, threads, opts))
 }
 
-/// Stream one exact `BrtCalcProp` payload through [`Writer`].
+/// Stream one exact `BrtCalcProp` payload through [`Encoder`].
 ///
 /// This writes exactly [`super::LEN`] bytes and does not allocate an intermediate
 /// payload buffer.
-pub fn write<W: Write>(props: &Props, writer: &mut Writer<W>) -> Result<()> {
+pub fn write<W: Write>(props: &Props, writer: &mut Encoder<W>) -> Result<()> {
     writer.write_u32(props.id())?;
     writer.write_u32(props.mode().wire())?;
     writer.write_u32(props.iters())?;

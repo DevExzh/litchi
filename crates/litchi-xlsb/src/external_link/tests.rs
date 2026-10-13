@@ -1,5 +1,5 @@
 use super::*;
-use crate::raw::{Header, Kind as RecordKind, Limits, Records, Writer};
+use crate::raw::{Encoder, Header, Kind as RecordKind, Limits, Records};
 
 fn workbook_link() -> Link {
     let sheets = SheetRange::sheets(0, 1).unwrap();
@@ -59,7 +59,7 @@ fn insert_unknown_records_after_known_record(
         known += 1;
     }
     let mut opaque = Vec::new();
-    let mut writer = Writer::new(&mut opaque);
+    let mut writer = Encoder::new(&mut opaque);
     for &(kind, payload) in records_to_insert {
         writer.write_record(kind, payload).unwrap();
     }
@@ -82,7 +82,7 @@ fn insert_repeated_unknown_after_first_record(
     let (_, header_len) = Header::parse(&source[first.offset()..], limits).unwrap();
     let split = first.offset() + header_len + first.len();
     let mut opaque = Vec::new();
-    let mut writer = Writer::new(&mut opaque);
+    let mut writer = Encoder::new(&mut opaque);
     let kind = RecordKind::new(0x3FFE).unwrap();
     for _ in 0..count {
         writer.write_record(kind, payload).unwrap();
@@ -119,7 +119,7 @@ fn replace_record_payload(
     }
     let (start, end) = range.unwrap();
     let mut replacement = Vec::new();
-    Writer::new(&mut replacement)
+    Encoder::new(&mut replacement)
         .write_record(target_kind, payload)
         .unwrap();
 
@@ -535,7 +535,7 @@ fn opaque_external_record_count_and_byte_limits_are_typed() {
     }
 
     let mut one_record = Vec::new();
-    Writer::new(&mut one_record)
+    Encoder::new(&mut one_record)
         .write_record(RecordKind::new(0x3FFE).unwrap(), &[0xC0; 128])
         .unwrap();
     let count = MAX_UNKNOWN_BYTES / one_record.len() + 1;
@@ -957,7 +957,7 @@ fn external_link_malformed_wire_keeps_wire_and_structural_errors_typed() {
     assert!(matches!(wire_error, Error::Wire(_)));
 
     let mut structurally_invalid = source;
-    Writer::new(&mut structurally_invalid)
+    Encoder::new(&mut structurally_invalid)
         .write_record(crate::raw::kind::SUP_NAME_END, &[])
         .unwrap();
     let structural_error =

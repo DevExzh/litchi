@@ -79,7 +79,11 @@ fn retained_input_budget_is_checked_before_commit_and_allows_bounded_chaining() 
         .expect("input")
         .build()
         .expect("limits");
-    let source = Package::from_bytes_with_limits(bytes.clone(), exact).expect("bounded source");
+    let source = Package::from_bytes_with_options(
+        &bytes,
+        litchi_xlsb::OpenOptions::new().source_limits(exact),
+    )
+    .expect("bounded source");
     let original = source.to_bytes().expect("source bytes");
     let mut edit = source.edit().expect("edit");
     edit.set_sheet_name(0, "A significantly longer name".to_owned())
@@ -105,7 +109,11 @@ fn retained_input_budget_is_checked_before_commit_and_allows_bounded_chaining() 
         .expect("input")
         .build()
         .expect("limits");
-    let mut package = Package::from_bytes_with_limits(bytes, roomy).expect("bounded source");
+    let mut package = Package::from_bytes_with_options(
+        &bytes,
+        litchi_xlsb::OpenOptions::new().source_limits(roomy),
+    )
+    .expect("bounded source");
     for name in ["A significantly longer name", "Second edit"] {
         let mut edit = package.edit().expect("edit");
         edit.set_sheet_name(0, name.to_owned())

@@ -7,7 +7,7 @@
 //! Shared strings table writer for XLSB
 
 use crate::package::error::{Error, Result};
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use crate::raw::kind;
 use std::collections::HashMap;
 use std::io::Write;
@@ -60,10 +60,10 @@ impl MutableSharedStringsWriter {
     }
 
     /// Write shared strings table to binary format
-    pub(crate) fn write<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         // Write BrtBeginSst
         let mut sst_header = Vec::new();
-        let mut temp_writer = Writer::new(&mut sst_header);
+        let mut temp_writer = Encoder::new(&mut sst_header);
         let total_count = u32::try_from(self.total_count).map_err(|_| {
             Error::Encoding("shared-string occurrence count exceeds u32".to_string())
         })?;
@@ -92,9 +92,9 @@ impl MutableSharedStringsWriter {
     }
 
     /// Write a single SST item
-    fn write_sst_item<W: Write>(&self, writer: &mut Writer<W>, s: &str) -> Result<()> {
+    fn write_sst_item<W: Write>(&self, writer: &mut Encoder<W>, s: &str) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         temp_writer.write_u8(0)?; // Flags (0 for plain text)
         temp_writer.write_wide_string(s)?;
@@ -193,7 +193,7 @@ mod tests {
         table.add_string("other".to_string());
 
         let mut bytes = Vec::new();
-        table.write(&mut Writer::new(&mut bytes)).unwrap();
+        table.write(&mut Encoder::new(&mut bytes)).unwrap();
         let mut records = crate::raw::Records::new(bytes.as_slice());
         let begin = records.next().unwrap().unwrap();
         assert_eq!(begin.kind(), kind::BEGIN_SST);

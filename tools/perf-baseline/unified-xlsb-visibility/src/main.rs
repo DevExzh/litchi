@@ -105,7 +105,7 @@ fn corpus(target_count: usize) -> Result<Vec<u8>> {
 fn open_native(bytes: &[u8], mode: OwnerMode) -> Result<NativeOwner> {
     match mode {
         OwnerMode::Eager => Ok(NativeOwner::Eager(Box::new(
-            litchi_xlsb::Package::from_bytes(bytes.to_vec())?,
+            litchi_xlsb::Package::from_bytes(bytes)?,
         ))),
         OwnerMode::Source => Ok(NativeOwner::Source(SourceBackedWorkbook::from_read_at(
             Arc::new(OwnedSource::new(bytes.to_vec())),
@@ -267,7 +267,7 @@ fn verify_equivalence(native: &[u8], unified: &[u8]) -> Result<Value> {
 }
 
 fn tab_states(bytes: &[u8]) -> Result<Vec<(String, State)>> {
-    let package = litchi_xlsb::Package::from_bytes(bytes.to_vec())?;
+    let package = litchi_xlsb::Package::from_bytes(bytes)?;
     let workbook = package.workbook()?;
     Ok(workbook
         .sheets()

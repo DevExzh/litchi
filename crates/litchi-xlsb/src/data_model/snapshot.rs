@@ -4,7 +4,7 @@ use std::sync::Arc;
 
 use litchi_opc::{OpcPackage, OwnedContentTypes, OwnedRelationships, Part};
 
-use super::codec::{self, ReadLimits};
+use super::codec::{self, SemanticLimits};
 use super::model::{Definition, Model, ModelPart};
 use super::package::{inspect_model_part, validate_definition_connections};
 use crate::package::error::{Error, Result};
@@ -14,7 +14,7 @@ use crate::package::error::{Error, Result};
 pub struct Snapshot {
     model: Option<Model>,
     connection_names: Option<Vec<String>>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     source: SourceState,
     package: Arc<OpcPackage>,
 }
@@ -33,11 +33,11 @@ impl Eq for Snapshot {}
 impl Snapshot {
     /// Read a Data Model snapshot with conservative finite limits.
     pub fn read(package: &OpcPackage) -> Result<Self> {
-        Self::read_with_limits(package, ReadLimits::DEFAULT)
+        Self::read_with_limits(package, SemanticLimits::DEFAULT)
     }
 
     /// Read a Data Model snapshot with explicit finite limits.
-    pub fn read_with_limits(package: &OpcPackage, limits: ReadLimits) -> Result<Self> {
+    pub fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
         let limits = limits.validate()?;
         super::package::preflight_metadata(package, limits)?;
         crate::package::connections::package::preflight(
@@ -160,7 +160,7 @@ impl Snapshot {
 
     /// Exact finite limits used to inspect and edit this snapshot.
     #[must_use]
-    pub const fn limits(&self) -> ReadLimits {
+    pub const fn limits(&self) -> SemanticLimits {
         self.limits
     }
 
@@ -202,7 +202,7 @@ impl SourceState {
         workbook: &dyn Part,
         model: Option<&Model>,
         connections: crate::package::connections::package::SourceImage,
-        limits: ReadLimits,
+        limits: SemanticLimits,
     ) -> Result<Self> {
         let opc_limits = super::package::opc_capture_limits(limits)?;
         let root_name =

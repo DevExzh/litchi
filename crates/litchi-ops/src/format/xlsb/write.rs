@@ -13,10 +13,12 @@ use std::path::Path as FilePath;
 use caseless::Caseless as _;
 use litchi_core::selector::{CellRange, Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
-use litchi_xlsb::cell_values::structure::Edit as NativeStructureEdit;
+use litchi_xlsb::cell_values::structure::{
+    Edit as NativeStructureEdit, EditOptions as NativeStructureOptions,
+};
 use litchi_xlsb::cell_values::{
-    Edit as NativeCellEdit, Patch as NativeCellPatch, Reference, Scalar as NativeScalar,
-    TransferLimits, structure::Patch as NativeStructurePatch,
+    Edit as NativeCellEdit, EditOptions as NativeCellOptions, Patch as NativeCellPatch, Reference,
+    Scalar as NativeScalar, TransferLimits, structure::Patch as NativeStructurePatch,
 };
 use litchi_xlsb::sheet::{Rect, Selector as NativeSelector, State as SheetState};
 use unicode_normalization::UnicodeNormalization;
@@ -334,7 +336,7 @@ pub(crate) fn add_with_limits<'p, 'n>(
         limits.max_snapshot_bytes(),
     );
     let mut edit = package
-        .edit_with_limits(native_limits)
+        .edit_with_options(NativeStructureOptions::new().transfer_limits(native_limits))
         .map_err(native_error)?;
     edit.insert_sheet(Position::new(position), name, state)
         .map_err(native_error)?;
@@ -492,10 +494,9 @@ pub(crate) fn remove_with_limits(
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
         let mut edit = package
-            .edit_cell_values_with_limits(
+            .edit_cell_values_with_options(
                 NativeSelector::from(sheet),
-                Default::default(),
-                native_limits,
+                NativeCellOptions::new().transfer_limits(native_limits),
             )
             .map_err(native_error)?
             .ok_or_else(|| {
@@ -593,7 +594,7 @@ fn remove_sheets_with_limits(
         limits.max_snapshot_bytes(),
     );
     let mut edit = package
-        .edit_with_limits(native_limits)
+        .edit_with_options(NativeStructureOptions::new().transfer_limits(native_limits))
         .map_err(native_error)?;
     for target in targets {
         // The native edit resolves every selector against its immutable source
@@ -662,7 +663,7 @@ fn reorder_with_limits(file: &Xlsb, order: Vec<usize>, limits: &SemanticLimits) 
         limits.max_snapshot_bytes(),
     );
     let mut edit = package
-        .edit_with_limits(native_limits)
+        .edit_with_options(NativeStructureOptions::new().transfer_limits(native_limits))
         .map_err(native_error)?;
     // `reorder_sheets` borrows semantic selectors for the complete
     // permutation. The native owner validates them against its immutable base
@@ -838,7 +839,7 @@ fn set_sheet_with_limits(
         limits.max_snapshot_bytes(),
     );
     let mut edit = package
-        .edit_with_limits(native_limits)
+        .edit_with_options(NativeStructureOptions::new().transfer_limits(native_limits))
         .map_err(native_error)?;
     if let Some(name) = assignments.name {
         // A name assignment is restricted to one target above, so cloning the
@@ -951,10 +952,9 @@ fn set_cells_with_limits(
         let native_limits =
             TransferLimits::new(image_budget, limits.max_expanded_targets(), 1, image_budget);
         let mut edit = package
-            .edit_cell_values_with_limits(
+            .edit_cell_values_with_options(
                 NativeSelector::from(sheet),
-                Default::default(),
-                native_limits,
+                NativeCellOptions::new().transfer_limits(native_limits),
             )
             .map_err(native_error)?
             .ok_or_else(|| {
@@ -1869,6 +1869,7 @@ pub(crate) mod sheet_coalesce {
     use crate::registry::Operation;
     use crate::transaction::Error as TransactionError;
     use litchi_xlsb::cell_values::TransferLimits as NativeTransferLimits;
+    use litchi_xlsb::cell_values::structure::EditOptions as NativeStructureOptions;
     use std::collections::HashSet;
 
     #[derive(Debug, Clone, Copy)]
@@ -1975,7 +1976,7 @@ pub(crate) mod sheet_coalesce {
                 remaining_snapshot,
             );
             let edit = source
-                .edit_with_limits(native_limits)
+                .edit_with_options(NativeStructureOptions::new().transfer_limits(native_limits))
                 .map_err(native_error)?;
             let catalog = base.catalog()?;
             let mut visible_count = 0usize;
@@ -2162,7 +2163,9 @@ pub(crate) mod sheet_coalesce {
         if items.is_empty() {
             return Ok(source.clone());
         }
-        let mut edit = source.edit_with_limits(limits).map_err(native_error)?;
+        let mut edit = source
+            .edit_with_options(NativeStructureOptions::new().transfer_limits(limits))
+            .map_err(native_error)?;
         for item in items {
             edit.set_sheet_state(item.plan.tab, item.plan.state)
                 .map_err(|error| native_error(error).with_item(item.index))?;
@@ -2232,7 +2235,7 @@ pub(crate) mod coalesce {
     use crate::error::{Code, Error};
     use crate::props::Props;
     use crate::transaction::Error as TransactionError;
-    use litchi_xlsb::cell_values::{Limits, TransferLimits};
+    use litchi_xlsb::cell_values::{EditOptions as NativeCellOptions, TransferLimits};
     use std::collections::HashSet;
 
     #[derive(Debug, Clone)]
@@ -2377,10 +2380,9 @@ pub(crate) mod coalesce {
                 remaining_snapshot,
             );
             let edit = source
-                .edit_cell_values_with_limits(
+                .edit_cell_values_with_options(
                     NativeSelector::from(sheet),
-                    Limits::DEFAULT,
-                    native_limits,
+                    NativeCellOptions::new().transfer_limits(native_limits),
                 )
                 .map_err(native_error)?
                 .ok_or_else(|| {
@@ -2511,10 +2513,9 @@ pub(crate) mod coalesce {
             return Ok(source.clone());
         };
         let mut edit = source
-            .edit_cell_values_with_limits(
+            .edit_cell_values_with_options(
                 NativeSelector::from(first.plan.target.sheet),
-                Limits::DEFAULT,
-                limits,
+                NativeCellOptions::new().transfer_limits(limits),
             )
             .map_err(native_error)?
             .ok_or_else(|| {

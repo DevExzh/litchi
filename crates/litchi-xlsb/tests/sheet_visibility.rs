@@ -20,7 +20,7 @@ use litchi_xlsb::cell_values::TransferLimits;
 use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::raw::{Kind as RawKind, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind as RawKind, Records, kind};
 use litchi_xlsb::sheet::State;
 use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
@@ -110,7 +110,7 @@ fn ambiguous_catalog_names_are_rejected_before_state_selection() {
     let old: Vec<_> = "Else".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let replacement: Vec<_> = "data".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut rewritten = Vec::new();
-    let mut writer = Writer::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten);
     let mut replaced = false;
     for item in Records::new(&original) {
         let record = item.expect("workbook record");
@@ -199,7 +199,7 @@ fn durable_state_wire_round_trips_and_rejects_unknown_tags_and_states() {
     assert_eq!(wire[offset], 5, "visibility operation has its own wire tag");
     assert_eq!(
         Package::from_bytes(
-            package
+            &package
                 .apply(&Patch::from_bytes(&wire, TransferLimits::DEFAULT).expect("decode"))
                 .expect("replay")
                 .to_bytes()
@@ -320,7 +320,7 @@ fn all_hidden_source_accepts_an_equal_state_exact_noop() {
         &visible.to_bytes().expect("source bytes"),
         &[(0, 1), (1, 1)],
     );
-    let package = Package::from_bytes(bytes).expect("all-hidden source");
+    let package = Package::from_bytes(&bytes).expect("all-hidden source");
     let source = package.to_bytes().expect("all-hidden source bytes");
     let mut edit = package.edit().expect("all-hidden edit");
     assert_eq!(
@@ -343,7 +343,7 @@ fn unknown_workbook_records_survive_a_native_state_patch() {
             .to_bytes()
             .expect("source bytes"),
     );
-    let package = Package::from_bytes(source).expect("unknown-record source");
+    let package = Package::from_bytes(&source).expect("unknown-record source");
     let mut edit = package.edit().expect("edit");
     edit.set_sheet_state(0usize, State::Hidden)
         .expect("hide active");
@@ -369,7 +369,7 @@ fn multi_sheet_visibility_preserves_opaque_records_and_exact_inverse() {
             .expect("source bytes"),
         &[1, 2],
     );
-    let package = Package::from_bytes(source).expect("opaque-sheet source");
+    let package = Package::from_bytes(&source).expect("opaque-sheet source");
     let source_bytes = package.to_bytes().expect("canonical source bytes");
     let expected_opaque = [1usize, 2usize].map(|position| {
         let uri = sheet_partname(package.opc_package(), position);
@@ -467,7 +467,7 @@ fn grouped_rename_metadata_rejects_duplicate_final_names() {
 #[test]
 fn chart_visibility_is_native_and_unmodeled_selected_kinds_fail_closed() {
     let bytes = every_kind_workbook();
-    let package = Package::from_bytes(bytes).expect("complete-kind source");
+    let package = Package::from_bytes(&bytes).expect("complete-kind source");
 
     // Dialog, macro, and international macro tabs have no selected-view
     // codec.  Hiding one must refuse before leaving a selected tab behind.
@@ -496,7 +496,7 @@ fn chart_visibility_is_native_and_unmodeled_selected_kinds_fail_closed() {
 #[test]
 fn unbound_tabs_accept_only_very_hidden_state() {
     let bytes = with_null_relationship(&every_kind_workbook(), 3, 2);
-    let package = Package::from_bytes(bytes).expect("unbound source");
+    let package = Package::from_bytes(&bytes).expect("unbound source");
     let mut edit = package.edit().expect("edit");
     assert!(edit.set_sheet_state(3usize, State::Hidden).is_err());
     assert_eq!(
@@ -509,7 +509,7 @@ fn unbound_tabs_accept_only_very_hidden_state() {
 #[test]
 fn active_relocation_refuses_multiple_chart_views() {
     let bytes = with_duplicate_chart_view(&with_states(&every_kind_workbook(), &[(1, 2)]));
-    let package = Package::from_bytes(bytes).expect("multiple-view source");
+    let package = Package::from_bytes(&bytes).expect("multiple-view source");
     let mut edit = package.edit().expect("edit");
     edit.set_sheet_state(0usize, State::Hidden)
         .expect("hide active worksheet");
@@ -521,7 +521,7 @@ fn active_relocation_refuses_multiple_chart_views() {
 #[test]
 fn active_relocation_refuses_a_missing_chart_view() {
     let bytes = without_chart_views(&with_states(&every_kind_workbook(), &[(1, 2)]));
-    let package = Package::from_bytes(bytes).expect("missing-view source");
+    let package = Package::from_bytes(&bytes).expect("missing-view source");
     let mut edit = package.edit().expect("edit");
     edit.set_sheet_state(0usize, State::Hidden)
         .expect("hide active worksheet");
@@ -578,7 +578,7 @@ fn with_states(bytes: &[u8], states: &[(usize, u32)]) -> Vec<u8> {
         .to_vec();
     let mut rewritten = Vec::new();
     let mut position = 0usize;
-    let mut writer = Writer::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten);
     for item in Records::new(&original) {
         let record = item.expect("workbook record");
         let mut payload = record.payload().to_vec();
@@ -612,7 +612,7 @@ fn with_unknown_workbook_record(bytes: &[u8]) -> Vec<u8> {
     let unknown = RawKind::new(0x3ffe).expect("unknown record kind");
     let mut rewritten = Vec::new();
     let mut inserted = false;
-    let mut writer = Writer::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten);
     for item in Records::new(&original) {
         let record = item.expect("workbook record");
         if !inserted && record.kind() == kind::END_BOOK {
@@ -749,7 +749,7 @@ fn with_opaque_sheet_records(bytes: &[u8], positions: &[usize]) -> Vec<u8> {
             2 => b"opaque-second-sheet-record",
             _ => panic!("unexpected opaque sheet position {position}"),
         };
-        Writer::new(&mut opaque)
+        Encoder::new(&mut opaque)
             .write_record(opaque_sheet_kind(position), payload)
             .expect("opaque record");
         let end_sheet = Records::new(&original)
@@ -873,7 +873,7 @@ fn with_null_relationship(bytes: &[u8], position: usize, state: u32) -> Vec<u8> 
         .to_vec();
     let mut rewritten = Vec::new();
     let mut current_position = 0usize;
-    let mut writer = Writer::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten);
     for item in Records::new(&original) {
         let record = item.expect("workbook record");
         let mut payload = record.payload().to_vec();
@@ -920,7 +920,7 @@ fn with_duplicate_chart_view(bytes: &[u8]) -> Vec<u8> {
     let mut rewritten = Vec::new();
     let mut view_payload = None;
     let mut inserted = false;
-    let mut writer = Writer::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten);
     for item in Records::new(&original) {
         let record = item.expect("chart record");
         if record.kind() == kind::BEGIN_CS_VIEW {
@@ -956,7 +956,7 @@ fn without_chart_views(bytes: &[u8]) -> Vec<u8> {
     let mut rewritten = Vec::new();
     let mut in_views = false;
     let mut removed = false;
-    let mut writer = Writer::new(&mut rewritten);
+    let mut writer = Encoder::new(&mut rewritten);
     for item in Records::new(&original) {
         let record = item.expect("chart record");
         if record.kind() == kind::BEGIN_CS_VIEWS {
@@ -1022,7 +1022,7 @@ fn canonical_name_selectors_track_staged_names_and_exact_cancellation() {
 #[test]
 fn every_catalog_kind_supports_name_patch_replay_and_inverse() {
     let package =
-        Package::from_bytes(with_null_relationship(&every_kind_workbook(), 3, 2)).unwrap();
+        Package::from_bytes(&with_null_relationship(&every_kind_workbook(), 3, 2)).unwrap();
     let before = package.to_bytes().unwrap();
     for position in 0..6 {
         let mut edit = package.edit().unwrap();

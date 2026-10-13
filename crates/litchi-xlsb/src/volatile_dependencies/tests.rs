@@ -5,7 +5,7 @@
 
 use super::*;
 use crate::package::error::Error;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 use litchi_opc::{BlobPart, PackURI};
 
 fn sample_dependencies() -> Dependencies {
@@ -49,8 +49,8 @@ fn package_with_payload(payload: Vec<u8>) -> crate::Package {
 #[test]
 fn typed_stream_round_trips_without_execution() {
     let dependencies = sample_dependencies();
-    let bytes = codec::write(&dependencies, ReadLimits::DEFAULT, 1).expect("write");
-    let parsed = codec::read(&bytes, ReadLimits::DEFAULT, 1).expect("read");
+    let bytes = codec::write(&dependencies, SemanticLimits::DEFAULT, 1).expect("write");
+    let parsed = codec::read(&bytes, SemanticLimits::DEFAULT, 1).expect("read");
     assert_eq!(parsed.dependencies, dependencies);
     assert!(parsed.rewrite_safe);
 }
@@ -58,7 +58,7 @@ fn typed_stream_round_trips_without_execution() {
 #[test]
 fn reserved_bits_are_opaque_and_scalar_domains_are_rejected() {
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes);
     writer
         .write_record(kind::BEGIN_VOL_DEPS, &[])
         .expect("begin");
@@ -69,7 +69,7 @@ fn reserved_bits_are_opaque_and_scalar_domains_are_rejected() {
         .write_record(kind::END_VOL_TYPE, &[])
         .expect("end type");
     writer.write_record(kind::END_VOL_DEPS, &[]).expect("end");
-    let parsed = codec::read(&bytes, ReadLimits::DEFAULT, 1).expect("reserved bits ignored");
+    let parsed = codec::read(&bytes, SemanticLimits::DEFAULT, 1).expect("reserved bits ignored");
     assert!(!parsed.rewrite_safe);
     assert!(parsed.dependencies.has_unsupported_records());
 
@@ -77,7 +77,7 @@ fn reserved_bits_are_opaque_and_scalar_domains_are_rejected() {
     if let CachedValue::Number(value) = &mut invalid.types[0].mains[0].topics[0].value {
         *value = f64::NAN;
     }
-    assert!(codec::write(&invalid, ReadLimits::DEFAULT, 1).is_err());
+    assert!(codec::write(&invalid, SemanticLimits::DEFAULT, 1).is_err());
 }
 
 #[test]
@@ -85,11 +85,11 @@ fn sheet_ordinals_bind_to_workbook_bundle_sheet_count() {
     let mut dependencies = sample_dependencies();
     dependencies.types[0].mains[0].topics[0].references[0] =
         CellReference::new(0, 1, 1).expect("reference");
-    assert!(codec::write(&dependencies, ReadLimits::DEFAULT, 1).is_err());
+    assert!(codec::write(&dependencies, SemanticLimits::DEFAULT, 1).is_err());
 
     let bytes =
-        codec::write(&sample_dependencies(), ReadLimits::DEFAULT, 1).expect("valid payload");
-    assert!(codec::read(&bytes, ReadLimits::DEFAULT, 0).is_err());
+        codec::write(&sample_dependencies(), SemanticLimits::DEFAULT, 1).expect("valid payload");
+    assert!(codec::read(&bytes, SemanticLimits::DEFAULT, 0).is_err());
 }
 
 #[test]
@@ -141,7 +141,7 @@ fn foreign_feature_relationship_is_not_treated_as_absence() {
 #[test]
 fn exact_noop_shares_source_and_stale_owner_is_rejected() {
     let package = package_with_payload(
-        codec::write(&sample_dependencies(), ReadLimits::DEFAULT, 1).expect("payload"),
+        codec::write(&sample_dependencies(), SemanticLimits::DEFAULT, 1).expect("payload"),
     );
     let before_bytes = package.to_bytes().expect("before bytes");
     let snapshot = package.volatile_dependencies().expect("snapshot");
@@ -157,7 +157,7 @@ fn exact_noop_shares_source_and_stale_owner_is_rejected() {
     stale_opc.get_part_mut(&owner).expect("owner").set_blob({
         let mut changed = sample_dependencies();
         changed.types[0].mains[0].first = "Stale".to_string();
-        codec::write(&changed, ReadLimits::DEFAULT, 1).expect("changed payload")
+        codec::write(&changed, SemanticLimits::DEFAULT, 1).expect("changed payload")
     });
     let stale = crate::Package::from_opc(stale_opc).expect("stale package");
     let mut changed = snapshot.edit();
@@ -170,7 +170,7 @@ fn exact_noop_shares_source_and_stale_owner_is_rejected() {
 
 #[test]
 fn unsupported_records_are_read_but_typed_rewrite_is_refused() {
-    let mut bytes = codec::write(&sample_dependencies(), ReadLimits::DEFAULT, 1).expect("base");
+    let mut bytes = codec::write(&sample_dependencies(), SemanticLimits::DEFAULT, 1).expect("base");
     let mut records = Vec::new();
     for record in crate::raw::Records::new(&bytes) {
         let record = record.expect("record");
@@ -181,7 +181,7 @@ fn unsupported_records_are_read_but_typed_rewrite_is_refused() {
         (crate::raw::Kind::new(0x3ff).expect("kind"), vec![9, 8, 7]),
     );
     bytes.clear();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes);
     for (record_kind, payload) in records {
         writer.write_record(record_kind, &payload).expect("record");
     }

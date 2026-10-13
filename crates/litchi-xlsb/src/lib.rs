@@ -128,6 +128,7 @@ pub mod leniency;
 pub mod merged_cells;
 pub mod metadata;
 pub mod named_ranges;
+mod open_options;
 pub mod package;
 mod pivot_chart;
 pub mod pivot_view;
@@ -153,6 +154,7 @@ pub mod writer;
 /// Canonical builder for authoring a new XLSB package.
 pub use writer::Builder;
 
+pub use open_options::{OpenOptions, OpenPolicy};
 pub use raw::Error;
 
 pub use leniency::{

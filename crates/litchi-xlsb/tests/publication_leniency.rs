@@ -18,7 +18,7 @@ use std::io::Cursor;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::cell_values::{CellError, Reference, StyleIndex, Value};
 use litchi_xlsb::cell_watches::Watch;
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sparkline::{Color, Colors, Group, Groups, Location, Sparkline, SparklineType};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Leniency, Package, Workbook};
@@ -62,7 +62,7 @@ fn nan_workbook() -> Vec<u8> {
     let source_sheet = package.get_part(&uri).expect("worksheet part").blob();
     let mut output = Vec::new();
     let mut replaced = false;
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     for item in Records::new(source_sheet) {
         let record = item.expect("fixture worksheet record");
         let mut payload = record.payload().to_vec();
@@ -89,8 +89,11 @@ fn nan_workbook() -> Vec<u8> {
 }
 
 fn tolerant_workbook() -> Workbook {
-    Workbook::new_with_leniency(Cursor::new(nan_workbook()), Leniency::TolerateCachedNumbers)
-        .expect("open tolerant workbook")
+    Workbook::new_with_options(
+        Cursor::new(nan_workbook()),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .expect("open tolerant workbook")
 }
 
 fn save(workbook: &Workbook) -> Vec<u8> {
@@ -173,7 +176,7 @@ fn assert_strict_cell_read_refuses(bytes: &[u8]) {
         strict.cell_values(0).is_err(),
         "strict cell-value projection must reject the NaN cache"
     );
-    let package = Package::from_bytes(bytes.to_vec()).expect("strict package open");
+    let package = Package::from_bytes(bytes).expect("strict package open");
     assert!(
         package
             .into_workbook()
@@ -244,9 +247,11 @@ fn changed_cell_values_keep_leniency_and_nan_record_bytes() {
     );
 
     let output = save(&workbook);
-    let reopened =
-        Workbook::new_with_leniency(Cursor::new(output.clone()), Leniency::TolerateCachedNumbers)
-            .expect("reopen tolerant cell publication");
+    let reopened = Workbook::new_with_options(
+        Cursor::new(output.clone()),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .expect("reopen tolerant cell publication");
     assert_tolerant_nan_with_b1(&reopened, 3.5);
     assert_strict_cell_read_refuses(&output);
 }
@@ -271,9 +276,11 @@ fn cell_watch_publication_retains_tolerant_cell_values_atomically() {
     );
 
     let output = save(&workbook);
-    let reopened =
-        Workbook::new_with_leniency(Cursor::new(output.clone()), Leniency::TolerateCachedNumbers)
-            .expect("reopen tolerant watch publication");
+    let reopened = Workbook::new_with_options(
+        Cursor::new(output.clone()),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .expect("reopen tolerant watch publication");
     assert_tolerant_nan(&reopened);
     assert_eq!(
         reopened.cell_watches(0).expect("watch snapshot").watches(),
@@ -302,9 +309,11 @@ fn sparkline_publication_retains_tolerant_cell_values_atomically() {
     );
 
     let output = save(&workbook);
-    let reopened =
-        Workbook::new_with_leniency(Cursor::new(output.clone()), Leniency::TolerateCachedNumbers)
-            .expect("reopen tolerant sparkline publication");
+    let reopened = Workbook::new_with_options(
+        Cursor::new(output.clone()),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .expect("reopen tolerant sparkline publication");
     assert_tolerant_nan(&reopened);
     assert_eq!(
         reopened.sparklines(0).expect("sparkline snapshot").groups(),
@@ -389,9 +398,11 @@ fn structural_transfer_into_tolerant_package_retains_nan_policy_and_bytes() {
     );
 
     let output = save(&published);
-    let reopened =
-        Workbook::new_with_leniency(Cursor::new(output.clone()), Leniency::TolerateCachedNumbers)
-            .expect("reopen tolerant transfer");
+    let reopened = Workbook::new_with_options(
+        Cursor::new(output.clone()),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .expect("reopen tolerant transfer");
     assert_tolerant_nan(&reopened);
     assert_strict_cell_read_refuses(&output);
 }
@@ -489,10 +500,13 @@ fn mutable_structural_application_retains_destination_input_budget() {
         .unwrap()
         .build()
         .unwrap();
-    let mut destination = Package::from_bytes_with_limits(bytes.clone(), limits)
-        .unwrap()
-        .into_workbook()
-        .unwrap();
+    let mut destination = Package::from_bytes_with_options(
+        &bytes,
+        litchi_xlsb::OpenOptions::new().source_limits(limits),
+    )
+    .unwrap()
+    .into_workbook()
+    .unwrap();
     assert!(commit.patch().apply(&mut destination).is_err());
     assert_eq!(destination.to_package().to_bytes().unwrap(), bytes);
     assert_eq!(destination.opc_package().read_limits(), limits);

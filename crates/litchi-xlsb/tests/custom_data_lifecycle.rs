@@ -26,7 +26,7 @@ use litchi_xlsb::custom_data::{
     StorageSelector, Transaction, write_properties,
 };
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::raw::{Kind, Writer, kind as rt};
+use litchi_xlsb::raw::{Encoder, Kind, kind as rt};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 const X14: &str = "http://schemas.microsoft.com/office/spreadsheetml/2009/9/main";
@@ -78,7 +78,7 @@ fn wide(value: &str) -> Vec<u8> {
 }
 
 fn record(kind: Kind, payload: &[u8], output: &mut Vec<u8>) {
-    Writer::new(output)
+    Encoder::new(output)
         .write_record(kind, payload)
         .expect("synthetic BIFF12 record writes");
 }
@@ -196,7 +196,7 @@ fn synthetic_fixture(
         .expect("build package")
         .write_to(&mut output)
         .expect("base XLSB package writes");
-    let base = Package::from_bytes(output.into_inner()).expect("base XLSB package reopens");
+    let base = Package::from_bytes(&output.into_inner()).expect("base XLSB package reopens");
     let mut package = base.into_opc();
 
     for (index, uid) in storage_ids.iter().enumerate() {
@@ -252,7 +252,7 @@ fn synthetic_fixture(
     package
         .to_stream(&mut package_bytes)
         .expect("synthetic source package serializes");
-    let package = Package::from_bytes(package_bytes)
+    let package = Package::from_bytes(&package_bytes)
         .expect("synthetic XLSB custom-data graph reopens with source provenance");
     Fixture {
         package,
@@ -410,7 +410,7 @@ fn source_preserving_fixture_with_properties(
         "xl/customData/props1.xml",
         source_properties,
     );
-    let package = Package::from_bytes(physical)
+    let package = Package::from_bytes(&physical)
         .expect("formatted source XML reopens through the physical package reader");
     Fixture {
         package,

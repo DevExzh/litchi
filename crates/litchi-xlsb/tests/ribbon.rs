@@ -9,7 +9,7 @@ use litchi_ooxml_common::ribbon::{Family, Set, Version};
 use litchi_opc::constants::relationship_type;
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use litchi_xlsb::Workbook;
-use litchi_xlsb::raw::{Kind, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind, kind};
 
 const UI_2007: &[u8] =
     br#"<customUI xmlns="http://schemas.microsoft.com/office/2006/01/customui"/>"#;
@@ -100,7 +100,7 @@ fn workbook() -> Workbook {
 
 fn records(values: &[(Kind, Vec<u8>)]) -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes);
     for (kind, payload) in values {
         writer.write_record(*kind, payload).unwrap();
     }

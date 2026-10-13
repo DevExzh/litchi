@@ -5,7 +5,7 @@ use super::super::model::{
 };
 use super::wire;
 use crate::package::error::{Error, Result};
-use crate::raw::{Record, Writer};
+use crate::raw::{Encoder, Record};
 
 #[derive(Default)]
 struct OpaqueBudget {
@@ -167,7 +167,7 @@ fn parse_scenario<'a>(
 pub(crate) fn write_manager(manager: &Manager) -> Result<Vec<u8>> {
     manager.validate()?;
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes);
     wire::write_record(
         &mut writer,
         wire::begin_manager(),
@@ -211,7 +211,7 @@ pub(crate) fn write_manager(manager: &Manager) -> Result<Vec<u8>> {
     Ok(bytes)
 }
 
-fn write_scenario<W: std::io::Write>(writer: &mut Writer<W>, scenario: &Scenario) -> Result<()> {
+fn write_scenario<W: std::io::Write>(writer: &mut Encoder<W>, scenario: &Scenario) -> Result<()> {
     wire::write_record(
         writer,
         wire::begin_scenario(),
@@ -265,7 +265,7 @@ fn write_scenario<W: std::io::Write>(writer: &mut Writer<W>, scenario: &Scenario
     wire::write_record(writer, wire::end_scenario(), &[])
 }
 
-fn write_unknown<W: std::io::Write>(writer: &mut Writer<W>, record: &UnknownRecord) -> Result<()> {
+fn write_unknown<W: std::io::Write>(writer: &mut Encoder<W>, record: &UnknownRecord) -> Result<()> {
     let kind = crate::raw::Kind::new(record.kind()).map_err(|error| Error::from(error))?;
     wire::write_record(writer, kind, record.payload())
 }

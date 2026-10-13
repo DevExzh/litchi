@@ -1,11 +1,11 @@
 use super::phonetic::{Alignment, Info, Type};
 use super::worksheet::read;
 use super::{Watch, Watches};
-use crate::raw::{Kind, Records, Writer, kind};
+use crate::raw::{Encoder, Kind, Records, kind};
 
 fn stream(records: &[(Kind, &[u8])]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     for (record_kind, payload) in records {
         writer.write_record(*record_kind, payload).unwrap();
     }

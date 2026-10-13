@@ -17,7 +17,7 @@ use super::{
     ExternalLinkLimits, Kind, Link, OLE_ITEM_DISPLAY_AS_ICON, OLE_ITEM_REQUIRED_CLASS_FLAG,
     OleItem, Result, UnknownRecord, ValueMatrix,
 };
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 
 const NULL_WIDE_STRING_LENGTH: u32 = u32::MAX;
 
@@ -431,7 +431,7 @@ fn encode_records(link: &Link, relationship_id: Option<&str>) -> Result<Vec<Vec<
         })?;
     let begin_capacity = begin_capacity(link, relationship_id)?;
     let mut begin = try_buffer(begin_capacity, "external-link header")?;
-    let mut payload = Writer::new(&mut begin);
+    let mut payload = Encoder::new(&mut begin);
     match link.kind() {
         Kind::Workbook => {
             payload.write_u16(EXTERNAL_REFERENCE_WORKBOOK)?;
@@ -470,7 +470,7 @@ fn encode_records(link: &Link, relationship_id: Option<&str>) -> Result<Vec<Vec<
                 })
         })?;
         let mut tabs = try_buffer(tabs_capacity, "external sheet names")?;
-        let mut payload = Writer::new(&mut tabs);
+        let mut payload = Encoder::new(&mut tabs);
         payload.write_u32(u32::try_from(link.sheet_names().len()).map_err(|_| {
             Error::InvalidFormula("external sheet-name count overflow".to_string())
         })?)?;
@@ -503,7 +503,7 @@ fn encode_record(record_kind: crate::raw::Kind, payload: &[u8]) -> Result<Vec<u8
             resource: "external-link record",
             source,
         })?;
-    Writer::new(&mut bytes).write_record(record_kind, payload)?;
+    Encoder::new(&mut bytes).write_record(record_kind, payload)?;
     Ok(bytes)
 }
 
@@ -518,7 +518,7 @@ fn write_entry_start(records: &mut Vec<Vec<u8>>, name: &str) -> Result<()> {
             resource: "external name",
             source,
         })?;
-    Writer::new(&mut payload).write_wide_string(name)?;
+    Encoder::new(&mut payload).write_wide_string(name)?;
     push_record(records, kind::SUP_NAME_START, &payload)
 }
 
@@ -615,7 +615,7 @@ fn write_cached_values(records: &mut Vec<Vec<u8>>, values: &ValueMatrix) -> Resu
                     })?,
                     "external cached string",
                 )?;
-                Writer::new(&mut payload).write_wide_string(value)?;
+                Encoder::new(&mut payload).write_wide_string(value)?;
                 push_record(records, kind::SUP_NAME_STRING, &payload)?;
             },
         }

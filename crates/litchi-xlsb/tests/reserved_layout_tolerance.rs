@@ -12,7 +12,7 @@ use std::io::Cursor;
 
 use litchi_core::sheet::traits::WorkbookTrait;
 use litchi_opc::{OpcPackage, PackURI};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::{
     Defect, LayoutDefect, Package, ReservedFieldDefect, SourceBackedWorkbook, ToleranceReport,
     Workbook,
@@ -44,7 +44,7 @@ fn rewrite(package_bytes: &[u8], part: &str, transform: impl FnOnce(&mut Stream)
         .collect();
     transform(&mut stream);
     let mut blob = Vec::new();
-    let mut writer = Writer::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob);
     for (record_type, payload) in &stream {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -162,7 +162,7 @@ fn the_unmodified_control_repairs_nothing() {
         );
     }
     assert!(
-        Package::from_bytes(fixture())
+        Package::from_bytes(&fixture())
             .unwrap()
             .tolerance_report()
             .is_clean()
@@ -262,7 +262,7 @@ fn open_workbook_fixture(bytes: &[u8]) -> ToleranceReport {
     let workbook = Workbook::new(Cursor::new(bytes.to_vec())).unwrap();
     let report = workbook.tolerance_report().clone();
     assert_eq!(
-        Package::from_bytes(bytes.to_vec())
+        Package::from_bytes(bytes)
             .unwrap()
             .tolerance_report(),
         &report

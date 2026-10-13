@@ -14,7 +14,7 @@ use super::codec::{parse_cache, parse_views, write_cache, write_views};
 use super::model::{Cache, MAX_CACHES, MAX_VIEWS, Views};
 use super::validation::{cache as validate_cache, views as validate_views};
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Records, kind};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use std::char;
 use std::collections::HashSet;
@@ -103,7 +103,7 @@ fn write_rel_id(value: &str) -> Result<Vec<u8>> {
         return Err(invalid("FRTHeader.RelID", "invalid relationship ID"));
     }
     let mut payload = Vec::with_capacity(6 + units * 2);
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u32(0x08)?;
     writer.write_u16(units as u16)?;
     for unit in value.encode_utf16() {
@@ -248,7 +248,7 @@ fn write_collection_refs(
     item_end: crate::raw::Kind,
 ) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_record(collection_begin, &[])?;
     for value in refs {
         writer.write_record(item_begin, &write_rel_id(value)?)?;
@@ -264,7 +264,7 @@ fn write_single_ref(
     end: crate::raw::Kind,
 ) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_record(begin, &write_rel_id(value)?)?;
     writer.write_record(end, &[])?;
     Ok(output)

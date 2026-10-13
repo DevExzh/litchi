@@ -1,6 +1,6 @@
 //! Workbook and package facades for the XLSB Calculation Chain owner.
 
-use super::{Commit, Limits, Patch, Snapshot, Transaction};
+use super::{Commit, Patch, SemanticLimits, Snapshot, Transaction};
 use crate::package::error::Result;
 
 impl crate::Workbook {
@@ -12,13 +12,13 @@ impl crate::Workbook {
     /// generic BIFF12 framing to the explicit `ChainPart::record_count`
     /// diagnostic. It never evaluates, recalculates, or refreshes formulas.
     pub fn calculation_chain(&self) -> Result<Snapshot> {
-        self.calculation_chain_with_limits(Limits::DEFAULT)
+        self.calculation_chain_with_limits(SemanticLimits::DEFAULT)
     }
 
     /// Read the Calculation Chain using explicit finite byte, relationship,
     /// and graph limits. `max_records` is retained only for an explicit
     /// `ChainPart::record_count` diagnostic and does not reject opaque bytes.
-    pub fn calculation_chain_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub fn calculation_chain_with_limits(&self, limits: SemanticLimits) -> Result<Snapshot> {
         Snapshot::read_with_limits(&self.package, limits)
     }
 
@@ -32,7 +32,10 @@ impl crate::Workbook {
     }
 
     /// Start a Calculation Chain transaction with explicit finite limits.
-    pub fn edit_calculation_chain_with_limits(&self, limits: Limits) -> Result<Transaction> {
+    pub fn edit_calculation_chain_with_limits(
+        &self,
+        limits: SemanticLimits,
+    ) -> Result<Transaction> {
         Ok(self.calculation_chain_with_limits(limits)?.edit())
     }
 
@@ -68,13 +71,13 @@ impl crate::Package {
     /// Read the optional Workbook-owned Calculation Chain as a lazy opaque
     /// source snapshot.
     pub fn calculation_chain(&self) -> Result<Snapshot> {
-        self.calculation_chain_with_limits(Limits::DEFAULT)
+        self.calculation_chain_with_limits(SemanticLimits::DEFAULT)
     }
 
     /// Read the Calculation Chain using explicit finite byte, relationship,
     /// and graph limits. `max_records` is retained only for an explicit
     /// `ChainPart::record_count` diagnostic and does not reject opaque bytes.
-    pub fn calculation_chain_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub fn calculation_chain_with_limits(&self, limits: SemanticLimits) -> Result<Snapshot> {
         Snapshot::read_with_limits(self.opc_package(), limits)
     }
 
@@ -84,7 +87,10 @@ impl crate::Package {
     }
 
     /// Start a Calculation Chain transaction with explicit finite limits.
-    pub fn edit_calculation_chain_with_limits(&self, limits: Limits) -> Result<Transaction> {
+    pub fn edit_calculation_chain_with_limits(
+        &self,
+        limits: SemanticLimits,
+    ) -> Result<Transaction> {
         Ok(self.calculation_chain_with_limits(limits)?.edit())
     }
 

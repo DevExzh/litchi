@@ -1217,6 +1217,7 @@ dependencies = [
 name = "litchi-ops"
 version = "0.0.1"
 dependencies = [
+ "base64",
  "caseless",
  "chrono",
  "litchi-cfb",

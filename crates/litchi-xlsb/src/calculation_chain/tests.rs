@@ -8,11 +8,11 @@ use litchi_opc::{BlobPart, PackURI, Part, TargetMode};
 
 use super::*;
 use crate::Package;
-use crate::raw::{Kind, Writer};
+use crate::raw::{Encoder, Kind};
 
 fn opaque_records() -> Vec<u8> {
     let mut bytes = Vec::new();
-    let mut writer = Writer::new(&mut bytes);
+    let mut writer = Encoder::new(&mut bytes);
     writer
         .write_record(Kind::new(0x123).expect("kind"), &[0x01, 0x02])
         .expect("first record");
@@ -111,7 +111,7 @@ fn opened_package_with_explicit_empty_chain_relationships(bytes: Vec<u8>) -> Pac
         }
     }
 
-    Package::from_bytes(writer.finish_to_bytes().expect("ZIP bytes")).expect("opened package")
+    Package::from_bytes(&writer.finish_to_bytes().expect("ZIP bytes")).expect("opened package")
 }
 
 fn package_with_unrelated_root_relationship(id: String) -> Package {
@@ -227,7 +227,8 @@ fn empty_owner_relationships_are_captured_and_restored() {
     assert!(restored_owner.relationships.member_present());
     assert_eq!(restored_owner.relationships.bytes(), EMPTY_RELATIONSHIPS);
 
-    let reopened = Package::from_bytes(restored.to_bytes().expect("restored ZIP")).expect("reopen");
+    let reopened =
+        Package::from_bytes(&restored.to_bytes().expect("restored ZIP")).expect("reopen");
     let chain = PackURI::new("/xl/calcChain.bin").expect("chain URI");
     let restored_member = reopened
         .opc_package()
@@ -586,7 +587,7 @@ fn content_types_source_changed_with_owner_and_workbook_bytes_unchanged_is_stale
     let replacement = current
         .without_parts(
             std::slice::from_ref(&stale_part),
-            ReadLimits::DEFAULT.max_part_bytes,
+            SemanticLimits::DEFAULT.max_part_bytes,
         )
         .expect("replacement content types");
     changed
@@ -601,14 +602,14 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
     let bytes = opaque_records();
     let package = package_with_chain(bytes.clone());
     let mut large_bytes = Vec::new();
-    let mut writer = Writer::new(&mut large_bytes);
+    let mut writer = Encoder::new(&mut large_bytes);
     writer
         .write_record(Kind::new(0x123).expect("kind"), &[0_u8; 1024])
         .expect("large record");
     let large_package = package_with_chain(large_bytes.clone());
-    let small_bytes = ReadLimits {
+    let small_bytes = SemanticLimits {
         max_part_bytes: large_bytes.len() - 1,
-        ..ReadLimits::DEFAULT
+        ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
         large_package.calculation_chain_with_limits(small_bytes),
@@ -618,9 +619,9 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         })
     ));
 
-    let small_records = ReadLimits {
+    let small_records = SemanticLimits {
         max_records: 2,
-        ..ReadLimits::DEFAULT
+        ..SemanticLimits::DEFAULT
     };
     let snapshot = package
         .calculation_chain_with_limits(small_records)
@@ -635,9 +636,9 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
     ));
     assert_eq!(snapshot.part().expect("part").bytes(), before_diagnostic);
 
-    let no_relationships = ReadLimits {
+    let no_relationships = SemanticLimits {
         max_relationships: 0,
-        ..ReadLimits::DEFAULT
+        ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
         package.calculation_chain_with_limits(no_relationships),
@@ -647,9 +648,9 @@ fn finite_byte_graph_limits_and_explicit_record_diagnostics_are_enforced() {
         })
     ));
 
-    let no_parts = ReadLimits {
+    let no_parts = SemanticLimits {
         max_graph_parts: 0,
-        ..ReadLimits::DEFAULT
+        ..SemanticLimits::DEFAULT
     };
     assert!(matches!(
         package.calculation_chain_with_limits(no_parts),

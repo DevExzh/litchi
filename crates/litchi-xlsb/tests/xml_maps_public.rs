@@ -21,7 +21,8 @@ use litchi_xlsb::Workbook;
 use litchi_xlsb::package::table::{Column, Range, Table, Type};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::xml_maps::{
-    CellReference, ColumnBinding, MappedTable, ReadLimits, SingleCellBinding, XPath, XmlDataType,
+    CellReference, ColumnBinding, MappedTable, SemanticLimits, SingleCellBinding, XPath,
+    XmlDataType,
 };
 
 const WORKBOOK_PART: &str = "/xl/workbook.bin";
@@ -531,7 +532,7 @@ fn public_reader_rejects_malformed_relationships_content_types_and_outbound_rels
 fn public_reader_enforces_exact_xml_binary_and_graph_limits() {
     let workbook = open(valid_package());
 
-    let mut exact = ReadLimits::default();
+    let mut exact = SemanticLimits::default();
     exact.xml_maps.max_part_bytes = MAP_INFO_XML.len();
     exact.bindings.max_part_bytes = 248;
     workbook
@@ -539,28 +540,28 @@ fn public_reader_enforces_exact_xml_binary_and_graph_limits() {
         .expect("exact source limits are inclusive");
 
     let mut cases = Vec::new();
-    let mut limits = ReadLimits::default();
+    let mut limits = SemanticLimits::default();
     limits.xml_maps.max_part_bytes = MAP_INFO_XML.len() - 1;
     cases.push(("XML part bytes", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.bindings.max_part_bytes = 247;
     cases.push(("binary part bytes", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.bindings.max_xpath_units = 10;
     cases.push(("XPath units", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.bindings.max_bindings = 0;
     cases.push(("binding count", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.bindings.max_records = 7;
     cases.push(("record count", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.max_parts = 2;
     cases.push(("part count", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.max_relationships = 2;
     cases.push(("relationship count", limits));
-    limits = ReadLimits::default();
+    limits = SemanticLimits::default();
     limits.max_total_bytes = MAP_INFO_XML.len();
     cases.push(("aggregate bytes", limits));
 
@@ -633,7 +634,7 @@ fn caller_xml_limits_are_inclusive_at_every_public_boundary() {
         "XML events",
     );
 
-    let mut exact = ReadLimits::default();
+    let mut exact = SemanticLimits::default();
     exact.max_total_bindings = 2;
     exact.max_total_xpath_units = 22;
     workbook.xml_maps_with_limits(exact).unwrap();
@@ -2089,7 +2090,7 @@ fn additive_crud_aggregate_limits_and_signed_inverse_are_publicly_enforced() {
     );
 
     let source = open(valid_package());
-    let mut exact = ReadLimits::default();
+    let mut exact = SemanticLimits::default();
     exact.max_total_bindings = 2;
     exact.max_total_xpath_units = 22;
     let snapshot = source.xml_maps_with_limits(exact).unwrap();
@@ -3029,14 +3030,14 @@ fn assert_error_contains(error: impl std::fmt::Display, context: &str, label: &s
 fn assert_xml_limit_boundary(
     workbook: &Workbook,
     upper: usize,
-    set: impl Fn(&mut ReadLimits, usize),
+    set: impl Fn(&mut SemanticLimits, usize),
     label: &str,
 ) {
     let mut low = 0usize;
     let mut high = upper;
     while low < high {
         let mid = low + (high - low) / 2;
-        let mut limits = ReadLimits::default();
+        let mut limits = SemanticLimits::default();
         set(&mut limits, mid);
         if workbook.xml_maps_with_limits(limits).is_ok() {
             high = mid;
@@ -3045,12 +3046,12 @@ fn assert_xml_limit_boundary(
         }
     }
     assert!(low > 0, "{label} limit was not enforced");
-    let mut exact = ReadLimits::default();
+    let mut exact = SemanticLimits::default();
     set(&mut exact, low);
     workbook
         .xml_maps_with_limits(exact)
         .unwrap_or_else(|error| panic!("exact {label} boundary {low} failed: {error}"));
-    let mut below = ReadLimits::default();
+    let mut below = SemanticLimits::default();
     set(&mut below, low - 1);
     assert!(
         workbook.xml_maps_with_limits(below).is_err(),

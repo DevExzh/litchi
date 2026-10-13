@@ -1,6 +1,6 @@
 //! Package facade for the Workbook-owned Volatile Dependencies owner.
 
-use super::{Commit, Limits, Patch, Snapshot, Transaction};
+use super::{Commit, Patch, SemanticLimits, Snapshot, Transaction};
 use crate::package::error::Result;
 
 impl crate::Package {
@@ -22,11 +22,11 @@ impl crate::Package {
     /// # }
     /// ```
     pub fn volatile_dependencies(&self) -> Result<Snapshot> {
-        self.volatile_dependencies_with_limits(Limits::DEFAULT)
+        self.volatile_dependencies_with_limits(SemanticLimits::DEFAULT)
     }
 
     /// Read Volatile Dependencies with explicit finite semantic limits.
-    pub fn volatile_dependencies_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub fn volatile_dependencies_with_limits(&self, limits: SemanticLimits) -> Result<Snapshot> {
         Snapshot::read_with_limits(self.opc_package(), limits)
     }
 
@@ -36,7 +36,10 @@ impl crate::Package {
     }
 
     /// Start a detached transaction with explicit finite semantic limits.
-    pub fn edit_volatile_dependencies_with_limits(&self, limits: Limits) -> Result<Transaction> {
+    pub fn edit_volatile_dependencies_with_limits(
+        &self,
+        limits: SemanticLimits,
+    ) -> Result<Transaction> {
         Ok(self.volatile_dependencies_with_limits(limits)?.edit())
     }
 

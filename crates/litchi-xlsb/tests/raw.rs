@@ -10,8 +10,8 @@
 use std::io::{Cursor as IoCursor, Read};
 
 use litchi_xlsb::raw::{
-    Cursor, Error, Header, Kind, LimitResource, Limits, MAX_WIRE_PAYLOAD, MAX_WIRE_STRING_UNITS,
-    Records, Stage, Writer, kind,
+    Cursor, Encoder, Error, Header, Kind, LimitResource, Limits, MAX_WIRE_PAYLOAD,
+    MAX_WIRE_STRING_UNITS, Records, Stage, kind,
 };
 
 #[test]
@@ -27,7 +27,7 @@ fn round_trips_kind_boundaries_with_borrowed_payloads() {
 
     for (kind, expected) in cases {
         let mut bytes = Vec::new();
-        Writer::new(&mut bytes)
+        Encoder::new(&mut bytes)
             .write_record(kind, &[1, 2, 3])
             .unwrap();
         assert_eq!(bytes, expected);
@@ -133,7 +133,7 @@ fn enforces_payload_budgets_before_reading_or_writing_payloads() {
         })
     ));
 
-    let mut writer = Writer::with_limits(Vec::new(), limits);
+    let mut writer = Encoder::with_limits(Vec::new(), limits);
     assert!(matches!(
         writer.write_header(kind::CELL_BLANK, 4),
         Err(Error::PayloadLimit {
@@ -197,7 +197,7 @@ fn legacy_limit_constructor_is_validated_before_wire_work() {
     ));
 
     let mut output = Vec::new();
-    let mut writer = Writer::with_limits(&mut output, invalid);
+    let mut writer = Encoder::with_limits(&mut output, invalid);
     assert!(matches!(
         writer.write_u8(0),
         Err(Error::InvalidLimit {
@@ -227,7 +227,7 @@ fn checked_limit_constructors_reject_invalid_profiles() {
         })
     ));
     assert!(matches!(
-        Writer::try_with_limits(Vec::new(), invalid),
+        Encoder::try_with_limits(Vec::new(), invalid),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             ..
@@ -240,7 +240,7 @@ fn oversized_wire_limits_are_rejected_before_writer_creation() {
     let too_large = MAX_WIRE_PAYLOAD + 1;
     let mut output = Vec::new();
     assert!(matches!(
-        Writer::try_with_limits(&mut output, Limits::new(too_large, 1)),
+        Encoder::try_with_limits(&mut output, Limits::new(too_large, 1)),
         Err(Error::InvalidLimit {
             resource: LimitResource::Payload,
             value,
@@ -297,7 +297,7 @@ fn hostile_wide_string_count_is_rejected_before_materialization() {
 #[test]
 fn writer_streams_utf16_and_round_trips_without_a_temporary_unit_buffer() {
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes)
+    Encoder::new(&mut bytes)
         .write_wide_string("Hello 世界")
         .unwrap();
     let mut cursor = Cursor::new(&bytes, "test");
@@ -362,7 +362,7 @@ fn decode_rk(rk: u32) -> f64 {
 
 fn encode_rk(value: f64) -> Result<u32, Error> {
     let mut bytes = Vec::new();
-    Writer::new(&mut bytes).write_rk(value)?;
+    Encoder::new(&mut bytes).write_rk(value)?;
     let encoded = <[u8; 4]>::try_from(bytes.as_slice()).map_err(|_| Error::LengthOverflow {
         what: "RK test output",
         length: bytes.len(),

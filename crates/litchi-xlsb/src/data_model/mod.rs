@@ -16,7 +16,7 @@ mod workbook;
 
 pub use codec::{
     HARD_MAX_CONNECTION_BYTES, HARD_MAX_CONNECTIONS, HARD_MAX_GRAPH_PARTS,
-    HARD_MAX_GRAPH_RELATIONSHIPS, HARD_MAX_METADATA_BYTES, HARD_MAX_PART_BYTES, ReadLimits,
+    HARD_MAX_GRAPH_RELATIONSHIPS, HARD_MAX_METADATA_BYTES, HARD_MAX_PART_BYTES, SemanticLimits,
 };
 pub use litchi_xldm::{Xldm140ColumnBinding, Xldm140TimeGroupingBinding};
 pub use model::TimeGroupingContentType as ContentType;
@@ -34,8 +34,6 @@ pub(crate) use package::{
 };
 
 /// Alias matching the concise limits naming used by other XLSB feature modules.
-pub type Limits = ReadLimits;
-
 pub use crate::package::error::{Error, Result};
 
 pub(crate) fn serialize_workbook_records(definition: &Definition) -> Result<Vec<u8>> {

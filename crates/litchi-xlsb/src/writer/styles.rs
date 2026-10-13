@@ -19,7 +19,7 @@
 use crate::package::error::{Error, Result};
 use crate::package::styles::{Border, BorderSide};
 use crate::package::styles_table::{Fill, Font};
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use crate::raw::kind;
 use std::io::Write;
 
@@ -141,7 +141,7 @@ impl StylesWriter {
     ///   BrtBeginTableStyles / BrtEndTableStyles        (no table styles, only defaults)
     /// BrtEndStyleSheet
     /// ```
-    pub(crate) fn write<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(crate) fn write<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         // BrtBeginStyleSheet
         writer.write_record(kind::BEGIN_STYLE_SHEET, &[])?;
 
@@ -170,9 +170,9 @@ impl StylesWriter {
     }
 
     /// Write default number formats
-    fn write_default_formats<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_default_formats<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut count_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut count_data);
+        let mut temp_writer = Encoder::new(&mut count_data);
         temp_writer.write_u32(0)?; // count = 0 (no custom formats)
         writer.write_record(kind::BEGIN_FMTS, &count_data)?;
         // Built-in formats don't need to be written
@@ -181,12 +181,12 @@ impl StylesWriter {
     }
 
     /// Write fonts (default and custom)
-    fn write_default_fonts<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_default_fonts<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         // For now we always serialize at least one default font. Additional
         // fonts added through `add_font` are serialized using a simplified
         // BrtFont layout used by SheetJS and Excel.
         let mut count_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut count_data);
+        let mut temp_writer = Encoder::new(&mut count_data);
         let font_count = if self.fonts.is_empty() {
             1u32
         } else {
@@ -208,9 +208,9 @@ impl StylesWriter {
     }
 
     /// Write the standard and user-added pattern fills.
-    fn write_fills<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_fills<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut count_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut count_data);
+        let mut temp_writer = Encoder::new(&mut count_data);
         temp_writer.write_u32(self.fills.len() as u32)?;
         writer.write_record(kind::BEGIN_FILLS, &count_data)?;
 
@@ -224,9 +224,9 @@ impl StylesWriter {
     }
 
     /// Write cell borders as `BrtBorder` records.
-    fn write_borders<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_borders<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut count_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut count_data);
+        let mut temp_writer = Encoder::new(&mut count_data);
         temp_writer.write_u32(self.borders.len() as u32)?;
         writer.write_record(kind::BEGIN_BORDERS, &count_data)?;
 
@@ -239,7 +239,7 @@ impl StylesWriter {
         Ok(())
     }
 
-    fn write_blxf<W: Write>(writer: &mut Writer<W>, side: Option<&BorderSide>) -> Result<()> {
+    fn write_blxf<W: Write>(writer: &mut Encoder<W>, side: Option<&BorderSide>) -> Result<()> {
         if let Some(side) = side {
             writer.write_u8(side.style as u8)?;
             writer.write_u8(0)?;
@@ -252,9 +252,9 @@ impl StylesWriter {
     }
 
     /// Write default cell style XFs (BrtBeginCellStyleXFs / BrtXF / BrtEndCellStyleXFs).
-    fn write_default_cell_style_xfs<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_default_cell_style_xfs<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut count_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut count_data);
+        let mut temp_writer = Encoder::new(&mut count_data);
         temp_writer.write_u32(1)?; // one style XF
         writer.write_record(kind::BEGIN_CELL_STYLE_XFS, &count_data)?;
 
@@ -266,9 +266,9 @@ impl StylesWriter {
     }
 
     /// Write default cell XFs (cell formats)
-    fn write_default_cell_xfs<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_default_cell_xfs<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut count_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut count_data);
+        let mut temp_writer = Encoder::new(&mut count_data);
         temp_writer.write_u32(1)?; // one default XF
         writer.write_record(kind::BEGIN_CELL_XFS, &count_data)?;
 
@@ -280,14 +280,14 @@ impl StylesWriter {
     }
 
     /// Write default styles table (BrtBeginStyles / BrtStyle / BrtEndStyles).
-    fn write_default_styles<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_default_styles<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut count_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut count_data);
+        let mut temp_writer = Encoder::new(&mut count_data);
         temp_writer.write_u32(1)?; // one style: Normal
         writer.write_record(kind::BEGIN_STYLES, &count_data)?;
 
         let mut style_data = Vec::new();
-        let mut sw = Writer::new(&mut style_data);
+        let mut sw = Encoder::new(&mut style_data);
 
         // xfId (u32)
         sw.write_u32(0)?;
@@ -308,10 +308,10 @@ impl StylesWriter {
     /// Write DXF table (`BrtBeginDXFs` / `BrtDXF`* / `BrtEndDXFs`).
     ///
     /// Each [`DxfStyle`] is serialized as a `BrtDXF` record per [MS-XLSB] 2.4.356.
-    fn write_default_dxfs<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_default_dxfs<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         // BrtBeginDXFs: count(u32)
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
         temp_writer.write_u32(self.dxfs.len() as u32)?;
         writer.write_record(kind::BEGIN_DXFS, &data)?;
 
@@ -399,9 +399,9 @@ impl StylesWriter {
 
     /// Write minimal table styles (BrtBeginTableStyles / BrtEndTableStyles) with
     /// zero styles but default names matching SheetJS and Excel.
-    fn write_default_table_styles<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_default_table_styles<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
         temp_writer.write_u32(0)?; // cnt = 0
         temp_writer.write_wide_string("TableStyleMedium9")?;
         temp_writer.write_wide_string("PivotStyleMedium4")?;
@@ -427,9 +427,9 @@ impl StylesWriter {
     /// u8  xfGrbitAtr
     /// u8  reserved
     /// ```
-    fn write_xf_record<W: Write>(writer: &mut Writer<W>, ixfe_parent: u16) -> Result<()> {
+    fn write_xf_record<W: Write>(writer: &mut Encoder<W>, ixfe_parent: u16) -> Result<()> {
         let mut xf_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut xf_data);
+        let mut temp_writer = Encoder::new(&mut xf_data);
 
         temp_writer.write_u16(ixfe_parent)?;
         temp_writer.write_u16(0)?; // numFmtId
@@ -467,7 +467,7 @@ impl StylesWriter {
         }
 
         let mut font_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut font_data);
+        let mut temp_writer = Encoder::new(&mut font_data);
 
         // Height in twips (size * 20)
         temp_writer.write_u16(height as u16)?;
@@ -511,7 +511,7 @@ impl StylesWriter {
         Ok(font_data)
     }
 
-    fn write_font_record<W: Write>(writer: &mut Writer<W>, font: &Font) -> Result<()> {
+    fn write_font_record<W: Write>(writer: &mut Encoder<W>, font: &Font) -> Result<()> {
         writer.write_record(kind::FONT, &Self::encode_font_payload(font)?)?;
         Ok(())
     }
@@ -524,7 +524,7 @@ impl StylesWriter {
             )));
         }
         let mut data = Vec::new();
-        let mut writer = Writer::new(&mut data);
+        let mut writer = Encoder::new(&mut data);
         writer.write_u32(fill.pattern_type)?;
         Self::write_brt_color(&mut writer, fill.fg_color)?;
         Self::write_brt_color(&mut writer, fill.bg_color)?;
@@ -547,7 +547,7 @@ impl StylesWriter {
             });
         }
         let mut data = Vec::new();
-        let mut writer = Writer::new(&mut data);
+        let mut writer = Encoder::new(&mut data);
         writer.write_u8(u8::from(border.diagonal_down) | (u8::from(border.diagonal_up) << 1))?;
         Self::write_blxf(&mut writer, border.top.as_ref())?;
         Self::write_blxf(&mut writer, border.bottom.as_ref())?;
@@ -558,7 +558,7 @@ impl StylesWriter {
     }
 
     /// Write an automatic or direct ARGB `BrtColor`.
-    fn write_brt_color<W: Write>(writer: &mut Writer<W>, color: Option<u32>) -> Result<()> {
+    fn write_brt_color<W: Write>(writer: &mut Encoder<W>, color: Option<u32>) -> Result<()> {
         if let Some(argb) = color {
             // fValidRGB=1, xColorType=2 (direct ARGB).
             writer.write_u8((2 << 1) | 1)?;
@@ -661,7 +661,7 @@ mod tests {
         });
 
         let mut bytes = Vec::new();
-        styles.write(&mut Writer::new(&mut bytes)).unwrap();
+        styles.write(&mut Encoder::new(&mut bytes)).unwrap();
         let parsed = StylesTable::from_bytes(&bytes).unwrap();
 
         let font = parsed.get_font(1).unwrap();
@@ -691,7 +691,7 @@ mod tests {
     #[test]
     fn direct_brt_color_uses_rgba_byte_order() {
         let mut bytes = Vec::new();
-        StylesWriter::write_brt_color(&mut Writer::new(&mut bytes), Some(0x80402010)).unwrap();
+        StylesWriter::write_brt_color(&mut Encoder::new(&mut bytes), Some(0x80402010)).unwrap();
         assert_eq!(bytes, [5, 0, 0, 0, 0x40, 0x20, 0x10, 0x80]);
     }
 

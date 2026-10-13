@@ -45,13 +45,15 @@
     reason = "new workbook transaction code uses checked wire conversions and explicit validation"
 )]
 
+pub use super::LimitKind;
 use super::{CellFormula, Reference, TransferLimits, Value};
 use crate::Workbook;
 use crate::external_link::ExternalLinkLimits;
 use crate::formula::{Parser, Token};
-use crate::package::error::{Error, Result};
+pub use crate::package::error::Error;
+use crate::package::error::Result;
 use crate::package::formula::excel_name_eq;
-use crate::raw::{Header, Limits as RawLimits, Records, Writer, kind};
+use crate::raw::{Encoder, Header, Limits as RawLimits, Records, kind};
 use crate::sheet::{Kind, Selector, State};
 use crate::workbook::DrawingLoadPolicy;
 use litchi_core::sheet::traits::WorkbookTrait;
@@ -62,6 +64,34 @@ use std::sync::Arc;
 
 const MAGIC: &[u8; 8] = b"LCXBWRP1";
 const WORKSHEET_CONTENT_TYPE: &str = "application/vnd.ms-excel.worksheet";
+
+/// Finite policies for the primary workbook transaction
+/// ([`crate::Package::edit_with_options`]).
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    transfer_limits: TransferLimits,
+}
+
+impl EditOptions {
+    /// The default transfer and patch policy.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            transfer_limits: TransferLimits::DEFAULT,
+        }
+    }
+
+    /// Select the transfer, patch and history policy.
+    #[must_use]
+    pub const fn transfer_limits(mut self, limits: TransferLimits) -> Self {
+        self.transfer_limits = limits;
+        self
+    }
+
+    pub(crate) const fn get_transfer_limits(self) -> TransferLimits {
+        self.transfer_limits
+    }
+}
 
 /// Typed resources for one newly authored cell XF.
 #[derive(Debug, Clone)]
@@ -571,9 +601,9 @@ impl Edit {
             ));
         }
         if self.operations.len() >= self.limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: self.operations.len().saturating_add(1),
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
         }
@@ -624,9 +654,9 @@ impl Edit {
                 resource: "durable workbook patch bytes",
             })?;
         if minimum_patch_bytes > self.limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "durable workbook patch bytes",
-                actual: minimum_patch_bytes,
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
+                observed: minimum_patch_bytes,
                 maximum: self.limits.bytes(),
             });
         }
@@ -742,9 +772,9 @@ impl Edit {
         let positions: Arc<[usize]> = positions.into();
         let operation = Operation::RemoveSheets { positions };
         if existing_index.is_none() && self.operations.len() >= self.limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: self.operations.len().saturating_add(1),
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
         }
@@ -777,9 +807,9 @@ impl Edit {
                 resource: "durable workbook patch bytes",
             })?;
         if minimum_patch_bytes > self.limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "durable workbook patch bytes",
-                actual: minimum_patch_bytes,
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
+                observed: minimum_patch_bytes,
                 maximum: self.limits.bytes(),
             });
         }
@@ -1176,9 +1206,9 @@ impl Edit {
             ));
         }
         if self.operations.len() >= self.limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: self.operations.len().saturating_add(1),
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: self.operations.len().saturating_add(1),
                 maximum: self.limits.changes(),
             });
         }
@@ -1433,9 +1463,9 @@ impl Patch {
     pub fn to_bytes(&self, limits: TransferLimits) -> Result<Vec<u8>> {
         validate_limits(limits)?;
         if self.operations.len() > limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: self.operations.len(),
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: self.operations.len(),
                 maximum: limits.changes(),
             });
         }
@@ -1457,9 +1487,9 @@ impl Patch {
                 resource: "durable workbook patch bytes",
             })?;
         if total > limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "durable workbook patch bytes",
-                actual: total,
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
+                observed: total,
                 maximum: limits.bytes(),
             });
         }
@@ -1556,9 +1586,9 @@ impl Patch {
     ) -> Result<Self> {
         validate_limits(limits)?;
         if data.len() > limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "durable workbook patch bytes",
-                actual: data.len(),
+            return Err(Error::Limit {
+                kind: LimitKind::PatchBytes,
+                observed: data.len(),
                 maximum: limits.bytes(),
             });
         }
@@ -1572,9 +1602,9 @@ impl Patch {
         let after_len = read_usize(data, 16)?;
         let operation_count = read_usize(data, 24)?;
         if operation_count > limits.changes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook structural operations",
-                actual: operation_count,
+            return Err(Error::Limit {
+                kind: LimitKind::Changes,
+                observed: operation_count,
                 maximum: limits.changes(),
             });
         }
@@ -1807,9 +1837,9 @@ impl History {
     pub fn push(&mut self, patch: Patch) -> Result<()> {
         let bytes = patch.retained_bytes()?;
         if bytes > self.limits.history_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "workbook patch history bytes",
-                actual: bytes,
+            return Err(Error::Limit {
+                kind: LimitKind::HistoryBytes,
+                observed: bytes,
                 maximum: self.limits.history_bytes(),
             });
         }
@@ -2282,13 +2312,13 @@ fn add_image(workbook: &mut Workbook, sheet: usize, plan: &ImagePlan) -> Result<
         },
     );
     let mut drawing_payload = Vec::new();
-    Writer::new(&mut drawing_payload).write_wide_string(&drawing_rel_id)?;
+    Encoder::new(&mut drawing_payload).write_wide_string(&drawing_rel_id)?;
     let mut worksheet_output = Vec::new();
     let mut inserted = false;
     for item in Records::new(&worksheet_source) {
         let record = item?;
         if !inserted && matches!(record.kind(), kind::BEGIN_LIST_PARTS | kind::END_SHEET) {
-            Writer::new(&mut worksheet_output).write_record(kind::DRAWING, &drawing_payload)?;
+            Encoder::new(&mut worksheet_output).write_record(kind::DRAWING, &drawing_payload)?;
             inserted = true;
         }
         copy_record(&worksheet_source, &record, &mut worksheet_output)?;
@@ -2666,7 +2696,7 @@ fn authored_blank_worksheet(name: &str) -> Result<(Vec<u8>, Vec<u8>)> {
     });
     let mut source = Vec::new();
     worksheet.write_with_sparkline_block(
-        &mut Writer::new(&mut source),
+        &mut Encoder::new(&mut source),
         &mut crate::writer::MutableSharedStringsWriter::new(),
         None,
     )?;
@@ -2844,7 +2874,7 @@ fn bundle_sheet_payload(state: State, tab_id: u32, rel_id: &str, name: &str) -> 
         ));
     }
     let mut payload = Vec::new();
-    let mut writer = Writer::new(&mut payload);
+    let mut writer = Encoder::new(&mut payload);
     writer.write_u32(u32::from(state_to_wire(state)))?;
     writer.write_u32(tab_id)?;
     writer.write_wide_string(rel_id)?;
@@ -2985,7 +3015,7 @@ fn rewrite_workbook_insert(
 
 fn make_record(record_kind: crate::raw::Kind, payload: &[u8]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    Writer::new(&mut output).write_record(record_kind, payload)?;
+    Encoder::new(&mut output).write_record(record_kind, payload)?;
     Ok(output)
 }
 
@@ -5542,7 +5572,7 @@ fn apply_sheet_metadata(workbook: &mut Workbook, operations: &[Operation]) -> Re
                     })?;
                     state_bytes.copy_from_slice(&u32::from(state_to_wire(state)).to_le_bytes());
                 }
-                Writer::new(&mut output).write_record(kind::BUNDLE_SH, &payload)?;
+                Encoder::new(&mut output).write_record(kind::BUNDLE_SH, &payload)?;
                 replaced = true;
             } else {
                 copy_record(&source, &record, &mut output)?;
@@ -6045,7 +6075,7 @@ fn renamed_bundle_payload(source: &[u8], name: &str) -> Result<Vec<u8>> {
             found: source.len(),
         })?
         .to_vec();
-    Writer::new(&mut payload).write_wide_string(name)?;
+    Encoder::new(&mut payload).write_wide_string(name)?;
     payload.extend_from_slice(suffix);
     let mut tolerance_report = crate::leniency::ToleranceReport::default();
     let _validated_record = crate::package::records::BundleSheetRecord::parse_with(

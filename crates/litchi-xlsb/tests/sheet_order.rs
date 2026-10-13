@@ -21,7 +21,7 @@ use litchi_xlsb::cell_values::structure::Patch;
 use litchi_xlsb::chart::{Anchor, Chart};
 use litchi_xlsb::named_ranges::Definition as NamedRange;
 use litchi_xlsb::package::PackageError;
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::{Kind, Selector};
 use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
@@ -122,11 +122,11 @@ where
 
 fn rewrite_records<F>(source: &[u8], mut rewrite: F) -> Vec<u8>
 where
-    F: FnMut(litchi_xlsb::raw::Kind, &[u8], usize, &mut Writer<&mut Vec<u8>>),
+    F: FnMut(litchi_xlsb::raw::Kind, &[u8], usize, &mut Encoder<&mut Vec<u8>>),
 {
     let mut output = Vec::new();
     let mut ordinal = 0usize;
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     for item in Records::new(source) {
         let record = item.expect("workbook record");
         rewrite(record.kind(), record.payload(), ordinal, &mut writer);
@@ -244,7 +244,7 @@ fn with_unknown_between_bundle_sheets(package: &Package) -> Package {
         let unknown = litchi_xlsb::raw::Kind::new(0x3ffe).expect("unknown record kind");
         let mut inserted = false;
         let mut bundles = 0usize;
-        let mut writer = Writer::new(output);
+        let mut writer = Encoder::new(output);
         for item in Records::new(source) {
             let record = item.expect("workbook record");
             if record.kind() == kind::BUNDLE_SH {
@@ -580,7 +580,7 @@ fn unknown_record_between_bundle_tabs_is_a_safe_reorder_barrier() {
 #[test]
 fn unknown_workbook_record_outside_catalog_refuses_changed_order_only() {
     let source = replace_workbook(&worksheets(&["A", "B"]), |source, output| {
-        let mut writer = Writer::new(output);
+        let mut writer = Encoder::new(output);
         for item in Records::new(source) {
             let record = item.expect("record");
             if record.kind() == kind::END_BOOK {

@@ -100,9 +100,9 @@ pub(super) fn reconcile_with_limits(
     for worksheet_uri in &worksheet_uris {
         let source = package.get_part(worksheet_uri)?.blob();
         if source.len() > worksheet_limits.source_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "shared-string worksheet source",
-                actual: source.len(),
+            return Err(Error::Limit {
+                kind: crate::cell_values::LimitKind::SourceBytes,
+                observed: source.len(),
                 maximum: worksheet_limits.source_bytes(),
             });
         }
@@ -122,9 +122,9 @@ pub(super) fn reconcile_with_limits(
             &mapping,
         )?;
         if rewritten.len() > worksheet_limits.source_bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "shared-string worksheet image",
-                actual: rewritten.len(),
+            return Err(Error::Limit {
+                kind: crate::cell_values::LimitKind::SourceBytes,
+                observed: rewritten.len(),
                 maximum: worksheet_limits.source_bytes(),
             });
         }

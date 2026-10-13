@@ -11,7 +11,7 @@ use super::model::{
 };
 use super::validation::{cache as validate_cache, views as validate_views};
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Record, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Record, Records, kind};
 
 const MAX_PART_BYTES: usize = 32 * 1024 * 1024;
 const MAX_RECORDS: usize = 1_000_000;
@@ -307,13 +307,13 @@ pub fn parse_cache(data: &[u8]) -> Result<Cache> {
 }
 
 fn write_wide(output: &mut Vec<u8>, value: &str) -> Result<()> {
-    Writer::new(output).write_wide_string(value)?;
+    Encoder::new(output).write_wide_string(value)?;
     Ok(())
 }
 
 fn write_cache_inner(cache: &Cache, output: &mut Vec<u8>) -> Result<()> {
     validate_cache(cache)?;
-    let mut writer = Writer::new(output);
+    let mut writer = Encoder::new(output);
     writer.write_record(kind::BEGIN_SLICER_CACHE, &[])?;
     let mut definition = Vec::new();
     write_wide(&mut definition, &cache.name)?;
@@ -321,10 +321,10 @@ fn write_cache_inner(cache: &Cache, output: &mut Vec<u8>) -> Result<()> {
     writer.write_record(kind::BEGIN_SLICER_CACHE_DEF, &definition)?;
     if !cache.pivot_tables.is_empty() {
         let mut payload = Vec::new();
-        Writer::new(&mut payload).write_u32(cache.pivot_tables.len() as u32)?;
+        Encoder::new(&mut payload).write_u32(cache.pivot_tables.len() as u32)?;
         for pivot in &cache.pivot_tables {
             let mut item = Vec::new();
-            let mut item_writer = Writer::new(&mut item);
+            let mut item_writer = Encoder::new(&mut item);
             item_writer.write_u32(pivot.sheet_id)?;
             item_writer.write_wide_string(&pivot.name)?;
             payload.extend_from_slice(&item);
@@ -338,13 +338,13 @@ fn write_cache_inner(cache: &Cache, output: &mut Vec<u8>) -> Result<()> {
                 | (u8::from(native.sort_using_custom_lists) << 4)
                 | (u8::from(native.show_all_items) << 5);
             let mut header = Vec::with_capacity(9);
-            let mut header_writer = Writer::new(&mut header);
+            let mut header_writer = Encoder::new(&mut header);
             header_writer.write_u32(0)?;
             header_writer.write_u32(native.cache_id)?;
             header_writer.write_u8(flags)?;
             writer.write_record(kind::BEGIN_SLICER_CACHE_NATIVE, &header)?;
             let mut items = Vec::with_capacity(4 + native.items.len() * 5);
-            let mut item_writer = Writer::new(&mut items);
+            let mut item_writer = Encoder::new(&mut items);
             item_writer.write_u32(native.items.len() as u32)?;
             for item in &native.items {
                 item_writer.write_u32(item.cache_index)?;
@@ -358,7 +358,7 @@ fn write_cache_inner(cache: &Cache, output: &mut Vec<u8>) -> Result<()> {
                 | (table.cross_filter.wire() << 2)
                 | (u8::from(table.sort_using_custom_lists) << 4);
             let mut payload = Vec::with_capacity(13);
-            let mut payload_writer = Writer::new(&mut payload);
+            let mut payload_writer = Encoder::new(&mut payload);
             payload_writer.write_u32(0)?;
             payload_writer.write_u32(table.column)?;
             payload_writer.write_u32(table.table_id)?;
@@ -460,14 +460,14 @@ pub fn parse_views(data: &[u8]) -> Result<Views> {
 pub fn write_views(views: &Views) -> Result<Vec<u8>> {
     validate_views(views)?;
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_record(kind::BEGIN_SLICERS, &[])?;
     for view in &views.items {
         let mut payload = Vec::new();
         let mut flags = u8::from(view.caption_visible) | (u8::from(view.caption.is_some()) << 1);
         flags |= u8::from(view.style.is_some()) << 2;
         flags |= u8::from(view.locked_position) << 3;
-        let mut payload_writer = Writer::new(&mut payload);
+        let mut payload_writer = Encoder::new(&mut payload);
         payload_writer.write_u8(flags)?;
         payload_writer.write_u32(view.start_item)?;
         payload_writer.write_u32(view.column_count)?;

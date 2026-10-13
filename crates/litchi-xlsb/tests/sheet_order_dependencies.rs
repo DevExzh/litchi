@@ -396,7 +396,7 @@ fn opaque_volatile_record_blocks_reordering_but_retains_exact_noop() {
     let mut opc = source.opc_package().clone();
     let before = owner_blob(&source);
     let mut output = Vec::new();
-    let mut writer = litchi_xlsb::raw::Writer::new(&mut output);
+    let mut writer = litchi_xlsb::raw::Encoder::new(&mut output);
     for record in Records::new(&before) {
         let record = record.unwrap();
         writer

@@ -2,7 +2,7 @@
 
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
-use super::model::ReadLimits;
+use super::model::SemanticLimits;
 use crate::package::error::{Error, Result};
 
 /// MS-XLSB 2.1.7.4 content type.
@@ -28,7 +28,7 @@ pub(crate) struct Graph {
 /// pass covers both feature ownership and target topology.
 pub(crate) fn discover_graph_with_probe(
     package: &OpcPackage,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     probe_target: Option<&PackURI>,
 ) -> Result<Option<Graph>> {
     let limits = limits.validate()?;
@@ -106,7 +106,7 @@ pub(crate) fn discover_graph_with_probe(
 /// allocator telemetry: retained source-map keys are covered by the repeated
 /// URI terms, while opaque source members are bounded by OPC ingress and
 /// source-capture limits.
-pub(crate) fn preflight_metadata(package: &OpcPackage, limits: ReadLimits) -> Result<()> {
+pub(crate) fn preflight_metadata(package: &OpcPackage, limits: SemanticLimits) -> Result<()> {
     // Keep this metadata pass independent of the per-stream byte ceiling.
     // `max_part_bytes` is enforced against the Workbook/owner and captured
     // source tokens after graph discovery; using it here would make a small
@@ -181,7 +181,7 @@ fn preflight_relationship_collection(
     opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     relationship_metadata_bytes: &mut usize,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     // A cloned Relationships owns these collection-level strings even when
     // the collection is empty.  They are distinct from the relationship
@@ -220,7 +220,7 @@ fn preflight_relationship(
     opc_limits: &litchi_opc::SourceLimits,
     relationship_count: &mut usize,
     relationship_metadata_bytes: &mut usize,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     *relationship_count = relationship_count
         .checked_add(1)
@@ -372,7 +372,7 @@ fn scan_relationship_graph(
     target: Option<&PackURI>,
     expected_source: Option<&PackURI>,
     expected_relationship_id: Option<&str>,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let mut relationship_count = 0usize;
     let mut part_count = 0usize;
@@ -430,7 +430,7 @@ fn scan_relationship_graph(
     Ok(())
 }
 
-fn checked_relationship_count(current: usize, limits: ReadLimits) -> Result<usize> {
+fn checked_relationship_count(current: usize, limits: SemanticLimits) -> Result<usize> {
     let actual = current.checked_add(1).ok_or(Error::CapacityOverflow {
         resource: "Calculation Chain relationships",
     })?;
@@ -444,7 +444,7 @@ fn checked_relationship_count(current: usize, limits: ReadLimits) -> Result<usiz
     Ok(actual)
 }
 
-fn checked_graph_part_count(current: usize, limits: ReadLimits) -> Result<usize> {
+fn checked_graph_part_count(current: usize, limits: SemanticLimits) -> Result<usize> {
     let actual = current.checked_add(1).ok_or(Error::CapacityOverflow {
         resource: "Calculation Chain graph parts",
     })?;

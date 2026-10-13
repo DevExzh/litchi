@@ -12,12 +12,12 @@ use crate::calc;
 use crate::named_ranges::validate_name;
 use crate::package::error::{Error, Result};
 use crate::package::formula::ParsedFormula;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 use std::io::Write;
 
 impl Builder {
     /// Write workbook-level defined names (BrtName records).
-    fn write_named_ranges<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_named_ranges<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         for named_range in &self.named_ranges {
             if named_range.function {
                 return Err(Error::UnsupportedFeature(format!(
@@ -44,7 +44,7 @@ impl Builder {
                 rgcb: Vec::new(),
             };
             let mut data = Vec::new();
-            let mut temp_writer = Writer::new(&mut data);
+            let mut temp_writer = Encoder::new(&mut data);
 
             let mut flags = 0u32;
             if named_range.hidden {
@@ -87,7 +87,7 @@ impl Builder {
     /// single default view and sensible defaults for calculation settings.
     pub(super) fn write_workbook<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         formula_sheet_ranges: &[(u32, u32)],
         pivot_cache_rel_ids: &[(u32, String)],
         external_link_rel_ids: &[String],
@@ -141,7 +141,7 @@ impl Builder {
     /// pairing the workbook cache identifier (`idSx`) with the relationship
     /// ID of its PivotCache Definition part.
     fn write_pivot_cache_ids<W: Write>(
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         pivot_cache_rel_ids: &[(u32, String)],
     ) -> Result<()> {
         if pivot_cache_rel_ids.is_empty() {
@@ -150,7 +150,7 @@ impl Builder {
         writer.write_record(kind::BEGIN_PIVOT_CACHE_IDS, &[])?;
         for (cache_id, rel_id) in pivot_cache_rel_ids {
             let mut data = Vec::with_capacity(rel_id.len() * 2 + 8);
-            let mut temp_writer = Writer::new(&mut data);
+            let mut temp_writer = Encoder::new(&mut data);
             temp_writer.write_u32(*cache_id)?;
             temp_writer.write_wide_string(rel_id)?;
             writer.write_record(kind::BEGIN_PIVOT_CACHE_ID, &data)?;
@@ -162,12 +162,12 @@ impl Builder {
 
     /// Write file version record (BrtFileVersion)
     /// This is REQUIRED for Excel to open the file
-    fn write_file_version<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_file_version<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         // Build structure per spec example (48 bytes total):
         // guidCodeName (16 zero bytes), stAppName ("xl"), stLastEdited ("4"),
         // stLowestEdited ("4"), stRupBuild ("4505")
         let mut data = Vec::with_capacity(48);
-        let mut w = Writer::new(&mut data);
+        let mut w = Encoder::new(&mut data);
 
         // GUID (16 bytes of zeros)
         w.write_u32(0)?;
@@ -189,9 +189,9 @@ impl Builder {
     }
 
     /// Write workbook properties (BrtWbProp)
-    fn write_workbook_properties<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_workbook_properties<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // Flags (4 bytes). We currently only support the 1904 date system
         // bit, mirroring the minimal SheetJS implementation:
@@ -214,7 +214,7 @@ impl Builder {
     }
 
     /// Write book views (REQUIRED by Excel)
-    fn write_book_views<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_book_views<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         if self.sheet_order.is_empty() {
             return Ok(());
         }
@@ -222,7 +222,7 @@ impl Builder {
 
         // Write one default book view
         let mut view_data = Vec::new();
-        let mut temp_writer = Writer::new(&mut view_data);
+        let mut temp_writer = Encoder::new(&mut view_data);
 
         // xWn (4), yWn (4), dxWn (4), dyWn (4)
         temp_writer.write_u32(0)?; // xWn
@@ -256,12 +256,12 @@ impl Builder {
     }
 
     /// Write bundle sheets in workbook order.
-    fn write_bundle_sheets<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_bundle_sheets<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         writer.write_record(kind::BEGIN_BUNDLE_SHS, &[])?;
 
         for (i, slot) in self.sheet_order.iter().copied().enumerate() {
             let mut sheet_data = Vec::new();
-            let mut temp_writer = Writer::new(&mut sheet_data);
+            let mut temp_writer = Encoder::new(&mut sheet_data);
 
             let state = match slot {
                 SheetSlot::Worksheet(_) => 0,
@@ -292,7 +292,7 @@ impl Builder {
     /// Write calculation properties (CALC_PROP, 0x009D)
     ///
     /// Spec example fields and order
-    fn write_calc<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    fn write_calc<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         writer.write_header(kind::CALC_PROP, calc::LEN)?;
         calc::write(&self.calc, writer)?;
         Ok(())
@@ -304,7 +304,7 @@ impl Builder {
     /// This creates self-references for the workbook and all sheets.
     fn write_externals<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         formula_sheet_ranges: &[(u32, u32)],
         external_link_rel_ids: &[String],
     ) -> Result<()> {
@@ -316,13 +316,13 @@ impl Builder {
 
         for relationship_id in external_link_rel_ids {
             let mut data = Vec::with_capacity(4 + relationship_id.len() * 2);
-            Writer::new(&mut data).write_wide_string(relationship_id)?;
+            Encoder::new(&mut data).write_wide_string(relationship_id)?;
             writer.write_record(kind::SUP_BOOK_SRC, &data)?;
         }
 
         // BrtExternSheet - self-references data
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         let sheet_count = self.sheet_order.len();
 

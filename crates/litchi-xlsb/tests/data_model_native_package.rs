@@ -24,7 +24,7 @@ fn fixture_bytes() -> Vec<u8> {
 }
 
 fn native_package() -> Package {
-    Package::from_bytes(fixture_bytes()).expect("native XLSB package")
+    Package::from_bytes(&fixture_bytes()).expect("native XLSB package")
 }
 
 fn connections() -> Connections {
@@ -61,7 +61,7 @@ fn attach_connections(package: Package) -> Package {
         .to_package()
         .write_to(&mut output)
         .expect("save synthetic connections");
-    Package::from_bytes(output.into_inner()).expect("reopen synthetic connections")
+    Package::from_bytes(&output.into_inner()).expect("reopen synthetic connections")
 }
 
 fn native_part_bytes(package: &Package) -> BTreeMap<String, Vec<u8>> {
@@ -147,7 +147,7 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
     assert_eq!(native_part_bytes(&attached), native_members);
 
     let attached_bytes = attached.to_bytes().expect("synthetic model bytes");
-    let attached_reopened = Package::from_bytes(attached_bytes).expect("reopen synthetic model");
+    let attached_reopened = Package::from_bytes(&attached_bytes).expect("reopen synthetic model");
     let attached_snapshot = attached_reopened.data_model().expect("attached snapshot");
     assert_eq!(attached_snapshot.definition(), Some(&definition()));
     assert_eq!(
@@ -176,7 +176,7 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
             .min_version_load,
         6
     );
-    let changed_reopened = Package::from_bytes(changed.to_bytes().expect("changed bytes"))
+    let changed_reopened = Package::from_bytes(&changed.to_bytes().expect("changed bytes"))
         .expect("reopen changed model");
     assert_eq!(native_part_bytes(&changed_reopened), native_members);
 
@@ -202,7 +202,7 @@ fn native_package_preserves_members_through_synthetic_model_lifecycle() {
         with_connections_workbook
     );
 
-    let removed_reopened = Package::from_bytes(removed.to_bytes().expect("removed bytes"))
+    let removed_reopened = Package::from_bytes(&removed.to_bytes().expect("removed bytes"))
         .expect("reopen removed model");
     assert!(
         !removed_reopened

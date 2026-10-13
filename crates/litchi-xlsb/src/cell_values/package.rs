@@ -23,6 +23,42 @@ use std::io::{self, Write};
 use std::mem::size_of;
 use std::sync::Arc;
 
+/// Finite policies for one package-owned cell-values edit
+/// ([`Package::edit_cell_values_with_options`]).
+///
+/// The worksheet limits bound parsing of the selected worksheet; the transfer
+/// limits bound the retained package patch.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Limits,
+    transfer_limits: TransferLimits,
+}
+
+impl EditOptions {
+    /// The default worksheet and transfer policies.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            limits: Limits::DEFAULT,
+            transfer_limits: TransferLimits::DEFAULT,
+        }
+    }
+
+    /// Select the worksheet parsing policy.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Select the patch transfer and history policy.
+    #[must_use]
+    pub const fn transfer_limits(mut self, limits: TransferLimits) -> Self {
+        self.transfer_limits = limits;
+        self
+    }
+}
+
 /// Publication diagnostics for a package-owned cell-values commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Diagnostics {
@@ -450,9 +486,9 @@ impl Edit {
             transfer_limits: self.transfer_limits,
         };
         if patch.retained_bytes() > self.transfer_limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "cell-values retained patch bytes",
-                actual: patch.retained_bytes(),
+            return Err(Error::Limit {
+                kind: crate::cell_values::LimitKind::PatchBytes,
+                observed: patch.retained_bytes(),
                 maximum: self.transfer_limits.bytes(),
             });
         }
@@ -654,7 +690,7 @@ impl Package {
     /// Start a detached cell-values edit selected from the complete tab
     /// catalog using the default worksheet and transfer policies.
     pub fn edit_cell_values<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Edit>> {
-        self.edit_cell_values_with_limits(selector, Limits::DEFAULT, TransferLimits::DEFAULT)
+        self.edit_cell_values_with_options(selector, EditOptions::default())
     }
 
     /// Start a detached cell-values edit with explicit finite policies.
@@ -662,12 +698,13 @@ impl Package {
     /// The transfer byte budget bounds the retained package patch, including
     /// package and worksheet images plus owned semantic cell payloads.
     /// Worksheet parsing uses the separate worksheet policy.
-    pub fn edit_cell_values_with_limits<'a>(
+    pub fn edit_cell_values_with_options<'a>(
         &self,
         selector: impl Into<Selector<'a>>,
-        worksheet_limits: Limits,
-        transfer_limits: TransferLimits,
+        options: EditOptions,
     ) -> Result<Option<Edit>> {
+        let worksheet_limits = options.limits;
+        let transfer_limits = options.transfer_limits;
         validate_limits(transfer_limits)?;
         let Some(worksheet) = resolve_worksheet(self, selector)? else {
             return Ok(None);
@@ -774,14 +811,11 @@ fn publish_validated_workbook(
 }
 
 fn remaining_image_budget(before_len: usize, limits: TransferLimits) -> Result<usize> {
-    limits
-        .bytes()
-        .checked_sub(before_len)
-        .ok_or(Error::LimitExceeded {
-            resource: "cell-values package patch images",
-            actual: before_len.saturating_add(1),
-            maximum: limits.bytes(),
-        })
+    limits.bytes().checked_sub(before_len).ok_or(Error::Limit {
+        kind: crate::cell_values::LimitKind::PatchBytes,
+        observed: before_len.saturating_add(1),
+        maximum: limits.bytes(),
+    })
 }
 
 fn serialize_package(package: &Package, maximum: usize) -> Result<Vec<u8>> {
@@ -792,9 +826,9 @@ fn serialize_opc_package(package: &OpcPackage, maximum: usize) -> Result<Vec<u8>
     let mut writer = BoundedWriter::new(maximum);
     let result = PackageWriter::write_to_stream(&mut writer, package);
     if writer.exceeded {
-        return Err(Error::LimitExceeded {
-            resource: "cell-values package image",
-            actual: writer.written.max(maximum.saturating_add(1)),
+        return Err(Error::Limit {
+            kind: super::LimitKind::PatchBytes,
+            observed: writer.written.max(maximum.saturating_add(1)),
             maximum,
         });
     }
@@ -852,9 +886,9 @@ impl Write for BoundedWriter {
 fn validate_transfer_limits(patch: &WorksheetPatch, limits: TransferLimits) -> Result<()> {
     validate_limits(limits)?;
     if patch.changes().len() > limits.changes() {
-        return Err(Error::LimitExceeded {
-            resource: "cell-values patch changes",
-            actual: patch.changes().len(),
+        return Err(Error::Limit {
+            kind: crate::cell_values::LimitKind::Changes,
+            observed: patch.changes().len(),
             maximum: limits.changes(),
         });
     }
@@ -866,9 +900,9 @@ fn validate_transfer_limits(patch: &WorksheetPatch, limits: TransferLimits) -> R
             resource: "cell-values patch images",
         })?;
     if bytes > limits.bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "cell-values patch images",
-            actual: bytes,
+        return Err(Error::Limit {
+            kind: crate::cell_values::LimitKind::PatchBytes,
+            observed: bytes,
             maximum: limits.bytes(),
         });
     }
