@@ -279,6 +279,12 @@ Branches `uo2/*` cut from `908f9cccdd`; records 0249–0255:
   - no regression above 5%.
 - New owner rule (2026-10-13, AGENTS.md `e467bcf4e8`): code never references `3rdparty/`; fixtures are copied into `test-data/`. The trunk worktree's untracked partial `3rdparty/` directory, left by the Codex session, was moved aside to the session scratchpad.
 
+- Merged `p7c-pptx` (0252, `c3f3f11a8c`):
+  - pptx W2 residue: `OpenOptions`, `PatchConflict`, typed `EditLimit`, `opened` family registered, scoped `Transaction`/`rollback` removed;
+  - P0 writes: rich text, cells, notes, comments, picture add, layout placeholders and sections;
+  - eager run formatting at ≥100 shapes misses the budget (+17–22%), a follow-up for plan step 8;
+  - picture `set` remains open.
+
 ## Wave R2 (2026-10-13)
 Cut from `e467bcf4e8`:
 - `fix-3rdparty` (0257): vendor the fixtures into `test-data/`, plus a guard.
