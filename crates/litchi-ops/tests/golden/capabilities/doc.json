@@ -197,6 +197,160 @@
   ],
   "gaps": [
     {
+      "subject": "element",
+      "element": "run",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "hyperlink",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "table",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "row",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "cell",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "equation",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "section",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "header",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "footer",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "footnote",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "endnote",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "comment",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "style",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "numbering",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "bookmark",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "field",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "formfield",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "picture",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "ole",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "revision",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "textbox",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
+      "subject": "element",
+      "element": "shape",
+      "code": "unsupported_capability",
+      "followUp": "record 0248 Phase C step 11 (DOC read+write loop)",
+      "reason": "this native DOC concept is not yet projected into generic paths and queries"
+    },
+    {
       "subject": "operation",
       "verb": "create",
       "element": "document",

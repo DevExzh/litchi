@@ -558,3 +558,25 @@ fn gap_subjects_are_unique() {
         );
     }
 }
+
+#[cfg(feature = "doc")]
+#[test]
+fn doc_enumerates_its_unprojected_element_gaps() {
+    let capabilities = Capabilities::of(FileFormat::Doc);
+    for element in ["run", "table", "header", "footnote", "comment", "picture"] {
+        assert!(
+            capabilities
+                .gaps()
+                .any(|gap| gap.subject() == crate::node::spec::Subject::Element(element)),
+            "missing DOC element gap {element}"
+        );
+    }
+    let mut subjects = std::collections::HashSet::new();
+    for gap in capabilities.gaps() {
+        assert!(
+            subjects.insert(gap.subject()),
+            "duplicate {:?}",
+            gap.subject()
+        );
+    }
+}
