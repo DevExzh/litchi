@@ -173,7 +173,7 @@ automatic-fonts = [
     "litchi-pptx?/automatic-fonts",
 ]
 images = ["dep:litchi-imgconv", "dep:litchi-odraw"]
-eval = ["dep:litchi-eval"]
+eval = ["dep:litchi-eval", "litchi-ops?/eval"]
 web-functions = ["eval", "litchi-eval/web_functions"]
 markdown = ["dep:litchi-markdown", "litchi-ops?/markdown"]
 yaml = ["dep:serde-saphyr", "litchi-ops?/yaml"]

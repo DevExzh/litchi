@@ -957,8 +957,8 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             prop_gap(
                 "cell",
                 "computedValue",
-                "M4 (formula evaluation)",
-                "the read path has no formula evaluator; `evaluated` reports the cached value only",
+                "M4 follow-up: project computed values in cell views",
+                "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results (record 0266)",
             ),
             prop_gap(
                 "cell",

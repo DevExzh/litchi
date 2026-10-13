@@ -236,7 +236,8 @@ impl State {
 /// assert_eq!(Verb::Query.as_str(), "query");
 /// assert!(Verb::Set.is_edit() && !Verb::Get.is_edit());
 /// assert!(!Verb::Save.is_edit() && !Verb::Create.is_edit());
-/// assert_eq!(Verb::ALL.len(), 13);
+/// assert!(Verb::Import.is_edit() && !Verb::Evaluate.is_edit());
+/// assert_eq!(Verb::ALL.len(), 15);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -250,6 +251,9 @@ pub enum Verb {
     /// [`File::view`], [`File::view_to`] and [`File::view_json`]; each mode
     /// is reported on its own ([`Capabilities::view`]).
     View,
+    /// Formula evaluation: `File::evaluate` and `File::recalculate`
+    /// (record 0266, the `eval` feature).
+    Evaluate,
     /// Set properties (M2).
     Set,
     /// Add an element (M2).
@@ -264,6 +268,8 @@ pub enum Verb {
     Edit,
     /// [`File::batch`] and its single-command [`File::apply`] channel.
     Batch,
+    /// CSV/TSV import into a worksheet, [`File::import`] (record 0266).
+    Import,
     /// Save in the same format (W4).
     Save,
     /// Create a new package of this format (W4).
@@ -273,11 +279,12 @@ pub enum Verb {
 impl Verb {
     /// Every verb, in declaration order: the reads, then the edits,
     /// publication and creation.
-    pub const ALL: [Self; 13] = [
+    pub const ALL: [Self; 15] = [
         Self::Get,
         Self::Find,
         Self::Query,
         Self::View,
+        Self::Evaluate,
         Self::Set,
         Self::Add,
         Self::Remove,
@@ -285,6 +292,7 @@ impl Verb {
         Self::Swap,
         Self::Edit,
         Self::Batch,
+        Self::Import,
         Self::Save,
         Self::Create,
     ];
@@ -297,6 +305,7 @@ impl Verb {
             Self::Find => "find",
             Self::Query => "query",
             Self::View => "view",
+            Self::Evaluate => "evaluate",
             Self::Set => "set",
             Self::Add => "add",
             Self::Remove => "remove",
@@ -304,6 +313,7 @@ impl Verb {
             Self::Swap => "swap",
             Self::Edit => "edit",
             Self::Batch => "batch",
+            Self::Import => "import",
             Self::Save => "save",
             Self::Create => "create",
         }
@@ -322,8 +332,15 @@ impl Verb {
             | Self::Move
             | Self::Swap
             | Self::Edit
-            | Self::Batch => true,
-            Self::Get | Self::Find | Self::Query | Self::View | Self::Save | Self::Create => false,
+            | Self::Batch
+            | Self::Import => true,
+            Self::Get
+            | Self::Find
+            | Self::Query
+            | Self::View
+            | Self::Evaluate
+            | Self::Save
+            | Self::Create => false,
         }
     }
 }
@@ -663,6 +680,9 @@ impl Capabilities {
                 reason: "the unlocked encrypted workbook requires re-encryption for publication and refuses native editing",
             }.support();
         }
+        if matches!(verb, Verb::Import | Verb::Evaluate) {
+            return self.m4_support(verb);
+        }
         if verb == Verb::Create {
             return self.creation_support();
         }
@@ -851,6 +871,7 @@ impl Capabilities {
             | Verb::Batch => Support::Supported,
             Verb::Save => self.publication_support(),
             Verb::Create => self.creation_support(),
+            Verb::Import | Verb::Evaluate => self.m4_support(verb),
         }
     }
 
@@ -3940,5 +3961,6 @@ impl fmt::Display for Support {
     }
 }
 
+mod m4;
 #[cfg(test)]
 mod tests;

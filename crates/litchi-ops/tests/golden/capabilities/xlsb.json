@@ -14,6 +14,9 @@
     "view": {
       "supported": true
     },
+    "evaluate": {
+      "supported": true
+    },
     "set": {
       "supported": true
     },
@@ -33,6 +36,9 @@
       "supported": true
     },
     "batch": {
+      "supported": true
+    },
+    "import": {
       "supported": true
     },
     "save": {
@@ -1982,8 +1988,8 @@
       "element": "cell",
       "key": "computedValue",
       "code": "unsupported_capability",
-      "followUp": "M4 (formula evaluation)",
-      "reason": "the full XLSB grid exposes formula text and cached results; the source cached-value fallback has neither formula text nor formatting metadata, and there is no evaluator for an uncached result"
+      "followUp": "M4 follow-up: project computed values in cell views",
+      "reason": "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results from the full grid (record 0266); the source cached-value fallback has no formula text"
     },
     {
       "subject": "property",

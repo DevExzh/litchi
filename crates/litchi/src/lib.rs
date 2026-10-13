@@ -713,6 +713,14 @@ pub mod eval {
     pub use litchi_eval::*;
 }
 
+/// Unified formula evaluation over [`File`]: `File::evaluate` and
+/// `File::recalculate` (record 0266).
+#[cfg(all(
+    feature = "eval",
+    any(feature = "xls", feature = "xlsx", feature = "xlsb")
+))]
+pub use litchi_ops::calc;
+
 // The unified operations API (ADR 0033, `litchi-ops`): `open` and `File`
 // are the entry point. The openers wrap the `litchi-ops` ones with the
 // facade's iWork classifier.
@@ -783,8 +791,8 @@ pub use litchi_ops::{
     EncryptionKind, Error, Family, File, Flavor, IntoNode, IntoPlacement, IntoProps, IntoTarget,
     ItemResult, Key, Locked, NewNode, OpenOptions, Overwrite, Placement, PropValue, Props, Result,
     SaveOptions, SaveTo, Saved, SignatureOrigin, Signed, SourceMode, TargetArg, batch,
-    capabilities, compat, create, create_with, error, format, new_node, node, path, placement,
-    props, query, schema, target, transaction, view,
+    capabilities, compat, create, create_with, error, format, import, new_node, node, path,
+    placement, props, query, schema, target, transaction, view,
 };
 #[cfg(all(
     any(feature = "docx", feature = "pptx", feature = "xlsx", feature = "xlsb"),

@@ -95,6 +95,11 @@
 #![forbid(unsafe_code)]
 
 pub mod batch;
+#[cfg(all(
+    feature = "eval",
+    any(feature = "xlsx", feature = "xlsb", feature = "xls")
+))]
+pub mod calc;
 pub mod capabilities;
 pub mod compat;
 mod create;
@@ -102,6 +107,7 @@ pub mod error;
 mod file;
 pub mod format;
 mod handler;
+pub mod import;
 mod locked;
 #[cfg(feature = "markdown")]
 mod markdown;

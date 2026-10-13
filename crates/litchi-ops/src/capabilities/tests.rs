@@ -100,7 +100,11 @@ fn every_format_has_one_answer_for_its_reads() {
                 );
             },
         }
-        for verb in Verb::ALL.into_iter().filter(|verb| verb.is_edit()) {
+        // Import is a worksheet verb with its own answer (`m4_verbs_...`).
+        for verb in Verb::ALL
+            .into_iter()
+            .filter(|verb| verb.is_edit() && *verb != Verb::Import)
+        {
             #[cfg(feature = "pptx")]
             if format == FileFormat::Pptx
                 && matches!(verb, Verb::Add | Verb::Remove | Verb::Move | Verb::Swap)
@@ -609,5 +613,35 @@ fn doc_enumerates_its_unprojected_element_gaps() {
             "duplicate {:?}",
             gap.subject()
         );
+    }
+}
+
+/// Record 0266: import and evaluation answer for worksheets only.
+#[test]
+fn m4_verbs_are_worksheet_verbs() {
+    for format in [FileFormat::Xlsx, FileFormat::Xlsb, FileFormat::Xls] {
+        let capabilities = Capabilities::of(format);
+        let workbook = crate::read::Adapter::of(format).is_some();
+        assert_eq!(capabilities.verb(Verb::Import).is_supported(), workbook);
+        assert_eq!(
+            capabilities.verb(Verb::Evaluate).is_supported(),
+            workbook && cfg!(feature = "eval")
+        );
+    }
+    for format in [
+        FileFormat::Docx,
+        FileFormat::Doc,
+        FileFormat::Pptx,
+        FileFormat::Rtf,
+    ] {
+        let capabilities = Capabilities::of(format);
+        for verb in [Verb::Import, Verb::Evaluate] {
+            // "No worksheets", or the whole-format refusal of a build
+            // without the format.
+            assert!(
+                !capabilities.verb(verb).is_supported(),
+                "{format:?} {verb:?}"
+            );
+        }
     }
 }

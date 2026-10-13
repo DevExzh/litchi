@@ -843,3 +843,84 @@ fn officecli_smoke_script_replays() {
         run.stdout, run.stderr
     );
 }
+
+/// `import`, `evaluate` and `recalculate` (record 0266).
+#[test]
+fn import_evaluate_and_recalculate() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let workbook = dir.path().join("book.xlsx");
+    expect(0, ["create", arg(&workbook)]);
+    let source = dir.path().join("data.tsv");
+    std::fs::write(&source, "name\tscore\nAda\t36\n").expect("write source");
+    let run = expect(
+        0,
+        [
+            "--json",
+            "import",
+            arg(&workbook),
+            "/Sheet1",
+            arg(&source),
+            "--header",
+            "--start-cell",
+            "B2",
+        ],
+    );
+    let summary = run.json();
+    assert_eq!(summary["origin"], "B2");
+    assert_eq!(summary["rows"], 2);
+    assert_eq!(summary["numbers"], 1);
+    assert_eq!(summary["changed"], true);
+    let file = litchi_ops::open(&workbook).expect("reopen");
+    let cell = file.get("/Sheet1/C3").expect("imported cell");
+    assert_eq!(cell.view().text().expect("text").as_deref(), Some("36"));
+
+    // Empty input is a no-op that does not rewrite the file.
+    let empty = dir.path().join("empty.csv");
+    std::fs::write(&empty, "").expect("write empty source");
+    let before = std::fs::read(&workbook).expect("read");
+    let run = expect(0, ["import", arg(&workbook), "/Sheet1", arg(&empty)]);
+    assert_eq!(run.stdout.trim(), "No data to import");
+    assert_eq!(std::fs::read(&workbook).expect("read"), before);
+
+    // Formulas are written only on request, and evaluate computes them.
+    let formulas = dir.path().join("formulas.csv");
+    std::fs::write(&formulas, "2,=A10*21\n").expect("write formulas");
+    expect(
+        0,
+        [
+            "import",
+            arg(&workbook),
+            "/Sheet1/A10",
+            arg(&formulas),
+            "--formulas",
+        ],
+    );
+    let run = expect(0, ["--json", "evaluate", arg(&workbook), "/Sheet1/B10"]);
+    assert_eq!(
+        run.json(),
+        json!({"path": "/Sheet1/B10", "value": 42.0, "origin": "computed"})
+    );
+    let run = expect(0, ["--json", "recalculate", arg(&workbook), "--all"]);
+    let report = run.json();
+    assert_eq!(report["formulas"], 1);
+    assert_eq!(report["uncached"], 1);
+    assert_eq!(report["cells"][0]["computedValue"], 42.0);
+
+    // Usage and typed refusals.
+    expect(
+        2,
+        ["import", arg(&workbook), "/Sheet1", arg(&source), "--stdin"],
+    );
+    let run = expect(
+        4,
+        [
+            "import",
+            arg(&workbook),
+            "/Sheet1",
+            arg(&source),
+            "--delimiter",
+            ";;",
+        ],
+    );
+    assert!(run.stderr.contains("single character"), "{}", run.stderr);
+}

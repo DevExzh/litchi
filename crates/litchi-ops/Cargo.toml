@@ -67,6 +67,11 @@ markdown = ["dep:base64", "dep:litchi-markdown", "dep:memchr"]
 formula = ["dep:litchi-formula", "litchi-doc?/formula"]
 yaml = ["dep:serde-saphyr"]
 
+# `eval` (record 0266) evaluates spreadsheet formulas through the
+# `litchi-eval` engine: `File::evaluate`, `File::recalculate` and the
+# `calc` module. The facade's `eval` feature turns it on.
+eval = ["dep:litchi-eval"]
+
 # Compiles the detection probe counter and the test-only source detectors the
 # `litchi` facade's unit tests exercise. Enabled only by `litchi`'s
 # dev-dependency; never part of a release build.
@@ -85,6 +90,7 @@ litchi-crypto       = { workspace = true, optional = true, features = ["ooxml"] 
 litchi-doc          = { workspace = true, optional = true }
 litchi-docx         = { workspace = true, optional = true }
 litchi-drawingml    = { workspace = true, optional = true }
+litchi-eval         = { workspace = true, optional = true } # Formula evaluation (record 0266)
 litchi-formula      = { workspace = true, optional = true }
 litchi-markdown     = { workspace = true, optional = true }
 litchi-odf-common   = { workspace = true, optional = true }
@@ -129,3 +135,13 @@ required-features = ["xlsx", "docx", "pptx"]
 
 [lints]
 workspace = true
+
+# Formula-evaluation parity against the corpus' cached results (record 0266).
+[[example]]
+name              = "eval_parity"
+required-features = ["xlsx", "xlsb", "xls", "eval"]
+
+# Paired leaf-vs-unified import and evaluation measurements (record 0266).
+[[example]]
+name              = "m4_bench"
+required-features = ["xlsx", "xlsb", "xls", "eval"]

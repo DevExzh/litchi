@@ -714,6 +714,66 @@ class _ItemResult(TypedDict):
     suggestion: NotRequired[Optional[str]]
     """A failed item: how to recover, or None."""
 
+class _ImportSummary(TypedDict):
+    """``File.import_csv``'s ``Commit.value`` (stub-only type): content-free
+    facts about the import."""
+
+    sheet: int
+    """The worksheet's zero-based tab position."""
+    row: int
+    """The zero-based origin row."""
+    column: int
+    """The zero-based origin column."""
+    rows: int
+    """Records imported, the header included."""
+    columns: int
+    """Fields in the longest record."""
+    cells: int
+    """Non-empty fields written."""
+    texts: int
+    numbers: int
+    booleans: int
+    dates: int
+    """Fields written as date serials with a date format."""
+    dates_as_text: int
+    """Date fields kept as text (before the epoch, or XLS)."""
+    formulas: int
+    empty: int
+    """Empty fields (each clears an existing cell's value)."""
+
+class _Evaluated(TypedDict):
+    """``File.evaluate``'s result (stub-only type)."""
+
+    value: Union[None, bool, float, str]
+    """The value; an error value is its spelling ("#DIV/0!")."""
+    origin: str
+    """"literal", "cached" or "computed"."""
+
+class _RecalculatedCell(TypedDict):
+    """One formula of ``File.recalculate``'s ``cells`` (stub-only type)."""
+
+    sheet: int
+    row: int
+    column: int
+    formula: str
+    """The formula as stored, without "="."""
+    cached_value: Union[None, bool, float, str]
+    computed_value: Union[None, bool, float, str]
+    """None when the engine cannot evaluate the formula."""
+    status: str
+    """"match", "mismatch", "uncached", "unsupported" or "volatile"."""
+
+class _Recalculation(TypedDict):
+    """``File.recalculate``'s result (stub-only type)."""
+
+    formulas: int
+    match: int
+    mismatch: int
+    uncached: int
+    unsupported: int
+    volatile: int
+    cells: List[_RecalculatedCell]
+
 def open(path: Path | str) -> File:
     """Open the file at ``path`` through the unified API.
 
@@ -1175,6 +1235,57 @@ class File:
 
         As ``batch`` with one item in atomic mode.
         """
+        ...
+
+    def import_csv(
+        self,
+        target: str,
+        data: Union[bytes, str],
+        *,
+        delimiter: Optional[str] = None,
+        quote: Optional[str] = '"',
+        header: bool = False,
+        encoding: str = "auto",
+        infer: bool = True,
+        formulas: bool = False,
+        max_cells: Optional[int] = None,
+        max_bytes: Optional[int] = None,
+    ) -> Commit:
+        """Import CSV or TSV text into a worksheet; return the Commit.
+
+        ``target`` is a sheet ("/Sheet1", origin A1) or an origin cell
+        ("/Sheet1/B2") of an XLSX, XLSB or XLS workbook. Every field is
+        written in one atomic commit; empty input changes nothing. Numbers,
+        ISO dates and TRUE/FALSE are inferred unless ``infer`` is False;
+        fields starting with "=" become formulas only with ``formulas``.
+        ``Commit.value`` is the summary dict (``_ImportSummary``). The GIL is
+        released while the data is parsed and written.
+
+        Raises:
+            PathError: (a LookupError) If the target does not resolve
+            PropertyError: (a ValueError) If the text is malformed, an option
+                is invalid or a field is too long
+            UnsupportedError: (a ValueError) If the format has no worksheets
+            LitchiError: If a limit is exceeded ("limit_exceeded")
+        """
+        ...
+
+    def evaluate(self, path: str, *, recalculate: bool = False) -> _Evaluated:
+        """Evaluate one workbook cell: a value cell's value, a formula's
+        cached result, or (without a cache, or with ``recalculate``) its
+        computed result. The file is unchanged.
+
+        Raises:
+            UnsupportedError: (a ValueError) If the formula uses syntax or a
+                function the engine does not evaluate, or calls NOW, TODAY or
+                RAND without a cached value
+            PropertyError: (a ValueError) If the path is not a cell
+        """
+        ...
+
+    def recalculate(self) -> _Recalculation:
+        """Recalculate every formula and compare each result with its cached
+        value. The file is unchanged."""
         ...
 
     def save(self, path: Optional[Union[Path, str]] = None, *, overwrite: bool = True) -> int:

@@ -30,7 +30,7 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyModule, PyString};
 use crate::common::FileFormat;
 use crate::errors::Failure;
 use crate::write::{self, Commit, Edit, Items, Where};
-use crate::{nodes, props, pyser};
+use crate::{m4, nodes, props, pyser};
 
 /// Registers `File`, `open` and `open_bytes`.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -718,6 +718,138 @@ impl File {
             Some(results),
             None,
         )
+    }
+
+    /// Import CSV or TSV text into a worksheet; return the Commit.
+    ///
+    /// ``target`` is a sheet ("/Sheet1", origin A1) or an origin cell
+    /// ("/Sheet1/B2") of an XLSX, XLSB or XLS workbook. Every field is
+    /// written in one atomic commit; empty input changes nothing. Numbers,
+    /// ISO dates and TRUE/FALSE are inferred unless ``infer`` is False;
+    /// fields starting with "=" become formulas only with ``formulas``. The
+    /// GIL is released while the data is parsed and written.
+    ///
+    /// Args:
+    ///     target: The sheet or origin cell path
+    ///     data: The text, as bytes (any supported encoding) or str
+    ///     delimiter: One ASCII character ("\\t" or "tab" for a tab); by
+    ///         default the data's "sep=" line, else ","
+    ///     quote: The quote character, or None to read fields verbatim
+    ///     header: Whether the first record is a header, written as text
+    ///     encoding: "auto" (byte-order mark, else UTF-8), "utf-8",
+    ///         "utf-16le" or "utf-16be"
+    ///     infer: Whether numbers, dates and booleans are inferred
+    ///     formulas: Whether "=" fields become formulas
+    ///     max_cells: The largest number of fields (default 65,536)
+    ///     max_bytes: The largest source and staged payload (default 16 MiB)
+    ///
+    /// Returns:
+    ///     A Commit whose ``value`` is the summary dict: ``sheet``, ``row``,
+    ///     ``column`` (zero-based origin), ``rows``, ``columns``, ``cells``,
+    ///     ``texts``, ``numbers``, ``booleans``, ``dates``,
+    ///     ``dates_as_text``, ``formulas`` and ``empty``
+    ///
+    /// Raises:
+    ///     PathError: (a LookupError) If the target does not resolve
+    ///     PropertyError: (a ValueError) If the text is malformed, an option
+    ///         is invalid or a field is too long
+    ///     UnsupportedError: (a ValueError) If the format has no worksheets
+    ///     LitchiError: If a limit is exceeded ("limit_exceeded")
+    #[pyo3(signature = (
+        target,
+        data,
+        *,
+        delimiter = None,
+        quote = Some("\""),
+        header = false,
+        encoding = "auto",
+        infer = true,
+        formulas = false,
+        max_cells = None,
+        max_bytes = None
+    ))]
+    #[allow(clippy::too_many_arguments, reason = "the Python keyword arguments")]
+    fn import_csv(
+        &self,
+        py: Python<'_>,
+        target: PyBackedStr,
+        data: Bound<'_, PyAny>,
+        delimiter: Option<&str>,
+        quote: Option<&str>,
+        header: bool,
+        encoding: &str,
+        infer: bool,
+        formulas: bool,
+        max_cells: Option<usize>,
+        max_bytes: Option<usize>,
+    ) -> PyResult<Commit> {
+        let file = self.handle()?;
+        let data = m4::source(&data)?;
+        let (options, limits) = m4::options(
+            delimiter, quote, header, encoding, infer, formulas, max_cells, max_bytes,
+        )?;
+        let commit = py.detach(|| {
+            file.import_with_limits(&*target, &data, &options, &limits)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        m4::import_commit(py, commit)
+    }
+
+    /// Evaluate one workbook cell.
+    ///
+    /// A value cell gives its value; a formula gives its cached result, or
+    /// the computed one without a cache or with ``recalculate``. Evaluation
+    /// reads only: the file is unchanged. The GIL is released while
+    /// evaluating.
+    ///
+    /// Args:
+    ///     path: The cell ("/Sheet1/B2")
+    ///     recalculate: Compute the formula even when a cache exists
+    ///
+    /// Returns:
+    ///     {"value": None | bool | float | str, "origin": "literal" |
+    ///     "cached" | "computed"}; an error value is its spelling
+    ///     ("#DIV/0!")
+    ///
+    /// Raises:
+    ///     UnsupportedError: (a ValueError) If the formula uses syntax or a
+    ///         function the engine does not evaluate, or calls NOW/TODAY/RAND
+    ///         without a cached value
+    ///     PropertyError: (a ValueError) If the path is not a cell
+    ///     LitchiError: If a limit is exceeded ("limit_exceeded")
+    #[pyo3(signature = (path, *, recalculate = false))]
+    fn evaluate<'py>(
+        &self,
+        py: Python<'py>,
+        path: PyBackedStr,
+        recalculate: bool,
+    ) -> PyResult<Bound<'py, PyDict>> {
+        let file = self.handle()?;
+        let options = m4::calc_options(recalculate);
+        let evaluated = py.detach(|| {
+            file.evaluate(&*path, &options)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        m4::evaluated(py, &evaluated)
+    }
+
+    /// Recalculate every formula of the workbook and compare each result
+    /// with its cached value. The file is unchanged; the GIL is released
+    /// while evaluating.
+    ///
+    /// Returns:
+    ///     A dict with the counts ``formulas``, ``match``, ``mismatch``,
+    ///     ``uncached``, ``unsupported`` and ``volatile``, and ``cells``: one
+    ///     dict per formula (``sheet``, ``row``, ``column`` zero-based,
+    ///     ``formula``, ``cached_value``, ``computed_value``, ``status``)
+    fn recalculate<'py>(&self, py: Python<'py>) -> PyResult<Bound<'py, PyDict>> {
+        let file = self.handle()?;
+        let options = m4::calc_options(true);
+        let report = py.detach(|| {
+            file.recalculate(&options)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        m4::report(py, &report)
     }
 
     /// Save the File atomically, in its own format; return the bytes

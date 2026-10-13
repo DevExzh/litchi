@@ -17,6 +17,8 @@ use super::LegacyOpen;
 use super::signature::{self, Opened, Signature};
 use crate::{OpenOptions, Result};
 
+#[cfg(feature = "eval")]
+pub(crate) mod calc;
 mod children;
 mod layout;
 mod metadata;

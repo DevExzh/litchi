@@ -2562,6 +2562,9 @@ pub(crate) mod sheet_coalesce {
 /// original mutation index for deferred native failures while letting a
 /// sequence of ordinary scalar writes or removals share one package-owned
 /// edit.
+/// CSV/TSV import through one native edit (record 0266).
+pub(crate) mod import;
+
 pub(crate) mod coalesce {
     use super::{
         CellTarget, Commit, FileFormat, NativeCellEdit, NativeScalar, NativeSelector, Result,

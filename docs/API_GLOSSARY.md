@@ -1859,3 +1859,40 @@ the eager `Document::comments`.
 | `Edit::insert_picture_at` | adopted (0251d) |
 | `numbering::{ListKind, AddedList}` | adopted (0251e) |
 | `Edit::{add_list, list_kind}` | adopted (0251e) |
+
+## Unified CSV/TSV import and formula evaluation (record 0266)
+
+`File::import(target, source, &import::Options)` and
+`File::import_with_limits` import delimited text into a worksheet of an XLSX,
+XLSB or XLS workbook as one mutation and one native commit, returning
+`transaction::Commit<import::Summary>`; `transaction::Edit::import` is the
+same mutation inside a closure transaction. `import` is the design §13 verb
+name; Python spells it `File.import_csv` because `import` is a Python
+keyword. Options are one consuming `import::Options` (`csv`, `tsv`,
+`delimiter`, `quote`, `header`, `encoding`, `infer`, `infer_numbers`,
+`infer_booleans`, `infer_dates`, `formulas`); limits are the transaction's
+`SemanticLimits` (`max_expanded_targets` bounds fields, `max_staged_bytes`
+bounds the source and staged payload), not a second limits type. Parse
+failures are the focused, content-free `import::Error` (`InvalidOption`,
+`Encoding`, `UnterminatedQuote`, `InvalidCharacter`, `FieldTooLong`) with
+`import::OptionKind`.
+
+`File::evaluate(path, &calc::Options)` and `File::recalculate(&calc::Options)`
+(feature `eval`) read formula results through `litchi-eval`. The module is
+`calc` because the facade's `litchi::eval` already re-exports the engine
+crate. `calc::Value`/`ErrorValue` are the evaluated values,
+`calc::Evaluated`/`Origin` one cell's result, `calc::Report`/`Formula`/`Status`
+a recalculation. Bounds are `calc::Options::{max_cells, max_depth}` with
+`calc::LimitKind::{Cells, Depth}` folded into the focused `calc::Error`. The
+engine gains `litchi_eval::FormulaEvaluator::with_max_depth` and the
+`litchi_eval::DepthLimit` error.
+
+| Name | Status |
+|---|---|
+| `File::{import, import_with_limits}`, `transaction::Edit::import` | adopted (0266) |
+| `import::{Options, Encoding, Summary, Error, OptionKind}` | adopted (0266) |
+| `File::{evaluate, recalculate}` | adopted (0266) |
+| `calc::{Options, Value, ErrorValue, Evaluated, Origin, Report, Formula, Status, Error, LimitKind}` | adopted (0266) |
+| `capabilities::Verb::{Import, Evaluate}` | adopted (0266) |
+| `litchi_eval::{FormulaEvaluator::with_max_depth, DepthLimit}` | adopted (0266) |
+| Python `File.import_csv`, `File.evaluate`, `File.recalculate` | adopted (0266) |

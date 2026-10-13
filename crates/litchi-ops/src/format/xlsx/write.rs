@@ -2630,6 +2630,9 @@ fn property_error(error: Error, key: &crate::props::Key<'_>) -> Error {
 /// run never shadows cell state in the unified layer: the native
 /// `WorksheetEdit::state` view is the authority for each staged before/after
 /// pair.
+/// CSV/TSV import through one native edit (record 0266).
+pub(crate) mod import;
+
 pub(crate) mod coalesce {
     use super::{CellOperation, CellTarget, Xlsx, admit_properties_with_limits, native_error};
     use crate::error::{Code, Error, Result};

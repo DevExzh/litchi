@@ -250,6 +250,7 @@
       "litchi-doc",
       "litchi-docx",
       "litchi-drawingml",
+      "litchi-eval",
       "litchi-formula",
       "litchi-markdown",
       "litchi-odf-common",

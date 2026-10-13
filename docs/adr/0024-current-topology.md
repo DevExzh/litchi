@@ -4901,3 +4901,28 @@ edges and 11 ordered migration debts with IDs
 `[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]` (269 policy edges including the
 migration edges), with one migration host. Cargo metadata lists 270 internal
 dependency declarations.
+
+## 2026-10-13 amendment: `litchi-ops` formula-evaluation edge
+
+Unified-ops record [0266](../unified-ops/0266-csv-import-and-formula-evaluation.md)
+(plan step 18, design §13 P0) evaluates spreadsheet formulas through the
+unified API: `File::evaluate` and `File::recalculate` drive the existing
+`litchi-eval` engine over a snapshot of the workbook's cells. That adds one
+optional normal edge, `litchi-ops -> litchi-eval`, owned by a new `eval`
+feature of `litchi-ops`; the facade's existing `eval` feature turns it on
+(`litchi-ops?/eval`), and `litchi-cli` and `litchi-py` enable it. The same
+record also fixes three `litchi-eval` defects the corpus exposed (a panic on
+non-ASCII criteria, Excel's arithmetic and comparison coercion) and adds an
+evaluation depth bound; no edge of `litchi-eval` changes.
+
+`litchi-eval` is a runtime-neutral bulk package with no iWork edge (its async
+functions are driven by the caller; `litchi-ops` polls them with a no-op
+waker and never builds the network functions), so `litchi-ops` stays
+runtime-neutral and iWork-free and the non-iWork release gate is unchanged
+(48 bulk packages).
+
+The policy now records 67 packages, 259 canonical edges, 12
+development-only edges and 11 ordered migration debts with IDs
+`[1, 2, 4, 8, 10, 12, 13, 14, 15, 16, 17]` (270 policy edges including the
+migration edges), with one migration host. Cargo metadata lists 271 internal
+dependency declarations.

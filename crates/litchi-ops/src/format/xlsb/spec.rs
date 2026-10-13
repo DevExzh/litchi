@@ -991,8 +991,8 @@ static GAPS: &[GapSpec] = &[
     property_gap(
         "cell",
         "computedValue",
-        "M4 (formula evaluation)",
-        "the full XLSB grid exposes formula text and cached results; the source cached-value fallback has neither formula text nor formatting metadata, and there is no evaluator for an uncached result",
+        "M4 follow-up: project computed values in cell views",
+        "node views do not evaluate; `File::evaluate` and `File::recalculate` compute formula results from the full grid (record 0266); the source cached-value fallback has no formula text",
     ),
     property_gap(
         "cell",
