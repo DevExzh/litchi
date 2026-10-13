@@ -13,7 +13,7 @@ use std::io::Cursor;
 use litchi_core::sheet::{Cell as _, CellValue};
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::cell_values::{CellError, Reference, Value};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{
     Defect, SourceBackedWorkbook, ToleranceReport, Validation, ValueEncodingDefect, Workbook,
@@ -77,7 +77,7 @@ fn rewrite(
             .1,
     );
     let mut blob = Vec::new();
-    let mut writer = Writer::new(&mut blob);
+    let mut writer = Encoder::new(&mut blob);
     for (kind, payload) in &stream {
         writer.write_record(*kind, payload).unwrap();
     }

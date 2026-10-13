@@ -3,10 +3,10 @@
 use std::char;
 
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Records, kind};
 
 use super::model::{
-    CachedValue, CellReference, Dependencies, DependencyKind, ErrorCode, MainTopic, ReadLimits,
+    CachedValue, CellReference, Dependencies, DependencyKind, ErrorCode, MainTopic, SemanticLimits,
     Topic, VolatileType,
 };
 
@@ -21,7 +21,7 @@ pub(crate) struct Parsed {
 
 /// Parse one complete Volatile Dependencies stream and bind references to the
 /// Workbook sheet catalog cardinality.
-pub(crate) fn read(data: &[u8], limits: ReadLimits, sheet_count: usize) -> Result<Parsed> {
+pub(crate) fn read(data: &[u8], limits: SemanticLimits, sheet_count: usize) -> Result<Parsed> {
     let limits = limits.validate()?;
     if data.is_empty() {
         return Err(invalid("Volatile Dependencies stream is empty"));
@@ -57,7 +57,7 @@ pub(crate) fn read(data: &[u8], limits: ReadLimits, sheet_count: usize) -> Resul
 }
 
 struct Parser {
-    limits: ReadLimits,
+    limits: SemanticLimits,
     records: usize,
     strings: usize,
     mains: usize,
@@ -75,7 +75,7 @@ struct Parser {
 }
 
 impl Parser {
-    fn new(limits: ReadLimits) -> Self {
+    fn new(limits: SemanticLimits) -> Self {
         Self {
             limits,
             records: 0,
@@ -560,7 +560,7 @@ impl Parser {
 /// because their original positions cannot be proven from the typed model.
 pub(crate) fn write(
     value: &Dependencies,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     sheet_count: usize,
 ) -> Result<Vec<u8>> {
     let limits = limits.validate()?;
@@ -594,7 +594,7 @@ pub(crate) fn write(
             resource: "Volatile Dependencies output",
             source,
         })?;
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_record(kind::BEGIN_VOL_DEPS, &[])?;
     for volatile_type in &value.types {
         writer.write_record(
@@ -660,7 +660,7 @@ pub(crate) fn write(
     Ok(output)
 }
 
-fn wide_string_payload(value: &str, limits: ReadLimits) -> Result<Vec<u8>> {
+fn wide_string_payload(value: &str, limits: SemanticLimits) -> Result<Vec<u8>> {
     let units = value.encode_utf16().count();
     if units > limits.max_string_units {
         return Err(limit(

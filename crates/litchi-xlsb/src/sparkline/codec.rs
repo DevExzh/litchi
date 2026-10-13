@@ -5,7 +5,7 @@
 
 //! Strict BIFF12 sparkline block codec.
 
-use crate::raw::{self, Cursor, Record, Records, Writer, kind};
+use crate::raw::{self, Cursor, Encoder, Record, Records, kind};
 use litchi_sheet::sparkline::{AxisType, EmptyCells, SparklineType};
 
 use super::model::{
@@ -79,7 +79,7 @@ pub(crate) fn encode_block(value: &Groups, limits: Limits) -> Result<Vec<u8>> {
     output
         .try_reserve_exact(encoded_len)
         .map_err(|_| allocation("encoded block"))?;
-    let mut writer = Writer::with_limits(output, raw::Limits::new(limits.record_bytes(), 1));
+    let mut writer = Encoder::with_limits(output, raw::Limits::new(limits.record_bytes(), 1));
     writer.write_record(kind::BEGIN_SPARKLINE_GROUPS, &[])?;
     for group in value.as_slice() {
         let payload = encode_group_payload(group, limits)?;

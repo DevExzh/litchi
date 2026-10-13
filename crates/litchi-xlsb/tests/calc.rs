@@ -6,7 +6,7 @@
 )]
 
 use litchi_xlsb::calc::{self, Delta, Error, Mode, Opts, Props, Threads};
-use litchi_xlsb::raw::{Error as RawError, Stage, Writer};
+use litchi_xlsb::raw::{Encoder, Error as RawError, Stage};
 
 fn payload(id: u32, mode: u32, iters: u32, delta: f64, threads: i32, opts: u16) -> [u8; calc::LEN] {
     let mut bytes = [0_u8; calc::LEN];
@@ -33,7 +33,7 @@ fn exact_payload_round_trip_preserves_every_field() {
     assert_eq!(props.opts(), opts);
 
     let mut written = Vec::new();
-    calc::write(&props, &mut Writer::new(&mut written)).unwrap();
+    calc::write(&props, &mut Encoder::new(&mut written)).unwrap();
     assert_eq!(written, bytes);
 }
 
@@ -55,7 +55,7 @@ fn accepts_excel_12_single_byte_options_and_writes_canonical_form() {
     assert!(!props.has(Opts::IGNORE_DEPS));
 
     let mut canonical = Vec::new();
-    calc::write(&props, &mut Writer::new(&mut canonical)).unwrap();
+    calc::write(&props, &mut Encoder::new(&mut canonical)).unwrap();
     assert_eq!(canonical, full);
 }
 

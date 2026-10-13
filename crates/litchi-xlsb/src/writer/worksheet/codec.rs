@@ -11,7 +11,7 @@
 use crate::package::error::{Error, Result};
 use crate::package::formula::{Group, GroupKind, ParsedFormula, Range};
 use crate::package::sheet_view::MAX_SHEET_VIEW_SELECTIONS;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 use litchi_core::sheet::CellValue;
 use std::collections::BTreeMap;
 use std::io::Write;
@@ -23,9 +23,9 @@ impl MutableWorksheet {
     ///
     /// [MS-XLSB] 2.4.864 + spec example 3.7.21: 23 bytes total
     /// Structure: flags (3 bytes) + brtcolorTab (8 bytes) + rwSync (4) + colSync (4) + strName (4)
-    pub(super) fn write_ws_properties<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_ws_properties<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // Flags (3 bytes per spec example 3.7.21):
         // Byte 0-1 (USHORT): flags A-O
@@ -66,7 +66,7 @@ impl MutableWorksheet {
     ///
     /// [MS-XLSB] 2.4.307/2.4.308: BrtBeginWsViews / BrtBeginWsView, optionally
     /// followed by BrtPane (2.4.723) and BrtSel (2.4.790) records.
-    pub(super) fn write_ws_views<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_ws_views<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         if let Some(view) = &self.view {
             if view.selections.len() > MAX_SHEET_VIEW_SELECTIONS {
                 return Err(Error::Unrecognized {
@@ -104,9 +104,9 @@ impl MutableWorksheet {
     /// REQUIRED by Excel
     ///
     /// [MS-XLSB] 2.4.862 + spec example 3.7.28: 12 bytes total
-    pub(super) fn write_sheet_format_pr<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_sheet_format_pr<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // dxGCol (4 bytes) - 0xFFFFFFFF = use cchDefColWidth instead
         temp_writer.write_u32(0xFFFFFFFF)?;
@@ -128,9 +128,9 @@ impl MutableWorksheet {
     }
 
     /// Write worksheet dimensions record
-    pub(super) fn write_dimensions<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_dimensions<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         if let Some((min_row, min_col, max_row, max_col)) = self.dimensions() {
             let (max_row, max_col) = self
@@ -158,7 +158,7 @@ impl MutableWorksheet {
     /// Write all cells
     pub(super) fn write_cells<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         shared_strings: &mut crate::writer::MutableSharedStringsWriter,
     ) -> Result<()> {
         let formula_groups = self.formula_groups_for_write()?;
@@ -187,7 +187,7 @@ impl MutableWorksheet {
 
     pub(super) fn write_cells_from<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         shared_strings: &mut crate::writer::MutableSharedStringsWriter,
         cells: &BTreeMap<(u32, u32), CellData>,
         formula_groups: &[Group],
@@ -290,7 +290,7 @@ impl MutableWorksheet {
 
     pub(super) fn write_grouped_formula_cell<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         row: u32,
         col: u32,
         cell_data: &CellData,
@@ -337,12 +337,12 @@ impl MutableWorksheet {
     ///   (colFirst (u32) + colLast (u32))
     pub(super) fn write_row_header<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         row: u32,
         cells: &BTreeMap<(u32, u32), CellData>,
     ) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // Fixed part
         temp_writer.write_u32(row)?; // rw: Row index
@@ -427,7 +427,7 @@ impl MutableWorksheet {
     /// Write a single cell record
     pub(super) fn write_cell<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         _row: u32,
         col: u32,
         cell_data: &CellData,
@@ -472,7 +472,7 @@ impl MutableWorksheet {
     )]
     pub(super) fn write_formula_cell<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         col: u32,
         style: u32,
         formula_text: &str,
@@ -508,7 +508,7 @@ impl MutableWorksheet {
         let cached = cached_value.unwrap_or(&CellValue::Float(0.0));
 
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
         Self::write_cell_structure(&mut temp_writer, col, style)?;
 
         let record_type = match cached {
@@ -555,7 +555,7 @@ impl MutableWorksheet {
     /// - fPhShow (1 bit): Phonetic info flag
     /// - reserved (7 bits): Reserved
     pub(super) fn write_cell_structure<W: Write>(
-        temp_writer: &mut Writer<W>,
+        temp_writer: &mut Encoder<W>,
         col: u32,
         style: u32,
     ) -> Result<()> {
@@ -574,12 +574,12 @@ impl MutableWorksheet {
     /// Write a blank cell (BrtCellBlank - 8 bytes)
     pub(super) fn write_blank_cell<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         col: u32,
         style: u32,
     ) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         Self::write_cell_structure(&mut temp_writer, col, style)?;
 
@@ -590,7 +590,7 @@ impl MutableWorksheet {
     /// Write a shared string cell (BrtCellIsst - Cell + u32 = 12 bytes)
     pub(super) fn write_shared_string_cell<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         col: u32,
         value: &str,
         style: u32,
@@ -600,7 +600,7 @@ impl MutableWorksheet {
         let string_index = shared_strings.add_string(value.to_string());
 
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // Cell structure (8 bytes) + isst index (4 bytes) = 12 bytes
         Self::write_cell_structure(&mut temp_writer, col, style)?;
@@ -613,13 +613,13 @@ impl MutableWorksheet {
     /// Write a number cell (BrtCellReal - Cell + f64 = 16 bytes)
     pub(super) fn write_number_cell<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         col: u32,
         value: f64,
         style: u32,
     ) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // Cell structure (8 bytes) + Xnum value (8 bytes) = 16 bytes
         Self::write_cell_structure(&mut temp_writer, col, style)?;
@@ -632,13 +632,13 @@ impl MutableWorksheet {
     /// Write a boolean cell (BrtCellBool - Cell + u8 = 9 bytes)
     pub(super) fn write_bool_cell<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         col: u32,
         value: bool,
         style: u32,
     ) -> Result<()> {
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // Cell structure (8 bytes) + fBool (1 byte) = 9 bytes
         Self::write_cell_structure(&mut temp_writer, col, style)?;
@@ -651,7 +651,7 @@ impl MutableWorksheet {
     /// Write an error cell (BrtCellError - Cell + u8 = 9 bytes)
     pub(super) fn write_error_cell<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         col: u32,
         error: &str,
         style: u32,
@@ -659,7 +659,7 @@ impl MutableWorksheet {
         let error_code = Self::error_code(error);
 
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // Cell structure (8 bytes) + bError (1 byte) = 9 bytes
         Self::write_cell_structure(&mut temp_writer, col, style)?;
@@ -684,11 +684,11 @@ impl MutableWorksheet {
     }
 
     /// Write merged cells
-    pub(super) fn write_merged_cells<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_merged_cells<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         // BrtBeginMergeCells (0x00B1) payload is a single DWORD count of BrtMergeCell
         // records that follow. SheetJS writes this as write_BrtBeginMergeCells(cnt).
         let mut header = Vec::new();
-        let mut temp_writer = Writer::new(&mut header);
+        let mut temp_writer = Encoder::new(&mut header);
         temp_writer.write_u32(self.merged_cells.len() as u32)?;
 
         writer.write_record(kind::BEGIN_MERGE_CELLS, &header)?;
@@ -703,7 +703,7 @@ impl MutableWorksheet {
     }
 
     /// Write column information records.
-    pub(super) fn write_col_infos<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_col_infos<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         if self.columns.is_empty() {
             return Ok(());
         }
@@ -712,7 +712,7 @@ impl MutableWorksheet {
 
         for (col, info) in &self.columns {
             let mut data = Vec::new();
-            let mut temp_writer = Writer::new(&mut data);
+            let mut temp_writer = Encoder::new(&mut data);
 
             // firstCol / lastCol (both 0-based inclusive).
             temp_writer.write_u32(*col)?;
@@ -749,7 +749,7 @@ impl MutableWorksheet {
     }
 
     /// Write hyperlinks
-    pub(super) fn write_hyperlinks<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_hyperlinks<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         for hyperlink in &self.hyperlinks {
             let data = hyperlink.try_serialize()?;
             writer.write_record(kind::H_LINK, &data)?;
@@ -758,13 +758,13 @@ impl MutableWorksheet {
     }
 
     /// Write sheet protection if configured.
-    pub(super) fn write_sheet_protection<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_sheet_protection<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let Some(ref prot) = self.sheet_protection else {
             return Ok(());
         };
 
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // Password hash (Method 1). When absent, write 0.
         temp_writer.write_u16(prot.password_hash.unwrap_or(0))?;
@@ -807,7 +807,7 @@ impl MutableWorksheet {
     }
 
     /// Write basic auto-filter range if configured.
-    pub(super) fn write_auto_filter<W: Write>(&self, writer: &mut Writer<W>) -> Result<()> {
+    pub(super) fn write_auto_filter<W: Write>(&self, writer: &mut Encoder<W>) -> Result<()> {
         let Some(ref af) = self.auto_filter else {
             return Ok(());
         };
@@ -823,7 +823,7 @@ impl MutableWorksheet {
         }
 
         let mut data = Vec::new();
-        let mut temp_writer = Writer::new(&mut data);
+        let mut temp_writer = Encoder::new(&mut data);
 
         // UncheckedRfX: row_first, row_last, col_first, col_last
         temp_writer.write_u32(af.row_first)?;

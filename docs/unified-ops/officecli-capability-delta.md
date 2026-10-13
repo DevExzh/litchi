@@ -27,7 +27,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `b80c09f5723f4a3da889e473913cb9abfb9bf4cf31aecd4e2deafb79859b9b7f` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `4e7b212643def7f109a5c16da8f19abd855a0331adb9a527524a0f0e4bc14d4a` |
 | golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `5dc72bbb9ec23999d9cb2d8efe02e2d61f0cb1ff737130ecfd9863615635c18d` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `6973955c10443443ee1e2b70a8a3d4bd1937c0124d97ce99e2ec81a7ec5989bc` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `a86c4a171a866a03e0033b2a8142404a06a4b289500d15089b9fd35b3a723089` |
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b7398c8669b21634506424ba4d2acc637d9840f9fd2887c114083f07c1776f3e` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `51624cb2c23fd6fc8fa5b4b22fe4b896ebd8d38a375ce7750a757500e66dd0ab` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `e5ce90bdf0f83b73b5d7a306bee39269cc4f07f3896861578948eebfc37b9cde` |
@@ -85,7 +85,7 @@ Property reads:
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
 | rtf | 25 | 0 | 225 | 0 | 196 | 1 | 514 | 39 |
 | xlsx | 89 | 16 | 489 | 0 | 26 | 1 | 70 | 63 |
-| xlsb | 62 | 45 | 489 | 0 | 24 | 1 | 70 | 2 |
+| xlsb | 78 | 29 | 489 | 0 | 24 | 1 | 70 | 30 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
 | pptx | 159 | 27 | 113 | 0 | 126 | 0 | 262 | 159 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
@@ -98,7 +98,7 @@ Property writes:
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
 | rtf | 12 | 9 | 775 | 0 | 33 | 171 |
 | xlsx | 11 | 39 | 494 | 0 | 67 | 143 |
-| xlsb | 2 | 2 | 540 | 0 | 3 | 146 |
+| xlsb | 8 | 26 | 510 | 0 | 31 | 146 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 25 | 38 | 498 | 0 | 44 | 241 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
@@ -4253,28 +4253,28 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | autofilter | `range` | string | asg |  | element gap | gap | M1-extended (R4x) |
 | autofilter | `criteria0` | string | a-- |  | element gap | gap | M1-extended (R4x) |
 | cell | `value` | string | asg | -s- | write-only | partial |  |
-| cell | `formula` | string | asg | --g | supported | gap |  |
-| cell | `numberformat` | string | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `font.bold` | bool | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `font.italic` | bool | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `font.name` | string | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `font.size` | font-size | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `font.color` | color | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `fill` | color | asg |  | gap | gap | M1-extended (R4d) |
+| cell | `formula` | string | asg | -sg | supported | partial |  |
+| cell | `numberformat` | string | asg | -sg | supported | partial |  |
+| cell | `font.bold` | bool | asg | -sg | supported | partial |  |
+| cell | `font.italic` | bool | asg | -sg | supported | partial |  |
+| cell | `font.name` | string | asg | -sg | supported | partial |  |
+| cell | `font.size` | font-size | asg | -sg | supported | partial |  |
+| cell | `font.color` | color | asg | -sg | supported | partial |  |
+| cell | `fill` | color | asg | -sg | supported | partial |  |
 | cell | `fillPattern` | enum | asg |  | gap | gap | M1-extended (R4d) |
 | cell | `fillBg` | color | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `strike` | bool | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `underline` | enum | asg |  | gap | gap | M1-extended (R4d) |
+| cell | `strike` | bool | asg | -sg | supported | partial |  |
+| cell | `underline` | enum | asg | -sg | supported | partial |  |
 | cell | `locked` | bool | as- |  | write-only | gap |  |
 | cell | `protection.locked` | bool | --g |  | gap | — | M1-extended (R4d) |
 | cell | `protection.hidden` | bool | --g |  | gap | — | M1-extended (R4d) |
 | cell | `numFmtId` | number | --g |  | raw-only | — | ADR 0034: native selection requires explicit raw admission |
 | cell | `phonetic` | string | asg |  | gap | gap | M1-extended (R4x) |
 | cell | `quotePrefix` | bool | --g |  | gap | — | M1-extended (R4d) |
-| cell | `alignment.horizontal` | enum | asg | --g | supported | gap |  |
-| cell | `alignment.vertical` | enum | asg | --g | supported | gap |  |
-| cell | `alignment.wrapText` | bool | asg | --g | supported | gap |  |
-| cell | `alignment.readingOrder` | enum | asg | --g | supported | gap |  |
+| cell | `alignment.horizontal` | enum | asg | -sg | supported | partial |  |
+| cell | `alignment.vertical` | enum | asg | -sg | supported | partial |  |
+| cell | `alignment.wrapText` | bool | asg | -sg | supported | partial |  |
+| cell | `alignment.readingOrder` | enum | asg | -sg | supported | partial |  |
 | cell | `merge` | string | as- | --g | supported | gap |  |
 | cell | `ref` | string | a-- |  | write-only | gap |  |
 | cell | `link` | string | asg |  | gap | gap | M1-extended (R4x) |
@@ -4288,19 +4288,19 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `cachedValue` | string | --g | --g | supported | — |  |
 | cell | `computedValue` | string | --g |  | gap | — | M4 (formula evaluation) |
 | cell | `evaluated` | bool | --g | --g | supported | — |  |
-| cell | `alignment.indent` | number | asg | --g | supported | gap |  |
-| cell | `alignment.shrinkToFit` | bool | asg | --g | supported | gap |  |
-| cell | `alignment.textRotation` | number | asg | --g | supported | gap |  |
+| cell | `alignment.indent` | number | asg | -sg | supported | partial |  |
+| cell | `alignment.shrinkToFit` | bool | asg | -sg | supported | partial |  |
+| cell | `alignment.textRotation` | number | asg | -sg | supported | partial |  |
 | cell | `border.diagonal` | string | asg |  | gap | gap | M1-extended (R4d) |
 | cell | `border.diagonal.color` | color | asg |  | gap | gap | M1-extended (R4d) |
 | cell | `border.diagonalDown` | bool | asg |  | gap | gap | M1-extended (R4d) |
 | cell | `border.diagonalUp` | bool | asg |  | gap | gap | M1-extended (R4d) |
 | cell | `border` | string | as- |  | write-only | gap |  |
-| cell | `border.all` | string | as- |  | write-only | gap |  |
-| cell | `border.top` | string | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `border.bottom` | string | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `border.left` | string | asg |  | gap | gap | M1-extended (R4d) |
-| cell | `border.right` | string | asg |  | gap | gap | M1-extended (R4d) |
+| cell | `border.all` | string | as- | -s- | write-only | partial |  |
+| cell | `border.top` | string | asg | -sg | supported | partial |  |
+| cell | `border.bottom` | string | asg | -sg | supported | partial |  |
+| cell | `border.left` | string | asg | -sg | supported | partial |  |
+| cell | `border.right` | string | asg | -sg | supported | partial |  |
 | cell | `border.color` | color | as- |  | write-only | gap |  |
 | cell | `arrayref` | string | --g | --g | supported | — |  |
 | cell | `mergeAnchor` | bool | --g | --g | supported | — |  |
@@ -4312,6 +4312,11 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `alt` | string | asg |  | gap | gap | M1-extended (R4x) |
 | cell | `image.contentType` | string | --g |  | missing | — |  |
 | cell | `image.fileSize` | int | --g |  | missing | — |  |
+| cell | `border.left.color` | color |  | -sg | litchi-only | litchi-only |  |
+| cell | `border.right.color` | color |  | -sg | litchi-only | litchi-only |  |
+| cell | `border.top.color` | color |  | -sg | litchi-only | litchi-only |  |
+| cell | `border.bottom.color` | color |  | -sg | litchi-only | litchi-only |  |
+| cell | `border.all.color` | color |  | -s- | litchi-only | litchi-only |  |
 | cellis | `ref` | string | a-g |  | element gap | gap | M1-extended (R4x) |
 | cellis | `operator` | enum | a-g |  | element gap | gap | M1-extended (R4x) |
 | cellis | `value` | string | a-g |  | element gap | gap | M1-extended (R4x) |
@@ -4609,9 +4614,9 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | iconset | `showValue` | bool | a-- |  | element gap | gap | M1-extended (R4x) |
 | iconset | `type` | string | --g |  | element gap | — | M1-extended (R4x) |
 | iconset | `dxfId` | number | --g |  | element gap | — | M1-extended (R4x) |
-| namedrange | `name` | string | asg | --g | supported | gap |  |
-| namedrange | `ref` | string | asg |  | gap | gap | M1-extended (R4d) |
-| namedrange | `scope` | string | asg |  | gap | gap | M1-extended (R4d) |
+| namedrange | `name` | string | asg | a-g | supported | partial |  |
+| namedrange | `ref` | string | asg | asg | supported | supported |  |
+| namedrange | `scope` | string | asg | a-g | supported | partial |  |
 | namedrange | `comment` | string | asg |  | gap | gap | M1-extended (R4d) |
 | namedrange | `volatile` | bool | asg |  | gap | gap | M1-extended (R4d) |
 | ole | `anchor` | string | asg |  | element gap | gap | M1-extended (R4x) |
@@ -4703,13 +4708,36 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | pivottable | `collapsedFields` | string | --g |  | element gap | — | M1-extended (R4x) |
 | pivottable | `axisAsDataField` | bool | --g |  | element gap | — | M1-extended (R4x) |
 | pivottable | `sortByField` | string | --g |  | element gap | — | M1-extended (R4x) |
-| range | `merge` | bool | -sg |  | gap | gap | M1-extended (R4x) |
-| range | `font.bold` | bool | -s- |  | write-only | gap |  |
-| range | `fill` | color | -s- |  | write-only | gap |  |
-| range | `numberformat` | string | -s- |  | write-only | gap |  |
-| range | `alignment.horizontal` | enum | -s- |  | write-only | gap |  |
+| range | `merge` | bool | -sg | -sg | supported | supported |  |
+| range | `font.bold` | bool | -s- | -s- | write-only | supported |  |
+| range | `fill` | color | -s- | -s- | write-only | supported |  |
+| range | `numberformat` | string | -s- | -s- | write-only | supported |  |
+| range | `alignment.horizontal` | enum | -s- | -s- | write-only | supported |  |
 | range | `value` | scalar |  | -s- | litchi-only | litchi-only |  |
+| range | `formula` | string |  | -s- | litchi-only | litchi-only |  |
 | range | `clear` | bool |  | -s- | litchi-only | litchi-only |  |
+| range | `font.italic` | bool |  | -s- | litchi-only | litchi-only |  |
+| range | `strike` | bool |  | -s- | litchi-only | litchi-only |  |
+| range | `underline` | enum |  | -s- | litchi-only | litchi-only |  |
+| range | `font.name` | string |  | -s- | litchi-only | litchi-only |  |
+| range | `font.size` | font-size |  | -s- | litchi-only | litchi-only |  |
+| range | `font.color` | color |  | -s- | litchi-only | litchi-only |  |
+| range | `border.all` | enum |  | -s- | litchi-only | litchi-only |  |
+| range | `border.all.color` | color |  | -s- | litchi-only | litchi-only |  |
+| range | `border.left` | enum |  | -s- | litchi-only | litchi-only |  |
+| range | `border.left.color` | color |  | -s- | litchi-only | litchi-only |  |
+| range | `border.right` | enum |  | -s- | litchi-only | litchi-only |  |
+| range | `border.right.color` | color |  | -s- | litchi-only | litchi-only |  |
+| range | `border.top` | enum |  | -s- | litchi-only | litchi-only |  |
+| range | `border.top.color` | color |  | -s- | litchi-only | litchi-only |  |
+| range | `border.bottom` | enum |  | -s- | litchi-only | litchi-only |  |
+| range | `border.bottom.color` | color |  | -s- | litchi-only | litchi-only |  |
+| range | `alignment.vertical` | enum |  | -s- | litchi-only | litchi-only |  |
+| range | `alignment.wrapText` | bool |  | -s- | litchi-only | litchi-only |  |
+| range | `alignment.textRotation` | int |  | -s- | litchi-only | litchi-only |  |
+| range | `alignment.indent` | int |  | -s- | litchi-only | litchi-only |  |
+| range | `alignment.shrinkToFit` | bool |  | -s- | litchi-only | litchi-only |  |
+| range | `alignment.readingOrder` | enum |  | -s- | litchi-only | litchi-only |  |
 | row | `matchedTable` | string | --g |  | missing | — |  |
 | row | `tableSource` | string | --g |  | missing | — |  |
 | row | `cols` | int | a-- |  | write-only | gap |  |

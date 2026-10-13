@@ -790,7 +790,7 @@ fn validate_draft(
     mapped_tables: &[MappedTable],
     groups: &[Option<Vec<SingleCellBinding>>],
     conformance: XmlMapConformance,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<()> {
     let has_singles = groups
         .iter()
@@ -945,7 +945,7 @@ fn source_relationship_targets(
 fn serialize_catalog(
     catalog: &XmlMapInfo,
     conformance: XmlMapConformance,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<Vec<u8>> {
     litchi_ooxml_common::spreadsheet_xml_maps::serialize_xml_map_info_with_limits(
         catalog,
@@ -981,7 +981,7 @@ fn _cell_reference_is_public(_: CellReference) {}
 #[cfg(test)]
 mod transaction_tests {
     use super::*;
-    use crate::xml_maps::{DataBinding, ReadLimits, XPath, XmlDataType, XmlSchema};
+    use crate::xml_maps::{DataBinding, SemanticLimits, XPath, XmlDataType, XmlSchema};
 
     #[test]
     fn absent_catalog_conformance_is_an_exact_signed_no_op() {
@@ -1013,7 +1013,7 @@ mod transaction_tests {
         )
         .expect("binding");
         let groups = vec![Some(vec![binding])];
-        let mut exact = ReadLimits::DEFAULT;
+        let mut exact = SemanticLimits::DEFAULT;
         exact.max_total_bindings = 1;
         exact.max_total_xpath_units = 2;
         validate_draft(
@@ -1057,7 +1057,7 @@ mod transaction_tests {
         let xml_bytes = serialize_catalog(
             &catalog,
             XmlMapConformance::Transitional,
-            ReadLimits::DEFAULT,
+            SemanticLimits::DEFAULT,
         )
         .expect("default serialization")
         .len();

@@ -22,7 +22,7 @@ mod codec_review_tests;
 pub use model::{
     CachedValue, CellReference, Dependencies, DependencyKind, ErrorCode, HARD_MAX_ITEMS,
     HARD_MAX_PART_BYTES, HARD_MAX_RECORDS, HARD_MAX_RELATIONSHIPS, HARD_MAX_STRING_UNITS,
-    HARD_MAX_TOTAL_STRING_UNITS, MainTopic, ReadLimits, Topic, VolatileType,
+    HARD_MAX_TOTAL_STRING_UNITS, MainTopic, SemanticLimits, Topic, VolatileType,
 };
 pub use package::{CONTENT_TYPE, DEFAULT_PART_NAME, RELATIONSHIP_TYPE};
 pub use patch::{Commit, Patch};
@@ -30,8 +30,6 @@ pub use snapshot::Snapshot;
 pub use transaction::Transaction;
 
 /// Alias matching other XLSB feature owners.
-pub type Limits = ReadLimits;
-
 pub use crate::package::error::{Error, Result};
 
 /// Validate graph ownership and the modeled stream before catalog remapping.
@@ -40,13 +38,13 @@ pub(crate) fn reorder_owner(
     sheet_count: usize,
 ) -> Result<Option<litchi_opc::PackURI>> {
     let workbook_name = package.main_document_part()?.partname();
-    let graph = package::discover_graph(package, workbook_name, Limits::DEFAULT)?;
+    let graph = package::discover_graph(package, workbook_name, SemanticLimits::DEFAULT)?;
     let Some(graph) = graph else {
         return Ok(None);
     };
     let parsed = codec::read(
         package.get_part(&graph.part_name)?.blob(),
-        Limits::DEFAULT,
+        SemanticLimits::DEFAULT,
         sheet_count,
     )?;
     if !parsed.rewrite_safe {

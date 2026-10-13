@@ -36,9 +36,10 @@
 //! [`CachedNumberDefect`] class (MS-XLSB 2.5.153 `Xnum` caches that are NaN,
 //! infinite, denormalized, or negative zero, audit finding F3.10): a NaN cache
 //! has no unambiguous ground truth, so the repair is never applied by
-//! default. Select it with [`Workbook::new_with_leniency`](crate::Workbook::new_with_leniency),
-//! [`Workbook::from_opc_package_with_leniency`](crate::Workbook::from_opc_package_with_leniency),
-//! or [`SourceBackedWorkbook::from_reader_with_leniency`](crate::SourceBackedWorkbook::from_reader_with_leniency).
+//! default. Select it with [`OpenOptions::leniency`](crate::OpenOptions::leniency)
+//! on any configured open route, for example
+//! [`Package::open_with_options`](crate::Package::open_with_options) or
+//! [`SourceBackedWorkbook::from_reader_with_options`](crate::SourceBackedWorkbook::from_reader_with_options).
 //!
 //! **Structural corruption and security limits stay hard errors** under every
 //! variant: BIFF12 record framing (header varints, declared lengths, truncated

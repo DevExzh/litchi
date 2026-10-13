@@ -7,7 +7,7 @@
 //! Workbook-writer serialization and round-trip tests.
 
 use super::super::Builder;
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 use crate::writer::MutableWorksheet;
 use litchi_opc::constants::relationship_type as rel;
 use litchi_opc::{OpcPackage, PackURI};
@@ -26,7 +26,7 @@ fn pivot_chart_round_trips_with_lossless_view_and_cache_graph() {
     }
     let mut view_bytes = Vec::new();
     {
-        let mut writer = Writer::new(&mut view_bytes);
+        let mut writer = Encoder::new(&mut view_bytes);
         writer
             .write_record(kind::BEGIN_SX_VIEW, &begin_view)
             .unwrap();

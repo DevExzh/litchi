@@ -14,7 +14,7 @@ use crate::package::error::Result;
 use crate::package::formula::{Compiler, Context, ExternalBook, Parser};
 use crate::package::shared_strings::SharedString;
 use crate::package::styles_table::StylesTable;
-use crate::raw::{Kind as RawKind, Records, Writer, kind};
+use crate::raw::{Encoder, Kind as RawKind, Records, kind};
 use litchi_core::sheet::{Cell, WorkbookTrait, Worksheet};
 use litchi_ooxml_common::embedded::{Kind as EmbeddedKind, Target};
 use litchi_ooxml_common::web;
@@ -38,7 +38,7 @@ fn wide_string(value: &str) -> Vec<u8> {
 
 fn external_link_records(records: &[(RawKind, Vec<u8>)]) -> Vec<u8> {
     let mut data = Vec::new();
-    let mut writer = Writer::new(&mut data);
+    let mut writer = Encoder::new(&mut data);
     for (record_type, payload) in records {
         writer.write_record(*record_type, payload).unwrap();
     }
@@ -107,7 +107,11 @@ fn durable_patch_decode_can_opt_into_skipped_drawing_projection() {
     assert_eq!(decoded.operation_count(), 0);
 
     let package_bytes = litchi_opc::PackageWriter::to_bytes(workbook.opc_package()).unwrap();
-    let mut skipped = Workbook::new_without_drawing_parse(Cursor::new(package_bytes)).unwrap();
+    let mut skipped = Workbook::new_with_options(
+        Cursor::new(package_bytes),
+        crate::OpenOptions::new().parse_drawings(false),
+    )
+    .unwrap();
     decoded.apply(&mut skipped).unwrap();
     assert!(!skipped.drawings_parsed());
 }
@@ -136,8 +140,20 @@ fn workbook_ingress_honors_exact_read_limits() {
         .expect("valid smaller limit");
 
     assert!(Workbook::new(Cursor::new(bytes.clone())).is_ok());
-    assert!(Workbook::new_with_limits(Cursor::new(bytes.clone()), exact).is_ok());
-    assert!(Workbook::new_with_limits(Cursor::new(bytes), over).is_err());
+    assert!(
+        Workbook::new_with_options(
+            Cursor::new(bytes.clone()),
+            crate::OpenOptions::new().source_limits(exact)
+        )
+        .is_ok()
+    );
+    assert!(
+        Workbook::new_with_options(
+            Cursor::new(bytes),
+            crate::OpenOptions::new().source_limits(over)
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -424,7 +440,7 @@ fn package_with_external_links<'a>(links: &[ExternalLinkFixture<'a>]) -> OpcPack
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_data = Vec::new();
     {
-        let mut writer = Writer::new(&mut workbook_data);
+        let mut writer = Encoder::new(&mut workbook_data);
         for (workbook_relationship_id, _, _) in links {
             writer
                 .write_record(kind::SUP_BOOK_SRC, &wide_string(workbook_relationship_id))
@@ -532,9 +548,9 @@ fn default_external_link_constructors_match_explicit_default_policy() {
     );
 
     let default_package = crate::Package::from_opc(package_with_external_links(&links)).unwrap();
-    let explicit_package = crate::Package::from_opc_with_external_link_limits(
+    let explicit_package = crate::Package::from_opc_with_options(
         package_with_external_links(&links),
-        ExternalLinkLimits::DEFAULT,
+        crate::OpenOptions::new().external_link_limits(ExternalLinkLimits::DEFAULT),
     )
     .unwrap();
     assert_eq!(
@@ -588,8 +604,11 @@ fn eager_external_link_part_bytes_are_aggregated_across_parts() {
         part_bytes,
     );
 
-    let error = crate::Package::from_opc_with_external_link_limits(source_package.clone(), limits)
-        .unwrap_err();
+    let error = crate::Package::from_opc_with_options(
+        source_package.clone(),
+        crate::OpenOptions::new().external_link_limits(limits),
+    )
+    .unwrap_err();
     assert_external_link_limit(
         error,
         ExternalLinkResource::TotalPartBytes,
@@ -647,14 +666,19 @@ fn eager_external_link_limits_are_atomic_and_reconstruct_with_policy() {
             .unwrap_err();
     assert_external_link_limit(error, ExternalLinkResource::Links, 2, 1);
 
-    let error =
-        crate::Package::from_opc_with_external_link_limits(source_package.clone(), restrictive)
-            .unwrap_err();
+    let error = crate::Package::from_opc_with_options(
+        source_package.clone(),
+        crate::OpenOptions::new().external_link_limits(restrictive),
+    )
+    .unwrap_err();
     assert_external_link_limit(error, ExternalLinkResource::Links, 2, 1);
 
     let permissive = ExternalLinkLimits::builder().max_links(2).build().unwrap();
-    let package =
-        crate::Package::from_opc_with_external_link_limits(source_package, permissive).unwrap();
+    let package = crate::Package::from_opc_with_options(
+        source_package,
+        crate::OpenOptions::new().external_link_limits(permissive),
+    )
+    .unwrap();
     assert_eq!(package.external_link_limits(), permissive);
 
     let workbook = package.workbook().unwrap();
@@ -1333,7 +1357,7 @@ fn resolves_external_formula_tokens_from_package_relationships() {
     let workbook_uri = PackURI::new("/xl/workbook.bin").unwrap();
     let mut workbook_data = Vec::new();
     {
-        let mut writer = Writer::new(&mut workbook_data);
+        let mut writer = Encoder::new(&mut workbook_data);
         writer
             .write_record(kind::SUP_BOOK_SRC, &wide_string("rIdExternal"))
             .unwrap();

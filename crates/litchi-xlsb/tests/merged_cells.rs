@@ -9,7 +9,7 @@
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::Workbook;
 use litchi_xlsb::merged_cells::MergedCell;
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
 
@@ -87,7 +87,7 @@ fn rewrite_first_sheet(package_bytes: &[u8], transform: impl FnOnce(&[u8]) -> Ve
 
 fn merge_block(declared_count: u32, ranges: &[MergedCell]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer
         .write_record(kind::BEGIN_MERGE_CELLS, &declared_count.to_le_bytes())
         .unwrap();
@@ -120,7 +120,7 @@ fn inserts_absent_block_preserving_unknown_records_parts_and_package_metadata() 
     let source = workbook_bytes(&[("First", &[]), ("Second", &[])]);
     let source = rewrite_first_sheet(&source, |sheet| {
         let mut unknown = Vec::new();
-        Writer::new(&mut unknown)
+        Encoder::new(&mut unknown)
             .write_record(Kind::new(0x0FFE).unwrap(), b"unknown-record-payload")
             .unwrap();
         insert_before_end_sheet(sheet, &unknown)
@@ -238,7 +238,7 @@ fn malformed_count_size_duplicate_and_out_of_order_blocks_roll_back() {
         }),
         rewrite_first_sheet(&base, |sheet| {
             let mut block = Vec::new();
-            let mut writer = Writer::new(&mut block);
+            let mut writer = Encoder::new(&mut block);
             writer
                 .write_record(kind::BEGIN_MERGE_CELLS, &1u32.to_le_bytes())
                 .unwrap();

@@ -3319,7 +3319,7 @@
         {
           "name": "edit_workbook_structure_with_limits",
           "scope": "litchi_xlsb::workbook::Workbook",
-          "replacement": "use Package::edit_with_limits"
+          "replacement": "use Package::edit_with_options"
         },
         {
           "name": "apply_workbook_structure",
@@ -3390,10 +3390,256 @@
           "scope": "litchi_xlsb::cell_values::structure::Edit",
           "replacement": "use set_sheet_name with a complete-catalog Selector",
           "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "open_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "open_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_bytes_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_bytes_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_slice",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_slice_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_slice_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_slice_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_opc_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_opc_with_options(package, OpenOptions)"
+        },
+        {
+          "name": "edit_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use edit_with_options(cell_values::structure::EditOptions)"
+        },
+        {
+          "name": "edit_cell_values_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use edit_cell_values_with_options(selector, cell_values::EditOptions)"
+        },
+        {
+          "name": "new_with_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_without_drawing_parse",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_without_drawing_parse_with_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_without_drawing_parse_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_with_leniency",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_opc_package_with_leniency",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use from_opc_package_with_options(package, OpenOptions)"
+        },
+        {
+          "name": "from_opc_package_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use from_opc_package_with_options(package, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_leniency",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_cache_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_execution_context",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_leniency",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_source_backed_package_with_leniency",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options or from_reader_with_options"
+        },
+        {
+          "name": "from_source_backed_package_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options or from_reader_with_options"
+        },
+        {
+          "name": "Writer",
+          "scope": "litchi_xlsb::raw",
+          "replacement": "use raw::Encoder (the BIFF12 record encoder; fresh authoring is Builder)",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb::data_model",
+          "replacement": "use data_model::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb::calculation_chain",
+          "replacement": "use calculation_chain::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb::volatile_dependencies",
+          "replacement": "use volatile_dependencies::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb::xml_maps",
+          "replacement": "use xml_maps::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_xlsb::data_model",
+          "replacement": "use data_model::SemanticLimits (one name per dimension set)",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_xlsb::calculation_chain",
+          "replacement": "use calculation_chain::SemanticLimits (one name per dimension set)",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_xlsb::volatile_dependencies",
+          "replacement": "use volatile_dependencies::SemanticLimits (one name per dimension set)",
+          "recursive": false
         }
       ],
       "families": [
-        "litchi_xlsb::metadata"
+        "litchi_xlsb::metadata",
+        "litchi_xlsb::cell_values",
+        "litchi_xlsb::cell_values::structure",
+        "litchi_xlsb::cell_values::worksheet"
       ]
     },
     {
@@ -3502,7 +3748,7 @@
         {
           "name": "edit_workbook_structure_with_limits",
           "scope": "litchi_xlsb::workbook::Workbook",
-          "replacement": "use Package::edit_with_limits"
+          "replacement": "use Package::edit_with_options"
         },
         {
           "name": "apply_workbook_structure",
@@ -3573,10 +3819,256 @@
           "scope": "litchi_xlsb::cell_values::structure::Edit",
           "replacement": "use set_sheet_name with a complete-catalog Selector",
           "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "open_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "open_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use open_with_options(path, OpenOptions)"
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_bytes_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_bytes_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_slice",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_slice_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_slice_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_slice_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_bytes(&[u8]) or from_bytes_with_options(bytes, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_opc_with_external_link_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use from_opc_with_options(package, OpenOptions)"
+        },
+        {
+          "name": "edit_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use edit_with_options(cell_values::structure::EditOptions)"
+        },
+        {
+          "name": "edit_cell_values_with_limits",
+          "scope": "litchi_xlsb::package::Package",
+          "replacement": "use edit_cell_values_with_options(selector, cell_values::EditOptions)"
+        },
+        {
+          "name": "new_with_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_without_drawing_parse",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_without_drawing_parse_with_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_without_drawing_parse_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "new_with_leniency",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use new_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_opc_package_with_leniency",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use from_opc_package_with_options(package, OpenOptions)"
+        },
+        {
+          "name": "from_opc_package_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::Workbook",
+          "replacement": "use from_opc_package_with_options(package, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_reader_with_leniency",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_reader_with_options(reader, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_limits_and_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_cache_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_execution_context",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_read_at_with_leniency",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options(source, OpenOptions)"
+        },
+        {
+          "name": "from_source_backed_package_with_leniency",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options or from_reader_with_options"
+        },
+        {
+          "name": "from_source_backed_package_with_external_link_limits",
+          "scope": "litchi_xlsb::workbook::SourceBackedWorkbook",
+          "replacement": "use from_read_at_with_options or from_reader_with_options"
+        },
+        {
+          "name": "Writer",
+          "scope": "litchi_xlsb::raw",
+          "replacement": "use raw::Encoder (the BIFF12 record encoder; fresh authoring is Builder)",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb::data_model",
+          "replacement": "use data_model::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb::calculation_chain",
+          "replacement": "use calculation_chain::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb::volatile_dependencies",
+          "replacement": "use volatile_dependencies::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_xlsb::xml_maps",
+          "replacement": "use xml_maps::SemanticLimits",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_xlsb::data_model",
+          "replacement": "use data_model::SemanticLimits (one name per dimension set)",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_xlsb::calculation_chain",
+          "replacement": "use calculation_chain::SemanticLimits (one name per dimension set)",
+          "recursive": false
+        },
+        {
+          "name": "Limits",
+          "scope": "litchi_xlsb::volatile_dependencies",
+          "replacement": "use volatile_dependencies::SemanticLimits (one name per dimension set)",
+          "recursive": false
         }
       ],
       "families": [
-        "litchi_xlsb::metadata"
+        "litchi_xlsb::metadata",
+        "litchi_xlsb::cell_values",
+        "litchi_xlsb::cell_values::structure",
+        "litchi_xlsb::cell_values::worksheet"
       ]
     },
     {

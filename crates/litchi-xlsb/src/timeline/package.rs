@@ -12,7 +12,7 @@ use super::codec::{
 };
 use super::model::{Cache, MAX_CACHES, MAX_VIEWS, Views, validate_cache, validate_views};
 use crate::package::error::{Error, Result};
-use crate::raw::{Cursor, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Records, kind};
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part};
 use std::char;
 use std::collections::HashSet;
@@ -84,7 +84,7 @@ fn write_rel_id(value: &str) -> Result<Vec<u8>> {
         return Err(invalid("FRTHeader.RelID", "invalid relationship ID"));
     }
     let mut output = Vec::with_capacity(6 + units * 2);
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_u32(0x08)?;
     writer.write_u16(units as u16)?;
     for unit in value.encode_utf16() {
@@ -207,7 +207,7 @@ fn parse_single_ref(data: &[u8], typ: &str) -> Result<Option<String>> {
 
 fn write_collection_refs(refs: &[String]) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_record(kind::BEGIN_TIMELINE_CACHE_IDS, &[])?;
     for value in refs {
         writer.write_record(kind::BEGIN_TIMELINE_CACHE_ID, &write_rel_id(value)?)?;
@@ -219,7 +219,7 @@ fn write_collection_refs(refs: &[String]) -> Result<Vec<u8>> {
 
 fn write_single_ref(value: &str) -> Result<Vec<u8>> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_record(kind::BEGIN_TIMELINE_EX, &write_rel_id(value)?)?;
     writer.write_record(kind::END_TIMELINE_EX, &[])?;
     Ok(output)

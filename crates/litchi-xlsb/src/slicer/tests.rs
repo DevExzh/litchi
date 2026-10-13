@@ -77,7 +77,7 @@ fn validation_rejects_unsafe_selection_and_reserved_bits() {
         .unwrap();
     native.1[8] |= 0x80;
     bytes.clear();
-    let mut writer = crate::raw::Writer::new(&mut bytes);
+    let mut writer = crate::raw::Encoder::new(&mut bytes);
     for (kind, payload) in records {
         writer.write_record(kind, &payload).unwrap();
     }

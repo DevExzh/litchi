@@ -51,7 +51,7 @@ impl Patch {
         }
     }
 
-    pub(crate) fn limits(&self) -> super::ReadLimits {
+    pub(crate) fn limits(&self) -> super::SemanticLimits {
         self.before.limits()
     }
 
@@ -237,7 +237,7 @@ fn add_graph(
 pub(crate) fn remove_owner(
     package: &mut OpcPackage,
     source: &SourceState,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<()> {
     let graph = source.graph.as_ref().ok_or_else(|| {
         Error::InvalidFormat("Calculation Chain owner is already absent".to_string())
@@ -288,7 +288,7 @@ pub(crate) fn remove_owner(
 fn restore_lexical_tokens(
     package: &mut OpcPackage,
     source: &SourceState,
-    limits: super::ReadLimits,
+    limits: super::SemanticLimits,
 ) -> Result<()> {
     let opc_limits = super::snapshot::opc_capture_limits(limits)?;
     restore_lexical_tokens_from_parts(

@@ -19,7 +19,7 @@ pub const HARD_MAX_GRAPH_PARTS: usize = 1_000_000;
 /// Caller-controlled finite limits for Calculation Chain inspection and
 /// source-bound removal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct ReadLimits {
+pub struct SemanticLimits {
     /// Maximum encoded bytes in the Workbook or Calculation Chain stream and
     /// in each captured relationship/content-types source token.
     pub max_part_bytes: usize,
@@ -35,7 +35,7 @@ pub struct ReadLimits {
     pub max_graph_parts: usize,
 }
 
-impl ReadLimits {
+impl SemanticLimits {
     /// Conservative finite limits for ordinary Calculation Chain inspection.
     pub const DEFAULT: Self = Self {
         max_part_bytes: 16 * 1024 * 1024,
@@ -78,7 +78,7 @@ impl ReadLimits {
     }
 }
 
-impl Default for ReadLimits {
+impl Default for SemanticLimits {
     fn default() -> Self {
         Self::DEFAULT
     }

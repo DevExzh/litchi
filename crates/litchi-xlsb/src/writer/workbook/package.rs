@@ -11,7 +11,7 @@ use crate::package::error::{Error, Result};
 use crate::package::formula::{
     CompilationContext, Context, DefinedName, ExternalSheet, SupportingLink,
 };
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use litchi_core::xml::escape_xml;
 use litchi_opc::constants::{content_type as ct, relationship_type as rel};
 use litchi_opc::part::Part;
@@ -380,7 +380,7 @@ impl Builder {
 
         // Write workbook structure
         let mut workbook_data = Vec::new();
-        let mut writer = Writer::new(&mut workbook_data);
+        let mut writer = Encoder::new(&mut workbook_data);
         self.write_workbook(
             &mut writer,
             formula_sheet_ranges,
@@ -629,7 +629,7 @@ impl Builder {
                     sheet_part.relate_to(&format!("../{comments_name}"), rel::COMMENTS);
                     let mut comments_data = Vec::new();
                     crate::comments::write(
-                        &mut Writer::new(&mut comments_data),
+                        &mut Encoder::new(&mut comments_data),
                         worksheet.comments(),
                     )?;
                     Some(BlobPart::new(
@@ -810,7 +810,7 @@ impl Builder {
                 // in the hyperlink records.
                 let mut sheet_data = Vec::new();
                 let worksheet_write_result = {
-                    let mut writer = Writer::new(&mut sheet_data);
+                    let mut writer = Encoder::new(&mut sheet_data);
                     worksheet.write_with_sparkline_block(
                         &mut writer,
                         &mut self.shared_strings,
@@ -969,7 +969,7 @@ impl Builder {
     /// Add shared strings part to the package
     fn add_shared_strings_part(&self, package: &mut OpcPackage) -> Result<()> {
         let mut sst_data = Vec::new();
-        let mut writer = Writer::new(&mut sst_data);
+        let mut writer = Encoder::new(&mut sst_data);
 
         self.shared_strings.write(&mut writer)?;
 
@@ -988,7 +988,7 @@ impl Builder {
     /// Add styles part to the package
     fn add_styles_part(&self, package: &mut OpcPackage) -> Result<()> {
         let mut styles_data = Vec::new();
-        let mut writer = Writer::new(&mut styles_data);
+        let mut writer = Encoder::new(&mut styles_data);
 
         self.styles.write(&mut writer)?;
 

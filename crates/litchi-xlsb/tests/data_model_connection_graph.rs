@@ -68,7 +68,7 @@ fn package_with_model_connection(names: &[&str], model_connection: &str) -> Pack
         .expect("build package")
         .write_to(&mut output)
         .expect("save");
-    Package::from_bytes(output.into_inner()).expect("package")
+    Package::from_bytes(&output.into_inner()).expect("package")
 }
 
 fn workbook_uri() -> PackURI {

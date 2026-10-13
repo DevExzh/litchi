@@ -10,18 +10,18 @@
 
 use litchi_opc::PackURI;
 
-use super::{Commit, Patch, ReadLimits, Snapshot};
+use super::{Commit, Patch, SemanticLimits, Snapshot};
 use crate::package::error::Result;
 use litchi_core::sheet::WorkbookTrait;
 
 impl crate::Workbook {
     /// Read the workbook Custom XML Maps catalog and inert BIFF12 bindings.
     pub fn xml_maps(&self) -> Result<Snapshot> {
-        self.xml_maps_with_limits(ReadLimits::DEFAULT)
+        self.xml_maps_with_limits(SemanticLimits::DEFAULT)
     }
 
     /// Read the workbook Custom XML Maps catalog and bindings with explicit limits.
-    pub fn xml_maps_with_limits(&self, limits: ReadLimits) -> Result<Snapshot> {
+    pub fn xml_maps_with_limits(&self, limits: SemanticLimits) -> Result<Snapshot> {
         Snapshot::read_for_worksheets(&self.package, self.xml_maps_worksheet_parts()?, limits)
     }
 

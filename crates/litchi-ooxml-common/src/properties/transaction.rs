@@ -35,7 +35,9 @@ use litchi_core::metadata::{Field, Metadata};
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::rel::TargetMode;
-use litchi_opc::{OpcError, OpcPackage, PackURI, SourceBackedPackage};
+use litchi_opc::{
+    OpcError, OpcPackage, PackURI, PreparedTopology, SourceBackedPackage, SourceTopologyPlan,
+};
 
 use super::package_graph::{
     GraphPart as _, PackageMetadata, ensure_only_inbound, free_part_name, names_conflict,
@@ -1092,6 +1094,163 @@ impl Patch {
         *package = candidate;
         Ok(true)
     }
+}
+
+impl Patch {
+    /// The patch that applies this patch and then `next`.
+    ///
+    /// `next` must start from this patch's after state: for every family
+    /// both patches change, `next`'s before bytes equal this patch's after
+    /// bytes. A family whose composed before and after bytes are equal is
+    /// dropped, so composing a patch with its inverse is a no-op.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Conflict`] when `next` does not continue this patch,
+    /// or when one family is removed and then created again under another
+    /// part or relationship (one [`Change`] keeps one relationship).
+    pub fn compose(&self, next: &Self) -> Result<Self> {
+        let mut changes = Vec::new();
+        for family in [Family::Core, Family::App, Family::Custom] {
+            let first = self.changes.iter().find(|change| change.family == family);
+            let second = next.changes.iter().find(|change| change.family == family);
+            let composed = match (first, second) {
+                (None, None) => continue,
+                (Some(change), None) | (None, Some(change)) => change.clone(),
+                (Some(first), Some(second)) => {
+                    if first.after != second.before {
+                        return Err(Error::Conflict(format!(
+                            "the second {} change does not start from the first one's result",
+                            family.label()
+                        )));
+                    }
+                    if first.part != second.part
+                        || first.relationship_id != second.relationship_id
+                        || first.relationship_type != second.relationship_type
+                        || first.relationship_target != second.relationship_target
+                    {
+                        return Err(Error::Conflict(format!(
+                            "the {} part moved between the composed changes",
+                            family.label()
+                        )));
+                    }
+                    Change {
+                        before: first.before.clone(),
+                        after: second.after.clone(),
+                        ..first.clone()
+                    }
+                },
+            };
+            if composed.before != composed.after {
+                changes.push(composed);
+            }
+        }
+        Ok(Self {
+            changes: changes.into_boxed_slice(),
+        })
+    }
+
+    /// Check that a source-backed package is in this patch's before state,
+    /// with the rules of [`Self::check`]. Only the changed families' parts
+    /// are read, inside the package's source-freshness checks.
+    ///
+    /// # Errors
+    ///
+    /// The errors of [`Self::check`], and a source-change or cancellation
+    /// error.
+    pub fn check_source_backed(&self, package: &SourceBackedPackage) -> Result<()> {
+        package.check_execution()?;
+        for change in &self.changes {
+            let graph = source_graph(package, change.family)?;
+            let bytes = match &graph.0 {
+                Some(part) => Some(package.part(part)?.data()?),
+                None => None,
+            };
+            check_change(
+                package,
+                change,
+                graph,
+                bytes.as_ref().map(|data| data.as_bytes()),
+            )?;
+        }
+        package.check_execution()?;
+        Ok(())
+    }
+
+    /// Plan this patch over a source-backed package without materializing
+    /// it: each change becomes a part replacement, or a part and
+    /// package-relationship addition or removal, of one
+    /// [`SourceTopologyPlan`]. Every other member keeps its source bytes and
+    /// compression when the returned topology is published.
+    ///
+    /// The package is checked first ([`Self::check_source_backed`]). An empty
+    /// patch prepares the exact-source no-op topology, so a signed package
+    /// keeps its signature; a changed patch refuses a package that carries
+    /// signature infrastructure (ADR 0006).
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::Signed`] for a changed patch of a signed package, the
+    /// errors of [`Self::check_source_backed`], and the topology planner's
+    /// source, limit and allocation errors.
+    pub fn prepare_source_backed(&self, package: &SourceBackedPackage) -> Result<PreparedTopology> {
+        let mut plan = SourceTopologyPlan::new();
+        if !self.is_noop() {
+            self.check_source_backed(package)?;
+            if package.has_signature_infrastructure() {
+                return Err(Error::Signed);
+            }
+            let root = PackURI::new("/").map_err(Error::Invalid)?;
+            for change in &self.changes {
+                match (&change.before, &change.after) {
+                    (Some(_), Some(after)) => {
+                        plan.try_replace_part_shared(change.part.clone(), Arc::clone(after))?;
+                    },
+                    (Some(_), None) => {
+                        plan.try_remove_part(change.part.clone())?;
+                        plan.try_remove_relationship(root.clone(), change.relationship_id.clone())?;
+                    },
+                    (None, Some(after)) => {
+                        plan.try_add_part_shared(
+                            change.part.clone(),
+                            change.family.content_type(),
+                            Arc::clone(after),
+                        )?;
+                        plan.try_add_internal_relationship(
+                            root.clone(),
+                            change.relationship_id.clone(),
+                            change.relationship_type.clone(),
+                            change.part.clone(),
+                        )?;
+                    },
+                    (None, None) => {},
+                }
+            }
+        }
+        Ok(package.clone().prepare_topology(plan)?)
+    }
+}
+
+/// The selected part and relationship ID of one family of a source-backed
+/// package, strictly inspected.
+fn source_graph(
+    package: &SourceBackedPackage,
+    family: Family,
+) -> Result<(Option<PackURI>, Option<String>)> {
+    Ok(match family {
+        Family::Core => {
+            let graph = graph::inspect_source_strict(package)?;
+            (graph.part, graph.relationship_id)
+        },
+        Family::App => {
+            let graph = app::inspect_source(package)?;
+            (graph.part, graph.relationship_id)
+        },
+        Family::Custom => {
+            let graph = custom::inspect_source_graph(package)?;
+            (graph.part_name, graph.relationship_id)
+        },
+    })
 }
 
 /// The selected part and relationship ID of one family of an owning

@@ -18,7 +18,7 @@
 
 use crate::package::error::{Error, Result};
 use crate::package::records::decode_string_with;
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use litchi_core::binary;
 
 /// A font change within an XLSB shared string.
@@ -292,7 +292,7 @@ impl SharedString {
             flags |= 2;
         }
         data.push(flags);
-        Writer::new(&mut data).write_wide_string(&self.text)?;
+        Encoder::new(&mut data).write_wide_string(&self.text)?;
         if !self.runs.is_empty() {
             let count = u32::try_from(self.runs.len()).map_err(|_| {
                 Error::Encoding("shared-string formatting-run count overflow".to_string())
@@ -304,7 +304,7 @@ impl SharedString {
             }
         }
         if let Some(phonetic) = &self.phonetic {
-            Writer::new(&mut data).write_wide_string(&phonetic.text)?;
+            Encoder::new(&mut data).write_wide_string(&phonetic.text)?;
             let count = u32::try_from(phonetic.runs.len()).map_err(|_| {
                 Error::Encoding("shared-string phonetic-run count overflow".to_string())
             })?;

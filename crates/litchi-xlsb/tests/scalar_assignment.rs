@@ -12,9 +12,9 @@ use std::io::Cursor;
 use litchi_core::sheet::CellValue;
 use litchi_opc::PackURI;
 use litchi_xlsb::Package;
-use litchi_xlsb::cell_values::{Limits, Reference, Scalar, StyleIndex, TransferLimits, Value};
+use litchi_xlsb::cell_values::{Limits, Reference, Scalar, StyleIndex, Value};
 use litchi_xlsb::formula::ParsedFormula;
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 fn a1() -> Reference {
@@ -55,7 +55,7 @@ fn package_with_scalars() -> Package {
         .expect("build package")
         .write_to(&mut bytes)
         .expect("write fixture");
-    Package::from_bytes(bytes.into_inner()).expect("read fixture")
+    Package::from_bytes(&bytes.into_inner()).expect("read fixture")
 }
 
 fn package_with_grouped_formula() -> Package {
@@ -71,7 +71,7 @@ fn package_with_grouped_formula() -> Package {
         .expect("build package")
         .write_to(&mut bytes)
         .expect("write formula fixture");
-    Package::from_bytes(bytes.into_inner()).expect("read formula fixture")
+    Package::from_bytes(&bytes.into_inner()).expect("read formula fixture")
 }
 
 fn package_with_missing_group_follower() -> Package {
@@ -103,7 +103,7 @@ fn package_with_missing_group_follower() -> Package {
                     .expect("formula cell payload"),
             ) == 1;
         if !drop_follower {
-            Writer::new(&mut output)
+            Encoder::new(&mut output)
                 .write_record(record.kind(), record.payload())
                 .expect("copy worksheet record");
         }
@@ -129,7 +129,7 @@ fn package_with_ordinary_formula() -> Package {
         .expect("build package")
         .write_to(&mut bytes)
         .expect("write ordinary formula fixture");
-    Package::from_bytes(bytes.into_inner()).expect("read ordinary formula fixture")
+    Package::from_bytes(&bytes.into_inner()).expect("read ordinary formula fixture")
 }
 
 fn package_with_typed_formula_caches() -> Package {
@@ -156,7 +156,7 @@ fn package_with_typed_formula_caches() -> Package {
         .expect("build package")
         .write_to(&mut bytes)
         .expect("write typed formula fixture");
-    Package::from_bytes(bytes.into_inner()).expect("read typed formula fixture")
+    Package::from_bytes(&bytes.into_inner()).expect("read typed formula fixture")
 }
 
 fn snapshot_cell(package: &Package, reference: Reference) -> Value {
@@ -277,10 +277,14 @@ fn invalid_scalar_is_rejected_before_mutation() {
     let source = package_with_scalars();
     let original = source.to_bytes().expect("source bytes");
     let mut edit = source
-        .edit_cell_values_with_limits(
+        .edit_cell_values_with_options(
             0,
-            Limits::new(512 * 1024, 128, 512 * 1024, 4),
-            TransferLimits::DEFAULT,
+            litchi_xlsb::cell_values::EditOptions::new().limits(Limits::new(
+                512 * 1024,
+                128,
+                512 * 1024,
+                4,
+            )),
         )
         .expect("selector")
         .expect("worksheet");
@@ -532,11 +536,11 @@ fn semantic_mutation_refuses_unmodeled_cell_families_without_guessing_coordinate
     let mut inserted = false;
     for item in Records::new(&bytes) {
         let record = item.expect("record");
-        Writer::new(&mut output)
+        Encoder::new(&mut output)
             .write_record(record.kind(), record.payload())
             .expect("copy");
         if !inserted && record.kind() == kind::ROW_HDR {
-            Writer::new(&mut output)
+            Encoder::new(&mut output)
                 .write_record(
                     litchi_xlsb::raw::Kind::new(0x000C).expect("reserved kind"),
                     &[0; 12],

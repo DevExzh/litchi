@@ -515,7 +515,7 @@ impl Corpus {
             semantic_cells.push((cell.row(), cell.column(), cell.value().clone()));
         }
         let full_text = facade_text(&bytes)?;
-        let package = litchi_xlsb::Package::from_slice(&bytes)?;
+        let package = litchi_xlsb::Package::from_bytes(&bytes)?;
         let part_digests = package_part_digests(package.opc_package());
         Ok(Self {
             path: path.to_path_buf(),
@@ -917,9 +917,10 @@ fn run_case_with_opener(
                 }
                 // The leaf call the deleted `sheet::open_xlsb_workbook_from_bytes`
                 // wrapped (M0a step S9), with the same default read limits.
-                let workbook = litchi_xlsb::Package::from_slice_with_limits(
+                let workbook = litchi_xlsb::Package::from_bytes_with_options(
                     &corpus.bytes,
-                    litchi_xlsb::SourceLimits::default(),
+                    litchi_xlsb::OpenOptions::new()
+                        .source_limits(litchi_xlsb::SourceLimits::default()),
                 )?
                 .into_workbook()?;
                 return Ok(RunOutcome::Projection {
@@ -1027,12 +1028,16 @@ fn verify_case(
     observed_text_bytes: Option<usize>,
     observed_text_sha256: Option<&str>,
 ) -> Result<GateReport> {
-    let malformed_input_refused = litchi_xlsb::Package::from_bytes(vec![0, 1, 2, 3]).is_err();
+    let malformed_input_refused = litchi_xlsb::Package::from_bytes(&[0, 1, 2, 3]).is_err();
     let tight_limits_refused = {
         let limit = litchi_xlsb::SourceLimits::builder()
             .max_input_bytes(u64::try_from(corpus.bytes.len().saturating_sub(1))?)?
             .build()?;
-        litchi_xlsb::Package::from_bytes_with_limits(corpus.bytes.clone(), limit).is_err()
+        litchi_xlsb::Package::from_bytes_with_options(
+            &corpus.bytes,
+            litchi_xlsb::OpenOptions::new().source_limits(limit),
+        )
+        .is_err()
     };
     let tight_cell_limits_refused = {
         let workbook = opener(&corpus.bytes)?;
@@ -1088,7 +1093,7 @@ fn verify_case(
     let output_matches_across_samples = sample_identities
         .iter()
         .all(|identity| identity == &output_identity);
-    let output_package = litchi_xlsb::Package::from_slice(output)?;
+    let output_package = litchi_xlsb::Package::from_bytes(output)?;
     let output_parts = package_part_digests(output_package.opc_package());
     let changed_part_names: Vec<String> = corpus
         .part_digests
@@ -1226,7 +1231,11 @@ fn verify_source_case(
             corpus.bytes.clone(),
             Arc::new(SourceReadCounters::default()),
         ));
-        SourceBackedWorkbook::from_read_at_with_limits(source, limit).is_err()
+        SourceBackedWorkbook::from_read_at_with_options(
+            source,
+            litchi_xlsb::OpenOptions::new().source_limits(limit),
+        )
+        .is_err()
     };
     // SourceBackedWorksheet::materialize currently exposes the format-level
     // read limits but no separate cell-value limit parameter. Keep this gate
@@ -1386,8 +1395,9 @@ fn open_direct(bytes: &[u8]) -> Result<litchi_xlsb::Workbook> {
 }
 
 fn open_direct_without_drawings(bytes: &[u8]) -> Result<litchi_xlsb::Workbook> {
-    Ok(litchi_xlsb::Workbook::new_without_drawing_parse(
+    Ok(litchi_xlsb::Workbook::new_with_options(
         Cursor::new(bytes.to_vec()),
+        litchi_xlsb::OpenOptions::new().parse_drawings(false),
     )?)
 }
 
@@ -1727,8 +1737,14 @@ mod tests {
             .expect("limit")
             .build()
             .expect("limits");
-        assert!(litchi_xlsb::Package::from_bytes_with_limits(corpus.bytes.clone(), limit).is_err());
-        assert!(litchi_xlsb::Package::from_bytes(vec![0, 1, 2, 3]).is_err());
+        assert!(
+            litchi_xlsb::Package::from_bytes_with_options(
+                &corpus.bytes,
+                litchi_xlsb::OpenOptions::new().source_limits(limit)
+            )
+            .is_err()
+        );
+        assert!(litchi_xlsb::Package::from_bytes(&[0, 1, 2, 3]).is_err());
         let workbook = open_direct(&corpus.bytes).expect("workbook");
         let limits = litchi_xlsb::cell_values::Limits::new(1, 1, 1, 1);
         assert!(
@@ -1833,7 +1849,7 @@ mod tests {
         }
         assert_eq!(
             corpus.report().package_part_count,
-            litchi_xlsb::Package::from_slice(&corpus.bytes)
+            litchi_xlsb::Package::from_bytes(&corpus.bytes)
                 .expect("package")
                 .opc_package()
                 .iter_parts()
@@ -1864,8 +1880,8 @@ mod tests {
         let workbook = open_direct_without_drawings(&bytes).expect("projection workbook");
         assert!(workbook.sheet_drawings().is_empty());
         let output = save_workbook(&workbook).expect("projection save");
-        let before = litchi_xlsb::Package::from_slice(&bytes).expect("input package");
-        let after = litchi_xlsb::Package::from_slice(&output).expect("output package");
+        let before = litchi_xlsb::Package::from_bytes(&bytes).expect("input package");
+        let after = litchi_xlsb::Package::from_bytes(&output).expect("output package");
         let before_parts = package_part_digests(before.opc_package());
         assert!(
             before_parts.keys().any(|name| name.contains("/drawings/")),
@@ -1887,7 +1903,7 @@ mod tests {
         assert!(raw_noop.sheet_drawings().is_empty());
         let raw_noop_output = save_workbook(&raw_noop).expect("raw no-op projection save");
         let raw_noop_package =
-            litchi_xlsb::Package::from_slice(&raw_noop_output).expect("raw no-op package");
+            litchi_xlsb::Package::from_bytes(&raw_noop_output).expect("raw no-op package");
         assert_eq!(
             before_parts,
             package_part_digests(raw_noop_package.opc_package())
@@ -1914,7 +1930,7 @@ mod tests {
             "drawing-skipped projection must retain its explicit typed-inventory boundary after publication"
         );
         let changed_package =
-            litchi_xlsb::Package::from_slice(&changed_output).expect("changed output package");
+            litchi_xlsb::Package::from_bytes(&changed_output).expect("changed output package");
         let changed_parts = package_part_digests(changed_package.opc_package());
         assert_ne!(
             before_parts, changed_parts,
@@ -2003,7 +2019,7 @@ mod tests {
         );
         let raw_saved = save_workbook(&raw_drawing).expect("raw drawing mutation save");
         let raw_reopened =
-            litchi_xlsb::Package::from_slice(&raw_saved).expect("raw drawing mutation reopen");
+            litchi_xlsb::Package::from_bytes(&raw_saved).expect("raw drawing mutation reopen");
         assert_eq!(
             raw_after_parts,
             package_part_digests(raw_reopened.opc_package()),
@@ -2179,7 +2195,7 @@ mod tests {
             .expect("scalar publication with opaque drawing");
         assert!(scalar.sheet_drawings().is_empty());
         let scalar_after_package =
-            litchi_xlsb::Package::from_slice(&scalar_output).expect("scalar output package");
+            litchi_xlsb::Package::from_bytes(&scalar_output).expect("scalar output package");
         let scalar_after = package_part_digests(scalar_after_package.opc_package());
         assert_eq!(
             scalar_after.get(scalar_drawing_uri.as_str()),

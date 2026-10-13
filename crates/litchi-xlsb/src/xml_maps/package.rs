@@ -40,7 +40,7 @@ pub(crate) struct Loaded {
 pub(crate) fn read_with_limits(
     package: &OpcPackage,
     worksheet_parts: Vec<PackURI>,
-    limits: super::snapshot::ReadLimits,
+    limits: super::snapshot::SemanticLimits,
 ) -> Result<Loaded> {
     preflight(package, limits)?;
     let workbook = package.main_document_part()?;
@@ -416,7 +416,10 @@ fn xml_maps_relationship(
 }
 
 /// Reject package-wide resource overages before callers clone or parse the workbook.
-pub(crate) fn preflight(package: &OpcPackage, limits: super::snapshot::ReadLimits) -> Result<()> {
+pub(crate) fn preflight(
+    package: &OpcPackage,
+    limits: super::snapshot::SemanticLimits,
+) -> Result<()> {
     if package.part_count() > limits.max_parts {
         return Err(invalid("package exceeds the XML Maps maximum part count"));
     }
@@ -621,7 +624,7 @@ fn charge_bindings<'a>(
     xpaths: impl Iterator<Item = &'a str>,
     total_bindings: &mut usize,
     total_xpath_units: &mut usize,
-    limits: super::snapshot::ReadLimits,
+    limits: super::snapshot::SemanticLimits,
 ) -> Result<()> {
     for xpath in xpaths {
         *total_bindings = total_bindings

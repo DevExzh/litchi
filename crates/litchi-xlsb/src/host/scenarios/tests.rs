@@ -7,7 +7,7 @@ use super::codec;
 use super::package::{parse_worksheet, replace_worksheet};
 use super::{CellRange, ChangedCell, Manager, Scenario};
 use crate::package::error::Error;
-use crate::raw::{Header, Kind, Limits, Records, Writer, kind};
+use crate::raw::{Encoder, Header, Kind, Limits, Records, kind};
 
 fn scenario() -> Scenario {
     let mut scenario = Scenario::new("Forecast", "Analyst").unwrap();
@@ -34,7 +34,7 @@ fn manager() -> Manager {
 
 fn worksheet(manager: &Manager) -> Vec<u8> {
     let mut data = codec::write_manager(manager).unwrap();
-    Writer::new(&mut data)
+    Encoder::new(&mut data)
         .write_record(kind::END_SHEET, &[])
         .unwrap();
     data
@@ -42,7 +42,7 @@ fn worksheet(manager: &Manager) -> Vec<u8> {
 
 fn record(kind: Kind, payload: &[u8]) -> Vec<u8> {
     let mut data = Vec::new();
-    Writer::new(&mut data).write_record(kind, payload).unwrap();
+    Encoder::new(&mut data).write_record(kind, payload).unwrap();
     data
 }
 
@@ -126,7 +126,7 @@ fn opaque_manager_rejects_semantic_edits_and_removal() {
 fn package_splice_inserts_replaces_and_removes_only_the_known_block() {
     let prefix = record(Kind::new(0x0ffc).unwrap(), b"worksheet metadata");
     let mut absent = prefix.clone();
-    Writer::new(&mut absent)
+    Encoder::new(&mut absent)
         .write_record(kind::END_SHEET, &[])
         .unwrap();
 

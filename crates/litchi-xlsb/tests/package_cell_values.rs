@@ -14,7 +14,7 @@ use std::io::Cursor;
 use litchi_opc::{OpcPackage, PackURI};
 use litchi_xlsb::cell_values::{Reference, StyleIndex, TransferLimits, Value};
 use litchi_xlsb::chart::{Anchor, Chart};
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 use litchi_xlsb::{Package, SourceLimits};
 
@@ -71,7 +71,7 @@ fn chart_sheet_package() -> Package {
         .expect("build package")
         .write_to(&mut output)
         .expect("write chart fixture");
-    Package::from_bytes(output.into_inner()).expect("read chart package")
+    Package::from_bytes(&output.into_inner()).expect("read chart package")
 }
 
 #[test]
@@ -91,7 +91,7 @@ fn package_cell_name_selection_rejects_ambiguous_names() {
     let old: Vec<_> = "Else".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let replacement: Vec<_> = "data".encode_utf16().flat_map(u16::to_le_bytes).collect();
     let mut rewritten = Vec::new();
-    let mut records = Writer::new(&mut rewritten);
+    let mut records = Encoder::new(&mut rewritten);
     let mut replaced = false;
     for record in Records::new(&original) {
         let record = record.expect("record");
@@ -250,9 +250,11 @@ fn package_cell_commit_and_replay_honor_finite_retained_input_limits() {
         "the fixture operation must produce a larger package image"
     );
 
-    let bounded_source =
-        Package::from_bytes_with_limits(original.clone(), exact_input_limits(&original))
-            .expect("reopen source at its exact input budget");
+    let bounded_source = Package::from_bytes_with_options(
+        &original,
+        litchi_xlsb::OpenOptions::new().source_limits(exact_input_limits(&original)),
+    )
+    .expect("reopen source at its exact input budget");
     assert!(
         bounded_source.apply_cell_values(commit.patch()).is_err(),
         "destination retained input limits must reject a patch that grows the package"
@@ -325,11 +327,7 @@ fn raw_worksheet_transaction_stays_under_an_explicit_namespace() {
 fn package_cell_edit_accepts_explicit_worksheet_and_transfer_limits() {
     let source = Package::new().expect("source package");
     let edit = source
-        .edit_cell_values_with_limits(
-            0_usize,
-            litchi_xlsb::cell_values::Limits::DEFAULT,
-            TransferLimits::DEFAULT,
-        )
+        .edit_cell_values_with_options(0_usize, litchi_xlsb::cell_values::EditOptions::new())
         .expect("worksheet selector")
         .expect("Sheet1 worksheet");
     assert!(edit.commit().expect("bounded no-op").patch().is_noop());
@@ -337,15 +335,24 @@ fn package_cell_edit_accepts_explicit_worksheet_and_transfer_limits() {
 
 #[test]
 fn package_cell_transfer_quotas_cover_images_and_changes() {
-    use litchi_xlsb::cell_values::{Error, Limits};
+    use litchi_xlsb::cell_values::Error;
     let source = Package::new().expect("source");
     let original = source.to_bytes().expect("bytes");
     let quota = |bytes, changes| TransferLimits::new(bytes, changes, 1, bytes);
     let edit = source
-        .edit_cell_values_with_limits(0, Limits::DEFAULT, quota(1, 1))
+        .edit_cell_values_with_options(
+            0,
+            litchi_xlsb::cell_values::EditOptions::new().transfer_limits(quota(1, 1)),
+        )
         .expect("edit")
         .expect("worksheet");
-    assert!(matches!(edit.commit(), Err(Error::LimitExceeded { .. })));
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Limit {
+            kind: litchi_xlsb::cell_values::LimitKind::PatchBytes,
+            ..
+        })
+    ));
     let image_bytes = source
         .edit_cell_values(0)
         .expect("edit")
@@ -359,12 +366,24 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
         "quota includes worksheet proof and metadata"
     );
     let edit = source
-        .edit_cell_values_with_limits(0, Limits::DEFAULT, quota(image_bytes - 1, 1))
+        .edit_cell_values_with_options(
+            0,
+            litchi_xlsb::cell_values::EditOptions::new().transfer_limits(quota(image_bytes - 1, 1)),
+        )
         .expect("edit")
         .expect("worksheet");
-    assert!(matches!(edit.commit(), Err(Error::LimitExceeded { .. })));
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Limit {
+            kind: litchi_xlsb::cell_values::LimitKind::PatchBytes,
+            ..
+        })
+    ));
     let edit = source
-        .edit_cell_values_with_limits(0, Limits::DEFAULT, quota(image_bytes, 1))
+        .edit_cell_values_with_options(
+            0,
+            litchi_xlsb::cell_values::EditOptions::new().transfer_limits(quota(image_bytes, 1)),
+        )
         .expect("edit")
         .expect("worksheet");
     assert!(
@@ -374,7 +393,10 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
             .is_noop()
     );
     let mut edit = source
-        .edit_cell_values_with_limits(0, Limits::DEFAULT, quota(image_bytes * 2, 1))
+        .edit_cell_values_with_options(
+            0,
+            litchi_xlsb::cell_values::EditOptions::new().transfer_limits(quota(image_bytes * 2, 1)),
+        )
         .expect("edit")
         .expect("worksheet");
     for column in [0, 1] {
@@ -385,6 +407,12 @@ fn package_cell_transfer_quotas_cover_images_and_changes() {
         )
         .expect("insert");
     }
-    assert!(matches!(edit.commit(), Err(Error::LimitExceeded { .. })));
+    assert!(matches!(
+        edit.commit(),
+        Err(Error::Limit {
+            kind: litchi_xlsb::cell_values::LimitKind::Changes,
+            ..
+        })
+    ));
     assert_eq!(source.to_bytes().expect("source unchanged"), original);
 }

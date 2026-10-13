@@ -605,7 +605,7 @@ fn assert_exact_noop(input: &Input) {
         },
         #[cfg(feature = "xlsb")]
         FileFormat::Xlsb => {
-            let package = litchi_xlsb::Package::from_bytes(bytes.clone()).unwrap();
+            let package = litchi_xlsb::Package::from_bytes(bytes).unwrap();
             let commit = package
                 .edit_cell_values(0)
                 .unwrap()

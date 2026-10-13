@@ -10,8 +10,8 @@
 use crate::error::Code;
 use crate::format::workbook::spec as workbook;
 use crate::node::spec::{ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec};
-use crate::registry::{Access, Constraint, Entry, Table};
-use crate::value::ValueType;
+use crate::registry::{Access, Alias, Constraint, Entry, Table};
+use crate::value::{ColorContext, Length, LengthSpec, Tokens, ValueType};
 
 pub(crate) use workbook::{
     COLUMN_PROPS, ColumnKey, Kind, ROW_PROPS, RowKey, SheetKey, TABLE_PROPS, TableKey,
@@ -53,35 +53,357 @@ pub(crate) const SHEET_WRITE_TABLE: Table<SheetSetter, 3, 0> = Table::new(
 /// Read-schema projection of the XLSB sheet write registry.
 pub(crate) const SHEET_WRITE_PROPS: &[PropSpec] = &SHEET_WRITE_TABLE.readable();
 
-/// XLSB's cell payload setter vocabulary.
+/// XLSB's cell setter vocabulary (records 0168, 0261).
 ///
-/// The binary cell owner accepts the common scalar union and an explicit
-/// `clear: true`.  A null `value` is admitted through the registry's clear
-/// path and has the same blank-cell meaning.  Formula authoring remains
-/// deliberately absent from this table: `formula` is readable in the
-/// capability schema, but its setter is still a format-local gap.
+/// Payloads: the common scalar union (`value`), an explicit `clear: true`
+/// (a null `value` is admitted through the registry's clear path and has the
+/// same blank-cell meaning) and `formula` text, compiled by the leaf for
+/// references within the sheet and stored for recalculation on open.
+///
+/// Formatting: font flags, size, name and RGB color; a solid RGB `fill`
+/// (null removes the fill); the four outer border sides with RGB colors
+/// (`border.all` sets all four); the number-format code; and the alignment
+/// fields. Each change is a partial edit of the cell's current format, so
+/// unnamed attributes keep their exact records.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CellSetter {
     Value,
+    Formula,
     Clear,
+    Bold,
+    Italic,
+    Strike,
+    Underline,
+    FontName,
+    FontSize,
+    FontColor,
+    Fill,
+    BorderAll,
+    BorderAllColor,
+    BorderLeft,
+    BorderLeftColor,
+    BorderRight,
+    BorderRightColor,
+    BorderTop,
+    BorderTopColor,
+    BorderBottom,
+    BorderBottomColor,
+    NumberFormat,
+    Horizontal,
+    Vertical,
+    WrapText,
+    TextRotation,
+    Indent,
+    ShrinkToFit,
+    ReadingOrder,
 }
 
-pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 2, 0> = Table::new(
+/// XLSB underline values: the binary font record keeps a single underline.
+static XLSB_UNDERLINE: Tokens = Tokens::new(
+    "underline",
+    &["single", "none"],
+    &[("false", 1), ("true", 0)],
+);
+
+/// XLSB border lines (`Blxf` styles 1–13) and `none`, which removes a line.
+static XLSB_BORDER_LINE: Tokens = Tokens::new(
+    "border style",
+    &[
+        "thin",
+        "medium",
+        "dashed",
+        "dotted",
+        "thick",
+        "double",
+        "hair",
+        "mediumDashed",
+        "dashDot",
+        "mediumDashDot",
+        "dashDotDot",
+        "mediumDashDotDot",
+        "slantDashDot",
+        "none",
+    ],
+    &[],
+);
+
+const COLOR: ValueType = ValueType::Color(ColorContext::Spreadsheet);
+
+const fn set(
+    name: &'static str,
+    ty: ValueType,
+    setter: CellSetter,
+    clear: bool,
+) -> Entry<CellSetter> {
+    Entry {
+        spec: PropSpec::new(name, ty),
+        access: Access::Set(setter),
+        constraint: Constraint::None,
+        clear,
+    }
+}
+
+const fn constrained(
+    name: &'static str,
+    ty: ValueType,
+    setter: CellSetter,
+    constraint: Constraint,
+) -> Entry<CellSetter> {
+    Entry {
+        spec: PropSpec::new(name, ty),
+        access: Access::Set(setter),
+        constraint,
+        clear: false,
+    }
+}
+
+const fn write_only_entry(
+    name: &'static str,
+    ty: ValueType,
+    setter: CellSetter,
+    clear: bool,
+) -> Entry<CellSetter> {
+    Entry {
+        spec: write_only(name, ty),
+        access: Access::Set(setter),
+        constraint: Constraint::None,
+        clear,
+    }
+}
+
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 29, 24> = Table::new(
     [
-        Entry {
-            spec: write_only("value", ValueType::Scalar),
-            access: Access::Set(CellSetter::Value),
-            constraint: Constraint::None,
-            clear: true,
+        write_only_entry("value", ValueType::Scalar, CellSetter::Value, true),
+        constrained(
+            "formula",
+            ValueType::Text,
+            CellSetter::Formula,
+            Constraint::NotEmpty,
+        ),
+        write_only_entry("clear", ValueType::Bool, CellSetter::Clear, false),
+        set("font.bold", ValueType::Bool, CellSetter::Bold, false),
+        set("font.italic", ValueType::Bool, CellSetter::Italic, false),
+        set("strike", ValueType::Bool, CellSetter::Strike, false),
+        set(
+            "underline",
+            ValueType::Token(&XLSB_UNDERLINE),
+            CellSetter::Underline,
+            false,
+        ),
+        constrained(
+            "font.name",
+            ValueType::Text,
+            CellSetter::FontName,
+            Constraint::NotEmpty,
+        ),
+        constrained(
+            "font.size",
+            ValueType::Length(LengthSpec::FONT_SIZE),
+            CellSetter::FontSize,
+            Constraint::Length {
+                min: Length::from_points(1),
+                max: Length::from_points(409),
+            },
+        ),
+        set("font.color", COLOR, CellSetter::FontColor, true),
+        set("fill", COLOR, CellSetter::Fill, true),
+        write_only_entry(
+            "border.all",
+            ValueType::Token(&XLSB_BORDER_LINE),
+            CellSetter::BorderAll,
+            true,
+        ),
+        write_only_entry("border.all.color", COLOR, CellSetter::BorderAllColor, false),
+        set(
+            "border.left",
+            ValueType::Token(&XLSB_BORDER_LINE),
+            CellSetter::BorderLeft,
+            true,
+        ),
+        set(
+            "border.left.color",
+            COLOR,
+            CellSetter::BorderLeftColor,
+            false,
+        ),
+        set(
+            "border.right",
+            ValueType::Token(&XLSB_BORDER_LINE),
+            CellSetter::BorderRight,
+            true,
+        ),
+        set(
+            "border.right.color",
+            COLOR,
+            CellSetter::BorderRightColor,
+            false,
+        ),
+        set(
+            "border.top",
+            ValueType::Token(&XLSB_BORDER_LINE),
+            CellSetter::BorderTop,
+            true,
+        ),
+        set("border.top.color", COLOR, CellSetter::BorderTopColor, false),
+        set(
+            "border.bottom",
+            ValueType::Token(&XLSB_BORDER_LINE),
+            CellSetter::BorderBottom,
+            true,
+        ),
+        set(
+            "border.bottom.color",
+            COLOR,
+            CellSetter::BorderBottomColor,
+            false,
+        ),
+        constrained(
+            "numberformat",
+            ValueType::Text,
+            CellSetter::NumberFormat,
+            Constraint::NotEmpty,
+        ),
+        set(
+            "alignment.horizontal",
+            ValueType::Token(&workbook::HORIZONTAL),
+            CellSetter::Horizontal,
+            false,
+        ),
+        set(
+            "alignment.vertical",
+            ValueType::Token(&workbook::VERTICAL),
+            CellSetter::Vertical,
+            false,
+        ),
+        set(
+            "alignment.wrapText",
+            ValueType::Bool,
+            CellSetter::WrapText,
+            false,
+        ),
+        constrained(
+            "alignment.textRotation",
+            ValueType::Int,
+            CellSetter::TextRotation,
+            Constraint::Int { min: 0, max: 255 },
+        ),
+        constrained(
+            "alignment.indent",
+            ValueType::Int,
+            CellSetter::Indent,
+            Constraint::Int { min: 0, max: 250 },
+        ),
+        set(
+            "alignment.shrinkToFit",
+            ValueType::Bool,
+            CellSetter::ShrinkToFit,
+            false,
+        ),
+        set(
+            "alignment.readingOrder",
+            ValueType::Token(&workbook::READING_ORDER),
+            CellSetter::ReadingOrder,
+            false,
+        ),
+    ],
+    [
+        Alias {
+            name: "bold",
+            entry: 3,
         },
-        Entry {
-            spec: write_only("clear", ValueType::Bool),
-            access: Access::Set(CellSetter::Clear),
-            constraint: Constraint::None,
-            clear: false,
+        Alias {
+            name: "italic",
+            entry: 4,
+        },
+        Alias {
+            name: "font.strike",
+            entry: 5,
+        },
+        Alias {
+            name: "strikethrough",
+            entry: 5,
+        },
+        Alias {
+            name: "font.underline",
+            entry: 6,
+        },
+        Alias {
+            name: "font",
+            entry: 7,
+        },
+        Alias {
+            name: "fontname",
+            entry: 7,
+        },
+        Alias {
+            name: "size",
+            entry: 8,
+        },
+        Alias {
+            name: "fontsize",
+            entry: 8,
+        },
+        Alias {
+            name: "color",
+            entry: 9,
+        },
+        Alias {
+            name: "bgcolor",
+            entry: 10,
+        },
+        Alias {
+            name: "bg",
+            entry: 10,
+        },
+        Alias {
+            name: "border",
+            entry: 11,
+        },
+        Alias {
+            name: "border.color",
+            entry: 12,
+        },
+        Alias {
+            name: "numfmt",
+            entry: 21,
+        },
+        Alias {
+            name: "format",
+            entry: 21,
+        },
+        Alias {
+            name: "halign",
+            entry: 22,
+        },
+        Alias {
+            name: "align",
+            entry: 22,
+        },
+        Alias {
+            name: "valign",
+            entry: 23,
+        },
+        Alias {
+            name: "wrap",
+            entry: 24,
+        },
+        Alias {
+            name: "wraptext",
+            entry: 24,
+        },
+        Alias {
+            name: "rotation",
+            entry: 25,
+        },
+        Alias {
+            name: "indent",
+            entry: 26,
+        },
+        Alias {
+            name: "readingorder",
+            entry: 28,
         },
     ],
-    [],
 );
 
 const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
@@ -92,11 +414,36 @@ const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
 
 pub(crate) const CELL_WRITE_PROPS: &[PropSpec] = &CELL_WRITE_TABLE.readable();
 
+/// How many write properties have no read property of the same name: the
+/// write-only payloads (`value`, `clear`, `border.all`, `border.all.color`).
+const fn write_only_count() -> usize {
+    let mut count = 0;
+    let mut write_index = 0;
+    while write_index < CELL_WRITE_PROPS.len() {
+        let mut found = false;
+        let mut index = 0;
+        while index < CELL_PROPS.len() {
+            if same_name(CELL_PROPS[index].name, CELL_WRITE_PROPS[write_index].name) {
+                found = true;
+            }
+            index += 1;
+        }
+        if !found {
+            count += 1;
+        }
+        write_index += 1;
+    }
+    count
+}
+
+const WRITE_ONLY_COUNT: usize = write_only_count();
+
 /// Capability projection for cell writes.  The read projection remains the
-/// local `CELL_PROPS` slice; the two write-only payload entries are appended
-/// so the capability report exposes their registry types and set flags.
-const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
-    let mut props = [PropSpec::new("", ValueType::Text); CELL_PROPS.len() + 2];
+/// local `CELL_PROPS` slice with matching registry properties upgraded to
+/// writable; the write-only entries are appended so the capability report
+/// exposes their registry types and set flags.
+const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + WRITE_ONLY_COUNT] {
+    let mut props = [PropSpec::new("", ValueType::Text); CELL_PROPS.len() + WRITE_ONLY_COUNT];
     let mut index = 0;
     while index < CELL_PROPS.len() {
         let mut prop = CELL_PROPS[index];
@@ -113,12 +460,68 @@ const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
         props[index] = prop;
         index += 1;
     }
-    props[CELL_PROPS.len()] = CELL_WRITE_PROPS[0];
-    props[CELL_PROPS.len() + 1] = CELL_WRITE_PROPS[1];
+    let mut next = CELL_PROPS.len();
+    let mut write_index = 0;
+    while write_index < CELL_WRITE_PROPS.len() {
+        let write = CELL_WRITE_PROPS[write_index];
+        let mut found = false;
+        let mut read = 0;
+        while read < CELL_PROPS.len() {
+            if same_name(CELL_PROPS[read].name, write.name) {
+                found = true;
+            }
+            read += 1;
+        }
+        if !found {
+            props[next] = write;
+            next += 1;
+        }
+        write_index += 1;
+    }
     props
 }
 
 pub(crate) static CELL_CAPABILITY_PROPS: &[PropSpec] = &cell_capability_array();
+
+/// The properties a range target accepts: the cell setters (applied to
+/// every cell of the range) and `merge`.
+pub(crate) static RANGE_PROPS: &[PropSpec] = &range_props();
+
+/// The index of `merge` in [`RANGE_PROPS`].
+pub(crate) const RANGE_MERGE_INDEX: usize = CELL_WRITE_PROPS.len();
+
+const fn range_props() -> [PropSpec; CELL_WRITE_PROPS.len() + 1] {
+    let mut props = [PropSpec::new("", ValueType::Text); CELL_WRITE_PROPS.len() + 1];
+    let mut index = 0;
+    while index < CELL_WRITE_PROPS.len() {
+        // A range reads no per-cell property; its setters are write-only.
+        let mut prop = CELL_WRITE_PROPS[index];
+        prop.access.get = false;
+        props[index] = prop;
+        index += 1;
+    }
+    props[CELL_WRITE_PROPS.len()] = MERGE_WRITE_PROPS[0];
+    props
+}
+
+/// The XLSB merge setter: `merge` on a range target, `true` to merge the
+/// range exactly and `false` or null to remove exactly that merge.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum MergeSetter {
+    Merge,
+}
+
+pub(crate) const MERGE_WRITE_TABLE: Table<MergeSetter, 1, 0> = Table::new(
+    [Entry {
+        spec: PropSpec::new("merge", ValueType::Bool),
+        access: Access::Set(MergeSetter::Merge),
+        constraint: Constraint::None,
+        clear: true,
+    }],
+    [],
+);
+
+pub(crate) const MERGE_WRITE_PROPS: &[PropSpec] = &MERGE_WRITE_TABLE.readable();
 
 const fn same_name(left: &str, right: &str) -> bool {
     let left = left.as_bytes();
@@ -180,6 +583,22 @@ pub(crate) enum CellKey {
     ArrayFormula,
     ArrayRef,
     Empty,
+    Bold,
+    Italic,
+    Strike,
+    Underline,
+    FontColor,
+    FontSize,
+    FontName,
+    Fill,
+    BorderLeft,
+    BorderLeftColor,
+    BorderRight,
+    BorderRightColor,
+    BorderTop,
+    BorderTopColor,
+    BorderBottom,
+    BorderBottomColor,
     WrapText,
     Horizontal,
     Vertical,
@@ -187,6 +606,7 @@ pub(crate) enum CellKey {
     Indent,
     ShrinkToFit,
     ReadingOrder,
+    NumberFormat,
     Merge,
     MergeAnchor,
 }
@@ -200,6 +620,22 @@ impl CellKey {
         Self::ArrayFormula,
         Self::ArrayRef,
         Self::Empty,
+        Self::Bold,
+        Self::Italic,
+        Self::Strike,
+        Self::Underline,
+        Self::FontColor,
+        Self::FontSize,
+        Self::FontName,
+        Self::Fill,
+        Self::BorderLeft,
+        Self::BorderLeftColor,
+        Self::BorderRight,
+        Self::BorderRightColor,
+        Self::BorderTop,
+        Self::BorderTopColor,
+        Self::BorderBottom,
+        Self::BorderBottomColor,
         Self::WrapText,
         Self::Horizontal,
         Self::Vertical,
@@ -207,6 +643,7 @@ impl CellKey {
         Self::Indent,
         Self::ShrinkToFit,
         Self::ReadingOrder,
+        Self::NumberFormat,
         Self::Merge,
         Self::MergeAnchor,
     ];
@@ -224,6 +661,23 @@ pub(crate) static CELL_PROPS: &[PropSpec] = &[
     workbook::CELL_PROPS[4],
     workbook::CELL_PROPS[5],
     workbook::CELL_PROPS[6],
+    workbook::CELL_PROPS[7],
+    workbook::CELL_PROPS[8],
+    workbook::CELL_PROPS[9],
+    // The binary font keeps a single underline; advertise what it stores.
+    PropSpec::new("underline", ValueType::Token(&XLSB_UNDERLINE)),
+    workbook::CELL_PROPS[11],
+    workbook::CELL_PROPS[14],
+    workbook::CELL_PROPS[15],
+    workbook::CELL_PROPS[16],
+    workbook::CELL_PROPS[19],
+    workbook::CELL_PROPS[20],
+    workbook::CELL_PROPS[21],
+    workbook::CELL_PROPS[22],
+    workbook::CELL_PROPS[23],
+    workbook::CELL_PROPS[24],
+    workbook::CELL_PROPS[25],
+    workbook::CELL_PROPS[26],
     workbook::CELL_PROPS[31],
     workbook::CELL_PROPS[32],
     workbook::CELL_PROPS[33],
@@ -231,6 +685,7 @@ pub(crate) static CELL_PROPS: &[PropSpec] = &[
     workbook::CELL_PROPS[35],
     workbook::CELL_PROPS[36],
     workbook::CELL_PROPS[37],
+    workbook::CELL_PROPS[42],
     workbook::CELL_PROPS[43],
     workbook::CELL_PROPS[44],
 ];
@@ -238,17 +693,70 @@ pub(crate) static CELL_PROPS: &[PropSpec] = &[
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum NamedRangeKey {
     Name,
+    Ref,
+    Scope,
 }
 
 impl NamedRangeKey {
-    const ALL: &'static [Self] = &[Self::Name];
+    const ALL: &'static [Self] = &[Self::Name, Self::Ref, Self::Scope];
 
     pub(crate) fn at(index: usize) -> Option<Self> {
         Self::ALL.get(index).copied()
     }
 }
 
-pub(crate) static NAMED_RANGE_PROPS: &[PropSpec] = &[workbook::NAMED_RANGE_PROPS[0]];
+/// The XLSB defined-name setters (record 0261): `add` takes `name`, `ref`
+/// and an optional `scope` (a sheet name; absent is workbook scope); `set`
+/// replaces `ref`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum NamedRangeSetter {
+    Name,
+    Ref,
+    Scope,
+}
+
+pub(crate) const NAMED_RANGE_WRITE_TABLE: Table<NamedRangeSetter, 3, 0> = Table::new(
+    [
+        Entry {
+            spec: PropSpec::new("name", ValueType::Text),
+            access: Access::Add(NamedRangeSetter::Name),
+            constraint: Constraint::NotEmpty,
+            clear: false,
+        },
+        Entry {
+            spec: PropSpec::new("ref", ValueType::Text),
+            access: Access::SetAndAdd(NamedRangeSetter::Ref),
+            constraint: Constraint::NotEmpty,
+            clear: false,
+        },
+        Entry {
+            spec: PropSpec::new("scope", ValueType::Text),
+            access: Access::Add(NamedRangeSetter::Scope),
+            constraint: Constraint::NotEmpty,
+            clear: false,
+        },
+    ],
+    [],
+);
+
+const NAMED_RANGE_WRITE_PROPS: &[PropSpec] = &NAMED_RANGE_WRITE_TABLE.readable();
+
+const fn named_range_props() -> [PropSpec; 3] {
+    let mut props = [
+        workbook::NAMED_RANGE_PROPS[0],
+        workbook::NAMED_RANGE_PROPS[1],
+        workbook::NAMED_RANGE_PROPS[2],
+    ];
+    let mut index = 0;
+    while index < props.len() {
+        props[index].access.set = NAMED_RANGE_WRITE_PROPS[index].access.set;
+        props[index].access.add = NAMED_RANGE_WRITE_PROPS[index].access.add;
+        index += 1;
+    }
+    props
+}
+
+pub(crate) static NAMED_RANGE_PROPS: &[PropSpec] = &named_range_props();
 
 const fn element_gap(
     element: &'static str,
@@ -403,7 +911,7 @@ static ELEMENTS: [ElementSpec<Kind>; 26] = [
     with_gap(&workbook::SPEC.elements[0], None),
     with_props(&workbook::SPEC.elements[1], SHEET_PROPS, None),
     with_props(&workbook::SPEC.elements[2], CELL_CAPABILITY_PROPS, None),
-    with_props(&workbook::SPEC.elements[3], CELL_WRITE_PROPS, None),
+    with_props(&workbook::SPEC.elements[3], RANGE_PROPS, None),
     with_gap(&workbook::SPEC.elements[4], None),
     with_gap(&workbook::SPEC.elements[5], None),
     with_gap(&workbook::SPEC.elements[6], None),
@@ -488,36 +996,6 @@ static GAPS: &[GapSpec] = &[
     ),
     property_gap(
         "cell",
-        "font.bold",
-        "M1-extended (R4d)",
-        "the XLSB node does not project font records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "font.italic",
-        "M1-extended (R4d)",
-        "the XLSB node does not project font records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "strike",
-        "M1-extended (R4d)",
-        "the XLSB node does not project font records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "underline",
-        "M1-extended (R4d)",
-        "the XLSB node does not project font records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "font.color",
-        "M1-extended (R4d)",
-        "the XLSB node does not project font records into cell properties",
-    ),
-    property_gap(
-        "cell",
         "superscript",
         "M1-extended (R4d)",
         "the XLSB node does not project font records into cell properties",
@@ -525,18 +1003,6 @@ static GAPS: &[GapSpec] = &[
     property_gap(
         "cell",
         "subscript",
-        "M1-extended (R4d)",
-        "the XLSB node does not project font records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "font.size",
-        "M1-extended (R4d)",
-        "the XLSB node does not project font records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "font.name",
         "M1-extended (R4d)",
         "the XLSB node does not project font records into cell properties",
     ),
@@ -596,12 +1062,6 @@ static GAPS: &[GapSpec] = &[
     ),
     property_gap(
         "cell",
-        "fill",
-        "M1-extended (R4d)",
-        "the XLSB node does not project fill records into cell properties",
-    ),
-    property_gap(
-        "cell",
         "fillPattern",
         "M1-extended (R4d)",
         "the XLSB node does not project fill records into cell properties",
@@ -611,54 +1071,6 @@ static GAPS: &[GapSpec] = &[
         "fillBg",
         "M1-extended (R4d)",
         "the XLSB node does not project fill records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "border.left",
-        "M1-extended (R4d)",
-        "the XLSB node does not project border records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "border.left.color",
-        "M1-extended (R4d)",
-        "the XLSB node does not project border records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "border.right",
-        "M1-extended (R4d)",
-        "the XLSB node does not project border records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "border.right.color",
-        "M1-extended (R4d)",
-        "the XLSB node does not project border records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "border.top",
-        "M1-extended (R4d)",
-        "the XLSB node does not project border records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "border.top.color",
-        "M1-extended (R4d)",
-        "the XLSB node does not project border records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "border.bottom",
-        "M1-extended (R4d)",
-        "the XLSB node does not project border records into cell properties",
-    ),
-    property_gap(
-        "cell",
-        "border.bottom.color",
-        "M1-extended (R4d)",
-        "the XLSB node does not project border records into cell properties",
     ),
     property_gap(
         "cell",
@@ -710,12 +1122,6 @@ static GAPS: &[GapSpec] = &[
     ),
     property_gap(
         "cell",
-        "numberformat",
-        "M1-extended (R4d)",
-        "the XLSB node does not resolve number-format codes into cell properties",
-    ),
-    property_gap(
-        "cell",
         "link",
         "M1-extended (R4x)",
         "XLSB hyperlink targets are retained by the leaf but not resolved into cell properties yet",
@@ -752,45 +1158,27 @@ static GAPS: &[GapSpec] = &[
     ),
     property_gap(
         "namedrange",
-        "ref",
-        "M1-extended (R4d)",
-        "the XLSB defined-name catalog exposes only the authored name",
-    ),
-    property_gap(
-        "namedrange",
-        "scope",
-        "M1-extended (R4d)",
-        "the XLSB defined-name catalog exposes only the authored name",
-    ),
-    property_gap(
-        "namedrange",
         "comment",
         "M1-extended (R4d)",
-        "the XLSB defined-name catalog exposes only the authored name",
+        "the XLSB defined-name projection reads name, ref and scope; BrtName comments are not projected yet",
     ),
     property_gap(
         "namedrange",
         "volatile",
         "M1-extended (R4d)",
-        "the XLSB defined-name catalog exposes only the authored name",
+        "the XLSB defined-name projection reads name, ref and scope; macro and volatile flags are not projected yet",
     ),
     property_gap(
         "namedrange",
         "hidden",
         "M1-extended (R4d)",
-        "the XLSB defined-name catalog exposes only the authored name",
+        "the XLSB defined-name projection reads name, ref and scope; the hidden flag is not projected yet",
     ),
     property_gap(
         "column",
         "numberformat",
         "M1-extended (R4x)",
         "XLSB column styles are not projected into column nodes yet",
-    ),
-    property_gap(
-        "range",
-        "merge",
-        "M1-extended (R4x)",
-        "XLSB ranges do not report whether they are merged yet",
     ),
 ];
 

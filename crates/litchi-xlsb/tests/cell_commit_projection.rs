@@ -16,7 +16,7 @@ use std::io::Cursor;
 use litchi_core::sheet::WorkbookTrait as _;
 use litchi_opc::{OpcPackage, PackURI, SourceLimits};
 use litchi_xlsb::cell_values::{CellError, Reference, StyleIndex, Value};
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 use litchi_xlsb::{Leniency, Package, Workbook};
 
@@ -56,7 +56,7 @@ fn nan_workbook() -> Vec<u8> {
     let uri = PackURI::new(SHEET1).expect("worksheet URI");
     let source_sheet = package.get_part(&uri).expect("worksheet part").blob();
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     let mut replaced = false;
     for item in Records::new(source_sheet) {
         let record = item.expect("fixture worksheet record");
@@ -218,9 +218,11 @@ fn no_op_cell_commit_projection_preserves_the_exact_source() {
 
 #[test]
 fn changed_cell_commit_retains_tolerant_cached_number_policy() {
-    let workbook =
-        Workbook::new_with_leniency(Cursor::new(nan_workbook()), Leniency::TolerateCachedNumbers)
-            .expect("open tolerant workbook");
+    let workbook = Workbook::new_with_options(
+        Cursor::new(nan_workbook()),
+        litchi_xlsb::OpenOptions::new().leniency(Leniency::TolerateCachedNumbers),
+    )
+    .expect("open tolerant workbook");
     let package = workbook.into_package();
     let mut edit = package
         .edit_cell_values(0)
@@ -263,8 +265,13 @@ fn changed_cell_commit_retains_read_limits_and_skipped_drawing_policy() {
         .expect("input limit")
         .build()
         .expect("source limits");
-    let workbook = Workbook::new_without_drawing_parse_with_limits(Cursor::new(source), limits)
-        .expect("open drawing-skipped workbook");
+    let workbook = Workbook::new_with_options(
+        Cursor::new(source),
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(limits)
+            .parse_drawings(false),
+    )
+    .expect("open drawing-skipped workbook");
     assert!(!workbook.drawings_parsed());
 
     let package = workbook.into_package();

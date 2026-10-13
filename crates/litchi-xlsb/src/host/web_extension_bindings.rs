@@ -14,7 +14,7 @@ use std::sync::Arc;
 use crate::package::error::{Error, Result};
 use crate::package::formula::{ParsedFormula, Parser, Token};
 use crate::package::frt::{parse_formula_header, serialize_formula_header};
-use crate::raw::{Records, Writer, kind};
+use crate::raw::{Encoder, Records, kind};
 
 const MAX_BINDINGS: usize = 65_536;
 const MAX_APP_REF_CODE_UNITS: usize = 32_767;
@@ -173,7 +173,7 @@ pub fn parse_xlsb_web_extension_bindings(
 pub fn write_xlsb_web_extension_bindings(bindings: &[Binding]) -> Result<Vec<u8>> {
     validate_bindings(bindings, None)?;
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     writer.write_record(kind::BEGIN_WEB_EXTENSIONS, &[])?;
     for binding in bindings {
         writer.write_record(kind::WEB_EXTENSION, &binding.to_payload()?)?;

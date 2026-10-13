@@ -207,3 +207,105 @@ fn a_stale_patch_conflicts_without_mutation() {
     ));
     assert_eq!(bytes(&package, "/docProps/core.xml"), before);
 }
+
+fn source_backed(package: &OpcPackage) -> litchi_opc::SourceBackedPackage {
+    let bytes = litchi_opc::PackageWriter::to_bytes(package).unwrap();
+    litchi_opc::SourceBackedPackage::from_vec(bytes).unwrap()
+}
+
+fn edited(snapshot: &Snapshot, title: &str) -> (Snapshot, super::Patch) {
+    let mut edit = snapshot.edit();
+    edit.update_metadata(|metadata| metadata.title = Some(title.into()))
+        .unwrap();
+    let (after, patch, _) = edit.commit().unwrap().into_parts();
+    (after, patch)
+}
+
+#[test]
+fn composed_patches_apply_as_their_sequence_and_an_inverse_composes_to_a_no_op() {
+    let package = full();
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let (once, first) = edited(&snapshot, "One");
+    let (_, second) = edited(&once, "Two");
+    let composed = first.compose(&second).unwrap();
+    let mut sequential = package.clone();
+    first.apply(&mut sequential).unwrap();
+    second.apply(&mut sequential).unwrap();
+    let mut direct = package.clone();
+    composed.apply(&mut direct).unwrap();
+    assert_eq!(
+        bytes(&direct, "/docProps/core.xml"),
+        bytes(&sequential, "/docProps/core.xml")
+    );
+    assert!(first.compose(&first.inverse()).unwrap().is_noop());
+    // A patch that does not continue the first one is refused.
+    assert!(matches!(first.compose(&first), Err(Error::Conflict(_))));
+}
+
+#[test]
+fn a_patch_prepares_over_a_source_backed_package_without_materializing_it() {
+    let package = full();
+    let source = source_backed(&package);
+    let snapshot = Snapshot::read_source_backed(&source, Host::Word).unwrap();
+    let mut edit = snapshot.edit();
+    edit.update_metadata(|metadata| {
+        metadata.title = Some("After".into());
+        metadata.manager = Some("Lin".into());
+    })
+    .unwrap();
+    let mut custom = edit.custom_props().clone();
+    custom.insert("Phase", "two").unwrap();
+    edit.set_custom_props(custom);
+    let (after, patch, _) = edit.commit().unwrap().into_parts();
+    let topology = patch.prepare_source_backed(&source).unwrap();
+    let mut published = Vec::new();
+    topology.publish_to_stream(&mut published).unwrap();
+    let reopened = OpcPackage::from_bytes(&published).unwrap();
+    let read = Snapshot::read(&reopened, Host::Word).unwrap();
+    assert_eq!(read.metadata().unwrap(), after.metadata().unwrap());
+    assert_eq!(
+        read.custom_props().get("Phase"),
+        Some(&Value::Text("two".into()))
+    );
+
+    // The same patch on the owning package stores the same parts.
+    let mut owning = package.clone();
+    patch.apply(&mut owning).unwrap();
+    for name in [
+        "/docProps/core.xml",
+        "/docProps/app.xml",
+        "/docProps/custom.xml",
+    ] {
+        assert_eq!(bytes(&reopened, name), bytes(&owning, name), "{name}");
+    }
+
+    // A stale patch is refused, and an empty patch is the exact source.
+    let changed = source_backed(&owning);
+    assert!(matches!(
+        patch.prepare_source_backed(&changed),
+        Err(Error::Conflict(_))
+    ));
+    let mut exact = Vec::new();
+    super::Patch::default()
+        .prepare_source_backed(&source)
+        .unwrap()
+        .publish_to_stream(&mut exact)
+        .unwrap();
+    assert_eq!(
+        exact,
+        litchi_opc::PackageWriter::to_bytes(&package).unwrap()
+    );
+}
+
+#[test]
+fn a_changed_source_backed_patch_refuses_a_signed_package() {
+    let mut package = full();
+    let snapshot = Snapshot::read(&package, Host::Word).unwrap();
+    let (_, patch) = edited(&snapshot, "Changed");
+    sign(&mut package);
+    let source = source_backed(&package);
+    assert!(matches!(
+        patch.prepare_source_backed(&source),
+        Err(Error::Signed)
+    ));
+}

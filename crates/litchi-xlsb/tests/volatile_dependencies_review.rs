@@ -7,7 +7,7 @@
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::volatile_dependencies::{
     CachedValue, CellReference, DEFAULT_PART_NAME, Dependencies, DependencyKind, MainTopic, Topic,
     VolatileType,
@@ -144,7 +144,7 @@ fn reserved_type_bits_package() -> Package {
         records.push((record.kind(), payload));
     }
     let mut replacement = Vec::new();
-    let mut writer = Writer::new(&mut replacement);
+    let mut writer = Encoder::new(&mut replacement);
     for (record_kind, payload) in records {
         writer
             .write_record(record_kind, &payload)
@@ -265,7 +265,7 @@ fn explicit_unsigning_requires_a_fresh_plan_and_allows_reversible_edits() {
     let changed = unsigned
         .apply_volatile_dependencies(&commit)
         .expect("unsigned edit publication");
-    let reopened = Package::from_bytes(changed.to_bytes().expect("changed bytes"))
+    let reopened = Package::from_bytes(&changed.to_bytes().expect("changed bytes"))
         .expect("reopen changed package");
     assert!(!reopened.opc_package().is_signed());
     assert_eq!(

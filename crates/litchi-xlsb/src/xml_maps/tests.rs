@@ -1,6 +1,6 @@
 use super::*;
 use crate::package::table::{Column, Range, Table};
-use crate::raw::{Records, Writer, kind};
+use crate::raw::{Encoder, Records, kind};
 use crate::writer::{Builder, MutableWorksheet};
 use std::io::Cursor;
 
@@ -72,7 +72,7 @@ fn rewrite_record(
     mut edit: impl FnMut(&mut Vec<u8>),
 ) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     for record in Records::new(source) {
         let record = record.unwrap();
         let mut payload = record.payload().to_vec();
@@ -87,7 +87,7 @@ fn rewrite_record(
 
 fn minimal_table(binding: &ColumnBinding, ignored_flags: u32) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     let mut list = vec![0; 24];
     list[16..20].copy_from_slice(&2u32.to_le_bytes());
     list[20..24].copy_from_slice(&2u32.to_le_bytes());
@@ -164,7 +164,7 @@ fn single_cell_accepts_but_will_not_normalize_unmodeled_metadata() {
         rewrite_record(&with_list_metadata, kind::BEGIN_LIST_COL, |payload| {
             payload[4..8].copy_from_slice(&6u32.to_le_bytes());
             let mut total = Vec::new();
-            Writer::new(&mut total).write_wide_string("Total").unwrap();
+            Encoder::new(&mut total).write_wide_string("Total").unwrap();
             payload.splice(32..36, total);
         });
     let source_bytes = rewrite_record(&with_column_metadata, kind::BEGIN_LIST_XML_CPR, |payload| {
@@ -249,7 +249,7 @@ fn opaque_record_limits_accept_exact_boundaries_and_reject_excess() {
     .unwrap();
     let canonical = serialize_single_cells(&[value], Limits::DEFAULT).unwrap();
     let mut source = Vec::new();
-    let mut writer = Writer::new(&mut source);
+    let mut writer = Encoder::new(&mut source);
     for record in Records::new(&canonical) {
         let record = record.unwrap();
         writer
@@ -291,7 +291,7 @@ fn opaque_record_limits_accept_exact_boundaries_and_reject_excess() {
 
     let table = minimal_table(&binding(3), 0);
     let mut table_source = Vec::new();
-    let mut writer = Writer::new(&mut table_source);
+    let mut writer = Encoder::new(&mut table_source);
     for record in Records::new(&table) {
         let record = record.unwrap();
         writer

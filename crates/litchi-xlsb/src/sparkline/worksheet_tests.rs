@@ -1,10 +1,10 @@
 use super::worksheet::{read, read_with_limits};
 use super::{Color, Colors, Formula, Group, Groups, Limits, Location, Sparkline, SparklineType};
-use crate::raw::{Kind, Records, Writer, kind};
+use crate::raw::{Encoder, Kind, Records, kind};
 
 fn stream(records: &[(Kind, &[u8])]) -> Vec<u8> {
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     for (record, payload) in records {
         writer.write_record(*record, payload).unwrap();
     }

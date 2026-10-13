@@ -617,7 +617,7 @@ impl Workbook {
             return Ok(Vec::new());
         }
         let mut output = Vec::with_capacity(10 + ranges.len() * 19);
-        let mut writer = crate::raw::Writer::new(&mut output);
+        let mut writer = crate::raw::Encoder::new(&mut output);
         writer.write_record(
             kind::BEGIN_MERGE_CELLS,
             &(ranges.len() as u32).to_le_bytes(),

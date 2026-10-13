@@ -40,14 +40,14 @@ use crate::package::data_validation::{
 };
 use crate::package::error::{Error, Result};
 use crate::package::formula::ParsedFormula;
-use crate::raw::Writer;
+use crate::raw::Encoder;
 use crate::raw::kind;
 use crate::writer::bin_range::{parse_range_list, write_bin_range_list};
 use std::io::Write;
 
 /// Write classic and Office 2013 validation collections as required.
 pub fn write_data_validations<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     validations: &[Validation],
     classic_settings: Settings,
     extension14_settings: Settings,
@@ -75,7 +75,7 @@ pub fn write_data_validations<W: Write>(
 }
 
 fn write_classic_collection<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     validations: &[&Validation],
     settings: Settings,
 ) -> Result<()> {
@@ -114,7 +114,7 @@ fn write_classic_collection<W: Write>(
 }
 
 fn write_extension14_collection<W: Write>(
-    writer: &mut Writer<W>,
+    writer: &mut Encoder<W>,
     validations: &[&Validation],
     settings: Settings,
 ) -> Result<()> {
@@ -535,7 +535,7 @@ fn build_ptg_for_value(text: &str, ptg: &mut Vec<u8>) {
 mod tests {
     use super::*;
     use crate::package::formula::Context;
-    use crate::raw::Writer;
+    use crate::raw::Encoder;
 
     #[test]
     fn test_serialize_list_validation() {
@@ -668,7 +668,7 @@ mod tests {
     #[test]
     fn test_write_data_validations_empty() {
         let mut buffer = Vec::new();
-        let mut writer = Writer::new(&mut buffer);
+        let mut writer = Encoder::new(&mut buffer);
         let validations: Vec<Validation> = vec![];
 
         let result = write_data_validations(
@@ -684,7 +684,7 @@ mod tests {
     #[test]
     fn test_write_data_validations_single() {
         let mut buffer = Vec::new();
-        let mut writer = Writer::new(&mut buffer);
+        let mut writer = Encoder::new(&mut buffer);
         let validations = vec![Validation {
             validation_type: 3, // list
             operator: 0,

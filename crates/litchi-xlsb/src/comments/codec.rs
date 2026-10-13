@@ -11,7 +11,7 @@
 
 use super::model::{Record, Run};
 use crate::leniency::{Tolerance, ToleranceReport};
-use crate::raw::{Cursor, Record as RawRecord, Records, Writer, kind};
+use crate::raw::{Cursor, Encoder, Record as RawRecord, Records, kind};
 use std::collections::{HashMap, HashSet, TryReserveError};
 use std::io::Write;
 use thiserror::Error;
@@ -269,7 +269,7 @@ fn read_with(bytes: &[u8], tolerance: &mut Tolerance<'_>) -> Result<Vec<Record>>
 }
 
 /// Write one complete XLSB comments stream.
-pub fn write<W: Write>(writer: &mut Writer<W>, comments: &[Record]) -> Result<()> {
+pub fn write<W: Write>(writer: &mut Encoder<W>, comments: &[Record]) -> Result<()> {
     writer.write_record(kind::BEGIN_COMMENTS, &[])?;
     writer.write_record(kind::BEGIN_COMMENT_AUTHORS, &[])?;
 
@@ -663,7 +663,7 @@ mod tests {
 
     fn comment_stream(comment: &Record) -> Vec<u8> {
         let mut bytes = Vec::new();
-        write(&mut Writer::new(&mut bytes), std::slice::from_ref(comment)).unwrap();
+        write(&mut Encoder::new(&mut bytes), std::slice::from_ref(comment)).unwrap();
         bytes
     }
 
@@ -697,7 +697,7 @@ mod tests {
     #[test]
     fn reads_alternate_uid_and_future_record_wrappers() {
         let mut bytes = Vec::new();
-        let mut writer = Writer::new(&mut bytes);
+        let mut writer = Encoder::new(&mut bytes);
         writer.write_record(kind::BEGIN_COMMENTS, &[]).unwrap();
         writer
             .write_record(kind::BEGIN_COMMENT_AUTHORS, &[])
@@ -737,14 +737,14 @@ mod tests {
         let bytes = comment_stream(&comment);
         let mut duplicate = Vec::new();
         write(
-            &mut Writer::new(&mut duplicate),
+            &mut Encoder::new(&mut duplicate),
             &[comment.clone(), comment],
         )
         .unwrap_err();
         assert!(read(&bytes).is_ok());
 
         let mut malformed = Vec::new();
-        let mut writer = Writer::new(&mut malformed);
+        let mut writer = Encoder::new(&mut malformed);
         writer.write_record(kind::BEGIN_COMMENTS, &[]).unwrap();
         writer
             .write_record(kind::BEGIN_COMMENT_AUTHORS, &[])

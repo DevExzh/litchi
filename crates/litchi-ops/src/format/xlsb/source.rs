@@ -55,6 +55,19 @@ impl SourceWorkbook {
         })
     }
 
+    /// The same catalog over another snapshot of the same source, such as a
+    /// document-property revision: the catalog facts do not change, so they
+    /// are not read again.
+    pub(super) fn with_workbook(&self, workbook: xlsb::SourceBackedWorkbook) -> Self {
+        Self {
+            workbook,
+            names: self.names.clone(),
+            date1904: self.date1904,
+            active_catalog_position: self.active_catalog_position,
+            active_worksheet_ordinal: self.active_worksheet_ordinal,
+        }
+    }
+
     pub(super) fn workbook(&self) -> &xlsb::SourceBackedWorkbook {
         &self.workbook
     }

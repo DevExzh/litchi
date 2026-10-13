@@ -14,10 +14,10 @@
 
 use litchi_opc::{BlobPart, PackURI, TargetMode};
 use litchi_xlsb::Package;
-use litchi_xlsb::raw::{Kind, Records, Writer};
+use litchi_xlsb::raw::{Encoder, Kind, Records};
 use litchi_xlsb::volatile_dependencies::{
     CachedValue, CellReference, Commit, DEFAULT_PART_NAME, Dependencies, DependencyKind, MainTopic,
-    RELATIONSHIP_TYPE, ReadLimits, Topic, VolatileType,
+    RELATIONSHIP_TYPE, SemanticLimits, Topic, VolatileType,
 };
 
 fn sample_dependencies() -> Dependencies {
@@ -106,7 +106,7 @@ fn rewrite_records(bytes: &[u8], insert_at: usize, kind: Kind, payload: &[u8]) -
     }
     records.insert(insert_at.min(records.len()), (kind, payload.to_vec()));
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     for (record_kind, record_payload) in records {
         writer
             .write_record(record_kind, &record_payload)
@@ -269,7 +269,7 @@ fn public_create_change_remove_save_reopen_and_exact_inverse() {
     assert_eq!(snapshot.dependencies(), Some(&sample_dependencies()));
 
     let serialized = package_bytes(&package);
-    let reopened = Package::from_bytes(serialized.clone()).expect("save/reopen package");
+    let reopened = Package::from_bytes(&serialized).expect("save/reopen package");
     assert_eq!(package_bytes(&reopened), serialized);
     assert_eq!(
         reopened
@@ -376,7 +376,7 @@ fn custom_owner_name_and_relationship_id_survive_remove_inverse_and_reopen() {
         .apply_volatile_dependencies_patch(&commit.patch().inverse())
         .expect("restore custom owner");
     assert_eq!(package_bytes(&restored), before);
-    let reopened = Package::from_bytes(package_bytes(&restored)).expect("reopen restored owner");
+    let reopened = Package::from_bytes(&package_bytes(&restored)).expect("reopen restored owner");
     assert_eq!(package_bytes(&reopened), before);
     assert_eq!(
         reopened
@@ -430,7 +430,7 @@ fn caller_limits_refuse_before_publication_and_leave_source_unchanged() {
     let package = package_with_dependencies(sample_dependencies());
     let before = package_bytes(&package);
 
-    let mut part_limit = ReadLimits::DEFAULT;
+    let mut part_limit = SemanticLimits::DEFAULT;
     part_limit.max_part_bytes = owner_bytes(&package).len().saturating_sub(1);
     let part_error = package
         .volatile_dependencies_with_limits(part_limit)
@@ -438,7 +438,7 @@ fn caller_limits_refuse_before_publication_and_leave_source_unchanged() {
     assert!(part_error.to_string().contains("limit"));
     assert_eq!(package_bytes(&package), before);
 
-    let mut record_limit = ReadLimits::DEFAULT;
+    let mut record_limit = SemanticLimits::DEFAULT;
     record_limit.max_records = 1;
     let record_error = package
         .volatile_dependencies_with_limits(record_limit)
@@ -446,7 +446,7 @@ fn caller_limits_refuse_before_publication_and_leave_source_unchanged() {
     assert!(record_error.to_string().contains("limit"));
     assert_eq!(package_bytes(&package), before);
 
-    let mut relationship_limit = ReadLimits::DEFAULT;
+    let mut relationship_limit = SemanticLimits::DEFAULT;
     relationship_limit.max_relationships = 0;
     let relationship_error = package
         .volatile_dependencies_with_limits(relationship_limit)

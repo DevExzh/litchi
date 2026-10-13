@@ -8,14 +8,11 @@ use std::sync::{Arc, Mutex};
 
 use litchi_core::sheet::{Cell as SheetCell, CellValue, Worksheet as SheetWorksheet};
 use litchi_core::{
-    ExecutionContext, ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind, TextOutputError,
+    ReadAt, SequentialTextWriter, SourceVersion, TextObjectKind, TextOutputError,
     TextOutputOptions, TextOutputReport,
 };
 use litchi_opc::constants::{content_type, relationship_type};
-use litchi_opc::{
-    PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics, SourceCacheLimits,
-    SourceLimits,
-};
+use litchi_opc::{PackURI, PartData, PartView, SourceBackedPackage, SourceCacheDiagnostics};
 use once_cell::sync::OnceCell;
 
 use super::cache::{Limits as WorksheetCacheLimits, Stats, WorksheetCache};
@@ -133,6 +130,10 @@ struct SourceInner {
 #[derive(Clone)]
 pub struct SourceBackedWorkbook {
     inner: Arc<SourceInner>,
+    /// Document-property edits published over the retained source
+    /// ([`crate::metadata::source`]). The workbook parts are unchanged, so
+    /// every semantic read and cache stays shared with the source owner.
+    pub(crate) metadata: Option<Arc<crate::metadata::source::Revision>>,
 }
 
 /// A source-bound handle for one sheet in an XLSB workbook.
@@ -447,181 +448,67 @@ impl SourceBackedWorkbook {
     /// deferred until their selected semantic reads require them. The owned
     /// source has stable freshness identity for this immutable snapshot.
     pub fn from_reader<R: Read>(reader: R) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            SourceLimits::default(),
-            ExternalLinkLimits::default(),
-        )
+        Self::from_reader_with_options(reader, crate::OpenOptions::default())
     }
 
-    /// Open an XLSB package from a sequential reader with explicit OPC
-    /// resource limits.
-    pub fn from_reader_with_limits<R: Read>(reader: R, limits: SourceLimits) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            limits,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Open an XLSB package from a sequential reader with explicit
-    /// external-link resource limits and the default OPC policy.
-    pub fn from_reader_with_external_link_limits<R: Read>(
+    /// Open an XLSB package from a sequential reader under explicit source
+    /// limits, external-link limits and leniency.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedOpenPolicy`] for skipped drawing decoding
+    /// and for cache or execution policies (the owned sequential source keeps
+    /// its bytes in memory and has no deferred-payload session; open through
+    /// [`Self::from_read_at_with_options`] to use them), the OPC limit and
+    /// archive errors, and the catalog validation errors.
+    pub fn from_reader_with_options<R: Read>(
         reader: R,
-        external_link_limits: ExternalLinkLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_reader_with_limits_and_external_link_limits(
-            reader,
-            SourceLimits::default(),
-            external_link_limits,
+        options.check_source()?;
+        options.check_owning()?;
+        Self::build(
+            SourceBackedPackage::from_reader_with_limits(reader, options.source_limits)?,
+            options.external_link_limits,
+            options.leniency,
         )
     }
 
-    /// Open an XLSB package from a sequential reader with explicit OPC and
-    /// external-link resource limits.
-    pub fn from_reader_with_limits_and_external_link_limits<R: Read>(
-        reader: R,
-        limits: SourceLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_reader_with_limits(reader, limits)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with an explicit bounded OPC read policy.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: SourceLimits) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_limits(
-            source, limits,
-        )?)
-    }
-
-    /// Open with the default bounded OPC policy and explicit external-link
-    /// semantic resource limits.
-    pub fn from_read_at_with_external_link_limits(
+    /// Open a positional source under explicit ingress policies: source,
+    /// cache and external-link limits, an execution context and leniency.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::UnsupportedOpenPolicy`] for skipped drawing decoding
+    /// (this owner defers every drawing on its own), the OPC limit, archive
+    /// and execution errors, and the catalog validation errors.
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        external_link_limits: ExternalLinkLimits,
+        options: crate::OpenOptions,
     ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_read_at(source)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with explicit bounded OPC and external-link semantic policies.
-    pub fn from_read_at_with_limits_and_external_link_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            SourceBackedPackage::from_read_at_with_limits(source, limits)?,
-            external_link_limits,
-        )
-    }
-
-    /// Open with an explicit finite deferred-payload cache policy.
-    pub fn from_read_at_with_cache_limits(
-        source: Arc<dyn ReadAt>,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_cache_limits(
-            source,
-            cache_limits,
-        )?)
-    }
-
-    /// Open with explicit bounded OPC read and cache policies.
-    pub fn from_read_at_with_limits_and_cache_limits(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
+        options.check_source()?;
+        let cache_limits = options.cache_limits.unwrap_or_default();
+        let package = match options.execution_context {
+            Some(context) => {
+                SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
+                    source,
+                    options.source_limits,
+                    cache_limits,
+                    context,
+                )?
+            },
+            None => SourceBackedPackage::from_read_at_with_limits_and_cache_limits(
                 source,
-                limits,
+                options.source_limits,
                 cache_limits,
             )?,
-        )
-    }
-
-    /// Open with explicit read and caller-owned execution policies.
-    pub fn from_read_at_with_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(SourceBackedPackage::from_read_at_with_execution_context(
-            source, limits, context,
-        )?)
-    }
-
-    /// Open with explicit read, cache, and caller-owned execution policies.
-    pub fn from_read_at_with_limits_and_cache_limits_and_execution_context(
-        source: Arc<dyn ReadAt>,
-        limits: SourceLimits,
-        cache_limits: SourceCacheLimits,
-        context: ExecutionContext,
-    ) -> Result<Self> {
-        Self::from_source_backed_package(
-            SourceBackedPackage::from_read_at_with_limits_and_cache_limits_and_execution_context(
-                source,
-                limits,
-                cache_limits,
-                context,
-            )?,
-        )
+        };
+        Self::build(package, options.external_link_limits, options.leniency)
     }
 
     /// Build a lazy XLSB catalog from an already validated deferred OPC package.
     pub fn from_source_backed_package(package: SourceBackedPackage) -> Result<Self> {
-        Self::from_source_backed_package_with_external_link_limits(
-            package,
-            ExternalLinkLimits::default(),
-        )
-    }
-
-    /// Open an XLSB package from a sequential reader with the default bounded
-    /// policies under an explicit [`Leniency`].
-    ///
-    /// The Excel-compatible repairs are applied under every variant; see
-    /// [`crate::leniency`]. [`Leniency::TolerateCachedNumbers`] additionally
-    /// repairs non-normal cached numbers read by worksheet materialization
-    /// (recorded on the [`Worksheet`]) and by indexed lookups (recorded in
-    /// [`Self::tolerance_report`]).
-    pub fn from_reader_with_leniency<R: Read>(reader: R, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_reader_with_limits(reader, SourceLimits::default())?,
-            leniency,
-        )
-    }
-
-    /// Open with the default bounded OPC read and cache policies under an
-    /// explicit [`Leniency`]; see [`Self::from_reader_with_leniency`].
-    pub fn from_read_at_with_leniency(source: Arc<dyn ReadAt>, leniency: Leniency) -> Result<Self> {
-        Self::from_source_backed_package_with_leniency(
-            SourceBackedPackage::from_read_at(source)?,
-            leniency,
-        )
-    }
-
-    /// Build a lazy XLSB catalog under an explicit [`Leniency`]; see
-    /// [`Self::from_reader_with_leniency`].
-    pub fn from_source_backed_package_with_leniency(
-        package: SourceBackedPackage,
-        leniency: Leniency,
-    ) -> Result<Self> {
-        Self::build(package, ExternalLinkLimits::default(), leniency)
-    }
-
-    /// Build a lazy XLSB catalog with explicit external-link semantic limits.
-    pub fn from_source_backed_package_with_external_link_limits(
-        package: SourceBackedPackage,
-        external_link_limits: ExternalLinkLimits,
-    ) -> Result<Self> {
-        Self::build(package, external_link_limits, Leniency::Strict)
+        Self::build(package, ExternalLinkLimits::default(), Leniency::Strict)
     }
 
     fn build(
@@ -883,6 +770,7 @@ impl SourceBackedWorkbook {
         postflight_package(&package)?;
 
         Ok(Self {
+            metadata: None,
             inner: Arc::new(SourceInner {
                 package,
                 sheets,
@@ -1292,6 +1180,50 @@ impl SourceBackedWorkbook {
         &self.inner.package
     }
 
+    /// Publish this snapshot to a sequential sink.
+    ///
+    /// An unedited catalog streams its source artifact byte for byte. After
+    /// a document-property edit ([`Self::edit_metadata`]) the property
+    /// parts, their package relationships and content types are replaced,
+    /// and every other member keeps its source bytes and compression.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and sink errors of the OPC
+    /// publisher.
+    pub fn write_to(&self, writer: impl Write) -> Result<()> {
+        match &self.metadata {
+            Some(revision) => revision
+                .topology(&self.inner.package)
+                .map_err(publication_error)?
+                .publish_to_stream(writer)?,
+            None => self
+                .inner
+                .package
+                .source_artifact()
+                .write_to_stream(writer)?,
+        }
+        Ok(())
+    }
+
+    /// The same source owner with another document-property revision.
+    pub(crate) fn with_metadata_revision(
+        &self,
+        metadata: Option<Arc<crate::metadata::source::Revision>>,
+    ) -> Self {
+        Self {
+            inner: Arc::clone(&self.inner),
+            metadata,
+        }
+    }
+
+    /// Whether this snapshot carries document-property edits over its
+    /// source ([`Self::edit_metadata`]).
+    #[must_use]
+    pub fn has_metadata_edits(&self) -> bool {
+        self.metadata.is_some()
+    }
+
     /// Materialize the eager, editable [`Workbook`] from this catalog.
     ///
     /// The owning OPC graph is built from the package indexed at open,
@@ -1309,7 +1241,13 @@ impl SourceBackedWorkbook {
     /// limit and allocation errors otherwise.
     pub fn to_workbook(&self) -> Result<Workbook> {
         preflight_package(&self.inner.package)?;
-        let package = self.inner.package.to_opc_package()?;
+        let package = match &self.metadata {
+            Some(revision) => revision
+                .topology(&self.inner.package)
+                .map_err(publication_error)?
+                .to_opc_package()?,
+            None => self.inner.package.to_opc_package()?,
+        };
         let mut workbook = Workbook::from_opc_package_with_external_link_limits(
             package,
             self.inner.external_link_limits,
@@ -1375,6 +1313,22 @@ impl SourceBackedWorkbook {
         let is_1904 = self.inner.is_1904_date_system;
         postflight_package(&self.inner.package)?;
         Ok(is_1904)
+    }
+
+    /// The workbook's defined names in record order, with their scope and
+    /// formula text. Only the workbook stream is read.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and decoding errors of the
+    /// workbook stream.
+    pub fn defined_name_entries(&self) -> Result<Vec<crate::named_ranges::Entry>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let data = self.inner.package.main_document_part()?.data()?;
+        let entries =
+            crate::named_ranges::read_entries(data.as_bytes(), &self.inner.formula_context);
+        postflight_package(&self.inner.package)?;
+        entries
     }
 
     /// Return content-free deferred-Part cache diagnostics.
@@ -1588,6 +1542,18 @@ impl SourceBackedWorksheet {
     /// Resolve one materialized cell's local style through the source-owned
     /// stylesheet cache. The cell and stylesheet remain tied to this source
     /// generation; no eager workbook reconstruction is performed.
+    /// The workbook styles table, parsed once per owner on first use.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and styles-part errors.
+    pub fn styles(&self) -> Result<Arc<StylesTable>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let styles = self.inner.styles()?;
+        postflight_package(&self.inner.package)?;
+        Ok(styles)
+    }
+
     pub fn style_for_cell(
         &self,
         cell: &crate::package::Cell,
@@ -2555,6 +2521,23 @@ fn preflight_indexed_part(
         });
     }
     Ok(())
+}
+
+/// Classify a failure to plan a document-property revision over the source.
+fn publication_error(error: crate::metadata::Error) -> Error {
+    let message = error.to_string();
+    match error {
+        crate::metadata::Error::Package(litchi_ooxml_common::Error::Opc(error)) => {
+            Error::Opc(error)
+        },
+        crate::metadata::Error::Package(error) => Error::Common(error),
+        crate::metadata::Error::Signed => Error::Signed,
+        crate::metadata::Error::Conflict(part) => Error::PatchConflict { part },
+        crate::metadata::Error::Unsupported { .. }
+        | crate::metadata::Error::Invalid(_)
+        | crate::metadata::Error::Limit { .. }
+        | _ => Error::InvalidFormat(message),
+    }
 }
 
 #[cfg(test)]

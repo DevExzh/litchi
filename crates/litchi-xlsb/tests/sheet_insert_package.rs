@@ -19,7 +19,7 @@ use litchi_opc::constants::relationship_type;
 use litchi_opc::{BlobPart, PackURI, Part as _, TargetMode};
 use litchi_xlsb::Package;
 use litchi_xlsb::chart::{Anchor, Chart};
-use litchi_xlsb::raw::{Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Records, kind};
 use litchi_xlsb::sheet::State;
 use litchi_xlsb::writer::{Builder, MutableChartSheet, MutableWorksheet};
 
@@ -195,7 +195,7 @@ fn with_book_view_indices(package: &Package, first: u32, active: u32) -> Package
     let uri = workbook_uri(package);
     let source = opc.get_part(&uri).expect("workbook part").blob().to_vec();
     let mut output = Vec::new();
-    let mut writer = Writer::new(&mut output);
+    let mut writer = Encoder::new(&mut output);
     for item in Records::new(&source) {
         let record = item.expect("workbook record");
         let mut payload = record.payload().to_vec();

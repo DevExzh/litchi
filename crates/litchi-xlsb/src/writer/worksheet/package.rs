@@ -1,7 +1,7 @@
 //! XLSB worksheet package/stream assembly.
 
 use crate::package::error::{Error, Result};
-use crate::raw::{Writer, kind};
+use crate::raw::{Encoder, kind};
 use std::io::Write;
 
 use super::model::MutableWorksheet;
@@ -26,7 +26,7 @@ impl MutableWorksheet {
     #[cfg(test)]
     pub(crate) fn write<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         shared_strings: &mut crate::writer::MutableSharedStringsWriter,
     ) -> Result<()> {
         let sparkline_block = self.stage_sparkline_block()?;
@@ -36,7 +36,7 @@ impl MutableWorksheet {
     /// Serialize with a block staged during workbook-wide validation.
     pub(crate) fn write_with_sparkline_block<W: Write>(
         &self,
-        writer: &mut Writer<W>,
+        writer: &mut Encoder<W>,
         shared_strings: &mut crate::writer::MutableSharedStringsWriter,
         sparkline_block: Option<&[u8]>,
     ) -> Result<()> {
@@ -113,7 +113,7 @@ impl MutableWorksheet {
                 )
             })?;
             let mut payload = Vec::with_capacity(4 + rel_id.len() * 2);
-            Writer::new(&mut payload).write_wide_string(rel_id)?;
+            Encoder::new(&mut payload).write_wide_string(rel_id)?;
             writer.write_record(kind::DRAWING, &payload)?;
         }
 

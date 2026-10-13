@@ -144,7 +144,7 @@ fn prepared_ops(cell_count: usize) -> Result<PreparedOps> {
 fn open_native(bytes: &[u8], mode: OwnerMode) -> Result<NativeOwner> {
     match mode {
         OwnerMode::Eager => Ok(NativeOwner::Eager(Box::new(
-            litchi_xlsb::Package::from_bytes(bytes.to_vec())?,
+            litchi_xlsb::Package::from_bytes(bytes)?,
         ))),
         OwnerMode::Source => Ok(NativeOwner::Source(SourceBackedWorkbook::from_read_at(
             Arc::new(OwnedSource::new(bytes.to_vec())),

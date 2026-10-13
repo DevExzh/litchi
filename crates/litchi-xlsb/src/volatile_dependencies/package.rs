@@ -2,7 +2,7 @@
 
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
-use super::model::ReadLimits;
+use super::model::SemanticLimits;
 use crate::package::error::{Error, Result};
 
 /// MS-XLSB 2.1.7.60 content type.
@@ -29,7 +29,7 @@ pub(crate) struct Graph {
 pub(crate) fn discover_graph(
     package: &OpcPackage,
     workbook_name: &PackURI,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<Option<Graph>> {
     let workbook = package.get_part(workbook_name)?;
     if workbook.content_type() != litchi_opc::constants::content_type::XLSB_BIN {
@@ -100,7 +100,7 @@ pub(crate) fn discover_graph(
 fn scan_feature_relationships(
     package: &OpcPackage,
     workbook_name: &PackURI,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let mut relationship_count = 0usize;
     for relationship in package.rels().iter() {
@@ -125,7 +125,7 @@ fn scan_feature_relationships(
     Ok(())
 }
 
-fn checked_relationship_count(current: usize, limits: ReadLimits) -> Result<usize> {
+fn checked_relationship_count(current: usize, limits: SemanticLimits) -> Result<usize> {
     let actual = current.checked_add(1).ok_or(Error::CapacityOverflow {
         resource: "Volatile Dependencies relationships",
     })?;
@@ -156,7 +156,7 @@ fn ensure_exclusive_inbound_relationship(
     target: &PackURI,
     expected_source: &PackURI,
     expected_relationship_id: &str,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let mut relationship_count = 0usize;
     for relationship in package.rels().iter() {
@@ -193,7 +193,7 @@ pub(crate) fn default_part_uri() -> Result<PackURI> {
 pub(crate) fn reject_inbound_relationships(
     package: &OpcPackage,
     target: &PackURI,
-    limits: ReadLimits,
+    limits: SemanticLimits,
 ) -> Result<()> {
     let mut relationship_count = 0usize;
     for relationship in package.rels().iter() {

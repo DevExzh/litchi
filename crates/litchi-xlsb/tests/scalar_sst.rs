@@ -11,7 +11,7 @@ use std::io::Cursor;
 use litchi_opc::{BlobPart, OpcPackage, PackURI};
 use litchi_xlsb::Package;
 use litchi_xlsb::cell_values::{Reference, Scalar, Value};
-use litchi_xlsb::raw::{Kind, Records, Writer, kind};
+use litchi_xlsb::raw::{Encoder, Kind, Records, kind};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
 const SHARED_STRINGS_CONTENT_TYPE: &str = "application/vnd.ms-excel.sharedStrings";
@@ -42,7 +42,7 @@ fn generated_package() -> Package {
         .expect("build package")
         .write_to(&mut bytes)
         .expect("write shared-string fixture");
-    Package::from_bytes(bytes.into_inner()).expect("read shared-string fixture")
+    Package::from_bytes(&bytes.into_inner()).expect("read shared-string fixture")
 }
 
 fn generated_unique_package() -> Package {
@@ -62,7 +62,7 @@ fn generated_unique_package() -> Package {
         .expect("build package")
         .write_to(&mut bytes)
         .expect("write unique-string fixture");
-    Package::from_bytes(bytes.into_inner()).expect("read unique-string fixture")
+    Package::from_bytes(&bytes.into_inner()).expect("read unique-string fixture")
 }
 
 fn workbook_part(opc: &OpcPackage) -> PackURI {
@@ -265,7 +265,7 @@ fn opaque_sst_suffix_survives_entry_compaction() {
     let uri = shared_strings_uri(&opc);
     let mut bytes = opc.get_part(&uri).expect("SST").blob().to_vec();
     let opaque_kind = Kind::new(0x0f00).expect("opaque kind");
-    Writer::new(&mut bytes)
+    Encoder::new(&mut bytes)
         .write_record(opaque_kind, b"opaque-sst-suffix")
         .expect("opaque suffix");
     opc.get_part_mut(&uri).expect("mutable SST").set_blob(bytes);
@@ -310,11 +310,11 @@ fn unsupported_low_cell_family_is_refused_before_remapping() {
     for item in Records::new(&source_bytes) {
         let record = item.expect("worksheet record");
         if record.kind() == kind::END_SHEET_DATA {
-            Writer::new(&mut bytes)
+            Encoder::new(&mut bytes)
                 .write_record(opaque_cell_family, &payload)
                 .expect("unsupported cell record");
         }
-        Writer::new(&mut bytes)
+        Encoder::new(&mut bytes)
             .write_record(record.kind(), record.payload())
             .expect("copy worksheet record");
     }
@@ -359,17 +359,17 @@ fn shared_string_cell_inside_opaque_frt_is_refused() {
     for item in Records::new(&source_bytes) {
         let record = item.expect("worksheet record");
         if record.kind() == kind::END_SHEET_DATA {
-            Writer::new(&mut bytes)
+            Encoder::new(&mut bytes)
                 .write_record(kind::FRT_BEGIN, &[0; 4])
                 .expect("FRT begin");
-            Writer::new(&mut bytes)
+            Encoder::new(&mut bytes)
                 .write_record(opaque_cell_family, &payload)
                 .expect("unsupported cell record");
-            Writer::new(&mut bytes)
+            Encoder::new(&mut bytes)
                 .write_record(kind::FRT_END, &[])
                 .expect("FRT end");
         }
-        Writer::new(&mut bytes)
+        Encoder::new(&mut bytes)
             .write_record(record.kind(), record.payload())
             .expect("copy worksheet record");
     }
@@ -398,7 +398,7 @@ fn inconsistent_source_sst_count_is_not_silently_repaired() {
         if record.kind() == kind::BEGIN_SST {
             payload[..4].copy_from_slice(&100_u32.to_le_bytes());
         }
-        Writer::new(&mut output)
+        Encoder::new(&mut output)
             .write_record(record.kind(), &payload)
             .expect("record");
     }

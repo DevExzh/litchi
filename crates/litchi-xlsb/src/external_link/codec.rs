@@ -782,7 +782,7 @@ mod tests {
         EXT_PTG_AREA, EXT_PTG_AREA_ERROR, EXT_PTG_ERROR, EXT_PTG_REFERENCE,
         EXT_PTG_REFERENCE_ERROR, REFERENCE_ERROR_CODE,
     };
-    use crate::raw::Writer;
+    use crate::raw::Encoder;
 
     #[test]
     fn accepts_exactly_the_five_external_name_token_structures() {
@@ -938,7 +938,7 @@ mod tests {
     fn owner_parser_rejects_trailing_records_after_end() {
         let link = Link::dde("Excel", "System", vec!["StatusItem".to_string()]).unwrap();
         let mut bytes = write_external_link_stream(&link, None).unwrap();
-        Writer::new(&mut bytes)
+        Encoder::new(&mut bytes)
             .write_record(crate::raw::kind::SUP_NAME_END, &[])
             .unwrap();
         assert!(parse_external_link(&bytes).is_err());

@@ -5,7 +5,7 @@
 
 //! BIFF12 `BrtHLink` decoding and encoding.
 
-use crate::raw::{Cursor, Writer};
+use crate::raw::{Cursor, Encoder};
 
 use super::model::{Error, Hyperlink, PREFIX_LEN, Result};
 
@@ -44,7 +44,7 @@ pub(super) fn parse(data: &[u8]) -> Result<Hyperlink> {
 
 /// Serialize one `BrtHLink` payload with checked raw-kernel limits.
 pub(super) fn serialize(value: &Hyperlink) -> Result<Vec<u8>> {
-    let mut writer = Writer::new(Vec::new());
+    let mut writer = Encoder::new(Vec::new());
     writer.write_u32(value.row_first)?;
     writer.write_u32(value.row_last)?;
     writer.write_u32(value.col_first)?;
@@ -78,7 +78,7 @@ fn read_optional_string(cursor: &mut Cursor<'_>) -> Result<Option<String>> {
     Ok((!value.is_empty()).then_some(value))
 }
 
-fn write_optional_string(writer: &mut Writer<Vec<u8>>, value: Option<&str>) -> Result<()> {
+fn write_optional_string(writer: &mut Encoder<Vec<u8>>, value: Option<&str>) -> Result<()> {
     writer.write_wide_string(value.unwrap_or_default())?;
     Ok(())
 }

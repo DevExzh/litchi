@@ -255,7 +255,7 @@ fn styled_corpus_fixture() -> (Vec<u8>, String, usize, litchi_xlsb::cell_values:
                 .join(name),
         )
         .expect("XLSB corpus fixture");
-        let package = litchi_xlsb::Package::from_bytes(bytes.clone()).expect("native XLSB package");
+        let package = litchi_xlsb::Package::from_bytes(&bytes).expect("native XLSB package");
         let workbook = package.workbook().expect("native workbook");
         for tab in workbook.sheets() {
             let Some(worksheet) = tab.worksheet_position() else {
@@ -371,7 +371,7 @@ fn ordinary_formula_and_styled_records_are_removed_without_rewriting_opaque_part
         Some("(empty)")
     );
     let after = removed.to_bytes().expect("publish removed corpus fixture");
-    let native = litchi_xlsb::Package::from_bytes(after.clone()).expect("native package");
+    let native = litchi_xlsb::Package::from_bytes(&after).expect("native package");
     let workbook = native.workbook().expect("native projection");
     assert!(
         workbook

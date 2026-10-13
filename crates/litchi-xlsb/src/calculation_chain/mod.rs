@@ -19,7 +19,7 @@ mod tests;
 
 pub use model::{
     ChainPart, HARD_MAX_GRAPH_PARTS, HARD_MAX_PART_BYTES, HARD_MAX_RECORDS, HARD_MAX_RELATIONSHIPS,
-    ReadLimits,
+    SemanticLimits,
 };
 pub use package::{CONTENT_TYPE, RELATIONSHIP_TYPE};
 pub use patch::{Commit, Patch};
@@ -27,6 +27,4 @@ pub use snapshot::Snapshot;
 pub use transaction::Transaction;
 
 /// Alias matching the concise limits naming used by other XLSB feature owners.
-pub type Limits = ReadLimits;
-
 pub use crate::package::error::{Error, Result};

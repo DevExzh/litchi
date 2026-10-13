@@ -1,6 +1,6 @@
 use std::mem::size_of;
 
-use crate::raw::Writer;
+use crate::raw::Encoder;
 
 use super::{LEN, Opts, Props, read, write};
 
@@ -8,7 +8,7 @@ use super::{LEN, Opts, Props, read, write};
 fn defaults_round_trip_exactly() {
     let expected = Props::default();
     let mut payload = Vec::new();
-    write(&expected, &mut Writer::new(&mut payload)).unwrap();
+    write(&expected, &mut Encoder::new(&mut payload)).unwrap();
 
     assert_eq!(payload.len(), LEN);
     assert_eq!(read(&payload).unwrap(), expected);

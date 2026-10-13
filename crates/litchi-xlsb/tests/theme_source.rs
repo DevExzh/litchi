@@ -104,10 +104,11 @@ fn stale_source_refuses_theme_without_payload_reads() {
 fn cancelled_source_refuses_theme_without_payload_reads() {
     let source = Source::fixture();
     let (cancellation, context) = context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let before = source.reads.load(Ordering::SeqCst);
@@ -180,10 +181,11 @@ fn theme_byte_limit_is_checked_before_payload_reads() {
 fn managed_theme_view_retains_captured_data_after_workbook_drop() {
     let source = Source::fixture();
     let (_cancellation, context) = context();
-    let workbook = SourceBackedWorkbook::from_read_at_with_execution_context(
+    let workbook = SourceBackedWorkbook::from_read_at_with_options(
         source.clone(),
-        SourceLimits::default(),
-        context,
+        litchi_xlsb::OpenOptions::new()
+            .source_limits(SourceLimits::default())
+            .execution_context(context),
     )
     .unwrap();
     let view = workbook.theme().unwrap().unwrap();

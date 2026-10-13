@@ -5,7 +5,7 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, OwnedContentTypes, OwnedRelationships, Part};
 
 use super::codec;
-use super::model::{Dependencies, ReadLimits};
+use super::model::{Dependencies, SemanticLimits};
 use super::package::{self, Graph};
 use crate::package::error::{Error, Result};
 use crate::raw::kind;
@@ -15,7 +15,7 @@ use crate::raw::kind;
 pub struct Snapshot {
     dependencies: Option<Arc<Dependencies>>,
     sheet_count: usize,
-    limits: ReadLimits,
+    limits: SemanticLimits,
     source: SourceState,
     package: Arc<OpcPackage>,
     rewrite_safe: bool,
@@ -23,7 +23,7 @@ pub struct Snapshot {
 
 impl Snapshot {
     /// Read a snapshot with explicit finite limits.
-    pub(crate) fn read_with_limits(package: &OpcPackage, limits: ReadLimits) -> Result<Self> {
+    pub(crate) fn read_with_limits(package: &OpcPackage, limits: SemanticLimits) -> Result<Self> {
         let limits = limits.validate()?;
         let workbook = package.main_document_part()?;
         let workbook_name = workbook.partname().clone();
@@ -81,7 +81,7 @@ impl Snapshot {
 
     /// Exact finite limits retained by this snapshot.
     #[must_use]
-    pub const fn limits(&self) -> ReadLimits {
+    pub const fn limits(&self) -> SemanticLimits {
         self.limits
     }
 
@@ -114,7 +114,7 @@ impl Snapshot {
 /// `BrtBeginBundleShs` collection. `BrtVolRef.ish` is defined as this
 /// zero-based ordinal, so semantic Volatile inspection cannot accept an
 /// arbitrary sheet number.
-fn workbook_sheet_count(workbook: &dyn Part, limits: ReadLimits) -> Result<usize> {
+fn workbook_sheet_count(workbook: &dyn Part, limits: SemanticLimits) -> Result<usize> {
     let data = workbook.blob();
     if data.len() > limits.max_part_bytes {
         return Err(Error::LimitExceeded {
@@ -222,7 +222,7 @@ impl SourceState {
         package: &OpcPackage,
         workbook_name: &litchi_opc::PackURI,
         graph: Option<&Graph>,
-        limits: ReadLimits,
+        limits: SemanticLimits,
     ) -> Result<Self> {
         let workbook = package.get_part(workbook_name)?;
         let relationship_count = workbook

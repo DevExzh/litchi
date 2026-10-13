@@ -23,6 +23,42 @@ use std::io::{self, Write};
 use std::mem::size_of;
 use std::sync::Arc;
 
+/// Finite policies for one package-owned cell-values edit
+/// ([`Package::edit_cell_values_with_options`]).
+///
+/// The worksheet limits bound parsing of the selected worksheet; the transfer
+/// limits bound the retained package patch.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct EditOptions {
+    limits: Limits,
+    transfer_limits: TransferLimits,
+}
+
+impl EditOptions {
+    /// The default worksheet and transfer policies.
+    #[must_use]
+    pub const fn new() -> Self {
+        Self {
+            limits: Limits::DEFAULT,
+            transfer_limits: TransferLimits::DEFAULT,
+        }
+    }
+
+    /// Select the worksheet parsing policy.
+    #[must_use]
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
+    }
+
+    /// Select the patch transfer and history policy.
+    #[must_use]
+    pub const fn transfer_limits(mut self, limits: TransferLimits) -> Self {
+        self.transfer_limits = limits;
+        self
+    }
+}
+
 /// Publication diagnostics for a package-owned cell-values commit.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Diagnostics {
@@ -97,6 +133,82 @@ pub struct Edit {
     transfer_limits: TransferLimits,
     shared_strings: Option<Vec<SharedString>>,
     calculation_chain_present: bool,
+    /// The styles part with the formats staged by [`Self::set_format`].
+    styles: Option<StylesDraft>,
+}
+
+/// The working styles stream of an edit and the XF each staged format
+/// produced from each source XF.
+#[derive(Debug, Clone)]
+struct StylesDraft {
+    uri: PackURI,
+    bytes: Vec<u8>,
+    changed: bool,
+    restyled: Vec<(super::Format, std::collections::BTreeMap<u32, u32>)>,
+}
+
+impl StylesDraft {
+    fn load(base: &Package) -> Result<Self> {
+        let workbook = base.opc_package().main_document_part()?;
+        let mut targets = workbook.rels().iter().filter(|relationship| {
+            !relationship.is_external()
+                && matches!(
+                    relationship.reltype(),
+                    litchi_opc::constants::relationship_type::STYLES
+                        | litchi_opc::constants::relationship_type::STRICT_STYLES
+                )
+        });
+        let Some(relationship) = targets.next() else {
+            return Err(Error::UnsupportedFeature(
+                "cell formats need a workbook styles part".to_string(),
+            ));
+        };
+        if targets.next().is_some() {
+            return Err(Error::UnsupportedFeature(
+                "the workbook has more than one styles relationship".to_string(),
+            ));
+        }
+        let uri = relationship.target_partname()?;
+        let bytes = base.opc_package().get_part(&uri)?.blob().to_vec();
+        Ok(Self {
+            uri,
+            bytes,
+            changed: false,
+            restyled: Vec::new(),
+        })
+    }
+
+    fn restyle(&mut self, old: u32, format: &super::Format) -> Result<u32> {
+        let slot = match self
+            .restyled
+            .iter()
+            .position(|(staged, _)| staged == format)
+        {
+            Some(slot) => slot,
+            None => {
+                self.restyled
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation {
+                        resource: "XLSB staged cell formats",
+                        source,
+                    })?;
+                self.restyled
+                    .push((format.clone(), std::collections::BTreeMap::new()));
+                self.restyled.len() - 1
+            },
+        };
+        if let Some(index) = self.restyled[slot].1.get(&old) {
+            return Ok(*index);
+        }
+        let mut bytes = self.bytes.clone();
+        let index = super::format::restyle(&mut bytes, old, format)?;
+        if bytes != self.bytes {
+            self.bytes = bytes;
+            self.changed = true;
+        }
+        self.restyled[slot].1.insert(old, index);
+        Ok(index)
+    }
 }
 
 impl Edit {
@@ -114,6 +226,7 @@ impl Edit {
             transfer_limits,
             shared_strings: None,
             calculation_chain_present,
+            styles: None,
         }
     }
 
@@ -269,6 +382,165 @@ impl Edit {
         Ok(true)
     }
 
+    /// Apply a partial format change to one cell.
+    ///
+    /// The cell's current XF and its font, fill and border records are
+    /// copied, the attributes `format` names are patched, and the results are
+    /// interned in the styles part; every other attribute keeps its bytes.
+    /// A coordinate without a stored cell becomes a blank cell carrying the
+    /// new format. Returns whether the staged cell changed: applying a format
+    /// the cell already has is an exact no-op.
+    ///
+    /// # Examples
+    ///
+    /// ```
+    /// use litchi_xlsb::Package;
+    /// use litchi_xlsb::cell_values::{Format, Reference};
+    ///
+    /// let package = Package::new()?;
+    /// let mut edit = package.edit_cell_values(0)?.expect("worksheet");
+    /// let mut format = Format::default();
+    /// format.bold = Some(true);
+    /// assert!(edit.set_format(Reference::new(0, 0)?, &format)?);
+    /// assert!(edit.commit()?.diagnostics().changed());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for a value outside its BIFF12 field, a coordinate in
+    /// a formula group or with an unsupported cell-record family, a workbook
+    /// without exactly one styles part, and malformed style records.
+    pub fn set_format(&mut self, reference: Reference, format: &super::Format) -> Result<bool> {
+        format.validate()?;
+        if format.is_empty() {
+            return Ok(false);
+        }
+        if self.raw.is_removed(reference) {
+            return Err(Error::UnsupportedFeature(
+                "format edits cannot target a cell already staged for removal".to_string(),
+            ));
+        }
+        let current = self.raw.current_cell(reference)?.map(|cell| cell.style());
+        if current.is_none() && self.raw.source_has_cell(reference)? {
+            return Err(Error::UnsupportedFeature(
+                "format edits cannot target an unsupported cell-record family".to_string(),
+            ));
+        }
+        let old = current.map_or(0, StyleIndex::get);
+        if self.styles.is_none() {
+            self.styles = Some(StylesDraft::load(&self.base)?);
+        }
+        let styles = self
+            .styles
+            .as_mut()
+            .ok_or_else(|| Error::InvalidFormat("the styles draft was not loaded".to_string()))?;
+        let new = styles.restyle(old, format)?;
+        if new == old {
+            return Ok(false);
+        }
+        let style = StyleIndex::new(new)?;
+        match current {
+            Some(_) => self.raw.set_style(reference, style)?,
+            None => self.raw.insert(reference, style, Value::Blank)?,
+        }
+        Ok(true)
+    }
+
+    /// Set a cell's formula from Excel formula text (a leading `=` is
+    /// optional), keeping the cell's style.
+    ///
+    /// The formula is stored with `fAlwaysCalc`, so Excel recalculates it
+    /// when the workbook opens; no value is computed here. An ordinary
+    /// formula cell keeps its cached result; a value cell keeps its value as
+    /// the cached result, and a blank or new cell caches an empty string.
+    /// Returns whether the staged cell changed.
+    ///
+    /// Formulas that name another sheet or a defined name need the workbook's
+    /// extern-sheet and name tables and are refused
+    /// ([`Error::UnsupportedFeature`]); references within the sheet,
+    /// operators, literals and built-in functions are compiled.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for invalid or unsupported formula text, a
+    /// coordinate in a formula group or with an unsupported cell-record
+    /// family, and a new formula while the workbook keeps an opaque
+    /// calculation chain this owner cannot extend.
+    pub fn set_formula_text(&mut self, reference: Reference, formula: &str) -> Result<bool> {
+        let parsed = crate::package::formula::text::Compiler::compile(formula).map_err(|error| {
+            if let Error::UnresolvedDependency(message) = error {
+                Error::UnsupportedFeature(format!(
+                    "the formula needs workbook context ({message}); only formulas within the sheet are compiled"
+                ))
+            } else {
+                error
+            }
+        })?;
+        let formula = CellFormula::new(0x0002, parsed.rgce, parsed.rgcb)?;
+        self.raw.scalar_assignment_guard(reference)?;
+        if self.raw.is_removed(reference) {
+            return Err(Error::UnsupportedFeature(
+                "formula edits cannot target a cell already staged for removal".to_string(),
+            ));
+        }
+        let current = self.raw.current_cell(reference)?.cloned();
+        let Some(current) = current else {
+            if self.raw.source_has_cell(reference)? {
+                return Err(Error::UnsupportedFeature(
+                    "formula edits cannot target an unsupported cell-record family".to_string(),
+                ));
+            }
+            if self.calculation_chain_present {
+                return Err(Error::UnsupportedFeature(
+                    "a new formula cell cannot be added while an opaque calculation chain is present"
+                        .to_string(),
+                ));
+            }
+            self.raw.insert_formula(
+                reference,
+                StyleIndex::new(0)?,
+                Value::FormulaStringCache(String::new()),
+                formula,
+            )?;
+            return Ok(true);
+        };
+        if current.formula().is_some() {
+            if current.formula() == Some(&formula) {
+                return Ok(false);
+            }
+            self.raw.set_formula(reference, formula)?;
+            return Ok(true);
+        }
+        if self.calculation_chain_present {
+            return Err(Error::UnsupportedFeature(
+                "a value cell cannot become a formula while an opaque calculation chain is present"
+                    .to_string(),
+            ));
+        }
+        let cache = match current.value() {
+            Value::Number(value) | Value::RkNumber(value) => Value::FormulaNumberCache(*value),
+            Value::Boolean(value) => Value::FormulaBooleanCache(*value),
+            Value::Error(value) => Value::FormulaErrorCache(*value),
+            Value::InlineString(value) => Value::FormulaStringCache(value.clone()),
+            Value::SharedStringIndex(index) => {
+                Value::FormulaStringCache(self.shared_string(*index)?.text)
+            },
+            Value::RichString(value) => Value::FormulaStringCache(value.text.clone()),
+            Value::Blank => Value::FormulaStringCache(String::new()),
+            Value::FormulaStringCache(_)
+            | Value::FormulaNumberCache(_)
+            | Value::FormulaBooleanCache(_)
+            | Value::FormulaErrorCache(_) => {
+                return Err(Error::InvalidFormat(
+                    "a formula cache without a formula payload".to_string(),
+                ));
+            },
+        };
+        self.raw.replace_with_formula(reference, cache, formula)?;
+        Ok(true)
+    }
+
     /// Replace a value while retaining the existing BIFF12 storage family.
     pub fn set_value(&mut self, reference: Reference, value: Value) -> Result<()> {
         self.raw.set_value(reference, value)
@@ -411,8 +683,21 @@ impl Edit {
         let image_budget = remaining_image_budget(retained, self.transfer_limits)?;
         let before: Arc<[u8]> = Arc::from(serialize_package(&self.base, image_budget)?);
 
+        // Staged formats intern their records into the styles part; the
+        // worksheet commit is published over that candidate package.
+        let styled = match &self.styles {
+            Some(styles) if styles.changed => {
+                let mut package = self.base.opc_package().clone();
+                crate::signature_policy::ensure_unsigned(&package)?;
+                package
+                    .get_part_mut(&styles.uri)?
+                    .set_blob(styles.bytes.clone());
+                Some(package)
+            },
+            _ => None,
+        };
         let applied = workbook::apply_retaining_parse(
-            self.base.opc_package(),
+            styled.as_ref().unwrap_or_else(|| self.base.opc_package()),
             &self.worksheet,
             &raw_commit,
             self.base.external_link_limits(),
@@ -450,9 +735,9 @@ impl Edit {
             transfer_limits: self.transfer_limits,
         };
         if patch.retained_bytes() > self.transfer_limits.bytes() {
-            return Err(Error::LimitExceeded {
-                resource: "cell-values retained patch bytes",
-                actual: patch.retained_bytes(),
+            return Err(Error::Limit {
+                kind: crate::cell_values::LimitKind::PatchBytes,
+                observed: patch.retained_bytes(),
                 maximum: self.transfer_limits.bytes(),
             });
         }
@@ -654,7 +939,7 @@ impl Package {
     /// Start a detached cell-values edit selected from the complete tab
     /// catalog using the default worksheet and transfer policies.
     pub fn edit_cell_values<'a>(&self, selector: impl Into<Selector<'a>>) -> Result<Option<Edit>> {
-        self.edit_cell_values_with_limits(selector, Limits::DEFAULT, TransferLimits::DEFAULT)
+        self.edit_cell_values_with_options(selector, EditOptions::default())
     }
 
     /// Start a detached cell-values edit with explicit finite policies.
@@ -662,12 +947,13 @@ impl Package {
     /// The transfer byte budget bounds the retained package patch, including
     /// package and worksheet images plus owned semantic cell payloads.
     /// Worksheet parsing uses the separate worksheet policy.
-    pub fn edit_cell_values_with_limits<'a>(
+    pub fn edit_cell_values_with_options<'a>(
         &self,
         selector: impl Into<Selector<'a>>,
-        worksheet_limits: Limits,
-        transfer_limits: TransferLimits,
+        options: EditOptions,
     ) -> Result<Option<Edit>> {
+        let worksheet_limits = options.limits;
+        let transfer_limits = options.transfer_limits;
         validate_limits(transfer_limits)?;
         let Some(worksheet) = resolve_worksheet(self, selector)? else {
             return Ok(None);
@@ -774,14 +1060,11 @@ fn publish_validated_workbook(
 }
 
 fn remaining_image_budget(before_len: usize, limits: TransferLimits) -> Result<usize> {
-    limits
-        .bytes()
-        .checked_sub(before_len)
-        .ok_or(Error::LimitExceeded {
-            resource: "cell-values package patch images",
-            actual: before_len.saturating_add(1),
-            maximum: limits.bytes(),
-        })
+    limits.bytes().checked_sub(before_len).ok_or(Error::Limit {
+        kind: crate::cell_values::LimitKind::PatchBytes,
+        observed: before_len.saturating_add(1),
+        maximum: limits.bytes(),
+    })
 }
 
 fn serialize_package(package: &Package, maximum: usize) -> Result<Vec<u8>> {
@@ -792,9 +1075,9 @@ fn serialize_opc_package(package: &OpcPackage, maximum: usize) -> Result<Vec<u8>
     let mut writer = BoundedWriter::new(maximum);
     let result = PackageWriter::write_to_stream(&mut writer, package);
     if writer.exceeded {
-        return Err(Error::LimitExceeded {
-            resource: "cell-values package image",
-            actual: writer.written.max(maximum.saturating_add(1)),
+        return Err(Error::Limit {
+            kind: super::LimitKind::PatchBytes,
+            observed: writer.written.max(maximum.saturating_add(1)),
             maximum,
         });
     }
@@ -852,9 +1135,9 @@ impl Write for BoundedWriter {
 fn validate_transfer_limits(patch: &WorksheetPatch, limits: TransferLimits) -> Result<()> {
     validate_limits(limits)?;
     if patch.changes().len() > limits.changes() {
-        return Err(Error::LimitExceeded {
-            resource: "cell-values patch changes",
-            actual: patch.changes().len(),
+        return Err(Error::Limit {
+            kind: crate::cell_values::LimitKind::Changes,
+            observed: patch.changes().len(),
             maximum: limits.changes(),
         });
     }
@@ -866,9 +1149,9 @@ fn validate_transfer_limits(patch: &WorksheetPatch, limits: TransferLimits) -> R
             resource: "cell-values patch images",
         })?;
     if bytes > limits.bytes() {
-        return Err(Error::LimitExceeded {
-            resource: "cell-values patch images",
-            actual: bytes,
+        return Err(Error::Limit {
+            kind: crate::cell_values::LimitKind::PatchBytes,
+            observed: bytes,
             maximum: limits.bytes(),
         });
     }

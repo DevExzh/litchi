@@ -10,7 +10,7 @@ use std::io::Cursor;
 
 use litchi_opc::{BlobPart, OpcPackage, PackURI, Part, TargetMode};
 use litchi_xlsb::Package;
-use litchi_xlsb::data_model::{Definition, Model, ReadLimits, Relationship, Table};
+use litchi_xlsb::data_model::{Definition, Model, Relationship, SemanticLimits, Table};
 use litchi_xlsb::package::connections::{Connection, Connections, SourceType};
 use litchi_xlsb::writer::{Builder, MutableWorksheet};
 
@@ -91,7 +91,7 @@ fn package_with_model(definition: Definition, payload: Vec<u8>) -> Package {
         .expect("build package")
         .write_to(&mut output)
         .expect("save");
-    Package::from_bytes(output.into_inner()).expect("package")
+    Package::from_bytes(&output.into_inner()).expect("package")
 }
 
 fn complete_package(self_relationship: bool) -> Package {
@@ -884,7 +884,7 @@ fn complete_xldm140_rename_updates_outer_identity_relationships_and_inner_closur
     assert_eq!(preserved_members(&changed), preserved);
     assert_ne!(changed.to_bytes().unwrap(), source_bytes);
 
-    let reopened = Package::from_bytes(changed.to_bytes().unwrap()).expect("reopen changed");
+    let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).expect("reopen changed");
     assert_eq!(
         reopened.data_model().unwrap().definition().unwrap().tables[0].name,
         NEW_TABLE_NAME
@@ -1155,7 +1155,7 @@ fn tabular150_model_profile_refuses_xldm140_identity_edit() {
 fn caller_rewrite_limit_refuses_before_publication() {
     let source = complete_package(false);
     let source_bytes = source.to_bytes().expect("source bytes");
-    let mut limits = ReadLimits::DEFAULT;
+    let mut limits = SemanticLimits::DEFAULT;
     limits.max_rewrite_bytes = package_part_bytes(&source, WORKBOOK_URI).len();
     let before = source
         .data_model_with_limits(limits)
@@ -1174,7 +1174,7 @@ fn caller_model_part_limit_refuses_before_draft_change() {
     let source_bytes = source.to_bytes().expect("source bytes");
     let payload_len = package_part_bytes(&source, MODEL_URI).len();
     let long_name = "x".repeat(32 * 1024 - 1);
-    let mut limits = ReadLimits::DEFAULT;
+    let mut limits = SemanticLimits::DEFAULT;
     limits.max_part_bytes = payload_len;
     let before = source
         .data_model_with_limits(limits)
@@ -1193,7 +1193,7 @@ fn native_date_fixture_has_no_model_and_is_not_positive_identity_evidence() {
     let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
         .join("../../test-data/ooxml/xlsb/date.xlsb");
     let bytes = std::fs::read(path).expect("native date fixture");
-    let package = Package::from_bytes(bytes).expect("native package");
+    let package = Package::from_bytes(&bytes).expect("native package");
     let snapshot = package.data_model().expect("native snapshot");
     assert!(!snapshot.is_present());
 }

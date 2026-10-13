@@ -1,16 +1,16 @@
 //! Workbook and package facades for the XLSB Data Model owner.
 
-use super::{Commit, Limits, Patch, Snapshot};
+use super::{Commit, Patch, SemanticLimits, Snapshot};
 use crate::package::error::Result;
 
 impl crate::Workbook {
     /// Read the workbook Data Model records and its lazy opaque model part.
     pub fn data_model(&self) -> Result<Snapshot> {
-        self.data_model_with_limits(Limits::DEFAULT)
+        self.data_model_with_limits(SemanticLimits::DEFAULT)
     }
 
     /// Read the workbook Data Model using explicit finite limits.
-    pub fn data_model_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub fn data_model_with_limits(&self, limits: SemanticLimits) -> Result<Snapshot> {
         Snapshot::read_with_limits(&self.package, limits)
     }
 
@@ -20,7 +20,10 @@ impl crate::Workbook {
     }
 
     /// Start a detached Data Model transaction with explicit limits.
-    pub fn edit_data_model_with_limits(&self, limits: Limits) -> Result<super::Transaction> {
+    pub fn edit_data_model_with_limits(
+        &self,
+        limits: SemanticLimits,
+    ) -> Result<super::Transaction> {
         Ok(self.data_model_with_limits(limits)?.edit())
     }
 
@@ -57,11 +60,11 @@ impl crate::Workbook {
 impl crate::Package {
     /// Read the workbook Data Model records and its lazy opaque model part.
     pub fn data_model(&self) -> Result<Snapshot> {
-        Snapshot::read_with_limits(self.opc_package(), Limits::DEFAULT)
+        Snapshot::read_with_limits(self.opc_package(), SemanticLimits::DEFAULT)
     }
 
     /// Read the workbook Data Model using explicit finite limits.
-    pub fn data_model_with_limits(&self, limits: Limits) -> Result<Snapshot> {
+    pub fn data_model_with_limits(&self, limits: SemanticLimits) -> Result<Snapshot> {
         Snapshot::read_with_limits(self.opc_package(), limits)
     }
 
