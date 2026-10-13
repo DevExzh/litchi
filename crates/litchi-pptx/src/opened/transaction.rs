@@ -182,7 +182,7 @@ impl Edit {
         let mut order = self.slide_order_ids()?;
         let id = order.remove(from);
         order.insert(to, id);
-        self.reorder_slide_ids(&order)
+        self.reorder_slide_ids_moving(&order, Some(to))
     }
 
     /// Exchange two selected slides in one failure-atomic order edit.
@@ -243,6 +243,18 @@ impl Edit {
     }
 
     fn reorder_slide_ids(&mut self, ordered_ids: &[u32]) -> Result<bool> {
+        self.reorder_slide_ids_moving(ordered_ids, None)
+    }
+
+    /// Stage `ordered_ids`. With `moved`, the slide at that position left its
+    /// section and joins its new neighbour's, as `PowerPoint` moves a slide;
+    /// otherwise every slide keeps its section and each section is re-sorted
+    /// into the new order (p14 sections, record 0252).
+    fn reorder_slide_ids_moving(
+        &mut self,
+        ordered_ids: &[u32],
+        moved: Option<usize>,
+    ) -> Result<bool> {
         if ordered_ids.len() == self.slides.len()
             && ordered_ids
                 .iter()
@@ -253,6 +265,11 @@ impl Edit {
         }
         let main = self.working.get_part(&self.source.presentation_name)?;
         let xml = super::xml::reorder_slides(main.blob(), &self.slides, ordered_ids)?;
+        let sectioned = match moved {
+            Some(position) => super::sections::place(&xml, ordered_ids, position)?,
+            None => super::sections::sort(&xml, ordered_ids)?,
+        };
+        let xml = sectioned.unwrap_or(xml);
         let mut reordered = Vec::new();
         reordered
             .try_reserve_exact(self.slides.len())

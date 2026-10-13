@@ -210,6 +210,9 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     )?;
     let xml =
         super::xml::insert_slide(main.blob(), &source.slides, position, id, &relationship_id)?;
+    let mut order: Vec<u32> = source.slides.iter().map(|slide| slide.id).collect();
+    order.insert(position, id);
+    let xml = super::sections::place(&xml, &order, position)?.unwrap_or(xml);
     super::new_slide::read_back(slide.blob(), &placeholders)?;
     let sizes = [
         main.blob().len(),

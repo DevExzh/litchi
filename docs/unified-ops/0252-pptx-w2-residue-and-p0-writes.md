@@ -209,3 +209,23 @@ moved slides (reference `sections.rs` not ported; trunk still refuses
 section decks in source-backed order edits), and no paired measurement for
 notes/comment/picture/slide-add (they are not single-property hot paths;
 the source→eager promotion costs one copy and reparse of the package).
+
+## 7. p14 section maintenance (eager owner)
+
+Port of reference 9474e2b6ce `opened/sections.rs` (refusals re-typed as
+`SlideOrderPlan { kind: Sections }`; no `SlideAdd` error family added):
+- eager `insert_slide`: the new slide joins the section of the slide before
+  it, or at the start the section of the slide after it, or the first
+  section; eager slide-insertion admission now accepts the p14 section list
+  and its `p:extLst/p:ext` wrapper (removal admission is unchanged);
+- eager `move_slide`: the moved slide leaves its section and joins its new
+  neighbour's; `swap_slides`/`reorder_slides`: membership is kept and each
+  section is re-sorted into the new order;
+- edits splice `p14:sldId` elements only and read the entry back.
+
+Tests: `crates/litchi-pptx/tests/slide_sections.rs` (3) and the six ported
+unit tests in `opened/sections.rs`. Not done: the source-backed owner (the
+default unified open route) still refuses insertion and order edits on
+section decks, because its root validators (`source_removal`,
+`source_cross_copy`) do not model the extension; unified slide add/move on a
+section deck therefore needs `SourceMode::Eager` until that follow-up.

@@ -19,6 +19,7 @@ mod patch;
 mod properties;
 mod removal_proof;
 mod remove_plan;
+mod sections;
 mod slide_properties;
 mod text_format;
 mod transaction;

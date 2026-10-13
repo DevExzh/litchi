@@ -17,7 +17,7 @@ use super::model::{Slide, invalid};
 use crate::{Error, Result};
 use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
-const MAX_XML_DEPTH: usize = 256;
+pub(super) const MAX_XML_DEPTH: usize = 256;
 const MAX_XML_NODES: usize = 1_000_000;
 
 /// The compacted bytes and the conservative witness that the document root
@@ -2755,7 +2755,7 @@ fn is_drawing(namespace: &ResolveResult<'_>) -> bool {
     )
 }
 
-fn is_presentation_namespace(namespace: &ResolveResult<'_>) -> bool {
+pub(super) fn is_presentation_namespace(namespace: &ResolveResult<'_>) -> bool {
     matches!(
         namespace,
         ResolveResult::Bound(Namespace(value))
@@ -2764,7 +2764,7 @@ fn is_presentation_namespace(namespace: &ResolveResult<'_>) -> bool {
     )
 }
 
-fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
+pub(super) fn position(reader: &NsReader<&[u8]>, origin: ReaderOrigin) -> Result<usize> {
     origin
         .offset(reader.buffer_position())
         .ok_or_else(|| invalid("opened-presentation XML position exceeds usize"))
@@ -2782,7 +2782,7 @@ fn check_execution_context(context: Option<&litchi_core::ExecutionContext>) -> R
     Ok(())
 }
 
-fn bump(nodes: &mut usize) -> Result<()> {
+pub(super) fn bump(nodes: &mut usize) -> Result<()> {
     *nodes = nodes
         .checked_add(1)
         .ok_or_else(|| invalid("opened-presentation XML node count overflow"))?;
