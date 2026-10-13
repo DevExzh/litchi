@@ -157,6 +157,8 @@ struct StoryBuilder {
     /// Byte offset where the story's content starts (text box content, or
     /// the first direct paragraph-level child).
     start: Option<usize>,
+    /// The element of a self-closing container (`<draw:text-box/>`).
+    empty: Option<Range<usize>>,
     end: usize,
     insertion: usize,
     paragraphs: Vec<Paragraph>,
@@ -573,6 +575,7 @@ impl Scanner<'_> {
         });
         self.stories.push(StoryBuilder {
             start: None,
+            empty: None,
             end,
             insertion: end,
             paragraphs: Vec::new(),
@@ -662,6 +665,7 @@ impl Scanner<'_> {
                     story.start = Some(end);
                     story.end = end;
                     story.insertion = if empty { usize::MAX } else { end };
+                    story.empty = empty.then_some(start..end);
                 }
                 Ok(Frame::TextBox)
             },
@@ -960,6 +964,7 @@ impl Scanner<'_> {
         });
         self.stories.push(StoryBuilder {
             start: Some(end),
+            empty: empty.then_some(start..end),
             end,
             insertion: if empty { usize::MAX } else { end },
             paragraphs: Vec::new(),
@@ -1268,6 +1273,7 @@ fn finish_story(story: StoryBuilder, end: usize) -> Story {
         paragraphs: story.paragraphs,
         replaceable: story.replaceable,
         insertion: story.insertion,
+        empty: story.empty,
     }
 }
 

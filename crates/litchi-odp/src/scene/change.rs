@@ -237,14 +237,17 @@ pub(crate) enum Fragment {
     Markup(String),
     /// One rewritten start tag.
     StartTag(String),
+    /// Source markup relocated from another range of the same part.
+    Relocated(Range<usize>),
     /// Removal.
     Delete,
 }
 
 impl Fragment {
-    pub(crate) fn bytes(&self) -> &str {
+    pub(crate) fn bytes<'a>(&'a self, xml: &'a str) -> &'a str {
         match self {
             Self::Text(text) | Self::Markup(text) | Self::StartTag(text) => text,
+            Self::Relocated(range) => &xml[range.clone()],
             Self::Delete => "",
         }
     }
@@ -267,13 +270,13 @@ impl Plan {
         let added: usize = self
             .edits
             .iter()
-            .map(|(_, fragment)| fragment.bytes().len())
+            .map(|(_, fragment)| fragment.bytes(xml).len())
             .sum();
         let mut out = String::with_capacity(xml.len() + added);
         let mut cursor = 0;
         for (range, fragment) in &self.edits {
             out.push_str(&xml[cursor..range.start]);
-            out.push_str(fragment.bytes());
+            out.push_str(fragment.bytes(xml));
             cursor = range.end;
         }
         out.push_str(&xml[cursor..]);
@@ -336,7 +339,12 @@ pub(crate) fn plan(xml: &str, scene: &Scene, changes: &[Change]) -> Result<Plan>
             let both_insertions =
                 last.start == last.end && range.start == range.end && last.start == range.start;
             if both_insertions {
-                let joined = format!("{}{}", last_fragment.bytes(), fragment.bytes());
+                if matches!(last_fragment, Fragment::Relocated(_))
+                    || matches!(fragment, Fragment::Relocated(_))
+                {
+                    return Err(invalid("two ODP scene changes insert at the same position"));
+                }
+                let joined = format!("{}{}", last_fragment.bytes(xml), fragment.bytes(xml));
                 *last_fragment = Fragment::Markup(joined);
                 continue;
             }
@@ -482,12 +490,15 @@ impl<'a> Planner<'a> {
         if story.text() == text {
             return Ok(());
         }
-        if !story.replaceable || story.insertion == usize::MAX {
+        let markup = self.story_markup(story, text)?;
+        if let Some(empty) = &story.empty {
+            return self.expand(empty.clone(), &markup);
+        }
+        if !story.replaceable {
             return Err(unsupported(
                 "this ODP text story holds content other than paragraphs and lists",
             ));
         }
-        let markup = self.story_markup(story, text)?;
         self.push(story.range.clone(), Fragment::Markup(markup));
         Ok(())
     }
@@ -621,10 +632,13 @@ impl<'a> Planner<'a> {
             .get(index.saturating_sub(1))
             .or_else(|| story.paragraphs.first())
         else {
-            if story.insertion == usize::MAX {
-                return Err(unsupported("this ODP text story is a self-closing element"));
-            }
             let markup = format!("<{prefix}:p>{content}</{prefix}:p>");
+            if let Some(empty) = &story.empty {
+                return self.expand(empty.clone(), &markup);
+            }
+            if story.insertion == usize::MAX {
+                return Err(unsupported("this ODP text story has no insertion point"));
+            }
             self.push(story.insertion..story.insertion, Fragment::Markup(markup));
             return Ok(());
         };
@@ -658,6 +672,19 @@ impl<'a> Planner<'a> {
             },
         };
         self.push(at..at, Fragment::Markup(markup));
+        Ok(())
+    }
+
+    /// Replace a self-closing element with its open form holding `content`.
+    fn expand(&mut self, element: Range<usize>, content: &str) -> Result<()> {
+        let raw = &self.xml[element.clone()];
+        let name = StartTag::parse(raw)?.name.to_owned();
+        let mut markup = open_tag(raw)?;
+        markup.push_str(content);
+        markup.push_str("</");
+        markup.push_str(&name);
+        markup.push('>');
+        self.push(element, Fragment::Markup(markup));
         Ok(())
     }
 
@@ -754,9 +781,6 @@ impl<'a> Planner<'a> {
 
     fn insert_text_box(&mut self, index: usize, text_box: &NewTextBox) -> Result<()> {
         let page = self.page(index)?;
-        let at = page
-            .insertion
-            .ok_or_else(|| unsupported("this ODP page is a self-closing element"))?;
         let draw = self.prefix(self.scene.prefixes.draw.as_ref(), "drawing")?;
         let svg = self.prefix(self.scene.prefixes.svg.as_ref(), "SVG")?;
         let story = Story {
@@ -764,6 +788,7 @@ impl<'a> Planner<'a> {
             paragraphs: Vec::new(),
             replaceable: true,
             insertion: 0,
+            empty: None,
         };
         let paragraphs = self.story_markup(&story, &text_box.text)?;
         let mut markup = format!("<{draw}:frame");
@@ -776,6 +801,12 @@ impl<'a> Planner<'a> {
         markup.push_str(&format!(
             "><{draw}:text-box>{paragraphs}</{draw}:text-box></{draw}:frame>"
         ));
+        if page.empty {
+            return self.expand(page.range.clone(), &markup);
+        }
+        let at = page
+            .insertion
+            .ok_or_else(|| unsupported("this ODP page has no insertion point"))?;
         self.push(at..at, Fragment::Markup(markup));
         Ok(())
     }
@@ -827,14 +858,13 @@ impl<'a> Planner<'a> {
         if to == from {
             return Ok(());
         }
-        let bytes = self.xml[object.range.clone()].to_owned();
         let at = if to > from {
             objects[to].range.end
         } else {
             objects[to].range.start
         };
         self.push(object.range.clone(), Fragment::Delete);
-        self.push(at..at, Fragment::Markup(bytes));
+        self.push(at..at, Fragment::Relocated(object.range.clone()));
         Ok(())
     }
 
@@ -853,10 +883,8 @@ impl<'a> Planner<'a> {
         }
         let left = self.object(first)?.range.clone();
         let right = self.object(second)?.range.clone();
-        let left_bytes = self.xml[left.clone()].to_owned();
-        let right_bytes = self.xml[right.clone()].to_owned();
-        self.push(left, Fragment::Markup(right_bytes));
-        self.push(right, Fragment::Markup(left_bytes));
+        self.push(left.clone(), Fragment::Relocated(right.clone()));
+        self.push(right, Fragment::Relocated(left));
         Ok(())
     }
 
@@ -980,14 +1008,13 @@ impl<'a> Planner<'a> {
         if to == index {
             return Ok(());
         }
-        let bytes = self.xml[page.range.clone()].to_owned();
         let at = if to > index {
             self.scene.pages[to].range.end
         } else {
             self.scene.pages[to].range.start
         };
         self.push(page.range.clone(), Fragment::Delete);
-        self.push(at..at, Fragment::Markup(bytes));
+        self.push(at..at, Fragment::Relocated(page.range.clone()));
         Ok(())
     }
 
@@ -997,10 +1024,8 @@ impl<'a> Planner<'a> {
         if first == second {
             return Ok(());
         }
-        let left_bytes = self.xml[left.clone()].to_owned();
-        let right_bytes = self.xml[right.clone()].to_owned();
-        self.push(left, Fragment::Markup(right_bytes));
-        self.push(right, Fragment::Markup(left_bytes));
+        self.push(left.clone(), Fragment::Relocated(right.clone()));
+        self.push(right, Fragment::Relocated(left));
         Ok(())
     }
 }

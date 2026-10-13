@@ -80,6 +80,7 @@ pub(crate) fn apply_changes(
             Fragment::Text(text) => AuthoredXmlFragment::text(text.as_bytes().to_vec())?,
             Fragment::Markup(markup) => AuthoredXmlFragment::markup(markup.as_bytes().to_vec())?,
             Fragment::StartTag(tag) => AuthoredXmlFragment::start_tag(tag.as_bytes().to_vec())?,
+            Fragment::Relocated(source) => AuthoredXmlFragment::relocated(&part, source.clone())?,
             Fragment::Delete => AuthoredXmlFragment::deletion(),
         };
         publication.replace(proof, fragment)?;
@@ -529,6 +530,9 @@ pub struct Story {
     /// Where a paragraph goes in an empty story: the container's content
     /// start, or `usize::MAX` when the container is a self-closing element.
     pub(crate) insertion: usize,
+    /// The self-closing container element (`<draw:text-box/>`,
+    /// `<table:table-cell/>`), which a write expands.
+    pub(crate) empty: Option<Range<usize>>,
 }
 
 impl Story {

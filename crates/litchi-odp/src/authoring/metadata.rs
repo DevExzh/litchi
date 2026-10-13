@@ -7,7 +7,10 @@
 
 use litchi_core::{Error, Metadata as CoreMetadata, Result};
 use litchi_odf_common::core::metadata::Metadata as OdfMetadata;
-use litchi_odf_common::core::{MetaXmlPatch, Structure, patch_meta_xml};
+use litchi_odf_common::core::{
+    AuthoredXmlFragment, MetaXmlPatch, Structure, XmlSourcePart, XmlSplicePublication,
+    patch_meta_xml,
+};
 
 use crate::core::OwnedPackage;
 
@@ -31,9 +34,13 @@ pub(crate) fn read(source: &OwnedPackage) -> Result<CoreMetadata> {
 }
 
 /// Publish `metadata` into `source`'s `meta.xml`; `None` for an exact no-op.
+///
+/// Each changed field is published as its own checked splice of the
+/// retained part, so the producer's formatting between fields never has to
+/// pass the authored-XML audit.
 pub(crate) fn apply(source: &OwnedPackage, metadata: &CoreMetadata) -> Result<Option<Vec<u8>>> {
-    let (xml, odf) = source_metadata(source)?;
-    let current = CoreMetadata::from(odf.clone());
+    let (_, odf) = source_metadata(source)?;
+    let current = CoreMetadata::from(odf);
     if !unsupported_equal(&current, metadata) {
         return Err(Error::Unsupported(
             "ODP metadata edits support title, author, subject, description and keywords only"
@@ -43,6 +50,32 @@ pub(crate) fn apply(source: &OwnedPackage, metadata: &CoreMetadata) -> Result<Op
     if supported_equal(&current, metadata) {
         return Ok(None);
     }
+    let mut package = source.clone();
+    let mut staged = current;
+    let steps: [fn(&mut CoreMetadata, &CoreMetadata); 5] = [
+        |to, from| to.title.clone_from(&from.title),
+        |to, from| to.author.clone_from(&from.author),
+        |to, from| to.subject.clone_from(&from.subject),
+        |to, from| to.description.clone_from(&from.description),
+        |to, from| to.keywords.clone_from(&from.keywords),
+    ];
+    for step in steps {
+        let mut next = staged.clone();
+        step(&mut next, metadata);
+        if next == staged {
+            continue;
+        }
+        let bytes = publish_one(&package, &next)?;
+        package = OwnedPackage::from_bytes(bytes)?;
+        staged = next;
+    }
+    Ok(Some(package.as_bytes().to_vec()))
+}
+
+/// Publish one metadata state whose patch differs from `source` in one
+/// field.
+fn publish_one(source: &OwnedPackage, metadata: &CoreMetadata) -> Result<Vec<u8>> {
+    let (xml, odf) = source_metadata(source)?;
     let base = xml.clone().unwrap_or_else(Structure::default_meta_xml);
     let patch = MetaXmlPatch::preserve_all().diff_simple_fields(&odf, metadata);
     let patched = patch_meta_xml(&base, &patch)?.unwrap_or(base);
@@ -52,16 +85,41 @@ pub(crate) fn apply(source: &OwnedPackage, metadata: &CoreMetadata) -> Result<Op
         ));
     }
     OdfMetadata::from_xml(&patched)?;
-    if xml.is_some()
-        && let Ok(publication) =
-            litchi_odf_common::package::xml_splice_publication(source, META, &patched)
-    {
+    if let Some(xml) = &xml {
+        let part = XmlSourcePart::load(source, META)?;
+        if part.bytes() != xml.as_bytes() {
+            return Err(Error::InvalidFormat(
+                "ODP meta.xml changed while it was patched".to_string(),
+            ));
+        }
+        // The patcher drops a byte-order mark the source part keeps.
+        let patched = match (
+            xml.strip_prefix('\u{feff}'),
+            patched.starts_with('\u{feff}'),
+        ) {
+            (Some(_), false) => format!("\u{feff}{patched}"),
+            _ => patched,
+        };
+        let (range, fragment) = element_splice(xml, &patched).ok_or_else(|| {
+            Error::Unsupported(
+                "the ODP meta.xml change does not align with one element".to_string(),
+            )
+        })?;
+        let fragment = if fragment.is_empty() {
+            AuthoredXmlFragment::deletion()
+        } else {
+            AuthoredXmlFragment::markup(fragment.into_bytes())?
+        };
+        let mut publication = XmlSplicePublication::new(part.clone());
+        publication.replace(
+            part.checked_range(range.clone(), &xml.as_bytes()[range])?,
+            fragment,
+        )?;
         return litchi_odf_common::core::rebuild_package_with_xml_splices(
             source,
             vec![publication],
             MAX_OUTPUT_BYTES,
-        )
-        .map(Some);
+        );
     }
     let content = String::from_utf8(source.get_file("content.xml")?)
         .map_err(|error| Error::InvalidFormat(format!("ODP content.xml is not UTF-8: {error}")))?;
@@ -77,7 +135,6 @@ pub(crate) fn apply(source: &OwnedPackage, metadata: &CoreMetadata) -> Result<Op
         Vec::<String>::new(),
         Vec::<String>::new(),
     )
-    .map(Some)
 }
 
 fn supported_equal(left: &CoreMetadata, right: &CoreMetadata) -> bool {
@@ -113,4 +170,101 @@ fn unsupported_equal(left: &CoreMetadata, right: &CoreMetadata) -> bool {
         && left.hyperlink_base == right.hyperlink_base
         && left.security == right.security
         && left.codepage == right.codepage
+}
+
+/// The one source range and balanced replacement markup that turn `old`
+/// into `new`, aligned to element boundaries: the range starts at a `<` and
+/// ends before one, and the replacement is empty or balanced markup.
+fn element_splice(old: &str, new: &str) -> Option<(std::ops::Range<usize>, String)> {
+    let (old_bytes, new_bytes) = (old.as_bytes(), new.as_bytes());
+    let prefix = old_bytes
+        .iter()
+        .zip(new_bytes)
+        .take_while(|(left, right)| left == right)
+        .count();
+    // Candidate starts: each `<` before the first difference, nearest first.
+    let mut starts = old_bytes[..prefix]
+        .iter()
+        .enumerate()
+        .rev()
+        .filter(|(_, byte)| **byte == b'<')
+        .map(|(index, _)| index);
+    starts.find_map(|start| {
+        let limit = old_bytes.len().min(new_bytes.len()) - start;
+        let suffix = old_bytes
+            .iter()
+            .rev()
+            .zip(new_bytes.iter().rev())
+            .take(limit)
+            .take_while(|(left, right)| left == right)
+            .count();
+        let (mut old_end, mut new_end) = (old_bytes.len() - suffix, new_bytes.len() - suffix);
+        while old_end < old_bytes.len() {
+            if old_bytes[old_end] == b'<'
+                && let (Some(source), Some(candidate)) =
+                    (old.get(start..old_end), new.get(start..new_end))
+                && balanced(source)
+                && balanced(candidate)
+            {
+                return Some((start..old_end, candidate.to_owned()));
+            }
+            old_end += 1;
+            new_end += 1;
+        }
+        None
+    })
+}
+
+/// Whether `fragment` is empty or balanced markup that starts with a tag.
+fn balanced(fragment: &str) -> bool {
+    if fragment.is_empty() {
+        return true;
+    }
+    if !fragment.starts_with('<') || !fragment.ends_with('>') {
+        return false;
+    }
+    let mut reader = quick_xml::Reader::from_str(fragment);
+    reader.config_mut().check_end_names = true;
+    let mut depth = 0usize;
+    loop {
+        match reader.read_event() {
+            Ok(quick_xml::events::Event::Start(_)) => depth += 1,
+            Ok(quick_xml::events::Event::End(_)) => {
+                let Some(next) = depth.checked_sub(1) else {
+                    return false;
+                };
+                depth = next;
+            },
+            Ok(quick_xml::events::Event::Eof) => return depth == 0,
+            Ok(_) => {},
+            Err(_) => return false,
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::element_splice;
+
+    fn apply(old: &str, new: &str) -> (String, String) {
+        let (range, fragment) = element_splice(old, new).unwrap();
+        assert!(fragment.is_empty() || fragment.starts_with('<'));
+        assert_eq!(old.as_bytes().get(range.end), Some(&b'<'));
+        let assembled = format!("{}{}{}", &old[..range.start], fragment, &old[range.end..]);
+        (assembled, fragment)
+    }
+
+    #[test]
+    fn splices_align_to_elements() {
+        let old = "<m><a>1</a><b/></m>";
+        for new in [
+            "<m><t>T</t><a>1</a><b/></m>",
+            "<m><a>2</a><b/></m>",
+            "<m><b/></m>",
+            "<m><a>1</a><b/><c>x y</c></m>",
+        ] {
+            assert_eq!(apply(old, new).0, new);
+        }
+        assert_eq!(apply(old, "<m><a>2</a><b/></m>").1, "<a>2</a>");
+    }
 }

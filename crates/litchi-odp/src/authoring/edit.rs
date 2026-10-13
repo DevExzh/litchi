@@ -3006,7 +3006,11 @@ impl Edit {
                     })
                 });
             if scene_only {
-                validate_compact_xml_parts_except(&reopened, &source_package, "content.xml")?;
+                validate_compact_xml_parts_except(
+                    &reopened,
+                    &source_package,
+                    &["content.xml", "meta.xml"],
+                )?;
             } else {
                 validate_compact_xml_parts(&reopened, &source_package)?;
             }
@@ -4651,43 +4655,43 @@ fn shape_resource(root: &Shape) -> Result<usize> {
 }
 
 fn validate_compact_xml_parts(package: &OwnedPackage, source: &OwnedPackage) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), true, None)
+    validate_compact_xml_parts_against(package, Some(source), true, &[])
 }
 
-/// [`validate_compact_xml_parts`] for a commit whose `skip` part was
+/// [`validate_compact_xml_parts`] for a commit whose `skip` parts were
 /// published only through checked source splices.
 fn validate_compact_xml_parts_except(
     package: &OwnedPackage,
     source: &OwnedPackage,
-    skip: &str,
+    skip: &[&str],
 ) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), true, Some(skip))
+    validate_compact_xml_parts_against(package, Some(source), true, skip)
 }
 
 pub(crate) fn validate_raw_preserved_xml_parts(
     package: &OwnedPackage,
     source: &OwnedPackage,
 ) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), true, None)
+    validate_compact_xml_parts_against(package, Some(source), true, &[])
 }
 
 pub(crate) fn validate_raw_preserved_referenced_xml_parts(
     package: &OwnedPackage,
     source: &OwnedPackage,
 ) -> Result<()> {
-    validate_compact_xml_parts_against(package, Some(source), false, None)
+    validate_compact_xml_parts_against(package, Some(source), false, &[])
 }
 
 fn validate_compact_xml_parts_against(
     package: &OwnedPackage,
     source: Option<&OwnedPackage>,
     audit_core_parts: bool,
-    skip: Option<&str>,
+    skip: &[&str],
 ) -> Result<()> {
     let mut part_count = 0usize;
     let mut aggregate_bytes = 0usize;
     for path in package.files()? {
-        if skip == Some(path.as_str()) {
+        if skip.contains(&path.as_str()) {
             continue;
         }
         if !path.rsplit_once('.').is_some_and(|(_, extension)| {
