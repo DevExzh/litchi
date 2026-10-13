@@ -303,6 +303,13 @@ Cut from `e467bcf4e8`:
 - Known pre-existing failure on trunk, not from this wave: `litchi-oth` `semantic_api::raw_zip_negatives_are_rejected_by_the_open_boundary` (a DTD package is accepted). Tier 3 ODF follow-up.
 - The `ods_formula_conditional_native` test target cannot compile: its 5.5 MB fixture was purged on 2026-10-05. It needs a reduced fixture.
 
+- Merged `p11-doc` (0258):
+  - DOC reads: runs, tables, stories, notes and comments (element gaps 22 → 13).
+  - DOC writes: run and paragraph formatting; paragraph add, remove, move and swap.
+  - Writes cost 0–8.5% over the leaf. The 0190 13.6% read miss no longer reproduces.
+  - W4: `open_with_limits*` and `rollback` removed and banned.
+  - Golden rows merged by hand: 3 DOC rows carry both 0258's text and 0253's metadata front-matter.
+
 Still running from R1: `p7a-docx` (0251), `p7c-pptx` (0252), `p6-ooxml-meta` (0253).
 
 Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
