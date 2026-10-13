@@ -526,9 +526,24 @@ fn full_metadata() -> litchi_core::Metadata {
         template: Some("Normal.dot".to_owned()),
         last_modified_by: Some("Grace".to_owned()),
         revision: Some("7".to_owned()),
-        created: Some(chrono::Utc.with_ymd_and_hms(2026, 10, 5, 9, 30, 0).unwrap()),
-        modified: Some(chrono::Utc.with_ymd_and_hms(2026, 10, 6, 9, 30, 0).unwrap()),
-        last_printed_time: Some(chrono::Utc.with_ymd_and_hms(2001, 2, 3, 4, 5, 6).unwrap()),
+        created: Some(
+            chrono::Utc
+                .with_ymd_and_hms(2026, 10, 5, 9, 30, 0)
+                .unwrap()
+                .into(),
+        ),
+        modified: Some(
+            chrono::Utc
+                .with_ymd_and_hms(2026, 10, 6, 9, 30, 0)
+                .unwrap()
+                .into(),
+        ),
+        last_printed: Some(
+            chrono::Utc
+                .with_ymd_and_hms(2001, 2, 3, 4, 5, 6)
+                .unwrap()
+                .into(),
+        ),
         page_count: Some(3),
         word_count: Some(300),
         character_count: Some(1800),
@@ -576,7 +591,7 @@ fn unified_metadata_round_trips_through_the_streams() {
     }
     assert_eq!(read.created, metadata.created);
     assert_eq!(read.modified, metadata.modified);
-    assert_eq!(read.last_printed_time, metadata.last_printed_time);
+    assert_eq!(read.last_printed, metadata.last_printed);
     assert_eq!(read.page_count, metadata.page_count);
     assert_eq!(read.word_count, metadata.word_count);
     assert_eq!(read.character_count, metadata.character_count);
@@ -629,28 +644,28 @@ fn unrepresentable_metadata_fields_are_refused_atomically() {
         (
             "created",
             litchi_core::Metadata {
-                created_local: Some(unzoned),
+                created: Some(unzoned.into()),
                 ..litchi_core::Metadata::default()
             },
         ),
         (
             "modified",
             litchi_core::Metadata {
-                modified_local: Some(unzoned),
+                modified: Some(unzoned.into()),
                 ..litchi_core::Metadata::default()
             },
         ),
         (
-            "last_printed_time",
+            "last_printed",
             litchi_core::Metadata {
-                last_printed_local: Some(unzoned),
+                last_printed: Some(unzoned.into()),
                 ..litchi_core::Metadata::default()
             },
         ),
         (
-            "last_backup_local",
+            "last_backup",
             litchi_core::Metadata {
-                last_backup_local: Some(unzoned),
+                last_backup: Some(unzoned.into()),
                 ..litchi_core::Metadata::default()
             },
         ),

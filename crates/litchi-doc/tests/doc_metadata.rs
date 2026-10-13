@@ -31,8 +31,8 @@ fn metadata() -> Metadata {
         keywords: Some("q3; revenue".to_owned()),
         description: Some("Draft for review".to_owned()),
         company: Some("Litchi Project".to_owned()),
-        created: Some(time("2026-10-05T09:30:00Z")),
-        modified: Some(time("2026-10-05T10:45:00Z")),
+        created: Some(time("2026-10-05T09:30:00Z").into()),
+        modified: Some(time("2026-10-05T10:45:00Z").into()),
         ..Metadata::default()
     }
 }

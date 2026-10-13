@@ -11,9 +11,9 @@ use super::super::document_summary;
 use super::super::model::CodePage;
 use super::super::summary_information::{self, DocumentSecurity, FileTime};
 use super::model::SummaryProperties;
-use chrono::{DateTime, NaiveDateTime, Utc};
 use litchi_cfb::OleError;
 use litchi_core::Metadata;
+use litchi_core::metadata::Timestamp;
 use std::fmt;
 
 /// FILETIME ticks (100 ns) per minute of editing time.
@@ -98,7 +98,7 @@ impl SummaryProperties {
     /// | `description` | PIDSI `COMMENTS` |
     /// | `last_modified_by` | PIDSI `LASTAUTHOR` |
     /// | `revision` | PIDSI `REVNUMBER` (a whole number) |
-    /// | `created`, `modified`, `last_printed_time` | PIDSI `CREATE_DTM`, `LASTSAVE_DTM`, `LASTPRINTED` |
+    /// | `created`, `modified`, `last_printed` | PIDSI `CREATE_DTM`, `LASTSAVE_DTM`, `LASTPRINTED` |
     /// | `editing_time_minutes` | PIDSI `EDITTIME` |
     /// | `page_count`, `word_count`, `character_count` | PIDSI counts |
     /// | `security` | PIDSI `DOC_SECURITY` |
@@ -108,10 +108,9 @@ impl SummaryProperties {
     /// | `codepage` | both standard sections' code page, applied first |
     ///
     /// Text the code page cannot represent switches its section to UTF-16, as
-    /// [`Self::set`] does. `identifier`, `hyperlink_base` and the unzoned
-    /// timestamps (`created_local`, `modified_local`, `last_printed_local`,
-    /// `last_backup_local`) have no place in the property sets and are
-    /// refused.
+    /// [`Self::set`] does. `identifier`, `hyperlink_base`, `last_backup` and
+    /// unzoned timestamps ([`Timestamp::Unzoned`]) have no place in the
+    /// property sets and are refused.
     ///
     /// The merge is atomic: on any error nothing changes. Returns whether a
     /// property changed.
@@ -133,9 +132,7 @@ impl SummaryProperties {
             last_modified_by,
             revision,
             created,
-            created_local,
             modified,
-            modified_local,
             page_count,
             word_count,
             character_count,
@@ -148,9 +145,8 @@ impl SummaryProperties {
             content_status,
             content_type,
             version,
-            last_printed_time,
-            last_printed_local,
-            last_backup_local,
+            last_printed,
+            last_backup,
             hyperlink_base,
             security,
             codepage,
@@ -158,10 +154,10 @@ impl SummaryProperties {
 
         refuse_present("identifier", identifier.as_ref())?;
         refuse_present("hyperlink_base", hyperlink_base.as_ref())?;
-        let created = utc_time("created", *created, *created_local)?;
-        let modified = utc_time("modified", *modified, *modified_local)?;
-        let last_printed = utc_time("last_printed_time", *last_printed_time, *last_printed_local)?;
-        refuse_present("last_backup_local", last_backup_local.as_ref())?;
+        let created = utc_time("created", *created)?;
+        let modified = utc_time("modified", *modified)?;
+        let last_printed = utc_time("last_printed", *last_printed)?;
+        refuse_present("last_backup", last_backup.as_ref())?;
 
         let mut draft = self.clone();
         if let Some(page) = *codepage {
@@ -199,7 +195,7 @@ impl SummaryProperties {
             ("modified", modified, |edit, value| {
                 edit.set_last_save_time(value)
             }),
-            ("last_printed_time", last_printed, |edit, value| {
+            ("last_printed", last_printed, |edit, value| {
                 edit.set_last_printed(value)
             }),
         ];
@@ -296,15 +292,15 @@ fn refuse_present<T>(field: &'static str, value: Option<&T>) -> Result<(), Metad
 /// form is stored; an unzoned timestamp is refused rather than reinterpreted.
 fn utc_time(
     field: &'static str,
-    utc: Option<DateTime<Utc>>,
-    unzoned: Option<NaiveDateTime>,
+    time: Option<Timestamp>,
 ) -> Result<Option<FileTime>, MetadataError> {
-    if unzoned.is_some() {
-        return Err(MetadataError::Unsupported { field });
+    match time {
+        None => Ok(None),
+        Some(Timestamp::Unzoned(_)) => Err(MetadataError::Unsupported { field }),
+        Some(Timestamp::Utc(utc)) => FileTime::from_date_time(utc)
+            .map(Some)
+            .map_err(|source| invalid(field, source)),
     }
-    utc.map(FileTime::from_date_time)
-        .transpose()
-        .map_err(|source| invalid(field, source))
 }
 
 type TimeSetter = fn(&mut summary_information::Edit<'_>, FileTime) -> Result<(), OleError>;
