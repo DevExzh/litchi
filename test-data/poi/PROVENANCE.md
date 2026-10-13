@@ -1,0 +1,14 @@
+# Apache POI fixture provenance (record 0257)
+
+Files under `test-data/` here keep their path inside the Apache POI source
+tree (<https://github.com/apache/poi>). License: Apache-2.0 (the repository
+root `LICENSE`); the upstream notice is retained in `NOTICE`. Metafile, XLSB
+and VBA fixtures are described in
+`../libreoffice-core/METAFILE_PROVENANCE.md`.
+
+Copied byte-for-byte on 2026-10-13 from the workspace's local, untracked
+Apache POI checkout (no git metadata; pinned by SHA-256):
+
+| Path | SHA-256 | Used by |
+|---|---|---|
+| `test-data/poifs/60320-protected.xlsx` | `deed30663d59c44ea36728f81c8428ed5ff85373b30f4e4c92974d0f8b3e5329` | `crates/litchi-crypto/tests/native_ooxml_encryption.rs` |

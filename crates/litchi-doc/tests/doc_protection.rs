@@ -35,7 +35,7 @@
 //! Tests for Word 2003 range-level protection tables (`SttbfBkmkProt`,
 //! `PlcfBkfProt`, `PlcfBklProt`, `SttbProtUser`; MS-DOC 2.9.283 and 2.9.293).
 //!
-//! No fixture in `test-data/` (or its `3rdparty/` sources) carries these
+//! No fixture in `test-data/` (or the upstream corpora it was drawn from) carries these
 //! tables — the only candidate hits were encrypted or fuzz-corrupted files —
 //! so the typed parsing itself is covered by synthesized table streams in the
 //! module's unit tests. These integration tests verify that real documents

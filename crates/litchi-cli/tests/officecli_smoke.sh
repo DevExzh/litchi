@@ -1,22 +1,38 @@
 #!/usr/bin/env bash
 # Replays a few command lines of OfficeCLI's example scripts through `litchi`
 # (record 0256). It is the seed of the OfficeCLI example-corpus harness of
-# plan step 17: each replayed line is cited as
-# `3rdparty/OfficeCLI/examples/<file>:<line>` and kept as OfficeCLI wrote it,
-# with `officecli` replaced by the binary under test. A line whose status is
-# not 0 is a recorded delta; the status says how Litchi refuses it.
+# plan step 17: each replayed line is cited as `<file>:<line>` of the copies
+# vendored under `test-data/officecli/examples/` (record 0257; provenance in
+# `test-data/officecli/PROVENANCE.md`) and kept as OfficeCLI wrote it, with
+# `officecli` replaced by the binary under test. Every `step` checks that its
+# cited line exists and runs the same verb. A line whose status is not 0 is a
+# recorded delta; the status says how Litchi refuses it.
 #
 # Usage: officecli_smoke.sh <litchi binary> <scratch directory>
 set -u
 
 CLI=${1:?usage: officecli_smoke.sh <litchi binary> <scratch directory>}
 DIR=${2:?usage: officecli_smoke.sh <litchi binary> <scratch directory>}
+EXAMPLES="$(cd "$(dirname "${BASH_SOURCE[0]}")/../../.." && pwd)/test-data/officecli/examples"
 failures=0
+
+# cited <citation> <verb>: the vendored example line must run the same verb.
+cited() {
+    local citation=$1 verb=$2
+    local file=${citation%%:*} number=${citation##*:}
+    local line
+    line=$(sed -n "${number}p" "$EXAMPLES/$file" 2>/dev/null)
+    if [[ " $line " != *" $verb "* ]]; then
+        echo "FAIL $citation: the vendored example line does not run '$verb': $line" >&2
+        failures=$((failures + 1))
+    fi
+}
 
 # step <expected status> <citation> <arguments...>
 step() {
     local expected=$1 citation=$2
     shift 2
+    cited "$citation" "$1"
     local status=0
     "$CLI" "$@" >"$DIR/last.out" 2>"$DIR/last.err" || status=$?
     if [ "$status" -ne "$expected" ]; then

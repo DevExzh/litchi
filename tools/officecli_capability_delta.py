@@ -14,12 +14,15 @@ status (Litchi's ``get`` against OfficeCLI's) and a write status (Litchi's
 ``add``/``set`` against OfficeCLI's). It writes
 ``docs/unified-ops/officecli-capability-delta.md``.
 
-OfficeCLI is not tracked in git, so the script runs locally::
+The OfficeCLI help schemas it reads are vendored, unchanged, under
+``test-data/officecli/`` (record 0257; provenance, license and the pinned
+upstream commit sit next to them), so the script runs anywhere::
 
-    python3 tools/officecli_capability_delta.py --officecli /path/to/OfficeCLI
+    python3 tools/officecli_capability_delta.py
 
-``--officecli`` defaults to ``$LITCHI_OFFICECLI``, then to ``3rdparty/OfficeCLI``
-in the repository. The table records the SHA-256 of every golden report it
+``--officecli`` (default ``$LITCHI_OFFICECLI``, then ``test-data/officecli``)
+names another OfficeCLI tree, such as a newer upstream checkout; refresh the
+vendored copy from it before regenerating the committed table. The table records the SHA-256 of every golden report it
 read and of the schema tree, and ``tools/test_officecli_capability_delta.py``
 fails when a golden report no longer matches the hash recorded here. Rerun
 the script whenever the goldens change: after an adapter lands (R4a, R4c,
@@ -42,6 +45,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parent.parent
+VENDORED_OFFICECLI = Path("test-data/officecli")
+# The vendored tree has no git metadata; this file pins its upstream commit.
+UPSTREAM_COMMIT = "UPSTREAM_COMMIT"
 GOLDEN_DIR = Path("crates/litchi-ops/tests/golden/capabilities")
 OUTPUT = Path("docs/unified-ops/officecli-capability-delta.md")
 FORMATS = ("docx", "xlsx", "xlsb", "xls", "pptx")
@@ -185,6 +191,12 @@ def schema_tree_hash(help_dir: Path) -> tuple[str, int]:
 
 
 def officecli_commit(root: Path) -> str:
+    pinned = root / UPSTREAM_COMMIT
+    if pinned.is_file():
+        return pinned.read_text(encoding="utf-8").strip()[:8] or "unknown"
+    if not (root / ".git").exists():
+        # `git -C` would otherwise report an enclosing repository's commit.
+        return "unknown"
     try:
         result = subprocess.run(
             ["git", "-C", str(root), "rev-parse", "--short=8", "HEAD"],
@@ -693,8 +705,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--officecli",
         type=Path,
-        default=Path(os.environ.get("LITCHI_OFFICECLI", REPO / "3rdparty" / "OfficeCLI")),
-        help="the OfficeCLI checkout (default: $LITCHI_OFFICECLI, then 3rdparty/OfficeCLI)",
+        default=Path(os.environ.get("LITCHI_OFFICECLI", REPO / VENDORED_OFFICECLI)),
+        help="the OfficeCLI tree (default: $LITCHI_OFFICECLI, then test-data/officecli)",
     )
     parser.add_argument("--output", type=Path, default=REPO / OUTPUT)
     parser.add_argument(

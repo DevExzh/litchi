@@ -17,7 +17,7 @@
 //! # References
 //!
 //! - ODF 1.4 Part 4, `OpenFormula` Format
-//! - odfdo: `3rdparty/odfdo/src/odfdo/utils/formula.py`
+//! - odfdo: `src/odfdo/utils/formula.py`
 use litchi_core::{Error, Resource, ResourceLimit, Result};
 use smallvec::SmallVec;
 use std::{borrow::Cow, convert::TryFrom, sync::Arc};
