@@ -52,6 +52,23 @@ pub(crate) trait Inspect<'f>: Navigate<'f> {
         Ok(None)
     }
 
+    /// The children of `parent` whose kinds are in `kinds`, for a walk that
+    /// is likely to stop after a few of them: one with a `limit` or `first()`,
+    /// or whose every alternative selects its `[N]`th match (record 0267).
+    ///
+    /// An adapter may stream them instead of reading the parent whole: a
+    /// worksheet adapter reads its cells through the leaf's cell cursor,
+    /// which parses only the leading rows the walk visits. The children and
+    /// their order are those of [`Navigate::children`]; the default is that
+    /// call.
+    fn early_children(
+        &self,
+        parent: &Self::Node,
+        kinds: crate::path::navigate::KindSet<Self::Kind>,
+    ) -> Result<Self::Children> {
+        self.children(parent, kinds)
+    }
+
     /// The node's local properties, in the order of its kind's property
     /// table. Read once per candidate that reaches a property predicate.
     fn format<'n>(&'n self, node: &'n Self::Node) -> Result<Format<'n>>;
@@ -177,6 +194,14 @@ impl<'f, N: Inspect<'f>> Inspect<'f> for &N {
 
     fn style<'n>(&'n self, node: &'n Self::Node) -> Result<Option<Cow<'n, str>>> {
         (**self).style(node)
+    }
+
+    fn early_children(
+        &self,
+        parent: &Self::Node,
+        kinds: crate::path::navigate::KindSet<Self::Kind>,
+    ) -> Result<Self::Children> {
+        (**self).early_children(parent, kinds)
     }
 
     fn format<'n>(&'n self, node: &'n Self::Node) -> Result<Format<'n>> {

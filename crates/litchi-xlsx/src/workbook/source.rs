@@ -46,11 +46,13 @@ mod styles;
 mod tables;
 
 mod blocks;
+mod cursor;
 mod grid;
 #[cfg(test)]
 mod m1_tests;
 mod values;
 
+pub use cursor::CellCursor;
 pub use grid::Grid;
 pub use styles::Record;
 pub use values::CacheDiagnostics;
@@ -1337,7 +1339,7 @@ impl SourceWorksheet {
             weight,
         ) {
             values::Cached::Grid(store) => store,
-            values::Cached::Blocks(_) => {
+            values::Cached::Blocks(_) | values::Cached::Prefix(_) => {
                 return Err(invalid(
                     "source-backed worksheet grid cache returned another value kind",
                 ));
@@ -1382,7 +1384,7 @@ impl SourceWorksheet {
             .get(self.data.position, values::Axis::Grid, record_miss)?
         {
             values::Cached::Grid(store) => Some(store),
-            values::Cached::Blocks(_) => None,
+            values::Cached::Blocks(_) | values::Cached::Prefix(_) => None,
         }
     }
 

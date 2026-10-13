@@ -7,6 +7,14 @@ hand-written loops over the source-backed leaves, on generated XLSX
 fixtures from `test-data`, each opened from memory (`bytes`) and from a file
 (`file`). Route names end in `_v1`.
 
+Record 0267 adds new routes only: `xlsx_*_cold_*`, `xlsb_*_cold_*` and
+`xls_*_cold_*` open a fresh handle in every call and stop at the first or
+tenth `cell[value>1000]` match (the cold first-match cost of a worksheet no
+earlier read has decoded), against the leaf's own early-stopping read of a
+freshly opened workbook; and warm `xlsb_*` get/first/full routes like the
+XLSX ones. The XLSB and XLS workbooks have the XLSX corpus's shape and are
+written by the leaves' builders.
+
 ```sh
 CARGO_NET_OFFLINE=true CARGO_TARGET_DIR=target/bench cargo build --release \
   --manifest-path tools/perf-baseline/unified-query/Cargo.toml

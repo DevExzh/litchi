@@ -42,17 +42,23 @@ type Address = (u32, u32);
 pub struct Node<'f> {
     file: &'f Xlsb,
     item: Item,
-    steps: [PathStep<'f>; 2],
-    depth: u8,
-    sheet: usize,
+    /// The position of the node's worksheet (0 for the workbook and a
+    /// defined name). The path is written from it and the item on demand
+    /// (record 0267, as record 0262 did for XLSX).
+    sheet: u32,
 }
+
+// A walk moves every node it visits: keep it small (record 0267; 176 bytes
+// before, with its two path steps and label kept inline).
+const _: () = assert!(size_of::<Node<'static>>() <= 96);
 
 /// The semantic element held by a node.  Native relationship identifiers and
 /// physical part names never enter this enum or its paths.
 #[derive(Clone)]
 pub(super) enum Item {
     Workbook,
-    Sheet(Sheet),
+    /// Boxed: a tab handle is large and sheets are few (record 0267).
+    Sheet(Box<Sheet>),
     Cell(CellItem),
     Range(RangeItem),
     Row(RowItem),
@@ -90,12 +96,19 @@ impl Sheet {
     }
 }
 
+/// A direct mutation target's worksheet, resolved on first inspection.
+#[derive(Clone)]
+pub(super) struct DeferredCell {
+    handle: SheetHandle,
+    grid: OnceLock<Grid>,
+}
+
 /// A coordinate and the grid or dense-range state from which it is read.
 #[derive(Clone)]
 pub(super) struct CellItem {
     pub(super) at: Address,
     pub(super) source: CellSource,
-    label: Label,
+    label: OnceLock<Label>,
     format: OnceLock<Option<StyleFormat>>,
 }
 
@@ -106,10 +119,7 @@ pub(super) enum CellSource {
     /// A direct mutation target.  The worksheet grid remains lazy so target
     /// admission can validate the path without parsing the read projection;
     /// a later inspection still resolves the same source-backed grid.
-    Deferred {
-        handle: SheetHandle,
-        grid: OnceLock<Grid>,
-    },
+    Deferred(Box<DeferredCell>),
     Stub,
 }
 
@@ -117,7 +127,7 @@ pub(super) enum CellSource {
 pub(super) struct RangeItem {
     pub(super) grid: Grid,
     pub(super) rect: Rect,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
 #[derive(Clone)]
@@ -125,28 +135,48 @@ pub(super) struct RowItem {
     pub(super) grid: Grid,
     pub(super) index: u32,
     pub(super) bulk: bool,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
 #[derive(Clone)]
 pub(super) struct ColumnItem {
     pub(super) grid: Grid,
     pub(super) index: u32,
-    label: Label,
+    label: OnceLock<Label>,
 }
 
 #[derive(Clone)]
 pub(super) struct TableItem {
     pub(super) part: Box<xlsb::package::table::Table>,
+    /// The table's position among its worksheet's tables, for its path step.
+    index: usize,
 }
 
 /// A pinned sparse worksheet.  The grid owns an `Arc` in the leaf and the
 /// handle supplies source/version fences and local style resolution.
+///
+/// One `Arc`, so listing a cell costs one reference-count increment instead
+/// of a tab-handle clone (record 0267).
 #[derive(Clone)]
-pub(super) struct Grid {
+pub(super) struct Grid(Arc<GridInner>);
+
+pub(super) struct GridInner {
     leaf: xlsb::sheet::Grid,
     handle: SheetHandle,
     cached_only: bool,
+    /// For a batch of the leaf's cell cursor (record 0267), `leaf` holds the
+    /// batch's cells only and this the worksheet's complete grid, read on
+    /// first use by a read that needs more than a cell's own record (its
+    /// merge).
+    complete: Option<OnceLock<xlsb::sheet::Grid>>,
+}
+
+impl std::ops::Deref for Grid {
+    type Target = GridInner;
+
+    fn deref(&self) -> &GridInner {
+        &self.0
+    }
 }
 
 /// Sparse cells selected by a checked rectangle. The leaf iterator borrows
@@ -170,11 +200,35 @@ impl std::iter::FusedIterator for Cells<'_> {}
 impl Grid {
     pub(super) fn from_handle(handle: &SheetHandle) -> Result<Self> {
         let read = handle.grid_read()?;
-        Ok(Self {
+        Ok(Self(Arc::new(GridInner {
             leaf: read.leaf,
             handle: handle.clone(),
             cached_only: read.cached_only,
-        })
+            complete: None,
+        })))
+    }
+
+    /// The node grid of a grid the leaf's cell cursor read: the complete
+    /// grid, or a batch of it.
+    pub(super) fn streamed(leaf: xlsb::sheet::Grid, handle: SheetHandle, complete: bool) -> Self {
+        Self(Arc::new(GridInner {
+            leaf,
+            handle,
+            cached_only: false,
+            complete: (!complete).then(OnceLock::new),
+        }))
+    }
+
+    /// The worksheet's complete grid.
+    fn full(&self) -> Result<&xlsb::sheet::Grid> {
+        let Some(complete) = &self.complete else {
+            return Ok(&self.leaf);
+        };
+        if let Some(grid) = complete.get() {
+            return Ok(grid);
+        }
+        let read = self.handle.grid_read()?;
+        Ok(complete.get_or_init(|| read.leaf))
     }
 
     pub(super) fn cached_only(&self) -> bool {
@@ -182,7 +236,13 @@ impl Grid {
     }
 
     pub(super) fn record(&self, at: Address) -> Result<Option<&xlsb::Cell>> {
-        Ok(self.leaf.cell_at(at)?)
+        if let Some(cell) = self.leaf.cell_at(at)? {
+            return Ok(Some(cell));
+        }
+        if self.complete.is_none() {
+            return Ok(None);
+        }
+        Ok(self.full()?.cell_at(at)?)
     }
 
     pub(super) fn cells(&self, rect: Rect) -> Result<Cells<'_>> {
@@ -225,7 +285,7 @@ impl Grid {
             ));
         }
         let (row, column) = at;
-        for merge in self.leaf.worksheet().merged_cells() {
+        for merge in self.full()?.worksheet().merged_cells() {
             if (merge.row_first..=merge.row_last).contains(&row)
                 && (merge.col_first..=merge.col_last).contains(&column)
             {
@@ -363,49 +423,56 @@ impl Grid {
     }
 }
 
-const NO_STEP: PathStep<'static> = PathStep::new("");
+/// The first and last cells of `rect`, each a zero-based `(column, row)`.
+fn corners(rect: Rect) -> ((u32, u32), (u32, u32)) {
+    let first = (rect.start().column().get(), rect.start().row().get());
+    let last = (
+        rect.end().1.saturating_sub(1),
+        rect.end().0.saturating_sub(1),
+    );
+    (first, last)
+}
+
+/// A position as stored in a node: tab positions are below the catalog's
+/// length, which no workbook brings near `u32::MAX`.
+fn position_u32(position: usize) -> u32 {
+    u32::try_from(position).unwrap_or(u32::MAX)
+}
 
 impl<'f> Node<'f> {
     pub(super) fn new_workbook(file: &'f Xlsb) -> Self {
         Self {
             file,
             item: Item::Workbook,
-            steps: [NO_STEP; 2],
-            depth: 0,
             sheet: 0,
         }
     }
 
     pub(super) fn new_sheet(file: &'f Xlsb, sheet: Sheet) -> Self {
-        let position = sheet.position;
+        let position = position_u32(sheet.position);
         Self {
             file,
-            item: Item::Sheet(sheet),
-            steps: [PathStep::at("sheet", Position::new(position)), NO_STEP],
-            depth: 1,
+            item: Item::Sheet(Box::new(sheet)),
             sheet: position,
         }
     }
 
-    fn in_sheet(file: &'f Xlsb, sheet: usize, item: Item, tail: PathStep<'f>) -> Self {
+    fn in_sheet(file: &'f Xlsb, sheet: usize, item: Item) -> Self {
         Self {
             file,
             item,
-            steps: [PathStep::at("sheet", Position::new(sheet)), tail],
-            depth: 2,
-            sheet,
+            sheet: position_u32(sheet),
         }
     }
 
     pub(super) fn new_cell(file: &'f Xlsb, sheet: usize, at: Address, source: CellSource) -> Self {
-        let (row, column) = at;
         let item = Item::Cell(CellItem {
             at,
             source,
-            label: Label::cell(column, row),
+            label: OnceLock::new(),
             format: OnceLock::new(),
         });
-        Self::in_sheet(file, sheet, item, PathStep::cell(column, row))
+        Self::in_sheet(file, sheet, item)
     }
 
     pub(super) fn new_cell_target(
@@ -418,25 +485,20 @@ impl<'f> Node<'f> {
             file,
             sheet,
             at,
-            CellSource::Deferred {
+            CellSource::Deferred(Box::new(DeferredCell {
                 handle,
                 grid: OnceLock::new(),
-            },
+            })),
         )
     }
 
     pub(super) fn new_range(file: &'f Xlsb, sheet: usize, grid: Grid, rect: Rect) -> Self {
-        let first = (rect.start().column().get(), rect.start().row().get());
-        let last = (
-            rect.end().1.saturating_sub(1),
-            rect.end().0.saturating_sub(1),
-        );
         let item = Item::Range(RangeItem {
             grid,
             rect,
-            label: Label::range(first, last),
+            label: OnceLock::new(),
         });
-        Self::in_sheet(file, sheet, item, PathStep::range(first, last))
+        Self::in_sheet(file, sheet, item)
     }
 
     pub(super) fn new_row(file: &'f Xlsb, sheet: usize, grid: Grid, index: u32) -> Self {
@@ -452,23 +514,18 @@ impl<'f> Node<'f> {
             grid,
             index,
             bulk,
-            label: Label::row(index),
+            label: OnceLock::new(),
         });
-        Self::in_sheet(
-            file,
-            sheet,
-            item,
-            PathStep::at("row", Position::new(index as usize)),
-        )
+        Self::in_sheet(file, sheet, item)
     }
 
     pub(super) fn new_column(file: &'f Xlsb, sheet: usize, grid: Grid, index: u32) -> Self {
         let item = Item::Column(ColumnItem {
             grid,
             index,
-            label: Label::column(index),
+            label: OnceLock::new(),
         });
-        Self::in_sheet(file, sheet, item, PathStep::column("col", index))
+        Self::in_sheet(file, sheet, item)
     }
 
     pub(super) fn new_table(
@@ -482,8 +539,8 @@ impl<'f> Node<'f> {
             sheet,
             Item::Table(TableItem {
                 part: Box::new(table),
+                index,
             }),
-            PathStep::at("table", Position::new(index)),
         )
     }
 
@@ -491,8 +548,6 @@ impl<'f> Node<'f> {
         Self {
             file,
             item: Item::NamedRange(index),
-            steps: [PathStep::at("namedrange", Position::new(index)), NO_STEP],
-            depth: 1,
             sheet: 0,
         }
     }
@@ -506,13 +561,40 @@ impl<'f> Node<'f> {
     }
 
     pub(super) fn sheet_position(&self) -> usize {
-        self.sheet
+        self.sheet as usize
     }
 
-    pub(super) fn last_step(&self) -> Option<&PathStep<'f>> {
-        usize::from(self.depth)
-            .checked_sub(1)
-            .and_then(|index| self.steps.get(index))
+    /// The node's own path step, written from its item; `None` for the
+    /// workbook root.
+    pub(super) fn last_step(&self) -> Option<PathStep<'static>> {
+        Some(match &self.item {
+            Item::Workbook => return None,
+            Item::Sheet(_) => PathStep::at("sheet", Position::new(self.sheet_position())),
+            Item::Cell(cell) => PathStep::cell(cell.at.1, cell.at.0),
+            Item::Range(range) => {
+                let (first, last) = corners(range.rect);
+                PathStep::range(first, last)
+            },
+            Item::Row(row) => PathStep::at("row", Position::new(row.index as usize)),
+            Item::Column(column) => PathStep::column("col", column.index),
+            Item::Table(table) => PathStep::at("table", Position::new(table.index)),
+            Item::NamedRange(index) => PathStep::at("namedrange", Position::new(*index)),
+        })
+    }
+
+    /// The A1 label of a cell, range, row or column node, written on first
+    /// use.
+    fn label(&self) -> Option<&Label> {
+        Some(match &self.item {
+            Item::Cell(cell) => cell.label.get_or_init(|| Label::cell(cell.at.1, cell.at.0)),
+            Item::Range(range) => range.label.get_or_init(|| {
+                let (first, last) = corners(range.rect);
+                Label::range(first, last)
+            }),
+            Item::Row(row) => row.label.get_or_init(|| Label::row(row.index)),
+            Item::Column(column) => column.label.get_or_init(|| Label::column(column.index)),
+            _ => return None,
+        })
     }
 
     pub(super) fn element(&self) -> Kind {
@@ -540,7 +622,7 @@ impl<'f> Node<'f> {
         self.file.0.owner.finish(|| match self.item {
             Item::Workbook | Item::NamedRange(_) => Ok(None),
             Item::Sheet(ref sheet) => Ok(Some(sheet.handle.name().to_owned())),
-            _ => SheetHandle::at(self.file, self.sheet)
+            _ => SheetHandle::at(self.file, self.sheet_position())
                 .map(|handle| handle.map(|handle| handle.name().to_owned())),
         })
     }
@@ -564,7 +646,9 @@ impl<'f> Node<'f> {
 
     pub(super) fn cell_ref(&self) -> Option<CellRef> {
         match &self.item {
-            Item::Cell(cell) => CellRef::parse(cell.label.as_str()),
+            Item::Cell(_) => self
+                .label()
+                .and_then(|label| CellRef::parse(label.as_str())),
             _ => None,
         }
     }
@@ -681,12 +765,12 @@ impl CellItem {
     fn grid(&self) -> Result<&Grid> {
         match &self.source {
             CellSource::Grid(grid) => Ok(grid),
-            CellSource::Deferred { handle, grid } => {
-                if let Some(grid) = grid.get() {
+            CellSource::Deferred(deferred) => {
+                if let Some(grid) = deferred.grid.get() {
                     return Ok(grid);
                 }
-                let materialized = Grid::from_handle(handle)?;
-                Ok(grid.get_or_init(|| materialized))
+                let materialized = Grid::from_handle(&deferred.handle)?;
+                Ok(deferred.grid.get_or_init(|| materialized))
             },
             CellSource::Stub => Err(unsupported("the XLSB cell has no worksheet grid")),
         }
@@ -695,7 +779,7 @@ impl CellItem {
     pub(super) fn state(&self) -> Result<CellState<'_>> {
         match &self.source {
             CellSource::Stub => Ok(CellState::Stub),
-            CellSource::Grid(_) | CellSource::Deferred { .. } => {
+            CellSource::Grid(_) | CellSource::Deferred(_) => {
                 let grid = self.grid()?;
                 let at = self.at;
                 if let Some(cell) = grid.record(at)? {
@@ -725,7 +809,7 @@ impl CellItem {
     fn merge(&self, state: CellState<'_>) -> Result<Option<(Rect, bool)>> {
         match (&self.source, state) {
             (_, CellState::Covered(range)) => Ok(Some((range, false))),
-            (CellSource::Grid(_) | CellSource::Deferred { .. }, CellState::Stored(_)) => {
+            (CellSource::Grid(_) | CellSource::Deferred(_), CellState::Stored(_)) => {
                 self.grid()?.merge(self.at)
             },
             _ => Ok(None),
@@ -736,7 +820,7 @@ impl CellItem {
         let state = self.state()?;
         let cached_only = match &self.source {
             CellSource::Grid(grid) => grid.cached_only(),
-            CellSource::Deferred { .. } => self.grid()?.cached_only(),
+            CellSource::Deferred(_) => self.grid()?.cached_only(),
             CellSource::Stub => false,
         };
         let format = match state {
@@ -766,7 +850,14 @@ impl<'f> Project<'f> for Node<'f> {
     }
 
     fn path(&self) -> NodePath<'_> {
-        NodePath::new(&self.steps[..usize::from(self.depth)])
+        match (&self.item, self.last_step()) {
+            (_, None) => NodePath::ROOT,
+            (Item::Sheet(_) | Item::NamedRange(_), Some(step)) => NodePath::short(step, None),
+            (_, Some(step)) => NodePath::short(
+                PathStep::at("sheet", Position::new(self.sheet_position())),
+                Some(step),
+            ),
+        }
     }
 
     fn text(&self) -> Result<Option<Cow<'_, str>>> {
@@ -797,10 +888,9 @@ impl<'f> Project<'f> for Node<'f> {
             Ok(match &self.item {
                 Item::Workbook => None,
                 Item::Sheet(sheet) => Some(Preview::Text(Cow::Borrowed(sheet.handle.name()))),
-                Item::Cell(cell) => Some(Preview::Text(Cow::Borrowed(cell.label.as_str()))),
-                Item::Range(range) => Some(Preview::Text(Cow::Borrowed(range.label.as_str()))),
-                Item::Row(row) => Some(Preview::Text(Cow::Borrowed(row.label.as_str()))),
-                Item::Column(column) => Some(Preview::Text(Cow::Borrowed(column.label.as_str()))),
+                Item::Cell(_) | Item::Range(_) | Item::Row(_) | Item::Column(_) => self
+                    .label()
+                    .map(|label| Preview::Text(Cow::Borrowed(label.as_str()))),
                 Item::Table(table) => Some(Preview::Text(Cow::Borrowed(table_label(table)))),
                 Item::NamedRange(index) => defined_names(self.file)?
                     .get(*index)

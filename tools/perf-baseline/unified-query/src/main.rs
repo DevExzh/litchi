@@ -21,7 +21,13 @@
 //! - DOCX: `test-data/ooxml/docx/drawing.docx` and
 //!   `test-data/poi/test-data/document/saut_page.docx`;
 //! - PPTX: generated decks of 10 slides × 8 boxes and 500 × 40
-//!   (`crates/litchi-ops/tests/support/pptx_presentation.rs`).
+//!   (`crates/litchi-ops/tests/support/pptx_presentation.rs`);
+//! - XLSB and XLS (record 0267): the XLSX corpus's shape (a header and N
+//!   rows of region, sales, status) written by the leaves' own builders.
+//!
+//! Record 0267 adds `*_cold_*` routes, which open a fresh handle in every
+//! call and stop at the first or tenth match (the cold first-match cost of
+//! a worksheet no earlier read has decoded), and warm XLSB routes.
 //!
 //! Each sample times `reps` calls of each leg, unified then leaf for samples
 //! 0 and 3 (mod 4), leaf then unified otherwise. Every route checks before
@@ -353,6 +359,329 @@ fn xlsx_rows_route(context: &XlsxContext) -> Route<'_> {
     )
 }
 
+// --- Cold workbooks (record 0267) -------------------------------------------
+
+/// The `Sales` values of the generated workbooks, repeating: half exceed
+/// 1000 (as in `xlsx_workbook.rs`).
+const SALES: [f64; 4] = [1200.0, 800.0, 450.5, 2000.0];
+const REGIONS: [&str; 4] = ["West", "East", "North", "South"];
+const STATUSES: [&str; 2] = ["open", "closed"];
+
+/// An XLSB workbook shaped like the XLSX corpus: a `Data` sheet with a
+/// header row and `rows` rows of (region, sales, status).
+fn xlsb_workbook(rows: usize) -> Vec<u8> {
+    let mut sheet = litchi_xlsb::writer::MutableWorksheet::new("Data");
+    for (column, header) in ["Region", "Sales", "Status"].into_iter().enumerate() {
+        sheet.set_cell(0, column as u32, header.to_string());
+    }
+    for index in 0..rows {
+        let row = index as u32 + 1;
+        sheet.set_cell(row, 0, REGIONS[index % 4].to_string());
+        sheet.set_cell(row, 1, SALES[index % 4]);
+        sheet.set_cell(row, 2, STATUSES[index % 2].to_string());
+    }
+    let mut builder = litchi_xlsb::Builder::new();
+    builder.add_worksheet(sheet);
+    builder
+        .build()
+        .expect("builds")
+        .to_bytes()
+        .expect("serializes")
+}
+
+/// An XLS workbook of the same shape.
+fn xls_workbook(rows: usize) -> Vec<u8> {
+    let mut builder = litchi_xls::writer::Builder::new();
+    let sheet = builder.add_worksheet("Data").expect("a sheet");
+    for (column, header) in ["Region", "Sales", "Status"].into_iter().enumerate() {
+        builder
+            .write_string(sheet, 0, column as u16, header)
+            .expect("writes");
+    }
+    for index in 0..rows {
+        let row = index as u32 + 1;
+        builder
+            .write_string(sheet, row, 0, REGIONS[index % 4])
+            .expect("writes");
+        builder
+            .write_number(sheet, row, 1, SALES[index % 4])
+            .expect("writes");
+        builder
+            .write_string(sheet, row, 2, STATUSES[index % 2])
+            .expect("writes");
+    }
+    builder
+        .build()
+        .expect("builds")
+        .to_bytes()
+        .expect("serializes")
+}
+
+fn core_over_1000(value: &litchi_core::sheet::CellValue) -> bool {
+    use litchi_core::sheet::CellValue;
+    match value {
+        CellValue::Float(value) => *value > 1000.0,
+        CellValue::Int(value) => *value > 1000,
+        _ => false,
+    }
+}
+
+/// A freshly opened unified handle of `bytes` (or of the file at `path`),
+/// then the first `limit` matches of `plan`: the cold early-stop route.
+fn cold_unified(
+    bytes: &[u8],
+    path: Option<&std::path::Path>,
+    plan: &Plan<'_>,
+    limit: usize,
+) -> usize {
+    let file = match path {
+        Some(path) => litchi_ops::open(path).expect("opens"),
+        None => litchi_ops::open_bytes(bytes.to_vec()).expect("opens"),
+    };
+    if limit == 1 {
+        first_match(&file, plan)
+    } else {
+        limited(&file, plan, limit)
+    }
+}
+
+/// The same work through a freshly opened XLSX leaf: the first `limit`
+/// stored cells over 1000, by the leaf's early-stopping range visitor.
+fn cold_xlsx_leaf(bytes: &[u8], path: Option<&std::path::Path>, limit: usize) -> usize {
+    let leaf = match path {
+        Some(path) => SourceBackedWorkbook::open(path).expect("opens"),
+        None => SourceBackedWorkbook::from_reader(Cursor::new(bytes.to_vec())).expect("opens"),
+    };
+    let mut matches = 0;
+    for position in 0..leaf.len() {
+        let sheet = leaf.sheet(position).expect("reads").expect("a sheet");
+        let flow = sheet
+            .visit_cells_until(litchi_xlsx::Rect::ALL, |_, cell| {
+                if over_1000(cell) {
+                    matches += 1;
+                    if matches == limit {
+                        return std::ops::ControlFlow::Break(());
+                    }
+                }
+                std::ops::ControlFlow::Continue(())
+            })
+            .expect("visits");
+        if flow.is_break() {
+            break;
+        }
+    }
+    matches
+}
+
+/// The same work through a freshly opened XLSB leaf grid.
+fn cold_xlsb_leaf(bytes: &[u8], path: Option<&std::path::Path>, limit: usize) -> usize {
+    let leaf = xlsb_leaf(bytes, path);
+    xlsb_leaf_cells(&leaf, limit, core_over_1000)
+}
+
+fn xlsb_leaf(bytes: &[u8], path: Option<&std::path::Path>) -> litchi_xlsb::SourceBackedWorkbook {
+    match path {
+        Some(path) => litchi_xlsb::SourceBackedWorkbook::from_read_at(std::sync::Arc::new(
+            litchi_core::FileSource::open(path).expect("opens"),
+        ))
+        .expect("opens"),
+        None => litchi_xlsb::SourceBackedWorkbook::from_reader(Cursor::new(bytes.to_vec()))
+            .expect("opens"),
+    }
+}
+
+/// Every stored cell of every XLSB worksheet that passes `keep`, stopping
+/// after `limit`.
+fn xlsb_leaf_cells(
+    leaf: &litchi_xlsb::SourceBackedWorkbook,
+    limit: usize,
+    keep: fn(&litchi_core::sheet::CellValue) -> bool,
+) -> usize {
+    use litchi_core::sheet::Cell as _;
+    let mut matches = 0;
+    for sheet in leaf.worksheets().expect("reads") {
+        let grid = sheet.grid().expect("a grid");
+        for cell in grid.cells_in(litchi_xlsb::sheet::Rect::ALL).expect("cells") {
+            if keep(cell.value()) {
+                matches += 1;
+                if matches == limit {
+                    return matches;
+                }
+            }
+        }
+    }
+    matches
+}
+
+/// The same work through a freshly opened XLS leaf: the eager reader's
+/// cells from memory, the positional scanner from a file (stopped by its
+/// visitor's error once `limit` cells matched).
+fn cold_xls_leaf(bytes: &[u8], path: Option<&std::path::Path>, limit: usize) -> usize {
+    let mut matches = 0;
+    match path {
+        Some(path) => {
+            let leaf = litchi_xls::SourceBackedWorkbook::from_path(path).expect("opens");
+            let worksheet = leaf
+                .worksheet_by_index(0)
+                .expect("reads")
+                .expect("a worksheet");
+            let result = worksheet.visit_cells(|cell| {
+                if core_over_1000(cell.value()) {
+                    matches += 1;
+                    if matches == limit {
+                        return Err(litchi_xls::SourceBackedError::InvalidData("stop".into()));
+                    }
+                }
+                Ok(())
+            });
+            assert!(result.is_ok() || matches == limit, "visits");
+        },
+        None => {
+            let leaf = litchi_xls::Package::from_bytes(bytes).expect("opens");
+            let reader = leaf.reader_ref().expect("a reader");
+            let worksheet =
+                litchi_core::sheet::WorkbookTrait::worksheet_by_index(reader, 0).expect("a sheet");
+            let mut cells = worksheet.cells();
+            while let Some(cell) = cells.next() {
+                if core_over_1000(cell.expect("a cell").value()) {
+                    matches += 1;
+                    if matches == limit {
+                        break;
+                    }
+                }
+            }
+        },
+    }
+    matches
+}
+
+/// One cold corpus: its bytes, its scratch file for the file backing, and
+/// the compiled plan.
+struct ColdContext {
+    format: &'static str,
+    tag: String,
+    bytes: Vec<u8>,
+    path: Option<std::path::PathBuf>,
+    over: Plan<'static>,
+}
+
+fn cold_context(format: &'static str, rows: usize, backing: Backing) -> ColdContext {
+    let (bytes, file_format) = match format {
+        "xlsx" => (workbook::workbook(rows), FileFormat::Xlsx),
+        "xlsb" => (xlsb_workbook(rows), FileFormat::Xlsb),
+        "xls" => (xls_workbook(rows), FileFormat::Xls),
+        other => panic!("unknown cold format {other}"),
+    };
+    let path =
+        (backing == Backing::File).then(|| scratch_file(&format!("cold-{rows}.{format}"), &bytes));
+    ColdContext {
+        format,
+        tag: format!("{rows}_{}", backing.name()),
+        bytes,
+        path,
+        over: plan("cell[value>1000]", file_format),
+    }
+}
+
+fn cold_routes(context: &ColdContext) -> Vec<Route<'_>> {
+    let (bytes, path, over) = (&context.bytes, context.path.as_deref(), &context.over);
+    let leaf: fn(&[u8], Option<&std::path::Path>, usize) -> usize = match context.format {
+        "xlsx" => cold_xlsx_leaf,
+        "xlsb" => cold_xlsb_leaf,
+        _ => cold_xls_leaf,
+    };
+    let reps = if context.tag.starts_with("50000") {
+        5
+    } else {
+        100
+    };
+    let (format, tag) = (context.format, &context.tag);
+    vec![
+        Route::new(
+            format!("{format}_{tag}_cold_first_cell_value_gt_v1"),
+            reps,
+            move || cold_unified(bytes, path, over, 1),
+            move || leaf(bytes, path, 1),
+        ),
+        Route::new(
+            format!("{format}_{tag}_cold_limit10_cell_value_gt_v1"),
+            reps,
+            move || cold_unified(bytes, path, over, 10),
+            move || leaf(bytes, path, 10),
+        ),
+    ]
+}
+
+/// Warm XLSB routes: a handle opened once, as the XLSX routes do.
+struct XlsbContext {
+    tag: String,
+    file: File,
+    leaf: litchi_xlsb::SourceBackedWorkbook,
+    rows: usize,
+    over: Plan<'static>,
+    all: Plan<'static>,
+}
+
+fn xlsb_context(rows: usize, backing: Backing) -> XlsbContext {
+    let bytes = xlsb_workbook(rows);
+    let (file, path) = open_unified(&bytes, &format!("{rows}.xlsb"), backing);
+    assert_eq!(file.format(), Some(FileFormat::Xlsb));
+    XlsbContext {
+        tag: format!("{rows}_{}", backing.name()),
+        leaf: xlsb_leaf(&bytes, path.as_deref()),
+        file,
+        rows,
+        over: plan("cell[value>1000]", FileFormat::Xlsb),
+        all: plan("cell", FileFormat::Xlsb),
+    }
+}
+
+fn xlsb_routes(context: &XlsbContext) -> Vec<Route<'_>> {
+    let (file, leaf) = (&context.file, &context.leaf);
+    let (over, all) = (&context.over, &context.all);
+    let tag = &context.tag;
+    let middle = context.rows / 2 + 1;
+    let get_path = format!("/Data/B{middle}");
+    let full_reps = if context.rows > 10_000 { 3 } else { 300 };
+    vec![
+        Route::new(
+            format!("xlsb_{tag}_get_cell_v1"),
+            20_000,
+            move || {
+                black_box(file.get(black_box(get_path.as_str())).expect("resolves"));
+                1
+            },
+            move || {
+                let sheet = leaf
+                    .worksheet_by_index(black_box(0))
+                    .expect("reads")
+                    .expect("a sheet");
+                let grid = sheet.grid().expect("a grid");
+                black_box(grid.cell_at((middle as u32 - 1, 1)).expect("reads"));
+                1
+            },
+        ),
+        Route::new(
+            format!("xlsb_{tag}_first_cell_value_gt_v1"),
+            20_000,
+            move || first_match(file, over),
+            move || xlsb_leaf_cells(leaf, 1, core_over_1000),
+        ),
+        Route::new(
+            format!("xlsb_{tag}_all_cell_value_gt_v1"),
+            full_reps,
+            move || count_matches(file, over),
+            move || xlsb_leaf_cells(leaf, usize::MAX, core_over_1000),
+        ),
+        Route::new(
+            format!("xlsb_{tag}_all_cell_v1"),
+            full_reps,
+            move || count_matches(file, all),
+            move || xlsb_leaf_cells(leaf, usize::MAX, |_| true),
+        ),
+    ]
+}
+
 // --- DOCX ------------------------------------------------------------------
 
 /// Runs with direct bold in the body, stopping after `limit`.
@@ -653,7 +982,31 @@ fn main() {
         .filter(|(label, _, _, backing)| family(&format!("pptx_{label}_{}_", backing.name())))
         .map(|(label, slides, boxes, backing)| pptx_context(label, slides, boxes, backing))
         .collect();
+    let cold: Vec<ColdContext> = ["xlsx", "xlsb", "xls"]
+        .into_iter()
+        .flat_map(|format| {
+            [1_000, 50_000]
+                .into_iter()
+                .flat_map(move |rows| Backing::ALL.map(|backing| (format, rows, backing)))
+        })
+        .filter(|(format, rows, backing)| {
+            family(&format!("{format}_{rows}_{}_cold", backing.name()))
+        })
+        .map(|(format, rows, backing)| cold_context(format, rows, backing))
+        .collect();
+    let xlsb: Vec<XlsbContext> = [1_000, 50_000]
+        .into_iter()
+        .flat_map(|rows| Backing::ALL.map(|backing| (rows, backing)))
+        .filter(|(rows, backing)| family(&format!("xlsb_{rows}_{}_", backing.name())))
+        .map(|(rows, backing)| xlsb_context(rows, backing))
+        .collect();
     let mut routes: Vec<Route<'_>> = Vec::new();
+    for context in &cold {
+        routes.extend(cold_routes(context));
+    }
+    for context in &xlsb {
+        routes.extend(xlsb_routes(context));
+    }
     for context in &xlsx {
         routes.extend(xlsx_routes(context));
     }

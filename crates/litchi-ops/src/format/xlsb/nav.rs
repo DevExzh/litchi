@@ -490,6 +490,10 @@ impl<'f> Inspect<'f> for Nav<'f> {
         node.kind()
     }
 
+    fn early_children(&self, parent: &Node<'f>, kinds: KindSet<Kind>) -> Result<Children<'f>> {
+        finish(self.file, || Children::walk_early(parent, kinds))
+    }
+
     fn text<'n>(&'n self, node: &'n Node<'f>) -> Result<Option<Cow<'n, str>>> {
         finish(self.file, || {
             Ok(match node.item() {
@@ -524,6 +528,13 @@ impl<'f> Inspect<'f> for Nav<'f> {
         node.cell_ref()
     }
 
+    fn cell_at(&self, node: &Node<'f>) -> Option<(u32, u32)> {
+        // What `cell_ref` parses back from the A1 label, which every
+        // coordinate inside the sheet grid does.
+        node.cell()
+            .filter(|&(column, row)| column < 16_384 && row < 1_048_576)
+    }
+
     fn write_step(
         &self,
         node: &Node<'f>,
@@ -532,7 +543,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
         out: &mut fmt::Formatter<'_>,
     ) -> fmt::Result {
         match node.last_step() {
-            Some(step) => fmt::Display::fmt(step, out),
+            Some(step) => fmt::Display::fmt(&step, out),
             None => fmt::Display::fmt(&crate::node::PathStep::at(kind.name(), ordinal), out),
         }
     }

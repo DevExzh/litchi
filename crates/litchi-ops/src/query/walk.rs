@@ -123,6 +123,10 @@ where
     limit: usize,
     yielded: usize,
     visited: u64,
+    /// The walk is likely to stop early: it has a `limit`, or every
+    /// alternative selects its `[N]`th match. Its containers are then read
+    /// through [`Inspect::early_children`] (record 0267).
+    early: bool,
 }
 
 struct Frame<'f, N>
@@ -277,6 +281,13 @@ where
         let words = (plan.memo_slots as usize).div_ceil(64);
         let alternatives = plan.top.len();
         let interest = plan.wanted;
+        let early = !plan.top.is_empty()
+            && plan.top.iter().all(|&chain| {
+                matches!(
+                    plan.chains[chain as usize].position,
+                    Some(Positional::Nth(_))
+                )
+            });
         Ok(Self {
             nav,
             plan,
@@ -298,6 +309,7 @@ where
                 limit: usize::MAX,
                 yielded: 0,
                 visited: 0,
+                early,
             },
         })
     }
@@ -306,6 +318,7 @@ where
     #[must_use]
     pub(crate) fn limit(mut self, limit: usize) -> Self {
         self.state.limit = limit;
+        self.state.early |= limit != usize::MAX;
         self
     }
 
@@ -342,6 +355,7 @@ where
         }
     }
 
+    #[inline]
     fn advance(&mut self) -> Result<Option<Found<'f, N>>> {
         if matches!(self.state.phase, Phase::Done) || self.state.yielded >= self.state.limit {
             self.finish();
@@ -364,6 +378,7 @@ where
         result
     }
 
+    #[inline]
     fn advance_checked(&mut self) -> Result<Option<Found<'f, N>>> {
         match self.state.phase {
             Phase::Done => return Ok(None),
@@ -421,8 +436,14 @@ where
 {
     type Item = Result<N::Node>;
 
+    #[inline]
     fn next(&mut self) -> Option<Self::Item> {
-        self.next_hit().map(|hit| hit.map(Hit::into_node))
+        // The match moves out of the walk once, without a `Hit`.
+        match self.advance() {
+            Ok(Some(found)) => Some(Ok(found.node)),
+            Ok(None) => None,
+            Err(error) => Some(Err(error)),
+        }
     }
 }
 
@@ -454,11 +475,6 @@ where
     /// The matching node's kind.
     pub(crate) fn kind(&self) -> N::Kind {
         self.found.kind
-    }
-
-    /// The matching node.
-    pub(crate) fn into_node(self) -> N::Node {
-        self.found.node
     }
 
     /// The match's path, written from the walk's stack: the scope as the
@@ -709,10 +725,15 @@ where
     /// The next child of the top frame, or `None` when it has no more.
     fn next_child(&mut self) -> Option<Result<N::Node>> {
         let nav = self.nav;
+        let early = self.state.early;
         loop {
             let frame = self.state.frames.last_mut()?;
             match &mut frame.source {
-                Source::Lazy => match nav.children(&frame.node, KindSet::from_bits(frame.kinds)) {
+                Source::Lazy => match if early {
+                    nav.early_children(&frame.node, KindSet::from_bits(frame.kinds))
+                } else {
+                    nav.children(&frame.node, KindSet::from_bits(frame.kinds))
+                } {
                     Ok(children) => frame.source = Source::Open(children),
                     Err(error) => {
                         frame.source = Source::Done;

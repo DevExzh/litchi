@@ -481,6 +481,9 @@ struct SourceInner {
     /// Repairs applied so far: the globals repairs the open made, plus the
     /// cell-XF repairs lazy worksheet scans record as queries run.
     tolerance: Mutex<ToleranceReport>,
+    /// Per sheet, what the cell cursor's validating scan found, kept so a
+    /// later cursor over the same immutable snapshot skips it (record 0267).
+    cursor_checks: Box<[std::sync::OnceLock<cursor::Check>]>,
 }
 
 impl SourceInner {
@@ -1298,6 +1301,9 @@ impl SourceBackedWorkbook {
                 cache_sheet_count,
             )),
             tolerance: Mutex::new(tolerance),
+            cursor_checks: (0..cache_sheet_count)
+                .map(|_| std::sync::OnceLock::new())
+                .collect(),
         });
         inner.ensure_current()?;
         Ok(Self { inner })
@@ -1859,6 +1865,9 @@ impl SourceBackedWorksheet {
         Ok(value)
     }
 }
+
+mod cursor;
+pub use cursor::CellCursor;
 
 struct ParsedGlobals {
     global_end: u64,
@@ -2660,6 +2669,16 @@ impl<'a> WorksheetScan<'a> {
         })
     }
 
+    /// Continue the scan of a sheet starting at `sheet_start` that a sink
+    /// stopped: the limits count from the sheet start, as they did.
+    fn resume(&mut self, sheet_start: u64, resume: ScanResume) {
+        self.scanned_bytes = resume.scanned_bytes;
+        self.scanned_records = resume.scanned_records;
+        self.fill_bound = sheet_start
+            .saturating_add(self.limits.max_worksheet_scan_bytes)
+            .min(self.upper_bound);
+    }
+
     /// One past the last stream offset resident in the window, which is also
     /// the cursor's position.
     fn filled_end(&self) -> u64 {
@@ -3315,6 +3334,13 @@ trait CellSink {
     /// change which bytes are checked.
     fn wants(&self, row: u16, col: u16) -> bool;
 
+    /// [`CellSink::wants`] for a `FORMULA` record. The cell cursor's
+    /// validating scan parses formulas only, to learn whether one needs the
+    /// workbook's name tables to render (record 0267).
+    fn wants_formula(&self, row: u16, col: u16) -> bool {
+        self.wants(row, col)
+    }
+
     /// Consumes one validated cell record the sink does not want.
     ///
     /// Every implementation applies the Excel-compatible cell-XF repair,
@@ -3332,6 +3358,23 @@ trait CellSink {
             .check_cell_xf(scan.formatting, measured.xf_index, measured.row);
         Ok(())
     }
+
+    /// Whether the scan may stop at the next record boundary that leaves no
+    /// string-valued `FORMULA` waiting for its `STRING` (the cell cursor's
+    /// batch is full, record 0267). Every other sink scans to the EOF.
+    fn stop(&self) -> bool {
+        false
+    }
+}
+
+/// Where a scan a sink stopped resumes: the next record boundary, with the
+/// scan's limit counters, so a resumed scan charges the worksheet's byte and
+/// record limits exactly as one uninterrupted scan does (record 0267).
+#[derive(Debug, Clone, Copy)]
+struct ScanResume {
+    position: u64,
+    scanned_bytes: u64,
+    scanned_records: usize,
 }
 
 /// The per-scan constants every sink needs, gathered once so that the frame
@@ -3541,6 +3584,16 @@ fn wants_record<S: CellSink + ?Sized>(sink: &S, payload: &[u8]) -> bool {
     })
 }
 
+/// [`wants_record`] for a `FORMULA` record.
+fn wants_formula_record<S: CellSink + ?Sized>(sink: &S, payload: &[u8]) -> bool {
+    payload.get(..4).is_none_or(|head| {
+        sink.wants_formula(
+            u16::from_le_bytes([head[0], head[1]]),
+            u16::from_le_bytes([head[2], head[3]]),
+        )
+    })
+}
+
 /// Scans one worksheet substream to its EOF, handing every parsed cell record
 /// to `sink`.
 ///
@@ -3554,6 +3607,19 @@ fn scan_worksheet<S: CellSink>(
     execution: Option<&ExecutionContext>,
     sink: &mut S,
 ) -> Result<()> {
+    scan_worksheet_from(owner, sheet_index, execution, sink, None).map(|_| ())
+}
+
+/// [`scan_worksheet`] from the sheet's BOF, or from where a stopped scan
+/// left off. Returns where to resume when the sink stopped the scan, `None`
+/// once the scan reached the worksheet's EOF.
+fn scan_worksheet_from<S: CellSink>(
+    owner: &Arc<SourceInner>,
+    sheet_index: usize,
+    execution: Option<&ExecutionContext>,
+    sink: &mut S,
+    resume: Option<ScanResume>,
+) -> Result<Option<ScanResume>> {
     let sheet = owner
         .sheets
         .get(sheet_index)
@@ -3577,15 +3643,26 @@ fn scan_worksheet<S: CellSink>(
     let mut scan = WorksheetScan::new(
         &owner.cfb,
         &refs,
-        sheet.start,
+        resume.map_or(sheet.start, |resume| resume.position),
         sheet.end,
         owner.limits,
         execution,
         &mut sheet_chain,
     )?;
+    if let Some(resume) = resume {
+        scan.resume(sheet.start, resume);
+    }
     sink.started(&sheet_chain);
-    let mut first = true;
+    let mut first = resume.is_none();
     loop {
+        if pending_formula.is_none() && sink.stop() {
+            finish_scan(owner, execution)?;
+            return Ok(Some(ScanResume {
+                position: scan.position,
+                scanned_bytes: scan.scanned_bytes,
+                scanned_records: scan.scanned_records,
+            }));
+        }
         let frame = scan.next_frame()?;
         let frame_offset = scan.position.saturating_sub(4);
         if first {
@@ -3610,7 +3687,7 @@ fn scan_worksheet<S: CellSink>(
                     "string-valued FORMULA lacks STRING result".into(),
                 ));
             }
-            return finish_scan(owner, execution);
+            return finish_scan(owner, execution).map(|()| None);
         }
         if let Some((mut formula, occurrence)) = pending_formula.take() {
             if frame.kind == STRING {
@@ -3656,7 +3733,7 @@ fn scan_worksheet<S: CellSink>(
         match frame.kind {
             0x0006 => {
                 let payload = scan.read_payload(&frame)?;
-                if !wants_record(sink, payload) {
+                if !wants_formula_record(sink, payload) {
                     let measured = CellRecord::measure(frame.kind, payload, &owner.encoding)
                         .map_err(SourceBackedError::Parse)?;
                     sink.accept_measured(

@@ -392,9 +392,56 @@ enum GridInner {
         grid: xlsx::workbook::source::Grid,
         sheet: xlsx::SourceWorksheet,
     },
+    /// A leading part of a source-backed worksheet, which the leaf's cell
+    /// cursor parsed (record 0267). Its records are the complete grid's
+    /// first records at the same positions; everything else (a coordinate's
+    /// view, a range scan, rows, merges, formatting) reads the complete
+    /// grid, materialized on first use.
+    Prefix {
+        prefix: xlsx::workbook::source::Grid,
+        sheet: xlsx::SourceWorksheet,
+        complete: OnceLock<xlsx::workbook::source::Grid>,
+    },
+}
+
+impl GridInner {
+    /// The leaf grid that answers coordinate reads.
+    fn leaf(&self) -> Result<Option<&xlsx::workbook::source::Grid>> {
+        Ok(match self {
+            Self::Eager(_) => None,
+            Self::Source { grid, .. } => Some(grid),
+            Self::Prefix {
+                sheet, complete, ..
+            } => Some(match complete.get() {
+                Some(grid) => grid,
+                None => {
+                    let grid = sheet.grid()?;
+                    complete.get_or_init(|| grid)
+                },
+            }),
+        })
+    }
 }
 
 impl Grid {
+    /// The node grid of a leaf grid a cell cursor read: the complete grid,
+    /// or a prefix of it.
+    pub(super) fn streamed(
+        leaf: xlsx::workbook::source::Grid,
+        sheet: xlsx::SourceWorksheet,
+        complete: bool,
+    ) -> Self {
+        Self(Arc::new(if complete {
+            GridInner::Source { grid: leaf, sheet }
+        } else {
+            GridInner::Prefix {
+                prefix: leaf,
+                sheet,
+                complete: OnceLock::new(),
+            }
+        }))
+    }
+
     /// The record stored at `at`, as stored (a merged follower's included).
     pub(super) fn record(&self, at: Address) -> Result<Option<&xlsx::Cell>> {
         Ok(self.cells(Rect::single(at))?.next().map(|(_, cell)| cell))
@@ -409,22 +456,25 @@ impl Grid {
         Ok(match &*self.0 {
             GridInner::Eager(sheet) => sheet.record(index)?,
             GridInner::Source { grid, .. } => grid.record(index),
+            GridInner::Prefix { prefix, .. } => prefix.record(index),
         })
     }
 
     /// The state of one coordinate: missing, covered by a merge, or stored.
     pub(super) fn view(&self, at: Address) -> Result<xlsx::cell::View<'_>> {
-        Ok(match &*self.0 {
-            GridInner::Eager(sheet) => sheet.cell(at)?,
-            GridInner::Source { grid, .. } => grid.cell(at)?,
+        Ok(match (&*self.0, self.0.leaf()?) {
+            (GridInner::Eager(sheet), _) => sheet.cell(at)?,
+            (_, Some(grid)) => grid.cell(at)?,
+            (_, None) => return Err(lost_grid()),
         })
     }
 
     /// The stored records of `rect`, in row-major order.
     pub(super) fn cells(&self, rect: Rect) -> Result<xlsx::Cells<'_>> {
-        Ok(match &*self.0 {
-            GridInner::Eager(sheet) => sheet.cells(rect)?,
-            GridInner::Source { grid, .. } => grid.cells(rect)?,
+        Ok(match (&*self.0, self.0.leaf()?) {
+            (GridInner::Eager(sheet), _) => sheet.cells(rect)?,
+            (_, Some(grid)) => grid.cells(rect)?,
+            (_, None) => return Err(lost_grid()),
         })
     }
 
@@ -432,7 +482,9 @@ impl Grid {
     pub(super) fn row(&self, index: u32) -> Result<xlsx::Row<'_>> {
         Ok(match &*self.0 {
             GridInner::Eager(sheet) => sheet.row(index)?,
-            GridInner::Source { sheet, .. } => sheet.row(index)?,
+            GridInner::Source { sheet, .. } | GridInner::Prefix { sheet, .. } => {
+                sheet.row(index)?
+            },
         })
     }
 
@@ -440,7 +492,7 @@ impl Grid {
     pub(super) fn rows(&self) -> Result<xlsx::Rows<'_>> {
         Ok(match &*self.0 {
             GridInner::Eager(sheet) => sheet.rows()?,
-            GridInner::Source { sheet, .. } => sheet.rows()?,
+            GridInner::Source { sheet, .. } | GridInner::Prefix { sheet, .. } => sheet.rows()?,
         })
     }
 
@@ -448,7 +500,9 @@ impl Grid {
     pub(super) fn column(&self, index: u32) -> Result<xlsx::Column<'_>> {
         Ok(match &*self.0 {
             GridInner::Eager(sheet) => sheet.column(index)?,
-            GridInner::Source { sheet, .. } => sheet.column(index)?,
+            GridInner::Source { sheet, .. } | GridInner::Prefix { sheet, .. } => {
+                sheet.column(index)?
+            },
         })
     }
 
@@ -456,7 +510,7 @@ impl Grid {
     pub(super) fn columns(&self) -> Result<xlsx::Columns<'_>> {
         Ok(match &*self.0 {
             GridInner::Eager(sheet) => sheet.columns()?,
-            GridInner::Source { sheet, .. } => sheet.columns()?,
+            GridInner::Source { sheet, .. } | GridInner::Prefix { sheet, .. } => sheet.columns()?,
         })
     }
 
@@ -464,7 +518,7 @@ impl Grid {
     pub(super) fn merges(&self) -> Result<xlsx::merge::Merges<'_>> {
         Ok(match &*self.0 {
             GridInner::Eager(sheet) => sheet.merges()?,
-            GridInner::Source { sheet, .. } => sheet.merges()?,
+            GridInner::Source { sheet, .. } | GridInner::Prefix { sheet, .. } => sheet.merges()?,
         })
     }
 
@@ -486,7 +540,7 @@ impl Grid {
     pub(super) fn extents(&self) -> Result<&xlsx::Extents> {
         Ok(match &*self.0 {
             GridInner::Eager(sheet) => sheet.extents()?,
-            GridInner::Source { sheet, .. } => sheet.extents()?,
+            GridInner::Source { sheet, .. } | GridInner::Prefix { sheet, .. } => sheet.extents()?,
         })
     }
 
@@ -498,7 +552,7 @@ impl Grid {
                 Some(xlsx::LocalStyle::Shared(style)) => Ok(Some(style.format()?)),
                 _ => Ok(None),
             },
-            GridInner::Source { sheet, .. } => {
+            GridInner::Source { sheet, .. } | GridInner::Prefix { sheet, .. } => {
                 let Some(style) = sheet.style_key(at)? else {
                     return Ok(None);
                 };
@@ -509,6 +563,11 @@ impl Grid {
             },
         }
     }
+}
+
+fn lost_grid() -> Error {
+    Error::new(Code::InternalError, "a worksheet grid lost its leaf grid")
+        .with_format(FileFormat::Xlsx)
 }
 
 fn base_format(file: &Xlsx) -> Result<Option<CellFormat>> {

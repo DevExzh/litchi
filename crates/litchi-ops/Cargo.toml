@@ -126,12 +126,12 @@ required-features = ["test-support"]
 # before the query-walker optimizations (record 0262).
 [[test]]
 name              = "query_corpus_differential"
-required-features = ["xlsx", "docx", "pptx"]
+required-features = ["xlsx", "docx", "pptx", "xls", "xlsb"]
 
 # Prints the corpus query digests, to compare two builds (record 0262).
 [[example]]
 name              = "query_corpus_digest"
-required-features = ["xlsx", "docx", "pptx"]
+required-features = ["xlsx", "docx", "pptx", "xls", "xlsb"]
 
 [lints]
 workspace = true

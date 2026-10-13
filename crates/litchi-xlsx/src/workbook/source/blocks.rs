@@ -326,7 +326,7 @@ impl SourceWorksheet {
             weight,
         ) {
             Cached::Blocks(blocks) => Ok(blocks),
-            Cached::Grid(_) => Err(invalid(
+            Cached::Grid(_) | Cached::Prefix(_) => Err(invalid(
                 "source-backed worksheet block cache returned another value kind",
             )),
         }
@@ -339,7 +339,7 @@ impl SourceWorksheet {
             .get(self.data.position, Axis::Blocks, record_miss)?
         {
             Cached::Blocks(blocks) => Some(blocks),
-            Cached::Grid(_) => None,
+            Cached::Grid(_) | Cached::Prefix(_) => None,
         }
     }
 

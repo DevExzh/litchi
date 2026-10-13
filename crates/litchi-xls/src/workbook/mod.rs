@@ -20,7 +20,7 @@ mod validation_only_tests;
 pub use crate::source_limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilder};
 pub use model::OpenOptions;
 pub use source::{
-    SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
+    CellCursor, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
     SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor, StyleTables,
 };
 pub(crate) use validation_only::{KeptCells, ValidationWorkbook};

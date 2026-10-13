@@ -3,7 +3,7 @@
 //! for blessing `tests/golden/query_corpus/digests.json` (record 0262).
 //!
 //! ```text
-//! cargo run --release -p litchi-ops --features "xlsx docx pptx" \
+//! cargo run --release -p litchi-ops --features "xlsx docx pptx xls xlsb" \
 //!     --example query_corpus_digest -- [corpus root, default test-data]
 //! ```
 

@@ -17,6 +17,6 @@ pub use cache::Stats;
 pub(crate) use model::DrawingLoadPolicy;
 pub use model::{Workbook, WorksheetIterator};
 pub use source::{
-    SourceBackedExternalLink, SourceBackedIndexedWorksheet, SourceBackedWorkbook,
+    CellCursor, SourceBackedExternalLink, SourceBackedIndexedWorksheet, SourceBackedWorkbook,
     SourceBackedWorksheet,
 };

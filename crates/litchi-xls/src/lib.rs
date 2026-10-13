@@ -761,8 +761,9 @@ pub use uses_elfs::UsesElfs;
 pub use vba::{VbaMetadata, VbaProjectStorage};
 pub use web_pub::{WebPageType, WebPub, WebPubRange, WebSourceType};
 pub use workbook::{
-    OpenOptions, SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
-    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor, StyleTables,
+    CellCursor, OpenOptions, SourceBackedCell, SourceBackedError, SourceBackedLimits,
+    SourceBackedOptions, SourceBackedWorkbook, SourceBackedWorksheet,
+    SourceBackedWorksheetDescriptor, StyleTables,
 };
 pub use workbook_view::{WorkbookView, WorkbookWindow};
 pub use worksheet::Worksheet;
