@@ -387,7 +387,7 @@ fn source_checked_transaction_no_op_is_byte_stable() {
     let before = package.get_part(&name).unwrap().blob().to_vec();
     let snapshot = Snapshot::load(&package, &name).unwrap().unwrap();
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     commit.patch().apply(&mut package).unwrap();
     assert_eq!(package.get_part(&name).unwrap().blob(), before);
 }

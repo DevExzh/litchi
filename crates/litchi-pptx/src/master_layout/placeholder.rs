@@ -198,10 +198,14 @@ impl Edit {
         self.target = Some(value);
     }
 
-    /// Whether this edit changes the typed value.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.value() != self.snapshot.value
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume this edit into a source checked, reversible commit.
@@ -267,10 +271,14 @@ impl Commit {
         &self.patch
     }
 
-    /// Whether this commit changes owner bytes.
+    fn is_changed(&self) -> bool {
+        !self.patch.is_noop()
+    }
+
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Alias for callers that prefer a no-op predicate.
@@ -310,12 +318,6 @@ impl Patch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias used by transaction callers that prefer changed terminology.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_noop()
     }
 
     /// Return the exact inverse patch.
@@ -774,10 +776,14 @@ impl SlotEdit {
         self.target_set = true;
     }
 
-    /// Whether this edit changes owner bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.value() != self.snapshot.value
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume this edit into a source-checked reversible commit.
@@ -839,10 +845,14 @@ impl SlotCommit {
         &self.patch
     }
 
-    /// Whether this commit changes owner bytes.
+    fn is_changed(&self) -> bool {
+        !self.patch.is_noop()
+    }
+
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Whether this commit is an exact byte-preserving no-op.
@@ -882,12 +892,6 @@ impl SlotPatch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Whether this patch changes owner bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_noop()
     }
 
     /// Return the exact inverse patch.

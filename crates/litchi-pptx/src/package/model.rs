@@ -252,7 +252,7 @@ impl Package {
     ) -> Result<crate::presentation::embedded::ink_actions::Snapshot> {
         self.ensure_graph_current("apply_ink_actions_patch")?;
         self.ensure_plain_mutation("apply_ink_actions_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         // The InkAction package owner stages and publishes its own candidate
         // atomically.  Avoid wrapping that operation in `edit_typed`, whose
         // generic rollback snapshot would duplicate the complete OPC graph.
@@ -748,7 +748,7 @@ impl Package {
     ) -> Result<crate::change_tracking::Snapshot> {
         self.ensure_graph_current("apply_change_tracking_commit")?;
         self.ensure_plain_mutation("apply_change_tracking_commit")?;
-        let changed = commit.is_changed();
+        let changed = !commit.patch().is_noop();
         let snapshot = crate::change_tracking::apply_commit(&mut self.opc, commit)?;
         self.release_part_digests();
         if changed {
@@ -775,7 +775,7 @@ impl Package {
     ) -> Result<crate::change_tracking::Snapshot> {
         self.ensure_graph_current("apply_change_tracking_patch")?;
         self.ensure_plain_mutation("apply_change_tracking_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot = crate::change_tracking::apply_patch(&mut self.opc, patch)?;
         self.release_part_digests();
         if changed {
@@ -855,7 +855,7 @@ impl Package {
         commit: crate::notes::Commit,
     ) -> Result<crate::notes::Snapshot> {
         self.ensure_graph_current("apply_notes_commit")?;
-        let changed = commit.is_changed();
+        let changed = commit.diagnostics().changed();
         let snapshot = self.edit_typed(move |opc| crate::notes::apply_commit(opc, commit))?;
         if changed {
             self.mutable_pres = None;
@@ -880,7 +880,7 @@ impl Package {
         patch: &crate::notes::Patch,
     ) -> Result<crate::notes::Snapshot> {
         self.ensure_graph_current("apply_notes_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot = self.edit_typed(|opc| crate::notes::apply_patch(opc, patch))?;
         if changed {
             self.mutable_pres = None;
@@ -1169,7 +1169,7 @@ impl Package {
             .edit()?;
         edit.set(tags)?;
         let commit = edit.commit()?;
-        let changed = commit.is_changed();
+        let changed = commit.diagnostics().changed();
         self.publish_designer(changed, move |opc| commit.apply(opc))
     }
 
@@ -1219,7 +1219,7 @@ impl Package {
             .edit()?;
         edit.remove();
         let commit = edit.commit()?;
-        let changed = commit.is_changed();
+        let changed = commit.diagnostics().changed();
         self.publish_designer(changed, move |opc| commit.apply(opc))
     }
 
@@ -1375,7 +1375,7 @@ impl Package {
         commit: crate::presentation_properties::readonly_recommended::Commit,
     ) -> Result<crate::presentation_properties::readonly_recommended::Snapshot> {
         self.ensure_graph_current("apply_readonly_recommended_commit")?;
-        let changed = commit.is_changed();
+        let changed = commit.diagnostics().changed();
         let snapshot = self.edit_typed(move |opc| {
             crate::presentation_properties::readonly_recommended::apply_commit(opc, commit)
         })?;
@@ -1404,7 +1404,7 @@ impl Package {
         patch: &crate::presentation_properties::readonly_recommended::Patch,
     ) -> Result<crate::presentation_properties::readonly_recommended::Snapshot> {
         self.ensure_graph_current("apply_readonly_recommended_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot = self.edit_typed(|opc| {
             crate::presentation_properties::readonly_recommended::apply_patch(opc, patch)
         })?;
@@ -2061,7 +2061,7 @@ impl Package {
     ) -> Result<crate::master_layout::PlaceholderTypeExtensionSnapshot> {
         self.ensure_graph_current("apply_placeholder_type_extension_patch")?;
         self.ensure_plain_mutation("apply_placeholder_type_extension_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot = crate::master_layout::apply_placeholder_type_extension_patch_with_policy(
             &mut self.opc,
             patch,
@@ -2107,7 +2107,7 @@ impl Package {
     ) -> Result<crate::master_layout::PlaceholderTypeExtensionSlotSnapshot> {
         self.ensure_graph_current("apply_placeholder_type_extension_slot_patch")?;
         self.ensure_plain_mutation("apply_placeholder_type_extension_slot_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot =
             crate::master_layout::apply_placeholder_type_extension_slot_patch_with_policy(
                 &mut self.opc,

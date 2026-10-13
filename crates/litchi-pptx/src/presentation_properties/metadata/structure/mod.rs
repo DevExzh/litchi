@@ -8,6 +8,7 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+pub use crate::diagnostics::Diagnostics;
 pub use model::{Graph, Reference};
 pub use package::{
     add_custom_show, add_custom_show_slide, add_section, add_section_slide, apply_commit,
@@ -16,4 +17,4 @@ pub use package::{
     reorder_custom_shows, reorder_section_slides, reorder_sections, replace_custom_show,
     replace_section, store, synchronize_after_slide_mutation, update_custom_show, update_section,
 };
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use transaction::{Commit, Edit, Patch, Revision, Snapshot};

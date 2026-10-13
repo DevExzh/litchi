@@ -33,15 +33,19 @@ impl Edit {
         &self.source
     }
 
-    /// Whether one or more target profiles differ from the source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.replacements.iter().any(|(index, profile)| {
             self.source
                 .anchors()
                 .get(*index)
                 .is_some_and(|anchor| anchor.profile() != profile)
         })
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Obtain a detached shared profile edit for one selected target.
@@ -331,10 +335,14 @@ impl Commit {
         &self.patch
     }
 
-    /// Whether publication changes any owner or target bytes.
+    fn is_changed(&self) -> bool {
+        !self.patch.is_noop()
+    }
+
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.patch.is_empty()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume the commit and return its patch.
@@ -366,14 +374,8 @@ impl Patch {
 
     /// Whether the patch is an exact semantic/source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias used by package owners for no-op checks.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Reverse this patch while retaining exact source checks.

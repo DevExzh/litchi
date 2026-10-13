@@ -83,7 +83,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     if !current.same_source(patch.before()) {
         return Err(super::validation::invalid_revision());
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
     refuse_signed_change(package)?;

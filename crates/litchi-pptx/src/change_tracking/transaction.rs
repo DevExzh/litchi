@@ -189,13 +189,6 @@ impl Commit {
         self.diagnostics
     }
 
-    /// Whether publication would change the slide XML.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.patch.is_changed()
-    }
-
     pub(super) fn into_parts(self) -> (Snapshot, Patch) {
         (self.snapshot, self.patch)
     }
@@ -226,11 +219,14 @@ impl Patch {
         &self.after
     }
 
-    /// Whether source and target slide XML differ.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.source != self.target
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Construct the exact inverse patch.

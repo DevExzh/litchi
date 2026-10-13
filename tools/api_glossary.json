@@ -1178,6 +1178,31 @@
           "name": "StaleSource",
           "scope": "litchi_pptx::Error",
           "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pptx",
+          "replacement": "module-local Edit (ADR 0034 §3; record 0252)"
+        },
+        {
+          "name": "AuthorPresenceTransaction",
+          "scope": "litchi_pptx",
+          "replacement": "AuthorPresenceEdit (record 0252)"
+        },
+        {
+          "name": "CommentThreadingTransaction",
+          "scope": "litchi_pptx",
+          "replacement": "CommentThreadingEdit (record 0252)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_pptx",
+          "replacement": "drop the Edit (ADR 0034 §3; record 0252)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pptx",
+          "replacement": "diagnostics().changed() on edits/commits, is_noop() on patches (record 0252)"
         }
       ],
       "families": [
@@ -1708,6 +1733,31 @@
           "name": "StaleSource",
           "scope": "litchi_pptx::Error",
           "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pptx",
+          "replacement": "module-local Edit (ADR 0034 §3; record 0252)"
+        },
+        {
+          "name": "AuthorPresenceTransaction",
+          "scope": "litchi_pptx",
+          "replacement": "AuthorPresenceEdit (record 0252)"
+        },
+        {
+          "name": "CommentThreadingTransaction",
+          "scope": "litchi_pptx",
+          "replacement": "CommentThreadingEdit (record 0252)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_pptx",
+          "replacement": "drop the Edit (ADR 0034 §3; record 0252)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pptx",
+          "replacement": "diagnostics().changed() on edits/commits, is_noop() on patches (record 0252)"
         }
       ],
       "families": [

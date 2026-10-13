@@ -50959,7 +50959,7 @@ fn publish_pptx_source_edit<W: Write>(
         return Err("PPTX source edit unexpectedly reported no change".into());
     }
     let commit = edit.commit();
-    if !commit.is_changed() {
+    if !commit.diagnostics().changed() {
         return Err("PPTX source edit produced an unchanged commit".into());
     }
     let replayed = commit.patch().apply(commit.patch().source())?;
@@ -51088,7 +51088,7 @@ fn publish_pptx_batch_edit<W: Write>(
             return Err("PPTX source-backed batch changed an unexpected shape count".into());
         }
         let commit = edit.commit();
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX source-backed batch produced an unchanged commit".into());
         }
         let replayed = commit.patch().apply(commit.patch().source())?;
@@ -51257,7 +51257,7 @@ fn publish_pptx_multi_slide_batch_edit<W: Write>(
             }
         }
         let commit = edit.commit()?;
-        if !commit.is_changed() {
+        if !commit.diagnostics().changed() {
             return Err("PPTX source-backed multi-slide batch produced no changes".into());
         }
         let replayed = commit.patch().apply(commit.patch().source())?;

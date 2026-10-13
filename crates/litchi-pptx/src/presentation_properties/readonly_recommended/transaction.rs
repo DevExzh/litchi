@@ -140,8 +140,8 @@ impl Snapshot {
     /// Start an atomic detached edit.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             original: self.clone(),
             working: self.value(),
         }
@@ -161,12 +161,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one presentation-properties source.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     original: Snapshot,
     working: Option<bool>,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the projected optional value.
     #[inline]
     #[must_use]
@@ -181,11 +181,14 @@ impl Transaction {
         self.value()
     }
 
-    /// Return whether the staged semantic value differs from the source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.value() != self.working
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Set or clear the optional recommendation.
@@ -262,16 +265,14 @@ pub struct Commit {
 }
 
 impl Commit {
-    #[inline]
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
     }
 
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn changed(&self) -> bool {
-        self.changed
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[inline]
@@ -330,14 +331,8 @@ impl Patch {
 
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     #[inline]
@@ -364,7 +359,7 @@ impl Patch {
         if target.as_slice() != self.before.source_xml.as_slice() {
             return Err(invalid("presentation-properties source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(self.before.clone());
         }
         let located = codec::locate(self.after.source_xml.as_slice())?;

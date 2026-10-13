@@ -48,15 +48,15 @@ transaction is the bare `Package::edit()`.
 | PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
 | PPTX chunked shape publication | `Edit::{set_shape_text_chunks, set_shape_property_chunks}` | — | Eager/source primary and focused source edits admit bounded, globally disjoint chunks together for one same-slide publication (0158); single-chunk setter limits are retained |
 | PPT chunked text publication | `Edit::set_shape_text_chunks` | — | At most 4096 globally distinct targets across at most 4096 chunks, each bounded at 256; one native publication and complete readback per call (0220); ordinary `set_shape_texts` remains bounded at 256 |
-| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); 🔴 remaining XLSB mutators/error families and scoped PPTX families (W2) |
+| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); 🔴 remaining XLSB mutators/error families (W2); ✅ scoped PPTX families renamed `Edit` (0252) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
 | New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118) · 🔴 other W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118) · 🔴 remaining owners (W2) |
 | Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031), PPTX eager (0118); 🔴 remaining owner shapes |
 | Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ PPT primary immutable `apply` (0212) · ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); 🔴 other W2 owners |
-| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118) · 🔴 remaining W2 |
+| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118) · ✅ scoped PPTX families: `diagnostics().changed()` / `is_noop()` (0252) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
-| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); 🔴 scoped PPTX families (W2) |
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ scoped PPTX families (0252) |
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
@@ -1541,3 +1541,25 @@ pairs a `TextTarget` (`Shape`, `Paragraph`, `Run`, `Cell`, all checked
 `Option<Option<_>>` arguments distinguish omission, removal and replacement.
 `table::Cell::fill()` reads a cell's local RGB fill. No parallel transaction
 type or mutable writer is introduced.
+
+## PPTX scoped family vocabulary (0252)
+
+The scoped PPTX edit families (notes, embedded content parts/OLE/controls,
+presentation-properties metadata tracks/changes/structure/custom shows/
+guides/events/colour map/designer tags, read-only recommendation, change
+tracking, ink actions, shape designer/classification, placeholder type
+extensions, comment collaboration, source-backed slide/SVG/order edits) now
+use the canonical names: `Transaction` types are `Edit`
+(`AuthorPresenceTransaction`/`CommentThreadingTransaction` are
+`AuthorPresenceEdit`/`CommentThreadingEdit`), `rollback()` is deleted
+(dropping the edit is the rollback), edits and commits expose
+`diagnostics() -> litchi_pptx::diagnostics::Diagnostics` with `changed()`
+(families that already had their own diagnostics keep them), and patches
+expose `is_noop()`; public `is_changed()`, `changed()` aliases and patch
+`is_empty()` are removed. Both PPTX profiles ban `Transaction`,
+`AuthorPresenceTransaction`, `CommentThreadingTransaction`, `rollback` and
+`is_changed` crate-wide. `presentation_mut` was already removed (0127).
+These families remain snapshot-scoped (`Snapshot::edit()`); moving them to
+`Package::{x, edit_x, apply_x}` entries with full `Error`/`LimitKind`
+families is a follow-up.
+

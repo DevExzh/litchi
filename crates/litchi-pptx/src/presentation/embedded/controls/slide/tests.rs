@@ -79,7 +79,7 @@ fn exact_noop_preserves_source_and_package_bytes() {
         .to_vec();
     let source = snapshot(&package);
     let commit = source.edit().commit().unwrap();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().source_xml(), before.as_slice());
     apply_patch(&mut package, commit.patch()).unwrap();
     assert_eq!(

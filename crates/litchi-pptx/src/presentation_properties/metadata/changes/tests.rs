@@ -59,8 +59,8 @@ fn no_op_commit_and_patch_preserve_exact_source() {
     let before = load_snapshot(&package).unwrap().unwrap();
     let source = before.source_xml().to_vec();
     let commit = before.edit().commit().unwrap();
-    assert!(!commit.changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert_eq!(commit.snapshot().source_xml(), source.as_slice());
 
     let result = apply_commit(&mut package, commit).unwrap();

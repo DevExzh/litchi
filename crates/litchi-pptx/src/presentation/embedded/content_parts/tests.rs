@@ -138,8 +138,8 @@ fn exact_noop_snapshot_commit_preserves_the_complete_source_graph() {
         .to_vec();
     let commit = source.edit().commit().unwrap();
 
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     apply_commit(&mut package, commit).unwrap();
     assert_eq!(
         package
@@ -404,7 +404,7 @@ fn p14_bw_mode_edits_preserve_opaque_anchor_bytes_and_inverse() {
             .set_black_white_mode(0, Some(BlackWhiteMode::Gray))
             .unwrap()
     );
-    assert!(!noop.commit().unwrap().is_changed());
+    assert!(!noop.commit().unwrap().diagnostics().changed());
 
     let mut edit = source.edit();
     assert!(
@@ -491,7 +491,7 @@ fn p14_bw_mode_insert_remove_handles_inherited_and_local_namespaces() {
         .unwrap();
     exact.set_black_white_mode(0, None).unwrap();
     let exact = exact.commit().unwrap();
-    assert!(!exact.is_changed());
+    assert!(!exact.diagnostics().changed());
     assert_eq!(exact.snapshot().source_xml(), source.source_xml());
 }
 
@@ -661,7 +661,7 @@ fn signed_content_part_noop_is_preserved_and_mutation_requires_explicit_unsign()
 
     let source = snapshot(&package);
     let noop = source.edit().commit().unwrap();
-    assert!(!noop.is_changed());
+    assert!(!noop.diagnostics().changed());
     apply_commit(&mut package, noop).unwrap();
     assert!(package.is_signed());
 

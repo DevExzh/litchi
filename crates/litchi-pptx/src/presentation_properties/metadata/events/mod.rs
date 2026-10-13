@@ -9,7 +9,8 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use crate::diagnostics::Diagnostics;
 pub use codec::EXTENSION_URI;
 pub use model::{Draft, Event, Kind, Trigger};
 pub use package::{apply_commit, apply_patch, load, load_snapshot, remove, store};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use transaction::{Commit, Edit, Patch, Revision, Snapshot};

@@ -50,7 +50,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     if !current.same_source(patch.before()) {
         return Err(invalid("presentation structure source is stale"));
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
 

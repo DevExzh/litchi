@@ -94,8 +94,8 @@ impl Snapshot {
 
     /// Start an atomic detached edit over the typed event sequence.
     #[inline]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             original: self.clone(),
             working: self.events.iter().map(Draft::from_event).collect(),
         }
@@ -114,12 +114,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one existing event list.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     original: Snapshot,
     working: Vec<Draft>,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the projected typed draft sequence.
     #[inline]
     #[must_use]
@@ -134,9 +134,7 @@ impl Transaction {
         self.events()
     }
 
-    /// Return whether the staged semantic sequence differs from the source.
-    #[inline]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.working
             != self
                 .original
@@ -144,6 +142,12 @@ impl Transaction {
                 .iter()
                 .map(Draft::from_event)
                 .collect::<Vec<_>>()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Replace all typed records while retaining the owning extension bytes.
@@ -343,18 +347,14 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Whether publication changes the exact slide bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the projected post-edit snapshot.
@@ -407,15 +407,8 @@ impl Patch {
     /// Whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch.

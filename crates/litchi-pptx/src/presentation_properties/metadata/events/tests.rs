@@ -44,8 +44,8 @@ fn create_read_noop_and_typed_update_are_source_checked() {
     assert_eq!(source.events().len(), 2);
 
     let no_op = source.edit().commit().unwrap();
-    assert!(!no_op.is_changed());
-    assert!(no_op.patch().is_empty());
+    assert!(!no_op.diagnostics().changed());
+    assert!(no_op.patch().is_noop());
     apply_commit(&mut package, no_op).unwrap();
     assert_eq!(package.get_part(&name).unwrap().blob(), source.source_xml());
 
@@ -54,7 +54,7 @@ fn create_read_noop_and_typed_update_are_source_checked() {
     edit.set_object_id(1, 7).unwrap();
     edit.set_kind(1, Kind::Play).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let output = String::from_utf8_lossy(commit.snapshot().source_xml());
     assert!(output.contains("time=\"1500\""));
     assert!(output.contains("objId=\"7\""));

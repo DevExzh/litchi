@@ -122,7 +122,7 @@ fn detached_edits_are_atomic_and_preserve_the_snapshot_contract() {
     let snapshot = Snapshot::new(true);
     let mut editor = snapshot.edit();
     editor.set(false).expect("set");
-    assert!(editor.is_changed());
+    assert!(editor.diagnostics().changed());
     assert_eq!(editor.snapshot().value(), Some(false));
     let committed = editor.commit().expect("commit");
     assert_eq!(snapshot.value(), Some(true));

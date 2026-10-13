@@ -453,7 +453,7 @@ fn families() -> Vec<Family> {
             }),
             no_op: Some(|package| {
                 let commit = package.change_tracking(0_usize)?.edit().commit()?;
-                assert!(!commit.is_changed());
+                assert!(commit.patch().is_noop());
                 package.apply_change_tracking_commit(commit).map(drop)
             }),
         },

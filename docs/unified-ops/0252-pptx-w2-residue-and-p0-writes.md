@@ -95,3 +95,22 @@ Unified (`litchi-ops`), registry entries flipped to `set`:
   query fan-out, atomic `edit` closures, typed refusals). Capability golden
   `pptx.json` re-blessed; OfficeCLI delta regenerated (pptx: 153→164
   supported, 280→271 missing).
+
+## 4. Scoped family vocabulary (W2 residue, part 3)
+
+- 12 snapshot-scoped `Transaction` types are renamed `Edit`;
+  `AuthorPresenceTransaction`/`CommentThreadingTransaction` become
+  `AuthorPresenceEdit`/`CommentThreadingEdit`. Three `rollback()` methods
+  are deleted (no caller used them).
+- Public `is_changed()` (and `changed()` aliases) on 40 edit, commit and
+  patch types are removed. Edits and commits answer through
+  `diagnostics() -> litchi_pptx::diagnostics::Diagnostics` (`changed()`);
+  families with their own diagnostics type keep it. Patches answer through
+  `is_noop()`; patch `is_empty()` is renamed `is_noop()`.
+- Callers in the crate, its tests, `litchi-ops` and `tools/perf-baseline`
+  are migrated. Both PPTX glossary profiles ban `Transaction`,
+  `AuthorPresenceTransaction`, `CommentThreadingTransaction`, `rollback` and
+  `is_changed` crate-wide; the gate passes.
+- Not done: the scoped families keep their `Snapshot::edit()` entry and the
+  crate error; the `Package::{x, edit_x, apply_x}` reshape and per-family
+  `Error`/`LimitKind` are a follow-up.

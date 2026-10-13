@@ -463,7 +463,7 @@ fn edit_commit(editor: &SourceBackedPresentationEditor) -> litchi_pptx::SourceBa
     let mut edit = editor.edit_slide(0).unwrap();
     assert!(edit.set_shape_text("Title", "after").unwrap());
     let commit = edit.commit();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert!(commit.patch().inverse().apply(commit.snapshot()).is_ok());
     commit
 }
@@ -629,7 +629,7 @@ fn multi_slide_batch_is_atomic_sorted_and_raw_copies_unselected_members() {
         1
     );
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
         commit
             .snapshot()
@@ -728,7 +728,7 @@ fn multi_slide_batch_noop_signed_source_is_exact_and_changed_signed_is_refused()
         0
     );
     let commit = edit.commit().unwrap();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_slide_batch_commit_to_stream(&mut output, &commit)
@@ -993,7 +993,7 @@ fn empty_and_all_equal_batch_preserve_signed_source_exactly() {
         Err(Error::UnsafeEdit { .. })
     ));
     let commit = edit.commit();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_slide_commit_to_stream(&mut output, &commit)
@@ -1135,7 +1135,7 @@ fn direct_transition_set_replaces_clears_and_reopens_with_one_part_overlay() {
     let requested = direct_transition(TransitionKind::Push(Side::Left));
     assert!(edit.set_transition(&requested).unwrap());
     let commit = edit.commit();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let replayed = commit.patch().apply(commit.patch().source()).unwrap();
     assert!(commit.patch().inverse().apply(&replayed).is_ok());
 
@@ -1560,7 +1560,7 @@ fn transition_extension_prefix_collision_refuses_without_changing_source() {
         Err(Error::UnsafeEdit { .. })
     ));
     let commit = edit.commit();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_slide_commit_to_stream(&mut output, &commit)
@@ -1677,7 +1677,7 @@ fn source_backed_transition_semantic_noop_preserves_optional_attribute_lexical_p
     ));
     assert!(!edit.set_transition(&requested).unwrap());
     let commit = edit.commit();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_slide_commit_to_stream(&mut output, &commit)
@@ -1705,7 +1705,7 @@ fn source_backed_exact_unknown_transition_noop_shares_source() {
     let mut edit = snapshot.edit();
     assert!(!edit.set_transition(&requested).unwrap());
     let commit = edit.commit();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
 
     let mut output = Vec::new();
     editor
@@ -1734,9 +1734,9 @@ fn direct_transition_semantic_noop_shares_signed_source_exactly() {
         Err(Error::UnsafeEdit { .. })
     ));
     let commit = edit.commit();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     let replayed = commit.patch().apply(commit.patch().source()).unwrap();
-    assert!(!commit.patch().inverse().is_changed());
+    assert!(commit.patch().inverse().is_noop());
     assert!(
         commit
             .patch()
@@ -1931,7 +1931,7 @@ fn source_slide_order_move_changes_only_root_and_keeps_payloads_lazy() {
     let mut edit = editor.edit_slide_order().unwrap();
     assert!(edit.move_slide(Position::new(0), Position::new(2)).unwrap());
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let replayed = commit.patch().apply(commit.patch().source()).unwrap();
     let restored = commit.patch().inverse().apply(&replayed).unwrap();
     assert!(restored.is_exactly_same_as(commit.patch().source()));
@@ -1974,7 +1974,7 @@ fn source_slide_order_composes_current_positions_and_preserves_lazy_payloads() {
     assert_eq!(editor.cache_diagnostics().hits, before.hits);
 
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let replay = commit.patch().apply(commit.patch().source()).unwrap();
     assert!(replay.is_exactly_same_as(commit.snapshot()));
     let restored = commit.inverse().apply(&replay).unwrap();
@@ -2075,7 +2075,7 @@ fn source_slide_order_cancellation_reuses_original_lexical_spans_and_zip() {
             .unwrap()
     );
     let commit = edit.commit().unwrap();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(editor.cache_diagnostics(), before);
 
     let mut output = Vec::new();
@@ -2112,7 +2112,7 @@ fn source_slide_order_noop_is_byte_exact_signed_and_bad_positions_are_refused() 
     )))
     .unwrap();
     let empty = editor.edit_slide_order().unwrap().commit().unwrap();
-    assert!(!empty.is_changed());
+    assert!(!empty.diagnostics().changed());
     let mut empty_output = Vec::new();
     editor
         .publish_slide_order_commit_to_stream(&mut empty_output, &empty)
@@ -2125,7 +2125,7 @@ fn source_slide_order_noop_is_byte_exact_signed_and_bad_positions_are_refused() 
     )))
     .unwrap();
     let empty = editor.edit_slide_order().unwrap().commit().unwrap();
-    assert!(!empty.is_changed());
+    assert!(!empty.diagnostics().changed());
     let mut empty_output = Vec::new();
     editor
         .publish_slide_order_commit_to_stream(&mut empty_output, &empty)
@@ -2139,7 +2139,7 @@ fn source_slide_order_noop_is_byte_exact_signed_and_bad_positions_are_refused() 
     let mut edit = editor.edit_slide_order().unwrap();
     assert!(!edit.move_slide(Position::new(1), Position::new(1)).unwrap());
     let commit = edit.commit().unwrap();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_slide_order_commit_to_stream(&mut output, &commit)

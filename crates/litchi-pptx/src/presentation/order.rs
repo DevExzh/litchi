@@ -254,16 +254,14 @@ impl SourceBackedSlideOrderEdit {
         &self.source
     }
 
-    /// Whether this edit has a byte-changing move staged.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.source.xml.as_bytes() != self.working.as_bytes()
     }
 
-    /// Alias for [`Self::is_changed`].
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.is_changed()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Stage a positional move in the currently staged slide list.
@@ -406,21 +404,13 @@ impl SourceBackedSlideOrderPatch {
         &self.after
     }
 
-    /// Whether this patch changes the presentation XML bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_changed`].
-    #[must_use]
-    pub fn changed(&self) -> bool {
-        self.is_changed()
     }
 
     /// Whether this patch is an exact source no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         !self.is_changed()
     }
 
@@ -466,16 +456,14 @@ impl SourceBackedSlideOrderCommit {
         &self.patch
     }
 
-    /// Whether the ordered slide entries change.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
     }
 
-    /// Alias for [`Self::is_changed`].
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.is_changed()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Exact reversible inverse patch for this edit.

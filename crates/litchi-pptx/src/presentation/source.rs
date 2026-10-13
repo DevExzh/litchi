@@ -3302,10 +3302,14 @@ impl SourceBackedSlidePatch {
         &self.after
     }
 
-    /// Whether this patch changes the selected slide XML bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the exact inverse slide patch.
@@ -3355,10 +3359,14 @@ impl SourceBackedSlideCommit {
         &self.patch
     }
 
-    /// Whether the selected slide XML changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
@@ -3553,10 +3561,14 @@ impl SourceBackedSvgPatch {
         &self.after
     }
 
-    /// Whether the media payload or relationship target changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the exact inverse SVG patch.
@@ -3596,10 +3608,14 @@ impl SourceBackedSvgCommit {
         &self.patch
     }
 
-    /// Whether the media payload or relationship target changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
@@ -3767,10 +3783,14 @@ impl SourceBackedSlideBatchPatch {
         &self.after
     }
 
-    /// Whether any selected slide XML bytes change.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.before.same_source(&self.after)
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the exact inverse multi-slide patch.
@@ -3823,10 +3843,14 @@ impl SourceBackedSlideBatchCommit {
         &self.patch
     }
 
-    /// Whether any selected slide XML bytes change.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 

@@ -496,7 +496,7 @@ fn scalar_profile_edit_changes_only_the_target_and_replays_mce_exactly() {
         .expect("scalar profile edit")
     );
     let commit = edit.commit().expect("action target commit");
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(commit.snapshot().source_xml(), source.source_xml());
     assert_eq!(commit.snapshot().anchors()[0].owner_xml(), original_owner);
     assert_eq!(commit.snapshot().anchors()[0].choice_xml(), original_choice);
@@ -569,15 +569,15 @@ fn exact_scalar_noop_reuses_source_and_has_an_empty_forward_and_inverse_patch() 
             .unwrap()
     );
     let commit = edit.commit().unwrap();
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert_eq!(commit.snapshot().source_xml().as_ptr(), source_pointer);
     ink_actions::apply_patch(&mut package, commit.patch()).unwrap();
     assert_eq!(
         action_snapshot(&package, &slide_name).source_xml(),
         source.source_xml()
     );
-    assert!(commit.patch().inverse().is_empty());
+    assert!(commit.patch().inverse().is_noop());
 }
 
 #[test]
@@ -639,7 +639,7 @@ fn signed_package_root_edge_allows_exact_noop_and_requires_unsign_reload_for_cha
             .unwrap()
     );
     let noop = noop_edit.commit().unwrap();
-    assert!(!noop.is_changed());
+    assert!(!noop.diagnostics().changed());
     let signed_before = serialized_opc(&package);
     ink_actions::apply_patch(&mut package, noop.patch()).unwrap();
     assert!(package.is_signed());
@@ -749,7 +749,7 @@ fn shared_target_updates_all_owners_and_retains_the_complete_inbound_graph() {
     })
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert_eq!(
         commit.snapshot().anchors()[0].target_bytes(),
         commit.snapshot().anchors()[1].target_bytes(),
@@ -1593,7 +1593,7 @@ fn public_package_facade_reads_edits_publishes_and_reopens_ink_actions() {
     })
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
 
     let published = package
         .apply_ink_actions_patch(commit.patch())
@@ -2154,7 +2154,7 @@ fn oversized_profile_bytes_hit_the_target_cap_before_profile_parse_or_staging() 
         "unexpected early target-cap error: {error:?}"
     );
     assert!(
-        !edit.is_changed(),
+        !edit.diagnostics().changed(),
         "a refused replacement must not be staged"
     );
     assert_eq!(package.get_part(&action_name).unwrap().blob(), before);

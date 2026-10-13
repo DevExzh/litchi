@@ -32,7 +32,7 @@ fn xml_attribute_whitespace_preserves_scalar_edit_and_inverse() {
         let mut noop = snapshot.edit();
         noop.set_readonly_recommended(true).unwrap();
         let noop = noop.commit().unwrap();
-        assert!(!noop.is_changed());
+        assert!(!noop.diagnostics().changed());
         assert_eq!(noop.snapshot().source_xml(), original.as_slice());
 
         let mut edit = snapshot.edit();
@@ -98,8 +98,8 @@ fn exact_noop_keeps_source_bytes() {
     let mut edit = snapshot.edit();
     edit.set_readonly_recommended(true).unwrap();
     let commit = edit.commit().unwrap();
-    assert!(!commit.is_changed());
-    assert!(commit.patch().is_empty());
+    assert!(!commit.diagnostics().changed());
+    assert!(commit.patch().is_noop());
     assert_eq!(commit.snapshot().source_xml(), original.as_slice());
 }
 
@@ -111,7 +111,7 @@ fn exact_noop_keeps_character_references_in_opaque_extensions() {
     .into_bytes();
     let snapshot = Snapshot::from_xml(&original).unwrap();
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().source_xml(), original.as_slice());
 }
 

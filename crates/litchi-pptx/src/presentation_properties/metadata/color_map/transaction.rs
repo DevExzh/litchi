@@ -114,8 +114,8 @@ impl Snapshot {
     /// Start an atomic detached edit over this typed color-map value.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             original: self.clone(),
             working: self.located.value,
         }
@@ -139,12 +139,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one color-map source.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     original: Snapshot,
     working: Value,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the projected typed value.
     #[inline]
     #[must_use]
@@ -166,11 +166,14 @@ impl Transaction {
         mapped_value(&self.working)
     }
 
-    /// Return whether the staged value differs from the source value.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.value() != self.working
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Set one mapped color role without touching any other source bytes.
@@ -272,18 +275,14 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Return whether publication changes the exact source bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the projected post-edit snapshot.
@@ -337,15 +336,8 @@ impl Patch {
     /// Return whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Return whether this patch changes the source bytes.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch.
@@ -378,7 +370,7 @@ impl Patch {
         if current.value != self.before.value() {
             return Err(invalid("color-map source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(self.before.clone());
         }
 
@@ -489,8 +481,8 @@ mod tests {
         let snapshot = Snapshot::from_master(&source).unwrap();
         let commit = snapshot.edit().commit().unwrap();
 
-        assert!(!commit.changed());
-        assert!(commit.patch().is_empty());
+        assert!(!commit.diagnostics().changed());
+        assert!(commit.patch().is_noop());
         assert_eq!(commit.snapshot().source_xml(), source.as_slice());
 
         let mut target = source.clone();

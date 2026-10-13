@@ -556,7 +556,7 @@ fn p232_scalar_patch_preserves_unknown_shape_bytes_and_inverse() {
     let mut edit = source.edit();
     edit.set(PlaceholderTypeExtension::Unknown);
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert!(!commit.is_noop());
     assert!(
         commit
@@ -901,7 +901,7 @@ fn p232_slot_add_remove_preserves_shape_bytes_and_inverse() {
     let mut add = absent.edit();
     add.set(PlaceholderTypeExtension::Cameo);
     let added = add.commit().unwrap();
-    assert!(added.is_changed());
+    assert!(added.diagnostics().changed());
     assert!(
         added
             .snapshot()

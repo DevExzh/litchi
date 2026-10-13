@@ -160,8 +160,8 @@ impl Snapshot {
     /// Start an atomic detached edit over custom shows and sections.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             original: self.clone(),
             working: self.graph.clone(),
         }
@@ -192,12 +192,12 @@ impl Snapshot {
 
 /// A detached atomic edit over custom shows and sections.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     original: Snapshot,
     working: Graph,
 }
 
-impl Transaction {
+impl Edit {
     /// Immutable source snapshot used for conflict checks and inverse patches.
     #[inline]
     #[must_use]
@@ -233,11 +233,14 @@ impl Transaction {
         &self.working.sections
     }
 
-    /// Whether the staged semantic graph differs from the captured source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !codec::equivalent_graph(&self.original.graph, &self.working)
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Replace the complete typed graph, retaining the source slide topology.
@@ -374,18 +377,14 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Whether publication changes the exact presentation XML bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the projected post-edit snapshot.
@@ -444,22 +443,8 @@ impl Patch {
     /// Whether this patch is an exact source no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[inline]
-    #[must_use]
     pub fn is_noop(&self) -> bool {
-        self.is_empty()
-    }
-
-    /// Whether this patch changes the presentation source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
+        self.before.same_source(&self.after)
     }
 
     /// Return the exact inverse patch without reinterpreting XML.
