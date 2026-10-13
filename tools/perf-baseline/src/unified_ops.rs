@@ -3242,7 +3242,12 @@ impl OdpRoot {
                 owned.ok_or("eager ODP route has no owned bytes")?,
             )?),
             (Leg::Unified, Ingress::Source) => Self::Unified(litchi::open(path)?),
-            (Leg::Leaf, Ingress::Eager) => Self::Eager(litchi_odp::Package::from_bytes(&owned.ok_or("eager ODP route has no owned bytes")?)?.presentation()?),
+            (Leg::Leaf, Ingress::Eager) => Self::Eager(
+                litchi_odp::Package::from_bytes(
+                    &owned.ok_or("eager ODP route has no owned bytes")?,
+                )?
+                .presentation()?,
+            ),
             (Leg::Leaf, Ingress::Source) => {
                 Self::Source(litchi_odp::SourceBackedPresentation::open(path)?)
             },
@@ -3348,7 +3353,9 @@ fn run_odp(
         (Leg::Unified, _, true) => {
             "File::presentation()?.slide(middle) on a File prepared outside the timer"
         },
-        (Leg::Leaf, Ingress::Eager, false) => "litchi_odp::Package::from_bytes(&Vec<u8>).map_err(litchi_core::Error::from).and_then(|package| package.presentation())",
+        (Leg::Leaf, Ingress::Eager, false) => {
+            "litchi_odp::Package::from_bytes(&Vec<u8>).map_err(litchi_core::Error::from).and_then(|package| package.presentation())"
+        },
         (Leg::Leaf, Ingress::Source, false) => "litchi_odp::SourceBackedPresentation::from_path",
         (Leg::Leaf, Ingress::Eager, true) => {
             "litchi_odp::Presentation::slide(middle) on a presentation prepared outside the timer"
@@ -3443,7 +3450,9 @@ fn run_ods(
     let timed_calls = match (entry.leg, ingress) {
         (Leg::Unified, Ingress::Eager) => "litchi::open_bytes(Vec<u8>) -> File::Ods",
         (Leg::Unified, Ingress::Source) => "litchi::open(Path) -> File::Ods (source-backed)",
-        (Leg::Leaf, Ingress::Eager) => "litchi_ods::Package::from_bytes(&Vec<u8>).map_err(litchi_core::Error::from).and_then(|package| package.workbook())",
+        (Leg::Leaf, Ingress::Eager) => {
+            "litchi_ods::Package::from_bytes(&Vec<u8>).map_err(litchi_core::Error::from).and_then(|package| package.workbook())"
+        },
         (Leg::Leaf, Ingress::Source) => "litchi_ods::SourceBackedSpreadsheet::from_path",
     };
     let summary = RouteSummary::for_case(entry.case, timed_calls)?.verified(&expected, samples)?;

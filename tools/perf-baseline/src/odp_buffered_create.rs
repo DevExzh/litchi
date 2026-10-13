@@ -720,7 +720,8 @@ mod tests {
                 .unwrap();
         }
         let error = builder.build().unwrap_err();
-        let litchi_odf_common::Error::Core(litchi_core::Error::InvalidFormat(message)) = error else {
+        let litchi_odf_common::Error::Core(litchi_core::Error::InvalidFormat(message)) = error
+        else {
             panic!("unexpected oversized deck refusal: {error}");
         };
         assert!(message.contains("XML publication rejected for 'content.xml'"));

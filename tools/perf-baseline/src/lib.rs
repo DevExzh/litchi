@@ -17589,7 +17589,8 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
         "destination",
     )?;
     let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
-    let destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let source_slide_name = source_snapshot
@@ -17644,8 +17645,10 @@ fn build_pptx_cross_copy_corpus(case: Case) -> Result<PptxCrossCopyCorpus, Box<d
         return Err("media-rich PPTX cross-copy did not exercise a closure collision".into());
     }
 
-    let mut published_destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
-    let mut source_for_publication = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
+    let mut published_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
+    let mut source_for_publication =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
     let published_snapshot =
         published_destination.apply_cross_slide_copy_plan(&source_for_publication, &plan)?;
     if published_snapshot.slides().len() != destination_snapshot.slides().len() + 1 {
@@ -17789,14 +17792,16 @@ fn build_pptx_source_backed_cross_copy_corpus(
         );
     }
 
-    let source_package = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
+    let source_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.clone()))?;
     let source_slides = source_package.presentation()?.slides()?;
     let source_slide = source_slides
         .get(PPTX_CROSS_COPY_SOURCE_SLIDE)
         .ok_or("source-backed PPTX source slide is missing")?;
     let source_slide_name = source_slide.name()?;
     let source_slide_text = source_slide.text()?;
-    let destination_package = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
+    let destination_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.clone()))?;
     let destination_slide_name = destination_package
         .presentation()?
         .slides()?
@@ -18586,7 +18591,8 @@ fn verify_pptx_source_backed_cross_copy_gates(
     matched_existing_plain_corpus_verified: bool,
 ) -> Result<PptxSourceBackedCrossCopyGateSummary, Box<dyn Error>> {
     let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
-    let destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let candidate = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.to_vec()))?;
     let source_opc = source.opc()?;
     let destination_opc = destination.opc()?;
@@ -19034,7 +19040,8 @@ fn verify_pptx_source_backed_lifecycle_output(
     expectation: &PptxSourceBackedCrossCopyLifecycleExpectation<'_>,
 ) -> Result<PptxSourceBackedLifecycleOutputChecks, Box<dyn Error>> {
     let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
-    let destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let candidate = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.to_vec()))?;
     let source_opc = source.opc()?;
     let destination_opc = destination.opc()?;
@@ -19443,7 +19450,8 @@ fn verify_pptx_source_backed_cross_copy_lifecycle_gates(
     expectation: &PptxSourceBackedCrossCopyLifecycleExpectation<'_>,
 ) -> Result<PptxSourceBackedCrossCopyLifecycleGateSummary, Box<dyn Error>> {
     let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
-    let destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let source_snapshot = source.opened_presentation()?;
     let destination_snapshot = destination.opened_presentation()?;
     let owned_plan = destination_snapshot.plan_cross_slide_copy(
@@ -19921,7 +19929,8 @@ fn verify_pptx_cross_copy_output(
     expectation: PptxCrossCopySemanticExpectation<'_>,
 ) -> Result<PptxCrossCopyOutputChecks, Box<dyn Error>> {
     let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
-    let destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let candidate = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.to_vec()))?;
     let source_opc = source.opc()?;
     let destination_opc = destination.opc()?;
@@ -20108,8 +20117,10 @@ fn verify_pptx_cross_copy_refusal_gates(
     output_checks: PptxCrossCopyOutputChecks,
     source_immutability_verified: bool,
 ) -> Result<PptxCrossCopyGateSummary, Box<dyn Error>> {
-    let mut patch_destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
-    let patch_source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
+    let mut patch_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let patch_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let encoded = plan.patch().to_bytes()?;
     let decoded = litchi_pptx::opened::CrossSlideCopyPatch::from_bytes(&encoded)?;
     if decoded != *plan.patch() {
@@ -20117,7 +20128,8 @@ fn verify_pptx_cross_copy_refusal_gates(
     }
     patch_destination.apply_cross_slide_copy_patch(&patch_source, &decoded)?;
     let published = patch_destination.to_bytes()?;
-    let mut inverse_destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(published))?;
+    let mut inverse_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(published))?;
     inverse_destination.apply_cross_slide_copy_patch(&patch_source, &decoded.inverse())?;
     let durable_patch_round_trip_verified = inverse_destination.to_bytes()? == destination_archive;
 
@@ -20139,8 +20151,10 @@ fn verify_pptx_cross_copy_refusal_gates(
         })
     );
 
-    let mut stale_destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
-    let stale_source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
+    let mut stale_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let stale_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let stale_destination_snapshot = stale_destination.opened_presentation()?;
     let stale_plan = stale_destination_snapshot.plan_cross_slide_copy(
         &stale_source.opened_presentation()?,
@@ -20161,8 +20175,10 @@ fn verify_pptx_cross_copy_refusal_gates(
     let stale_destination_refusal_verified = stale_destination_result.is_err()
         && stale_destination.to_bytes()? == stale_destination_before;
 
-    let clean_destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
-    let clean_source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
+    let clean_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let clean_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let clean_destination_snapshot = clean_destination.opened_presentation()?;
     let clean_plan = clean_destination_snapshot.plan_cross_slide_copy(
         &clean_source.opened_presentation()?,
@@ -20170,7 +20186,8 @@ fn verify_pptx_cross_copy_refusal_gates(
         PPTX_CROSS_COPY_DESTINATION_SLIDE,
         PPTX_CROSS_COPY_INSERTION_POSITION,
     )?;
-    let mut stale_source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
+    let mut stale_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(source_archive.to_vec()))?;
     let stale_source_snapshot = stale_source.opened_presentation()?;
     let mut stale_source_edit = stale_source_snapshot.edit();
     stale_source_edit.set_shape_text(
@@ -20189,14 +20206,17 @@ fn verify_pptx_cross_copy_refusal_gates(
         && stale_source.to_bytes()? == stale_source_before
         && stale_source_destination.to_bytes()? == stale_source_destination_before;
 
-    let mut foreign_destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let mut foreign_destination =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let foreign_before = foreign_destination.to_bytes()?;
-    let foreign_source = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let foreign_source =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let foreign_result = foreign_destination.apply_cross_slide_copy_plan(&foreign_source, plan);
     let foreign_source_refusal_verified =
         foreign_result.is_err() && foreign_destination.to_bytes()? == foreign_before;
 
-    let destination_for_collision = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
+    let destination_for_collision =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_archive.to_vec()))?;
     let destination_for_collision_opc = destination_for_collision.opc()?;
     let collision_remap_verified = plan.parts().iter().all(|part| {
         destination_for_collision_opc
@@ -26889,7 +26909,8 @@ fn verify_pptx_selector_error_oracle(corpus: &Corpus) -> Result<(), Box<dyn Erro
     let duplicate_archive = rewrite_pptx_slide_names(&corpus.archive, |index| {
         (index == 1).then(|| duplicate_name.clone())
     })?;
-    let duplicate_package = litchi_pptx::Package::from_reader(std::io::Cursor::new(duplicate_archive))?;
+    let duplicate_package =
+        litchi_pptx::Package::from_reader(std::io::Cursor::new(duplicate_archive))?;
     let duplicate_snapshot = duplicate_package.opened_presentation()?;
     let mut duplicate_edit = duplicate_snapshot.edit();
     match duplicate_edit.set_shape_text(duplicate_name.as_str(), 0usize, "duplicate") {
@@ -34945,7 +34966,9 @@ fn run_semantic_pptx(
             Case::PptxSemanticNoopEditSave
             | Case::PptxSemanticOneEditSave
             | Case::PptxSemanticOnePercentEditSave => {
-                let mut package = litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
+                let mut package = litchi_pptx::Package::from_reader(std::io::Cursor::new(
+                    corpus.archive.clone(),
+                ))?;
                 let started = Instant::now();
                 let mut edit = package.edit()?;
                 for linear in &selected {
@@ -35013,7 +35036,8 @@ fn run_pptx_opened_transaction_phases(
     };
 
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut package = litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
+        let mut package =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
         let total_started = Instant::now();
 
         let started = Instant::now();
@@ -35155,7 +35179,8 @@ fn run_pptx_slide_name_index(
     }
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut package = litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
+        let mut package =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
         let started = Instant::now();
         let mut edit = package.edit()?;
         for operation in &edits {
@@ -35547,9 +35572,7 @@ fn verify_odt_mixed_raw_members(source: &[u8], published: &[u8]) -> Result<(), B
     Ok(())
 }
 
-fn signed_odt_mixed_snapshot(
-    source: &[u8],
-) -> Result<litchi_odt::Package, Box<dyn Error>> {
+fn signed_odt_mixed_snapshot(source: &[u8]) -> Result<litchi_odt::Package, Box<dyn Error>> {
     let archive = ArchiveReader::new(source)?;
     let mut writer = litchi_odt::core::PackageWriter::new();
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
@@ -35633,8 +35656,7 @@ fn verify_odt_mixed_guardrails(
             "https://example.invalid/litchi/odt/late",
             "missing",
         )?;
-    if late_error_edit.commit().is_ok() || source.as_bytes() != source.to_bytes()?.as_slice()
-    {
+    if late_error_edit.commit().is_ok() || source.as_bytes() != source.to_bytes()?.as_slice() {
         return Err("ODT mixed late-error atomicity gate failed".into());
     }
 
@@ -37067,7 +37089,8 @@ fn run_semantic_ods(
                 let bytes = commit.package().as_bytes().to_vec();
                 let duration = started.elapsed();
                 let updated = !updated_indices.is_empty();
-                if (bytes != corpus.archive) != updated || commit.diagnostics().changed() != updated {
+                if (bytes != corpus.archive) != updated || commit.diagnostics().changed() != updated
+                {
                     return Err(
                         "semantic ODS edit/save changed-state differs from specification".into(),
                     );
@@ -38242,7 +38265,8 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticListSlides => {
-                let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
+                let presentation =
+                    litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let slides = presentation.slides()?;
                 let duration = started.elapsed();
@@ -38254,7 +38278,8 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticOneSlide => {
-                let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
+                let presentation =
+                    litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let slide = presentation
                     .slide(index)?
@@ -38273,7 +38298,8 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticFullText => {
-                let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
+                let presentation =
+                    litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let text = presentation.text()?;
                 let duration = started.elapsed();
@@ -38299,7 +38325,8 @@ fn run_semantic_odp(
                 let commit = transaction.commit()?;
                 let bytes = commit.package().as_bytes().to_vec();
                 let duration = started.elapsed();
-                if (bytes != corpus.archive) != updated || commit.diagnostics().changed() != updated {
+                if (bytes != corpus.archive) != updated || commit.diagnostics().changed() != updated
+                {
                     return Err(
                         "semantic ODP edit/save changed-state differs from specification".into(),
                     );
@@ -42150,9 +42177,12 @@ fn run_odp_text_box_model_publication(
         &scalar,
         &expected_scalar,
     )?;
-    let scalar_projection =
-        litchi_odp::Package::from_bytes(&expected_scalar)?.presentation()?.text()?;
-    let batch_projection = litchi_odp::Package::from_bytes(&expected_batch)?.presentation()?.text()?;
+    let scalar_projection = litchi_odp::Package::from_bytes(&expected_scalar)?
+        .presentation()?
+        .text()?;
+    let batch_projection = litchi_odp::Package::from_bytes(&expected_batch)?
+        .presentation()?
+        .text()?;
     if scalar_projection != batch_projection {
         return Err("matched ODP scalar and batch semantic projections differ".into());
     }
@@ -51495,7 +51525,8 @@ fn run_pptx_cross_copy(
     let mut sink_summaries = Vec::with_capacity(samples);
     let mut output_digests = Vec::with_capacity(samples);
     let source_text = {
-        let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
+        let source =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
         source
             .presentation()?
             .slides()?
@@ -51505,8 +51536,11 @@ fn run_pptx_cross_copy(
     };
 
     for iteration in 0..iterations {
-        let mut source = litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
-        let mut destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.destination_archive.clone()))?;
+        let mut source =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
+        let mut destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(
+            corpus.destination_archive.clone(),
+        ))?;
         let source_snapshot = source.opened_presentation()?;
         let destination_snapshot = destination.opened_presentation()?;
 
@@ -51706,7 +51740,8 @@ fn run_pptx_cross_copy_lifecycle(
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or("PPTX cross-copy lifecycle sequential output ceiling overflows u64")?;
     let source_text = {
-        let source = litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
+        let source =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(corpus.source_archive.clone()))?;
         source
             .presentation()?
             .slides()?
@@ -51738,7 +51773,8 @@ fn run_pptx_cross_copy_lifecycle(
         let allocation_region = allocation_metrics::begin();
         let started = Instant::now();
         let mut source = litchi_pptx::Package::from_reader(std::io::Cursor::new(source_input))?;
-        let mut destination = litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_input))?;
+        let mut destination =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(destination_input))?;
         let source_snapshot = source.opened_presentation()?;
         let destination_snapshot = destination.opened_presentation()?;
 
@@ -66303,7 +66339,8 @@ mod tests {
             expected_collision_remapped_parts: corpus.matched_owned_collision_remapped_parts,
         };
 
-        let candidate = litchi_pptx::Package::from_reader(std::io::Cursor::new(output.clone())).unwrap();
+        let candidate =
+            litchi_pptx::Package::from_reader(std::io::Cursor::new(output.clone())).unwrap();
         let candidate_opc = candidate.opc().unwrap();
         let candidate_presentation = candidate_opc.main_document_part().unwrap();
         let candidate_refs =
@@ -68871,8 +68908,7 @@ mod tests {
             assert_eq!(result.elapsed_ns.samples.len(), 1);
             assert!(result.output_sha256.is_some());
 
-            let source =
-                litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
+            let source = litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
             let mut edit = source.edit();
             if inserted {
                 edit.insert_paragraph(
@@ -68949,7 +68985,10 @@ mod tests {
             assert_eq!(sink.largest_write, expected_bytes);
         }
 
-        let document = litchi_odt::Package::from_bytes(&first.archive).unwrap().document().unwrap();
+        let document = litchi_odt::Package::from_bytes(&first.archive)
+            .unwrap()
+            .document()
+            .unwrap();
         assert_eq!(document.images().unwrap().len(), ODT_RESOURCE_BATCH_COUNT);
         assert!(document.images().unwrap().iter().all(|image| {
             image
@@ -68976,8 +69015,7 @@ mod tests {
         assert_eq!(result.case, "odp_media_textbox_edit_save");
         assert_eq!(result.elapsed_ns.samples.len(), 1);
 
-        let source =
-            litchi_odp::authoring::edit::Package::from_bytes(&first.archive).unwrap();
+        let source = litchi_odp::authoring::edit::Package::from_bytes(&first.archive).unwrap();
         let mut transaction = source.edit().unwrap();
         transaction
             .add_text_box(
@@ -69633,8 +69671,7 @@ mod tests {
             assert_eq!(sink.accepted_bytes, sink.largest_write);
         }
 
-        let source =
-            litchi_odp::authoring::edit::Package::from_bytes(&first.archive).unwrap();
+        let source = litchi_odp::authoring::edit::Package::from_bytes(&first.archive).unwrap();
         let inventory = source.rich_content().unwrap();
         assert_eq!(
             inventory
