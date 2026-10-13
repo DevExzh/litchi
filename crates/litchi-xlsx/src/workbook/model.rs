@@ -407,6 +407,9 @@ pub(crate) struct Inner {
     /// Repairs made while the shared-string table was parsed; published
     /// before the table itself (see `crate::leniency`).
     pub(super) shared_strings_tolerance: OnceLock<ToleranceReport>,
+    /// Ascending indexes of the shared-string items that carry rich-text
+    /// runs, scanned on first use (record 0273).
+    pub(super) rich_shared_strings: OnceLock<Box<[usize]>>,
     pub(crate) shared_string_lineage: Arc<SharedStringLineage>,
     pub(super) styles_uri: Option<PackURI>,
     pub(super) styles: OnceLock<raw::styles::Catalog>,
@@ -617,6 +620,7 @@ impl Workbook {
                 shared_strings_uri,
                 shared_strings: OnceLock::new(),
                 shared_strings_tolerance: OnceLock::new(),
+                rich_shared_strings: OnceLock::new(),
                 shared_string_lineage,
                 styles_uri,
                 styles: OnceLock::new(),
@@ -1440,6 +1444,33 @@ impl Worksheet {
         Ok(Some(Style::from_raw(Arc::clone(&self.owner), key)))
     }
 
+    /// Whether the stored text at `at` carries rich-text runs: an inline
+    /// string with `r` runs, or a shared string whose item has them.
+    /// Writing a plain value to such a cell drops the runs' formatting, so
+    /// a text search refuses to rewrite it (record 0273).
+    ///
+    /// # Errors
+    ///
+    /// The errors of reading the worksheet's cell store or the
+    /// shared-string part.
+    pub fn has_rich_text<'a>(&self, at: impl Into<At<'a>>) -> Result<bool> {
+        let address = at.into().resolve()?;
+        let Some(entry) = self.store()?.entry(address) else {
+            return Ok(false);
+        };
+        if entry.inline_rich {
+            return Ok(true);
+        }
+        let Some(index) = entry.shared_string else {
+            return Ok(false);
+        };
+        Ok(self
+            .owner
+            .rich_shared_strings()?
+            .binary_search(&index)
+            .is_ok())
+    }
+
     /// Lazily traverse stored cells selected by A1 range, raw zero-based
     /// half-open bounds, or a reusable checked rectangle.
     pub fn cells<'a>(&self, area: impl Into<Area<'a>>) -> Result<Cells<'_>> {
@@ -1607,6 +1638,24 @@ impl Inner {
             .ok_or_else(|| invalid("shared-string cache initialization did not publish a value"))
     }
 
+    /// The ascending indexes of the shared-string items with rich runs.
+    fn rich_shared_strings(&self) -> Result<&[usize]> {
+        if let Some(indexes) = self.rich_shared_strings.get() {
+            return Ok(indexes);
+        }
+        let indexes = match self.shared_strings_uri.as_ref() {
+            Some(uri) => rich_items(self.package.get_part(uri)?.blob())?,
+            None => Box::default(),
+        };
+        let _publish_result = self.rich_shared_strings.set(indexes);
+        self.rich_shared_strings
+            .get()
+            .map(AsRef::as_ref)
+            .ok_or_else(|| {
+                invalid("rich shared-string cache initialization did not publish a value")
+            })
+    }
+
     fn style_catalog(&self) -> Result<Option<&raw::styles::Catalog>> {
         let Some(uri) = self.styles_uri.as_ref() else {
             return Ok(None);
@@ -1741,5 +1790,64 @@ impl Inner {
                 .ok_or_else(|| invalid("shared style fan-out count overflowed usize"))?;
         }
         Ok(count)
+    }
+}
+
+/// The ascending indexes of the `si` items of a shared-string part that
+/// hold `r` runs.
+fn rich_items(xml: &[u8]) -> Result<Box<[usize]>> {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let mut depth = 0usize;
+    let mut item = None::<usize>;
+    let mut count = 0usize;
+    let mut rich = Vec::new();
+    loop {
+        match reader
+            .read_event()
+            .map_err(|error| invalid(format!("malformed shared-string part: {error}")))?
+        {
+            quick_xml::events::Event::Start(element) => {
+                depth += 1;
+                let local = element.local_name();
+                if depth == 2 && local.as_ref() == b"si" {
+                    item = Some(count);
+                    count += 1;
+                } else if depth == 3
+                    && local.as_ref() == b"r"
+                    && let Some(index) = item
+                    && rich.last() != Some(&index)
+                {
+                    rich.try_reserve(1).map_err(|source| Error::Allocation {
+                        resource: "rich shared-string indexes",
+                        source,
+                    })?;
+                    rich.push(index);
+                }
+            },
+            quick_xml::events::Event::Empty(element) => {
+                if depth == 1 && element.local_name().as_ref() == b"si" {
+                    count += 1;
+                }
+            },
+            quick_xml::events::Event::End(_) => {
+                if depth == 2 {
+                    item = None;
+                }
+                depth = depth.saturating_sub(1);
+            },
+            quick_xml::events::Event::Eof => break,
+            _ => {},
+        }
+    }
+    Ok(rich.into_boxed_slice())
+}
+
+#[cfg(test)]
+mod rich_item_tests {
+    #[test]
+    fn rich_items_lists_the_items_with_runs() {
+        let xml = br#"<sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="4" uniqueCount="4"><si><t>plain</t></si><si><r><rPr><b/></rPr><t>rich</t></r><r><t> text</t></r></si><si/><si><t>x</t><rPh sb="0" eb="1"><t>y</t></rPh></si><si><r><t>z</t></r></si></sst>"#;
+        assert_eq!(&*super::rich_items(xml).unwrap(), &[1, 4]);
+        assert!(super::rich_items(b"<sst").is_err());
     }
 }

@@ -2634,6 +2634,7 @@ fn property_error(error: Error, key: &crate::props::Key<'_>) -> Error {
 /// `WorksheetEdit::state` view is the authority for each staged before/after
 /// pair.
 /// CSV/TSV import through one native edit (record 0266).
+mod find;
 pub(crate) mod import;
 
 pub(crate) mod coalesce {

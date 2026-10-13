@@ -237,7 +237,8 @@ impl State {
 /// assert!(Verb::Set.is_edit() && !Verb::Get.is_edit());
 /// assert!(!Verb::Save.is_edit() && !Verb::Create.is_edit());
 /// assert!(Verb::Import.is_edit() && !Verb::Evaluate.is_edit());
-/// assert_eq!(Verb::ALL.len(), 15);
+/// assert!(Verb::Replace.is_edit());
+/// assert_eq!(Verb::ALL.len(), 16);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -270,6 +271,10 @@ pub enum Verb {
     Batch,
     /// CSV/TSV import into a worksheet, [`File::import`] (record 0266).
     Import,
+    /// Text find/replace: [`File::set`] with the `find=` and `replace=`
+    /// properties, OfficeCLI's spelling (record 0273). The match count is
+    /// [`crate::Applied::matched`].
+    Replace,
     /// Save in the same format (W4).
     Save,
     /// Create a new package of this format (W4).
@@ -279,7 +284,7 @@ pub enum Verb {
 impl Verb {
     /// Every verb, in declaration order: the reads, then the edits,
     /// publication and creation.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 16] = [
         Self::Get,
         Self::Find,
         Self::Query,
@@ -293,6 +298,7 @@ impl Verb {
         Self::Edit,
         Self::Batch,
         Self::Import,
+        Self::Replace,
         Self::Save,
         Self::Create,
     ];
@@ -314,6 +320,7 @@ impl Verb {
             Self::Edit => "edit",
             Self::Batch => "batch",
             Self::Import => "import",
+            Self::Replace => "replace",
             Self::Save => "save",
             Self::Create => "create",
         }
@@ -333,7 +340,8 @@ impl Verb {
             | Self::Swap
             | Self::Edit
             | Self::Batch
-            | Self::Import => true,
+            | Self::Import
+            | Self::Replace => true,
             Self::Get
             | Self::Find
             | Self::Query
@@ -683,6 +691,9 @@ impl Capabilities {
         if matches!(verb, Verb::Import | Verb::Evaluate) {
             return self.m4_support(verb);
         }
+        if verb == Verb::Replace {
+            return self.replace_support();
+        }
         if verb == Verb::Create {
             return self.creation_support();
         }
@@ -872,6 +883,7 @@ impl Capabilities {
             Verb::Save => self.publication_support(),
             Verb::Create => self.creation_support(),
             Verb::Import | Verb::Evaluate => self.m4_support(verb),
+            Verb::Replace => self.replace_support(),
         }
     }
 
@@ -3970,6 +3982,7 @@ impl fmt::Display for Support {
     }
 }
 
+mod find;
 mod m4;
 #[cfg(test)]
 mod tests;

@@ -351,7 +351,7 @@ fn alignment(token: &str) -> Result<Alignment> {
     })
 }
 
-fn admit<const N: usize, const A: usize>(
+pub(super) fn admit<const N: usize, const A: usize>(
     table: &Table<TextSetter, N, A>,
     props: &Props<'_>,
     limits: &SemanticLimits,

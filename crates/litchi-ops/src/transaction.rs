@@ -233,6 +233,8 @@ pub struct Edit {
     shapes: Option<crate::format::pptx::write::coalesce::Run>,
     #[cfg(feature = "ppt")]
     ppt_shapes: Option<crate::format::ppt::write::coalesce::Run>,
+    /// The match count of the last `find=` set (record 0273).
+    matched: Option<usize>,
 }
 impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -316,6 +318,7 @@ impl File {
                 shapes: None,
                 #[cfg(feature = "ppt")]
                 ppt_shapes: None,
+                matched: None,
             };
             let value = f(&mut edit);
             if let Some(error) = edit.failure {
@@ -403,6 +406,9 @@ impl Edit {
     /// at the next barrier or when the outer closure finishes, with the original
     /// mutation index. Any mutation or flush failure poisons the transaction.
     ///
+    /// A `find` property searches the target's subtree, as [`File::set`]
+    /// describes, in one native commit that never joins a coalesced run.
+    ///
     /// # Errors
     /// As [`File::set`], with the mutation's item index and transaction limits.
     pub fn set<'p, 'v>(
@@ -455,6 +461,10 @@ impl Edit {
                     return Err(error);
                 },
             };
+            if crate::find::requested(&props) {
+                self.matched = Some(self.find_replace(&target, &props)?);
+                return Ok(());
+            }
             if self
                 .coalesce_parsed(&target, &props, index, None)?
                 .is_some()
@@ -1059,6 +1069,11 @@ impl Edit {
         _index: usize,
         _spelling: Option<&str>,
     ) -> Result<Option<bool>> {
+        if crate::find::requested(_props) {
+            // A find resolves its whole scope: it never joins a native run.
+            self.flush_pending()?;
+            return Ok(None);
+        }
         #[cfg(feature = "doc")]
         if let File::Doc(handle) = self.current.clone() {
             // A body paragraph's ordinal is stable across text replacement,
@@ -1971,6 +1986,54 @@ impl Edit {
                 Err(error)
             },
         }
+    }
+
+    /// The match count of the last `find=` set, taken (record 0273).
+    pub(crate) fn take_matched(&mut self) -> Option<usize> {
+        self.matched.take()
+    }
+
+    /// A `set` whose properties name `find` (record 0273): one native commit
+    /// over the target's subtree, returning the match count.
+    fn find_replace(
+        &mut self,
+        target: &crate::TargetArg<'_>,
+        props: &crate::Props<'_>,
+    ) -> Result<usize> {
+        let spec = match crate::find::Spec::admit(props) {
+            Ok(spec) => spec,
+            Err(error) => {
+                self.flush_pending()?;
+                return Err(error);
+            },
+        };
+        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf"))]
+        let limits = self.limits;
+        #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf")))]
+        let _ = (target, &spec);
+        self.execute(|file| match file {
+            #[cfg(feature = "docx")]
+            File::Docx(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap(handle, commit, matched)
+            },
+            #[cfg(feature = "xlsx")]
+            File::Xlsx(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap_xlsx(handle, commit, matched)
+            },
+            #[cfg(feature = "pptx")]
+            File::Pptx(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap_pptx(handle, commit, matched)
+            },
+            #[cfg(feature = "rtf")]
+            File::Rtf(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap_rtf(handle, commit, matched)
+            },
+            _ => Err(crate::find::unsupported(file)),
+        })
     }
 
     fn poison(&mut self, error: crate::Error, index: usize) -> crate::Error {

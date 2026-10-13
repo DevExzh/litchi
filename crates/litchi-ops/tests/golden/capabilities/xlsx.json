@@ -41,6 +41,9 @@
     "import": {
       "supported": true
     },
+    "replace": {
+      "supported": true
+    },
     "save": {
       "supported": true
     },

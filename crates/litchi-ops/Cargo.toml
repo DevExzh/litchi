@@ -145,3 +145,8 @@ required-features = ["xlsx", "xlsb", "xls", "eval"]
 [[example]]
 name              = "m4_bench"
 required-features = ["xlsx", "xlsb", "xls", "eval"]
+
+# Paired leaf-vs-unified find/replace measurements (record 0273).
+[[example]]
+name              = "find_replace_bench"
+required-features = ["docx", "pptx"]

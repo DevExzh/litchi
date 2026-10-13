@@ -625,7 +625,7 @@ class SchemaTests(unittest.TestCase):
     def test_stub_typed_dict_matches_the_export(self):
         fields = typed_dict_fields(STUB_PATH)["_Schema"]
         self.assertEqual(list(L.schema("xlsx")), [key for key in fields if key != "pending"])
-        self.assertEqual(list(L.schema("pages")), list(fields))
+        self.assertEqual(list(L.schema("pages")), [key for key in fields if key != "setKeywords"])
         self.assertEqual(L.schema("pages")["elements"], [])
 
     def test_unknown_format_names_raise(self):

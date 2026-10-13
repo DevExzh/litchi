@@ -24,6 +24,45 @@ pub struct Applied {
     /// suggestion. Empty (and unallocated) under [`Unsupported::Refuse`];
     /// boxed so a result stays four words.
     pub warnings: Box<[Error]>,
+    /// A `find=` set's match count plus one; zero for any other command.
+    /// Packed beside `changed` so a result stays four words.
+    found: u32,
+}
+impl Applied {
+    /// The number of matches of a `set` whose properties name `find`
+    /// (record 0273); `None` for every other command. Zero matches are an
+    /// exact no-op.
+    ///
+    /// ```
+    /// # #[cfg(feature = "xlsx")]
+    /// # {
+    /// use litchi_core::FileFormat;
+    /// use litchi_ops::{BatchItem, Props, create};
+    ///
+    /// let file = create(FileFormat::Xlsx)?;
+    /// let file = file.set("/Sheet1/A1", litchi_ops::props! { "value" => "draft one, draft two" })?;
+    /// let mut item = BatchItem::new("set");
+    /// item.path = Some("/Sheet1".into());
+    /// item.props = Some(Props::new().with("find", "draft").with("replace", "final"));
+    /// let commit = file.apply(&item)?;
+    /// assert_eq!(commit.value.matched(), Some(2));
+    /// # }
+    /// # Ok::<(), litchi_ops::Error>(())
+    /// ```
+    #[must_use]
+    pub const fn matched(&self) -> Option<usize> {
+        match self.found {
+            0 => None,
+            found => Some((found - 1) as usize),
+        }
+    }
+
+    fn with_matched(mut self, matched: Option<usize>) -> Self {
+        self.found = matched.map_or(0, |matched| {
+            u32::try_from(matched).map_or(u32::MAX, |matched| matched.saturating_add(1))
+        });
+        self
+    }
 }
 impl fmt::Debug for Applied {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -31,6 +70,7 @@ impl fmt::Debug for Applied {
             .field("has_path", &self.path.is_some())
             .field("changed", &self.changed)
             .field("warnings", &self.warnings.len())
+            .field("matched", &self.matched())
             .finish()
     }
 }
@@ -304,6 +344,7 @@ impl File {
                             path: None,
                             changed,
                             warnings: Box::default(),
+                            found: 0,
                         }));
                         continue;
                     }
@@ -332,6 +373,7 @@ impl File {
                             path: None,
                             changed,
                             warnings: Box::default(),
+                            found: 0,
                         }));
                         continue;
                     }
@@ -370,6 +412,8 @@ fn apply_item(
     let warn = unsupported == Unsupported::Warn
         && item.props.as_ref().is_some_and(|props| !props.is_empty())
         && (item.command.eq_ignore_ascii_case("set") || item.command.eq_ignore_ascii_case("add"));
+    // A failed earlier find must not lend its count to this command.
+    let _ = edit.take_matched();
     if warn {
         return apply_skipping(edit, item, index);
     }
@@ -378,7 +422,9 @@ fn apply_item(
         path: path.map(Box::new),
         changed,
         warnings: Box::default(),
-    })
+        found: 0,
+    }
+    .with_matched(edit.take_matched()))
 }
 
 /// [`Unsupported::Warn`]: run the item; while its target refuses one of its
@@ -400,6 +446,7 @@ fn apply_skipping(edit: &mut Edit, item: &BatchItem<'_>, index: usize) -> Result
                 path: None,
                 changed: false,
                 warnings: warnings.into_boxed_slice(),
+                found: 0,
             });
         }
         let error = match edit.isolated(|edit| dispatch(edit, attempt)) {
@@ -408,7 +455,9 @@ fn apply_skipping(edit: &mut Edit, item: &BatchItem<'_>, index: usize) -> Result
                     path: path.map(Box::new),
                     changed,
                     warnings: warnings.into_boxed_slice(),
-                });
+                    found: 0,
+                }
+                .with_matched(edit.take_matched()));
             },
             Err(error) => error,
         };

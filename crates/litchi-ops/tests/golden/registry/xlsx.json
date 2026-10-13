@@ -3919,5 +3919,44 @@
       "followUp": "design §10 (rendering is out of scope)",
       "reason": "visual rendering is outside the unified layer"
     }
-  ]
+  ],
+  "setKeywords": {
+    "verb": "replace",
+    "support": {
+      "supported": true
+    },
+    "keywords": {
+      "find": {
+        "type": "string",
+        "constraint": {
+          "notEmpty": true
+        },
+        "set": true
+      },
+      "replace": {
+        "type": "string",
+        "set": true
+      },
+      "matchCase": {
+        "type": "bool",
+        "default": true,
+        "set": true
+      },
+      "wholeWord": {
+        "type": "bool",
+        "default": false,
+        "set": true
+      },
+      "regex": {
+        "type": "bool",
+        "default": false,
+        "set": true,
+        "writeGap": {
+          "code": "unsupported_capability",
+          "followUp": "record 0010 Q3: an owner-approved regular-expression dependency",
+          "reason": "Litchi has no approved regular-expression engine; `regex=true` and OfficeCLI's `r\"...\"` patterns are refused"
+        }
+      }
+    }
+  }
 }

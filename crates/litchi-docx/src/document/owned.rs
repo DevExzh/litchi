@@ -263,6 +263,31 @@ impl<P: Clone> Edit<P> {
         Ok(self)
     }
 
+    /// The searchable text nodes of the paragraph at `path`.
+    ///
+    /// See [`super::snapshot::Edit::text_nodes`].
+    ///
+    /// # Errors
+    /// Returns a typed selection or markup refusal.
+    pub fn text_nodes(&self, path: &super::ElementPath) -> Result<Vec<super::TextNode>> {
+        self.inner.text_nodes(path)
+    }
+
+    /// Rewrite text nodes of several paragraphs, returning the paths of the
+    /// runs that isolate text.
+    ///
+    /// See [`super::snapshot::Edit::rewrite_text_nodes`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, text or resource refusal without changing the
+    /// staged document.
+    pub fn rewrite_text_nodes(
+        &mut self,
+        rewrites: &[super::ParagraphRewrite],
+    ) -> Result<Vec<super::ElementPath>> {
+        self.inner.rewrite_text_nodes(rewrites)
+    }
+
     /// Replace the text of the paragraph, run or hyperlink at `path`.
     ///
     /// See [`super::snapshot::Edit::replace_text_at`].

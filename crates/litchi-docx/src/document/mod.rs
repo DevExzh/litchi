@@ -61,10 +61,11 @@ pub use transaction::{
     BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics,
     ElementAnchor, ElementPath, ElementStep, Error, GraphChange, History, HistoryLimits,
     HyperlinkTextReplacement, JoinError, MAX_NEW_TABLE_DIMENSION, MergeChoice, NewParagraph,
-    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
-    ParagraphTransfer, Patch, PreparedEdit, Refusal, Result, RevisionAction, RevisionKind,
-    RevisionSelector, RunAnchor, Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress,
-    ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
+    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphRewrite,
+    ParagraphTextReplacement, ParagraphTransfer, Patch, PreparedEdit, Refusal, Result,
+    RevisionAction, RevisionKind, RevisionSelector, RunAnchor, Snapshot, SubEditConflict,
+    SubEditJoinFailure, TableCellAddress, TextNode, TextNodeRewrite, ThreeWayError,
+    ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
 };
 
 /// Explicit native identifiers for indexed document blocks.

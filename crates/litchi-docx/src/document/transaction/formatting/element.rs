@@ -39,6 +39,9 @@ use super::{
 };
 use crate::properties;
 
+mod text_nodes;
+pub use text_nodes::{ParagraphRewrite, TextNode, TextNodeRewrite};
+
 /// One step of an [`ElementPath`]: the position of a direct
 /// WordprocessingML child, counted among the container's direct children with
 /// the same element name.

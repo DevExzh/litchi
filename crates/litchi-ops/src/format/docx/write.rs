@@ -33,6 +33,8 @@ macro_rules! both {
     };
 }
 
+mod find;
+
 /// Complete result of one DOCX leaf transaction.
 ///
 /// Single-operation sugar takes only the file. The transaction executor can

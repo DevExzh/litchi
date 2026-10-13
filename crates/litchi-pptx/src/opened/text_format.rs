@@ -58,6 +58,23 @@ pub enum TextTarget {
         /// Position among the paragraph's run children.
         run: Position,
     },
+    /// Bytes `start..end` of the text of one text run (`a:r`): the run is
+    /// split so that the span is a run of its own, each part carrying a copy
+    /// of the run's `a:rPr`. The edit's text replaces the span and its run
+    /// properties apply to that run only (record 0273). The span is
+    /// non-empty and lies on character boundaries of the run's text.
+    RunSpan {
+        /// Positional scene index of the shape.
+        shape: Position,
+        /// Position among the body's `a:p` children.
+        paragraph: Position,
+        /// Position among the paragraph's run children.
+        run: Position,
+        /// First byte of the span in the run's text.
+        start: usize,
+        /// End byte of the span in the run's text.
+        end: usize,
+    },
     /// One cell of a table graphic frame.
     Cell {
         /// Positional scene index of the table frame.
@@ -355,6 +372,7 @@ const fn shape_position(target: TextTarget) -> Position {
         TextTarget::Shape { shape }
         | TextTarget::Paragraph { shape, .. }
         | TextTarget::Run { shape, .. }
+        | TextTarget::RunSpan { shape, .. }
         | TextTarget::Cell { shape, .. } => shape,
     }
 }
@@ -387,11 +405,20 @@ fn validate(edit: &TextEdit<'_>) -> Result<()> {
     }
     if let Some(text) = properties.text {
         check_characters(text)?;
-        if matches!(edit.target, TextTarget::Run { .. }) && text.contains(['\n', '\r']) {
+        if matches!(
+            edit.target,
+            TextTarget::Run { .. } | TextTarget::RunSpan { .. }
+        ) && text.contains(['\n', '\r'])
+        {
             return Err(Error::Invalid(
                 "run text cannot contain a line break".into(),
             ));
         }
+    }
+    if let TextTarget::RunSpan { start, end, .. } = edit.target
+        && start >= end
+    {
+        return Err(Error::Invalid("a run span is empty".into()));
     }
     if properties.fill.is_some() && !matches!(edit.target, TextTarget::Cell { .. }) {
         return Err(Error::Invalid("fill applies to table cells only".into()));
@@ -974,6 +1001,56 @@ fn rewrite_run(run: &[u8], properties: &TextProperties<'_>, text: Option<&str>) 
     splices.apply(&body)
 }
 
+/// Split a text run so that bytes `span` of its text are a run of their
+/// own, with `properties` (and their replacement text) applied to it; the
+/// other parts keep the run's markup with their part of the text.
+fn split_run(run: &[u8], span: Range<usize>, properties: &TextProperties<'_>) -> Result<Vec<u8>> {
+    let node = root(run)?;
+    if node.local(run) != b"r" {
+        return Err(Error::UnsafeEdit {
+            operation: "set_text_properties",
+            reason: "a run span applies to a text run (a:r)",
+        });
+    }
+    let kids = children(run, &node)?;
+    let t = child(run, &kids, b"t").ok_or_else(|| invalid("a text run has no a:t element"))?;
+    let text = if t.empty {
+        String::new()
+    } else {
+        let raw =
+            std::str::from_utf8(&run[t.content()]).map_err(|_| invalid("run text is not UTF-8"))?;
+        if raw.contains("<![CDATA[") {
+            return Err(Error::UnsafeEdit {
+                operation: "set_text_properties",
+                reason: "a run span cannot split character data sections",
+            });
+        }
+        quick_xml::escape::unescape(raw)
+            .map_err(|_| invalid("run text holds an unknown entity"))?
+            .into_owned()
+    };
+    if span.start >= span.end
+        || span.end > text.len()
+        || !text.is_char_boundary(span.start)
+        || !text.is_char_boundary(span.end)
+    {
+        return Err(Error::Invalid(
+            "a run span lies outside its run's text or off a character boundary".into(),
+        ));
+    }
+    let plain = TextProperties::default();
+    let mut output = Vec::with_capacity(run.len() * 3);
+    if span.start > 0 {
+        output.extend_from_slice(&rewrite_run(run, &plain, Some(&text[..span.start]))?);
+    }
+    let middle = properties.text.unwrap_or(&text[span.clone()]);
+    output.extend_from_slice(&rewrite_run(run, properties, Some(middle))?);
+    if span.end < text.len() {
+        output.extend_from_slice(&rewrite_run(run, &plain, Some(&text[span.end..]))?);
+    }
+    Ok(output)
+}
+
 /// Build a fresh text run carrying `rpr` (raw, possibly empty).
 fn new_run(prefix: &[u8], rpr: &[u8], text: &str) -> Result<Vec<u8>> {
     let r = qualified(prefix, "r");
@@ -1032,6 +1109,7 @@ fn first_run_properties<'x>(paragraph: &'x [u8], kids: &[Node]) -> Result<&'x [u
 fn rewrite_paragraph(
     paragraph: &[u8],
     run: Option<usize>,
+    span: Option<Range<usize>>,
     properties: &TextProperties<'_>,
 ) -> Result<Vec<u8>> {
     let node = root(paragraph)?;
@@ -1050,7 +1128,11 @@ fn rewrite_paragraph(
                     .filter(|kid| is_run(kid.local(paragraph)))
                     .count(),
             })?;
-        let replaced = rewrite_run(&paragraph[target.span.clone()], properties, properties.text)?;
+        let element = &paragraph[target.span.clone()];
+        let replaced = match span {
+            Some(span) => split_run(element, span, properties)?,
+            None => rewrite_run(element, properties, properties.text)?,
+        };
         splices.replace(target.span.clone(), replaced);
         return splices.apply(paragraph);
     }
@@ -1158,6 +1240,7 @@ fn rewrite_body(
     body: &[u8],
     paragraph: Option<usize>,
     run: Option<usize>,
+    span: Option<Range<usize>>,
     properties: &TextProperties<'_>,
 ) -> Result<Vec<u8>> {
     let node = root(body)?;
@@ -1170,12 +1253,13 @@ fn rewrite_body(
                 index,
                 len: paragraphs.len(),
             })?;
-            let replaced = rewrite_paragraph(&body[target.span.clone()], run, properties)?;
+            let replaced = rewrite_paragraph(&body[target.span.clone()], run, span, properties)?;
             splices.replace(target.span.clone(), replaced);
         },
         None => {
             for target in paragraphs {
-                let replaced = rewrite_paragraph(&body[target.span.clone()], None, properties)?;
+                let replaced =
+                    rewrite_paragraph(&body[target.span.clone()], None, None, properties)?;
                 splices.replace(target.span.clone(), replaced);
             }
         },
@@ -1312,10 +1396,17 @@ fn rewrite_shape(
         operation: "set_text_properties",
         reason: "the shape has no text body",
     })?;
-    let (paragraph, run) = match target {
-        TextTarget::Shape { .. } => (None, None),
-        TextTarget::Paragraph { paragraph, .. } => (Some(paragraph.get()), None),
-        TextTarget::Run { paragraph, run, .. } => (Some(paragraph.get()), Some(run.get())),
+    let (paragraph, run, span) = match target {
+        TextTarget::Shape { .. } => (None, None, None),
+        TextTarget::Paragraph { paragraph, .. } => (Some(paragraph.get()), None, None),
+        TextTarget::Run { paragraph, run, .. } => (Some(paragraph.get()), Some(run.get()), None),
+        TextTarget::RunSpan {
+            paragraph,
+            run,
+            start,
+            end,
+            ..
+        } => (Some(paragraph.get()), Some(run.get()), Some(start..end)),
         TextTarget::Cell { .. } => unreachable!("cells are rewritten through their frame"),
     };
     let element = &shape[body.span.clone()];
@@ -1329,7 +1420,7 @@ fn rewrite_shape(
                 .ok_or_else(|| invalid("the shape text body has no drawing children"))?;
             rewrite_body_text(element, &prefix, text, properties)?
         },
-        _ => rewrite_body(element, paragraph, run, properties)?,
+        _ => rewrite_body(element, paragraph, run, span, properties)?,
     };
     splices.replace(body.span.clone(), replaced);
     splices.apply(shape)
@@ -1397,7 +1488,7 @@ fn rewrite_cell(cell: &[u8], properties: &TextProperties<'_>) -> Result<Vec<u8>>
         let element = &cell[body.span.clone()];
         let rewritten = match properties.text {
             Some(text) => rewrite_body_text(element, &prefix, text, properties)?,
-            None => rewrite_body(element, None, None, properties)?,
+            None => rewrite_body(element, None, None, None, properties)?,
         };
         splices.replace(body.span.clone(), rewritten);
     }
@@ -1477,7 +1568,7 @@ fn rewrite_body_text(
                 fill: None,
                 ..*properties
             };
-            rewrite_paragraph(&paragraph, None, &formatting)?
+            rewrite_paragraph(&paragraph, None, None, &formatting)?
         } else {
             paragraph
         };

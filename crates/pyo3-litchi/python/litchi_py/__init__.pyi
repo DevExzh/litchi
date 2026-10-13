@@ -648,6 +648,10 @@ class _Schema(TypedDict):
     """Each element kind with its properties, ``propertyGaps`` and ``gap``."""
     gaps: List[Dict[str, Any]]
     """The format's axis, operation, view and undeclared element gaps."""
+    setKeywords: NotRequired[Dict[str, Any]]
+    """Present when the format has a reader: the find/replace keywords of
+    ``set`` (``find``, ``replace``, ``matchCase``, ``wholeWord``,
+    ``regex``) and the ``support`` of the ``replace`` verb (record 0273)."""
 
 class _Metadata(TypedDict, total=False):
     """``File.metadata()``: the document properties that are set
@@ -707,6 +711,8 @@ class _ItemResult(TypedDict):
     """Successful items: whether the item changed the document."""
     path: NotRequired[str]
     """A successful add: the new element's canonical path."""
+    matched: NotRequired[int]
+    """A successful set with ``find``: the number of matches (record 0273)."""
     code: NotRequired[str]
     """A failed item (best-effort mode): the error code."""
     error: NotRequired[str]

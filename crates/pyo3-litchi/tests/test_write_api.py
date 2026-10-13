@@ -583,6 +583,25 @@ class BatchTests(WriteAssertions):
         self.assertError(error, L.PropertyError, "corrupt_batch")
         self.assertEqual(error.item, 0)
 
+    def test_find_and_replace_report_the_match_count(self):
+        # Record 0273: ``find``/``replace`` props on ``set``.
+        file = L.create("xlsx")
+        file = file.set("/sheet[1]/A1", {"value": "draft one, draft two"})
+        commit = file.apply({"command": "set", "path": "/", "props": {"find": "draft", "replace": "final"}})
+        self.assertEqual(commit.results, [{"index": 0, "success": True, "changed": True, "matched": 2}])
+        self.assertEqual(cell_text(commit.file, "/sheet[1]/A1"), "final one, final two")
+        none = file.apply({"command": "set", "path": "/", "props": {"find": "absent", "replace": "x"}})
+        self.assertEqual(none.results[0]["matched"], 0)
+        self.assertFalse(none.changed)
+        self.assertEqual(none.file.to_bytes(), file.to_bytes())
+        self.assertEqual(cell_text(file.set("/", {"find": "draft", "replace": "x"}), "/sheet[1]/A1"), "x one, x two")
+        self.assertError(raised(lambda: file.set("/", {"find": "draft"})), L.PropertyError, "missing_property")
+        self.assertError(
+            raised(lambda: file.set("/", {"find": "d", "replace": "x", "regex": True})),
+            L.UnsupportedError,
+            "unsupported_capability",
+        )
+
     def test_every_writable_format_batches(self):
         cases = (
             (L.create("docx"), [{"command": "add", "parent": "/body", "type": "paragraph", "props": {"text": "x"}}]),
