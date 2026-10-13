@@ -161,11 +161,6 @@ impl Transaction {
         self.before != self.working
     }
 
-    /// Restore the staged value to the source snapshot.
-    pub fn rollback(&mut self) {
-        self.working = self.before.clone();
-    }
-
     /// Replace the complete optional table atomically.
     pub fn set(&mut self, tags: Option<Tags>) -> Result<(), Error> {
         self.working = Snapshot::from_option(tags).map_err(Error::Invalid)?;

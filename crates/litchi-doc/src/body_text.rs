@@ -2756,12 +2756,6 @@ impl Edit {
         Ok(())
     }
 
-    /// Discards staged changes and returns the original immutable snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Publishes a validated snapshot and its reversible source-checked patch.
     ///
     /// # Errors

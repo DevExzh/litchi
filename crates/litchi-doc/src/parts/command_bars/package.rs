@@ -137,21 +137,27 @@ pub struct Editor {
 impl Editor {
     /// Opens an unencrypted Word 97+ package from CFB bytes.
     pub fn open(bytes: Vec<u8>) -> Result<Self> {
-        Self::open_with_limits(bytes, Limits::default())
+        Self::open_bounded(bytes, Limits::default(), ProtectionPolicy::default())
     }
 
     /// Opens a package with an explicit policy for changed protected content.
     pub fn open_with_policy(bytes: Vec<u8>, policy: ProtectionPolicy) -> Result<Self> {
-        Self::open_with_limits_and_policy(bytes, Limits::default(), policy)
+        Self::open_bounded(bytes, Limits::default(), policy)
     }
 
-    /// Opens a package with an explicit bounded OLE resource profile.
-    pub fn open_with_limits(bytes: Vec<u8>, limits: Limits) -> Result<Self> {
-        Self::open_with_limits_and_policy(bytes, limits, ProtectionPolicy::default())
+    /// Opens a package under one edit profile: its revision limits bound the
+    /// compound-file parse and its protection policy governs changed
+    /// protected content.
+    pub fn open_with_options(bytes: Vec<u8>, options: &crate::EditOptions) -> Result<Self> {
+        Self::open_bounded(
+            bytes,
+            options.revision_limits(),
+            options.protection_policy(),
+        )
     }
 
     /// Opens a package with both bounded resources and an explicit protection policy.
-    pub fn open_with_limits_and_policy(
+    fn open_bounded(
         bytes: Vec<u8>,
         limits: Limits,
         protection_policy: ProtectionPolicy,
