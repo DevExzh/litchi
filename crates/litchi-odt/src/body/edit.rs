@@ -242,7 +242,7 @@ enum Fragment {
 #[derive(Debug, Default)]
 pub(crate) struct BodyEdits {
     nodes: BTreeMap<u32, NodeEdit>,
-    claims: Vec<(u32, Range<usize>, Claim)>,
+    claims: Claims,
     /// Inserted fragments per offset, in final order.
     inserts: BTreeMap<usize, Vec<Fragment>>,
     /// Content appended to empty parent elements, per parent.
@@ -262,6 +262,59 @@ struct Generated {
     notes: usize,
     footnotes: usize,
     endnotes: usize,
+}
+
+/// Claimed source ranges by start offset. Claims of different nodes never
+/// overlap (staging refuses that), so a range meets at most the claims that
+/// start inside it and the claims of the one start before it.
+#[derive(Debug, Default)]
+struct Claims {
+    by_start: BTreeMap<usize, Vec<(usize, u32, Claim)>>,
+}
+
+impl Claims {
+    fn push(&mut self, id: u32, range: Range<usize>, claim: Claim) {
+        self.by_start
+            .entry(range.start)
+            .or_default()
+            .push((range.end, id, claim));
+    }
+
+    fn pop(&mut self, start: usize) {
+        if let Some(list) = self.by_start.get_mut(&start) {
+            list.pop();
+            if list.is_empty() {
+                self.by_start.remove(&start);
+            }
+        }
+    }
+
+    /// Whether a claim of a node other than `except` overlaps `range`.
+    fn overlaps(&self, range: &Range<usize>, except: Option<u32>, whole_only: bool) -> bool {
+        let hit = |start: usize, list: &Vec<(usize, u32, Claim)>| {
+            list.iter().any(|(end, id, claim)| {
+                Some(*id) != except
+                    && (!whole_only || *claim == Claim::Whole)
+                    && overlaps(range, &(start..*end))
+            })
+        };
+        self.by_start
+            .range(range.start..range.end.max(range.start + 1))
+            .any(|(start, list)| hit(*start, list))
+            || self
+                .by_start
+                .range(..range.start)
+                .next_back()
+                .is_some_and(|(start, list)| hit(*start, list))
+    }
+
+    /// Whether `offset` lies strictly inside a claim.
+    fn splits(&self, offset: usize) -> bool {
+        self.by_start
+            .range(..offset)
+            .next_back()
+            .is_some_and(|(_, list)| list.iter().any(|(end, _, _)| offset < *end))
+    }
 }
 
 fn invalid(message: impl Into<String>) -> Error {
@@ -293,19 +346,20 @@ impl BodyEdits {
                 "an ODT body node that is removed, moved or swapped cannot be edited again in the same transaction",
             ));
         }
-        for (other, held, _) in &self.claims {
-            if *other != id.0 && overlaps(range, held) {
-                return Err(invalid(
-                    "ODT body edits overlap: one edited node lies inside another node this transaction replaces",
-                ));
-            }
+        if self.claims.overlaps(range, Some(id.0), false) {
+            return Err(invalid(
+                "ODT body edits overlap: one edited node lies inside another node this transaction replaces",
+            ));
         }
-        for offset in self.inserts.keys() {
-            if range.start < *offset && *offset < range.end {
-                return Err(invalid(
-                    "ODT body edits overlap: an insertion lies inside a node this transaction replaces",
-                ));
-            }
+        if self
+            .inserts
+            .range(range.start + 1..range.end.max(range.start + 1))
+            .next()
+            .is_some()
+        {
+            return Err(invalid(
+                "ODT body edits overlap: an insertion lies inside a node this transaction replaces",
+            ));
         }
         for parent in self.expansions.keys() {
             if *parent != id.0
@@ -336,7 +390,7 @@ impl BodyEdits {
         claim: Claim,
     ) -> Result<()> {
         self.check_claim(body, id, &range)?;
-        self.claims.push((id.0, range, claim));
+        self.claims.push(id.0, range, claim);
         Ok(())
     }
 
@@ -474,12 +528,10 @@ impl BodyEdits {
         self.claim(body, id, target.range(), Claim::Whole)?;
         // A range bookmark or annotation loses its end marker with it.
         if let Some(end) = end_marker(target) {
-            for (_, held, _) in &self.claims {
-                if overlaps(held, &end) {
-                    return Err(invalid(
-                        "ODT body edits overlap: the end marker of a removed node lies inside another edited node",
-                    ));
-                }
+            if self.claims.overlaps(&end, None, false) {
+                return Err(invalid(
+                    "ODT body edits overlap: the end marker of a removed node lies inside another edited node",
+                ));
             }
             self.marker_removals.push(end);
         }
@@ -539,9 +591,10 @@ impl BodyEdits {
             ));
         }
         self.check_claim(body, id, &range)?;
-        self.claims.push((id.0, range.clone(), Claim::Whole));
+        self.claims.push(id.0, range.clone(), Claim::Whole);
+        let start = range.start;
         if let Err(error) = self.place(body, parent, location.placement, Fragment::Copy(range)) {
-            self.claims.pop();
+            self.claims.pop(start);
             return Err(error);
         }
         self.edit_mut(id).replacement = Some(Replacement::Remove);
@@ -583,8 +636,8 @@ impl BodyEdits {
         }
         self.check_claim(body, left, &ra)?;
         self.check_claim(body, right, &rb)?;
-        self.claims.push((left.0, ra.clone(), Claim::Whole));
-        self.claims.push((right.0, rb.clone(), Claim::Whole));
+        self.claims.push(left.0, ra.clone(), Claim::Whole);
+        self.claims.push(right.0, rb.clone(), Claim::Whole);
         self.edit_mut(left).replacement = Some(Replacement::Bytes(rb));
         self.edit_mut(right).replacement = Some(Replacement::Bytes(ra));
         Ok(())
@@ -625,15 +678,13 @@ impl BodyEdits {
         }
         let Some(offset) = offset else {
             // An empty element grows content of its own.
-            for (other, held, claim) in &self.claims {
-                if *other != parent.id().0
-                    && *claim == Claim::Whole
-                    && overlaps(held, &parent.range())
-                {
-                    return Err(invalid(
-                        "ODT body edits overlap: an insertion targets a node inside another replaced node",
-                    ));
-                }
+            if self
+                .claims
+                .overlaps(&parent.range(), Some(parent.id().0), true)
+            {
+                return Err(invalid(
+                    "ODT body edits overlap: an insertion targets a node inside another replaced node",
+                ));
             }
             let list = self.expansions.entry(parent.id().0).or_default();
             if prepend {
@@ -643,12 +694,10 @@ impl BodyEdits {
             }
             return Ok(());
         };
-        for (_, held, _) in &self.claims {
-            if held.start < offset && offset < held.end {
-                return Err(invalid(
-                    "ODT body edits overlap: an insertion lies inside a node this transaction replaces",
-                ));
-            }
+        if self.claims.splits(offset) {
+            return Err(invalid(
+                "ODT body edits overlap: an insertion lies inside a node this transaction replaces",
+            ));
         }
         for marker in &self.marker_removals {
             if marker.start < offset && offset < marker.end {
@@ -944,7 +993,7 @@ fn check_style(body: Body<'_>, name: &str) -> Result<()> {
     if body.automatic_style(name).is_some() || body.common_style(name).is_some() {
         Ok(())
     } else {
-        Err(invalid(format!("ODT style `{name}` does not exist")))
+        Err(invalid("ODT style does not exist"))
     }
 }
 

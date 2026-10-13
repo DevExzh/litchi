@@ -30,7 +30,7 @@ use litchi_core::Metadata;
 use litchi_core::detection::FileFormat;
 use litchi_odf_common::PreparedPackage;
 use litchi_odf_common::leniency::ToleranceReport;
-use litchi_odt::body::{Body, Tree};
+use litchi_odt::body::{Body, NodeId, Tree};
 
 use crate::{Error, OpenOptions, Result};
 
@@ -46,7 +46,35 @@ struct OdtState {
     /// The body index of a filesystem-backed owner (an eager document keeps
     /// its own).
     tree: OnceLock<Tree>,
+    /// Child identities by parent and unified kind, built on the first
+    /// ordinal lookup past [`DIRECT_SCAN`] children.
+    kinds: OnceLock<KindIndex>,
     origin: Option<Arc<Path>>,
+}
+
+/// Ordinal lookups below this many same-kind children scan the parent;
+/// deeper ones read the per-handle [`KindIndex`].
+const DIRECT_SCAN: usize = 32;
+
+/// The children of every body node by unified kind, in document order.
+struct KindIndex {
+    children: std::collections::HashMap<(NodeId, u8), Vec<NodeId>>,
+}
+
+impl KindIndex {
+    fn build(body: Body<'_>) -> Self {
+        let mut children: std::collections::HashMap<(NodeId, u8), Vec<NodeId>> =
+            std::collections::HashMap::new();
+        for node in body.nodes() {
+            if let (Some(parent), Some(kind)) = (node.parent(), Kind::of(node.kind())) {
+                children
+                    .entry((parent.id(), kind as u8))
+                    .or_default()
+                    .push(node.id());
+            }
+        }
+        Self { children }
+    }
 }
 
 /// The ODT read owner, in the state today's route builds.
@@ -101,6 +129,7 @@ impl Odt {
             owner: OdtOwner::Eager(document),
             package: OnceLock::from(package),
             tree: OnceLock::new(),
+            kinds: OnceLock::new(),
             origin,
         })))
     }
@@ -127,6 +156,7 @@ impl Odt {
             owner,
             package: OnceLock::new(),
             tree: OnceLock::new(),
+            kinds: OnceLock::new(),
             origin: None,
         }))
     }
@@ -227,6 +257,56 @@ impl Odt {
                 Ok(tree.view(content, styles))
             },
         }
+    }
+
+    /// The `ordinal`th child of `kind` under a body-backed `parent`, with
+    /// its ordinal.
+    pub(crate) fn nth_child(
+        &self,
+        parent: &Node<'_>,
+        kind: Kind,
+        ordinal: usize,
+    ) -> Result<Option<(NodeId, usize)>> {
+        let Some(leaf) = parent.leaf() else {
+            return Ok(None);
+        };
+        if ordinal < DIRECT_SCAN {
+            return Ok(leaf
+                .children()
+                .filter(|child| Kind::of(child.kind()) == Some(kind))
+                .nth(ordinal)
+                .map(|child| (child.id(), ordinal)));
+        }
+        let index = match self.0.kinds.get() {
+            Some(index) => index,
+            None => {
+                let index = KindIndex::build(self.body()?);
+                self.0.kinds.get_or_init(|| index)
+            },
+        };
+        Ok(index
+            .children
+            .get(&(leaf.id(), kind as u8))
+            .and_then(|children| children.get(ordinal))
+            .map(|id| (*id, ordinal)))
+    }
+
+    /// The last child of `kind` under a body-backed `parent`, with its
+    /// ordinal.
+    pub(crate) fn last_child(
+        &self,
+        parent: &Node<'_>,
+        kind: Kind,
+    ) -> Result<Option<(NodeId, usize)>> {
+        let Some(leaf) = parent.leaf() else {
+            return Ok(None);
+        };
+        Ok(leaf
+            .children()
+            .filter(|child| Kind::of(child.kind()) == Some(kind))
+            .enumerate()
+            .last()
+            .map(|(ordinal, child)| (child.id(), ordinal)))
     }
 
     /// The immutable leaf package edits start from.

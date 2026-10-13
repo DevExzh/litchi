@@ -204,6 +204,16 @@ impl<'f> Node<'f> {
                 return path;
             }
         }
+        let steps = self.address.steps();
+        if steps.len() <= 4 {
+            let mut inline = [PathStep::new(""); 4];
+            for (slot, step) in inline.iter_mut().zip(steps) {
+                *slot = step.positional();
+            }
+            if let Some(path) = NodePath::inline(&inline[..steps.len()]) {
+                return path;
+            }
+        }
         NodePath::new(self.paths.get_or_init(|| {
             self.address
                 .steps()

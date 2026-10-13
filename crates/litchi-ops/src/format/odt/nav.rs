@@ -103,6 +103,25 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 }))
             },
             (_, kind) => {
+                if let (Target::Body(body, _), Select::None | Select::Ordinal(_) | Select::Last) =
+                    (parent.target, step.select)
+                {
+                    let ordinal = match step.select {
+                        Select::Ordinal(position) => Some(position.get()),
+                        Select::None => Some(0),
+                        _ => None,
+                    };
+                    let found = match ordinal {
+                        Some(ordinal) => self.doc.nth_child(parent, kind, ordinal)?,
+                        None => self.doc.last_child(parent, kind)?,
+                    };
+                    return Ok(found.map_or(Lookup::Missing, |(id, ordinal)| {
+                        let address = parent
+                            .address()
+                            .with(Step::new(kind, u32::try_from(ordinal).unwrap_or(u32::MAX)));
+                        Lookup::Found(Node::new(self.doc, kind, Target::Body(body, id), address))
+                    }));
+                }
                 let children = Children::of(parent, KindSet::of(kind))?;
                 let found = match step.select {
                     Select::None => children.take(1).last(),

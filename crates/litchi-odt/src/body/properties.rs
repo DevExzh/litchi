@@ -528,9 +528,9 @@ impl ParagraphPropertyEdit {
     pub(crate) fn validate(&self) -> Result<()> {
         if let Some(align) = &self.align {
             if !matches!(align.as_str(), "left" | "right" | "center" | "justify") {
-                return Err(Error::InvalidFormat(format!(
-                    "ODT paragraph alignment `{align}` is not left, right, center or justify"
-                )));
+                return Err(Error::InvalidFormat(
+                    "ODT paragraph alignment is not left, right, center or justify".to_owned(),
+                ));
             }
         }
         for (value, field, signed) in [
@@ -612,7 +612,7 @@ pub(crate) fn check_length(value: &str, field: &str, signed: bool) -> Result<()>
         Ok(())
     } else {
         Err(Error::InvalidFormat(format!(
-            "ODT {field} `{value}` is not an ODF length"
+            "ODT {field} is not an ODF length"
         )))
     }
 }
@@ -624,8 +624,6 @@ fn check_color(value: &str, transparent: bool) -> Result<()> {
     if hex || (transparent && value == "transparent") {
         Ok(())
     } else {
-        Err(Error::InvalidFormat(format!(
-            "ODT colour `{value}` is not #rrggbb"
-        )))
+        Err(Error::InvalidFormat("ODT colour is not #rrggbb".to_owned()))
     }
 }
