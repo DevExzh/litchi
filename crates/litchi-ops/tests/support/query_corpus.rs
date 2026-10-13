@@ -73,6 +73,11 @@ pub(crate) const XLS: &[&str] = XLSX;
 /// Binary workbook selectors (record 0267); see [`XLS`].
 pub(crate) const XLSB: &[&str] = XLSX;
 
+/// OpenDocument spreadsheet selectors (record 0277): the XLSX selectors,
+/// over packaged `.ods` and flat `.fods` files. Recorded from the ODS read
+/// adapter before its writers landed.
+pub(crate) const ODS: &[&str] = XLSX;
+
 /// Document selectors.
 pub(crate) const DOCX: &[&str] = &[
     "paragraph",
@@ -310,6 +315,8 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
         ("pptx", FileFormat::Pptx, PPTX),
         ("xls", FileFormat::Xls, XLS),
         ("xlsb", FileFormat::Xlsb, XLSB),
+        ("ods", FileFormat::Ods, ODS),
+        ("fods", FileFormat::Ods, ODS),
     ] {
         let mut hashers: Vec<Fnv> = selectors.iter().map(|_| Fnv::new()).collect();
         let mut counts = vec![0_usize; selectors.len()];
@@ -341,7 +348,7 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
                 hashers[index].update(record.as_bytes());
             }
         }
-        if matches!(extension, "xlsx" | "xls" | "xlsb") {
+        if matches!(extension, "xlsx" | "xls" | "xlsb" | "ods" | "fods") {
             early_stop_digests(root, extension, format, selectors, &mut out);
         }
         for ((selector, hasher), count) in selectors.iter().zip(hashers).zip(counts) {

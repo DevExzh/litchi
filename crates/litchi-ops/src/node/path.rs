@@ -109,10 +109,10 @@ impl<'a> NodePath<'a> {
 
     /// The path of `first` and, when given, `second`, carried by value.
     #[cfg_attr(
-        not(any(feature = "xlsx", feature = "xls")),
+        not(any(feature = "xlsx", feature = "xls", feature = "ods")),
         allow(
             dead_code,
-            reason = "the XLSX and XLS adapters write their paths this way"
+            reason = "the XLSX, XLS and ODS adapters write their paths this way"
         )
     )]
     pub(crate) fn short(first: PathStep<'a>, second: Option<PathStep<'a>>) -> Self {
@@ -258,7 +258,7 @@ impl<'a> PathStep<'a> {
     /// The worksheet cell step `B3`, written in A1 notation from its
     /// zero-based `column` and `row`.
     #[must_use]
-    #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb"))]
+    #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
     pub(crate) const fn cell(column: u32, row: u32) -> Self {
         Self {
             name: "",
@@ -269,7 +269,7 @@ impl<'a> PathStep<'a> {
     /// The worksheet range step `A1:C5` from its first and last cells, each
     /// a zero-based `(column, row)`.
     #[must_use]
-    #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb"))]
+    #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
     pub(crate) const fn range(first: (u32, u32), last: (u32, u32)) -> Self {
         Self {
             name: "",
@@ -280,7 +280,7 @@ impl<'a> PathStep<'a> {
     /// The step `name[B]`: a worksheet column by its letters, for the
     /// zero-based `column`.
     #[must_use]
-    #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb"))]
+    #[cfg(any(feature = "xls", feature = "xlsx", feature = "xlsb", feature = "ods"))]
     pub(crate) const fn column(name: &'a str, column: u32) -> Self {
         Self {
             name,

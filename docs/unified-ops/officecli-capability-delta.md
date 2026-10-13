@@ -31,6 +31,7 @@ differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b79c62d11b084a6d64eab2536ad000a17ebb8bedf67380dbf46557265eb55b5e` |
 | golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `2326a7db7ac883ceb3b53fc9bfddfd88f2462408886140b195be269f04477baa` |
 | golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `e5ce90bdf0f83b73b5d7a306bee39269cc4f07f3896861578948eebfc37b9cde` |
+| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `54c5d59fb87dc5e0167ce0ba338b230b39cf07a9dcea8de2ac154b9b9a944c55` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -76,6 +77,7 @@ Elements:
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 8 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
+| ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 
 Property reads:
 
@@ -89,6 +91,7 @@ Property reads:
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
 | pptx | 167 | 22 | 70 | 0 | 144 | 0 | 284 | 249 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
+| ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
 
 Property writes:
 
@@ -102,6 +105,7 @@ Property writes:
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 53 | 55 | 453 | 0 | 133 | 242 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
+| ods | 6 | 5 | 533 | 0 | 6 | 147 |
 
 ## docx
 
@@ -7662,3 +7666,775 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `set` | `slide` | `native-visibility-record` | slide visibility writes require one native-admitted SSSlideInfoAtom; insertion of missing timing records is not integrated | M2 PPT visibility atom insertion |
 | `set` | `shape` | `native-shape-preservation` | top-level shape, outline placeholder, paragraph and notes text and shape anchors require native closure admission: a changed text length refuses where interactions, field metacharacters or several formatting or language runs hold character positions; nested groups, new text bodies and rich-text formatting remain unsupported | M2 PPT nested-shape and rich-text edits |
 | `batch` | `presentation` | `native-write-coalescing` | distinct direct shape text/geometry sets share native transactions; selectors, repeated shapes, reads and structural edits close the run; broader coalescing and frozen-harness qualification remain open | M2 PPT broader native edit runs and performance qualification |
+
+## ods
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+| aboveaverage | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| autofilter | autofilter | gap | ODS adapter follow-up (record 0277) |
+| cell | cell | supported |  |
+| cellis | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| cfextended | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | axis | gap | ODS adapter follow-up (record 0277) |
+| chart-series | series | gap | ODS adapter follow-up (record 0277) |
+| chart | chart | gap | ODS adapter follow-up (record 0277) |
+| colbreak | colbreak | gap | ODS adapter follow-up (record 0277) |
+| colorscale | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| column | column | supported |  |
+| comment | comment | supported |  |
+| conditionalformatting | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| containstext | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| databar | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| detectedtable |  | missing |  |
+| duplicatevalues | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| formulacf | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| hyperlink | hyperlink | gap | ODS adapter follow-up (record 0277) |
+| iconset | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| namedrange | namedrange | supported |  |
+| ole | ole | gap | ODS adapter follow-up (record 0277) |
+| pagebreak | colbreak | gap | ODS adapter follow-up (record 0277) |
+| picture | picture | gap | ODS adapter follow-up (record 0277) |
+| pivottable | pivottable | gap | ODS adapter follow-up (record 0277) |
+| range | range | supported |  |
+| raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| row | row | supported |  |
+| rowbreak | rowbreak | gap | ODS adapter follow-up (record 0277) |
+| run | run | gap | ODS adapter follow-up (record 0277) |
+| shape | shape | gap | ODS adapter follow-up (record 0277) |
+| sheet | sheet | supported |  |
+| slicer | slicer | gap | none: OpenDocument has no slicer element |
+| sort |  | out of scope | a set-only action that reorders rows; M2 write surface |
+| sparkline | sparkline | gap | ODS adapter follow-up (record 0277) |
+| table | table | gap | ODS adapter follow-up (record 0277) |
+| topn | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| validation | dataValidation | gap | ODS adapter follow-up (record 0277) |
+| workbook | workbook | supported |  |
+|  | mergeCell | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+| aboveaverage | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `aboveAverage` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `stdDev` | number | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `equalAverage` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| aboveaverage | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| autofilter | `range` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| autofilter | `criteria0` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cell | `value` | string | asg | -s- | write-only | partial |  |
+| cell | `formula` | string | asg | -sg | supported | partial |  |
+| cell | `numberformat` | string | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| cell | `font.bold` | bool | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| cell | `font.italic` | bool | asg |  | missing | gap |  |
+| cell | `font.name` | string | asg |  | missing | gap |  |
+| cell | `font.size` | font-size | asg |  | missing | gap |  |
+| cell | `font.color` | color | asg |  | missing | gap |  |
+| cell | `fill` | color | asg |  | missing | gap |  |
+| cell | `fillPattern` | enum | asg |  | missing | gap |  |
+| cell | `fillBg` | color | asg |  | missing | gap |  |
+| cell | `strike` | bool | asg |  | missing | gap |  |
+| cell | `underline` | enum | asg |  | missing | gap |  |
+| cell | `locked` | bool | as- |  | write-only | gap |  |
+| cell | `protection.locked` | bool | --g |  | missing | — |  |
+| cell | `protection.hidden` | bool | --g |  | missing | — |  |
+| cell | `numFmtId` | number | --g |  | raw-only | — | ADR 0034: native selection requires explicit raw admission |
+| cell | `phonetic` | string | asg |  | missing | gap |  |
+| cell | `quotePrefix` | bool | --g |  | missing | — |  |
+| cell | `alignment.horizontal` | enum | asg |  | missing | gap |  |
+| cell | `alignment.vertical` | enum | asg |  | missing | gap |  |
+| cell | `alignment.wrapText` | bool | asg |  | missing | gap |  |
+| cell | `alignment.readingOrder` | enum | asg |  | missing | gap |  |
+| cell | `merge` | string | as- | --g | supported | gap |  |
+| cell | `ref` | string | a-- |  | write-only | gap |  |
+| cell | `link` | string | asg | --g | supported | gap |  |
+| cell | `tooltip` | string | as- |  | write-only | gap |  |
+| cell | `display` | string | asg |  | missing | gap |  |
+| cell | `type` | enum | asg | --g | supported | gap |  |
+| cell | `runs` | string | a-- |  | write-only | gap |  |
+| cell | `clear` | bool | as- | -s- | write-only | partial |  |
+| cell | `shift` | string | a-- |  | write-only | gap |  |
+| cell | `arrayformula` | string | as- |  | write-only | gap |  |
+| cell | `cachedValue` | string | --g | --g | supported | — |  |
+| cell | `computedValue` | string | --g |  | gap | — | ODS adapter follow-up (record 0277) |
+| cell | `evaluated` | bool | --g |  | missing | — |  |
+| cell | `alignment.indent` | number | asg |  | missing | gap |  |
+| cell | `alignment.shrinkToFit` | bool | asg |  | missing | gap |  |
+| cell | `alignment.textRotation` | number | asg |  | missing | gap |  |
+| cell | `border.diagonal` | string | asg |  | missing | gap |  |
+| cell | `border.diagonal.color` | color | asg |  | missing | gap |  |
+| cell | `border.diagonalDown` | bool | asg |  | missing | gap |  |
+| cell | `border.diagonalUp` | bool | asg |  | missing | gap |  |
+| cell | `border` | string | as- |  | write-only | gap |  |
+| cell | `border.all` | string | as- |  | write-only | gap |  |
+| cell | `border.top` | string | asg |  | missing | gap |  |
+| cell | `border.bottom` | string | asg |  | missing | gap |  |
+| cell | `border.left` | string | asg |  | missing | gap |  |
+| cell | `border.right` | string | asg |  | missing | gap |  |
+| cell | `border.color` | color | as- |  | write-only | gap |  |
+| cell | `arrayref` | string | --g |  | missing | — |  |
+| cell | `mergeAnchor` | bool | --g | --g | supported | — |  |
+| cell | `empty` | bool | --g | --g | supported | — |  |
+| cell | `richtext` | bool | --g |  | missing | — |  |
+| cell | `subscript` | bool | asg |  | missing | gap |  |
+| cell | `superscript` | bool | asg |  | missing | gap |  |
+| cell | `image` | string | as- |  | write-only | gap |  |
+| cell | `alt` | string | asg |  | missing | gap |  |
+| cell | `image.contentType` | string | --g |  | missing | — |  |
+| cell | `image.fileSize` | int | --g |  | missing | — |  |
+| cell | `style` | string |  | -s- | litchi-only | litchi-only |  |
+| cellis | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `operator` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `value` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `value2` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| cellis | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| cfextended | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| cfextended | `text` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `role` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `dispUnits` | enum | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `majorUnit` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `minorUnit` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisFont` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisMax` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisMin` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisNumFmt` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisOrientation` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisTitle` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `format` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `labelOffset` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `labelRotation` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `logBase` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `majorGridlines` | bool | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `max` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `min` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `minorGridlines` | bool | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `tickLabelSkip` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `title` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `visible` | bool | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `valuesRef` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `trendline.dispEq` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `trendline.dispRSqr` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `alpha` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `outlineColor` | color | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `categories` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `categoriesRef` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `dataLabels.numFmt` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `dataLabels.separator` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `errBars` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `invertIfNeg` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `lineDash` | enum | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `lineWidth` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `marker` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `markerSize` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `markerColor` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `name` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `nameRef` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `scatterStyle` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `secondaryAxis` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `smooth` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `values` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `bubbleSize` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `bubbleSizeRef` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dataRange` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `radarStyle` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `roundedCorners` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `valAxisVisible` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `view3d.perspective` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `view3d.rotateX` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `view3d.rotateY` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `anchor` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dispunits` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `x` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `y` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `seriesCount` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `areafill` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `autotitledeleted` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisfont` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axismax` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axismin` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisnumfmt` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisorientation` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisposition` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axistitle` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisvisible` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `bubbleScale` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `catAxisVisible` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `catTitle` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `cataxisline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `categories` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `chartFill` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `chartType` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `chartareafill` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `chartborder` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `colorrule` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `colors` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `combosplit` | number | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `combotypes` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `crossBetween` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `crosses` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `crossesAt` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `data` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dataLabels` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dataTable` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `decreaseColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dispBlanksAs` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `droplines` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `errbars` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `explosion` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `firstSliceAngle` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gapdepth` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gapwidth` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gradient` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gradients` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gridlines` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `height` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `hilowlines` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `holeSize` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `increaseColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `invertifneg` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `labelPos` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `labelfont` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `labelFont.size` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `labelFont.color` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `labelFont.bold` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `labelFont.name` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `labeloffset` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `labelrotation` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `leaderlines` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `legend` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `legend.overlay` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `legendFont` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `linedash` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `linewidth` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `logbase` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `majorTickMark` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `majorunit` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `marker` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `markersize` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `markercolor` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `minorGridlines` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `minorTickMark` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `minorunit` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `overlap` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `plotFill` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `plotborder` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `plotvisonly` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `preset` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `referenceline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `scatterstyle` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `secondaryaxis` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `series{N}` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `seriesoutline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `seriesshadow` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `serlines` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `shape` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `showMarker` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `shownegbubbles` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `sizerepresents` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `smooth` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `style` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `tickLabelPos` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `ticklabelskip` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.bold` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.font` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.overlay` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.size` | font-size | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `totalColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `transparency` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `trendline` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `updownbars` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `valaxisline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `varyColors` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `view3d` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `width` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colbreak | `col` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colbreak | `manual` | bool | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colbreak | `min` | int | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colbreak | `max` | int | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `minColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `maxColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `midColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `midpoint` | number | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| colorscale | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| column | `name` | string | a-- |  | write-only | gap |  |
+| column | `width` | length | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| column | `hidden` | bool | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| column | `outline` | int | -s- |  | write-only | gap |  |
+| column | `collapsed` | bool | -sg |  | missing | gap |  |
+| column | `numberformat` | string | -sg |  | missing | gap |  |
+| column | `customWidth` | bool | --g |  | missing | — |  |
+| column | `autofit` | bool | -s- |  | write-only | gap |  |
+| comment | `ref` | string | asg | a-g | supported | partial |  |
+| comment | `author` | string | asg | asg | supported | supported |  |
+| comment | `text` | string | asg | asg | supported | supported |  |
+| comment | `date` | string |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `type` | enum | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `ref` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `fill` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `operator` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `value` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `value2` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `text` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `rank` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `percent` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `bottom` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `aboveAverage` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `stdDev` | number | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `equalAverage` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `period` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `min` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `max` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `showValue` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `negativeColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `axisColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `axisPosition` | enum | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `minColor` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `maxColor` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `midColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `midPoint` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `iconset` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `reverse` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `formula` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `dxfId` | int | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| containstext | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `text` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| containstext | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| databar | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `min` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `max` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `color` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `showValue` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `negativeColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `axisColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `axisPosition` | enum | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `minLength` | number | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `maxLength` | number | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `direction` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| databar | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| dateoccurring | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `period` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| dateoccurring | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| detectedtable | `source` | string | --g |  | missing | — |  |
+| detectedtable | `stable` | bool | --g |  | missing | — |  |
+| detectedtable | `ref` | string | --g |  | missing | — |  |
+| detectedtable | `columns` | string | --g |  | missing | — |  |
+| detectedtable | `dataRange` | string | --g |  | missing | — |  |
+| duplicatevalues | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| formulacf | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `formula` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.italic` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.underline` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.strike` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.size` | font-size | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.name` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| formulacf | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `url` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `ref` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `location` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `display` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `tooltip` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| iconset | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| iconset | `iconset` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| iconset | `reverse` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| iconset | `showValue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| iconset | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| iconset | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| namedrange | `name` | string | asg | asg | supported | supported |  |
+| namedrange | `ref` | string | asg | asg | supported | supported |  |
+| namedrange | `scope` | string | asg | a-g | supported | partial |  |
+| namedrange | `comment` | string | asg |  | missing | gap |  |
+| namedrange | `volatile` | bool | asg |  | missing | gap |  |
+| ole | `anchor` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `shapeId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| ole | `contentType` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| ole | `fileSize` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| ole | `objectType` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| ole | `preview` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `progId` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `src` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `oleKind` | enum | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `embedExt` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pagebreak | `row` | int | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pagebreak | `col` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `title` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `decorative` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `rotation` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `flip` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `flipH` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `flipV` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `flipBoth` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `opacity` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `hyperlink` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `anchor` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `anchorMode` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `shadow` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `glow` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `reflection` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `softEdge` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop.l` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop.r` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop.t` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop.b` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `srcRect` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `anchoredTo` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `mergeAnchor` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `x` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `y` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `width` | integer | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `height` | integer | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `cropBottom` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `cropLeft` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `cropRight` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `cropTop` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `name` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `fallback` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `alt` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `contentType` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `fileSize` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `relId` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `src` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `source` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `position` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `name` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `style` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `rows` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `cols` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `filters` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `values` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `aggregate` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showDataAs` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `topN` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `sort` | enum | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `layout` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `labelFilter` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `calculatedField` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `blankRows` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `grandTotals` | enum | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `subtotals` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showColStripes` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showDrill` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `cacheId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `fieldCount` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `dataFieldCount` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `dataField{N}` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `location` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `collapsedFields` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `sortByField` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| range | `merge` | bool | -sg | -sg | supported | supported |  |
+| range | `font.bold` | bool | -s- |  | write-only | gap |  |
+| range | `fill` | color | -s- |  | write-only | gap |  |
+| range | `numberformat` | string | -s- |  | write-only | gap |  |
+| range | `alignment.horizontal` | enum | -s- |  | write-only | gap |  |
+| range | `value` | scalar |  | -s- | litchi-only | litchi-only |  |
+| range | `clear` | bool |  | -s- | litchi-only | litchi-only |  |
+| range | `formula` | string |  | -s- | litchi-only | litchi-only |  |
+| range | `style` | string |  | -s- | litchi-only | litchi-only |  |
+| row | `matchedTable` | string | --g |  | missing | — |  |
+| row | `tableSource` | string | --g |  | missing | — |  |
+| row | `cols` | int | a-- |  | write-only | gap |  |
+| row | `height` | length | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| row | `hidden` | bool | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| row | `outline` | int | -s- |  | write-only | gap |  |
+| row | `outlineLevel` | number | --g |  | missing | — |  |
+| row | `collapsed` | bool | -sg |  | missing | gap |  |
+| row | `customHeight` | bool | --g |  | missing | — |  |
+| rowbreak | `row` | int | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| rowbreak | `manual` | bool | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| rowbreak | `min` | int | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| rowbreak | `max` | int | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `subscript` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `superscript` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `bold` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `font` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `italic` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `size` | font-size | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `text` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `hyperlink` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `reflection` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `anchor` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `gradientFill` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `geometry` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `flip` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `flipBoth` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `x` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `y` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `width` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `height` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `align` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `bold` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `fill` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `flipH` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `flipV` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `font` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `glow` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `italic` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `line` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `margin` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `name` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `rotation` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `shadow` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `size` | font-size | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `softEdge` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `text` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `underline` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `valign` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sheet | `name` | string | asg | asg | supported | supported |  |
+| sheet | `autoFilter` | string | asg |  | missing | gap |  |
+| sheet | `tabColor` | color | asg |  | missing | gap |  |
+| sheet | `hidden` | bool | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| sheet | `freeze` | string | -sg |  | missing | gap |  |
+| sheet | `direction` | enum | -sg |  | missing | gap |  |
+| sheet | `zoom` | number | -sg |  | missing | gap |  |
+| sheet | `gridlines` | bool | --g |  | missing | — |  |
+| sheet | `headings` | bool | --g |  | missing | — |  |
+| sheet | `visibility` | enum | --g |  | gap | — | ODS adapter follow-up (record 0277) |
+| sheet | `protect` | bool | -sg |  | missing | gap |  |
+| sheet | `password` | string | -s- |  | write-only | gap |  |
+| sheet | `passwordHash` | string | --g |  | missing | — |  |
+| sheet | `protection.algorithm` | string | --g |  | missing | — |  |
+| sheet | `protection.hash` | string | --g |  | missing | — |  |
+| sheet | `protection.salt` | string | --g |  | missing | — |  |
+| sheet | `protection.spinCount` | number | --g |  | missing | — |  |
+| sheet | `printTitleRows` | string | -s- |  | write-only | gap |  |
+| sheet | `printTitleCols` | string | -s- |  | write-only | gap |  |
+| sheet | `orientation` | string | --g |  | missing | — |  |
+| sheet | `paperSize` | number | --g |  | missing | — |  |
+| sheet | `fitToPage` | string | --g |  | missing | — |  |
+| sheet | `printArea` | string | -sg |  | missing | gap |  |
+| sheet | `margin.top` | string | --g |  | missing | — |  |
+| sheet | `margin.bottom` | string | --g |  | missing | — |  |
+| sheet | `margin.left` | string | --g |  | missing | — |  |
+| sheet | `margin.right` | string | --g |  | missing | — |  |
+| sheet | `margin.header` | string | --g |  | missing | — |  |
+| sheet | `margin.footer` | string | --g |  | missing | — |  |
+| sheet | `header` | string | -sg |  | missing | gap |  |
+| sheet | `footer` | string | -sg |  | missing | gap |  |
+| sheet | `sort` | string | -sg |  | missing | gap |  |
+| sheet | `rowBreaks` | string | --g |  | missing | — |  |
+| sheet | `colBreaks` | string | --g |  | missing | — |  |
+| slicer | `pivotTable` | string | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `field` | string | a-g |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `caption` | string | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `name` | string | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `rowHeight` | number | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `columnCount` | number | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `pivotCacheId` | number | --g |  | element gap | — | none: OpenDocument has no slicer element |
+| slicer | `itemCount` | number | --g |  | element gap | — | none: OpenDocument has no slicer element |
+| slicer | `cache` | string | --g |  | element gap | — | none: OpenDocument has no slicer element |
+| sparkline | `type` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `dataRange` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `location` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `negativeColor` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `markers` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `highPoint` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lowPoint` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `firstPoint` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lastPoint` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `negative` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `markersColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lineWeight` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `dateAxis` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `ref` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `displayName` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `headerRow` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `totalRow` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `autoExpand` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `showFirstColumn` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `showLastColumn` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `showRowStripes` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `showColumnStripes` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `columns` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `totalsRowFunction` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `totalFunction` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| table | `totalLabel` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| table | `name` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `style` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `rank` | number | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `percent` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `bottom` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| topn | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| uniquevalues | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| uniquevalues | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| validation | `type` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `ref` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `allowBlank` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `showError` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `showInput` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `errorTitle` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `promptTitle` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `errorStyle` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `inCellDropdown` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `showDropDown` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `operator` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `formula1` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `formula2` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `prompt` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `error` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| workbook | `defaultFont` | string | --- |  | write-only | — |  |
+| workbook | `defaultFontSize` | length | --- |  | write-only | — |  |
+| workbook | `author` | string | -sg | --g | supported | gap |  |
+| workbook | `title` | string | -sg | --g | supported | gap |  |
+| workbook | `calc.mode` | enum | -sg |  | missing | gap |  |
+| workbook | `calc.iterate` | bool | -sg |  | missing | gap |  |
+| workbook | `calc.iterateCount` | number | -sg |  | missing | gap |  |
+| workbook | `calc.iterateDelta` | number | -sg |  | missing | gap |  |
+| workbook | `calc.fullPrecision` | bool | -sg |  | missing | gap |  |
+| workbook | `lastModifiedBy` | string | -sg | --g | supported | gap |  |
+| workbook | `created` | string | --g | --g | supported | — |  |
+| workbook | `modified` | string | --g | --g | supported | — |  |
+| workbook | `extended.application` | string | --g |  | missing | — |  |
+| workbook | `category` | string | -sg | --g | supported | gap |  |
+| workbook | `description` | string | -sg | --g | supported | gap |  |
+| workbook | `keywords` | string | -sg | --g | supported | gap |  |
+| workbook | `revisionNumber` | string | -sg | --g | supported | gap |  |
+| workbook | `activeTab` | number | --g |  | gap | — | ODS adapter follow-up (record 0277) |
+| workbook | `firstSheet` | number | --g |  | missing | — |  |
+| workbook | `calc.fullCalcOnLoad` | bool | --g |  | missing | — |  |
+| workbook | `calc.refMode` | string | --g |  | missing | — |  |
+| workbook | `workbook.backupFile` | bool | --g |  | missing | — |  |
+| workbook | `workbook.codeName` | string | --g |  | missing | — |  |
+| workbook | `workbook.date1904` | bool | -sg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| workbook | `workbook.dateCompatibility` | bool | -sg |  | missing | gap |  |
+| workbook | `workbook.filterPrivacy` | bool | -sg |  | missing | gap |  |
+| workbook | `workbook.showObjects` | enum | -sg |  | missing | gap |  |
+| workbook | `workbook.lockStructure` | bool | -sg |  | missing | gap |  |
+| workbook | `workbook.lockWindows` | bool | -sg |  | missing | gap |  |
+| workbook | `workbook.password` | string | -sg |  | missing | gap |  |
+| workbook | `extended.applicationVersion` | string | --g |  | missing | — |  |
+| workbook | `extended.characters` | number | --g |  | missing | — |  |
+| workbook | `extended.company` | string | -sg |  | missing | gap |  |
+| workbook | `extended.lines` | number | --g |  | missing | — |  |
+| workbook | `extended.manager` | string | -sg |  | missing | gap |  |
+| workbook | `extended.pages` | number | --g |  | missing | — |  |
+| workbook | `extended.paragraphs` | number | --g |  | missing | — |  |
+| workbook | `extended.template` | string | -sg |  | missing | gap |  |
+| workbook | `extended.totalTime` | number | --g |  | missing | — |  |
+| workbook | `extended.words` | number | --g |  | missing | — |  |
+| workbook | `subject` | string | -sg | --g | supported | gap |  |
+| workbook | `theme.color.accent1` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent2` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent3` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent4` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent5` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent6` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.dk1` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.dk2` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.folHlink` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.hlink` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.lt1` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.lt2` | color | -sg |  | missing | gap |  |
+| workbook | `theme.colorScheme` | string | --g |  | missing | — |  |
+| workbook | `theme.font.major.eastAsia` | string | -sg |  | missing | gap |  |
+| workbook | `theme.font.major.latin` | string | -sg |  | missing | gap |  |
+| workbook | `theme.font.minor.eastAsia` | string | -sg |  | missing | gap |  |
+| workbook | `theme.font.minor.latin` | string | -sg |  | missing | gap |  |
+| workbook | `theme.fontScheme` | string | --g |  | missing | — |  |
+| workbook | `theme.formatScheme` | string | --g |  | missing | — |  |
+| workbook | `theme.name` | string | --g |  | missing | — |  |
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `query` | `row` | `header-column-predicates` | ODS does not yet bind row predicate names to header columns | ODS adapter follow-up (record 0277) |
+| `query` | `cell` | `styled-blank-cells` | queries enumerate content cells (a value, text, formula, link or merge span); styled blank padding runs are addressable by coordinate only | ODS adapter follow-up (record 0277) |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the workbook root | ODS adapter follow-up (record 0277) |
+| `set` | `metadata` | `unowned-fields` | the leaf metadata patcher owns title, subject, description, keywords and author; lastModifiedBy, created, modified, language, revision, template and custom.<name> are refused until an ODS metadata family lands | ODS adapter follow-up (record 0277) |
+| `set` | `cell` | `formatting-properties` | cell formatting is applied by naming an existing cell style (`style`); direct font, fill, border, alignment and number-format keys need an automatic-style author in the unified layer | ODS adapter follow-up (record 0277) |
+| `set` | `cell` | `formula-evaluation` | an authored OpenFormula is stored inert with the cell's cached value (or none); the unified layer does not evaluate ODS formulas | ODS adapter follow-up (record 0277) |
+| `set` | `sheet` | `producer-table-markup` | a rename copies the table fragment under its new name and drops the original; the leaf refuses sheets with formulas, ranges, drawings, forms, protection or other dependency owners, and the writer refuses names a formula or named range still uses | ODS adapter follow-up (record 0277) |
+| `move` | `sheet` | `native-dependency-closure` | the leaf moves only dependency-free worksheets: formulas, named/database/validation/print ranges, settings, scripts and tracked changes are refused; an added sheet placed before the end is moved the same way | ODS adapter follow-up (record 0277) |
+| `add` | `row` | `logical-row-shift` | rows are inserted, removed, moved and swapped through the leaf's logical row editor, which refuses formulas, merges, ranges, validations, drawings, annotations and other coordinate owners on the worksheet | ODS adapter follow-up (record 0277) |
+| `add` | `col` | `native-editor` | inserting or removing a column that shifts cells needs a logical column editor the leaf does not have | ODS adapter follow-up (record 0277) |
+| `set` | `row` | `layout` | row height and visibility, and column width and visibility, live in automatic styles the unified writer does not author yet | ODS adapter follow-up (record 0277) |
+| `set` | `namedrange` | `scope` | a named range's scope is fixed once added; named expressions are retargeted through `ref` and are not added | ODS adapter follow-up (record 0277) |
+| `set` | `workbook` | `flat-odf` | flat single-XML spreadsheets (.fods) open read-only; their leaf transaction admits scalar cell writes only and is not integrated | ODS adapter follow-up (record 0277) |
+| `batch` | `cell` | `coalescing` | consecutive direct cell value, text, clear and formula sets share one leaf edit; style, merge, range and query sets and every other verb close the run | ODS adapter follow-up (record 0277) |

@@ -13,6 +13,7 @@ use std::path::Path;
     feature = "pptx",
     feature = "rtf",
     feature = "xlsb",
+    feature = "ods",
     all(
         any(unix, windows),
         any(
@@ -40,6 +41,7 @@ use crate::{File, OpenOptions};
     feature = "pptx",
     feature = "rtf",
     feature = "xlsb",
+    feature = "ods",
     all(
         any(unix, windows),
         any(
@@ -120,7 +122,8 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "pptx",
             feature = "xls",
             feature = "xlsb",
-            feature = "rtf"
+            feature = "rtf",
+            feature = "ods"
         ))]
         let file = if matches!(
             file.format(),
@@ -133,6 +136,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                     | litchi_core::FileFormat::Pptx
                     | litchi_core::FileFormat::Rtf
                     | litchi_core::FileFormat::Xlsb
+                    | litchi_core::FileFormat::Ods
             )
         ) || matches!(&file, File::Locked(_))
         {
@@ -223,7 +227,8 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "pptx",
         feature = "xls",
         feature = "xlsb",
-        feature = "rtf"
+        feature = "rtf",
+        feature = "ods"
     ))]
     let opened = if matches!(
         opened.format(),
@@ -236,6 +241,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                 | litchi_core::FileFormat::Pptx
                 | litchi_core::FileFormat::Rtf
                 | litchi_core::FileFormat::Xlsb
+                | litchi_core::FileFormat::Ods
         )
     ) || matches!(&opened, File::Locked(_))
     {
@@ -476,10 +482,10 @@ mod zip {
                         observed,
                     }));
                 }
-                Ok(File::Ods(crate::format::ods::Ods::from_source(
-                    Box::new(spreadsheet),
-                    options,
-                )?))
+                Ok(File::Ods(
+                    crate::format::ods::Ods::from_source(Box::new(spreadsheet), options)?
+                        .with_origin(Some(super::stable_origin(path)?)),
+                ))
             },
             #[cfg(feature = "odp")]
             FileFormat::Odp => {

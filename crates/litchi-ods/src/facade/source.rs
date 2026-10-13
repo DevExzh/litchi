@@ -787,12 +787,14 @@ impl SourceBackedSpreadsheet {
     }
 
     /// Explicitly materialize this source into an immutable
-    /// [`crate::Package`].
+    /// [`crate::Package`]. The source-backed owner stays usable, so a
+    /// caller that retains it for reads can build the editable owner on
+    /// demand.
     ///
     /// # Errors
     ///
     /// Returns a source-changed, archive or family-validation failure.
-    pub fn materialize(self) -> Result<crate::Package> {
+    pub fn materialize(&self) -> Result<crate::Package> {
         self.check_source()?;
         let source = Arc::clone(&self.source);
         let source_version = self.source_version;

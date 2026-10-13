@@ -21,6 +21,9 @@ const MAX_SPANS: usize = 1_048_576;
 const OFFICE_NAMESPACE: &str = codec::OFFICE_NAMESPACE;
 const TABLE_NAMESPACE: &str = codec::TABLE_NAMESPACE;
 const XML_NAMESPACE: &str = "http://www.w3.org/XML/1998/namespace";
+/// LibreOffice's Calc extension namespace: it restates every typed cell's
+/// `office:value-type` as `calcext:value-type`.
+const CALCEXT_NAMESPACE: &str = codec::CALCEXT_NAMESPACE;
 
 #[derive(Clone, Debug)]
 struct Span {
@@ -117,7 +120,7 @@ fn replace_tables_bounded(xml: &str, sheets: &[Sheet], max_output_bytes: usize) 
             }
         }
         for row in direct_children(&spans, *table, TABLE_NAMESPACE, "table-row") {
-            validate_rewritable_row(xml, &spans, row, RowRewriteMode::Owned)?;
+            validate_rewritable_row(xml, &spans, row, RowRewriteMode::Owned, None)?;
         }
     }
 
@@ -860,12 +863,46 @@ fn changed_row_edits(
         let old_end = before.rows.len() - suffix;
         let new_end = after.rows.len() - suffix;
         if prefix == old_end {
-            if allow_ineligible {
-                return Ok((None, None));
-            }
-            return Err(invalid(
-                "flat ODS row insertion requires an existing physical row anchor",
-            ));
+            // A pure insertion (a cell set below the last physical row, or
+            // into a sheet without rows): splice the new rows after the
+            // preceding row, before the following one, or at the end of a
+            // table whose only children are column declarations. Every
+            // source byte stays where it was.
+            let anchor = if prefix > 0 {
+                Some(spans[rows[prefix - 1]].end)
+            } else if let Some(next) = rows.get(old_end) {
+                Some(spans[*next].start)
+            } else {
+                layout.tables.get(sheet_index).and_then(|table| {
+                    let span = &spans[*table];
+                    let only_columns = direct_children_any(spans, *table).iter().all(|child| {
+                        let child = &spans[*child];
+                        child.namespace.as_deref() == Some(TABLE_NAMESPACE)
+                            && matches!(
+                                child.local.as_str(),
+                                "table-column" | "table-columns" | "table-header-columns"
+                            )
+                    });
+                    (!span.empty && only_columns).then_some(span.close_start)
+                })
+            };
+            let Some(anchor) = anchor else {
+                if allow_ineligible {
+                    return Ok((None, None));
+                }
+                return Err(invalid(
+                    "flat ODS row insertion requires an existing physical row anchor",
+                ));
+            };
+            edits.push(RowEdit {
+                start: anchor,
+                end: anchor,
+                replacement: codec::write_rows_bounded(
+                    &after.rows[prefix..new_end],
+                    max_output_bytes,
+                )?,
+            });
+            continue;
         }
 
         if allow_ineligible
@@ -879,13 +916,18 @@ fn changed_row_edits(
             ));
         }
 
+        let mut calcext = false;
         for row in &rows[prefix..old_end] {
-            validate_rewritable_row(xml, spans, *row, mode)?;
+            validate_rewritable_row(xml, spans, *row, mode, Some(&mut calcext))?;
         }
         edits.push(RowEdit {
             start: spans[rows[prefix]].start,
             end: spans[rows[old_end - 1]].end,
-            replacement: codec::write_rows_bounded(&after.rows[prefix..new_end], max_output_bytes)?,
+            replacement: codec::write_rows_with_calcext_bounded(
+                &after.rows[prefix..new_end],
+                max_output_bytes,
+                calcext,
+            )?,
         });
     }
 
@@ -1030,11 +1072,48 @@ fn apply_edits_bounded(
     Ok(output)
 }
 
+/// Whether a cell's `calcext:value-type` attribute equals the cell's own
+/// `office:value-type` and is a type the row writer re-emits.
+fn restates_office_value_type(
+    reader: &NsReader<&[u8]>,
+    element: &quick_xml::events::BytesStart<'_>,
+    attribute: &quick_xml::events::attributes::Attribute<'_>,
+) -> Result<bool> {
+    let value = attribute
+        .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+        .map_err(|error| Error::InvalidFormat(format!("invalid ODS calcext attribute: {error}")))?;
+    if codec::calcext_value_type_token(&value).is_none() {
+        return Ok(false);
+    }
+    for other in element.attributes().with_checks(true) {
+        let other = other.map_err(|error| {
+            Error::InvalidFormat(format!("invalid flat ODS attribute: {error}"))
+        })?;
+        let (namespace, other_local) = reader.resolver().resolve_attribute(other.key);
+        if resolve_namespace(&namespace)?.as_deref() == Some(OFFICE_NAMESPACE)
+            && other_local.as_ref() == b"value-type"
+        {
+            let office = other
+                .decoded_and_normalized_value(quick_xml::XmlVersion::Explicit1_0, reader.decoder())
+                .map_err(|error| {
+                    Error::InvalidFormat(format!("invalid ODS office:value-type: {error}"))
+                })?;
+            return Ok(office == value);
+        }
+    }
+    Ok(false)
+}
+
+/// Check that rewriting the row at `span_index` loses nothing the model
+/// does not carry. With `calcext`, a cell's `calcext:value-type` that
+/// restates its `office:value-type` is admitted (the row writer re-emits it)
+/// and the flag records that the source row carried one.
 fn validate_rewritable_row(
     xml: &str,
     spans: &[Span],
     span_index: usize,
     mode: RowRewriteMode,
+    mut calcext: Option<&mut bool>,
 ) -> Result<()> {
     let span = spans
         .get(span_index)
@@ -1163,6 +1242,7 @@ fn validate_rewritable_row(
                             namespace.as_deref(),
                             &local,
                             mode,
+                            calcext.as_deref_mut(),
                         )?;
                         row_depth = 1;
                     }
@@ -1175,7 +1255,14 @@ fn validate_rewritable_row(
                         "flat ODS edit would discard unmodeled row element '{local}'"
                     )));
                 }
-                validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local, mode)?;
+                validate_modeled_attributes(
+                    &reader,
+                    &element,
+                    namespace.as_deref(),
+                    &local,
+                    mode,
+                    calcext.as_deref_mut(),
+                )?;
                 if is_element_name(namespace.as_deref(), &local, codec::TEXT_NAMESPACE, "p") {
                     in_paragraph = true;
                 }
@@ -1198,6 +1285,7 @@ fn validate_rewritable_row(
                             namespace.as_deref(),
                             &local,
                             mode,
+                            calcext.as_deref_mut(),
                         )?;
                     }
                     buffer.clear();
@@ -1208,7 +1296,14 @@ fn validate_rewritable_row(
                         "flat ODS edit would discard unmodeled row element '{local}'"
                     )));
                 }
-                validate_modeled_attributes(&reader, &element, namespace.as_deref(), &local, mode)?;
+                validate_modeled_attributes(
+                    &reader,
+                    &element,
+                    namespace.as_deref(),
+                    &local,
+                    mode,
+                    calcext.as_deref_mut(),
+                )?;
                 if is_element_name(namespace.as_deref(), &local, codec::TEXT_NAMESPACE, "a")
                     && !in_paragraph
                 {
@@ -1363,6 +1458,7 @@ fn validate_modeled_attributes(
     element_namespace: Option<&str>,
     local: &str,
     mode: RowRewriteMode,
+    mut calcext: Option<&mut bool>,
 ) -> Result<()> {
     if element_namespace == Some(TABLE_NAMESPACE) && local == "cell-range-source" {
         codec::parse_cell_range_source(element, reader.resolver(), reader.decoder())?;
@@ -1380,6 +1476,17 @@ fn validate_modeled_attributes(
         let namespace = resolve_namespace(&namespace)?;
         let attribute_local = decode(attribute_local.as_ref(), "row attribute local name")?;
         let modeled = match (element_namespace, local, namespace.as_deref()) {
+            (
+                Some(TABLE_NAMESPACE),
+                "table-cell" | "covered-table-cell",
+                Some(CALCEXT_NAMESPACE),
+            ) if attribute_local == "value-type" && calcext.is_some() => {
+                let restated = restates_office_value_type(reader, element, &attribute)?;
+                if restated && let Some(seen) = calcext.as_deref_mut() {
+                    *seen = true;
+                }
+                restated
+            },
             (Some(TABLE_NAMESPACE), "table-row", Some(TABLE_NAMESPACE)) => matches!(
                 attribute_local.as_str(),
                 "number-rows-repeated" | "style-name" | "default-cell-style-name"
