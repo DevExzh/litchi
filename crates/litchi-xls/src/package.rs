@@ -160,6 +160,8 @@ enum PackageState {
         /// can serve source-backed reads without ever constructing this
         /// eager reader.
         materialized: OnceLock<std::result::Result<Arc<RawReader>, Arc<SourceBackedError>>>,
+        /// The complete tab catalog, captured on first catalog read.
+        catalog: OnceLock<Box<[crate::SheetMetadata]>>,
     },
 }
 
@@ -356,6 +358,7 @@ impl Package {
                     workbook,
                     encryption: None,
                     materialized: OnceLock::new(),
+                    catalog: OnceLock::new(),
                 },
                 policy: RetainedPolicy::Source {
                     limits: source_limits,
@@ -449,6 +452,17 @@ impl Package {
         Workbook {
             package: Arc::clone(&self.inner),
         }
+    }
+
+    /// Borrow the complete workbook-tab catalog; see
+    /// [`Workbook::sheet_catalog`].
+    ///
+    /// # Errors
+    ///
+    /// Returns the positional owner's source or metadata read error on the
+    /// first borrow.
+    pub fn sheet_catalog(&self) -> Result<&[crate::SheetMetadata]> {
+        sheet_catalog(&self.inner)
     }
 
     /// Return package metadata.
@@ -804,6 +818,29 @@ impl Workbook {
                 Ok(sheet.cloned())
             },
         }
+    }
+
+    /// Borrow the complete workbook-tab catalog in original tab order.
+    ///
+    /// The eager reader lends its parsed catalog; a positional owner captures
+    /// the catalog once, under its source fence, and lends it afterwards.
+    /// The catalog belongs to this immutable snapshot, so later borrows do
+    /// not re-read the source; callers that must observe a changed source
+    /// keep their own freshness fence.
+    ///
+    /// ```
+    /// let package = litchi_xls::Package::new()?;
+    /// let workbook = package.workbook();
+    /// assert_eq!(workbook.sheet_catalog()?.len(), 1);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns the positional owner's source or metadata read error on the
+    /// first borrow.
+    pub fn sheet_catalog(&self) -> Result<&[crate::SheetMetadata]> {
+        sheet_catalog(&self.package)
     }
 
     /// Return complete workbook-tab metadata in original tab order.
@@ -1309,4 +1346,19 @@ fn read_bounded<R: Read>(reader: &mut R, limits: SourceLimits) -> Result<Vec<u8>
         bytes.extend_from_slice(&buffer[..count]);
     }
     Ok(bytes)
+}
+
+fn sheet_catalog(inner: &PackageInner) -> Result<&[crate::SheetMetadata]> {
+    match &inner.state {
+        PackageState::Source {
+            workbook, catalog, ..
+        } => {
+            if let Some(catalog) = catalog.get() {
+                return Ok(catalog);
+            }
+            let captured = workbook.sheet_metadata().map_err(Error::Source)?;
+            Ok(catalog.get_or_init(|| captured.into_boxed_slice()))
+        },
+        PackageState::Eager { reader, .. } => Ok(reader.sheets()),
+    }
 }

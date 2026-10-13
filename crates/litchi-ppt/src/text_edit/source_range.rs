@@ -257,9 +257,12 @@ pub(super) fn resolve_source_target(
         .ok_or(Error::Refused(Refusal::ShapeNotFound))?;
     // The edit path applies text-style repairs (see `crate::leniency`) while
     // resolving the source range without enumerating them; the presentation
-    // is being rewritten rather than read.
+    // is being rewritten rather than read. Only the shape's native identity is
+    // needed here, so no slide-list text is resolved; resolution never
+    // changes which shapes are returned (L-PPT-R1).
     let shapes = crate::slide::types::Slide::parse_shape_enums(
         &ppdrawing.data,
+        &[],
         &mut crate::leniency::ToleranceReport::default(),
     )?;
     let shape = shapes

@@ -1,6 +1,5 @@
 //! Read-side speaker-notes support for binary `PowerPoint` files.
 
-use super::directory::SlideDirectory;
 use super::types::Slide;
 use crate::consts::RecordType;
 use crate::odraw::ShapeExt as _;
@@ -24,33 +23,25 @@ pub(crate) struct NoteDescriptor {
     pub expected_slide_id: Option<u32>,
 }
 
-#[derive(Debug, Default)]
+/// The presentation's notes pages by `NotesId`, read once per presentation
+/// from the `NotesListWithTextContainer` (L-PPT-R2).
+///
+/// The slide directory builds it at open from the `DocumentContainer` it has
+/// already parsed, so selecting a slide never parses the document again. A
+/// notes list that cannot be read does not fail the open: the error is kept
+/// and returned by [`Self::descriptor`] for each slide that names a notes
+/// page.
+#[derive(Debug, Clone, Default)]
 pub(crate) struct NotesIndex {
     notes: HashMap<u32, u32>,
-    slide_ids: HashMap<u32, u32>,
     error: Option<String>,
 }
 
 impl NotesIndex {
-    #[cfg(all(test, feature = "vba-inspection"))]
-    #[allow(
-        dead_code,
-        reason = "retained for focused presentation fixture construction"
-    )]
-    pub(crate) fn build(document_data: &[u8], slide_directory: &SlideDirectory) -> Self {
-        Self::build_with_limits(
-            PayloadStore::Owned(document_data),
-            slide_directory,
-            SourceLimits::default(),
-        )
-    }
-
-    pub(crate) fn build_with_limits(
-        source: PayloadStore<'_>,
-        slide_directory: &SlideDirectory,
-        limits: SourceLimits,
-    ) -> Self {
-        match Self::try_build_with_limits(source, slide_directory, limits) {
+    /// Indexes the notes list of the live `DocumentContainer`, keeping a
+    /// malformed list as the deferred error.
+    pub(crate) fn from_document(document: &Record) -> Self {
+        match Self::try_from_document(document) {
             Ok(index) => index,
             Err(error) => Self {
                 error: Some(error.to_string()),
@@ -59,38 +50,13 @@ impl NotesIndex {
         }
     }
 
-    #[cfg(test)]
-    fn try_build(document_data: &[u8], slide_directory: &SlideDirectory) -> Result<Self> {
-        Self::try_build_with_limits(
-            PayloadStore::Owned(document_data),
-            slide_directory,
-            SourceLimits::default(),
-        )
-    }
-
-    fn try_build_with_limits(
-        source: PayloadStore<'_>,
-        slide_directory: &SlideDirectory,
-        limits: SourceLimits,
-    ) -> Result<Self> {
-        let (document, _) = Record::parse_from_store_with_limits(
-            source,
-            slide_directory.document_offset(),
-            limits,
-        )?;
+    fn try_from_document(document: &Record) -> Result<Self> {
         if document.record_type != RecordType::Document {
             return Err(Error::Corrupted(
                 "live document persist object is not a DocumentContainer".to_string(),
             ));
         }
         let mut index = Self::default();
-        index
-            .slide_ids
-            .try_reserve(slide_directory.entries().len())
-            .map_err(|_err| Error::AllocationFailed("PPT notes slide index"))?;
-        for entry in slide_directory.entries() {
-            index.slide_ids.insert(entry.persist_id(), entry.slide_id());
-        }
         let mut saw_notes_list = false;
 
         for list in document.extract_slide_list_with_texts() {
@@ -104,6 +70,10 @@ impl NotesIndex {
                 ));
             }
             saw_notes_list = true;
+            index
+                .notes
+                .try_reserve(list.children.len())
+                .map_err(|_err| Error::AllocationFailed("PPT notes index"))?;
 
             for atom in &list.children {
                 if atom.record_type != RecordType::SlidePersistAtom {
@@ -146,10 +116,12 @@ impl NotesIndex {
         Ok(())
     }
 
+    /// Locates the notes page of `slide`, whose directory entry names
+    /// `slide_id`, which the notes page's `NotesAtom.slideIdRef` must match.
     pub(crate) fn descriptor(
         &self,
         slide: &Record,
-        slide_persist_id: u32,
+        slide_id: u32,
         persist_mapping: &PersistMapping,
     ) -> std::result::Result<Option<NoteDescriptor>, String> {
         let Some(slide_atom) = slide.find_child(RecordType::SlideAtom) else {
@@ -186,7 +158,7 @@ impl NotesIndex {
             notes_id,
             persist_id,
             offset: offset_usize,
-            expected_slide_id: self.slide_ids.get(&slide_persist_id).copied(),
+            expected_slide_id: Some(slide_id),
         }))
     }
 }
@@ -390,7 +362,7 @@ impl SpeakerNotes {
         let mut shapes = Vec::with_capacity(parsed.len());
         for (index, shape) in parsed.iter().enumerate() {
             if let Some(mut converted_shape) =
-                Slide::<'static>::convert_odraw_to_shape_enum(shape, index, &mut report)?
+                Slide::<'static>::convert_odraw_to_shape_enum(shape, index, &[], &mut report)?
             {
                 converted_shape.mark_source_bound_recursive();
                 shapes.push(converted_shape);
@@ -404,6 +376,39 @@ impl SpeakerNotes {
             },
         );
         Ok((shapes, report))
+    }
+
+    /// The `OfficeArt` shape identifiers of this notes page's body
+    /// placeholders (`PlaceholderKind::NotesBody`), in drawing order: the
+    /// shapes whose text [`Self::text`] joins.
+    pub(crate) fn body_shape_ids(&self) -> Result<Vec<u32>> {
+        const MAX_SHAPES: usize = 1_000_000;
+
+        let Some(drawing) = self.record.find_child(RecordType::PPDrawing) else {
+            return Ok(Vec::new());
+        };
+        let shapes = crate::odraw::parse(&drawing.data)?;
+        let mut ids = Vec::new();
+        let mut pending = shapes.iter().rev().collect::<Vec<_>>();
+        let mut visited = 0usize;
+        while let Some(current) = pending.pop() {
+            visited = visited
+                .checked_add(1)
+                .ok_or_else(|| Error::Corrupted("Notes shape count overflow".to_string()))?;
+            if visited > MAX_SHAPES {
+                return Err(Error::Corrupted(
+                    "Notes page exceeds the PPT shape limit".to_string(),
+                ));
+            }
+            if current
+                .placeholder()?
+                .is_some_and(|placeholder| placeholder.kind == crate::PlaceholderKind::NotesBody)
+            {
+                ids.push(current.id());
+            }
+            pending.extend(current.children().iter().rev());
+        }
+        Ok(ids)
     }
 
     fn extract_notes_body_text(&self) -> Result<String> {
@@ -496,12 +501,15 @@ mod tests {
         record(0x0f, 0, 0x03e8, &notes_list)
     }
 
+    fn build(document: &[u8]) -> Result<NotesIndex> {
+        let (document, _) = Record::parse(document, 0).expect("parse synthetic document");
+        NotesIndex::try_from_document(&document)
+    }
+
     #[test]
     fn notes_index_uses_ids_not_list_order() {
-        let directory = SlideDirectory::new_for_test(0);
         let index =
-            NotesIndex::try_build(&document_with_notes(&[(9, 0x345), (7, 0x123)]), &directory)
-                .expect("valid notes index");
+            build(&document_with_notes(&[(9, 0x345), (7, 0x123)])).expect("valid notes index");
         assert_eq!(index.notes.get(&0x123), Some(&7));
         assert_eq!(index.notes.get(&0x345), Some(&9));
     }
@@ -509,20 +517,37 @@ mod tests {
     #[test]
     fn notes_index_rejects_duplicate_and_malformed_atoms() {
         let duplicate = document_with_notes(&[(7, 0x123), (9, 0x123)]);
-        let directory = SlideDirectory::new_for_test(0);
-        assert!(NotesIndex::try_build(&duplicate, &directory).is_err());
+        assert!(build(&duplicate).is_err());
 
         let malformed = record(0, 0, 0x03f3, &[0; 16]);
         let notes_list = record(0x0f, 2, 0x0ff0, &malformed);
         let document = record(0x0f, 0, 0x03e8, &notes_list);
-        assert!(NotesIndex::try_build(&document, &directory).is_err());
+        assert!(build(&document).is_err());
+
+        // A malformed list is kept as the error of every slide with notes,
+        // and slides without notes are unaffected.
+        let (document, _) = Record::parse(&document, 0).unwrap();
+        let deferred = NotesIndex::from_document(&document);
+        let mut slide_atom_data = [0u8; SLIDE_ATOM_SIZE];
+        let without_notes = record(0x0f, 0, 0x03ee, &record(2, 0, 0x03ef, &slide_atom_data));
+        let (without_notes, _) = Record::parse(&without_notes, 0).unwrap();
+        assert!(matches!(
+            deferred.descriptor(&without_notes, 256, &PersistMapping::new()),
+            Ok(None)
+        ));
+        slide_atom_data[16..20].copy_from_slice(&0x345u32.to_le_bytes());
+        let with_notes = record(0x0f, 0, 0x03ee, &record(2, 0, 0x03ef, &slide_atom_data));
+        let (with_notes, _) = Record::parse(&with_notes, 0).unwrap();
+        assert!(
+            deferred
+                .descriptor(&with_notes, 256, &PersistMapping::new())
+                .is_err()
+        );
     }
 
     #[test]
     fn notes_index_rejects_dangling_persist_reference() {
-        let directory = SlideDirectory::new_for_test(0);
-        let index = NotesIndex::try_build(&document_with_notes(&[(9, 0x345)]), &directory)
-            .expect("valid notes index");
+        let index = build(&document_with_notes(&[(9, 0x345)])).expect("valid notes index");
         let mut slide_atom_data = [0u8; SLIDE_ATOM_SIZE];
         slide_atom_data[16..20].copy_from_slice(&0x345u32.to_le_bytes());
         let slide_atom = record(2, 0, 0x03ef, &slide_atom_data);

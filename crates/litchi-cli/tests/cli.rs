@@ -251,6 +251,39 @@ fn capabilities_json_is_the_capability_report() {
 }
 
 #[test]
+fn schema_json_is_the_registry_export() {
+    for (format, parsed) in [
+        ("docx", litchi_core::FileFormat::Docx),
+        ("xlsx", litchi_core::FileFormat::Xlsx),
+        ("doc", litchi_core::FileFormat::Doc),
+        ("rtf", litchi_core::FileFormat::Rtf),
+        ("pages", litchi_core::FileFormat::Pages),
+    ] {
+        let expected = serde_json::to_value(litchi_ops::schema(parsed)).expect("serialize");
+        assert_eq!(
+            expect(0, ["schema", format, "--json"]).json(),
+            expected,
+            "{format}"
+        );
+        let text = expect(0, ["schema", format]);
+        assert!(
+            text.stdout.starts_with(&format!("format: {format}\n")),
+            "{}",
+            text.stdout
+        );
+    }
+    let xlsx = expect(0, ["schema", "xlsx"]);
+    assert!(
+        xlsx.stdout
+            .contains("  outline int -s- aliases=group,outlinelevel\n"),
+        "{}",
+        xlsx.stdout
+    );
+    expect(2, ["schema"]);
+    expect(4, ["schema", "txt"]);
+}
+
+#[test]
 fn exit_statuses_follow_the_code_families() {
     let docx = fixture("ooxml/docx/drawing.docx");
     let docx = arg(&docx);

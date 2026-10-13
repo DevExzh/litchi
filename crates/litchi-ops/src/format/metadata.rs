@@ -359,7 +359,10 @@ pub(crate) fn native_error(error: properties::Error, format: FileFormat) -> Erro
 
 /// A timestamp in .NET's round-trip form (`"o"`), as OfficeCLI prints
 /// core-properties times: seven fraction digits, and `Z` for an instant.
-#[cfg(feature = "pptx")]
+#[cfg_attr(
+    not(feature = "pptx"),
+    allow(dead_code, reason = "only PPTX node views print core-property times")
+)]
 pub(crate) fn round_trip(timestamp: Timestamp) -> String {
     let naive = timestamp.naive();
     format!(

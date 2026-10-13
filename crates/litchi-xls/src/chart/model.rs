@@ -930,7 +930,7 @@ impl Chart {
     /// # Errors
     ///
     /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn edit_chart_area(&self) -> Result<super::chart_area::Transaction> {
+    pub fn edit_chart_area(&self) -> Result<super::chart_area::Edit> {
         self.chart_area().edit()
     }
 

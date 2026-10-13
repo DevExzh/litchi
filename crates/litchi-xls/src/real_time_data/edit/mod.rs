@@ -14,7 +14,7 @@ mod model;
 mod transaction;
 
 pub use model::{Commit, Patch, Snapshot};
-pub use transaction::Transaction;
+pub use transaction::Edit;
 
 /// Read and validate one complete workbook-global BIFF stream.
 /// # Errors

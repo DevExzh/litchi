@@ -233,14 +233,14 @@ impl Snapshot {
                 .inner
                 .sheets
                 .iter()
-                .position(|sheet| sheet.workbook_position == position)),
+                .position(|sheet| sheet.workbook_position == position.get())),
             Selector::Name(name) => {
                 let mut matches = self
                     .inner
                     .sheets
                     .iter()
                     .enumerate()
-                    .filter(|(_, sheet)| sheet.name.eq_ignore_ascii_case(name));
+                    .filter(|(_, sheet)| crate::sheet_name::equivalent(&sheet.name, name));
                 let found = matches.next().map(|(index, _)| index);
                 if matches.next().is_some() {
                     return Err(Error::UnsafeEdit(format!(
@@ -811,7 +811,7 @@ impl Patch {
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before == self.after
     }
 
@@ -841,7 +841,7 @@ impl Patch {
                 "XLS comment patch source does not match its base snapshot".into(),
             ));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(source.clone());
         }
         Snapshot::from_bytes(self.after.to_vec())

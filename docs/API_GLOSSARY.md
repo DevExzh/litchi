@@ -48,7 +48,7 @@ transaction is the bare `Package::edit()`.
 | PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
 | PPTX chunked shape publication | `Edit::{set_shape_text_chunks, set_shape_property_chunks}` | — | Eager/source primary and focused source edits admit bounded, globally disjoint chunks together for one same-slide publication (0158); single-chunk setter limits are retained |
 | PPT chunked text publication | `Edit::set_shape_text_chunks` | — | At most 4096 globally distinct targets across at most 4096 chunks, each bounded at 256; one native publication and complete readback per call (0220); ordinary `set_shape_texts` remains bounded at 256 |
-| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); ✅ XLSB `cell_values`, `cell_values::structure` and `cell_values::worksheet` complete with `Error` and `LimitKind` and registered (0261); 🔴 remaining XLSB scoped mutators (W2); ✅ scoped PPTX families renamed `Edit` (0252) |
+| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); ✅ XLSB `cell_values`, `cell_values::structure` and `cell_values::worksheet` complete with `Error` and `LimitKind` and registered (0261); ✅ XLS scoped families (`sheet_visibility`, `ole_object`, `real_time_data`, `revision_records`, `user_names`, `picture_compression`, `chart_area`, `web_pub`, `external_link`) (0259); ✅ scoped PPTX families renamed `Edit` (0252); 🔴 remaining XLSB scoped mutators and scoped PPTX families (W2) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
 | New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250) · 🔴 other W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250) · 🔴 remaining owners (W2) |
@@ -57,6 +57,14 @@ transaction is the bare `Package::edit()`.
 | No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250) · ✅ scoped PPTX families: `diagnostics().changed()` / `is_noop()` (0252) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ scoped PPTX families (0252) |
+
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ every DOC transaction, `rollback` banned crate-wide (0258); 🔴 scoped PPTX families (W2) |
+
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ PPT root `slide_order::Transaction` and `text_edit::{Transaction, SourceTransaction}` (0260); 🔴 scoped PPTX families (W2); 🔴 scoped PPT families (W4 residue, 0260) |
+
+| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250), XLS scoped families (0259) · 🔴 remaining W2 |
+| Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116), XLS scoped families (0259); 🔴 scoped PPTX families (W2) |
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
@@ -88,7 +96,7 @@ and redaction vocabulary remain pending.
 | Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252); ✅ XLSB `Package` (0261; copies into the owned source archive; `from_slice*` deleted) · 🔴 W3 |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; ✅ XLSB `Package`/`SourceBackedWorkbook` (0261); extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) · ✅ XLSB `OpenOptions` (source, external-link and cache limits, leniency, drawing decoding, execution context) on `Package`, the `Workbook` projection constructors and `SourceBackedWorkbook` (0261) · ✅ DOC raw owner and part editors, `open_with_limits*` banned crate-wide (0258) · ✅ PPT `text_edit::SourceSnapshot::open_with_options` and `slide_order::Snapshot::from_bytes_with_options` only (0260); 🔴 PPT `raw::Reader` limits-only ingress and scoped-family `*_with_limits` (W4 residue) |
 | Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
@@ -256,14 +264,16 @@ semantic-limit migrations.
 
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
-| Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · 🔴 numbers (W1) |
+| Catalog selector | `Selector<'a> = Name(Cow<'a, str>) \| Position(Position)` | the `Id` variant (raw IDs live in raw modules); `Index(usize)` (numbers); `At`/`Index` selector forms (pages footnotes) | ✅ core/pages/keynote shape · ✅ XLS `cell_values`/`sheet_visibility` `Position(Position)` (0259) · 🔴 numbers (W1) |
 | Positional selection word | `Position` — checked, zero-based value type | `Index` as a selector variant; raw `usize` in public signatures (facade `slide(usize)`, `paragraph(usize)`) | 🔴 facade fold into M0a |
 | Selector-taking methods | `impl Into<Selector>` parameter, `Result<Option<_>>` return; missing → `Ok(None)`, ambiguous/invalid → typed error, never panics, no `Index` trait | method-level splits that bypass the selector channel | pptx `scene::get/at` converge (W2) |
 | Grid coordinates (not selectors) | `At` / `Area` with A1 parsing at the edge | treating coordinates as catalog selectors | ✅ xlsx; rule recorded |
 | Name identity policy | follows the producing application; fresh authoring defaults to Unicode caseless | silently mixing case policies | ✅ behavior unchanged; per-format registration below |
 
 Registered name-identity policies: xlsx sheet names — Unicode caseless
-(Excel semantics); docx glossary entries — NFD/case-fold/NFD (Word
+(Excel semantics); xls sheet names — the same Unicode caseless key (NFD,
+default case fold, NFD) for the reader's duplicate check, selector lookup,
+rename and tab insertion (`litchi_xls::sheet_name`, record 0259); docx glossary entries — NFD/case-fold/NFD (Word
 semantics); pages section names — case-sensitive (Pages semantics); keynote
 slide names — exact (Keynote semantics).
 
@@ -1389,6 +1399,26 @@ replacement and unrepresented dependency/inverse closures remain explicit
 element-level gaps. No parallel mutable workbook model or transaction family
 is introduced.
 
+## XLS unified P0 and W4 residue (record 0259)
+
+Unified XLS adds sheet add/remove/move/swap, row and column height, width,
+hidden state and empty insertion/removal, formula writes with `formula` and
+`cachedValue` reads, cell alignment/border/fill writes through `XF` records,
+and read-only `namedrange` nodes. Every write is a native `Package::edit`
+operation: `Edit::{reorder_sheets, insert_sheet, remove_sheet, set_formula,
+set_row_height, set_row_hidden, set_column_width, set_column_hidden,
+set_cell_format}` with `cell_values::FormatChange`. Sheet-name identity uses
+the registered caseless key.
+
+W4 residue: the scoped XLS families name their transaction `Edit`; the
+`Transaction` names, `UserNamesTransaction`/`UserNamesPackageTransaction`,
+`rollback`, `is_changed`, `Patch::is_empty` and
+`sheet_visibility::Snapshot::transaction` are removed and banned in the
+`xls-minimal` profile. The `cell_values` and `sheet_visibility` selectors
+carry a checked `litchi_core::Position`. `property_set::Transaction` remains
+because the record 0254 metadata owner uses it. See
+[0259](unified-ops/0259-xls-unified-p0.md).
+
 ## Unified PPT navigation (0215)
 
 The PPT adapter now supports unified `get`, `find`, `query` and semantic views
@@ -1419,6 +1449,23 @@ shared post-detachment contract; removal selectors resolve before descending
 native staging. A swap composes at most two native slide moves in one edit.
 Exact self moves/swaps preserve snapshot identity. Slide and shape insertion,
 shape removal, and consecutive-command coalescing remain open.
+
+## PPT P0 read and write surface (0260)
+
+The native leg adds `package::edit::Edit::{insert_slide, set_notes_text}` (and
+the same methods on `slide_order::Transaction`), named after the PPTX
+`Edit::insert_slide` verb; `insert_slide(position)` creates a blank-layout
+slide. Shapes expose `ShapeEnum::{name, description, source_index, id}`
+(L-PPT-R3/R4) and slide-list placeholder text is read and written through
+`OutlineTextBody` (L-PPT-R1). `text_edit::Refusal::NoNotesPage` names the
+missing-notes refusal. The unified PPT adapter reads `/slide[N]/notes`,
+`.../paragraph[N]`, `name`, `alt` and raw `sourceIndex`, sets notes and
+paragraph `text`, and adds slides. Removed and banned in both PPT profiles:
+`text_edit::SourceSnapshot::open_with_limits`, `rollback` on
+`text_edit::{Transaction, SourceTransaction}` and `slide_order::Transaction`,
+and `slide_order::Snapshot::from_bytes_with_limits`. `ppt-full` now also
+bans `Builder::set_property` and checks the `package::metadata` family, as
+`ppt-minimal` already did. See [0260](unified-ops/0260-ppt-p0-surface.md).
 
 ## Unified PPT shape runs (0218)
 
@@ -1707,3 +1754,37 @@ diagnostics, into_parts}`). The unified layer accepts initial metadata in
 `create_with` and `set("/metadata", ..)` with record 0254's 22
 root-metadata keys, `custom.<name>` and `null` removal; `/metadata` stays
 set-only for every format.
+
+## DOC P0 surface and W4 residue (record 0258)
+
+Positional DOC readers take `Position`, never raw `usize`:
+`Document::{body_paragraph, body_table, footnote, endnote, comment,
+header_footer_slot, section_header_footer}` and `StoryBlocks::{get,
+get_kind, paragraph, table, element, paragraph_text}`; `HeaderFooterSlot`
+reports its sections as `Position`. The primary `doc::Edit` gains
+`set_character_value(TextTarget, CharacterValue)`, `insert_paragraph`,
+`remove_paragraph` and `move_paragraph`; `TextTarget::BodySpan` addresses
+one run. Part-level ingress is `open(bytes)`, `open_with_policy` and
+`open_with_options(bytes, &EditOptions)` (revision limits plus protection
+policy); `SourceSnapshot` keeps `open_with_options(source,
+SourceBackedOptions)`; the raw owner's configured open is
+`raw::Package::open_with_options(path, OpenOptions)`; smart tags adopt a
+bounded `Snapshot::parse_with_options_and_policy` result through
+`Editor::from_snapshot`. `open_with_limits`, `open_with_limits_and_policy`
+and every `rollback` are removed and banned in both DOC profiles (dropping a
+transaction is the rollback). See
+[0258](unified-ops/0258-doc-p0-surface.md).
+
+## Registry schema export (record 0263)
+
+`litchi_ops::schema(format) -> schema::Schema` is the one export of the
+property registry (`litchi::schema` in the facade, `litchi schema <type>` in
+the CLI, `litchi_py.schema(format)` in Python). `Schema::{format,
+registered, elements, element, gaps}` reuses the capability report's
+`Element`/`Property`/`Gap` types; it is not a second element model.
+`capabilities::Property` gains `aliases()`, `constraint()`, `clearable()`
+and `write_gap()`, and `capabilities::Constraint` (`None`, `Int`, `Number`,
+`Length`, `Chars`, `NotEmpty`) names the registry's value domain. The
+format-level report stays `Capabilities::of`; the file-level one stays
+`File::capabilities`. No alias names are added. See
+[0263](unified-ops/0263-registry-schema-export.md).

@@ -24,7 +24,7 @@ const FC_SIZE: usize = 4;
 ///
 /// This structure is part of PAPX BX entries and contains paragraph height information.
 /// Based on org.apache.poi.hwpf.model.ParagraphHeight.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ParagraphHeight {
     /// Info field containing various bit flags
     pub info_field: u16,

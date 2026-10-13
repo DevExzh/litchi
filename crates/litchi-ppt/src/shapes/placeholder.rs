@@ -410,6 +410,10 @@ impl<'a> Placeholder<'a> {
     pub(crate) fn mark_source_bound(&mut self) {
         self.container.mark_source_bound();
     }
+
+    pub(crate) fn apply_source_identity(&mut self, identity: super::shape::SourceIdentity) {
+        self.container.apply_source_identity(identity);
+    }
 }
 
 impl<'a> Shape for Placeholder<'a>

@@ -160,19 +160,31 @@ fn structural_index_distinguishes_disjoint_cells_and_sheet_wide_axes() {
 fn joining_a_noop_then_staging_reuses_the_coordinate_slot() {
     let source = Snapshot::from_bytes(package()).unwrap();
     let mut left = source.edit();
-    left.set_number(Selector::Position(0), Reference { row: 0, column: 0 }, 1.0)
-        .unwrap();
+    left.set_number(
+        Selector::Position(Position::new(0)),
+        Reference { row: 0, column: 0 },
+        1.0,
+    )
+    .unwrap();
     let mut incoming = source.edit();
     incoming
-        .set_number(Selector::Position(0), Reference { row: 0, column: 0 }, 2.0)
+        .set_number(
+            Selector::Position(Position::new(0)),
+            Reference { row: 0, column: 0 },
+            2.0,
+        )
         .unwrap();
     left.join(incoming).unwrap();
-    left.set_number(Selector::Position(0), Reference { row: 0, column: 0 }, 3.0)
-        .unwrap();
+    left.set_number(
+        Selector::Position(Position::new(0)),
+        Reference { row: 0, column: 0 },
+        3.0,
+    )
+    .unwrap();
     let commit = left.commit().unwrap();
     let snapshot = commit.snapshot();
     let cell = snapshot
-        .worksheet(Selector::Position(0))
+        .worksheet(Selector::Position(Position::new(0)))
         .unwrap()
         .unwrap()
         .number(Reference { row: 0, column: 0 })
@@ -189,11 +201,11 @@ fn joined_fixed_and_structural_cell_operations_conflict_in_both_orders() {
 
     let mut fixed = source.edit();
     fixed
-        .set_number(Selector::Position(0), reference, 4.0)
+        .set_number(Selector::Position(Position::new(0)), reference, 4.0)
         .unwrap();
     let mut structural = source.edit();
     structural
-        .set_style(Selector::Position(0), reference, style)
+        .set_style(Selector::Position(Position::new(0)), reference, style)
         .unwrap();
     assert!(matches!(
         fixed.join(structural.clone()),
@@ -202,11 +214,11 @@ fn joined_fixed_and_structural_cell_operations_conflict_in_both_orders() {
 
     let mut structural_first = source.edit();
     structural_first
-        .set_style(Selector::Position(0), reference, style)
+        .set_style(Selector::Position(Position::new(0)), reference, style)
         .unwrap();
     let mut fixed_second = source.edit();
     fixed_second
-        .set_number(Selector::Position(0), reference, 4.0)
+        .set_number(Selector::Position(Position::new(0)), reference, 4.0)
         .unwrap();
     assert!(matches!(
         structural_first.join(fixed_second),
@@ -228,22 +240,22 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
     // one more target.  The clone must carry the rebuilt coordinate sidecar.
     let mut fixed = source.edit();
     fixed
-        .set_numeric(Selector::Position(1), reference(2, 2), 33.0)
+        .set_numeric(Selector::Position(Position::new(1)), reference(2, 2), 33.0)
         .unwrap();
     fixed
-        .set_numeric(Selector::Position(0), reference(1, 1), 22.0)
+        .set_numeric(Selector::Position(Position::new(0)), reference(1, 1), 22.0)
         .unwrap();
     let mut incoming_fixed = source.edit();
     incoming_fixed
-        .set_numeric(Selector::Position(1), reference(0, 0), 11.0)
+        .set_numeric(Selector::Position(Position::new(1)), reference(0, 0), 11.0)
         .unwrap();
     incoming_fixed
-        .set_numeric(Selector::Position(0), reference(0, 0), 12.0)
+        .set_numeric(Selector::Position(Position::new(0)), reference(0, 0), 12.0)
         .unwrap();
     fixed.join(incoming_fixed).unwrap();
     let mut fixed_clone = fixed.clone();
     fixed_clone
-        .set_numeric(Selector::Position(1), reference(1, 1), 23.0)
+        .set_numeric(Selector::Position(Position::new(1)), reference(1, 1), 23.0)
         .unwrap();
     let fixed_commit = fixed_clone.commit().unwrap();
     let fixed_snapshot = fixed_commit.snapshot();
@@ -256,7 +268,7 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
         (1, 2, 2, 33.0),
     ] {
         let actual = fixed_snapshot
-            .worksheet(Selector::Position(sheet))
+            .worksheet(Selector::Position(Position::new(sheet)))
             .unwrap()
             .unwrap()
             .number(reference(row, column))
@@ -280,22 +292,22 @@ fn joined_cloned_edits_rebuild_indexes_across_sheets_and_invert_exactly() {
     // its post-join insertion path independently of fixed edits.
     let mut structural = source.edit();
     structural
-        .remove_cell(Selector::Position(1), reference(2, 2))
+        .remove_cell(Selector::Position(Position::new(1)), reference(2, 2))
         .unwrap();
     structural
-        .remove_cell(Selector::Position(0), reference(1, 1))
+        .remove_cell(Selector::Position(Position::new(0)), reference(1, 1))
         .unwrap();
     let mut incoming_structural = source.edit();
     incoming_structural
-        .remove_cell(Selector::Position(1), reference(0, 0))
+        .remove_cell(Selector::Position(Position::new(1)), reference(0, 0))
         .unwrap();
     incoming_structural
-        .remove_cell(Selector::Position(0), reference(0, 0))
+        .remove_cell(Selector::Position(Position::new(0)), reference(0, 0))
         .unwrap();
     structural.join(incoming_structural).unwrap();
     let mut structural_clone = structural.clone();
     structural_clone
-        .remove_cell(Selector::Position(1), reference(1, 1))
+        .remove_cell(Selector::Position(Position::new(1)), reference(1, 1))
         .unwrap();
     let structural_commit = structural_clone.commit().unwrap();
     for (position, worksheet) in structural_commit.snapshot().worksheets().enumerate() {

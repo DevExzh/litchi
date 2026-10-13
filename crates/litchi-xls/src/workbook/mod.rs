@@ -21,6 +21,6 @@ pub use crate::source_limits::{SourceLimitKind, SourceLimits, SourceLimitsBuilde
 pub use model::OpenOptions;
 pub use source::{
     SourceBackedCell, SourceBackedError, SourceBackedLimits, SourceBackedOptions,
-    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor,
+    SourceBackedWorkbook, SourceBackedWorksheet, SourceBackedWorksheetDescriptor, StyleTables,
 };
 pub(crate) use validation_only::{KeptCells, ValidationWorkbook};

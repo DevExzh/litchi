@@ -14,12 +14,12 @@ use super::{Commit, Patch, Snapshot};
 /// is replaced only after the package editor has validated and published that
 /// candidate, so failed edits leave all typed views unchanged.
 #[derive(Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     editor: Editor,
 }
 
-impl Transaction {
+impl Edit {
     pub(super) fn new(source: Snapshot) -> Self {
         Self {
             editor: source.editor().clone(),
@@ -184,20 +184,6 @@ impl Transaction {
         payload: EmbeddedPayload,
     ) -> Result<()> {
         self.with_candidate(|editor| editor.replace_embedded_payload(worksheet, object_id, payload))
-    }
-
-    /// Whether the current candidate serializes differently from its source.
-    /// # Errors
-    ///
-    /// Returns an error if validation, decoding, encoding, or the requested operation fails.
-    pub fn is_changed(&self) -> Result<bool> {
-        Ok(self.editor.clone().finish()? != self.source.bytes())
-    }
-
-    /// Discards the candidate and returns the original snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validates and publishes the candidate as a snapshot plus reversible

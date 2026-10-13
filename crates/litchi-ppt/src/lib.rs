@@ -142,6 +142,7 @@ pub mod master_layout;
 pub mod master_style;
 pub mod modify_password;
 pub mod named_shows;
+pub mod outline_text;
 pub mod picture_bullets;
 pub mod placeholder_atom;
 pub mod print_options;
@@ -281,6 +282,7 @@ pub use main_master::{
 pub use master_style::{TextMasterStyle, TextMasterStyleLevel};
 pub use modify_password::ModifyPassword;
 pub use named_shows::{NamedShow, NamedShows};
+pub use outline_text::OutlineTextBody;
 pub use picture_bullets::{
     MAX_PICTURE_BULLET_INDEX, PictureBullet, PictureBulletChange, PictureBulletChangeKind,
     PictureBulletCollection, PictureBulletCommit, PictureBulletLimits, PictureBulletPackageLimits,

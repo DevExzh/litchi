@@ -13,11 +13,11 @@ mod model;
 mod package;
 pub mod publication;
 
-pub use edit::{Commit, Patch, Snapshot, Transaction};
+pub use edit::{Commit, Edit, Patch, Snapshot};
 pub use model::{Limits, UserCheck, UserEntry, UserGuid, UserNames};
 pub use publication::{
-    Commit as PackageCommit, Patch as PackagePatch, Snapshot as PackageSnapshot,
-    Transaction as PackageTransaction,
+    Commit as PackageCommit, Edit as PackageEdit, Patch as PackagePatch,
+    Snapshot as PackageSnapshot,
 };
 
 /// Exact root-storage stream name required by MS-XLS 2.1.7.17.
@@ -25,8 +25,6 @@ pub const USER_NAMES_STREAM_NAME: &str = "User Names";
 
 /// Alias emphasizing the stream owner in APIs that expose several snapshots.
 pub type UserNamesSnapshot = Snapshot;
-/// Alias emphasizing the stream owner in APIs that expose several transactions.
-pub type UserNamesTransaction = Transaction;
 /// Alias emphasizing the stream owner in APIs that expose several patches.
 pub type UserNamesPatch = Patch;
 

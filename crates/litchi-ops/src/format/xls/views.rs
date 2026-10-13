@@ -15,13 +15,13 @@ use crate::format::workbook::Label;
 use crate::path::vocabulary::Case;
 use crate::view::mode::{Mode, Options};
 
-struct Worksheet {
+struct Worksheet<'f> {
     position: usize,
     name: String,
-    handle: SheetHandle,
+    handle: SheetHandle<'f>,
 }
 
-impl Worksheet {
+impl Worksheet<'_> {
     fn grid(&self) -> Result<Grid> {
         self.handle.grid()
     }
@@ -73,7 +73,7 @@ fn sink(_: fmt::Error) -> Error {
         .with_format(litchi_core::FileFormat::Xls)
 }
 
-fn worksheets(file: &Xls) -> Result<Vec<Worksheet>> {
+fn worksheets(file: &Xls) -> Result<Vec<Worksheet<'_>>> {
     let count = super::nav::tab_count(file)?;
     let mut sheets = Vec::new();
     sheets.try_reserve_exact(count).map_err(|_| {
@@ -267,7 +267,7 @@ struct SheetOutline {
     error_cells: usize,
 }
 
-fn sheet_outline(sheet: &Worksheet) -> Result<SheetOutline> {
+fn sheet_outline(sheet: &Worksheet<'_>) -> Result<SheetOutline> {
     let grid = sheet.grid()?;
     let rows = row_indices(&grid);
     let mut formula_cells = 0;

@@ -23,7 +23,12 @@
     )
 )]
 
+mod format;
+mod layout;
 mod structural;
+mod tabs;
+
+pub use format::FormatChange;
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::workbook::{KeptCells, ValidationWorkbook};
@@ -41,7 +46,7 @@ use litchi_core::patch::{
     Reversible, ReversibleOperation,
 };
 use litchi_core::sheet::{Cell as _, CellValue};
-use litchi_core::{ReadAt, SourceVersion};
+use litchi_core::{Position, ReadAt, SourceVersion};
 use litchi_ole_common::object::{Editor as PackageEditor, Limits, Targets};
 use litchi_ole_common::source_backed_overlay::SourceBackedOverlayPublisher;
 use std::collections::BTreeMap;
@@ -228,7 +233,7 @@ pub enum Selector<'a> {
     /// Select a worksheet by case-insensitive developer-visible tab name.
     Name(&'a str),
     /// Select a worksheet by checked zero-based workbook tab position.
-    Position(usize),
+    Position(Position),
 }
 
 impl<'a> From<&'a str> for Selector<'a> {
@@ -237,9 +242,15 @@ impl<'a> From<&'a str> for Selector<'a> {
     }
 }
 
+impl From<Position> for Selector<'_> {
+    fn from(value: Position) -> Self {
+        Self::Position(value)
+    }
+}
+
 impl From<usize> for Selector<'_> {
     fn from(value: usize) -> Self {
-        Self::Position(value)
+        Self::Position(Position::new(value))
     }
 }
 
@@ -1091,6 +1102,8 @@ impl Snapshot {
             resource_changes: Vec::new(),
             fixed_index: FixedChangeIndex::default(),
             structural_index: StructuralChangeIndex::default(),
+            tab_change: None,
+            layout_changes: Vec::new(),
         }
     }
 
@@ -1106,7 +1119,7 @@ impl Snapshot {
                 .inner
                 .sheets
                 .iter()
-                .position(|sheet| sheet.workbook_index == position)),
+                .position(|sheet| sheet.workbook_index == position.get())),
             Selector::Name(name) => {
                 let mut matches = self
                     .inner
@@ -1661,6 +1674,12 @@ pub struct Edit {
     resource_changes: Vec<ResourceChange>,
     fixed_index: FixedChangeIndex,
     structural_index: StructuralChangeIndex,
+    /// A complete-catalog tab-structure change.  It is exclusive: an edit
+    /// carrying one stages nothing else, because every other staged
+    /// operation addresses tabs by their source catalog position.
+    tab_change: Option<Box<tabs::TabChange>>,
+    /// Row and column layout transitions, one per row or column.
+    layout_changes: Vec<layout::LayoutChange>,
 }
 
 /// One exact cell targeted differently by independently prepared transactions.
@@ -1777,6 +1796,22 @@ impl Edit {
     pub fn join(&mut self, incoming: Self) -> std::result::Result<&mut Self, JoinError> {
         if self.source.bytes() != incoming.source.bytes() {
             return Err(JoinError::DifferentSource);
+        }
+        if !self.layout_changes.is_empty() || !incoming.layout_changes.is_empty() {
+            return Err(JoinError::StructuralConflicts(Box::new([
+                OperationConflict {
+                    target: "layout".to_string(),
+                },
+            ])));
+        }
+        if self.tab_change.is_some() || incoming.tab_change.is_some() {
+            // A tab-structure change renumbers every catalog position the
+            // other transaction addresses; it is never composed.
+            return Err(JoinError::StructuralConflicts(Box::new([
+                OperationConflict {
+                    target: tabs::SEMANTIC_TARGET.to_string(),
+                },
+            ])));
         }
         if self.source.inner.limits != incoming.source.inner.limits
             || self.source.inner.cfb_limits != incoming.source.inner.cfb_limits
@@ -2332,14 +2367,18 @@ impl Edit {
             match operation {
                 TransferCell::Insert { reference, value } => {
                     staged.insert_cell_with_style(
-                        Selector::Position(target_position),
+                        Selector::Position(Position::new(target_position)),
                         reference,
                         value,
                         target_style,
                     )?;
                 },
                 TransferCell::SetNumber { reference, value } => {
-                    staged.set_number(Selector::Position(target_position), reference, value)?;
+                    staged.set_number(
+                        Selector::Position(Position::new(target_position)),
+                        reference,
+                        value,
+                    )?;
                 },
             }
         }
@@ -2690,6 +2729,119 @@ impl Edit {
         })
     }
 
+    /// Writes one formula cell from the writer's bounded BIFF8 tokenizer.
+    ///
+    /// An absent coordinate receives a new Formula record with the
+    /// workbook's default XF, exactly as [`Self::insert_formula`] does. An
+    /// existing scalar cell (including a packed `MulRk`/`MulBlank` member) is
+    /// replaced in the same edit: its record is removed and the Formula is
+    /// authored with the cell's existing XF. The authored record carries an
+    /// empty cached result and `fAlwaysCalc`, so a spreadsheet application
+    /// recalculates it; this crate does not evaluate the expression.
+    /// Existing Formula records are refused because shared, array and table
+    /// owners and string caches need a dependency-aware rewrite.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_xls::cell_values::{Reference, Selector, Snapshot, Storage};
+    /// # let mut builder = litchi_xls::Builder::new();
+    /// # let sheet = builder.add_worksheet("Data")?;
+    /// # builder.write_number(sheet, 0, 0, 2.0)?;
+    /// # builder.write_number(sheet, 0, 1, 7.0)?;
+    /// # let bytes = builder.build()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// let b1 = Reference::new(0, 1)?;
+    /// edit.set_formula(Selector::Name("Data"), b1, "A1*3")?;
+    /// let target = edit.commit()?.into_parts().0;
+    /// let cell = target.worksheet(Selector::Position(Position::new(0)))?.unwrap().cell(b1)?.unwrap();
+    /// assert_eq!(cell.storage(), Storage::Formula);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a tokenizer, token-size, existing-formula, style, dependency,
+    /// allocation, or transaction-bound refusal without partially staging.
+    pub fn set_formula(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        expression: &str,
+    ) -> Result<()> {
+        let sheet = self.require_sheet(selector, "Formula write")?;
+        let current = self.source.inner.sheets[sheet]
+            .unique_entry_index(reference)?
+            .map(|index| self.source.inner.sheets[sheet].entries[index].cell.clone());
+        let Some(cell) = current else {
+            return self.insert_formula(
+                Selector::Position(Position::new(
+                    self.source.inner.sheets[sheet].workbook_index,
+                )),
+                reference,
+                expression,
+            );
+        };
+        if cell.storage == Storage::Formula {
+            return Err(Error::UnsafeEdit(
+                "existing Formula records require a dependency-aware formula rewrite".into(),
+            ));
+        }
+        if expression.is_empty() {
+            return Err(Error::InvalidData(
+                "authored Formula expression must be nonempty".into(),
+            ));
+        }
+        let parsed = crate::writer::FormulaTokenizer::new().tokenize(expression)?;
+        let tokens = crate::writer::formula::encode_ptg_tokens(&parsed)?;
+        if tokens.is_empty() || tokens.len() > MAX_FORMULA_TOKEN_BYTES {
+            return Err(Error::UnsafeEdit(
+                "authored Formula token bytes are empty or exceed the BIFF8 record limit".into(),
+            ));
+        }
+        let mut staged = self.clone();
+        staged.stage_structural(StructuralChange::Cell {
+            sheet,
+            reference,
+            before: Some((cell.storage, cell.value.clone(), cell.style)),
+            after: None,
+        })?;
+        staged.stage_resource(ResourceChange::FormulaCell {
+            sheet,
+            reference,
+            style: cell.style,
+            tokens,
+            insert: true,
+        })?;
+        *self = staged;
+        Ok(())
+    }
+
+    /// Whether this edit removes the authored Formula at one coordinate.
+    fn staged_formula_removal(&self, sheet: usize, reference: Reference) -> bool {
+        self.resource_changes.iter().any(|resource| {
+            matches!(resource, ResourceChange::FormulaCell { insert: false, .. })
+                && formula_resource_cell(resource) == Some((sheet, reference))
+        })
+    }
+
+    /// Whether this edit removes the source cell at one coordinate.
+    fn staged_removal(&self, sheet: usize, reference: Reference) -> bool {
+        self.structural_index
+            .cell(sheet, reference)
+            .and_then(|index| self.structural_changes.get(index))
+            .is_some_and(|change| {
+                matches!(
+                    change,
+                    StructuralChange::Cell {
+                        before: Some(_),
+                        after: None,
+                        ..
+                    }
+                )
+            })
+    }
+
     /// Inserts a previously absent scalar cell with an existing XF resource.
     ///
     /// # Errors
@@ -2730,6 +2882,7 @@ impl Edit {
         if self.source.inner.sheets[sheet]
             .unique_entry_index(reference)?
             .is_some()
+            && !self.staged_formula_removal(sheet, reference)
         {
             return Err(Error::UnsafeEdit(
                 "BIFF8 cell insertion target is occupied".into(),
@@ -2807,6 +2960,99 @@ impl Edit {
             before: Some((cell.storage, cell.value.clone(), cell.style)),
             after: Some((cell.storage, cell.value.clone(), style)),
         })
+    }
+
+    /// Changes one cell's alignment, border styles or fill.
+    ///
+    /// The cell's effective XF is rewritten with the requested fields; an
+    /// identical effective XF is reused, otherwise one XF resource is
+    /// authored in this edit. An absent coordinate gains a formatting-only
+    /// `Blank` cell whose base is the workbook's default cell XF. An empty or
+    /// ineffective change is an exact no-op.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_xls::cell_values::{FormatChange, Reference, Selector, Snapshot};
+    /// use litchi_xls::HorizontalAlignment;
+    /// # let mut builder = litchi_xls::Builder::new();
+    /// # let sheet = builder.add_worksheet("Data")?;
+    /// # builder.write_number(sheet, 0, 0, 1.0)?;
+    /// # let bytes = builder.build()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// let mut change = FormatChange::default();
+    /// change.horizontal = Some(HorizontalAlignment::Right);
+    /// edit.set_cell_format(Selector::Position(Position::new(0)), Reference::new(0, 0)?, &change)?;
+    /// assert!(edit.commit()?.diagnostics().changed());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed indent, palette-color, selector, formula-dependency,
+    /// style-resource or bound refusal without staging.
+    pub fn set_cell_format(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        change: &FormatChange,
+    ) -> Result<()> {
+        if change.is_empty() {
+            return Ok(());
+        }
+        let sheet = self.require_sheet(selector, "cell format")?;
+        let current = self.source.inner.sheets[sheet]
+            .unique_entry_index(reference)?
+            .map(|index| self.source.inner.sheets[sheet].entries[index].cell.style);
+        let base = match current {
+            Some(style) => style,
+            None => scalar_default_style(&self.source)?,
+        };
+        let payload = self
+            .effective_xf_payload(base)
+            .ok_or_else(|| Error::UnsafeEdit("cell XF resource is absent".into()))?
+            .to_vec();
+        let palette = if change.fill_foreground.is_some() || change.fill_background.is_some() {
+            format::workbook_palette(&self.source.inner.workbook_stream)?
+        } else {
+            crate::Palette::default()
+        };
+        let target = format::apply(&payload, change, &palette)?;
+        if target == payload {
+            return Ok(());
+        }
+        let mut staged = self.clone();
+        let style = match staged.effective_style_with_payload(&target) {
+            Some(style) => style,
+            None => staged.author_style(&target)?,
+        };
+        match current {
+            Some(_) => staged.set_style(
+                Selector::Position(Position::new(
+                    staged.source.inner.sheets[sheet].workbook_index,
+                )),
+                reference,
+                style,
+            )?,
+            None => staged.insert_cell_with_style(
+                Selector::Position(Position::new(
+                    staged.source.inner.sheets[sheet].workbook_index,
+                )),
+                reference,
+                Value::Blank,
+                style,
+            )?,
+        }
+        *self = staged;
+        Ok(())
+    }
+
+    /// An effective cell XF whose payload equals `payload`.
+    fn effective_style_with_payload(&self, payload: &[u8]) -> Option<StyleIndex> {
+        (0..self.effective_xf_count())
+            .filter_map(|index| u16::try_from(index).ok())
+            .map(StyleIndex)
+            .find(|style| self.effective_xf_payload(*style) == Some(payload))
     }
 
     /// Duplicates an existing XF into a newly authored workbook resource.
@@ -3024,6 +3270,7 @@ impl Edit {
     }
 
     fn stage_resource(&mut self, change: ResourceChange) -> Result<()> {
+        self.require_no_tab_change()?;
         if self
             .resource_changes
             .iter()
@@ -3105,8 +3352,12 @@ impl Edit {
                 insert,
             } => {
                 self.require_effective_style(*style)?;
+                // A staged removal of the same coordinate is the one cell
+                // operation an authored Formula may follow: together they
+                // replace a scalar cell with a formula.
+                let replaced = self.staged_removal(*sheet, *reference);
                 if self.structural_index.axis(*sheet).is_some()
-                    || self.structural_index.has_cell_sheet(*sheet)
+                    || (self.structural_index.cell(*sheet, *reference).is_some() && !replaced)
                 {
                     return Err(Error::UnsafeEdit(
                         "authored Formula cannot overlap another structural worksheet edit".into(),
@@ -3132,7 +3383,7 @@ impl Edit {
                 let current = sheet_data
                     .unique_entry_index(*reference)?
                     .map(|index| &sheet_data.entries[index]);
-                if *insert && current.is_some() {
+                if *insert && current.is_some() && !replaced {
                     return Err(Error::UnsafeEdit(
                         "authored Formula insertion target is occupied".into(),
                     ));
@@ -3243,6 +3494,430 @@ impl Edit {
         })
     }
 
+    /// Sets one row's height in twips (1/20 point) and marks it custom.
+    ///
+    /// The row need not hold cells: a missing `Row` record is created. Row
+    /// layout composes with cell edits of the same worksheet but not with an
+    /// axis shift.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// edit.set_row_height(Selector::Position(Position::new(0)), 4, 600)?;
+    /// edit.set_row_hidden(Selector::Position(Position::new(0)), 5, true)?;
+    /// let committed = edit.commit()?;
+    /// assert!(committed.diagnostics().changed());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed range, selector, axis-overlap, or bound refusal
+    /// without staging.
+    pub fn set_row_height(&mut self, selector: Selector<'_>, row: u16, twips: u16) -> Result<()> {
+        if twips == 0 || twips > layout::MAX_ROW_TWIPS {
+            return Err(Error::InvalidData(
+                "row height must be 1 through 8,180 twips (409 pt)".into(),
+            ));
+        }
+        self.stage_row_layout(selector, row, |state| {
+            state.present = true;
+            state.height = twips;
+            state.custom = true;
+        })
+    }
+
+    /// Hides or shows one row, keeping its height.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, axis-overlap, or bound refusal without
+    /// staging.
+    pub fn set_row_hidden(&mut self, selector: Selector<'_>, row: u16, hidden: bool) -> Result<()> {
+        self.stage_row_layout(selector, row, |state| {
+            if state.present || hidden {
+                state.present = true;
+                state.hidden = hidden;
+            }
+        })
+    }
+
+    /// Sets one column's width in 1/256 of a character and marks it user-set.
+    /// A `ColInfo` range covering other columns is split around it.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed range, selector, record-layout, axis-overlap, or bound
+    /// refusal without staging.
+    pub fn set_column_width(
+        &mut self,
+        selector: Selector<'_>,
+        column: u8,
+        width: u16,
+    ) -> Result<()> {
+        if width > layout::MAX_COLUMN_WIDTH {
+            return Err(Error::InvalidData(
+                "column width must be at most 255 characters".into(),
+            ));
+        }
+        self.stage_column_layout(selector, column, |state| {
+            state.present = true;
+            state.width = width;
+            state.user_set = true;
+        })
+    }
+
+    /// Hides or shows one column, keeping its width.
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, record-layout, axis-overlap, or bound
+    /// refusal without staging.
+    pub fn set_column_hidden(
+        &mut self,
+        selector: Selector<'_>,
+        column: u8,
+        hidden: bool,
+    ) -> Result<()> {
+        let default_width = self.default_column_width(selector)?;
+        self.stage_column_layout(selector, column, |state| {
+            if state.present || hidden {
+                if !state.present {
+                    state.width = default_width;
+                }
+                state.present = true;
+                state.hidden = hidden;
+            }
+        })
+    }
+
+    /// The source substream of one editable worksheet.
+    fn sheet_stream(&self, sheet: usize) -> Result<&[u8]> {
+        let workbook_index = self.source.inner.sheets[sheet].workbook_index;
+        let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
+        let tab = catalog
+            .get(workbook_index)
+            .ok_or_else(|| Error::UnsafeEdit("worksheet tab position is stale".into()))?;
+        self.source
+            .inner
+            .workbook_stream
+            .get(tab.start..tab.end)
+            .ok_or_else(|| Error::InvalidData("worksheet substream is outside Workbook".into()))
+    }
+
+    /// The `DefColWidth` width in 1/256 character, for a newly covered column.
+    fn default_column_width(&self, selector: Selector<'_>) -> Result<u16> {
+        let sheet = self.require_sheet(selector, "column layout")?;
+        let stream = self.sheet_stream(sheet)?;
+        let mut width = 8_u16;
+        for item in Records::new(stream) {
+            let record = item?;
+            match record.kind().get() {
+                0x0055 if record.payload().len() >= 2 => {
+                    width = binary::read_u16_le_at(record.payload(), 0)?;
+                    break;
+                },
+                EOF => break,
+                _ => {},
+            }
+        }
+        Ok(width.saturating_mul(256))
+    }
+
+    fn require_layout_sheet(&self, selector: Selector<'_>, context: &str) -> Result<usize> {
+        self.require_no_tab_change()?;
+        let sheet = self.require_sheet(selector, context)?;
+        if self.structural_index.axis(sheet).is_some() {
+            return Err(Error::UnsafeEdit(
+                "a row or column layout change cannot follow an axis shift of its worksheet".into(),
+            ));
+        }
+        Ok(sheet)
+    }
+
+    fn stage_row_layout(
+        &mut self,
+        selector: Selector<'_>,
+        row: u16,
+        update: impl FnOnce(&mut layout::RowState),
+    ) -> Result<()> {
+        let sheet = self.require_layout_sheet(selector, "row layout")?;
+        let existing = self.layout_changes.iter().position(|change| {
+            matches!(change, layout::LayoutChange::Row { sheet: owner, row: target, .. } if *owner == sheet && *target == row)
+        });
+        match existing {
+            Some(index) => {
+                if let layout::LayoutChange::Row { after, .. } = &mut self.layout_changes[index] {
+                    update(after);
+                }
+                Ok(())
+            },
+            None => {
+                let before = layout::row_state(self.sheet_stream(sheet)?, row)?;
+                let mut after = before;
+                update(&mut after);
+                self.push_layout(layout::LayoutChange::Row {
+                    sheet,
+                    row,
+                    before,
+                    after,
+                })
+            },
+        }
+    }
+
+    fn stage_column_layout(
+        &mut self,
+        selector: Selector<'_>,
+        column: u8,
+        update: impl FnOnce(&mut layout::ColumnState),
+    ) -> Result<()> {
+        let sheet = self.require_layout_sheet(selector, "column layout")?;
+        let existing = self.layout_changes.iter().position(|change| {
+            matches!(change, layout::LayoutChange::Column { sheet: owner, column: target, .. } if *owner == sheet && *target == column)
+        });
+        match existing {
+            Some(index) => {
+                if let layout::LayoutChange::Column { after, .. } = &mut self.layout_changes[index]
+                {
+                    update(after);
+                }
+                Ok(())
+            },
+            None => {
+                let before = layout::column_state(self.sheet_stream(sheet)?, column)?;
+                let mut after = before;
+                update(&mut after);
+                self.push_layout(layout::LayoutChange::Column {
+                    sheet,
+                    column,
+                    before,
+                    after,
+                })
+            },
+        }
+    }
+
+    fn push_layout(&mut self, change: layout::LayoutChange) -> Result<()> {
+        let observed = self
+            .changes
+            .len()
+            .saturating_add(self.structural_changes.len())
+            .saturating_add(self.resource_changes.len())
+            .saturating_add(self.layout_changes.len());
+        if observed >= MAX_STAGED_CHANGES {
+            return Err(Error::StagedChangeLimit {
+                observed: observed.saturating_add(1),
+                maximum: MAX_STAGED_CHANGES,
+            });
+        }
+        self.layout_changes
+            .try_reserve(1)
+            .map_err(|_error| Error::Allocation("staging XLS layout changes"))?;
+        self.layout_changes.push(change);
+        Ok(())
+    }
+
+    /// Reorders the complete workbook tab catalog.
+    ///
+    /// `order` names every tab exactly once, chart, macro and dialog tabs
+    /// included: the tab selected by `order[i]` moves to catalog position
+    /// `i`. Names compare by the workbook's Unicode caseless sheet identity.
+    /// The identity permutation is an exact no-op. Workbook-global tab
+    /// addresses (`Window1`, `RRTabId`, internal `ExternSheet` XTI ranges,
+    /// sheet-scoped names) and relocated worksheet `Index`/`ExtSST` offsets
+    /// are rewritten in the same closure.
+    ///
+    /// A tab-structure change must be the only operation of its edit.
+    ///
+    /// ```
+    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// # let mut builder = litchi_xls::Builder::new();
+    /// # builder.add_worksheet("First")?;
+    /// # builder.add_worksheet("Second")?;
+    /// # let bytes = builder.build()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// edit.reorder_sheets(&[Selector::Name("Second"), Selector::Name("first")])?;
+    /// let target = edit.commit()?.into_parts().0;
+    /// let names: Vec<_> = target.worksheets().map(|sheet| sheet.name().to_owned()).collect();
+    /// assert_eq!(names, ["Second", "First"]);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, ambiguity, protection, dependency-closure
+    /// (for example a 3-D reference range made noncontiguous), exclusivity or
+    /// allocation refusal without staging.
+    pub fn reorder_sheets(&mut self, order: &[Selector<'_>]) -> Result<()> {
+        self.require_tab_edit(false)?;
+        let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
+        if order.len() != catalog.len() {
+            return Err(Error::UnsafeEdit(
+                "a tab reorder must name every catalog tab exactly once".into(),
+            ));
+        }
+        let mut positions = Vec::new();
+        positions
+            .try_reserve_exact(order.len())
+            .map_err(|_error| Error::Allocation("staging an XLS tab reorder"))?;
+        for selector in order {
+            positions.push(resolve_tab(&catalog, *selector)?);
+        }
+        if positions.iter().enumerate().all(|(new, old)| new == *old) {
+            return Ok(());
+        }
+        let kind = tabs::TabChangeKind::Reorder { order: positions };
+        self.stage_tab_change(&catalog, kind, None)
+    }
+
+    /// Inserts one empty ordinary worksheet at a complete-catalog position.
+    ///
+    /// `position` may equal the tab count to append. The name must satisfy
+    /// the BIFF8 sheet-name rule and must not equal another tab's name under
+    /// Unicode caseless comparison. The inserted worksheet is visible and is
+    /// not selected; 3-D reference ranges that would gain it are refused.
+    ///
+    /// ```
+    /// use litchi_core::Position;
+    /// use litchi_xls::cell_values::Snapshot;
+    /// # let bytes = litchi_xls::Package::new()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// edit.insert_sheet(Position::new(0), "Summary")?;
+    /// let target = edit.commit()?.into_parts().0;
+    /// assert_eq!(target.worksheets().next().map(|sheet| sheet.name()), Some("Summary"));
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed name, uniqueness, position, protection, macro-project,
+    /// dependency-closure, exclusivity or allocation refusal without staging.
+    pub fn insert_sheet(&mut self, position: Position, name: &str) -> Result<()> {
+        self.require_tab_edit(true)?;
+        structural::validate_sheet_name(name)?;
+        let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
+        if catalog
+            .iter()
+            .any(|tab| crate::sheet_name::equivalent(&tab.name, name))
+        {
+            return Err(Error::UnsafeEdit(
+                "the inserted worksheet name would be ambiguous".into(),
+            ));
+        }
+        if position.get() > catalog.len() {
+            return Err(Error::UnsafeEdit(
+                "worksheet insertion position is outside the tab catalog".into(),
+            ));
+        }
+        let template = tabs::empty_worksheet_template()?;
+        let kind = tabs::TabChangeKind::Insert {
+            position: position.get(),
+            name: name.to_string(),
+        };
+        self.stage_tab_change(&catalog, kind, Some(&template))
+    }
+
+    /// Removes one ordinary worksheet tab and its complete substream.
+    ///
+    /// Removal is refused while any workbook dependency still addresses the
+    /// tab: an internal 3-D reference range, a sheet-scoped defined name, a
+    /// pivot data connection, or a drawing/pivot owner on the worksheet. The
+    /// workbook must retain a visible tab. When the active tab is removed the
+    /// first remaining visible tab becomes active and selected.
+    ///
+    /// ```
+    /// use litchi_xls::cell_values::{Selector, Snapshot};
+    /// # let mut builder = litchi_xls::Builder::new();
+    /// # builder.add_worksheet("Keep")?;
+    /// # builder.add_worksheet("Drop")?;
+    /// # let bytes = builder.build()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// edit.remove_sheet(Selector::Name("Drop"))?;
+    /// let target = edit.commit()?.into_parts().0;
+    /// assert_eq!(target.worksheet_count(), 1);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed selector, dependency, last-tab, last-visible-tab,
+    /// protection, macro-project, exclusivity or allocation refusal without
+    /// staging.
+    pub fn remove_sheet(&mut self, selector: Selector<'_>) -> Result<()> {
+        self.require_tab_edit(true)?;
+        let catalog = tabs::catalog(&self.source.inner.workbook_stream)?;
+        let position = resolve_tab(&catalog, selector)?;
+        let tab = &catalog[position];
+        tabs::certify_removal(&self.source.inner.workbook_stream, &catalog, tab)?;
+        let kind = tabs::TabChangeKind::Remove {
+            position,
+            name: tab.name.clone(),
+            fingerprint: tabs::fingerprint(&self.source.inner.workbook_stream, tab),
+        };
+        self.stage_tab_change(&catalog, kind, None)
+    }
+
+    fn require_no_tab_change(&self) -> Result<()> {
+        if self.tab_change.is_some() {
+            return Err(Error::UnsafeEdit(
+                "a worksheet tab-structure change must be the only operation of its edit".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn require_tab_edit(&self, creates_or_destroys: bool) -> Result<()> {
+        self.require_no_tab_change()?;
+        if !self.changes.is_empty()
+            || !self.structural_changes.is_empty()
+            || !self.resource_changes.is_empty()
+            || !self.layout_changes.is_empty()
+        {
+            return Err(Error::UnsafeEdit(
+                "a worksheet tab-structure change must be the only operation of its edit".into(),
+            ));
+        }
+        if self.source.inner.source_policy.protection == SourceProtectionPolicy::WorkbookOrShared {
+            return Err(Error::UnsafeEdit(
+                "protected or shared workbook structure cannot change its tabs".into(),
+            ));
+        }
+        if creates_or_destroys && !self.source.inner.source_policy.macro_free_workbook {
+            return Err(Error::UnsafeEdit(
+                "adding or removing tabs would desynchronize the workbook's macro project".into(),
+            ));
+        }
+        Ok(())
+    }
+
+    fn stage_tab_change(
+        &mut self,
+        catalog: &[tabs::Tab],
+        kind: tabs::TabChangeKind,
+        template: Option<&tabs::Template>,
+    ) -> Result<()> {
+        let workbook = tabs::rewrite(&self.source.inner.workbook_stream, &kind, template)?;
+        let source_names = catalog.iter().map(|tab| tab.name.clone()).collect();
+        let target_names = tabs::catalog(&workbook)?
+            .into_iter()
+            .map(|tab| tab.name)
+            .collect();
+        self.tab_change = Some(Box::new(tabs::TabChange {
+            kind,
+            source_names,
+            target_names,
+            workbook,
+        }));
+        Ok(())
+    }
+
     fn require_sheet(&self, selector: Selector<'_>, context: &str) -> Result<usize> {
         self.source
             .resolve_sheet(selector)?
@@ -3320,13 +3995,46 @@ impl Edit {
     }
 
     fn stage_structural(&mut self, change: StructuralChange) -> Result<()> {
-        let sheet = operation_sheet_index(&change);
-        if !matches!(change, StructuralChange::RenameSheet { .. })
-            && self.resource_changes.iter().any(|resource| {
-                formula_resource_cell(resource)
-                    .is_some_and(|(resource_sheet, _)| resource_sheet == sheet)
-            })
+        self.require_no_tab_change()?;
+        if matches!(
+            change,
+            StructuralChange::Rows { .. } | StructuralChange::Columns { .. }
+        ) && self
+            .layout_changes
+            .iter()
+            .any(|layout| layout.sheet() == operation_sheet_index(&change))
         {
+            return Err(Error::UnsafeEdit(
+                "an axis shift cannot follow a row or column layout change of its worksheet".into(),
+            ));
+        }
+        let sheet = operation_sheet_index(&change);
+        // An authored Formula is placed after the worksheet's cell operations
+        // in one row-block rebuild. Axis shifts would move it, and a cell
+        // operation at its own coordinate would race it; operations at other
+        // coordinates compose.
+        if self.resource_changes.iter().any(|resource| {
+            formula_resource_cell(resource).is_some_and(|(resource_sheet, reference)| {
+                resource_sheet == sheet
+                    && match &change {
+                        StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => true,
+                        // A scalar may take the place of a removed authored
+                        // Formula: removals are rebuilt before cell inserts.
+                        StructuralChange::Cell { before: None, .. }
+                            if matches!(
+                                resource,
+                                ResourceChange::FormulaCell { insert: false, .. }
+                            ) =>
+                        {
+                            false
+                        },
+                        StructuralChange::Cell {
+                            reference: target, ..
+                        } => *target == reference,
+                        StructuralChange::RenameSheet { .. } => false,
+                    }
+            })
+        }) {
             return Err(Error::UnsafeEdit(
                 "structural worksheet edit overlaps an authored Formula".into(),
             ));
@@ -3380,6 +4088,7 @@ impl Edit {
         storage: Storage,
         value: Value,
     ) -> Result<()> {
+        self.require_no_tab_change()?;
         let reference = self.source.inner.sheets[sheet_index].entries[entry]
             .cell
             .reference;
@@ -3502,6 +4211,9 @@ impl Edit {
     /// Returns an error if stream patching, CFB reconstruction, complete XLS
     /// reopen, or typed semantic readback fails.
     pub fn commit(self) -> Result<Commit> {
+        if let Some(change) = self.tab_change {
+            return commit_tab_change(self.source, *change);
+        }
         let fixed_cells = self
             .changes
             .iter()
@@ -3520,15 +4232,22 @@ impl Edit {
                     .filter(|change| matches!(change, ResourceChange::FormulaCell { .. }))
                     .count(),
             );
+        let layout: Vec<&layout::LayoutChange> = self
+            .layout_changes
+            .iter()
+            .filter(|change| !change.is_noop())
+            .collect();
         let semantic = SemanticPatch::from_transaction(
             &self.source,
             &self.changes,
             &self.structural_changes,
             &self.resource_changes,
+            &layout,
         )?;
         if changed_cells == 0
             && self.structural_changes.is_empty()
             && self.resource_changes.is_empty()
+            && layout.is_empty()
         {
             let patch = Patch::new(
                 Arc::clone(&self.source.inner.bytes),
@@ -3602,6 +4321,7 @@ impl Edit {
             });
         if !self.structural_changes.is_empty()
             || !self.resource_changes.is_empty()
+            || !layout.is_empty()
             || fixed_sst_change
         {
             workbook_bytes = structural::apply(
@@ -3610,6 +4330,7 @@ impl Edit {
                 &self.structural_changes,
                 &self.changes,
                 &self.resource_changes,
+                &layout,
                 &shared_strings,
             )?;
         }
@@ -3641,6 +4362,7 @@ impl Edit {
         let snapshot = if fixed_cells != 0
             && self.structural_changes.is_empty()
             && self.resource_changes.is_empty()
+            && layout.is_empty()
             && changes_are_fixed_numeric(&self.source, &self.changes)
         {
             Snapshot::from_fixed_numeric_package_editor(
@@ -3653,8 +4375,14 @@ impl Edit {
             Snapshot::open_package(package, Some(rendered), None)?
         };
         verify_readback(&snapshot, &self.changes)?;
-        verify_structural_readback(&snapshot, &self.source, &self.structural_changes)?;
+        verify_structural_readback(
+            &snapshot,
+            &self.source,
+            &self.structural_changes,
+            &self.resource_changes,
+        )?;
         verify_resource_readback(&snapshot, &self.resource_changes)?;
+        verify_layout_readback(&snapshot, &layout)?;
         let patch = Patch::new(
             Arc::clone(&self.source.inner.bytes),
             Arc::clone(&snapshot.inner.bytes),
@@ -3682,6 +4410,76 @@ impl Edit {
             },
         })
     }
+}
+
+/// Resolves a semantic selector against the complete tab catalog.
+fn resolve_tab(catalog: &[tabs::Tab], selector: Selector<'_>) -> Result<usize> {
+    match selector {
+        Selector::Position(position) if position.get() < catalog.len() => Ok(position.get()),
+        Selector::Position(_) => Err(Error::WorksheetNotFound("tab catalog position".into())),
+        Selector::Name(name) => {
+            let mut matches = catalog
+                .iter()
+                .enumerate()
+                .filter(|(_, tab)| caseless_eq(&tab.name, name));
+            let found = matches
+                .next()
+                .map(|(index, _)| index)
+                .ok_or_else(|| Error::WorksheetNotFound("tab catalog name".into()))?;
+            if matches.next().is_some() {
+                return Err(Error::UnsafeEdit("tab catalog name is ambiguous".into()));
+            }
+            Ok(found)
+        },
+    }
+}
+
+/// Publishes one exclusive tab-structure change through the same checked
+/// package editor, complete reopen and exact patch as every other commit.
+fn commit_tab_change(source: Snapshot, change: tabs::TabChange) -> Result<Commit> {
+    let semantic = SemanticPatch::from_tab_change(&change)?;
+    let tabs::TabChange {
+        target_names,
+        workbook,
+        ..
+    } = change;
+    let workbook: Arc<[u8]> = Arc::from(workbook);
+    let mut package = PackageEditor::open_with_cfb_limits(
+        source.inner.bytes.to_vec(),
+        Targets::default(),
+        source.inner.limits,
+        source.inner.cfb_limits,
+    )?;
+    let rendered =
+        package.put_stream_shared_with_rendered(&source.inner.workbook_path, workbook)?;
+    let snapshot = Snapshot::open_package(package, Some(rendered), None)?;
+    let observed = tabs::catalog(&snapshot.inner.workbook_stream)?;
+    if observed.len() != target_names.len()
+        || observed
+            .iter()
+            .zip(&target_names)
+            .any(|(tab, name)| tab.name != *name)
+    {
+        return Err(Error::UnsafeEdit(
+            "worksheet tab structure failed catalog readback".into(),
+        ));
+    }
+    let patch = Patch::new(
+        Arc::clone(&source.inner.bytes),
+        Arc::clone(&snapshot.inner.bytes),
+        semantic,
+    );
+    let changed = !patch.is_noop();
+    Ok(Commit {
+        snapshot,
+        patch,
+        diagnostics: Diagnostics {
+            changed,
+            changed_cells: 0,
+            changed_number_fields: 0,
+            touched_streams: 1,
+        },
+    })
 }
 
 impl fmt::Debug for Edit {
@@ -4474,6 +5272,7 @@ impl SemanticPatch {
         changes: &[Change],
         structural_changes: &[StructuralChange],
         resource_changes: &[ResourceChange],
+        layout_changes: &[&layout::LayoutChange],
     ) -> Result<Self> {
         let limits = semantic_patch_limits();
         let mut operations = Vec::new();
@@ -4550,6 +5349,9 @@ impl SemanticPatch {
         for change in resource_changes {
             append_resource_semantic(snapshot, resource_changes, change, limits, &mut operations)?;
         }
+        for change in layout_changes {
+            append_layout_semantic(snapshot, change, limits, &mut operations)?;
+        }
         operations.sort_by(|left, right| {
             semantic_operation_order(left.forward())
                 .cmp(&semantic_operation_order(right.forward()))
@@ -4564,6 +5366,110 @@ impl SemanticPatch {
             operations,
             blobs,
             reverse_blobs,
+        )
+        .map_err(patch_error)?;
+        Ok(Self { inner })
+    }
+
+    fn from_tab_change(change: &tabs::TabChange) -> Result<Self> {
+        let limits = semantic_patch_limits();
+        let names = |names: &[String]| {
+            serde_json::Value::Array(
+                names
+                    .iter()
+                    .cloned()
+                    .map(serde_json::Value::String)
+                    .collect(),
+            )
+        };
+        let preconditions = |names_value: serde_json::Value| {
+            let mut map = BTreeMap::new();
+            map.insert("tab_names".to_string(), names_value);
+            map
+        };
+        let (forward, inverse) = match &change.kind {
+            tabs::TabChangeKind::Reorder { order } => {
+                let mut inverse_order = vec![0_usize; order.len()];
+                for (new, old) in order.iter().enumerate() {
+                    inverse_order[*old] = new;
+                }
+                (
+                    PatchOperation::new(
+                        limits,
+                        "sheet.reorder",
+                        tabs::SEMANTIC_TARGET.to_string(),
+                        preconditions(names(&change.source_names)),
+                        serde_json::json!(order),
+                    ),
+                    PatchOperation::new(
+                        limits,
+                        "sheet.reorder",
+                        tabs::SEMANTIC_TARGET.to_string(),
+                        preconditions(names(&change.target_names)),
+                        serde_json::json!(inverse_order),
+                    ),
+                )
+            },
+            tabs::TabChangeKind::Insert { position, name } => {
+                let target = tabs::semantic_tab_target(*position);
+                let mut inverse_preconditions = preconditions(names(&change.target_names));
+                inverse_preconditions.insert("empty".to_string(), serde_json::Value::Bool(true));
+                (
+                    PatchOperation::new(
+                        limits,
+                        "sheet.insert",
+                        target.clone(),
+                        preconditions(names(&change.source_names)),
+                        serde_json::json!({ "name": name }),
+                    ),
+                    PatchOperation::new(
+                        limits,
+                        "sheet.remove",
+                        target,
+                        inverse_preconditions,
+                        serde_json::json!({ "name": name }),
+                    ),
+                )
+            },
+            tabs::TabChangeKind::Remove {
+                position,
+                name,
+                fingerprint,
+            } => {
+                let target = tabs::semantic_tab_target(*position);
+                let mut forward_preconditions = preconditions(names(&change.source_names));
+                forward_preconditions.insert(
+                    "fingerprint".to_string(),
+                    serde_json::Value::String(fingerprint.clone()),
+                );
+                (
+                    PatchOperation::new(
+                        limits,
+                        "sheet.remove",
+                        target.clone(),
+                        forward_preconditions,
+                        serde_json::json!({ "name": name }),
+                    ),
+                    PatchOperation::new(
+                        limits,
+                        "sheet.restore",
+                        target,
+                        preconditions(names(&change.target_names)),
+                        serde_json::json!({ "name": name, "fingerprint": fingerprint }),
+                    ),
+                )
+            },
+        };
+        let operations = vec![ReversibleOperation::new(
+            forward.map_err(patch_error)?,
+            inverse.map_err(patch_error)?,
+        )];
+        let inner = CorePatch::<Reversible>::new(
+            limits,
+            "litchi-xls.cell-values",
+            operations,
+            BlobBundle::new(limits.blobs()),
+            BlobBundle::new(limits.blobs()),
         )
         .map_err(patch_error)?;
         Ok(Self { inner })
@@ -5201,6 +6107,9 @@ fn authored_formula_record_matches(
     style: StyleIndex,
     tokens: &[u8],
 ) -> Result<bool> {
+    if entry.cell.storage != Storage::Formula {
+        return Ok(false);
+    }
     let mut expected = Vec::new();
     crate::writer::biff::write_formula(
         &mut expected,
@@ -5362,7 +6271,18 @@ fn reversible_pairs(patch: &SemanticPatch) -> Vec<(PatchOperation, PatchOperatio
         .collect()
 }
 
+fn is_tab_operation(op: &str) -> bool {
+    matches!(
+        op,
+        "sheet.reorder" | "sheet.insert" | "sheet.remove" | "sheet.restore"
+    )
+}
+
 fn semantic_operations_overlap(left: &PatchOperation, right: &PatchOperation) -> bool {
+    if is_tab_operation(&left.op) || is_tab_operation(&right.op) {
+        // A tab-structure operation renumbers every catalog address.
+        return true;
+    }
     let left_sheet = semantic_operation_sheet(left);
     let right_sheet = semantic_operation_sheet(right);
     if left_sheet != right_sheet {
@@ -5402,7 +6322,9 @@ fn semantic_cell_identity(operation: &PatchOperation) -> Option<(usize, u16, u8)
 }
 
 fn semantic_operation_order(operation: &PatchOperation) -> u8 {
-    if operation.op == "sheet.rename" {
+    if is_tab_operation(&operation.op) {
+        4
+    } else if operation.op == "sheet.rename" {
         3
     } else if matches!(
         operation.op.as_str(),
@@ -5413,7 +6335,9 @@ fn semantic_operation_order(operation: &PatchOperation) -> u8 {
             | "xf.author"
             | "xf.duplicate"
             | "xf.remove"
-            | "formula.insert"
+            // A removed authored Formula vacates its cell before cell
+            // operations; an inserted one follows them (same order as the
+            // `sheet/N/cell` targets, which sort first).
             | "formula.remove"
     ) {
         0
@@ -5454,9 +6378,9 @@ fn apply_semantic_operation(
             verify_semantic_sheet(source, sheet_names, sheet, operation)?;
             let count = parse_count(&operation.value, "row")?;
             if operation.op == "rows.insert" {
-                transaction.insert_rows(Selector::Position(sheet), start, count)
+                transaction.insert_rows(Selector::Position(Position::new(sheet)), start, count)
             } else {
-                transaction.delete_rows(Selector::Position(sheet), start, count)
+                transaction.delete_rows(Selector::Position(Position::new(sheet)), start, count)
             }
         },
         "columns.insert" | "columns.delete" => {
@@ -5467,10 +6391,16 @@ fn apply_semantic_operation(
             let count = u8::try_from(parse_count(&operation.value, "column")?)
                 .map_err(|_error| Error::InvalidData("column patch count exceeds u8".into()))?;
             if operation.op == "columns.insert" {
-                transaction.insert_columns(Selector::Position(sheet), start, count)
+                transaction.insert_columns(Selector::Position(Position::new(sheet)), start, count)
             } else {
-                transaction.delete_columns(Selector::Position(sheet), start, count)
+                transaction.delete_columns(Selector::Position(Position::new(sheet)), start, count)
             }
+        },
+        "sheet.reorder" | "sheet.insert" | "sheet.remove" | "sheet.restore" => {
+            apply_tab_semantic(source, transaction, operation)
+        },
+        "row.layout" | "column.layout" => {
+            apply_layout_semantic(source, transaction, operation, sheet_names)
         },
         "sheet.rename" => {
             let sheet = parse_sheet_target(&operation.target, "name")?;
@@ -5479,7 +6409,7 @@ fn apply_semantic_operation(
                 .value
                 .as_str()
                 .ok_or_else(|| Error::InvalidData("sheet rename value is not text".into()))?;
-            transaction.rename_sheet(Selector::Position(sheet), name)?;
+            transaction.rename_sheet(Selector::Position(Position::new(sheet)), name)?;
             sheet_names[sheet_index] = name.to_string();
             Ok(())
         },
@@ -5488,6 +6418,294 @@ fn apply_semantic_operation(
             operation.op
         ))),
     }
+}
+
+fn apply_tab_semantic(
+    source: &Snapshot,
+    transaction: &mut Edit,
+    operation: &PatchOperation,
+) -> Result<()> {
+    let catalog = tabs::catalog(&source.inner.workbook_stream)?;
+    let expected = operation
+        .preconditions
+        .get("tab_names")
+        .and_then(serde_json::Value::as_array)
+        .ok_or_else(|| Error::InvalidData("tab patch has no tab-name precondition".into()))?;
+    if expected.len() != catalog.len()
+        || expected
+            .iter()
+            .zip(&catalog)
+            .any(|(name, tab)| name.as_str() != Some(tab.name.as_str()))
+    {
+        return Err(Error::UnsafeEdit(
+            "tab patch precondition does not match the workbook tab catalog".into(),
+        ));
+    }
+    let name = || {
+        operation
+            .value
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| Error::InvalidData("tab patch has no sheet name".into()))
+    };
+    match operation.op.as_str() {
+        "sheet.reorder" => {
+            if operation.target != tabs::SEMANTIC_TARGET {
+                return Err(Error::InvalidData("tab reorder target is malformed".into()));
+            }
+            let order = operation
+                .value
+                .as_array()
+                .ok_or_else(|| Error::InvalidData("tab reorder value is not a list".into()))?
+                .iter()
+                .map(|value| {
+                    value
+                        .as_u64()
+                        .and_then(|value| usize::try_from(value).ok())
+                        .map(Selector::from)
+                        .ok_or_else(|| Error::InvalidData("tab reorder position is invalid".into()))
+                })
+                .collect::<Result<Vec<_>>>()?;
+            transaction.reorder_sheets(&order)
+        },
+        "sheet.insert" => {
+            let position = tabs::parse_semantic_tab_target(&operation.target)?;
+            transaction.insert_sheet(Position::new(position), name()?)
+        },
+        "sheet.remove" => {
+            let position = tabs::parse_semantic_tab_target(&operation.target)?;
+            let tab = catalog
+                .get(position)
+                .ok_or_else(|| Error::WorksheetNotFound("tab patch position".into()))?;
+            if tab.name != name()? {
+                return Err(Error::UnsafeEdit(
+                    "tab removal precondition names another tab".into(),
+                ));
+            }
+            if let Some(fingerprint) = operation.preconditions.get("fingerprint") {
+                if fingerprint.as_str()
+                    != Some(tabs::fingerprint(&source.inner.workbook_stream, tab).as_str())
+                {
+                    return Err(Error::UnsafeEdit(
+                        "tab removal precondition does not match the tab content".into(),
+                    ));
+                }
+            } else if operation.preconditions.get("empty") == Some(&serde_json::Value::Bool(true)) {
+                let empty = source
+                    .resolve_sheet(Selector::Position(Position::new(position)))?
+                    .is_some_and(|sheet| source.inner.sheets[sheet].entries.is_empty());
+                if !empty {
+                    return Err(Error::UnsafeEdit(
+                        "tab removal precondition requires an empty worksheet".into(),
+                    ));
+                }
+            } else {
+                return Err(Error::InvalidData(
+                    "tab removal patch has no content precondition".into(),
+                ));
+            }
+            transaction.remove_sheet(Selector::Position(Position::new(position)))
+        },
+        _ => Err(Error::UnsupportedFeature(
+            "restoring a removed worksheet requires the exact artifact patch".into(),
+        )),
+    }
+}
+
+fn row_state_json(state: layout::RowState) -> serde_json::Value {
+    serde_json::json!({
+        "present": state.present,
+        "height": state.height,
+        "custom": state.custom,
+        "hidden": state.hidden,
+    })
+}
+
+fn column_state_json(state: layout::ColumnState) -> serde_json::Value {
+    serde_json::json!({
+        "present": state.present,
+        "width": state.width,
+        "user_set": state.user_set,
+        "hidden": state.hidden,
+    })
+}
+
+fn json_bool(value: &serde_json::Value, key: &str) -> Result<bool> {
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_bool)
+        .ok_or_else(|| Error::InvalidData("layout patch state is malformed".into()))
+}
+
+fn json_u16(value: &serde_json::Value, key: &str) -> Result<u16> {
+    value
+        .get(key)
+        .and_then(serde_json::Value::as_u64)
+        .and_then(|value| u16::try_from(value).ok())
+        .ok_or_else(|| Error::InvalidData("layout patch state is malformed".into()))
+}
+
+fn parse_row_state(value: &serde_json::Value) -> Result<layout::RowState> {
+    Ok(layout::RowState {
+        present: json_bool(value, "present")?,
+        height: json_u16(value, "height")?,
+        custom: json_bool(value, "custom")?,
+        hidden: json_bool(value, "hidden")?,
+    })
+}
+
+fn parse_column_state(value: &serde_json::Value) -> Result<layout::ColumnState> {
+    Ok(layout::ColumnState {
+        present: json_bool(value, "present")?,
+        width: json_u16(value, "width")?,
+        user_set: json_bool(value, "user_set")?,
+        hidden: json_bool(value, "hidden")?,
+    })
+}
+
+fn append_layout_semantic(
+    snapshot: &Snapshot,
+    change: &layout::LayoutChange,
+    limits: PatchLimits,
+    operations: &mut Vec<ReversibleOperation>,
+) -> Result<()> {
+    let sheet_data = &snapshot.inner.sheets[change.sheet()];
+    let (op, target, before, after) = match change {
+        layout::LayoutChange::Row {
+            row, before, after, ..
+        } => (
+            "row.layout",
+            format!("sheet/{}/row/{row}", sheet_data.workbook_index),
+            row_state_json(*before),
+            row_state_json(*after),
+        ),
+        layout::LayoutChange::Column {
+            column,
+            before,
+            after,
+            ..
+        } => (
+            "column.layout",
+            format!("sheet/{}/column/{column}", sheet_data.workbook_index),
+            column_state_json(*before),
+            column_state_json(*after),
+        ),
+    };
+    let preconditions = |state: serde_json::Value| {
+        let mut map = BTreeMap::new();
+        map.insert(
+            "sheet_name".to_string(),
+            serde_json::Value::String(sheet_data.name.clone()),
+        );
+        map.insert("state".to_string(), state);
+        map
+    };
+    let forward = PatchOperation::new(
+        limits,
+        op,
+        target.clone(),
+        preconditions(before.clone()),
+        after.clone(),
+    )
+    .map_err(patch_error)?;
+    let inverse = PatchOperation::new(limits, op, target, preconditions(after), before)
+        .map_err(patch_error)?;
+    operations.push(ReversibleOperation::new(forward, inverse));
+    Ok(())
+}
+
+fn apply_layout_semantic(
+    source: &Snapshot,
+    transaction: &mut Edit,
+    operation: &PatchOperation,
+    sheet_names: &[String],
+) -> Result<()> {
+    let mut parts = operation.target.split('/');
+    let sheet_position = (parts.next() == Some("sheet"))
+        .then(|| parts.next()?.parse::<usize>().ok())
+        .flatten()
+        .ok_or_else(|| Error::InvalidData("layout patch target is malformed".into()))?;
+    let axis = parts.next();
+    let index = parts
+        .next()
+        .and_then(|value| value.parse::<u16>().ok())
+        .ok_or_else(|| Error::InvalidData("layout patch target is malformed".into()))?;
+    if parts.next().is_some() {
+        return Err(Error::InvalidData(
+            "layout patch target has trailing data".into(),
+        ));
+    }
+    let sheet = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
+    let expected = operation
+        .preconditions
+        .get("state")
+        .ok_or_else(|| Error::InvalidData("layout patch has no state".into()))?;
+    let stream = transaction.sheet_stream(sheet)?;
+    let selector = Selector::Position(Position::new(sheet_position));
+    match (operation.op.as_str(), axis) {
+        ("row.layout", Some("row")) => {
+            if layout::row_state(stream, index)? != parse_row_state(expected)? {
+                return Err(Error::UnsafeEdit(
+                    "row layout patch precondition is stale".into(),
+                ));
+            }
+            let after = parse_row_state(&operation.value)?;
+            transaction.stage_row_layout(selector, index, |state| *state = after)
+        },
+        ("column.layout", Some("column")) => {
+            let column = u8::try_from(index)
+                .map_err(|_error| Error::InvalidData("layout patch column exceeds u8".into()))?;
+            if layout::column_state(stream, column)? != parse_column_state(expected)? {
+                return Err(Error::UnsafeEdit(
+                    "column layout patch precondition is stale".into(),
+                ));
+            }
+            let after = parse_column_state(&operation.value)?;
+            transaction.stage_column_layout(selector, column, |state| *state = after)
+        },
+        _ => Err(Error::InvalidData(
+            "layout patch target is malformed".into(),
+        )),
+    }
+}
+
+/// Every non-no-op layout change reads back from the published candidate.
+fn verify_layout_readback(snapshot: &Snapshot, changes: &[&layout::LayoutChange]) -> Result<()> {
+    if changes.is_empty() {
+        return Ok(());
+    }
+    let catalog = tabs::catalog(&snapshot.inner.workbook_stream)?;
+    for change in changes {
+        let workbook_index = snapshot
+            .inner
+            .sheets
+            .get(change.sheet())
+            .ok_or_else(|| Error::UnsafeEdit("layout worksheet disappeared".into()))?
+            .workbook_index;
+        let tab = catalog
+            .get(workbook_index)
+            .ok_or_else(|| Error::UnsafeEdit("layout worksheet tab disappeared".into()))?;
+        let stream = &snapshot.inner.workbook_stream[tab.start..tab.end];
+        let matches = match change {
+            layout::LayoutChange::Row { row, after, .. } => {
+                let observed = layout::row_state(stream, *row)?;
+                if after.present {
+                    observed == *after
+                } else {
+                    !observed.present || (!observed.custom && !observed.hidden)
+                }
+            },
+            layout::LayoutChange::Column { column, after, .. } => {
+                layout::column_state(stream, *column)? == *after
+            },
+        };
+        if !matches {
+            return Err(Error::UnsafeEdit(
+                "row or column layout failed semantic readback".into(),
+            ));
+        }
+    }
+    Ok(())
 }
 
 fn apply_sst_semantic(transaction: &mut Edit, operation: &PatchOperation) -> Result<()> {
@@ -5693,12 +6911,14 @@ fn apply_formula_semantic(
     let current = sheet_data
         .unique_entry_index(reference)?
         .map(|index| &sheet_data.entries[index]);
-    if !expected && current.is_some() {
+    let replaced = transaction.staged_removal(sheet, reference);
+    if !expected && current.is_some() && !replaced {
         return Err(Error::UnsafeEdit(
             "Formula insertion precondition target is occupied".into(),
         ));
     }
     let present = match current {
+        Some(_) if replaced => false,
         Some(entry) => authored_formula_record_matches(source, entry, reference, style, &tokens)?,
         None => false,
     };
@@ -5773,7 +6993,11 @@ fn apply_fixed_semantic(
         && storage == Storage::LabelSst
         && matches!(&value, Value::Text(_))
     {
-        return transaction.set_value(Selector::Position(sheet_position), reference, value);
+        return transaction.set_value(
+            Selector::Position(Position::new(sheet_position)),
+            reference,
+            value,
+        );
     }
     let shared_strings = transaction.effective_shared_strings();
     let represented = target_storage(cell.storage, &value, &shared_strings)?;
@@ -5785,7 +7009,11 @@ fn apply_fixed_semantic(
     if matches!(cell.value, Value::FormulaCache(FormulaCache::String(_)))
         || matches!(value, Value::FormulaCache(FormulaCache::String(_)))
     {
-        return transaction.set_value(Selector::Position(sheet_position), reference, value);
+        return transaction.set_value(
+            Selector::Position(Position::new(sheet_position)),
+            reference,
+            value,
+        );
     }
     transaction.stage(sheet_index, entry_index, storage, value)
 }
@@ -5799,8 +7027,11 @@ fn apply_structural_cell_semantic(
     let (sheet_position, reference) = parse_semantic_target(&operation.target)?;
     let sheet_index = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
     let sheet = &source.inner.sheets[sheet_index];
+    // A Formula this patch already removed no longer occupies its cell.
+    let vacated = transaction.staged_formula_removal(sheet_index, reference);
     let current = sheet
         .unique_entry_index(reference)?
+        .filter(|_| !vacated)
         .map(|index| &sheet.entries[index])
         .map(|entry| {
             (
@@ -5819,7 +7050,7 @@ fn apply_structural_cell_semantic(
             "structural cell patch precondition is stale".into(),
         ));
     }
-    if let Some(index) = sheet.unique_entry_index(reference)? {
+    if let Some(index) = sheet.unique_entry_index(reference)?.filter(|_| !vacated) {
         let entry = &sheet.entries[index];
         verify_formula_dependency(source, entry, operation)?;
     }
@@ -5878,15 +7109,21 @@ fn apply_structural_cell_semantic(
                 ));
             }
             transaction.insert_cell_with_style(
-                Selector::Position(sheet_position),
+                Selector::Position(Position::new(sheet_position)),
                 reference,
                 value,
                 style,
             )
         },
-        (Some(_), None) => transaction.remove_cell(Selector::Position(sheet_position), reference),
+        (Some(_), None) => {
+            transaction.remove_cell(Selector::Position(Position::new(sheet_position)), reference)
+        },
         (Some(before), Some(after)) if before.0 == after.0 && values_equal(&before.1, &after.1) => {
-            transaction.set_style(Selector::Position(sheet_position), reference, after.2)
+            transaction.set_style(
+                Selector::Position(Position::new(sheet_position)),
+                reference,
+                after.2,
+            )
         },
         (Some(before), Some(after))
             if before.0 == Storage::Formula && after.0 == Storage::Formula =>
@@ -5952,7 +7189,7 @@ fn verify_semantic_sheet(
     operation: &PatchOperation,
 ) -> Result<usize> {
     let sheet_index = source
-        .resolve_sheet(Selector::Position(sheet_position))?
+        .resolve_sheet(Selector::Position(Position::new(sheet_position)))?
         .ok_or_else(|| Error::UnsafeEdit("semantic patch worksheet is absent".into()))?;
     let expected_name = operation
         .preconditions
@@ -6240,10 +7477,16 @@ fn commit_source_backed_numeric_plan(transaction: Edit) -> Result<SourceBackedPl
         changes,
         structural_changes,
         resource_changes,
+        tab_change,
+        layout_changes,
         ..
     } = transaction;
 
-    if !structural_changes.is_empty() || !resource_changes.is_empty() {
+    if !structural_changes.is_empty()
+        || !resource_changes.is_empty()
+        || tab_change.is_some()
+        || !layout_changes.is_empty()
+    {
         return Err(Error::UnsupportedFeature(
             "source-backed numeric plan accepts no structural or resource edits".into(),
         ));
@@ -6359,10 +7602,16 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         changes,
         structural_changes,
         resource_changes,
+        tab_change,
+        layout_changes,
         ..
     } = transaction;
 
-    if !structural_changes.is_empty() || !resource_changes.is_empty() {
+    if !structural_changes.is_empty()
+        || !resource_changes.is_empty()
+        || tab_change.is_some()
+        || !layout_changes.is_empty()
+    {
         return Err(Error::UnsupportedFeature(
             "source-backed numeric publication accepts no structural or resource edits".into(),
         ));
@@ -6374,7 +7623,7 @@ fn commit_source_backed_numeric(transaction: Edit) -> Result<SourceBackedCommit>
         ));
     }
 
-    let semantic = SemanticPatch::from_transaction(&source, &changes, &[], &[])?;
+    let semantic = SemanticPatch::from_transaction(&source, &changes, &[], &[], &[])?;
     // The complete source Workbook validation already ran when this immutable
     // snapshot was opened, over the same sealed bytes under the same limits,
     // and `SourcePolicyFacts` recorded its three verdicts with their exact
@@ -8344,9 +9593,7 @@ fn parse_error_code(object: &serde_json::Map<String, serde_json::Value>) -> Resu
 }
 
 fn caseless_eq(left: &str, right: &str) -> bool {
-    left.chars()
-        .flat_map(char::to_lowercase)
-        .eq(right.chars().flat_map(char::to_lowercase))
+    crate::sheet_name::equivalent(left, right)
 }
 
 fn require_bof(payload: &[u8], expected_substream: u16) -> Result<()> {
@@ -8415,9 +9662,22 @@ fn verify_structural_readback(
     snapshot: &Snapshot,
     source: &Snapshot,
     changes: &[StructuralChange],
+    resources: &[ResourceChange],
 ) -> Result<()> {
     for change in changes {
         match change {
+            StructuralChange::Cell {
+                sheet,
+                reference,
+                after: None,
+                ..
+            } if resources
+                .iter()
+                .any(|resource| formula_resource_cell(resource) == Some((*sheet, *reference))) =>
+            {
+                // An authored Formula replaced this cell; the resource
+                // readback verifies the replacement record.
+            },
             StructuralChange::Cell {
                 sheet,
                 reference,
@@ -8679,3 +9939,15 @@ mod tests;
 
 #[cfg(test)]
 mod index_tests;
+
+#[cfg(test)]
+mod tab_tests;
+
+#[cfg(test)]
+mod formula_tests;
+
+#[cfg(test)]
+mod layout_tests;
+
+#[cfg(test)]
+mod format_tests;

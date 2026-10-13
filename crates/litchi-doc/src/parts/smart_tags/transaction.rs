@@ -106,7 +106,9 @@ impl Snapshot {
         )
     }
 
-    pub(super) fn parse_with_options_and_policy(
+    /// Parse with explicit ANSI decoding, resource limits and protected-edit
+    /// policy.
+    pub fn parse_with_options_and_policy(
         fib: &FileInformationBlock,
         table_stream: &[u8],
         ansi: Option<Ansi>,
@@ -556,12 +558,6 @@ impl Transaction {
         self.source
             .materialize(self.metadata.clone())
             .map_err(Error::Invalid)
-    }
-
-    /// Discard the candidate and recover the immutable source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Commit the candidate as a reversible source-checked patch.

@@ -354,12 +354,6 @@ impl Transaction {
             .map_err(TransactionError::Invalid)
     }
 
-    /// Discards all staged operations and returns the source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     /// Publishes the candidate as a source-checked reversible commit.
     ///
     /// # Errors

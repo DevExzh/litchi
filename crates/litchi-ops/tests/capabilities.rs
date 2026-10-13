@@ -1,6 +1,6 @@
 //! Reports are generated from the same tables as production reads.
 use litchi_core::FileFormat;
-#[cfg(any(feature = "docx", feature = "ppt", feature = "pptx", feature = "xls"))]
+#[cfg(any(feature = "docx", feature = "ppt", feature = "pptx"))]
 use litchi_ops::Code;
 use litchi_ops::capabilities::Capabilities;
 #[cfg(any(
@@ -53,19 +53,20 @@ fn capability_goldens_follow_enabled_formats() {
 
 #[cfg(feature = "xls")]
 #[test]
-fn xls_capabilities_expose_initial_scalar_write_surface() {
+fn xls_capabilities_expose_write_surface() {
     use litchi_ops::capabilities::Subject;
 
     let caps = Capabilities::of(FileFormat::Xls);
-    for verb in [Verb::Set, Verb::Remove, Verb::Edit, Verb::Batch] {
+    for verb in [
+        Verb::Set,
+        Verb::Add,
+        Verb::Remove,
+        Verb::Move,
+        Verb::Swap,
+        Verb::Edit,
+        Verb::Batch,
+    ] {
         assert!(caps.verb(verb).is_supported(), "XLS {verb:?}");
-    }
-    for verb in [Verb::Add, Verb::Move, Verb::Swap] {
-        assert_eq!(
-            caps.verb(verb).code(),
-            Some(Code::UnsupportedCapability),
-            "XLS {verb:?} remains a granular gap"
-        );
     }
 
     let cell = caps.element("cell").expect("XLS cell capability");
@@ -79,8 +80,10 @@ fn xls_capabilities_expose_initial_scalar_write_surface() {
     }
     let sheet = caps.element("sheet").expect("XLS sheet capability");
     assert!(sheet.operations().set);
-    assert!(!sheet.operations().remove);
+    assert!(sheet.operations().add);
+    assert!(sheet.operations().remove);
     assert!(sheet.property("name").unwrap().set());
+    assert!(sheet.property("name").unwrap().add());
     assert!(!sheet.property("hidden").unwrap().set());
     assert!(!sheet.property("visibility").unwrap().set());
 
@@ -89,11 +92,9 @@ fn xls_capabilities_expose_initial_scalar_write_surface() {
         ("set", "cell", "existing-formula-cells"),
         ("set", "cell", "native-dependency-closure"),
         ("set", "sheet", "tab-state"),
-        ("add", "workbook", "structural-elements"),
-        ("remove", "workbook", "structural-elements"),
-        ("move", "workbook", "structural-elements"),
-        ("swap", "workbook", "structural-elements"),
-        ("batch", "workbook", "extended-commands"),
+        ("remove", "sheet", "native-dependency-closure"),
+        ("move", "sheet", "native-dependency-closure"),
+        ("add", "row", "native-dependency-closure"),
     ] {
         assert!(
             caps.gaps().any(|gap| {
@@ -787,14 +788,20 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
     }
     assert!(format.verb(Verb::Save).is_supported());
     assert!(format.verb(Verb::Create).is_supported());
-    for verb in [Verb::Remove, Verb::Move, Verb::Swap] {
-        assert!(format.verb(verb).is_supported());
+    for verb in [Verb::Add, Verb::Remove, Verb::Move, Verb::Swap] {
+        assert!(format.verb(verb).is_supported(), "PPT {verb:?}");
     }
-    assert_eq!(
-        format.verb(Verb::Add).code(),
-        Some(Code::UnsupportedCapability),
-        "PPT insertion remains a write gap"
-    );
+    for name in ["notes", "paragraph"] {
+        let element = format.element(name).expect("text element");
+        assert!(
+            element.operations().get && element.operations().set,
+            "PPT {name}"
+        );
+        assert!(
+            element.property("text").expect("text").set(),
+            "PPT {name}.text"
+        );
+    }
     for name in ["shape", "placeholder"] {
         let element = format.element(name).expect("shape element");
         for key in ["text", "x", "y", "width", "height"] {
@@ -825,7 +832,7 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
         let operations = element.operations();
         assert!(operations.get, "PPT {name} is readable");
         assert_eq!(operations.set, name != "presentation", "PPT {name} setter");
-        assert!(!operations.add, "PPT {name} is not addable");
+        assert_eq!(operations.add, name == "slide", "PPT {name} insertion");
         assert_eq!(operations.remove, name == "slide", "PPT {name} removal");
     }
 
@@ -852,6 +859,7 @@ fn ppt_reports_unified_reads_and_keeps_writes_granular() {
     );
     for verb in [
         Verb::Set,
+        Verb::Add,
         Verb::Remove,
         Verb::Move,
         Verb::Swap,

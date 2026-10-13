@@ -293,7 +293,7 @@ fn unresolved_candidates_refuse_changed_mutation_without_staging_or_commit_side_
             .is_err()
     );
     assert!(!transaction.is_changed());
-    assert_eq!(transaction.rollback().bytes(), without_property.bytes());
+    drop(transaction);
 
     let mut transaction = without_property
         .transaction_with_policy(fixture_policy())
@@ -349,7 +349,7 @@ fn overlay_limits_reject_reads_and_resolved_puts_without_mutation() {
             .is_err()
     );
     assert!(!transaction.is_changed());
-    assert_eq!(transaction.rollback().bytes(), snapshot.bytes());
+    drop(transaction);
 }
 
 #[test]
@@ -486,9 +486,10 @@ fn removing_hyperlinks_is_targeted_and_rollback_recovers_the_exact_source() {
             .unwrap()
     );
     assert!(rollback_transaction.is_changed());
-    let rolled_back = rollback_transaction.rollback();
-    assert_eq!(rolled_back.bytes(), snapshot.bytes());
-    assert!(rolled_back.user_defined_hyperlinks(None).unwrap().is_some());
+    // Dropping the staged transaction is the rollback; the source snapshot
+    // keeps its exact bytes and property.
+    drop(rollback_transaction);
+    assert!(snapshot.user_defined_hyperlinks(None).unwrap().is_some());
 
     let mut transaction = snapshot.transaction_with_policy(fixture_policy()).unwrap();
     assert!(transaction.remove_user_defined_hyperlinks().unwrap());

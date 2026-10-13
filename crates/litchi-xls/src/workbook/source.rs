@@ -473,6 +473,7 @@ struct SourceInner {
     worksheet_names: Box<[String]>,
     sst: Arc<SharedStringSstScan>,
     formatting: Arc<Formatting>,
+    styles: Option<Arc<StyleTables>>,
     encoding: Encoding,
     limits: SourceBackedLimits,
     leniency: Leniency,
@@ -606,6 +607,8 @@ impl SourceBackedWorksheetDescriptor {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceBackedCell {
     formula: bool,
+    formula_text: Option<Arc<str>>,
+    xf: u16,
     row: u32,
     column: u32,
     value: litchi_core::sheet::CellValue,
@@ -616,6 +619,26 @@ impl SourceBackedCell {
     #[must_use]
     pub const fn is_formula(&self) -> bool {
         self.formula
+    }
+
+    /// The record's `ixfe` cell format index; resolve it with
+    /// [`crate::Formatting::resolved_cell_format`].
+    #[must_use]
+    pub const fn xf_index(&self) -> u16 {
+        self.xf
+    }
+
+    /// Formula text rendered from the cell's BIFF tokens, with its leading
+    /// `=`.
+    ///
+    /// The positional owner renders without the workbook's name and
+    /// external-sheet tables, so a formula that needs them (a 3-D or named
+    /// reference) returns `None` here although [`Self::is_formula`] is true;
+    /// the eager reader's `Cell::formula` renders those with the full
+    /// workbook context.
+    #[must_use]
+    pub fn formula(&self) -> Option<&str> {
+        self.formula_text.as_deref()
     }
 
     /// Zero-based row.
@@ -1266,6 +1289,7 @@ impl SourceBackedWorkbook {
             worksheet_names: worksheet_names.into_boxed_slice(),
             sst: Arc::new(parsed.sst),
             formatting: Arc::new(parsed.formatting),
+            styles: parsed.styles.map(Arc::new),
             encoding: parsed.encoding,
             limits,
             leniency: options.leniency(),
@@ -1317,7 +1341,7 @@ impl SourceBackedWorkbook {
                 litchi_core::selector::Selector::Name(name) => inner
                     .sheets
                     .iter()
-                    .find(|sheet| sheet.name.eq_ignore_ascii_case(name.as_ref())),
+                    .find(|sheet| crate::sheet_name::equivalent(&sheet.name, name.as_ref())),
                 litchi_core::selector::Selector::Position(position) => {
                     inner.sheets.get(position.get())
                 },
@@ -1426,7 +1450,7 @@ impl SourceBackedWorkbook {
     pub fn worksheet_by_name(&self, name: &str) -> Result<Option<SourceBackedWorksheet>> {
         self.metadata(|inner| {
             let sheet_index = inner.sheets.iter().position(|sheet| {
-                sheet.worksheet_index.is_some() && sheet.name.eq_ignore_ascii_case(name)
+                sheet.worksheet_index.is_some() && crate::sheet_name::equivalent(&sheet.name, name)
             });
             sheet_index.map(|sheet_index| SourceBackedWorksheet {
                 owner: Arc::clone(&self.inner),
@@ -1463,6 +1487,29 @@ impl SourceBackedWorkbook {
             .worksheet_by_index(worksheet_index)?
             .ok_or_else(|| SourceBackedError::WorksheetNotFound(worksheet_index.to_string()))?;
         worksheet.cell(row, column)
+    }
+
+    /// The workbook's number formats and XF table.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-change error when the source no longer matches.
+    pub fn formatting(&self) -> Result<Arc<Formatting>> {
+        self.metadata(|inner| Arc::clone(&inner.formatting))
+    }
+
+    /// The workbook's font table and color palette.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-change error, or a typed refusal when the open could
+    /// not read the `Font` or `Palette` records under its leniency policy.
+    pub fn style_tables(&self) -> Result<Arc<StyleTables>> {
+        self.metadata(|inner| inner.styles.clone())?.ok_or_else(|| {
+            SourceBackedError::InvalidData(
+                "the workbook's Font or Palette records are not readable".into(),
+            )
+        })
     }
 
     /// Looks up one cell value by worksheet index and zero-based coordinates.
@@ -1818,8 +1865,69 @@ struct ParsedGlobals {
     sheets: Vec<SheetEntry>,
     sst: SharedStringSstScan,
     formatting: Formatting,
+    styles: Option<StyleTables>,
     encoding: Encoding,
     tolerance: ToleranceReport,
+}
+
+/// The workbook's font table and color palette, for cell formatting reads.
+#[derive(Debug, Clone, Default)]
+pub struct StyleTables {
+    fonts: Vec<crate::font::Font>,
+    palette: crate::Palette,
+}
+
+impl StyleTables {
+    /// Fonts in record order.
+    #[must_use]
+    pub fn fonts(&self) -> &[crate::font::Font] {
+        &self.fonts
+    }
+
+    /// The font an XF's logical font index names.
+    #[must_use]
+    pub fn font(&self, index: u16) -> Option<&crate::font::Font> {
+        self.fonts.iter().find(|font| font.index() == index)
+    }
+
+    /// The workbook color palette.
+    #[must_use]
+    pub const fn palette(&self) -> &crate::Palette {
+        &self.palette
+    }
+
+    /// Parse `Font` and `Palette` records from the globals the open already
+    /// read. The scratch tolerance log keeps the open's own repair report and
+    /// refusal behavior unchanged; a table this parse cannot read is reported
+    /// when a caller asks for it.
+    fn parse(records: &[RecordRef<'_>], leniency: Leniency) -> Option<Self> {
+        let mut tolerance = ToleranceLog::new(leniency);
+        let mut fonts = Vec::new();
+        let mut palette = crate::Palette::default();
+        let mut palette_seen = 0_u32;
+        for record in records {
+            match record.kind().get() {
+                crate::font::FONT_RECORD_TYPE => {
+                    let index = crate::font::logical_font_index(fonts.len()).ok()?;
+                    fonts.push(
+                        crate::font::Font::parse_record(index, record.payload(), &mut tolerance)
+                            .ok()?,
+                    );
+                },
+                0x0092 => {
+                    palette = crate::Palette::parse_unique_record(
+                        record.payload(),
+                        u32::try_from(record.offset()).unwrap_or(u32::MAX),
+                        &mut palette_seen,
+                        tolerance.report_mut(),
+                    )
+                    .ok()?;
+                },
+                _ => {},
+            }
+        }
+        Some(Self { fonts, palette })
+    }
 }
 
 fn descriptor(sheet: &SheetEntry) -> SourceBackedWorksheetDescriptor {
@@ -2377,6 +2485,7 @@ fn parse_globals(
     })?;
     let formatting =
         Formatting::parse_globals(&records, &mut tolerance).map_err(SourceBackedError::Parse)?;
+    let styles = StyleTables::parse(&records, leniency);
     let sst = scan_shared_string_records(&sst_refs, tolerance.report_mut())
         .map_err(map_shared_string_error)?;
 
@@ -2422,6 +2531,7 @@ fn parse_globals(
         sheets,
         sst,
         formatting,
+        styles,
         encoding,
         tolerance: tolerance.into_report(),
     })
@@ -3282,7 +3392,7 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
         if record.row() != self.row || record.col() != self.column {
             return Ok(());
         }
-        if let Some(value) = target_cell_value(record, scan.owner, scan.execution, strings)? {
+        if let Some(target) = target_cell_value(record, scan.owner, scan.execution, strings)? {
             if COLLECT_INDEX
                 && matches!(record, CellRecord::LabelSst { .. })
                 && let Some(index) = self.index.as_mut()
@@ -3293,9 +3403,11 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
             }
             self.found = Some(SourceBackedCell {
                 formula: matches!(record, CellRecord::Formula { .. }),
+                formula_text: target.formula,
+                xf: cell_xf_index(record),
                 row: u32::from(self.row),
                 column: u32::from(self.column),
-                value,
+                value: target.value,
             });
         }
         Ok(())
@@ -3344,14 +3456,23 @@ fn target_cell_value(
     owner: &SourceInner,
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
-) -> Result<Option<litchi_core::sheet::CellValue>> {
+) -> Result<Option<SelectedCell>> {
     let cell = Cell::from_record_with_formula_context(record, None, None, Some(&owner.formatting));
     let value = if let Some(string_index) = cell.shared_string_index() {
         resolve_shared_string(owner, string_index, execution, strings)?
     } else {
         cell.value().clone()
     };
-    Ok(Some(value))
+    Ok(Some(SelectedCell {
+        value,
+        formula: cell.formula_arc(),
+    }))
+}
+
+/// One selected cell's semantic value and context-free rendered formula.
+struct SelectedCell {
+    value: litchi_core::sheet::CellValue,
+    formula: Option<Arc<str>>,
 }
 
 /// The whole-sheet sink: reports every stored cell in stream order and retains
@@ -3382,6 +3503,8 @@ where
         };
         (self.visitor)(SourceBackedCell {
             formula: matches!(record, CellRecord::Formula { .. }),
+            formula_text: cell.formula_arc(),
+            xf: cell_xf_index(record),
             row: u32::from(record.row()),
             column: u32::from(record.col()),
             value,
@@ -3815,14 +3938,16 @@ fn replay_indexed_cell(
             .cfb
             .stream_cursor_at_hinted(&refs, slot.stream_offset, &mut chain)
             .map_err(SourceBackedError::from)?;
-        if let Some(value) =
+        if let Some(target) =
             replay_indexed_slot(owner, sheet.end, slot, &mut cursor, execution, &mut strings)?
         {
             found = Some(SourceBackedCell {
                 formula: slot.kind == 0x0006,
+                formula_text: target.formula,
+                xf: slot.xf,
                 row: u32::from(row),
                 column: u32::from(column),
-                value,
+                value: target.value,
             });
         }
     }
@@ -3843,7 +3968,7 @@ fn replay_indexed_slot(
     cursor: &mut SharedOleStreamCursor<'_>,
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
-) -> Result<Option<litchi_core::sheet::CellValue>> {
+) -> Result<Option<SelectedCell>> {
     let (kind, payload) = read_indexed_frame(cursor, upper_bound)?;
     if kind != slot.kind {
         return Err(SourceBackedError::InvalidData(

@@ -38,6 +38,7 @@ pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(open, m)?)?;
     m.add_function(wrap_pyfunction!(open_bytes, m)?)?;
     m.add_function(wrap_pyfunction!(create, m)?)?;
+    m.add_function(wrap_pyfunction!(schema, m)?)?;
     Ok(())
 }
 
@@ -115,6 +116,34 @@ fn create(py: Python<'_>, format: Bound<'_, PyAny>) -> PyResult<File> {
     let format = FileFormat::extract(&format)?.to_core();
     let file = py.detach(|| litchi::create(format).map_err(|error| Failure::read(&error)))?;
     Ok(File::new(file))
+}
+
+/// The property registry of ``format``: what ``set``, ``add`` and ``get``
+/// accept for each element, as data.
+///
+/// Each element is in OfficeCLI's help-schema shape. Each property has its
+/// ``type``, the enumeration ``values`` and ``valueAliases``, the ``unit``
+/// a bare length number is read in, its ``aliases``, ``constraint`` and
+/// ``clearable`` flag, the ``add``/``set``/``get`` flags, and a ``writeGap``
+/// with its follow-up when it cannot be written yet. ``propertyGaps`` lists
+/// an element's keys Litchi does not answer yet; ``gaps`` the format's other
+/// gaps. A format without a reader in this build has no elements and a
+/// ``pending`` entry. The result equals the Rust ``litchi_ops::schema``
+/// JSON.
+///
+/// Args:
+///     format: A FileFormat, or its name ("docx", "Xlsx", ".pptx")
+///
+/// Returns:
+///     A dict
+///
+/// Raises:
+///     PropertyError: (a ValueError) If format names no format
+///         ("invalid_argument")
+#[pyfunction]
+fn schema<'py>(py: Python<'py>, format: Bound<'py, PyAny>) -> PyResult<Bound<'py, PyAny>> {
+    let format = FileFormat::extract(&format)?.to_core();
+    pyser::to_py(py, &litchi::schema(format))
 }
 
 /// An open document, workbook or presentation: the unified API.

@@ -15,17 +15,27 @@ def write(path: Path, data: dict) -> None:
 
 
 def report(elements: list[dict], gaps: list[dict] | None = None, get: bool = True) -> dict:
-    verb = (
-        {"supported": True}
-        if get
-        else {
+    """A registry export (``litchi_ops::schema``): property gaps sit on their
+    element as ``propertyGaps``; a format without an adapter is ``pending``."""
+    elements = [dict(item) for item in elements]
+    rest = []
+    for gap in gaps or []:
+        if gap.get("subject") != "property":
+            rest.append(gap)
+            continue
+        owner = next(item for item in elements if item["element"] == gap["element"])
+        owner.setdefault("propertyGaps", {})[gap["key"]] = {
+            name: gap[name] for name in ("code", "followUp", "reason")
+        }
+    export = {"format": "xlsx", "elements": elements, "gaps": rest}
+    if not get:
+        export["pending"] = {
             "supported": False,
             "code": "unsupported_capability",
             "followUp": "M1 R4a",
             "reason": "the adapter has not landed",
         }
-    )
-    return {"format": "xlsx", "verbs": {"get": verb}, "elements": elements, "gaps": gaps or []}
+    return export
 
 
 def element(name: str, properties: dict, **extra) -> dict:
@@ -60,6 +70,22 @@ class SchemaLoading(unittest.TestCase):
         write(self.help / "xlsx" / "cell.json", {"element": "cell", "properties": {"value": READ}})
         self.assertEqual(delta.officecli_elements(self.help, "xlsb"), delta.officecli_elements(self.help, "xlsx"))
         self.assertEqual(delta.reference_format("xlsb"), "xlsx")
+
+    def test_legacy_and_rtf_formats_use_their_family_vocabulary(self) -> None:
+        self.assertEqual(delta.reference_format("doc"), "docx")
+        self.assertEqual(delta.reference_format("rtf"), "docx")
+        self.assertEqual(delta.reference_format("ppt"), "pptx")
+        self.assertEqual(delta.reference_format("pptx"), "pptx")
+
+    def test_every_registry_snapshot_is_a_table_format(self) -> None:
+        listed = delta.formats(delta.REPO)
+        for fmt in ("doc", "docx", "ppt", "pptx", "rtf", "xls", "xlsb", "xlsx"):
+            self.assertIn(fmt, listed)
+        self.assertFalse(any(fmt.endswith(delta.OPTIONAL_SUFFIX) for fmt in listed))
+        root = Path(self.tempdir.name)
+        for name in ("odt", "docx", "docx-encryption", "ppt"):
+            write(root / delta.GOLDEN_DIR / f"{name}.json", {})
+        self.assertEqual(delta.formats(root), ["docx", "ppt", "odt"])
 
     def test_xls_uses_xlsx_schema_reference(self) -> None:
         write(self.help / "xlsx" / "cell.json", {"element": "cell", "properties": {"value": READ}})
@@ -236,13 +262,28 @@ class Comparison(unittest.TestCase):
 
     def test_generated_table_tracks_current_golden_reports(self) -> None:
         table = (delta.REPO / delta.OUTPUT).read_text()
-        for fmt in delta.FORMATS:
-            relative = delta.GOLDEN_DIR / f"{fmt}.json"
-            digest = hashlib.sha256((delta.REPO / relative).read_bytes()).hexdigest()
+        snapshots = sorted((delta.REPO / delta.GOLDEN_DIR).glob("*.json"))
+        self.assertGreaterEqual(len(snapshots), 8)
+        for path in snapshots:
+            relative = path.relative_to(delta.REPO)
+            digest = hashlib.sha256(path.read_bytes()).hexdigest()
             self.assertIn(f"| golden | `{relative}` | `{digest}` |", table)
-        relative = delta.GOLDEN_DIR / "docx-encryption.json"
-        digest = hashlib.sha256((delta.REPO / relative).read_bytes()).hexdigest()
-        self.assertIn(f"| golden | `{relative}` | `{digest}` |", table)
+        for fmt in delta.formats(delta.REPO):
+            self.assertIn(f"\n## {fmt}\n", table)
+
+    def test_undeclared_element_gaps_are_gaps_not_missing(self) -> None:
+        officecli = self.schemas(
+            self.oc("comment", {"text": {"type": "string", "set": True, "get": True}}),
+            self.oc("gadget", {"size": {"type": "int", "get": True}}),
+        )
+        gaps = [{"subject": "element", "element": "comment", "code": "unsupported_capability",
+                 "followUp": "0248 C11", "reason": "r"}]
+        result = delta.compare("doc", officecli, report([element("paragraph", {})], gaps=gaps))
+        elements = {row[0]: (row[2], row[3]) for row in result.elements if row[0]}
+        self.assertEqual(elements["comment"], ("gap", "0248 C11"))
+        self.assertEqual(elements["gadget"], ("missing", ""))
+        row = next(row for row in result.properties if row[0] == "comment")
+        self.assertEqual((row[4], row[5], row[7]), ("element gap", "0248 C11", "gap"))
 
     def test_a_pending_adapter_lists_every_schema_as_pending(self) -> None:
         officecli = self.schemas(self.oc("paragraph", {"align": {"type": "enum", "get": True}}))

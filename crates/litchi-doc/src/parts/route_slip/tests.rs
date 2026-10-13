@@ -146,7 +146,9 @@ fn transaction_rollback_and_commit_produce_reversible_semantic_patch() {
     let mut transaction = source.edit();
     transaction.set_stage(RecipientSelector::Index(0)).unwrap();
     assert!(transaction.is_changed());
-    transaction.rollback();
+    // Dropping a transaction is the rollback; a fresh one starts unchanged.
+    drop(transaction);
+    let mut transaction = source.edit();
     assert!(!transaction.is_changed());
 
     transaction.set_stage(RecipientSelector::Index(1)).unwrap();

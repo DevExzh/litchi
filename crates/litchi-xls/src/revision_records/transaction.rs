@@ -135,8 +135,8 @@ impl Snapshot {
 
     /// Starts a detached, failure-atomic transaction.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction::new(self.clone())
+    pub fn edit(&self) -> Edit {
+        Edit::new(self.clone())
     }
 
     /// Publishes the exact validated source stream.
@@ -156,12 +156,12 @@ impl Eq for Snapshot {}
 
 /// A failure-atomic edit over inert Revision Log metadata.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     candidate: Vec<u8>,
 }
 
-impl Transaction {
+impl Edit {
     fn new(source: Snapshot) -> Self {
         Self {
             candidate: source.bytes().to_vec(),
@@ -191,12 +191,6 @@ impl Transaction {
         } else {
             Snapshot::parse(&self.candidate)
         }
-    }
-
-    /// Whether a staged edit changes any stream byte.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        self.candidate.as_slice() != self.source.bytes()
     }
 
     /// Replaces the accepted and undo-action bits of one revision.
@@ -284,12 +278,6 @@ impl Transaction {
         candidate[cch_offset..cch_offset + 2].copy_from_slice(&cch.to_le_bytes());
         self.replace_candidate(candidate)?;
         Ok(self)
-    }
-
-    /// Discards all staged edits and returns the original source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
     }
 
     /// Validates and publishes the candidate with a reversible source-checked
