@@ -194,7 +194,7 @@ fn a_candidate_the_writer_would_refuse_carries_no_proof() {
 fn generated_package(paragraphs: usize) -> crate::Package {
     let mut package = crate::Package::new().unwrap();
     {
-        let document = package.document_mut().unwrap();
+        let document = package.authoring_document().unwrap();
         for index in 0..paragraphs {
             document.add_paragraph_with_text(&format!("paragraph {index:05}"));
         }

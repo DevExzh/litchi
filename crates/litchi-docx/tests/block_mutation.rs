@@ -7,9 +7,9 @@ const RAW: &str = r#"<?xml version="1.0"?><w:document xmlns:w="http://schemas.op
 
 #[test]
 fn inserts_and_removes_paragraphs_and_tables_then_reparses() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_docx::Builder::new().unwrap();
     {
-        let doc = package.document_mut().unwrap();
+        let doc = builder.document().unwrap();
         doc.add_paragraph_with_text("one");
         doc.add_paragraph_with_text("two");
         doc.add_paragraph_with_text("three");
@@ -34,6 +34,7 @@ fn inserts_and_removes_paragraphs_and_tables_then_reparses() {
         assert_eq!(doc.table_count(), 0);
         assert!(!doc.to_xml().unwrap().contains("inserted"));
     }
+    let mut package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();
@@ -106,9 +107,9 @@ fn removing_a_section_ending_paragraph_merges_sections() {
 
 #[test]
 fn structural_edits_keep_the_pending_toc_anchored_after_existing_content() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_docx::Builder::new().unwrap();
     {
-        let doc = package.document_mut().unwrap();
+        let doc = builder.document().unwrap();
         doc.add_paragraph_with_text("body-text");
         doc.add_toc(TableOfContents::new()).unwrap();
         doc.insert_paragraph(0)
@@ -116,6 +117,7 @@ fn structural_edits_keep_the_pending_toc_anchored_after_existing_content() {
             .add_run()
             .set_text("front-text");
     }
+    let mut package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();

@@ -849,7 +849,7 @@ fn elements(xml: &[u8], local: &str) -> Vec<Vec<u8>> {
 /// and every direct run keeps every change-tracking element byte for byte.
 #[test]
 fn tracked_changes_of_a_real_producer_survive_formatting() {
-    let source = fixture("3rdparty/OfficeCLI/examples/word/revisions.docx");
+    let source = fixture("test-data/officecli/examples/word/revisions.docx");
     let package = Package::from_reader(Cursor::new(source.as_slice())).unwrap();
     let base = package.document_snapshot().unwrap();
     let tracked = ["rPrChange", "pPrChange", "ins", "del"];

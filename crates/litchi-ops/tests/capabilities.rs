@@ -134,15 +134,23 @@ fn ordinary_reports_hide_native_selection_fields() {
     assert!(!serialized.contains("<id>"));
     for element in caps.elements() {
         let writable_element = matches!(element.name(), "paragraph" | "run");
-        if writable_element {
-            assert!(element.operations().set);
-            assert!(element.operations().add);
-            assert!(element.operations().remove);
-        } else {
-            assert!(!element.operations().set);
-            assert!(!element.operations().add);
-            assert!(!element.operations().remove);
-        }
+        let operations = element.operations();
+        // Record 0251a: cells and hyperlinks take `text`; tables and rows
+        // are added and removed; cells, hyperlinks and content controls are
+        // removed.
+        let (set, add, remove) = match element.name() {
+            "paragraph" | "run" | "hyperlink" => (true, true, true),
+            "cell" => (true, false, true),
+            // Record 0251c: comments are added and removed.
+            "table" | "row" | "comment" => (false, true, true),
+            // Record 0251d: pictures are added.
+            "picture" => (false, true, false),
+            "sdt" => (false, false, true),
+            _ => (false, false, false),
+        };
+        assert_eq!(operations.set, set, "{} set", element.name());
+        assert_eq!(operations.add, add, "{} add", element.name());
+        assert_eq!(operations.remove, remove, "{} remove", element.name());
         for property in element.properties() {
             if writable_element {
                 let paragraph_initial_run = element.name() == "paragraph"
@@ -195,6 +203,14 @@ fn ordinary_reports_hide_native_selection_fields() {
                     assert!(!property.get());
                     assert!(property.set());
                     assert!(property.add());
+                } else if element.name() == "paragraph"
+                    && matches!(property.name(), "listStyle" | "start")
+                {
+                    // Record 0251e: list kinds are set through the
+                    // numbering part and not read back yet.
+                    assert!(!property.get(), "{}", property.name());
+                    assert!(property.set(), "{}", property.name());
+                    assert!(!property.add(), "{}", property.name());
                 } else if property.name() != "styleId" {
                     assert!(property.get(), "{}", property.name());
                     assert!(property.set(), "{}", property.name());
@@ -204,6 +220,55 @@ fn ordinary_reports_hide_native_selection_fields() {
                     assert!(!property.set(), "{}", property.name());
                     assert!(!property.add(), "{}", property.name());
                 }
+            } else if element.name() == "hyperlink"
+                && matches!(
+                    property.name(),
+                    "url"
+                        | "anchor"
+                        | "font"
+                        | "size"
+                        | "bold"
+                        | "italic"
+                        | "color"
+                        | "underline"
+                        | "rStyle"
+                )
+            {
+                // Record 0251b: the target and the run formatting seed a new
+                // hyperlink; only `url` changes an existing one.
+                assert!(property.get(), "hyperlink {}", property.name());
+                assert!(property.add(), "hyperlink {}", property.name());
+                assert_eq!(property.set(), property.name() == "url");
+            } else if element.name() == "picture" && property.name() != "relId" {
+                // Record 0251d: the extent, name and alternative text seed a
+                // new picture; `src` is add-only.
+                assert_eq!(
+                    property.get(),
+                    property.name() != "src",
+                    "picture {}",
+                    property.name()
+                );
+                assert!(!property.set(), "picture {}", property.name());
+                assert!(property.add(), "picture {}", property.name());
+            } else if element.name() == "comment" && property.name() != "id" {
+                // Record 0251c: author, initials, date and text seed a new
+                // comment.
+                assert!(property.get(), "comment {}", property.name());
+                assert!(!property.set(), "comment {}", property.name());
+                assert!(property.add(), "comment {}", property.name());
+            } else if property.name() == "text" {
+                // `text` of a hyperlink or cell is write-only.
+                assert!(!property.get(), "{} text", element.name());
+                assert!(property.set(), "{} text", element.name());
+            } else if matches!(element.name(), "table" | "row")
+                && matches!(
+                    property.name(),
+                    "cols" | "rows" | "style" | "colWidths" | "data"
+                )
+            {
+                // Seeds of a new table or row.
+                assert!(!property.set(), "{} {}", element.name(), property.name());
+                assert!(property.add(), "{} {}", element.name(), property.name());
             } else {
                 assert!(property.get());
                 assert!(!property.set());
@@ -225,7 +290,7 @@ fn docx_write_context_gaps_are_explicit() {
         .collect();
     assert_eq!(
         operation_gaps.len(),
-        25 + if cfg!(feature = "encryption") { 8 } else { 0 }
+        27 + if cfg!(feature = "encryption") { 8 } else { 0 }
     );
 
     let subjects: Vec<_> = operation_gaps.iter().map(|gap| gap.subject()).collect();
@@ -233,12 +298,12 @@ fn docx_write_context_gaps_are_explicit() {
         Subject::Operation {
             verb: "set",
             element: "paragraph",
-            context: "nested-or-unproven-selection",
+            context: "wrapped-or-unproven-selection",
         },
         Subject::Operation {
             verb: "set",
             element: "run",
-            context: "nested-or-unproven-selection",
+            context: "wrapped-or-unproven-selection",
         },
         Subject::Operation {
             verb: "set",
@@ -263,12 +328,12 @@ fn docx_write_context_gaps_are_explicit() {
         Subject::Operation {
             verb: "add",
             element: "paragraph",
-            context: "nested-or-unproven-parent",
+            context: "wrapped-or-unproven-parent",
         },
         Subject::Operation {
             verb: "add",
             element: "run",
-            context: "nested-or-unproven-parent",
+            context: "wrapped-or-unproven-parent",
         },
         Subject::Operation {
             verb: "remove",
@@ -278,7 +343,7 @@ fn docx_write_context_gaps_are_explicit() {
         Subject::Operation {
             verb: "remove",
             element: "paragraph/run",
-            context: "nested-or-unproven-selection",
+            context: "wrapped-or-unproven-selection",
         },
         Subject::Operation {
             verb: "remove",
@@ -293,7 +358,7 @@ fn docx_write_context_gaps_are_explicit() {
         Subject::Operation {
             verb: "move",
             element: "paragraph/run",
-            context: "nested-or-unproven-selection",
+            context: "wrapped-or-unproven-selection",
         },
         Subject::Operation {
             verb: "move",

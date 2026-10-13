@@ -20,6 +20,49 @@ use crate::value::{Base, Length, LengthContext, Scalar, Scheme, parse_number};
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Setter {
     ParagraphText,
+    /// A hyperlink's display text (record 0251a).
+    HyperlinkText,
+    /// A table cell's text, replacing its content with one paragraph.
+    CellText,
+    /// A hyperlink's external target (record 0251b).
+    HyperlinkUrl,
+    /// A new hyperlink's bookmark target.
+    HyperlinkAnchor,
+    /// A new table's row count.
+    TableRows,
+    /// A new table's column count.
+    TableColumns,
+    /// A new table's style identifier.
+    TableStyle,
+    /// A new table's comma-separated grid widths, in twips.
+    TableColumnWidths,
+    /// A new table's cell text: rows separated by `;`, cells by `,`.
+    TableData,
+    /// A new row's cell count.
+    RowColumns,
+    /// A paragraph's list kind (record 0251e); applied through the
+    /// numbering part, not the paragraph's properties.
+    ParagraphListStyle,
+    /// A paragraph list's restart value (record 0251e).
+    ParagraphListStart,
+    /// A new picture's image source (record 0251d).
+    PictureSrc,
+    /// A new picture's width.
+    PictureWidth,
+    /// A new picture's height.
+    PictureHeight,
+    /// A new picture's alternative text.
+    PictureAlt,
+    /// A new picture's name.
+    PictureName,
+    /// A new comment's author (record 0251c).
+    CommentAuthor,
+    /// A new comment's author initials.
+    CommentInitials,
+    /// A new comment's date.
+    CommentDate,
+    /// A new comment's text.
+    CommentText,
     ParagraphStyle,
     ParagraphAlign,
     ParagraphSpaceBefore,
@@ -93,7 +136,10 @@ impl Setter {
     /// Whether this setter is handled by a text replacement operation rather
     /// than a direct-property formatting closure.
     pub(crate) const fn is_text(self) -> bool {
-        matches!(self, Self::ParagraphText | Self::RunText)
+        matches!(
+            self,
+            Self::ParagraphText | Self::RunText | Self::HyperlinkText | Self::CellText
+        )
     }
 
     /// Apply a paragraph property through the leaf's typed formatting model.
@@ -103,7 +149,9 @@ impl Setter {
         value: Option<Scalar<'_>>,
     ) -> Result<()> {
         match self {
-            Self::ParagraphText | Self::RunText => Err(unsupported_text()),
+            Self::ParagraphText | Self::RunText | Self::HyperlinkText | Self::CellText => {
+                Err(unsupported_text())
+            },
             Self::ParagraphStyle => {
                 paragraph.style = text(value)?.map(str::to_owned);
                 Ok(())
@@ -261,6 +309,8 @@ impl Setter {
                 Ok(())
             },
             Self::ParagraphContextualSpacing => set_bool(&mut paragraph.contextual_spacing, value),
+            // Planned by `super::lists`; admission only checks the value.
+            Self::ParagraphListStyle | Self::ParagraphListStart => Ok(()),
             Self::ParagraphNumId => {
                 let value = text(value)?;
                 let value = value
@@ -313,7 +363,9 @@ impl Setter {
     /// Apply a run property through the leaf's typed formatting model.
     pub(crate) fn apply_run(self, run: &mut direct::Run, value: Option<Scalar<'_>>) -> Result<()> {
         match self {
-            Self::ParagraphText | Self::RunText => Err(unsupported_text()),
+            Self::ParagraphText | Self::RunText | Self::HyperlinkText | Self::CellText => {
+                Err(unsupported_text())
+            },
             Self::RunFontLatin => {
                 let value = text(value)?.map(str::to_owned);
                 let fonts = run.fonts.get_or_insert_default();

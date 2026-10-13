@@ -57,38 +57,37 @@ fn zip_members(bytes: &[u8]) -> BTreeMap<String, Vec<u8>> {
 }
 
 #[test]
-#[ignore = "requires the ignored local 3rdparty DOCX corpus; run this test explicitly with --ignored"]
 fn producer_and_native_revision_corpus_queries_survive_save_and_reopen() {
-    // These fixtures are local producer/native-derived DOCX files. Their
-    // package SHA-256 values are recorded here so a changed corpus is visible
-    // in review without copying binary fixtures into this repository.
+    // These producer/native-derived DOCX files are tracked under test-data/
+    // with their provenance. Their package SHA-256 values are recorded here so
+    // a changed fixture is visible in review.
     let cases = [
         (
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf157011_ins_del_empty_cols.docx",
             9_954,
             "7c737a45db1ed60fa1a56d8a388e7e4a0d394de909fa9c5ca5d07060a6914794",
             RevisionType::TableGridChange,
         ),
         (
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/n830205.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/n830205.docx",
             33_186,
             "9f27ef4097b11c6384c637bddaa1096e1b123623362d3acd8852eb9f83185cac",
             RevisionType::SectionPropertiesChange,
         ),
         (
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testTrackChangesInsertedTableCell.docx",
             13_842,
             "6f2d63be32322581fc9e185b3fd1e50993b93c8ba5f843ec6faef35514b11994",
             RevisionType::TableGridChange,
         ),
         (
-            "3rdparty/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf89731.docx",
+            "test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/tdf89731.docx",
             44_680,
             "4cd35ae2e80f890f57da8efac0eead7a2caaafdda8abb79f27021d8e32d43977",
             RevisionType::NumberingChange,
         ),
         (
-            "3rdparty/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/O14ISOStrict/Word/sectPr-Previous Section Properties-rsidSelect-004B4C75.docx",
+            "test-data/Open-XML-SDK/test/DocumentFormat.OpenXml.Tests.Assets/assets/TestDataStorage/O14ISOStrict/Word/sectPr-Previous Section Properties-rsidSelect-004B4C75.docx",
             14_219,
             "ffd9bbadb66fd764e08477e4f9590f89c993b8e855133e0fcf276be4b006cbc3",
             RevisionType::SectionPropertiesChange,

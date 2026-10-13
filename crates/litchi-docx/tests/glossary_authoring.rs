@@ -123,16 +123,17 @@ fn package_and_document_accessor_round_trip() {
 fn unrelated_document_mutation_preserves_producer_glossary() {
     let directory = tempfile::tempdir().unwrap();
     let output = directory.path().join("libreoffice-preserved.docx");
-    let mut package = Package::open(concat!(
+    let package = Package::open(concat!(
         env!("CARGO_MANIFEST_DIR"),
         "/../../test-data/libreoffice-core/sw/qa/extras/ooxmlexport/data/testGlossary.docx"
     ))
     .unwrap();
     assert!(package.glossary().unwrap().unwrap().0.is_empty());
-    package
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("unrelated mutation");
+    let count = package.document_snapshot().unwrap().paragraph_count();
+    let mut edit = package.edit().unwrap();
+    edit.insert_paragraph(litchi_core::Position::new(count), "unrelated mutation")
+        .unwrap();
+    let mut package = edit.commit().unwrap().into_package();
     package.save(&output).unwrap();
     assert!(
         Package::open(&output)

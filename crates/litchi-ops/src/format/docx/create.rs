@@ -38,6 +38,8 @@ fn apply_metadata(package: &mut litchi_docx::Package, metadata: &Metadata) -> Re
     }) {
         return Err(create::invalid_created_metadata());
     }
-    let _previous = package.put_props(metadata.clone());
+    let mut edit = package.edit_metadata();
+    edit.set(metadata.clone());
+    *package = edit.commit()?.into_package();
     Ok(())
 }

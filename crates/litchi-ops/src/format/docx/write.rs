@@ -14,13 +14,24 @@ use litchi_docx::source_backed;
 use super::Docx;
 use super::DocxEditor;
 use super::Nav;
+use super::element;
 use super::node::{Node, WriteSelection};
 use super::setters::Setter;
-use super::spec::{Kind, PARAGRAPH_REGISTRY, RUN_REGISTRY};
+use super::spec::{CELL_REGISTRY, HYPERLINK_REGISTRY, Kind, PARAGRAPH_REGISTRY, RUN_REGISTRY};
 use crate::error::{Code, Error, Result};
 use crate::props::{IntoProps, Key, PropValue, Props};
 use crate::registry::{Entry, Operation, Table};
 use crate::target::TargetArg;
+
+/// Evaluate `$body` against whichever owner's leaf edit `$work` holds.
+macro_rules! both {
+    ($work:expr, |$edit:ident| $body:expr) => {
+        match $work {
+            WorkEdit::Eager($edit) => $body,
+            WorkEdit::Source($edit) => $body,
+        }
+    };
+}
 
 /// Complete result of one DOCX leaf transaction.
 ///
@@ -46,6 +57,11 @@ impl Commit {
 
     pub(crate) fn into_file(self) -> Docx {
         self.into_parts().0
+    }
+
+    /// The committed handle.
+    pub(super) const fn file(&self) -> &Docx {
+        &self.file
     }
 }
 
@@ -77,15 +93,25 @@ impl Assignment<'_> {
     }
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, PartialEq, Eq)]
 enum TargetKind {
     Paragraph,
     Run,
+    Hyperlink,
+    Cell,
 }
 
-#[derive(Clone, Copy)]
+/// Where a set lands: a direct-body paragraph or run on the body-position
+/// route, or any other element through its leaf element path (record 0251a).
+#[derive(Clone)]
+enum Selection {
+    Body(WriteSelection),
+    Element(litchi_docx::document::ElementPath),
+}
+
+#[derive(Clone)]
 struct Target {
-    selection: WriteSelection,
+    selection: Selection,
     kind: TargetKind,
 }
 
@@ -135,11 +161,11 @@ impl Docx {
         // this makes an empty property list honor the same security policy as
         // a non-empty write.
         let editor = self.edit()?;
-        let targets = self.resolve_targets(&target)?;
+        let nodes = self.resolve_targets(&target)?;
         let props = Props::from_props(props)?;
         let controls = command_text && crate::batch::has_text_controls(&props);
         if controls
-            && targets
+            && nodes
                 .iter()
                 .any(|node| !matches!(node.element_kind(), Kind::Paragraph | Kind::Run))
         {
@@ -149,7 +175,7 @@ impl Docx {
             )
             .with_format(FileFormat::Docx));
         }
-        let targets = admit_targets(targets)?;
+        let targets = admit_targets(&nodes)?;
         let props = if controls && matches!(targets[0].kind, TargetKind::Paragraph) {
             crate::batch::inline_text_props(&props)
         } else {
@@ -160,18 +186,88 @@ impl Docx {
             return WorkEdit::from(editor)?.commit(self);
         }
         let assignments = admit_assignments(targets[0].kind, &props)?;
+        let (request, assignments) = list_request(assignments)?;
         self.owner().check_source()?;
+        // A hyperlink target change stages a relationship, which only the
+        // owning package publishes.
+        // So does a new list definition (record 0251e).
+        let new_lists = request
+            .is_some_and(|request| !matches!(request.style, Some(super::lists::Style::None)));
+        let editor = if new_lists
+            || assignments.iter().any(|assignment| {
+                matches!(
+                    assignment.entry.access,
+                    crate::registry::Access::Set(Setter::HyperlinkUrl)
+                        | crate::registry::Access::SetAndAdd(Setter::HyperlinkUrl)
+                )
+            }) {
+            self.eager_editor(editor)?
+        } else {
+            editor
+        };
 
         let mut editor = WorkEdit::from(editor)?;
-        if editor.bulk_paragraph_text(&targets, &assignments)? {
-            return editor.commit(self);
-        }
-        for target in &targets {
-            for assignment in &assignments {
-                editor.apply_with_policy(target.selection, assignment, command_text)?;
+        let Some(request) = request else {
+            if editor.bulk_paragraph_text(&targets, &assignments)? {
+                return editor.commit(self);
             }
+            for target in &targets {
+                for assignment in &assignments {
+                    editor.apply_with_policy(target, assignment, command_text)?;
+                }
+            }
+            return editor.commit(self);
+        };
+        // `listStyle`: plan each paragraph's list (staging new definitions),
+        // then write its numbering after the other properties.
+        let planned = if new_lists {
+            let WorkEdit::Eager(eager) = &mut editor else {
+                return Err(Error::new(
+                    Code::InternalError,
+                    "a DOCX list edit needs the owning package editor",
+                ));
+            };
+            super::lists::plan(&nodes, request, eager)?
+        } else {
+            vec![None; targets.len()]
+        };
+        let explicit_level = assignments.iter().any(|assignment| {
+            matches!(
+                assignment.entry.access,
+                crate::registry::Access::SetAndAdd(Setter::ParagraphNumLevel)
+                    | crate::registry::Access::Set(Setter::ParagraphNumLevel)
+            )
+        });
+        for (target, planned) in targets.iter().zip(planned) {
+            for assignment in &assignments {
+                editor.apply_with_policy(target, assignment, command_text)?;
+            }
+            editor.set_numbering(target, planned, explicit_level)?;
         }
         editor.commit(self)
+    }
+
+    /// An editor over the owning package: package-graph changes
+    /// (relationships, new parts) publish only through it. A source-backed
+    /// owner is materialized once; the committed handle is eager.
+    pub(super) fn eager_editor(&self, editor: DocxEditor) -> Result<DocxEditor> {
+        match editor {
+            DocxEditor::Source(_) => {
+                let super::DocxOwner::Source(package) = self.owner() else {
+                    return Err(Error::new(
+                        Code::InternalError,
+                        "a source editor came from an eager DOCX owner",
+                    ));
+                };
+                let owned = self.owner().finish(
+                    package
+                        .to_owned_package_preserving_source()
+                        .map_err(Error::from),
+                )?;
+                Ok(DocxEditor::Edit(Box::new(owned.edit()?)))
+            },
+            editor => Ok(editor),
+        }
     }
 
     pub(super) fn resolve_targets<'f>(&'f self, target: &TargetArg<'_>) -> Result<Vec<Node<'f>>> {
@@ -239,7 +335,7 @@ impl WorkEdit {
         }
         let mut previous = None;
         for target in targets {
-            let WriteSelection::Paragraph(position) = target.selection else {
+            let Selection::Body(WriteSelection::Paragraph(position)) = target.selection else {
                 return Ok(false);
             };
             if previous.is_some_and(|prior| position.get() <= prior) {
@@ -265,7 +361,7 @@ impl WorkEdit {
             .try_reserve_exact(targets.len())
             .map_err(|source| Error::from(crate::transaction::Error::Allocation { source }))?;
         for target in targets {
-            if let WriteSelection::Paragraph(position) = target.selection {
+            if let Selection::Body(WriteSelection::Paragraph(position)) = target.selection {
                 replacements.push(litchi_docx::document::ParagraphTextReplacement::new(
                     position,
                     text.clone(),
@@ -286,16 +382,24 @@ impl WorkEdit {
         Ok(true)
     }
 
-    fn apply(&mut self, selection: WriteSelection, assignment: &Assignment<'_>) -> Result<()> {
-        self.apply_with_policy(selection, assignment, false)
+    fn apply(&mut self, target: &Target, assignment: &Assignment<'_>) -> Result<()> {
+        self.apply_with_policy(target, assignment, false)
     }
 
     fn apply_with_policy(
         &mut self,
-        selection: WriteSelection,
+        target: &Target,
         assignment: &Assignment<'_>,
         command_text: bool,
     ) -> Result<()> {
+        let selection = match &target.selection {
+            Selection::Body(selection) => *selection,
+            Selection::Element(path) => {
+                return self
+                    .apply_element(path, target.kind, assignment)
+                    .map_err(|error| property_error(error, &assignment.key));
+            },
+        };
         let result = match selection {
             WriteSelection::Paragraph(position) => {
                 assignment
@@ -327,6 +431,112 @@ impl WorkEdit {
             },
         };
         result.map_err(|error| property_error(error, &assignment.key))
+    }
+
+    /// Apply one admitted assignment to an element reached by its leaf path.
+    /// Join a paragraph to a list, or remove its numbering, in one
+    /// formatting operation (record 0251e). An explicit `level` wins over
+    /// the planned one.
+    fn set_numbering(
+        &mut self,
+        target: &Target,
+        numbering: Option<(u32, u8)>,
+        keep_level: bool,
+    ) -> Result<()> {
+        let apply = |properties: &mut litchi_docx::properties::Paragraph| match numbering {
+            Some((id, level)) => {
+                let numbering = properties.numbering.get_or_insert_default();
+                numbering.id = Some(id);
+                if !keep_level || numbering.level.is_none() {
+                    numbering.level = Some(level);
+                }
+            },
+            None => properties.numbering = None,
+        };
+        match &target.selection {
+            Selection::Body(WriteSelection::Paragraph(position)) => {
+                both!(self, |edit| edit
+                    .format_paragraph(*position, apply)
+                    .map(|_| ())
+                    .map_err(Error::from))
+            },
+            Selection::Element(path) => both!(self, |edit| edit
+                .format_paragraph_at(path, apply)
+                .map(|_| ())
+                .map_err(Error::from)),
+            Selection::Body(WriteSelection::Run { .. }) => Err(Error::new(
+                Code::UnsupportedCapability,
+                "listStyle applies to paragraphs",
+            )
+            .with_property("listStyle")),
+        }
+    }
+
+    fn apply_element(
+        &mut self,
+        path: &litchi_docx::document::ElementPath,
+        kind: TargetKind,
+        assignment: &Assignment<'_>,
+    ) -> Result<()> {
+        assignment
+            .entry
+            .prepare(Operation::Set, &assignment.value, |setter, value| {
+                if setter.is_text() {
+                    let text = text_value(value)?;
+                    return if kind == TargetKind::Cell {
+                        both!(self, |edit| edit
+                            .replace_cell_text_at(path, text)
+                            .map(|_| ())
+                            .map_err(Error::from))
+                    } else {
+                        both!(self, |edit| edit
+                            .replace_text_at(path, text)
+                            .map(|_| ())
+                            .map_err(Error::from))
+                    };
+                }
+                if setter == Setter::HyperlinkUrl {
+                    let url = text_value(value)?;
+                    let Self::Eager(edit) = self else {
+                        return Err(Error::new(
+                            Code::InternalError,
+                            "a hyperlink target change needs the owning package editor",
+                        ));
+                    };
+                    edit.set_hyperlink_target_at(
+                        path,
+                        &litchi_docx::document::HyperlinkTarget::Url(url),
+                    )
+                    .map_err(Error::from)?;
+                    return Ok(());
+                }
+                let mut failure = None;
+                match kind {
+                    TargetKind::Paragraph => both!(self, |edit| edit
+                        .format_paragraph_at(path, |paragraph| {
+                            if let Err(error) = setter.apply_paragraph(paragraph, value) {
+                                failure = Some(error);
+                            }
+                        })
+                        .map(|_| ())
+                        .map_err(Error::from))?,
+                    TargetKind::Run => both!(self, |edit| edit
+                        .format_run_at(path, |run| {
+                            if let Err(error) = setter.apply_run(run, value) {
+                                failure = Some(error);
+                            }
+                        })
+                        .map(|_| ())
+                        .map_err(Error::from))?,
+                    TargetKind::Hyperlink | TargetKind::Cell => {
+                        return Err(Error::new(
+                            Code::UnsupportedProperty,
+                            "the DOCX element accepts only its text property",
+                        ));
+                    },
+                }
+                failure.map_or(Ok(()), Err)
+            })
     }
 
     fn replace_paragraph_text(&mut self, position: Position, text: String) -> Result<()> {
@@ -584,6 +794,71 @@ impl WorkEdit {
         }
     }
 
+    pub(super) fn insert_paragraph_at(
+        &mut self,
+        container: &litchi_docx::document::ElementPath,
+        anchor: litchi_docx::document::ElementAnchor,
+        paragraph: &litchi_docx::document::NewParagraph,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_paragraph_at(container, anchor, paragraph)
+            .map_err(Error::from))
+    }
+
+    pub(super) fn insert_table_at(
+        &mut self,
+        container: &litchi_docx::document::ElementPath,
+        anchor: litchi_docx::document::ElementAnchor,
+        table: &litchi_docx::document::NewTable,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_table_at(container, anchor, table)
+            .map_err(Error::from))
+    }
+
+    pub(super) fn insert_row_at(
+        &mut self,
+        table: &litchi_docx::document::ElementPath,
+        at: Option<Position>,
+        cells: Option<usize>,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_row_at(table, at, cells, &[])
+            .map_err(Error::from))
+    }
+
+    pub(super) fn insert_run_at(
+        &mut self,
+        owner: &litchi_docx::document::ElementPath,
+        at: Option<Position>,
+        run: &litchi_docx::document::NewRun,
+    ) -> Result<Position> {
+        both!(self, |edit| edit
+            .insert_run_at(owner, at, run)
+            .map_err(Error::from))
+    }
+
+    pub(super) fn remove_element_at(
+        &mut self,
+        path: &litchi_docx::document::ElementPath,
+    ) -> Result<()> {
+        both!(self, |edit| edit
+            .remove_element_at(path)
+            .map(|_| ())
+            .map_err(Error::from))
+    }
+
+    pub(super) fn move_element_at(
+        &mut self,
+        path: &litchi_docx::document::ElementPath,
+        container: &litchi_docx::document::ElementPath,
+        anchor: litchi_docx::document::ElementAnchor,
+    ) -> Result<litchi_docx::document::ElementPath> {
+        both!(self, |edit| edit
+            .move_element_at(path, container, anchor)
+            .map_err(Error::from))
+    }
+
     pub(super) fn commit(self, source: &Docx) -> Result<Commit> {
         match self {
             Self::Eager(edit) => {
@@ -610,53 +885,60 @@ impl WorkEdit {
     }
 }
 
-fn admit_targets(nodes: Vec<Node<'_>>) -> Result<Vec<Target>> {
+fn admit_targets(nodes: &[Node<'_>]) -> Result<Vec<Target>> {
     let mut targets = Vec::with_capacity(nodes.len());
     // Every node comes from one resolve_targets call on one immutable owner.
     // Cache only within this admission; later operations may have a new body.
     let mut body = None;
     for node in nodes {
-        let (kind, selection) = match node.element_kind() {
-            Kind::Paragraph => (
-                TargetKind::Paragraph,
-                node.write_selection_cached(&mut body)?,
-            ),
-            Kind::Run => (TargetKind::Run, node.write_selection_cached(&mut body)?),
+        let kind = match node.element_kind() {
+            Kind::Paragraph => TargetKind::Paragraph,
+            Kind::Run => TargetKind::Run,
+            Kind::Hyperlink => TargetKind::Hyperlink,
+            Kind::Cell => TargetKind::Cell,
             _ => {
                 return Err(Error::new(
                     Code::UnsupportedElement,
-                    "the DOCX write target must be a paragraph or run",
+                    "the DOCX write target must be a paragraph, run, hyperlink or cell",
                 )
                 .with_format(FileFormat::Docx));
+            },
+        };
+        let selection = match kind {
+            TargetKind::Paragraph | TargetKind::Run => {
+                match node.write_selection_cached(&mut body) {
+                    Ok(selection) => Selection::Body(selection),
+                    // Not a direct-body paragraph or direct run: try the
+                    // element path, which proves nested positions itself.
+                    Err(error) if error.code() == Code::UnsupportedCapability => {
+                        Selection::Element(element::element_path(node)?)
+                    },
+                    Err(error) => return Err(error),
+                }
+            },
+            TargetKind::Hyperlink | TargetKind::Cell => {
+                Selection::Element(element::element_path(node)?)
             },
         };
         targets.push(Target { selection, kind });
     }
     let first = targets[0].kind;
-    if targets
-        .iter()
-        .any(|target| !same_target_kind(target.kind, first))
-    {
+    if targets.iter().any(|target| target.kind != first) {
         return Err(Error::new(
             Code::UnsupportedCapability,
-            "one DOCX mutation cannot mix paragraph and run targets",
+            "one DOCX mutation cannot mix target kinds",
         )
         .with_format(FileFormat::Docx));
     }
     Ok(targets)
 }
 
-fn same_target_kind(left: TargetKind, right: TargetKind) -> bool {
-    matches!(
-        (left, right),
-        (TargetKind::Paragraph, TargetKind::Paragraph) | (TargetKind::Run, TargetKind::Run)
-    )
-}
-
 fn admit_assignments<'a>(kind: TargetKind, props: &'a Props<'_>) -> Result<Vec<Assignment<'a>>> {
     match kind {
         TargetKind::Paragraph => admit_table(&PARAGRAPH_REGISTRY, kind, props),
         TargetKind::Run => admit_table(&RUN_REGISTRY, kind, props),
+        TargetKind::Hyperlink => admit_table(&HYPERLINK_REGISTRY, kind, props),
+        TargetKind::Cell => admit_table(&CELL_REGISTRY, kind, props),
     }
 }
 
@@ -688,6 +970,8 @@ fn admit_table<'a, const N: usize, const A: usize>(
                             let mut probe = litchi_docx::properties::Run::default();
                             setter.apply_run(&mut probe, value)?;
                         },
+                        // Their registries hold only `text` as writable.
+                        TargetKind::Hyperlink | TargetKind::Cell => {},
                     }
                     Ok(setter)
                 }
@@ -700,6 +984,60 @@ fn admit_table<'a, const N: usize, const A: usize>(
         });
     }
     Ok(assignments)
+}
+
+/// Split the `listStyle` and `start` assignments (record 0251e) from the
+/// others.
+fn list_request(
+    assignments: Vec<Assignment<'_>>,
+) -> Result<(Option<super::lists::Request>, Vec<Assignment<'_>>)> {
+    let mut request = None::<super::lists::Request>;
+    let mut rest = Vec::with_capacity(assignments.len());
+    for assignment in assignments {
+        match assignment.entry.access {
+            crate::registry::Access::Set(Setter::ParagraphListStyle) => {
+                let style = assignment
+                    .entry
+                    .prepare(Operation::Set, &assignment.value, |_, value| {
+                        Ok(super::lists::style(&text_value(value)?))
+                    })
+                    .map_err(|error| property_error(error, &assignment.key))?;
+                request
+                    .get_or_insert(super::lists::Request {
+                        style: None,
+                        start: None,
+                    })
+                    .style = Some(style);
+            },
+            crate::registry::Access::Set(Setter::ParagraphListStart) => {
+                let start = assignment
+                    .entry
+                    .prepare(Operation::Set, &assignment.value, |_, value| match value {
+                        Some(crate::value::Scalar::Int(start)) => {
+                            u32::try_from(start).map_err(|_| {
+                                Error::new(
+                                    Code::InvalidValue,
+                                    "a list start is a non-negative integer",
+                                )
+                            })
+                        },
+                        _ => Err(Error::new(
+                            Code::InvalidValue,
+                            "a list start is a non-negative integer",
+                        )),
+                    })
+                    .map_err(|error| property_error(error, &assignment.key))?;
+                request
+                    .get_or_insert(super::lists::Request {
+                        style: None,
+                        start: None,
+                    })
+                    .start = Some(start);
+            },
+            _ => rest.push(assignment),
+        }
+    }
+    Ok((request, rest))
 }
 
 fn text_value(value: Option<crate::value::Scalar<'_>>) -> Result<String> {

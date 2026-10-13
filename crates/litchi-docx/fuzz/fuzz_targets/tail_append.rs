@@ -65,7 +65,7 @@ fuzz_target!(|data: &[u8]| {
     };
     if let Ok(plan) = package.tail_append_noop().with_limits(limits).prepare() {
         let mut output = Vec::new();
-        if let Ok(publication) = plan.write_to_stream(&mut output) {
+        if let Ok(publication) = plan.write_to(&mut output) {
             assert!(publication.is_noop());
             assert_eq!(output, data);
         }
@@ -84,7 +84,7 @@ fuzz_target!(|data: &[u8]| {
     assert_eq!(before.sect_pr_len, after.sect_pr_len);
     assert_eq!(before.sect_pr_sha256, after.sect_pr_sha256);
     let mut output = Vec::new();
-    if let Ok(publication) = plan.write_to_stream(&mut output) {
+    if let Ok(publication) = plan.write_to(&mut output) {
         assert!(!publication.is_noop());
         let current = Package::from_reader_with_options(
             Cursor::new(&output),

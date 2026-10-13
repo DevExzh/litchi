@@ -42,6 +42,10 @@ use super::{
 use crate::properties;
 type Result<T, E = Error> = std::result::Result<T, E>;
 
+mod element;
+pub(crate) use element::PictureMarkup;
+pub use element::{ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION, NewTable};
+
 /// A run to insert: its direct properties and its text.
 ///
 /// Tabs, line feeds, carriage returns, non-breaking hyphens (U+2011) and soft
@@ -2241,7 +2245,11 @@ fn body(edit: &Edit) -> Result<Body> {
 
 /// The direct element children of the projected document's body.
 fn body_of(edit: &Edit) -> Result<Body> {
-    let snapshot = &edit.projected;
+    body_of_snapshot(&edit.projected)
+}
+
+/// The direct element children of a snapshot's body.
+fn body_of_snapshot(snapshot: &super::Snapshot) -> Result<Body> {
     let xml = snapshot.xml_bytes();
     let (content_start, prefix) = body_start(xml, snapshot.conformance)?;
     let to_usize =

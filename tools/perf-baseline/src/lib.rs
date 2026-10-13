@@ -17069,11 +17069,12 @@ fn verify_rtf_logical_tail_gates(
 }
 
 fn semantic_docx_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_docx::Package::new()?;
-    let document = package.document_mut()?;
+    let mut builder = litchi_docx::Builder::new()?;
+    let document = builder.document()?;
     for index in 0..shape.docx_paragraphs() {
         document.add_paragraph_with_text(&semantic_docx_text(index, false));
     }
+    let mut package = builder.build()?;
     let mut output = Cursor::new(Vec::new());
     package.write_to(&mut output)?;
     Ok(output.into_inner())
@@ -17128,8 +17129,8 @@ fn docx_source_media_payload(index: usize) -> Vec<u8> {
 }
 
 fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
-    let mut package = litchi_docx::Package::new()?;
-    let document = package.document_mut()?;
+    let mut builder = litchi_docx::Builder::new()?;
+    let document = builder.document()?;
     for index in 0..SemanticShape::Medium.docx_paragraphs() {
         let paragraph = document.add_paragraph_with_text(&semantic_docx_text(index, false));
         if index < DOCX_SOURCE_MEDIA_ENTRY_COUNT {
@@ -17140,6 +17141,7 @@ fn docx_source_edit_bytes() -> Result<Vec<u8>, Box<dyn Error>> {
             )?;
         }
     }
+    let mut package = builder.build()?;
     let mut output = Cursor::new(Vec::new());
     package.write_to(&mut output)?;
     restore_docx_source_edit_v1(output.into_inner())

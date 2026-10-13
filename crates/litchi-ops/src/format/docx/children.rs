@@ -7,7 +7,7 @@
 //! | `body`, a cell, a content control | paragraphs, tables, content controls, display equations and (in the body) section breaks, in visible order; `w:customXml` wrappers flattened; `w:altChunk` anchors and unknown children skipped |
 //! | a table | rows |
 //! | a row | cells |
-//! | a paragraph | its addressable runs, then its direct hyperlinks |
+//! | a paragraph | its addressable runs, then its direct hyperlinks, then its inline pictures |
 //!
 //! The iterator owns what it reads (shared leaf values, an index cursor), so
 //! it borrows neither the adapter nor the parent node, and a walk that
@@ -36,8 +36,15 @@ pub(crate) struct Children<'f> {
 
 enum Source {
     Done,
-    /// The root's single child, the body.
+    /// The root's children: the body, then the comments part.
     Root,
+    /// The root's comments part, when the document has one.
+    CommentsRoot,
+    /// The comments of the comments part.
+    Comments {
+        comments: vec::IntoIter<litchi_docx::comment::Comment>,
+        next: u32,
+    },
     /// The direct blocks of a block container, from `next` on.
     Blocks {
         container: Blocks,
@@ -51,16 +58,24 @@ enum Source {
         cells: vec::IntoIter<Cell>,
         next: u32,
     },
-    /// A paragraph's runs; its hyperlinks follow when `links` holds it.
+    /// A paragraph's runs; its hyperlinks and pictures follow when `rest`
+    /// holds it.
     Runs {
         runs: vec::IntoIter<Run>,
         next: u32,
-        links: Option<Paragraph>,
+        rest: Option<Rest>,
     },
     /// A paragraph's hyperlinks, read when the first is needed.
-    Links(Paragraph),
+    Links(Rest),
     Hyperlinks {
         links: vec::IntoIter<InlineHyperlink>,
+        next: u32,
+        pictures: Option<Paragraph>,
+    },
+    /// A paragraph's inline pictures, read when the first is needed.
+    PictureList(Paragraph),
+    Pictures {
+        pictures: vec::IntoIter<litchi_docx::image::InlineImage>,
         next: u32,
     },
 }
@@ -70,6 +85,11 @@ impl<'f> Children<'f> {
     pub(super) fn of(parent: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
         let source = match &parent.value {
             Value::Document if kinds.contains(Kind::Body) => Source::Root,
+            Value::Document if kinds.contains(Kind::Comments) => Source::CommentsRoot,
+            Value::Comments if kinds.contains(Kind::Comment) => Source::Comments {
+                comments: nav::comments(parent.docx)?.into_iter(),
+                next: 0,
+            },
             Value::Body(_) | Value::Cell(_) | Value::Sdt(_) if wants_blocks(kinds) => {
                 match container_of(parent)? {
                     Some(container) => Source::Blocks { container, next: 0 },
@@ -85,15 +105,20 @@ impl<'f> Children<'f> {
                 next: 0,
             },
             Value::Paragraph { paragraph, .. } => {
-                let links = kinds.contains(Kind::Hyperlink).then(|| paragraph.clone());
+                let rest = Rest {
+                    paragraph: paragraph.clone(),
+                    links: kinds.contains(Kind::Hyperlink),
+                    pictures: kinds.contains(Kind::Picture),
+                };
+                let rest = (rest.links || rest.pictures).then_some(rest);
                 if kinds.contains(Kind::Run) {
                     Source::Runs {
                         runs: paragraph.addressable_runs()?.into_vec().into_iter(),
                         next: 0,
-                        links,
+                        rest,
                     }
                 } else {
-                    links.map_or(Source::Done, Source::Links)
+                    rest.map_or(Source::Done, Source::Links)
                 }
             },
             _ => Source::Done,
@@ -111,12 +136,44 @@ impl<'f> Children<'f> {
             match &mut self.source {
                 Source::Done => return None,
                 Source::Root => {
-                    self.source = Source::Done;
+                    self.source = Source::CommentsRoot;
+                    if !self.kinds.contains(Kind::Body) {
+                        continue;
+                    }
                     return Some(Ok(Node::new(
                         self.docx,
                         Kind::Body,
                         Value::Body(std::sync::OnceLock::new()),
                         self.address.with(Step::new(Kind::Body, 0)),
+                    )));
+                },
+                Source::CommentsRoot => {
+                    self.source = Source::Done;
+                    if !self.kinds.contains(Kind::Comments) {
+                        continue;
+                    }
+                    match nav::has_comments(self.docx) {
+                        Ok(true) => {
+                            return Some(Ok(Node::new(
+                                self.docx,
+                                Kind::Comments,
+                                Value::Comments,
+                                self.address.with(Step::new(Kind::Comments, 0)),
+                            )));
+                        },
+                        Ok(false) => return None,
+                        Err(error) => return Some(Err(error)),
+                    }
+                },
+                Source::Comments { comments, next } => {
+                    let comment = comments.next()?;
+                    let ordinal = *next;
+                    *next += 1;
+                    return Some(Ok(Node::new(
+                        self.docx,
+                        Kind::Comment,
+                        Value::Comment(Arc::new(comment)),
+                        self.address.with(Step::new(Kind::Comment, ordinal)),
                     )));
                 },
                 Source::Blocks { container, next } => {
@@ -158,7 +215,7 @@ impl<'f> Children<'f> {
                         self.address.with(Step::new(Kind::Cell, ordinal)),
                     )));
                 },
-                Source::Runs { runs, next, links } => {
+                Source::Runs { runs, next, rest } => {
                     if let Some(run) = runs.next() {
                         let ordinal = *next;
                         *next += 1;
@@ -169,19 +226,54 @@ impl<'f> Children<'f> {
                             self.address.with(Step::new(Kind::Run, ordinal)),
                         )));
                     }
-                    self.source = links.take().map_or(Source::Done, Source::Links);
+                    self.source = rest.take().map_or(Source::Done, Source::Links);
                 },
-                Source::Links(paragraph) => match nav::hyperlinks(self.docx, paragraph) {
-                    Ok(links) => {
-                        self.source = Source::Hyperlinks {
-                            links: links.into_iter(),
+                Source::Links(rest) => {
+                    let pictures = rest.pictures.then(|| rest.paragraph.clone());
+                    if !rest.links {
+                        self.source = pictures.map_or(Source::Done, Source::PictureList);
+                        continue;
+                    }
+                    match nav::hyperlinks(self.docx, &rest.paragraph) {
+                        Ok(links) => {
+                            self.source = Source::Hyperlinks {
+                                links: links.into_iter(),
+                                next: 0,
+                                pictures,
+                            };
+                        },
+                        Err(error) => return Some(Err(error)),
+                    }
+                },
+                Source::PictureList(paragraph) => match paragraph.images() {
+                    Ok(pictures) => {
+                        self.source = Source::Pictures {
+                            pictures: pictures.into_vec().into_iter(),
                             next: 0,
                         };
                     },
-                    Err(error) => return Some(Err(error)),
+                    Err(error) => return Some(Err(error.into())),
                 },
-                Source::Hyperlinks { links, next } => {
-                    let link = links.next()?;
+                Source::Pictures { pictures, next } => {
+                    let picture = pictures.next()?;
+                    let ordinal = *next;
+                    *next += 1;
+                    return Some(Ok(Node::new(
+                        self.docx,
+                        Kind::Picture,
+                        Value::Picture(Arc::new(picture)),
+                        self.address.with(Step::new(Kind::Picture, ordinal)),
+                    )));
+                },
+                Source::Hyperlinks {
+                    links,
+                    next,
+                    pictures,
+                } => {
+                    let Some(link) = links.next() else {
+                        self.source = pictures.take().map_or(Source::Done, Source::PictureList);
+                        continue;
+                    };
                     let ordinal = *next;
                     *next += 1;
                     return Some(Ok(Node::new(
@@ -194,6 +286,14 @@ impl<'f> Children<'f> {
             }
         }
     }
+}
+
+/// What follows a paragraph's runs: its hyperlinks and its pictures, each
+/// when wanted.
+struct Rest {
+    paragraph: Paragraph,
+    links: bool,
+    pictures: bool,
 }
 
 /// Whether `kinds` holds a kind a block container lists.

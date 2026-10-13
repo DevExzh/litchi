@@ -47,11 +47,11 @@ litchi-drawingml = "0.0.1"
 ### Creating Documents
 
 ```rust
-use litchi_docx::Package;
+use litchi_docx::Builder;
 
-// Create a new document
-let mut pkg = Package::new()?;
-let mut doc = pkg.document_mut()?;
+// Author a new document
+let mut builder = Builder::new()?;
+let doc = builder.document()?;
 
 // Add headings
 doc.add_heading("Document Title", 1)?;
@@ -128,19 +128,26 @@ println!("Found in {} paragraphs", matches.len());
 
 ### Updating Documents
 
+An opened document is an immutable snapshot. Every change stages an edit and
+commits a new package; the source is never mutated.
+
 ```rust
+use litchi_core::Position;
 use litchi_docx::Package;
 
 // Open existing document
-let mut pkg = Package::open("document.docx")?;
-let mut doc = pkg.document_mut()?;
+let pkg = Package::open("document.docx")?;
+let end = pkg.document_snapshot()?.paragraph_count();
 
 // Add new content
-doc.add_heading("New Section", 2)?;
-doc.add_paragraph_with_text("Additional content...");
+let mut edit = pkg.edit()?;
+edit.insert_paragraph(Position::new(end), "Additional content...")?;
+let pkg = edit.commit()?.into_package();
 
 // Update metadata
-pkg.properties_mut().last_modified_by = Some("Editor Name".to_string());
+let mut metadata = pkg.edit_metadata();
+metadata.update(|props| props.last_modified_by = Some("Editor Name".to_string()));
+let mut pkg = metadata.commit()?.into_package();
 
 // Save (can overwrite or save to new file)
 pkg.save("updated.docx")?;
@@ -284,16 +291,16 @@ for text_box in pkg.text_boxes()? {
 ### Authoring Rich Content
 
 Text boxes, SmartArt diagrams, embedded OLE objects, and legacy VML shapes
-can be authored through the mutable document and round-trip through the
+can be authored through `Builder::document()` and round-trip through the
 read inventories above:
 
 ```rust
 use litchi_docx::{MutableTextBox, MutableOleObject, MutableSmartArt, MutableVmlShape, VmlShapeKind};
 use litchi_drawingml::diagram::{DiagramType, SmartArtBuilder};
-use litchi_docx::Package;
+use litchi_docx::Builder;
 
-let mut pkg = Package::new()?;
-let mut doc = pkg.document_mut()?;
+let mut builder = Builder::new()?;
+let doc = builder.document()?;
 
 // DrawingML text box with formatted runs and body properties.
 let mut text_box = MutableTextBox::new("Intro Box", 2_743_200, 914_400)?; // 3" x 1"
@@ -317,7 +324,7 @@ shape.set_fill_color("FFDDEE")?;
 shape.set_stroke_color("336699")?;
 doc.add_vml_shape(shape);
 
-pkg.save("output.docx")?;
+builder.build()?.save("output.docx")?;
 ```
 
 ## Excel Spreadsheets (XLSX)

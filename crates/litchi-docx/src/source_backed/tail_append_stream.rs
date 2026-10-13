@@ -1615,14 +1615,14 @@ impl<'package> ParagraphStreamPlan<'package> {
     }
 
     /// Publish this plan directly to a sequential sink.
-    pub fn write_to_stream(self, writer: impl Write) -> Result<ParagraphStreamPublication> {
-        self.commit().write_to_stream(writer)
+    pub fn write_to(self, writer: impl Write) -> Result<ParagraphStreamPublication> {
+        self.commit().write_to(writer)
     }
 
     /// Atomically publish this plan to a filesystem path.
     ///
     /// The path publication uses the same consuming commit and source-backed
-    /// splice as [`Self::write_to_stream`].  The existing splice callback
+    /// splice as [`Self::write_to`].  The existing splice callback
     /// authenticates the source, candidate, replay, budget, and cancellation
     /// state while writing the complete candidate to an atomic temporary
     /// sibling; only then does the filesystem layer synchronize and replace
@@ -1654,7 +1654,7 @@ impl<'package> ParagraphStreamCommit<'package> {
     }
 
     /// Publish to a sequential sink and retain an exact immediate inverse.
-    pub fn write_to_stream(self, writer: impl Write) -> Result<ParagraphStreamPublication> {
+    pub fn write_to(self, writer: impl Write) -> Result<ParagraphStreamPublication> {
         publish_stream(self, writer)
     }
 
@@ -1871,7 +1871,7 @@ impl Package {
         };
         let plan = make_edit().prepare()?;
         ensure_current_archive(self, source_archive)?;
-        plan.write_to_stream(writer)
+        plan.write_to(writer)
     }
 
     /// Apply a durable stream patch using the shorter transaction-family

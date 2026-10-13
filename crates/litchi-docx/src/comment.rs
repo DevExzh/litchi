@@ -231,6 +231,11 @@ impl Comment {
     ///
     /// A vector of comments
     pub(crate) fn extract_from_part(part: &dyn Part) -> Result<Vec<Comment>> {
+        Self::extract_from_payload(&part.blob_arc())
+    }
+
+    /// Extract the comments of a comments-part payload.
+    pub(crate) fn extract_from_payload(payload: &Arc<Vec<u8>>) -> Result<Vec<Comment>> {
         // Preserve the Word 2023 tracked-change timestamp while selecting
         // active MCE content in comments.xml.  The generic baseline has no
         // knowledge of this DOCX extension and would drop an ignorable
@@ -238,13 +243,13 @@ impl Comment {
         let mut capabilities = litchi_ooxml_common::mce::Capabilities::default();
         capabilities.understand_namespace(crate::revision::WORD_2023_DATE_UTC_NAMESPACE);
         let source = match litchi_ooxml_common::mce::process_markup_compatibility(
-            part.blob(),
+            payload.as_slice(),
             &capabilities,
             &litchi_ooxml_common::mce::Limits::default(),
         )?
         .xml
         {
-            std::borrow::Cow::Borrowed(_) => part.blob_arc(),
+            std::borrow::Cow::Borrowed(_) => Arc::clone(payload),
             std::borrow::Cow::Owned(value) => Arc::new(value),
         };
         let mut comments = Vec::new();

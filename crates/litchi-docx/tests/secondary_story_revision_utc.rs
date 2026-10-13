@@ -16,11 +16,11 @@ fn revision_story(root: &str, alias: &str, timestamp: &str) -> String {
 
 #[test]
 fn header_and_footer_revision_utc_survive_package_save_and_reopen() {
-    let mut package = Package::new().unwrap();
+    let mut builder = litchi_docx::Builder::new().unwrap();
     let header_xml = revision_story("hdr", "h", "2026-07-17T00:00:00Z");
     let footer_xml = revision_story("ftr", "f", "2026-07-18T00:00:00Z");
     {
-        let document = package.document_mut().unwrap();
+        let document = builder.document().unwrap();
         document.add_paragraph_with_text("body");
         let mut section = SectionProperties::default().with_start_type(Start::NewPage);
         section
@@ -32,6 +32,7 @@ fn header_and_footer_revision_utc_survive_package_save_and_reopen() {
             .set_footer_part(Kind::Primary, "utc-footer", footer_xml.as_str())
             .unwrap();
     }
+    let mut package = builder.build().unwrap();
 
     let mut bytes = Cursor::new(Vec::new());
     package.write_to(&mut bytes).unwrap();

@@ -862,7 +862,7 @@ fn replayable_stream_escapes_borrowed_chunks_and_preserves_section_and_inverse()
 
             let mut output = Vec::new();
             let publication = plan
-                .write_to_stream(&mut output)
+                .write_to(&mut output)
                 .expect("replayable stream must publish");
             assert_ne!(output, source_archive);
             assert_eq!(
@@ -919,7 +919,7 @@ fn default_and_shadowed_namespaces_cannot_capture_generated_prefix() {
         .prepare()
         .expect("default namespace source must prepare");
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("shadowed namespace source must publish");
     assert_eq!(semantic_texts(&output), vec!["seed", "tail"]);
     assert!(
@@ -943,7 +943,7 @@ fn default_stream_limits_accept_a_tiny_valid_append() {
         .expect("default stream limits must admit a tiny valid append");
     assert_eq!(plan.authored_proof().paragraph_count, 1);
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("default stream limits must publish a tiny valid append");
     assert_eq!(semantic_texts(&output), vec!["seed", "default limits"]);
 }
@@ -1087,7 +1087,7 @@ fn each_replay_pass_opens_one_cursor_independent_of_encoded_window_count() {
         "sealing, DOCX candidate validation, and OPC candidate validation each open once"
     );
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("large authored output must publish");
     assert_eq!(
         opens.load(Ordering::Acquire),
@@ -1157,7 +1157,7 @@ fn one_shot_producer_requires_and_uses_explicit_replay_store() {
     let plan = edit.prepare().expect("one-shot stream must prepare");
     assert_eq!(runs.load(Ordering::Acquire), 1);
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("one-shot stream must publish");
     assert_eq!(semantic_texts(&output), vec!["seed", "one-shot"]);
 }
@@ -1330,7 +1330,7 @@ fn managed_external_output_is_charged_once_for_one_publication() {
             .prepare()
             .expect("unmanaged candidate must prepare");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("unmanaged candidate must publish");
         output
     };
@@ -1344,7 +1344,7 @@ fn managed_external_output_is_charged_once_for_one_publication() {
         .prepare()
         .expect("managed candidate must prepare");
     let mut output = Vec::new();
-    plan.write_to_stream(&mut output)
+    plan.write_to(&mut output)
         .expect("one publication must fit the exact external output budget");
     assert_eq!(output, expected);
     assert_eq!(output.len() as u64, expected_len);
@@ -1432,7 +1432,7 @@ fn durable_resolver_cancellation_refuses_before_replay_reader_or_output() {
         .expect("durable producer must prepare");
     let mut candidate = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate)
+        .write_to(&mut candidate)
         .expect("durable producer must publish");
     let patch = publication
         .durable_patch()
@@ -1498,7 +1498,7 @@ fn durable_forward_and_inverse_authorizations_are_compact_canonical_wire() {
     let authored_proof = plan.authored_proof();
     let candidate_proof = plan.candidate_proof();
     let mut candidate_archive = Vec::new();
-    plan.write_to_stream(&mut candidate_archive)
+    plan.write_to(&mut candidate_archive)
         .expect("durable patch fixture must publish");
     let source_artifact = artifact_proof(
         &SourceBackedPackage::from_vec(source_archive.clone())
@@ -1686,7 +1686,7 @@ fn durable_forward_patch_resolves_after_reopen_and_refuses_wrong_source_or_provi
     let plan = edit.prepare().expect("durable producer must prepare");
     let mut expected_candidate = Vec::new();
     let publication = plan
-        .write_to_stream(&mut expected_candidate)
+        .write_to(&mut expected_candidate)
         .expect("durable producer must publish");
     let patch = publication
         .durable_patch()
@@ -1811,7 +1811,7 @@ fn durable_resolver_error_yields_source_mismatch_when_resolver_mutates_current()
         .expect("durable producer must prepare");
     let mut candidate = Vec::new();
     let publication = plan
-        .write_to_stream(&mut candidate)
+        .write_to(&mut candidate)
         .expect("durable producer must publish");
     let patch = publication
         .durable_patch()
@@ -1903,7 +1903,7 @@ fn finite_limits_cancellation_and_partial_sink_errors_remain_at_public_boundary(
         .prepare()
         .expect("partial sink fixture plan must prepare");
     let mut sink = PrefixFailSink::after(32);
-    assert!(plan.write_to_stream(&mut sink).is_err());
+    assert!(plan.write_to(&mut sink).is_err());
     assert!(
         !sink.bytes.is_empty(),
         "sink failure must retain accepted prefix"
@@ -1927,7 +1927,7 @@ fn source_change_after_preparation_refuses_without_archive_output() {
     source.bump();
     let mut output = Vec::new();
     assert!(
-        plan.write_to_stream(&mut output).is_err(),
+        plan.write_to(&mut output).is_err(),
         "stale source must refuse publication"
     );
     assert!(
@@ -1952,7 +1952,7 @@ fn path_publication_replaces_new_and_existing_destinations_with_exact_reopenable
                     .prepare()
                     .expect("path fixture must prepare for stream comparison");
                 let mut output = Vec::new();
-                plan.write_to_stream(&mut output)
+                plan.write_to(&mut output)
                     .expect("path fixture stream comparison must publish");
                 output
             };
@@ -2296,7 +2296,7 @@ fn path_publication_late_managed_output_failure_leaves_destination_and_no_tempor
             .prepare()
             .expect("late output-limit comparison must prepare");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("late output-limit comparison must publish");
         output
     };
@@ -2437,7 +2437,7 @@ fn path_publication_releases_managed_workspace_after_success() {
             .prepare()
             .expect("managed path comparison must prepare");
         let mut output = Vec::new();
-        plan.write_to_stream(&mut output)
+        plan.write_to(&mut output)
             .expect("managed path comparison must publish");
         output
     };

@@ -225,16 +225,16 @@ error types, so the snippets in this section and the next run inside a
 function that returns `Result<(), Box<dyn std::error::Error + Send + Sync>>`.
 
 ```rust
-use litchi::docx::Package;
+use litchi::docx::Builder;
 use litchi::pptx::Package as PptxPackage;
 use litchi::xlsx::Package as XlsxPackage;
 
 // Create Word document
-let mut pkg = Package::new()?;
-let doc = pkg.document_mut()?;
+let mut builder = Builder::new()?;
+let doc = builder.document()?;
 doc.add_heading("My Document", 1)?;
 doc.add_paragraph_with_text("Hello, World!");
-pkg.save("output.docx")?;
+builder.build()?.save("output.docx")?;
 
 // Create Excel workbook: edits are transactions over an immutable package
 let mut edit = XlsxPackage::new()?.edit()?;

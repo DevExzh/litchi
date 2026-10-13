@@ -139,15 +139,19 @@ fn no_op_commit_shares_the_owner_and_failed_staging_rolls_back() {
 
 #[test]
 fn captured_edit_is_independent_of_later_source_writer_mutation() {
-    let mut source = source();
+    let source = source();
     let original = source.document_snapshot().unwrap();
     let mut edit = source.edit().unwrap();
     edit.replace_paragraph_text(Position::new(0), "captured edit")
         .unwrap();
-    source
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("later writer change");
+    let mut later = source.edit().unwrap();
+    later
+        .insert_paragraph(
+            Position::new(original.paragraph_count()),
+            "later writer change",
+        )
+        .unwrap();
+    let mut source = later.commit().unwrap().into_package();
     let commit = edit.commit().unwrap();
     assert_eq!(
         commit

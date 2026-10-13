@@ -33,7 +33,7 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         .write(true)
         .create_new(true)
         .open(output)?;
-    let publication = commit.write_to_stream(&mut sink)?;
+    let publication = commit.write_to(&mut sink)?;
     sink.sync_all()?;
     println!(
         "Appended one paragraph: {} -> {} paragraphs",

@@ -179,7 +179,7 @@ impl Kind {
 
     /// Whether a path step names the kind without an index (`/body`).
     pub(crate) const fn is_singleton(self) -> bool {
-        matches!(self, Self::Body)
+        matches!(self, Self::Body | Self::Comments)
     }
 }
 
@@ -446,9 +446,58 @@ const fn add_only_run(
     }
 }
 
+/// A read property that also seeds a newly added element (record 0251a).
+const fn read_add(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    crate::registry::Entry {
+        spec: PropSpec::new(name, ty),
+        access: crate::registry::Access::Add(setter),
+        constraint,
+        clear: false,
+    }
+}
+
+/// A property accepted only while adding an element.
+const fn add_only(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::Add(setter),
+        constraint,
+        clear: false,
+    }
+}
+
 /// One write-only property declaration.  Text has a dedicated write handler
 /// but is intentionally absent from the read model; the appended registry
 /// row keeps all pre-existing paragraph/run read indices stable.
+/// A property that `set` writes and `get` does not read.
+const fn set_only(
+    name: &'static str,
+    ty: ValueType,
+    setter: Setter,
+    constraint: Constraint,
+) -> crate::registry::Entry<Setter> {
+    let mut spec = PropSpec::new(name, ty);
+    spec.access.get = false;
+    crate::registry::Entry {
+        spec,
+        access: crate::registry::Access::Set(setter),
+        constraint,
+        clear: false,
+    }
+}
+
 const fn write_only(
     name: &'static str,
     ty: ValueType,
@@ -512,6 +561,10 @@ crate::registry::registry! {
     writable("contextualSpacing", ValueType::Bool, Setter::ParagraphContextualSpacing, Constraint::None, true),
     writable("numId", ValueType::Text, Setter::ParagraphNumId, Constraint::NotEmpty, true),
     writable("numLevel", ValueType::Text, Setter::ParagraphNumLevel, Constraint::NotEmpty, true),
+    // Record 0251e: list kinds are written through the numbering part;
+    // reading them back needs that part in the node view (L-DOCX-R6).
+    set_only("listStyle", ValueType::Text, Setter::ParagraphListStyle, Constraint::NotEmpty),
+    set_only("start", ValueType::Int, Setter::ParagraphListStart, Constraint::Int { min: 0, max: 32_767 }),
     writable("outlineLvl", ValueType::Int, Setter::ParagraphOutlineLevel, Constraint::Int { min: 0, max: 9 }, true),
     write_only("text", ValueType::Text, Setter::ParagraphText),
     // A paragraph may carry one initial run.  Its direct run formatting is
@@ -608,23 +661,29 @@ crate::registry::registry! {
 // `HyperlinkToNode`, in its order: the link's attributes, then the
 // formatting of its first run that holds text.
 crate::registry::registry! {
-    pub(crate) HYPERLINK_PROPS, HYPERLINK_REGISTRY: () {
-    crate::registry::Entry::read(PropSpec::new("url", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("anchor", ValueType::Text)),
+    pub(crate) HYPERLINK_PROPS, HYPERLINK_REGISTRY: Setter {
+    crate::registry::Entry {
+        spec: PropSpec::new("url", ValueType::Text),
+        access: crate::registry::Access::SetAndAdd(Setter::HyperlinkUrl),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    },
+    read_add("anchor", ValueType::Text, Setter::HyperlinkAnchor, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("docLocation", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("tooltip", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("tgtFrame", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("font", ValueType::Text)),
+    read_add("font", ValueType::Text, Setter::RunFontLatin, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("font.cs", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("size", ValueType::Length(LengthSpec::FONT_SIZE))),
-    crate::registry::Entry::read(PropSpec::new("bold", ValueType::Bool)),
-    crate::registry::Entry::read(PropSpec::new("italic", ValueType::Bool)),
-    crate::registry::Entry::read(PropSpec::new("color", ValueType::Color(ColorContext::Word))),
-    crate::registry::Entry::read(PropSpec::new("underline", ValueType::Token(&UNDERLINE))),
+    read_add("size", ValueType::Length(LengthSpec::FONT_SIZE), Setter::RunSize, Constraint::None),
+    read_add("bold", ValueType::Bool, Setter::RunBold, Constraint::None),
+    read_add("italic", ValueType::Bool, Setter::RunItalic, Constraint::None),
+    read_add("color", ValueType::Color(ColorContext::Word), Setter::RunColor, Constraint::None),
+    read_add("underline", ValueType::Token(&UNDERLINE), Setter::RunUnderline, Constraint::None),
     crate::registry::Entry::read(PropSpec::new("underline.color", ValueType::Color(ColorContext::Word))),
     crate::registry::Entry::read(PropSpec::new("strike", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("highlight", ValueType::Token(&HIGHLIGHT))),
-    crate::registry::Entry::read(PropSpec::new("rStyle", ValueType::Text)),
+    read_add("rStyle", ValueType::Text, Setter::RunStyle, Constraint::NotEmpty),
+    write_only("text", ValueType::Text, Setter::HyperlinkText),
     }
 }
 
@@ -632,10 +691,10 @@ crate::registry::registry! {
 // `width` is a string (`"5000"`, `"50%"`, `"auto"`) and `indent` a number
 // of twips or a percentage string.
 crate::registry::registry! {
-    pub(crate) TABLE_PROPS, TABLE_REGISTRY: () {
-    crate::registry::Entry::read(PropSpec::new("cols", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("rows", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("style", ValueType::Text)),
+    pub(crate) TABLE_PROPS, TABLE_REGISTRY: Setter {
+    read_add("cols", ValueType::Text, Setter::TableColumns, Constraint::NotEmpty),
+    read_add("rows", ValueType::Text, Setter::TableRows, Constraint::NotEmpty),
+    read_add("style", ValueType::Text, Setter::TableStyle, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("rowBandSize", ValueType::Int)),
     crate::registry::Entry::read(PropSpec::new("colBandSize", ValueType::Int)),
     crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
@@ -657,14 +716,15 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("bandedCols", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("caption", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("description", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("colWidths", ValueType::Text)),
+    read_add("colWidths", ValueType::Text, Setter::TableColumnWidths, Constraint::NotEmpty),
+    add_only("data", ValueType::Text, Setter::TableData, Constraint::None),
     }
 }
 
 // `ReadRowProps`, in its order. Heights and widths are strings with a
 // `dxa` unit there, grid counts strings.
 crate::registry::registry! {
-    pub(crate) ROW_PROPS, ROW_REGISTRY: () {
+    pub(crate) ROW_PROPS, ROW_REGISTRY: Setter {
     crate::registry::Entry::read(PropSpec::new("height", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("height.rule", ValueType::Token(&HEIGHT_RULE))),
     crate::registry::Entry::read(PropSpec::new("header", ValueType::Bool)),
@@ -676,13 +736,14 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("gridAfter", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("wAfter", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("cellSpacing", ValueType::Int)),
+    add_only("cols", ValueType::Int, Setter::RowColumns, Constraint::Int { min: 1, max: 4096 }),
     }
 }
 
 // `ReadCellProps`, in its order. `width` is a string (`"2880dxa"`,
 // `"50%"`, `"auto"`, `"nil"`) there.
 crate::registry::registry! {
-    pub(crate) CELL_PROPS, CELL_REGISTRY: () {
+    pub(crate) CELL_PROPS, CELL_REGISTRY: Setter {
     crate::registry::Entry::read(PropSpec::new("width", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("valign", ValueType::Token(&VALIGN))),
     crate::registry::Entry::read(PropSpec::new("vmerge", ValueType::Token(&MERGE))),
@@ -696,6 +757,33 @@ crate::registry::registry! {
     crate::registry::Entry::read(PropSpec::new("nowrap", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("hideMark", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("tcFitText", ValueType::Bool)),
+    write_only("text", ValueType::Text, Setter::CellText),
+    }
+}
+
+// An inline picture of a paragraph (record 0251d): its extent, name,
+// alternative text and image relationship; `src` (a `data:` URI or a file
+// path) seeds a new one.
+crate::registry::registry! {
+    pub(crate) PICTURE_PROPS, PICTURE_REGISTRY: Setter {
+    read_add("width", ValueType::Length(LengthSpec::EXTENT), Setter::PictureWidth, Constraint::None),
+    read_add("height", ValueType::Length(LengthSpec::EXTENT), Setter::PictureHeight, Constraint::None),
+    read_add("alt", ValueType::Text, Setter::PictureAlt, Constraint::None),
+    read_add("name", ValueType::Text, Setter::PictureName, Constraint::NotEmpty),
+    crate::registry::Entry::read(PropSpec::new("relId", ValueType::Text)),
+    add_only("src", ValueType::Text, Setter::PictureSrc, Constraint::NotEmpty),
+    }
+}
+
+// A comment of the comments part (record 0251c): its identity, author and
+// text; `text` and the author's details seed a new comment.
+crate::registry::registry! {
+    pub(crate) COMMENT_PROPS, COMMENT_REGISTRY: Setter {
+    crate::registry::Entry::read(PropSpec::new("id", ValueType::Int)),
+    read_add("author", ValueType::Text, Setter::CommentAuthor, Constraint::NotEmpty),
+    read_add("initials", ValueType::Text, Setter::CommentInitials, Constraint::NotEmpty),
+    read_add("date", ValueType::Text, Setter::CommentDate, Constraint::NotEmpty),
+    read_add("text", ValueType::Text, Setter::CommentText, Constraint::None),
     }
 }
 
@@ -763,8 +851,6 @@ gaps! {
     FOOTNOTE_GAP: "footnote", "L-DOCX-R5", "footnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
     ENDNOTES_GAP: "endnotes", "L-DOCX-R5", "the endnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
     ENDNOTE_GAP: "endnote", "L-DOCX-R5", "endnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    COMMENTS_GAP: "comments", "L-DOCX-R5", "the comments part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    COMMENT_GAP: "comment", "L-DOCX-R5", "comment stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
     STYLES_GAP: "styles", "L-DOCX-R6 (R4x)", "the styles part has no node adapter yet";
     STYLE_GAP: "style", "L-DOCX-R6 (R4x)", "styles have no node adapter yet";
     NUMBERING_GAP: "numbering", "L-DOCX-R6 (R4x)", "the numbering part has no node adapter yet";
@@ -776,7 +862,6 @@ gaps! {
     BOOKMARK_GAP: "bookmark", "R4x", "bookmarks have no located reader yet";
     FIELD_GAP: "field", "R4x", "fields have no located reader yet";
     FORM_FIELD_GAP: "formfield", "R4x", "legacy form fields have no located reader yet";
-    PICTURE_GAP: "picture", "R4x", "pictures have no located reader yet";
     CHART_GAP: "chart", "R4x", "charts have no located reader yet";
     OLE_GAP: "ole", "R4x", "embedded objects have no located reader yet";
     TOC_GAP: "toc", "R4x", "tables of contents have no located reader yet";
@@ -860,7 +945,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "document",
                 &["document"],
                 &[],
-                &[K::Body],
+                &[K::Body, K::Comments],
                 &["/"],
                 DOCUMENT_PROPS,
             ),
@@ -1013,21 +1098,26 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/endnote[N]", "/endnotes/endnote[N]"],
                 &ENDNOTE_GAP,
             ),
-            gap(
+            element(
                 K::Comments,
                 "comments",
                 &["comments"],
                 &[K::Document],
+                &[K::Comment],
                 &["/comments"],
-                &COMMENTS_GAP,
+                &[],
             ),
-            gap(
-                K::Comment,
-                "comment",
-                &["comment"],
-                &[K::Comments],
-                &["/comments/comment[N]"],
-                &COMMENT_GAP,
+            identities(
+                element(
+                    K::Comment,
+                    "comment",
+                    &["comment"],
+                    &[K::Comments],
+                    &[],
+                    &["/comments/comment[N]", "/comments/comment[@commentId=X]"],
+                    COMMENT_PROPS,
+                ),
+                &["commentId"],
             ),
             gap(
                 K::Styles,
@@ -1117,13 +1207,14 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/formfield[NAME]"],
                 &FORM_FIELD_GAP,
             ),
-            gap(
+            element(
                 K::Picture,
                 "picture",
                 &["image", "img", "picture"],
                 &[K::Paragraph],
+                &[],
                 &["/body/p[N]/picture[M]"],
-                &PICTURE_GAP,
+                PICTURE_PROPS,
             ),
             gap(
                 K::Chart,
@@ -1219,15 +1310,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
             },
             GapSpec {
                 subject: Subject::Property {
-                    element: "paragraph",
-                    key: "listStyle",
-                },
-                code: Code::UnsupportedCapability,
-                follow_up: "L-DOCX-R6 (R4x)",
-                reason: "list kinds need the numbering part, which the node view does not read yet",
-            },
-            GapSpec {
-                subject: Subject::Property {
                     element: "sdt",
                     key: "type",
                 },
@@ -1257,21 +1339,21 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 subject: Subject::Operation {
                     verb: "set",
                     element: "paragraph",
-                    context: "nested-or-unproven-selection",
+                    context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
-                reason: "paragraphs in cells, content controls or wrappers are readable, but their raw transaction position is not proven for editing",
+                reason: "paragraphs in cells and content controls are edited through proven element paths (record 0251a); paragraphs in w:customXml wrappers, wrapped rows or cells, or markup-compatibility-selected content have no proven raw position",
             },
             GapSpec {
                 subject: Subject::Operation {
                     verb: "set",
                     element: "run",
-                    context: "nested-or-unproven-selection",
+                    context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W2",
-                reason: "the editor addresses only direct runs whose raw ordinal is proven against the paragraph; nested and wrapped run selections are refused",
+                reason: "direct runs and direct runs of hyperlinks are edited (record 0251a); runs in tracked changes, smart tags, custom XML or other wrappers, and paragraphs with comment-reference runs, have no proven raw ordinal",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1301,7 +1383,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W2 / record 0011",
-                reason: "fields, hyperlinks, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits",
+                reason: "fields, markup-compatibility branches and other nested or unmodeled run content lack a proven raw ownership and address mapping for leaf edits",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1317,21 +1399,21 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 subject: Subject::Operation {
                     verb: "add",
                     element: "paragraph",
-                    context: "nested-or-unproven-parent",
+                    context: "wrapped-or-unproven-parent",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
-                reason: "paragraph creation is admitted only under the direct main body, so cells, content controls and other nested parents are refused",
+                reason: "paragraphs are added under the body, cells and block content controls (record 0251a); parents whose raw position is not proven are refused",
             },
             GapSpec {
                 subject: Subject::Operation {
                     verb: "add",
                     element: "run",
-                    context: "nested-or-unproven-parent",
+                    context: "wrapped-or-unproven-parent",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W2",
-                reason: "run creation is admitted only under a proven direct body paragraph and refuses wrapped or nested paragraph parents",
+                reason: "runs are added beside the direct runs of any proven paragraph (record 0251a); insertion inside a hyperlink and under wrapped paragraphs is refused",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1347,11 +1429,11 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 subject: Subject::Operation {
                     verb: "remove",
                     element: "paragraph/run",
-                    context: "nested-or-unproven-selection",
+                    context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W2 / L-DOCX-W3",
-                reason: "only direct body paragraphs and their direct runs have transaction positions proven for removal; nested selections are refused",
+                reason: "paragraphs, runs, hyperlinks, tables, rows, cells and content controls are removed through proven element paths (record 0251a); wrapped selections, the last paragraph of a cell, the last cell of a row and the last row of a table are refused",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1377,11 +1459,11 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 subject: Subject::Operation {
                     verb: "move",
                     element: "paragraph/run",
-                    context: "nested-or-unproven-selection",
+                    context: "wrapped-or-unproven-selection",
                 },
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
-                reason: "only direct main-body paragraphs and their direct runs can be moved; nested and wrapped selections have no proven body or run anchor",
+                reason: "body paragraphs, direct runs, tables, rows and nested paragraphs move through proven anchors (record 0251a); nested runs and wrapped selections have no proven anchor",
             },
             GapSpec {
                 subject: Subject::Operation {
@@ -1412,6 +1494,26 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 code: Code::UnsupportedCapability,
                 follow_up: "L-DOCX-W3",
                 reason: "only direct main-body paragraphs or direct runs can be swapped; nested and wrapped selections have no proven anchors",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "add",
+                    element: "cell",
+                    context: "cell-insertion",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "M2 (DOCX table grid editing)",
+                reason: "a cell changes the table grid; rows are added with the grid's cells, and adding a single cell is not integrated",
+            },
+            GapSpec {
+                subject: Subject::Operation {
+                    verb: "set",
+                    element: "table/row",
+                    context: "table-properties",
+                },
+                code: Code::UnsupportedCapability,
+                follow_up: "M2 (DOCX table properties)",
+                reason: "table and row properties are read and seed new tables and rows; changing them on an existing table is not integrated",
             },
             GapSpec {
                 subject: Subject::Operation {

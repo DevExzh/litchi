@@ -129,6 +129,10 @@ pub enum LimitKind {
     RestoreArtifactBytes,
     /// Story hyperlink replacements.
     StoryHyperlinkReplacements,
+    /// Rows of a new table.
+    TableRows,
+    /// Columns of a new table or cells of a new row.
+    TableColumns,
     /// Transfer dependency bytes.
     TransferDependencyBytes,
     /// Transfer dependency field bytes.
@@ -209,6 +213,8 @@ impl std::fmt::Display for LimitKind {
             Self::ReplacementTextCharacters => "replacement text characters",
             Self::RestoreArtifactBytes => "restore artifact bytes",
             Self::StoryHyperlinkReplacements => "story hyperlink replacements",
+            Self::TableRows => "table rows",
+            Self::TableColumns => "table columns",
             Self::TransferDependencyBytes => "transfer dependency bytes",
             Self::TransferDependencyFieldBytes => "transfer dependency field bytes",
             Self::TransferDependencyParts => "transfer dependency parts",

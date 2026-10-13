@@ -1156,7 +1156,7 @@ mod tests {
         watermark.set_layout(WatermarkLayout::Horizontal);
         watermark.set_semitransparent(false);
         package
-            .document_mut()
+            .authoring_document()
             .unwrap()
             .set_watermark(watermark.clone());
         package.save(file.path()).unwrap();
@@ -1177,7 +1177,7 @@ mod tests {
         let mut watermark = ImageWatermark::new(payload.clone()).unwrap();
         watermark.set_scale(2.0).unwrap();
         package
-            .document_mut()
+            .authoring_document()
             .unwrap()
             .set_image_watermark(watermark);
         package.save(file.path()).unwrap();
@@ -1212,7 +1212,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             document.set_watermark(Watermark::text("DRAFT"));
             document.set_image_watermark(ImageWatermark::new(minimal_png(10, 10)).unwrap());
             document.remove_watermark();
@@ -1237,7 +1237,7 @@ mod tests {
         let file = NamedTempFile::with_suffix(".docx").unwrap();
         let mut package = Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             document.add_paragraph_with_text("content page");
             document.set_watermark(Watermark::text("CONFIDENTIAL"));
             document.set_image_watermark(ImageWatermark::new(payload.clone()).unwrap());

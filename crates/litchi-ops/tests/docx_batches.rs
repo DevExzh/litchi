@@ -692,10 +692,17 @@ fn formatting_flushes_before_native_operation_capacity_and_charges_one_snapshot_
     ]"#,
     );
     let file = open(true);
-    let grouped = file
-        .batch(input.iter().cycle().take(4097), BatchMode::Atomic)
+    // One more than the native per-edit operation bound (65,536 since
+    // record 0251f), which is above the default batch bound.
+    let wide = SemanticLimits::builder()
+        .max_operations(65_537)
+        .unwrap()
+        .build()
         .unwrap();
-    assert_eq!(grouped.diagnostics.operations(), 4097);
+    let grouped = file
+        .batch_with_limits(input.iter().cycle().take(65_537), BatchMode::Atomic, &wide)
+        .unwrap();
+    assert_eq!(grouped.diagnostics.operations(), 65_537);
     assert_eq!(grouped.diagnostics.commits(), 2);
     let expected = file.set("/body/p[1]/r[1]", props! {"bold"=>true}).unwrap();
     assert_eq!(
@@ -1409,7 +1416,8 @@ fn paragraph_split_refuses_native_capacity_before_staging() {
     let mut add = BatchItem::new("add");
     add.parent = Some("/body".into());
     add.kind = Some("p".into());
-    add.props = Some(litchi_ops::Props::new().with("text", "\n".repeat(4096)));
+    // 65,537 paragraphs: one more than the native operation bound.
+    add.props = Some(litchi_ops::Props::new().with("text", "\n".repeat(65_536)));
     for mode in [BatchMode::Atomic, BatchMode::BestEffort] {
         let error = file.batch([add.clone()], mode).unwrap_err();
         assert_eq!(error.code(), Code::LimitExceeded);

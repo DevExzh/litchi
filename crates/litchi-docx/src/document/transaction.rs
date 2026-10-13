@@ -4,7 +4,10 @@
 mod attribute_tests;
 mod debug;
 mod durable;
+#[cfg(test)]
+mod element_tests;
 mod formatting;
+pub(crate) use formatting::PictureMarkup;
 #[cfg(test)]
 mod formatting_tests;
 #[cfg(test)]
@@ -37,7 +40,10 @@ use litchi_ooxml_common::xml::attributes::BytesStartExt as _;
 
 pub(crate) use durable::durable_transfer_operations;
 pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
-pub use formatting::{BodyAnchor, BodyBlock, NewParagraph, NewRun, RunAnchor};
+pub use formatting::{
+    BodyAnchor, BodyBlock, ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION,
+    NewParagraph, NewRun, NewTable, RunAnchor,
+};
 pub use litchi_core::patch::{
     CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
     ThreeWayMergeFailure,
@@ -49,7 +55,14 @@ const UTF8_BYTE_ORDER_MARK: &[u8] = b"\xEF\xBB\xBF";
 const UTF8_BYTE_ORDER_MARK_TEXT: &str = "\u{feff}";
 const MAX_DOCUMENT_DEPTH: usize = 256;
 const MAX_DOCUMENT_NODES: usize = 1_000_000;
-const MAX_OPERATIONS: usize = 4_096;
+/// Semantic operations one edit may stage (record 0251f raised it from
+/// 4,096 so a 10,000-paragraph fanout is one transaction; it matches the
+/// unified layer's expanded-target bound).
+const MAX_OPERATIONS: usize = 65_536;
+/// Runs a field-result scan visits in one paragraph.
+const MAX_FIELD_RUNS: usize = 4_096;
+/// Steps of one nested element path (content controls, tables).
+const MAX_PATH_STEPS: usize = 4_096;
 const MAX_REPLACEMENT_TEXT_BYTES: usize = 16 * 1024 * 1024;
 // The managed layout scanner owns each quick-xml event and grows bounded
 // layout indexes. `scan_text_owner` additionally retains one `TextSlot` for
@@ -443,6 +456,34 @@ pub(crate) struct TransferRelationship {
     pub(crate) relationship_type: String,
     pub(crate) target: String,
     pub(crate) external: bool,
+}
+
+/// A package-graph change staged with a main-document edit (record 0251b):
+/// relationships added to the main part, new parts related from it, and
+/// exact replacements of existing parts. Applied forward, it requires every
+/// relationship and new part to be absent and every replaced part to hold its
+/// `before` bytes; applied backward, the reverse.
+#[derive(Clone, PartialEq, Eq)]
+pub struct GraphChange {
+    pub(crate) relationships: Arc<[TransferRelationship]>,
+    pub(crate) parts: Arc<[TransferPart]>,
+    pub(crate) replaced: Arc<[ReplacedPart]>,
+}
+
+impl GraphChange {
+    /// Whether the change holds nothing.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.relationships.is_empty() && self.parts.is_empty() && self.replaced.is_empty()
+    }
+}
+
+/// One exact replacement of an existing part's payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReplacedPart {
+    pub(crate) name: String,
+    pub(crate) before: Arc<Vec<u8>>,
+    pub(crate) after: Arc<Vec<u8>>,
 }
 
 impl RevisionKind {
@@ -2338,6 +2379,57 @@ pub enum Operation {
         /// Exact run XML required at the position.
         xml: Arc<Vec<u8>>,
     },
+    /// Replace the exact bytes of one element reached through a path.
+    ///
+    /// Recorded by the path-addressed edits ([`Edit::format_paragraph_at`],
+    /// [`Edit::format_run_at`], [`Edit::replace_text_at`],
+    /// [`Edit::replace_cell_text_at`], [`Edit::insert_run_at`]).
+    ReplaceElement {
+        /// Path of the element from `w:body`.
+        path: ElementPath,
+        /// Exact element bytes required before the operation.
+        before: Arc<Vec<u8>>,
+        /// Exact element bytes the operation writes.
+        after: Arc<Vec<u8>>,
+    },
+    /// Insert one exact element as a direct child of a container.
+    ///
+    /// Recorded by [`Edit::insert_paragraph_at`], [`Edit::insert_table_at`],
+    /// [`Edit::insert_row_at`] and [`Edit::move_element_at`], and by the
+    /// inverse of [`Self::RemoveElement`].
+    InsertElement {
+        /// Path of the container (the body for the empty path; a content
+        /// control's children are those of its `w:sdtContent`).
+        container: ElementPath,
+        /// Index among the container's direct element children that the
+        /// element has after the insertion.
+        child: Position,
+        /// Exact element XML.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Remove one exact direct child element of a container.
+    ///
+    /// Recorded by [`Edit::remove_element_at`] and
+    /// [`Edit::move_element_at`]; see [`Self::InsertElement`].
+    RemoveElement {
+        /// Path of the container.
+        container: ElementPath,
+        /// Index of the element among the container's direct element
+        /// children.
+        child: Position,
+        /// Exact element XML required at the index.
+        xml: Arc<Vec<u8>>,
+    },
+    /// Apply (`forward`) or undo a package-graph change published with the
+    /// main document. It changes no main-document XML; package publication
+    /// applies it. Recorded by the relationship and part verbs of the
+    /// package-bound edit.
+    ChangeGraph {
+        /// The change.
+        change: Arc<GraphChange>,
+        /// Whether the change is applied (`true`) or undone.
+        forward: bool,
+    },
 }
 
 impl Operation {
@@ -2368,10 +2460,13 @@ impl Operation {
             | Self::InsertParagraphFragment { .. }
             | Self::RemoveParagraphFragment { .. }
             | Self::InsertRun { .. }
-            | Self::RemoveRun { .. } => true,
-            Self::InsertTransferredParagraph { .. } | Self::RemoveTransferredParagraph { .. } => {
-                false
-            },
+            | Self::RemoveRun { .. }
+            | Self::ReplaceElement { .. }
+            | Self::InsertElement { .. }
+            | Self::RemoveElement { .. } => true,
+            Self::InsertTransferredParagraph { .. }
+            | Self::RemoveTransferredParagraph { .. }
+            | Self::ChangeGraph { .. } => false,
         }
     }
 
@@ -2390,6 +2485,9 @@ impl Operation {
                 | Self::RemoveParagraphFragment { .. }
                 | Self::InsertRun { .. }
                 | Self::RemoveRun { .. }
+                | Self::ReplaceElement { .. }
+                | Self::InsertElement { .. }
+                | Self::RemoveElement { .. }
         )
     }
 
@@ -2698,6 +2796,37 @@ impl Operation {
                 child: *child,
                 run: *run,
                 xml: Arc::clone(xml),
+            },
+            Self::ReplaceElement {
+                path,
+                before,
+                after,
+            } => Self::ReplaceElement {
+                path: path.clone(),
+                before: Arc::clone(after),
+                after: Arc::clone(before),
+            },
+            Self::InsertElement {
+                container,
+                child,
+                xml,
+            } => Self::RemoveElement {
+                container: container.clone(),
+                child: *child,
+                xml: Arc::clone(xml),
+            },
+            Self::RemoveElement {
+                container,
+                child,
+                xml,
+            } => Self::InsertElement {
+                container: container.clone(),
+                child: *child,
+                xml: Arc::clone(xml),
+            },
+            Self::ChangeGraph { change, forward } => Self::ChangeGraph {
+                change: Arc::clone(change),
+                forward: !forward,
             },
         }
     }
@@ -5699,6 +5828,24 @@ impl Edit {
                 run,
                 xml,
             } => self.remove_run_fragment(*paragraph, *child, *run, xml),
+            Operation::ReplaceElement {
+                path,
+                before,
+                after,
+            } => self.replace_element(path, before, after),
+            Operation::InsertElement {
+                container,
+                child,
+                xml,
+            } => self.insert_element(container, *child, xml),
+            Operation::RemoveElement {
+                container,
+                child,
+                xml,
+            } => self.remove_element(container, *child, xml),
+            Operation::ChangeGraph { change, forward } => {
+                self.stage_graph_change(Arc::clone(change), *forward)
+            },
         }
     }
 
@@ -6375,6 +6522,29 @@ impl Edit {
         }))
     }
 
+    /// Record a package-graph change; the main-document XML is unchanged.
+    pub(crate) fn stage_graph_change(
+        &mut self,
+        change: Arc<GraphChange>,
+        forward: bool,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("change_graph")?;
+        self.reserve_operation()?;
+        self.operations
+            .push(Operation::ChangeGraph { change, forward });
+        Ok(self)
+    }
+
+    /// The package-graph changes staged so far, in order.
+    pub(crate) fn staged_graph_changes(&self) -> impl Iterator<Item = (&GraphChange, bool)> + '_ {
+        self.operations
+            .iter()
+            .filter_map(|operation| match operation {
+                Operation::ChangeGraph { change, forward } => Some((change.as_ref(), *forward)),
+                _ => None,
+            })
+    }
+
     fn ensure_unmanaged(&self, operation: &'static str) -> Result<()> {
         if self.projected.is_managed() {
             return Err(Error::Document(crate::Error::UnsafeEdit {
@@ -6500,6 +6670,10 @@ impl Patch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
+            && !self
+                .operations()
+                .iter()
+                .any(|operation| matches!(operation, Operation::ChangeGraph { .. }))
     }
 
     /// Return the exact inverse patch.
@@ -6655,7 +6829,8 @@ fn operation_string_bytes(operation: &Operation) -> usize {
             before.capacity().saturating_add(after.capacity())
         },
         Operation::InsertTransferredParagraph { .. }
-        | Operation::RemoveTransferredParagraph { .. } => 0,
+        | Operation::RemoveTransferredParagraph { .. }
+        | Operation::ChangeGraph { .. } => 0,
         Operation::ReplaceRunProperties { before, after, .. }
         | Operation::ReplaceParagraphProperties { before, after, .. } => {
             before.capacity().saturating_add(after.capacity())
@@ -6663,7 +6838,12 @@ fn operation_string_bytes(operation: &Operation) -> usize {
         Operation::InsertParagraphFragment { xml, .. }
         | Operation::RemoveParagraphFragment { xml, .. }
         | Operation::InsertRun { xml, .. }
-        | Operation::RemoveRun { xml, .. } => xml.capacity(),
+        | Operation::RemoveRun { xml, .. }
+        | Operation::InsertElement { xml, .. }
+        | Operation::RemoveElement { xml, .. } => xml.capacity(),
+        Operation::ReplaceElement { before, after, .. } => {
+            before.capacity().saturating_add(after.capacity())
+        },
     }
 }
 
@@ -7458,7 +7638,7 @@ fn scan_cached_field_runs(
                         has_direct_text,
                         marker,
                     });
-                    if runs.len() > MAX_OPERATIONS {
+                    if runs.len() > MAX_FIELD_RUNS {
                         return Err(Refusal::ComplexContent);
                     }
                 }
@@ -7487,7 +7667,7 @@ fn scan_cached_field_runs(
                         has_direct_text,
                         marker,
                     });
-                    if runs.len() > MAX_OPERATIONS {
+                    if runs.len() > MAX_FIELD_RUNS {
                         return Err(Refusal::ComplexContent);
                     }
                     run_capture = None;
@@ -10555,7 +10735,7 @@ fn select_complex_field_result(
 ) -> std::result::Result<Range, Refusal> {
     let mut active = Vec::<(usize, Option<usize>)>::new();
     let mut field_index = 0usize;
-    for run_index in 0..MAX_OPERATIONS {
+    for run_index in 0..MAX_FIELD_RUNS {
         let Ok(run) = select_direct_child(
             xml,
             b"p",
@@ -11853,10 +12033,10 @@ fn validate_path_length(length: usize, kind: super::LimitKind) -> Result<()> {
             reason: Refusal::ComplexContent,
         });
     }
-    if length > MAX_OPERATIONS {
+    if length > MAX_PATH_STEPS {
         return Err(Error::Limit {
             kind,
-            maximum: MAX_OPERATIONS,
+            maximum: MAX_PATH_STEPS,
             observed: length,
         });
     }
@@ -13004,7 +13184,7 @@ mod tests {
     fn generated_corpus_snapshot(paragraphs: usize) -> Snapshot {
         let mut package = crate::Package::new().unwrap();
         {
-            let document = package.document_mut().unwrap();
+            let document = package.authoring_document().unwrap();
             for index in 0..paragraphs {
                 document.add_paragraph_with_text(&format!(
                     "litchi-perf-baseline-docx-semantic-v1-source-{index:05}"

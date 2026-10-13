@@ -1693,7 +1693,7 @@ fn verify_docx(
     verify_source_identity(&bytes, corpus, allow_page_aligned_source, "DOCX")?;
     let leaf = leaf_docx_eager(bytes.clone())?;
     let leaf_metadata = leaf
-        .props()
+        .metadata()
         .cloned()
         .map(Metadata::from)
         .unwrap_or_default();

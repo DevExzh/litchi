@@ -350,7 +350,8 @@ fn misses_and_foreign_axes_have_their_codes() {
         ("/body/bogus[1]", Code::InvalidPath),
         ("/body/p[@style=Heading1]", Code::InvalidPath),
         ("/body/p[text~=x]", Code::InvalidPath),
-        ("/body/p[1]/picture[1]", Code::UnsupportedCapability),
+        // Pictures are read since record 0251d; the report has none.
+        ("/body/p[1]/picture[1]", Code::PathNotFound),
         ("/styles/Heading1", Code::UnsupportedCapability),
         ("/numbering", Code::UnsupportedCapability),
     ];
@@ -589,7 +590,7 @@ fn query_diagnostics_and_refusals() {
     let unknown = Query::parse("p[colour=red]").unwrap();
     let plan = Plan::compile(&unknown, FileFormat::Docx).unwrap();
     assert_eq!(plan.diagnostics().len(), 1);
-    let gap = Query::parse("picture").unwrap();
+    let gap = Query::parse("chart").unwrap();
     assert_eq!(
         Plan::compile(&gap, FileFormat::Docx).unwrap_err().code(),
         Code::UnsupportedCapability
@@ -1029,6 +1030,37 @@ fn native_query_predicates_require_raw_admission() {
 fn capabilities_match_live_paths_queries_and_views() {
     let file = report();
     let caps = file.capabilities();
+    // The report has no comments part; comment paths are checked on a copy
+    // with one added (record 0251c).
+    let commented = file
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("comment")
+                .prop("author", "Ada")
+                .prop("text", "note"),
+        )
+        .expect("add a comment")
+        .into_file();
+    // Likewise for pictures (record 0251d).
+    let pictured = file
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("picture").prop(
+                "src",
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC",
+            ),
+        )
+        .expect("add a picture")
+        .into_file();
+    let file_for = |name: &str| {
+        if matches!(name, "comments" | "comment") {
+            &commented
+        } else if name == "picture" {
+            &pictured
+        } else {
+            &file
+        }
+    };
     for element in caps.elements() {
         if !element.operations().get {
             continue;
@@ -1044,7 +1076,7 @@ fn capabilities_match_live_paths_queries_and_views() {
                     "/body/tbl[1]/tr[1]/tc[1]/tbl",
                     "/body/tbl[1]/tr[2]/tc[1]/tbl",
                 );
-            let node = file
+            let node = file_for(element.name())
                 .get(path.as_str())
                 .unwrap_or_else(|error| panic!("{path}: {error}"));
             assert_eq!(node.kind(), element.name());
@@ -1054,7 +1086,8 @@ fn capabilities_match_live_paths_queries_and_views() {
         }
         if element.operations().query {
             assert!(
-                file.query(element.name())
+                file_for(element.name())
+                    .query(element.name())
                     .unwrap()
                     .first()
                     .unwrap()

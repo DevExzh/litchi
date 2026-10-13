@@ -23,7 +23,7 @@ fn operation_limit_preserves_staging_and_has_content_free_diagnostics() {
     let xml = b"<w:document xmlns:w=\"http://schemas.openxmlformats.org/wordprocessingml/2006/main\"><w:body><w:p><w:r><w:t>initial</w:t></w:r></w:p></w:body></w:document>".to_vec();
     let snapshot = Snapshot::from_xml(xml).unwrap();
     let mut edit = snapshot.edit();
-    for i in 0..4096 {
+    for i in 0..65_536 {
         edit.replace_paragraph_text(
             Position::new(0),
             if i % 2 == 0 {
@@ -42,15 +42,15 @@ fn operation_limit_preserves_staging_and_has_content_free_diagnostics() {
         error,
         Error::Limit {
             kind: LimitKind::Operations,
-            observed: 4097,
-            maximum: 4096
+            observed: 65_537,
+            maximum: 65_536
         }
     ));
     assert!(!format!("{error} {error:?}").contains("private-author"));
     assert_eq!(
         format!("{error:?}"),
-        "Limit { kind: Operations, observed: 4097, maximum: 4096 }"
+        "Limit { kind: Operations, observed: 65537, maximum: 65536 }"
     );
     assert_eq!(edit.projected().xml_bytes(), before);
-    assert_eq!(edit.commit().unwrap().diagnostics().operations(), 4096);
+    assert_eq!(edit.commit().unwrap().diagnostics().operations(), 65_536);
 }

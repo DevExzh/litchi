@@ -662,14 +662,4 @@ fn durable_caller_limits_and_dirty_facade_leave_packages_unchanged() {
         "unexpected XML-limit error: {error}"
     );
     assert_eq!(members(&package_bytes(&xml_limited)), before);
-
-    let mut dirty = Package::from_reader(Cursor::new(&original)).unwrap();
-    dirty
-        .document_mut()
-        .unwrap()
-        .add_paragraph_with_text("unmaterialized durable edit");
-    let before = members(&package_bytes(&dirty));
-    let error = apply_durable(&mut dirty, &durable).unwrap_err();
-    assert!(error.to_string().contains("unmaterialized changes"));
-    assert_eq!(members(&package_bytes(&dirty)), before);
 }

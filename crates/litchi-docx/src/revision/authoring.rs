@@ -3694,7 +3694,7 @@ mod tests {
         let mut package = Package::new().expect("new package");
         let metadata = RevisionMetadata::new("1", "Alice").expect("revision metadata");
         package
-            .document_mut()
+            .authoring_document()
             .expect("document writer")
             .add_paragraph()
             .add_revision(RevisionKind::Insert, metadata)

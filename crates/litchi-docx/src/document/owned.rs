@@ -8,6 +8,14 @@ use super::{
 use crate::Package;
 use litchi_core::Position;
 
+mod comments;
+mod graph;
+mod numbering;
+mod picture;
+pub use comments::NewComment;
+pub use graph::HyperlinkTarget;
+pub use picture::NewPicture;
+
 /// An isolated main-document edit retaining its complete source package.
 ///
 /// `P` defaults to the eager [`crate::Package`]; source-backed owners use
@@ -221,6 +229,171 @@ impl<P: Clone> Edit<P> {
     #[must_use]
     pub const fn projected(&self) -> &Snapshot {
         self.inner.projected()
+    }
+
+    /// Change the direct properties of the paragraph at `path`.
+    ///
+    /// See [`super::snapshot::Edit::format_paragraph_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document.
+    pub fn format_paragraph_at(
+        &mut self,
+        path: &super::ElementPath,
+        change: impl FnOnce(&mut crate::properties::Paragraph),
+    ) -> Result<&mut Self> {
+        self.inner.format_paragraph_at(path, change)?;
+        Ok(self)
+    }
+
+    /// Change the direct properties of the run at `path`.
+    ///
+    /// See [`super::snapshot::Edit::format_run_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, property, dependency or resource refusal without
+    /// changing the staged document.
+    pub fn format_run_at(
+        &mut self,
+        path: &super::ElementPath,
+        change: impl FnOnce(&mut crate::properties::Run),
+    ) -> Result<&mut Self> {
+        self.inner.format_run_at(path, change)?;
+        Ok(self)
+    }
+
+    /// Replace the text of the paragraph, run or hyperlink at `path`.
+    ///
+    /// See [`super::snapshot::Edit::replace_text_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, text or resource refusal without changing the
+    /// staged document.
+    pub fn replace_text_at(
+        &mut self,
+        path: &super::ElementPath,
+        authored_text: impl Into<String>,
+    ) -> Result<&mut Self> {
+        self.inner.replace_text_at(path, authored_text)?;
+        Ok(self)
+    }
+
+    /// Replace a table cell's content with one paragraph of text.
+    ///
+    /// See [`super::snapshot::Edit::replace_cell_text_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, dependency, text or resource refusal without
+    /// changing the staged document.
+    pub fn replace_cell_text_at(
+        &mut self,
+        path: &super::ElementPath,
+        authored_text: impl Into<String>,
+    ) -> Result<&mut Self> {
+        self.inner.replace_cell_text_at(path, authored_text)?;
+        Ok(self)
+    }
+
+    /// Insert a run into the paragraph or hyperlink at `owner`.
+    ///
+    /// See [`super::snapshot::Edit::insert_run_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, field, property or resource refusal without
+    /// changing the staged document.
+    pub fn insert_run_at(
+        &mut self,
+        owner: &super::ElementPath,
+        at: Option<Position>,
+        new_run: &super::NewRun,
+    ) -> Result<Position> {
+        self.inner.insert_run_at(owner, at, new_run)
+    }
+
+    /// Insert a paragraph into the body, a cell or a block content control.
+    ///
+    /// See [`super::snapshot::Edit::insert_paragraph_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, property or resource refusal without changing
+    /// the staged document.
+    pub fn insert_paragraph_at(
+        &mut self,
+        container: &super::ElementPath,
+        anchor: super::ElementAnchor,
+        paragraph: &super::NewParagraph,
+    ) -> Result<Position> {
+        self.inner.insert_paragraph_at(container, anchor, paragraph)
+    }
+
+    /// Insert a table into the body, a cell or a block content control.
+    ///
+    /// See [`super::snapshot::Edit::insert_table_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, text or resource refusal without changing the
+    /// staged document.
+    pub fn insert_table_at(
+        &mut self,
+        container: &super::ElementPath,
+        anchor: super::ElementAnchor,
+        table: &super::NewTable,
+    ) -> Result<Position> {
+        self.inner.insert_table_at(container, anchor, table)
+    }
+
+    /// Insert a row into the table at `table`.
+    ///
+    /// See [`super::snapshot::Edit::insert_row_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, text or resource refusal without changing the
+    /// staged document.
+    pub fn insert_row_at(
+        &mut self,
+        table: &super::ElementPath,
+        at: Option<Position>,
+        cells: Option<usize>,
+        texts: &[String],
+    ) -> Result<Position> {
+        self.inner.insert_row_at(table, at, cells, texts)
+    }
+
+    /// Remove the element at `path`.
+    ///
+    /// See [`super::snapshot::Edit::remove_element_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, dependency or resource refusal without
+    /// changing the staged document.
+    pub fn remove_element_at(&mut self, path: &super::ElementPath) -> Result<&mut Self> {
+        self.inner.remove_element_at(path)?;
+        Ok(self)
+    }
+
+    /// Move the element at `path` into `container`.
+    ///
+    /// See [`super::snapshot::Edit::move_element_at`].
+    ///
+    /// # Errors
+    /// Returns a typed selection, dependency or resource refusal without
+    /// changing the staged document.
+    pub fn move_element_at(
+        &mut self,
+        path: &super::ElementPath,
+        container: &super::ElementPath,
+        anchor: super::ElementAnchor,
+    ) -> Result<super::ElementPath> {
+        self.inner.move_element_at(path, container, anchor)
+    }
+
+    /// The exact bytes of the element at `path` in the staged document.
+    ///
+    /// # Errors
+    /// Returns a typed selection refusal for a path that names no element.
+    pub fn element_xml(&self, path: &super::ElementPath) -> Result<&[u8]> {
+        self.inner.element_xml(path)
     }
 
     /// Remaining semantic-operation slots in the native document ledger.

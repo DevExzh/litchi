@@ -12,12 +12,12 @@
 //! 2. Regression test baseline
 //! 3. Visual reference for all capabilities
 
+use litchi::docx::metadata::Metadata;
 use litchi::docx::{
     Border, Borders, Color, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType,
-    MutableDocument, MutableTheme, Package, PageNumberFormat, PageOrientation, ParagraphAlignment,
-    Style, TableOfContents, UnderlineStyle, Watermark,
+    MutableDocument, MutableTheme, PageNumberFormat, PageOrientation, ParagraphAlignment, Style,
+    TableOfContents, UnderlineStyle, Watermark,
 };
-use litchi_core::Metadata;
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     println!("╔════════════════════════════════════════════════════════════╗");
@@ -645,20 +645,25 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // ═══════════════════════════════════════════════════════════════════════════
     println!("\n💾 Saving document...");
 
-    let mut package = Package::new()?;
-    *package.document_mut()? = doc;
+    let mut builder = litchi::docx::Builder::new()?;
+    *builder.document()? = doc;
 
     // Set document properties
-    let _ = package.put_props(
-        Metadata {
-title: Some("Comprehensive DOCX Feature Test".to_owned()),
-subject: Some("Feature Verification and Regression Testing".to_owned()),
-author: Some("Litchi OOXML Library".to_owned()),
-keywords: Some("docx, test, verification, regression, features, themes, watermarks, toc".to_owned()),
-description: Some("Complete test document for all DOCX writer features including new theme, watermark, and TOC support".to_owned()),
-..Metadata::default()
-},
-    );
+    let mut metadata = builder.build()?.edit_metadata();
+    metadata.set(Metadata {
+        title: Some("Comprehensive DOCX Feature Test".to_owned()),
+        subject: Some("Feature Verification and Regression Testing".to_owned()),
+        author: Some("Litchi OOXML Library".to_owned()),
+        keywords: Some(
+            "docx, test, verification, regression, features, themes, watermarks, toc".to_owned(),
+        ),
+        description: Some(
+            "Complete test document for all DOCX writer features including new theme, watermark, and TOC support"
+                .to_owned(),
+        ),
+        ..Metadata::default()
+    });
+    let mut package = metadata.commit()?.into_package();
 
     let filename = "comprehensive_test.docx";
     package.save(filename)?;
