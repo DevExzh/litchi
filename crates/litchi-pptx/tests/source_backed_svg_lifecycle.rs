@@ -351,7 +351,7 @@ fn slide_relationships_member(bytes: &[u8]) -> Vec<u8> {
 
 fn native_fixture(name: &str) -> Vec<u8> {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sd/qa/unit/data/pptx")
+        .join("../../test-data/libreoffice-core/sd/qa/unit/data/pptx")
         .join(name);
     std::fs::read(&fixture).unwrap_or_else(|error| {
         panic!(
