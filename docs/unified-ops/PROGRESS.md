@@ -6,6 +6,7 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 | No. | Title | Status |
 |-----|-------|--------|
+| 0248 | [Coordinator restart plan](0248-coordinator-restart-plan.md) | Claude resumes as sole coordinator (owner decision 2026-10-13). Survey of trunk 97ba48dcd7: 8 of 21 formats read+write, 13 still whole-format refused; trunk gates restored; prioritized steps P1–P10 |
 | 0247 | [RTF direct-set coalescing](0247-rtf-direct-set-coalescing.md) | Bounded native batch planning and sequential failure/axis semantics; 1,764 full-facade / 629 RTF-only tests, tooling and gates pass; three trials pass 90 output checks and all 1k cases meet 2×, while native paragraph-text scaling, tiny-input overhead and full goal remain open |
 | 0246 | [Native-backed RTF run insertion](0246-rtf-run-add.md) | Typed native insertion, unified placements/formatting, exact opaque/history preservation; 1,525 native / 1,746 full-facade / 611 RTF-only tests pass; three paired trials pass 108 output checks, with tiny-input overhead, scaling and full-goal gaps open |
 | 0245 | [Opaque body anchors through RTF run edits](0245-rtf-run-opaque-anchors.md) | Native UTF-8 anchor projection, terminal-empty delimiter handling and exact history; 1,515 native / 1,738 full-facade / 603 RTF-only tests pass; six paired trials cover 10k opaque anchors, with query/scaling and full-goal gaps still open |
