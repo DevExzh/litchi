@@ -30,7 +30,7 @@ use pyo3::types::{PyBytes, PyDict, PyList, PyModule, PyString};
 use crate::common::FileFormat;
 use crate::errors::Failure;
 use crate::write::{self, Commit, Edit, Items, Where};
-use crate::{m4, nodes, props, pyser};
+use crate::{m4, merge, nodes, props, pyser};
 
 /// Registers `File`, `open` and `open_bytes`.
 pub fn register(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -793,6 +793,65 @@ impl File {
                 .map_err(|error| Failure::read(&error))
         })?;
         m4::import_commit(py, commit)
+    }
+
+    /// Fill this template's ``{{key}}`` placeholders (and, for DOCX, its
+    /// Word ``MERGEFIELD`` fields) from one data record; return the Commit.
+    ///
+    /// The template is unchanged, so one opened template fills any number
+    /// of records. DOCX, PPTX and XLSX only. Placeholders split across runs
+    /// keep each run's formatting. The GIL is released while merging.
+    ///
+    /// Args:
+    ///     data: One record: a mapping (values rendered as JSON renders
+    ///         them; nested members also as "a.b" and "a[0]" keys), or a
+    ///         JSON object as str or bytes
+    ///     missing: "keep" (the default) leaves a placeholder whose key the
+    ///         record lacks; "empty" removes it
+    ///     fields: Whether Word merge fields are filled
+    ///     max_replacements: The largest number of replacements (default
+    ///         65,536)
+    ///     max_bytes: The largest replacement payload in bytes (default
+    ///         16 MiB)
+    ///
+    /// Returns:
+    ///     A Commit whose ``value`` is the summary dict: ``replacements``,
+    ///     ``fields``, ``skipped_fields``, ``keys`` (the record keys used)
+    ///     and ``unresolved`` (the keys the record lacks)
+    ///
+    /// Raises:
+    ///     PropertyError: (a ValueError) If the data is not one JSON
+    ///         object, an option is invalid, or a value holds a character
+    ///         the document cannot store
+    ///     UnsupportedError: (a ValueError) If the format is not DOCX, PPTX
+    ///         or XLSX
+    ///     LitchiError: If a limit is exceeded ("limit_exceeded")
+    #[pyo3(signature = (
+        data,
+        *,
+        missing = "keep",
+        fields = true,
+        max_replacements = None,
+        max_bytes = None
+    ))]
+    fn merge(
+        &self,
+        py: Python<'_>,
+        data: Bound<'_, PyAny>,
+        missing: &str,
+        fields: bool,
+        max_replacements: Option<usize>,
+        max_bytes: Option<usize>,
+    ) -> PyResult<Commit> {
+        let file = self.handle()?;
+        let source = merge::json_text(&data)?;
+        let (options, limits) = merge::options(missing, fields, max_replacements, max_bytes)?;
+        let commit = py.detach(|| {
+            let record = merge::record(&source, &limits)?;
+            file.merge_with_limits(&record, &options, &limits)
+                .map_err(|error| Failure::read(&error))
+        })?;
+        merge::commit(py, commit)
     }
 
     /// Evaluate one workbook cell.

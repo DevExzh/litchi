@@ -741,6 +741,20 @@ class _ImportSummary(TypedDict):
     empty: int
     """Empty fields (each clears an existing cell's value)."""
 
+class _MergeSummary(TypedDict):
+    """``File.merge``'s ``Commit.value`` (stub-only type)."""
+
+    replacements: int
+    """Placeholders replaced."""
+    fields: int
+    """Word merge fields replaced."""
+    skipped_fields: int
+    """Word merge fields left in place (other content inside their markup)."""
+    keys: List[str]
+    """The record keys used, sorted."""
+    unresolved: List[str]
+    """The keys the template uses and the record lacks, sorted."""
+
 class _Evaluated(TypedDict):
     """``File.evaluate``'s result (stub-only type)."""
 
@@ -1266,6 +1280,37 @@ class File:
             PropertyError: (a ValueError) If the text is malformed, an option
                 is invalid or a field is too long
             UnsupportedError: (a ValueError) If the format has no worksheets
+            LitchiError: If a limit is exceeded ("limit_exceeded")
+        """
+        ...
+
+    def merge(
+        self,
+        data: Union[Mapping[str, Any], str, bytes],
+        *,
+        missing: str = "keep",
+        fields: bool = True,
+        max_replacements: Optional[int] = None,
+        max_bytes: Optional[int] = None,
+    ) -> Commit:
+        """Fill this template's ``{{key}}`` placeholders (and, for DOCX, its
+        Word ``MERGEFIELD`` fields) from one data record; return the Commit.
+
+        ``data`` is a mapping (values rendered as JSON renders them; nested
+        members are also reachable as "a.b" and "a[0]" keys) or a JSON
+        object as str or bytes. DOCX, PPTX and XLSX only. The template is
+        unchanged, so one opened template fills any number of records.
+        Placeholders split across runs keep each run's formatting.
+        ``missing`` is "keep" (leave a placeholder whose key the record
+        lacks) or "empty" (remove it). ``Commit.value`` is the summary dict
+        (``_MergeSummary``). The GIL is released while merging.
+
+        Raises:
+            PropertyError: (a ValueError) If the data is not one JSON
+                object, an option is invalid, or a value holds a character
+                the document cannot store
+            UnsupportedError: (a ValueError) If the format is not DOCX, PPTX
+                or XLSX
             LitchiError: If a limit is exceeded ("limit_exceeded")
         """
         ...

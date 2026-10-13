@@ -12,6 +12,7 @@ mod comments;
 mod graph;
 mod numbering;
 mod picture;
+mod substitute;
 pub use comments::NewComment;
 pub use graph::HyperlinkTarget;
 pub use picture::NewPicture;

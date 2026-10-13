@@ -100,10 +100,11 @@ fn every_format_has_one_answer_for_its_reads() {
                 );
             },
         }
-        // Import is a worksheet verb with its own answer (`m4_verbs_...`).
+        // Import is a worksheet verb with its own answer (`m4_verbs_...`);
+        // merge is a template verb (`merge_is_a_template_verb`).
         for verb in Verb::ALL
             .into_iter()
-            .filter(|verb| verb.is_edit() && *verb != Verb::Import)
+            .filter(|verb| verb.is_edit() && !matches!(verb, Verb::Import | Verb::Merge))
         {
             #[cfg(feature = "pptx")]
             if format == FileFormat::Pptx
@@ -643,5 +644,29 @@ fn m4_verbs_are_worksheet_verbs() {
                 "{format:?} {verb:?}"
             );
         }
+    }
+}
+
+/// Record 0274: merge answers for DOCX, PPTX and XLSX templates only.
+#[test]
+fn merge_is_a_template_verb() {
+    for format in [
+        FileFormat::Docx,
+        FileFormat::Pptx,
+        FileFormat::Xlsx,
+        FileFormat::Xlsb,
+        FileFormat::Doc,
+        FileFormat::Rtf,
+    ] {
+        let capabilities = Capabilities::of(format);
+        let template = matches!(
+            format,
+            FileFormat::Docx | FileFormat::Pptx | FileFormat::Xlsx
+        ) && crate::read::Adapter::of(format).is_some();
+        assert_eq!(
+            capabilities.verb(Verb::Merge).is_supported(),
+            template,
+            "{format:?}"
+        );
     }
 }

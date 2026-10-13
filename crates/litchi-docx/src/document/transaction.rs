@@ -14,6 +14,7 @@ mod formatting_tests;
 mod publication_proof_tests;
 #[cfg(test)]
 mod scan_differential_tests;
+pub(crate) mod substitute;
 
 use std::mem::size_of;
 use std::sync::Arc;

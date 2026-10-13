@@ -47,6 +47,9 @@
       "followUp": "none: import and evaluation are worksheet operations",
       "reason": "this format has no worksheets"
     },
+    "merge": {
+      "supported": true
+    },
     "save": {
       "supported": true
     },

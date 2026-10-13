@@ -314,6 +314,8 @@ pub enum Source {
     Batch(crate::batch::Error),
     /// A CSV/TSV import decoding or parsing error (record 0266).
     Import(crate::import::Error),
+    /// A template merge data error (record 0274).
+    Merge(crate::merge::Error),
     /// A formula evaluation refusal or bound (record 0266).
     #[cfg(all(
         feature = "eval",
@@ -448,6 +450,7 @@ impl Source {
             Self::None => None,
             Self::Batch(error) => Some(error),
             Self::Import(error) => Some(error),
+            Self::Merge(error) => Some(error),
             #[cfg(all(
                 feature = "eval",
                 any(feature = "xlsx", feature = "xlsb", feature = "xls")
@@ -952,6 +955,15 @@ impl Classify for crate::batch::Error {
             Self::Limit { .. } => Code::LimitExceeded,
             Self::Malformed { .. } => Code::CorruptBatch,
             Self::Allocation { .. } => Code::InternalError,
+        })
+    }
+}
+
+impl Classify for crate::merge::Error {
+    fn classify(&self) -> Class {
+        Class::of(match self {
+            Self::Json { .. } | Self::NotAnObject | Self::NotARecord { .. } => Code::InvalidJson,
+            Self::TooDeep => Code::LimitExceeded,
         })
     }
 }
@@ -1991,6 +2003,7 @@ macro_rules! from_leaf {
 from_leaf!(io::Error => Io, None);
 from_leaf!(crate::batch::Error => Batch, None);
 from_leaf!(crate::import::Error => Import, None);
+from_leaf!(crate::merge::Error => Merge, None);
 from_leaf!(#[cfg(all(feature = "eval", any(feature = "xlsx", feature = "xlsb", feature = "xls")))] crate::calc::Error => Calc, None);
 from_leaf!(crate::transaction::Error => Transaction, None);
 from_leaf!(litchi_core::Error => Core, None);

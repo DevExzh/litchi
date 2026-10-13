@@ -464,6 +464,16 @@ fn refusal(reason: Refusal) -> Error {
     }
 }
 
+/// The byte range of the element `path` names in `snapshot`, for the
+/// story substitution of record 0274.
+pub(in crate::document::transaction) fn locate_element(
+    snapshot: &Snapshot,
+    path: &ElementPath,
+) -> Result<std::ops::Range<usize>> {
+    let located = locate(snapshot, path.steps())?;
+    Ok(located.start..located.end)
+}
+
 /// Locate the element `path` names in `snapshot`.
 fn locate(snapshot: &Snapshot, path: &[ElementStep]) -> Result<Located> {
     let (first, rest) = path.split_first().ok_or_else(not_found)?;

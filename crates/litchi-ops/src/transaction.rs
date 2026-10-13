@@ -12,6 +12,7 @@ use crate::{Code, File, IntoNode, IntoPlacement, IntoProps, IntoTarget, Result};
 
 mod import;
 mod limits;
+mod merge;
 pub use limits::{Error, LimitKind, SemanticLimits, SemanticLimitsBuilder};
 
 /// Content-free facts about a complete explicit transaction.
@@ -2250,7 +2251,19 @@ fn changed(steps: &[Step]) -> Result<bool> {
         (Leaf::Pptx { source, .. }, Leaf::Pptx { target, .. }) => Ok(!source.same_content(target)?),
         #[cfg(feature = "docx")]
         (Leaf::Docx(first), Leaf::Docx(last)) => {
-            Ok(first.source().xml_bytes() != last.target().xml_bytes())
+            // A template merge can change only a header or other story
+            // part: a package-graph change is a change (record 0274).
+            Ok(first.source().xml_bytes() != last.target().xml_bytes()
+                || steps.iter().any(|step| match &step.leaf {
+                    Leaf::Docx(patch) => patch.operations().iter().any(|operation| {
+                        matches!(
+                            operation,
+                            litchi_docx::document::Operation::ChangeGraph { .. }
+                        )
+                    }),
+                    #[allow(unreachable_patterns)]
+                    _ => false,
+                }))
         },
         #[cfg(feature = "xlsx")]
         (Leaf::Xlsx { source, .. }, Leaf::Xlsx { target, .. }) => Ok(!source.same_content(target)?),

@@ -1274,3 +1274,135 @@ fn import_evaluate_and_recalculate() {
     );
     assert!(run.stderr.contains("single character"), "{}", run.stderr);
 }
+
+#[test]
+fn merge_fills_templates_per_record() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let template = dir.path().join("letter.docx");
+    expect(0, ["create", arg(&template)]);
+    expect(
+        0,
+        [
+            "add",
+            arg(&template),
+            "/body",
+            "--type",
+            "paragraph",
+            "--prop",
+            "text=Dear {{name}}, you owe {{ total }}.",
+        ],
+    );
+    let read = |path: &Path| litchi_ops::open(path).expect("open").text().expect("text");
+
+    // OfficeCLI's form: inline JSON, the output second.
+    let single = dir.path().join("single.docx");
+    let run = expect(
+        0,
+        [
+            "--json",
+            "merge",
+            arg(&template),
+            arg(&single),
+            "--data",
+            r#"{"name":"Ada","total":5200.00}"#,
+        ],
+    );
+    let report = run.json();
+    assert_eq!(report["replacedKeys"], 2);
+    assert_eq!(report["replacements"], 2);
+    assert_eq!(report["unresolvedPlaceholders"], json!([]));
+    assert_eq!(read(&single), "Dear Ada, you owe 5200.00.");
+    // An existing output is refused without --force.
+    let run = expect(
+        6,
+        [
+            "merge",
+            arg(&template),
+            arg(&single),
+            "--data",
+            r#"{"name":"x"}"#,
+        ],
+    );
+    assert!(run.stderr.contains("file_exists"), "{}", run.stderr);
+    let run = expect(
+        0,
+        [
+            "merge",
+            arg(&template),
+            arg(&single),
+            "--data",
+            r#"{"name":"Grace"}"#,
+            "--force",
+        ],
+    );
+    assert!(run.stderr.contains("{{total}}"), "{}", run.stderr);
+    assert_eq!(read(&single), "Dear Grace, you owe {{ total }}.");
+
+    // CSV data: one output per record.
+    let data = dir.path().join("people.csv");
+    std::fs::write(&data, "name,total\nAda,1\nGrace,2\n").expect("write data");
+    let pattern = dir.path().join("out-{n}.docx");
+    let run = expect(
+        0,
+        [
+            "--json",
+            "merge",
+            arg(&template),
+            arg(&data),
+            "--out",
+            arg(&pattern),
+        ],
+    );
+    assert_eq!(run.json()["records"], 2);
+    assert_eq!(read(&dir.path().join("out-1.docx")), "Dear Ada, you owe 1.");
+    assert_eq!(
+        read(&dir.path().join("out-2.docx")),
+        "Dear Grace, you owe 2."
+    );
+    // Several records need `{n}`.
+    let run = expect(
+        4,
+        [
+            "merge",
+            arg(&template),
+            arg(&data),
+            "--out",
+            arg(&single),
+            "--force",
+        ],
+    );
+    assert!(run.stderr.contains("invalid_argument"), "{}", run.stderr);
+    // Missing keys can be emptied; the template is never changed.
+    let emptied = dir.path().join("emptied.docx");
+    expect(
+        0,
+        [
+            "merge",
+            arg(&template),
+            arg(&emptied),
+            "--data",
+            "{}",
+            "--missing",
+            "empty",
+        ],
+    );
+    assert_eq!(read(&emptied), "Dear , you owe .");
+    assert_eq!(read(&template), "Dear {{name}}, you owe {{ total }}.");
+    // Malformed data and unsupported templates have their own statuses.
+    let run = expect(
+        4,
+        [
+            "merge",
+            arg(&template),
+            arg(&emptied),
+            "--data",
+            "[1]",
+            "--force",
+        ],
+    );
+    assert!(run.stderr.contains("invalid_json"), "{}", run.stderr);
+    let workbook = dir.path().join("book.xlsb");
+    expect(0, ["create", arg(&workbook)]);
+    let other = dir.path().join("other.xlsb");
+    expect(5, ["merge", arg(&workbook), arg(&other), "--data", "{}"]);
+}

@@ -80,6 +80,7 @@ mod children;
 pub(crate) mod create;
 mod element;
 mod lists;
+pub(crate) mod merge;
 mod nav;
 mod nested;
 mod node;
@@ -117,6 +118,10 @@ pub(crate) struct DocxState {
     /// Successful explicit signature removal, shared by repeated publications.
     /// Failures are not cached, and source fences guard every use.
     unsigned: OnceLock<litchi_docx::Package>,
+    /// The owning package a source-backed owner materializes for the writes
+    /// that publish package-graph changes, built on the first such write
+    /// (record 0274). Source fences guard every use.
+    promoted: OnceLock<litchi_docx::Package>,
     /// The eager owner's open-time report. A source-backed report keeps
     /// growing as deferred parts are read, so it is never cached.
     tolerance: OnceLock<ToleranceReport>,
@@ -313,6 +318,7 @@ impl Docx {
             owner,
             metadata: OnceLock::new(),
             unsigned: OnceLock::new(),
+            promoted: OnceLock::new(),
             tolerance: tolerance.map_or_else(OnceLock::new, OnceLock::from),
             retain_source: options.retain_source,
             #[cfg(feature = "markdown")]
@@ -373,6 +379,23 @@ impl Docx {
     /// This handle's signature disposition (record 0013).
     pub(crate) fn signature(&self) -> Signature {
         self.0.signature()
+    }
+
+    /// The owning package of a source-backed owner, materialized once.
+    pub(crate) fn promoted(
+        &self,
+        package: &source_backed::Package,
+    ) -> Result<litchi_docx::Package> {
+        if let Some(promoted) = self.0.promoted.get() {
+            return self.owner().finish(Ok(promoted.clone()));
+        }
+        let owned = self.owner().finish(
+            package
+                .to_owned_package_preserving_source()
+                .map_err(Error::from),
+        )?;
+        let _ = self.0.promoted.set(owned.clone());
+        Ok(owned)
     }
 
     /// The owner, for the family views and write handlers built on this
