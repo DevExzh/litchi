@@ -958,9 +958,10 @@ fn failed_stream_keeps_document_and_properties_retryable() {
         .authoring_document()
         .unwrap()
         .add_paragraph_with_text("retryable document");
-    package
-        .properties
-        .put(Props::new().title("retryable properties"));
+    package.properties.put(Props {
+        title: Some("retryable properties".to_owned()),
+        ..Props::default()
+    });
     let document_before = package.opc.main_document_part().unwrap().blob_arc();
     let core_properties_uri = PackURI::new("/docProps/core.xml").unwrap();
     let core_properties_before = package
@@ -1016,9 +1017,10 @@ fn panicking_stream_restores_package_and_retryable_state() {
         document.add_heading("panic-safe heading", 1).unwrap();
         document.add_toc(crate::TableOfContents::new()).unwrap();
     }
-    package
-        .properties
-        .put(Props::new().title("panic-safe properties"));
+    package.properties.put(Props {
+        title: Some("panic-safe properties".to_owned()),
+        ..Props::default()
+    });
     package
         .custom_props_mut()
         .insert("RetryMarker", "panic-safe custom property")
@@ -1431,7 +1433,10 @@ fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
         .authoring_document()
         .unwrap()
         .add_paragraph_with_text("source");
-    source.properties.put(Props::new().title("source title"));
+    source.properties.put(Props {
+        title: Some("source title".to_owned()),
+        ..Props::default()
+    });
     source
         .custom_props_mut()
         .insert("Marker", "source value")
@@ -1492,7 +1497,10 @@ fn cloned_dirty_writer_and_metadata_detach_and_remain_retryable() {
     );
 
     let mut replaced = source.clone();
-    replaced.properties.put(Props::new().title("replacement"));
+    replaced.properties.put(Props {
+        title: Some("replacement".to_owned()),
+        ..Props::default()
+    });
     let mut cleared = source.clone();
     cleared.properties.clear();
     assert_eq!(

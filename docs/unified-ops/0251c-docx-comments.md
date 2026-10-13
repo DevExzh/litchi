@@ -46,7 +46,8 @@ without materializing the package, matching the eager
 | `/comments/comment[@commentId=X]` | by native identifier (raw path API only, like `sdtId`) |
 
 A comment's properties are `id` (read), and `author`, `initials`, `date` and
-`text`, which are read and add-only. Its view text is the comment text.
+`text`, which are read and add-only. Its view text is the comment text, one
+line per paragraph.
 
 **add.** `add <paragraph> comment` comments the whole paragraph, and
 `add <run> comment` comments one direct run. Both work under body, cell and

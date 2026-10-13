@@ -347,7 +347,7 @@ fn parses_namespaces_entities_and_complete_metadata_without_annotation_leakage()
         Some("0000000000000000000000007")
     );
     assert_eq!(common.page_count, None);
-    assert!(common.last_printed_time.is_some());
+    assert!(common.last_printed.is_some());
 }
 
 #[test]

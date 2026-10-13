@@ -8,10 +8,10 @@
 //! cargo run --example office_crud_demo
 //! ```
 
-use litchi::docx::metadata::Props;
 use litchi::docx::{Builder as DocxBuilder, Package as DocxPackage};
 use litchi::pptx::Package as PptxPackage;
 use litchi::xlsx::{Formula, Package};
+use litchi_core::Metadata;
 
 type ExampleResult<T> = Result<T, Box<dyn std::error::Error + Send + Sync>>;
 
@@ -80,12 +80,12 @@ fn demo_docx_operations() -> ExampleResult<()> {
 
     // Set metadata
     let mut metadata = builder.build()?.edit_metadata();
-    metadata.set(
-        Props::new()
-            .title("Product Catalog")
-            .creator("Litchi Demo")
-            .description("Demonstration of DOCX creation"),
-    );
+    metadata.set(Metadata {
+        title: Some("Product Catalog".to_owned()),
+        author: Some("Litchi Demo".to_owned()),
+        description: Some("Demonstration of DOCX creation".to_owned()),
+        ..Metadata::default()
+    });
     let mut pkg = metadata.commit()?.into_package();
 
     // Save

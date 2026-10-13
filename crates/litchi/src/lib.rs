@@ -416,8 +416,8 @@ pub mod ooxml_common {
     #[cfg(feature = "vba-inspection")]
     pub use litchi_ooxml_common::vba;
     pub use litchi_ooxml_common::{
-        Error, Keywords, Props, Result, XmlError, custom, custom_xml, embedded, external_link,
-        leniency, mce, properties, relationships, ribbon, spreadsheet_xml_maps, web, xml, xml_name,
+        Error, Result, XmlError, custom, custom_xml, embedded, external_link, leniency, mce,
+        properties, relationships, ribbon, spreadsheet_xml_maps, web, xml, xml_name,
     };
 }
 

@@ -30,11 +30,12 @@ impl RawPackage<File> {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn open<P: AsRef<Path>>(path: P) -> Result<Self> {
-        Self::open_with_limits(path, SourceLimits::default())
+        Self::open_with_options(path, OpenOptions::default())
     }
 
-    /// Open a `.doc` package with explicit finite read limits.
-    pub fn open_with_limits<P: AsRef<Path>>(path: P, source_limits: SourceLimits) -> Result<Self> {
+    /// Open a `.doc` package under the options' finite read limits.
+    pub fn open_with_options<P: AsRef<Path>>(path: P, options: OpenOptions) -> Result<Self> {
+        let source_limits = options.get_source_limits();
         let path = path.as_ref();
         let file = File::open(path)?;
         let source_len = file.metadata()?.len();

@@ -1,14 +1,18 @@
+use litchi_core::Metadata;
 use litchi_docx::Package;
-use litchi_docx::metadata::{Error, Props};
+use litchi_docx::metadata::Error;
 use tempfile::NamedTempFile;
 
 #[test]
 fn package_owns_core_property_crud_through_the_metadata_family() {
     let package = Package::new().expect("fresh DOCX");
-    assert_eq!(package.metadata().cloned(), Some(Props::new()));
+    assert_eq!(package.metadata().cloned(), Some(Metadata::default()));
 
     let mut edit = package.edit_metadata();
-    edit.set(Props::new().title("Moved"));
+    edit.set(Metadata {
+        title: Some("Moved".to_owned()),
+        ..Metadata::default()
+    });
     let commit = edit.commit().expect("commit");
     assert!(commit.diagnostics().changed());
     let mut moved = commit.into_package();
@@ -17,7 +21,7 @@ fn package_owns_core_property_crud_through_the_metadata_family() {
         Some("Moved")
     );
     // The source snapshot keeps its value.
-    assert_eq!(package.metadata().cloned(), Some(Props::new()));
+    assert_eq!(package.metadata().cloned(), Some(Metadata::default()));
 
     let path = NamedTempFile::with_suffix(".docx").unwrap();
     moved.save(path.path()).unwrap();

@@ -1,7 +1,7 @@
 //! XLSB creation through the unified [`litchi_ops::File`] facade.
 #![cfg(feature = "xlsb")]
 
-use litchi_core::{FileFormat, Metadata};
+use litchi_core::FileFormat;
 use litchi_ops::capabilities::{Capabilities, Verb};
 use litchi_ops::{Code, Conformance, CreateOptions, File, Flavor, create, create_with, props};
 
@@ -68,10 +68,6 @@ fn xlsb_creation_options_are_explicit_typed_refusals() {
     let cases = [
         CreateOptions::new().flavor(Flavor::Template),
         CreateOptions::new().conformance(Conformance::Strict),
-        CreateOptions::new().metadata(Metadata {
-            title: Some("initial title".to_owned()),
-            ..Metadata::default()
-        }),
     ];
     for options in cases {
         let error = create_with(FileFormat::Xlsb, &options).expect_err("unsupported option");

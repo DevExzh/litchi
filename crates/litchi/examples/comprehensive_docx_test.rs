@@ -12,7 +12,7 @@
 //! 2. Regression test baseline
 //! 3. Visual reference for all capabilities
 
-use litchi::docx::metadata::Props;
+use litchi::docx::metadata::Metadata;
 use litchi::docx::{
     Border, Borders, Color, EndnotePos, Endnotes, FootnotePos, Footnotes, ListType,
     MutableDocument, MutableTheme, PageNumberFormat, PageOrientation, ParagraphAlignment, Style,
@@ -650,14 +650,19 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set document properties
     let mut metadata = builder.build()?.edit_metadata();
-    metadata.set(
-        Props::new()
-            .title("Comprehensive DOCX Feature Test")
-            .subject("Feature Verification and Regression Testing")
-            .creator("Litchi OOXML Library")
-            .keywords("docx, test, verification, regression, features, themes, watermarks, toc")
-            .description("Complete test document for all DOCX writer features including new theme, watermark, and TOC support"),
-    );
+    metadata.set(Metadata {
+        title: Some("Comprehensive DOCX Feature Test".to_owned()),
+        subject: Some("Feature Verification and Regression Testing".to_owned()),
+        author: Some("Litchi OOXML Library".to_owned()),
+        keywords: Some(
+            "docx, test, verification, regression, features, themes, watermarks, toc".to_owned(),
+        ),
+        description: Some(
+            "Complete test document for all DOCX writer features including new theme, watermark, and TOC support"
+                .to_owned(),
+        ),
+        ..Metadata::default()
+    });
     let mut package = metadata.commit()?.into_package();
 
     let filename = "comprehensive_test.docx";

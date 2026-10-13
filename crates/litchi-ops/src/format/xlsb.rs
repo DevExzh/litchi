@@ -51,6 +51,7 @@ use crate::options::{OpenOptions, SourceMode};
 mod children;
 pub(crate) mod create;
 mod header;
+mod metadata;
 mod nav;
 mod node;
 mod owner;
@@ -388,8 +389,8 @@ impl Xlsb {
         let metadata =
             litchi_ooxml_common::properties::read_with_report(&package, &mut metadata_repairs)
                 .map_err(metadata_error)?
-                .map(Metadata::from)
                 .unwrap_or_default();
+        let metadata = super::metadata::with_app_props(metadata, &package);
         let workbook = xlsb::Package::from_opc(package)?.into_workbook()?;
         Ok(Self::with_owner(
             XlsbOwner::Eager(Box::new(workbook)),
@@ -410,8 +411,8 @@ impl Xlsb {
             &mut metadata_repairs,
         )
         .map_err(metadata_error)?
-        .map(Metadata::from)
         .unwrap_or_default();
+        let metadata = super::metadata::with_app_props(metadata, package.opc_package());
         let workbook = package.into_workbook()?;
         Ok(Self::with_owner(
             XlsbOwner::Eager(Box::new(workbook)),

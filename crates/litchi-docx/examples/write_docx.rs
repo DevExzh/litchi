@@ -7,7 +7,7 @@
 //! cargo run -p litchi-docx --example write_docx
 //! ```
 
-use litchi_docx::metadata::Props;
+use litchi_docx::metadata::Metadata;
 use litchi_docx::{Builder, Package, ParagraphAlignment};
 use tempfile::NamedTempFile;
 
@@ -58,12 +58,12 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // Set core properties through the metadata transaction.
     let mut metadata = pkg.edit_metadata();
-    metadata.set(
-        Props::new()
-            .title("litchi-docx example")
-            .creator("litchi-docx write_docx example")
-            .subject("Round-trip demo"),
-    );
+    metadata.set(Metadata {
+        title: Some("litchi-docx example".to_owned()),
+        author: Some("litchi-docx write_docx example".to_owned()),
+        subject: Some("Round-trip demo".to_owned()),
+        ..Metadata::default()
+    });
     let mut pkg = metadata.commit()?.into_package();
 
     // Save to a tempfile (with .docx extension so reopen path-detection is unambiguous).
@@ -91,8 +91,8 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
         props.and_then(|p| p.title.as_deref())
     );
     println!(
-        "Round-tripped creator : {:?}",
-        props.and_then(|p| p.creator.as_deref())
+        "Round-tripped author  : {:?}",
+        props.and_then(|p| p.author.as_deref())
     );
     println!(
         "Round-tripped subject : {:?}",

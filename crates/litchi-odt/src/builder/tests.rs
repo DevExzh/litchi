@@ -316,8 +316,10 @@ fn test_generate_meta_xml() {
     builder.metadata.identifier = Some("urn:litchi:document".to_string());
     builder.metadata.language = Some("en-US".to_string());
     builder.metadata.created = Some("2026-08-10T01:02:03Z".parse().unwrap());
-    builder.metadata.modified_local = Some(
-        chrono::NaiveDateTime::parse_from_str("2026-08-10T04:05:06", "%Y-%m-%dT%H:%M:%S").unwrap(),
+    builder.metadata.modified = Some(
+        chrono::NaiveDateTime::parse_from_str("2026-08-10T04:05:06", "%Y-%m-%dT%H:%M:%S")
+            .unwrap()
+            .into(),
     );
 
     let meta_xml = builder.generate_meta_xml();

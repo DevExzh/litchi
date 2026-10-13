@@ -1,14 +1,22 @@
-use litchi_ooxml_common::{Props, properties};
+use litchi_core::Metadata;
+use litchi_ooxml_common::properties;
 use litchi_opc::constants::{content_type as ct, relationship_type as rt};
 use litchi_opc::part::BlobPart;
 use litchi_opc::{OpcPackage, PackURI};
 
 /// Read core properties, asserting the conformant fixtures need no repair.
-fn read_clean(package: &OpcPackage) -> litchi_ooxml_common::Result<Option<Props>> {
+fn read_clean(package: &OpcPackage) -> litchi_ooxml_common::Result<Option<Metadata>> {
     let mut report = litchi_ooxml_common::leniency::ToleranceReport::default();
     let props = properties::read_with_report(package, &mut report)?;
     assert!(report.is_clean(), "{report:?}");
     Ok(props)
+}
+
+fn titled(title: &str) -> Metadata {
+    Metadata {
+        title: Some(title.to_owned()),
+        ..Metadata::default()
+    }
 }
 
 const STRICT_REL: &str =
@@ -39,7 +47,7 @@ fn strict_core_properties_preserve_the_selected_graph() {
         Some("Original")
     );
 
-    properties::write(&mut package, Props::new().title("Changed")).unwrap();
+    properties::write(&mut package, &titled("Changed")).unwrap();
     let relationship = package
         .rels()
         .iter()
@@ -73,7 +81,7 @@ fn absent_core_properties_are_idempotent() {
     let mut package = OpcPackage::new();
     assert!(read_clean(&package).unwrap().is_none());
     assert!(!properties::clear(&mut package).unwrap());
-    assert!(properties::write(&mut package, Props::new().title("Created")).unwrap());
+    assert!(properties::write(&mut package, &titled("Created")).unwrap());
     assert_eq!(
         read_clean(&package).unwrap().unwrap().title.as_deref(),
         Some("Created")

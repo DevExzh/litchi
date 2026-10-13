@@ -1044,7 +1044,7 @@ impl Package {
         {
             tolerance.append_properties(&repaired);
         }
-        Ok(properties.map(Into::into).unwrap_or_default())
+        Ok(properties.unwrap_or_default())
     }
 
     /// Inventory embedded-object and embedded-package relationships without

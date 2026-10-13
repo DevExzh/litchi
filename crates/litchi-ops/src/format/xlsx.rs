@@ -63,6 +63,7 @@ pub(crate) mod create;
 mod dimension_write;
 mod header;
 mod merge_write;
+mod metadata;
 mod nav;
 mod node;
 mod publish;
@@ -291,8 +292,8 @@ impl Xlsx {
         let metadata =
             litchi_ooxml_common::properties::read_with_report(&package, &mut metadata_repairs)
                 .map_err(metadata_error)?
-                .map(Metadata::from)
                 .unwrap_or_default();
+        let metadata = super::metadata::with_app_props(metadata, &package);
         let workbook = xlsx::Package::from_opc(package)?;
         Ok(Self::with_owner(
             XlsxOwner::Eager(workbook),
@@ -342,8 +343,15 @@ impl Xlsx {
         let mut metadata_repairs = MetadataRepairs::default();
         let metadata = package
             .core_properties_with_report(&mut metadata_repairs)?
-            .map(Metadata::from)
             .unwrap_or_default();
+        let metadata = match package.app_props() {
+            Ok(Some(app)) => {
+                let mut metadata = metadata;
+                app.project_into(&mut metadata);
+                metadata
+            },
+            _ => metadata,
+        };
         Ok(Self::with_owner(
             XlsxOwner::Eager(package),
             metadata,

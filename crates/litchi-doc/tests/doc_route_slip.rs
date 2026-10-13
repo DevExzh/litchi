@@ -183,7 +183,9 @@ fn selectors_are_typed_and_protected_transactions_roll_back() {
     ));
 
     transaction.set_stage(RecipientSelector::Index(1)).unwrap();
-    transaction.rollback();
+    // Dropping the transaction is the rollback; the source never changed.
+    drop(transaction);
+    let transaction = snapshot.edit();
     assert_eq!(transaction.snapshot(), &snapshot);
     assert!(!transaction.is_changed());
 

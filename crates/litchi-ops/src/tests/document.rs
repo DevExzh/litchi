@@ -1308,27 +1308,42 @@ mod rtf {
         assert_eq!(metadata.identifier.as_deref(), Some("77"));
         assert_eq!(metadata.application.as_deref(), Some("Litchi 1.0"));
         assert_eq!(
-            metadata.created_local,
+            metadata
+                .created
+                .and_then(litchi_core::metadata::Timestamp::unzoned),
             chrono::NaiveDate::from_ymd_opt(2026, 7, 15)
                 .unwrap()
                 .and_hms_opt(12, 34, 56)
         );
         assert_eq!(
-            metadata.modified_local,
+            metadata
+                .modified
+                .and_then(litchi_core::metadata::Timestamp::unzoned),
             chrono::NaiveDate::from_ymd_opt(2026, 7, 16)
                 .unwrap()
                 .and_hms_opt(9, 8, 0)
         );
         assert_eq!(
-            metadata.last_backup_local,
+            metadata
+                .last_backup
+                .and_then(litchi_core::metadata::Timestamp::unzoned),
             chrono::NaiveDate::from_ymd_opt(2026, 7, 17)
                 .unwrap()
                 .and_hms_opt(0, 0, 0)
         );
-        assert_eq!(metadata.created, None);
-        assert_eq!(metadata.modified, None);
-        assert_eq!(metadata.last_printed_time, None);
-        assert_eq!(metadata.last_printed_local, None);
+        assert_eq!(
+            metadata
+                .created
+                .and_then(litchi_core::metadata::Timestamp::utc),
+            None
+        );
+        assert_eq!(
+            metadata
+                .modified
+                .and_then(litchi_core::metadata::Timestamp::utc),
+            None
+        );
+        assert_eq!(metadata.last_printed, None);
         assert!(metadata.has_data());
     }
 

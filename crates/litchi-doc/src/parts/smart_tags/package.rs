@@ -5,7 +5,6 @@ use super::transaction::{Commit, Snapshot, Transaction};
 use crate::package::{Error as PackageError, Result};
 use crate::parts::protection::ProtectionPolicy;
 use litchi_codepage::Ansi;
-use litchi_ole_common::smart_tags::Limits;
 
 /// A small package facade that publishes only fixed-topology table edits.
 ///
@@ -47,33 +46,11 @@ impl Editor {
         })
     }
 
-    /// Open with custom bounded parsing and LCID-derived ANSI decoding.
-    pub fn open_with_limits(
-        fib: &FileInformationBlock,
-        table_stream: &[u8],
-        limits: Limits,
-    ) -> Result<Self> {
-        Ok(Self {
-            current: Snapshot::parse_with_limits(fib, table_stream, limits)?,
-        })
-    }
-
-    /// Open with bounded parsing and an explicit protected-edit policy.
-    pub fn open_with_limits_and_policy(
-        fib: &FileInformationBlock,
-        table_stream: &[u8],
-        limits: Limits,
-        protection_policy: ProtectionPolicy,
-    ) -> Result<Self> {
-        Ok(Self {
-            current: Snapshot::parse_with_options_and_policy(
-                fib,
-                table_stream,
-                None,
-                limits,
-                protection_policy,
-            )?,
-        })
+    /// Adopt an already parsed smart-tag snapshot, such as one bounded by
+    /// [`Snapshot::parse_with_options_and_policy`].
+    #[must_use]
+    pub const fn from_snapshot(snapshot: Snapshot) -> Self {
+        Self { current: snapshot }
     }
 
     /// The current immutable snapshot.

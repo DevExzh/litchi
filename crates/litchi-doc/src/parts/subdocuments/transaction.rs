@@ -193,11 +193,6 @@ impl Transaction {
             || self.before.main_document_chars != self.working.main_document_chars
     }
 
-    /// Restores the candidate to its source snapshot.
-    pub fn rollback(&mut self) {
-        self.working = self.before.clone();
-    }
-
     /// Changes the `ccpText` context used for the WKB terminal CP.
     ///
     /// This does not edit main-document text. The caller must update the

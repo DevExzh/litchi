@@ -177,15 +177,16 @@ fn package_limit_accepts_exact_size_and_rejects_one_less() {
     let path = temporary_path();
     std::fs::write(&path, &bytes).unwrap();
 
-    let mut package = Package::open_with_limits(&path, exact).unwrap();
+    let mut package =
+        Package::open_with_options(&path, OpenOptions::default().source_limits(exact)).unwrap();
     assert!(package.document().is_ok());
-    let error = Package::open_with_limits(
+    let error = Package::open_with_options(
         &path,
-        limits(
+        OpenOptions::default().source_limits(limits(
             exact.max_input_bytes() - 1,
             exact.max_entry_bytes(),
             exact.max_aggregate_bytes(),
-        ),
+        )),
     )
     .err()
     .unwrap();

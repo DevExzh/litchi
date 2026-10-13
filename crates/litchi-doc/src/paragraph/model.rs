@@ -1,4 +1,5 @@
 /// Paragraph and Run semantic models for legacy Word documents.
+use crate::cp_range::CpRange;
 use crate::package::Result;
 use crate::parts::chp::{CharacterProperties, UnderlineStyle, VerticalPosition};
 use crate::parts::revisions::RevisionAuthorTable;
@@ -33,6 +34,11 @@ pub struct Paragraph {
     numbering_revision: Option<NumberingRevisionMark>,
     /// Resolved property revision metadata for a containing table row.
     table_formatting_revision: Option<RevisionMark>,
+    /// Where the paragraph sits in the document's CP space, its mark
+    /// included; `None` for a paragraph not read from a story's text.
+    cp_range: Option<CpRange>,
+    /// Whether the last CP of `cp_range` is the paragraph's own mark.
+    marked: bool,
 }
 
 impl Paragraph {
@@ -61,6 +67,8 @@ impl Paragraph {
             formatting_revision: None,
             numbering_revision: None,
             table_formatting_revision: None,
+            cp_range: None,
+            marked: false,
         }
     }
 
@@ -82,6 +90,8 @@ impl Paragraph {
             formatting_revision: None,
             numbering_revision: None,
             table_formatting_revision: None,
+            cp_range: None,
+            marked: false,
         }
     }
 
@@ -101,6 +111,8 @@ impl Paragraph {
             formatting_revision: None,
             numbering_revision: None,
             table_formatting_revision: None,
+            cp_range: None,
+            marked: false,
         }
     }
 
@@ -143,6 +155,41 @@ impl Paragraph {
     #[must_use]
     pub fn properties(&self) -> &crate::parts::pap::ParagraphProperties {
         &self.properties
+    }
+
+    /// The paragraph's character positions, its paragraph or cell mark
+    /// included.
+    ///
+    /// Consecutive paragraphs of a story tile it: each starts where the
+    /// previous one ends. The last paragraph of a story that ends without a
+    /// mark ends with the story. `None` for a paragraph not read from a
+    /// story's text, such as the empty paragraph of a row that holds only a
+    /// row-end mark.
+    #[must_use]
+    pub fn cp_range(&self) -> Option<CpRange> {
+        self.cp_range
+    }
+
+    /// The character positions of the paragraph's text: [`Self::cp_range`]
+    /// without the paragraph's own mark.
+    #[must_use]
+    pub fn content_cp_range(&self) -> Option<CpRange> {
+        self.cp_range.map(|range| {
+            if self.marked && !range.is_empty() {
+                CpRange {
+                    start: range.start,
+                    end: range.end - 1,
+                }
+            } else {
+                range
+            }
+        })
+    }
+
+    /// Record where the paragraph was read from (internal use).
+    pub(crate) fn set_cp_range(&mut self, range: Option<CpRange>, marked: bool) {
+        self.cp_range = range;
+        self.marked = marked && range.is_some();
     }
 
     /// Tracked paragraph-formatting revision metadata.
@@ -310,6 +357,8 @@ pub struct Run {
     formatting_revision: Option<RevisionMark>,
     /// Resolved LISTNUM display-field revision metadata.
     display_field_revision: Option<DisplayFieldRevisionMark>,
+    /// Where the run's text sits in the document's CP space.
+    cp_range: Option<CpRange>,
 }
 
 impl Run {
@@ -324,6 +373,7 @@ impl Run {
             deletion_revision: None,
             formatting_revision: None,
             display_field_revision: None,
+            cp_range: None,
         }
     }
 
@@ -343,6 +393,7 @@ impl Run {
             deletion_revision: None,
             formatting_revision: None,
             display_field_revision: None,
+            cp_range: None,
         }
     }
 
@@ -362,6 +413,7 @@ impl Run {
             deletion_revision: None,
             formatting_revision: None,
             display_field_revision: None,
+            cp_range: None,
         }
     }
 
@@ -380,12 +432,29 @@ impl Run {
             deletion_revision: None,
             formatting_revision: None,
             display_field_revision: None,
+            cp_range: None,
         }
     }
 
     /// Get the text content of this run.
     pub fn text(&self) -> Result<&str> {
         Ok(&self.text)
+    }
+
+    /// The run's character positions.
+    ///
+    /// A run is a merge of adjacent character-property runs with equal
+    /// properties, so its range runs from the first merged run's start to
+    /// the last one's end; it never holds the paragraph's mark. `None` for a
+    /// run not read from a story's text.
+    #[must_use]
+    pub fn cp_range(&self) -> Option<CpRange> {
+        self.cp_range
+    }
+
+    /// Record where the run was read from (internal use).
+    pub(crate) fn set_cp_range(&mut self, range: CpRange) {
+        self.cp_range = Some(range);
     }
 
     /// Check if this run is bold.
@@ -441,6 +510,15 @@ impl Run {
     #[must_use]
     pub fn font_size(&self) -> Option<u16> {
         self.properties.font_size
+    }
+
+    /// The index of the run's font for ASCII text (`sprmCRgFtc0`) in the
+    /// document's font table, after style inheritance; `None` when nothing
+    /// sets it. [`crate::Document::font_name`] maps it to a name; the East
+    /// Asian, other and complex-script indexes are in [`Self::properties`].
+    #[must_use]
+    pub fn font_index(&self) -> Option<u16> {
+        self.properties.font_index
     }
 
     /// Get the text color as RGB tuple.

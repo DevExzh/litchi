@@ -168,6 +168,9 @@ pub(crate) struct Property {
 /// Names are unique case-insensitively. Exact-name insertion replaces a value
 /// while retaining its PID; insertion with different casing is rejected as
 /// ambiguous. Iterators use lexical name order, while XML output uses PID order.
+///
+/// A clone carries the same properties, PIDs and wire kinds, and the same
+/// tolerance report.
 #[derive(Debug, Clone)]
 pub struct Props {
     pub(crate) properties: BTreeMap<String, Property>,
@@ -363,6 +366,21 @@ impl Props {
     #[must_use]
     pub fn is_empty(&self) -> bool {
         self.properties.is_empty()
+    }
+
+    /// Whether `other` holds exactly the same names with equal values.
+    ///
+    /// This is what a reader observes: PIDs, format identifiers, the text
+    /// wire kind (`vt:lpstr` or `vt:lpwstr`) and the tolerance report are not
+    /// compared.
+    #[must_use]
+    pub fn same_values(&self, other: &Self) -> bool {
+        self.properties.len() == other.properties.len()
+            && self.properties.iter().zip(&other.properties).all(
+                |((left_name, left), (right_name, right))| {
+                    left_name == right_name && left.value == right.value
+                },
+            )
     }
 
     pub(crate) fn insert_parsed(

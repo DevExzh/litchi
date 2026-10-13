@@ -389,6 +389,9 @@ pub(crate) enum Source<'a> {
     /// An XLS node's leaf values.
     #[cfg(feature = "xls")]
     Xls(crate::format::xls::Props<'a>),
+    /// A DOC node's leaf values.
+    #[cfg(feature = "doc")]
+    Doc(crate::format::doc::NodeProps<'a>),
 }
 
 impl<'a> Source<'a> {
@@ -475,6 +478,8 @@ impl<'a> Source<'a> {
             Self::Xlsb(ref props) => props.get(index),
             #[cfg(feature = "xls")]
             Self::Xls(ref props) => props.get(index),
+            #[cfg(feature = "doc")]
+            Self::Doc(ref props) => props.get(index),
         }
     }
 }
@@ -495,7 +500,7 @@ impl<'a> Format<'a> {
     }
 
     /// Omit raw properties from ordinary projection; indexed query access remains explicit.
-    #[cfg(any(feature = "docx", feature = "rtf"))]
+    #[cfg(any(feature = "doc", feature = "docx", feature = "rtf"))]
     pub(crate) const fn without(mut self, hidden: &'static [&'static str]) -> Self {
         self.hidden = hidden;
         self

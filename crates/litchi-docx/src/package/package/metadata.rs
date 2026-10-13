@@ -81,7 +81,7 @@ impl Package {
         let mut package = self.clone();
         package.edit_semantic_opc("edit_metadata", |opc| {
             match target {
-                Some(props) => litchi_ooxml_common::properties::write(opc, props.clone())?,
+                Some(props) => litchi_ooxml_common::properties::write(opc, props)?,
                 None => litchi_ooxml_common::properties::clear(opc)?,
             };
             Ok(())

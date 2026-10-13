@@ -920,9 +920,23 @@
           "name": "write_to_stream",
           "scope": "litchi_ooxml_common",
           "replacement": "use write_to(impl Write)"
+        },
+        {
+          "name": "Props",
+          "scope": "litchi_ooxml_common",
+          "recursive": false,
+          "replacement": "use litchi_core::Metadata (record 0253)"
+        },
+        {
+          "name": "Props",
+          "scope": "litchi_ooxml_common::properties",
+          "recursive": false,
+          "replacement": "use litchi_core::Metadata (record 0253)"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_ooxml_common::properties"
+      ]
     },
     {
       "id": "ooxml-common-full",
@@ -1042,9 +1056,23 @@
           "name": "write_to_stream",
           "scope": "litchi_ooxml_common",
           "replacement": "use write_to(impl Write)"
+        },
+        {
+          "name": "Props",
+          "scope": "litchi_ooxml_common",
+          "recursive": false,
+          "replacement": "use litchi_core::Metadata (record 0253)"
+        },
+        {
+          "name": "Props",
+          "scope": "litchi_ooxml_common::properties",
+          "recursive": false,
+          "replacement": "use litchi_core::Metadata (record 0253)"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_ooxml_common::properties"
+      ]
     },
     {
       "id": "pptx-minimal",
@@ -1569,6 +1597,7 @@
         }
       ],
       "families": [
+        "litchi_pptx::metadata",
         "litchi_pptx::opened"
       ]
     },
@@ -2124,6 +2153,7 @@
         }
       ],
       "families": [
+        "litchi_pptx::metadata",
         "litchi_pptx::opened"
       ]
     },
@@ -2651,7 +2681,8 @@
         }
       ],
       "families": [
-        "litchi_xlsx::workbook::edit"
+        "litchi_xlsx::workbook::edit",
+        "litchi_xlsx::metadata"
       ]
     },
     {
@@ -3181,7 +3212,8 @@
         }
       ],
       "families": [
-        "litchi_xlsx::workbook::edit"
+        "litchi_xlsx::workbook::edit",
+        "litchi_xlsx::metadata"
       ]
     },
     {
@@ -3360,7 +3392,9 @@
           "recursive": false
         }
       ],
-      "families": []
+      "families": [
+        "litchi_xlsb::metadata"
+      ]
     },
     {
       "id": "xlsb-full",
@@ -3541,7 +3575,9 @@
           "recursive": false
         }
       ],
-      "families": []
+      "families": [
+        "litchi_xlsb::metadata"
+      ]
     },
     {
       "id": "drawingml",
@@ -3765,6 +3801,21 @@
           "name": "set_property",
           "scope": "litchi_doc::Builder",
           "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_doc",
+          "replacement": "use open_with_options (record 0258)"
+        },
+        {
+          "name": "open_with_limits_and_policy",
+          "scope": "litchi_doc",
+          "replacement": "use open_with_options with an EditOptions or SourceBackedOptions envelope (record 0258)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_doc",
+          "replacement": "drop the Edit or Transaction; the source snapshot is unchanged (record 0258)"
         }
       ],
       "families": [
@@ -3963,6 +4014,21 @@
           "name": "set_property",
           "scope": "litchi_doc::Builder",
           "replacement": "Builder::set_metadata(Metadata) plus summary_properties_mut() for custom properties (ADR 0034 §7, record 0254)"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_doc",
+          "replacement": "use open_with_options (record 0258)"
+        },
+        {
+          "name": "open_with_limits_and_policy",
+          "scope": "litchi_doc",
+          "replacement": "use open_with_options with an EditOptions or SourceBackedOptions envelope (record 0258)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_doc",
+          "replacement": "drop the Edit or Transaction; the source snapshot is unchanged (record 0258)"
         }
       ],
       "families": [

@@ -90,3 +90,18 @@ This contract supersedes the optional diagnostics and provisional create names
 in requests 1–2 above: diagnostics are required and minimal creation is
 `Package::new()`. Existing request evidence remains a historical inventory,
 not a claim that those old facade paths still exist after M0a.
+
+## 2026-10-13 typed keywords request (record 0253)
+
+ADR 0034 §7 types `Metadata.keywords` as `litchi_core::metadata::Keywords`.
+Three iWork construction sites assign an `Option<String>` to the field, so the
+field stays `Option<String>` until they change. Please replace each assignment
+with `.map(Keywords::from)` (one line each) when the field flips:
+
+- `crates/litchi-numbers/src/package.rs:1575` (`metadata.keywords = diagnostic.keywords;`);
+- `crates/litchi-pages/src/package.rs:891` (`keywords: self.keywords.clone(),`);
+- `crates/litchi-keynote/src/package.rs:4767` (`metadata.keywords = diagnostic.keywords.map(PropertyScalar::into_string);`).
+
+`Keywords` already exists in `litchi_core::metadata` with `From<String>` and
+`From<&str>`, so the change compiles against today's `litchi-core` once the
+field type flips. No other iWork code touches the fields record 0253 changed.

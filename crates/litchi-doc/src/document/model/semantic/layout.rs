@@ -109,60 +109,26 @@ impl Document {
         extracted_paras: Vec<ExtractedParagraph>,
         output: &mut Vec<Paragraph>,
     ) -> Result<()> {
-        use crate::image::extract_image;
-
         // Pre-allocate run vectors based on estimated size
         let mut object_name_buffer = String::with_capacity(32);
 
-        for (_para_text, para_props, runs) in extracted_paras {
+        for extracted in extracted_paras {
+            let ExtractedParagraph {
+                properties: para_props,
+                runs,
+                range,
+                marked,
+                ..
+            } = extracted;
             // Pre-allocate run storage
             let mut run_objects = Vec::with_capacity(runs.len());
 
             // Create runs for the paragraph, checking for MTEF formulas, images, and OLE2 objects
-            for (text, props) in runs {
-                // Primary matching: Use pic_offset to find MTEF data (most reliable)
-                if let Some(pic_offset) = props.pic_offset {
-                    // Skip zero offsets as they're likely invalid
-                    if pic_offset > 0 {
-                        // Reuse buffer to avoid repeated allocations
-                        object_name_buffer.clear();
-                        object_name_buffer.push('_');
-                        object_name_buffer.push_str(&pic_offset.to_string());
-
-                        if let Some(mtef_ast) = self.0.parsed_mtef.get(object_name_buffer.as_str())
-                        {
-                            // Found matching formula - create run with MTEF AST (Arc::clone is cheap)
-                            run_objects.push(Run::with_mtef_formula(
-                                text,
-                                props,
-                                Arc::clone(mtef_ast),
-                            ));
-                            continue;
-                        }
-                    }
-                }
-
-                // Secondary matching: Check if this is an OLE2 object without pic_offset
-                if props.is_ole2
-                    && Self::is_potential_mtef_formula(&text)
-                    && let Some(mtef_ast) = self.parse_mtef_for_text(&text)
-                {
-                    run_objects.push(Run::with_mtef_formula(text, props, mtef_ast));
-                    continue;
-                }
-
-                // Check for embedded images
-                // According to Apache POI, pictures are stored in Data stream if available
-                if let Some(pic_offset) = props.pic_offset
-                    && let Some(data_stream) = self.get_data_stream(pic_offset)
-                    && let Ok(Some(image)) = extract_image(data_stream, &text, &props)
-                {
-                    run_objects.push(Run::with_image(text, props, image));
-                    continue;
-                }
-
-                // Regular run without formula or image
-                run_objects.push(Run::new(text, props));
+            for run in runs {
+                let mut converted =
+                    self.convert_run(run.text, run.properties, &mut object_name_buffer);
+                converted.set_cp_range(run.range);
+                run_objects.push(converted);
             }
 
             for run in &mut run_objects {
@@ -175,10 +141,57 @@ impl Document {
             let mut para = Paragraph::new(String::new());
             para.set_runs(run_objects);
             para.set_properties(para_props);
+            para.set_cp_range(range, marked);
             para.resolve_revision(&self.0.revision_authors)?;
             output.push(para);
         }
         Ok(())
+    }
+
+    /// Build one run, checking for MTEF formulas, images, and OLE2 objects.
+    fn convert_run(
+        &self,
+        text: String,
+        props: crate::parts::chp::CharacterProperties,
+        object_name_buffer: &mut String,
+    ) -> Run {
+        use crate::image::extract_image;
+
+        // Primary matching: Use pic_offset to find MTEF data (most reliable)
+        if let Some(pic_offset) = props.pic_offset {
+            // Skip zero offsets as they're likely invalid
+            if pic_offset > 0 {
+                // Reuse buffer to avoid repeated allocations
+                object_name_buffer.clear();
+                object_name_buffer.push('_');
+                object_name_buffer.push_str(&pic_offset.to_string());
+
+                if let Some(mtef_ast) = self.0.parsed_mtef.get(object_name_buffer.as_str()) {
+                    // Found matching formula - create run with MTEF AST (Arc::clone is cheap)
+                    return Run::with_mtef_formula(text, props, Arc::clone(mtef_ast));
+                }
+            }
+        }
+
+        // Secondary matching: Check if this is an OLE2 object without pic_offset
+        if props.is_ole2
+            && Self::is_potential_mtef_formula(&text)
+            && let Some(mtef_ast) = self.parse_mtef_for_text(&text)
+        {
+            return Run::with_mtef_formula(text, props, mtef_ast);
+        }
+
+        // Check for embedded images
+        // According to Apache POI, pictures are stored in Data stream if available
+        if let Some(pic_offset) = props.pic_offset
+            && let Some(data_stream) = self.get_data_stream(pic_offset)
+            && let Ok(Some(image)) = extract_image(data_stream, &text, &props)
+        {
+            return Run::with_image(text, props, image);
+        }
+
+        // Regular run without formula or image
+        Run::new(text, props)
     }
 
     /// Get all tables in the document.
@@ -203,7 +216,13 @@ impl Document {
     /// # Ok::<(), Box<dyn std::error::Error>>(())
     /// ```
     pub fn tables(&self) -> Result<Vec<Table>> {
-        self.extract_tables_from_paragraphs(&self.paragraphs()?, 1)
+        let mut tables = Vec::new();
+        self.group_elements(|element| {
+            if let Grouped::Table(table) = element {
+                tables.push(table);
+            }
+        })?;
+        Ok(tables)
     }
 
     /// Get all document elements (paragraphs and tables) in document order.
@@ -241,59 +260,62 @@ impl Document {
     /// by scanning paragraph properties, which is significantly faster than calling
     /// `paragraphs()` and `tables()` separately.
     pub fn elements(&self) -> Result<Vec<crate::Element>> {
-        use crate::Element;
-
-        // Extract all paragraphs once
-        let paragraphs = self.paragraphs()?;
         let mut elements = Vec::new();
-        let mut i = 0;
+        self.group_elements(|element| {
+            elements.push(match element {
+                Grouped::Paragraph(paragraph) => crate::Element::Paragraph(Box::new(paragraph)),
+                Grouped::Table(table) => crate::Element::Table(Box::new(table)),
+            });
+        })?;
+        Ok(elements)
+    }
 
-        while i < paragraphs.len() {
-            let para = &paragraphs[i];
-            let props = para.properties();
+    /// Group [`Self::paragraphs`] into top-level elements, in order.
+    ///
+    /// A table is a paragraph of table depth 1 and every following paragraph
+    /// of depth 1 or more ([`crate::parts::pap::ParagraphProperties::table_depth`]);
+    /// paragraphs of nested tables stay inside it, and a nested-table
+    /// paragraph no top-level table encloses forms no element.
+    fn group_elements(&self, mut emit: impl FnMut(Grouped)) -> Result<()> {
+        use super::super::validation::{BlockGrouper, Placement};
 
-            // Check if this paragraph starts a top-level table (level 1)
-            if props.in_table && props.table_nesting_level == 1 {
-                // Found the start of a table - collect all paragraphs in this table
-                let mut table_paras = Vec::new();
-
-                // Collect paragraphs until we exit the table
-                while i < paragraphs.len() {
-                    let current_para = &paragraphs[i];
-                    let current_props = current_para.properties();
-
-                    if !current_props.in_table || current_props.table_nesting_level < 1 {
-                        // Exited the table
-                        break;
-                    }
-
-                    table_paras.push(current_para.clone());
-                    i += 1;
-                }
-
-                // Extract rows from the collected table paragraphs
-                let rows = self.extract_rows_from_table_paragraphs(&table_paras, 1)?;
-
-                if !rows.is_empty() {
-                    let properties = rows.first().and_then(|row| row.properties()).cloned();
-                    let table = if let Some(properties) = properties {
-                        Table::with_properties(rows, properties)
-                    } else {
-                        Table::new(rows)
-                    };
-                    elements.push(Element::Table(Box::new(table)));
-                }
-            } else if !props.in_table {
-                // This is a regular paragraph (not in a table)
-                elements.push(Element::Paragraph(Box::new(para.clone())));
-                i += 1;
-            } else {
-                // This paragraph is in a nested table (level > 1), skip it
-                // as it will be processed as part of its parent table
-                i += 1;
+        let mut grouper = BlockGrouper::default();
+        let mut table = Vec::new();
+        for paragraph in self.paragraphs()? {
+            match grouper.place(paragraph.properties().table_depth()) {
+                Placement::TableContinue => table.push(paragraph),
+                Placement::TableStart => {
+                    flush_table(&mut table, &mut emit);
+                    table.push(paragraph);
+                },
+                Placement::Paragraph => {
+                    flush_table(&mut table, &mut emit);
+                    emit(Grouped::Paragraph(paragraph));
+                },
+                Placement::Orphan => flush_table(&mut table, &mut emit),
             }
         }
+        flush_table(&mut table, &mut emit);
+        Ok(())
+    }
+}
 
-        Ok(elements)
+/// One top-level element, before the public API boxes it.
+#[allow(
+    clippy::large_enum_variant,
+    reason = "a transient value moved straight to its consumer; boxing the paragraph here would add one allocation per paragraph that `tables` discards"
+)]
+enum Grouped {
+    Paragraph(Paragraph),
+    Table(Table),
+}
+
+/// Emit the open top-level table, if any, and leave `table` empty.
+fn flush_table(table: &mut Vec<Paragraph>, emit: &mut impl FnMut(Grouped)) {
+    if table.is_empty() {
+        return;
+    }
+    if let Some(built) = super::super::validation::table_from_paragraphs(std::mem::take(table), 1) {
+        emit(Grouped::Table(built));
     }
 }

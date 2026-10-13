@@ -503,12 +503,6 @@ impl Transaction {
             changed,
         })
     }
-
-    /// Discards the transaction and recovers its exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
 }
 
 /// An owned result of a DOC property-set transaction.

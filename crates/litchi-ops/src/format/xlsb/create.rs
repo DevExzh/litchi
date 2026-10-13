@@ -21,15 +21,11 @@ pub(crate) fn create(options: &CreateOptions) -> Result<Xlsb> {
             "use Conformance::Transitional; Strict authoring is not integrated",
         ));
     }
-    if options.metadata_value().is_some() {
-        return Err(unsupported_option(
-            "the XLSB creator cannot author initial unified metadata",
-            "omit initial metadata; unified XLSB metadata authoring is not integrated",
-        ));
-    }
-
     let package = litchi_xlsb::Package::new().map_err(Error::from)?;
-    Xlsb::from_package(package, &OpenOptions::new())
+    match options.metadata_value() {
+        Some(metadata) => super::metadata::create(package, metadata),
+        None => Xlsb::from_package(package, &OpenOptions::new()),
+    }
 }
 
 fn unsupported_option(message: &'static str, suggestion: &'static str) -> Error {

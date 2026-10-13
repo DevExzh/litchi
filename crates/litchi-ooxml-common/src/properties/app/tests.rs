@@ -1,0 +1,233 @@
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    reason = "unit tests panic on fixture failure"
+)]
+
+use litchi_opc::constants::{content_type as ct, relationship_type as rt};
+use litchi_opc::part::BlobPart;
+use litchi_opc::{OpcError, OpcPackage, PackURI};
+
+use super::*;
+use crate::Error;
+
+/// The `app.xml` Word 2016 writes, with its vector properties.
+const WORD: &str = r#"<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:vt="http://schemas.openxmlformats.org/officeDocument/2006/docPropsVTypes"><Template>Normal.dotm</Template><TotalTime>3</TotalTime><Pages>1</Pages><Words>12</Words><Characters>70</Characters><Application>Microsoft Office Word</Application><DocSecurity>0</DocSecurity><Lines>1</Lines><Paragraphs>1</Paragraphs><ScaleCrop>false</ScaleCrop><HeadingPairs><vt:vector size="2" baseType="variant"><vt:variant><vt:lpstr>Title</vt:lpstr></vt:variant><vt:variant><vt:i4>1</vt:i4></vt:variant></vt:vector></HeadingPairs><TitlesOfParts><vt:vector size="1" baseType="lpstr"><vt:lpstr></vt:lpstr></vt:vector></TitlesOfParts><Company>Old &amp; Co</Company><LinksUpToDate>false</LinksUpToDate><CharactersWithSpaces>81</CharactersWithSpaces><SharedDoc>false</SharedDoc><HyperlinksChanged>false</HyperlinksChanged><AppVersion>16.0000</AppVersion></Properties>"#;
+
+fn word() -> Props {
+    Props {
+        template: Some("Normal.dotm".into()),
+        total_time: Some(3),
+        pages: Some(1),
+        words: Some(12),
+        characters: Some(70),
+        application: Some("Microsoft Office Word".into()),
+        doc_security: Some(0),
+        lines: Some(1),
+        paragraphs: Some(1),
+        scale_crop: Some(false),
+        company: Some("Old & Co".into()),
+        links_up_to_date: Some(false),
+        characters_with_spaces: Some(81),
+        shared_doc: Some(false),
+        hyperlinks_changed: Some(false),
+        app_version: Some("16.0000".into()),
+        ..Props::default()
+    }
+}
+
+#[test]
+fn decodes_every_scalar_and_ignores_vectors() {
+    assert_eq!(decode(WORD.as_bytes()).unwrap(), word());
+}
+
+#[test]
+fn splice_changes_only_the_edited_elements() {
+    let target = Props {
+        company: Some("New <Co>".into()),
+        ..word()
+    };
+    let output = splice(WORD.as_bytes(), &target).unwrap().unwrap();
+    let expected = WORD.replace("Old &amp; Co", "New &lt;Co&gt;");
+    assert_eq!(String::from_utf8(output).unwrap(), expected);
+}
+
+#[test]
+fn splice_appends_removes_and_keeps_vectors() {
+    let target = Props {
+        manager: Some("Ada".into()),
+        template: None,
+        pages: Some(7),
+        ..word()
+    };
+    let output = String::from_utf8(splice(WORD.as_bytes(), &target).unwrap().unwrap()).unwrap();
+    let expected = WORD
+        .replace("<Template>Normal.dotm</Template>", "")
+        .replace("<Pages>1</Pages>", "<Pages>7</Pages>")
+        .replace("</Properties>", "<Manager>Ada</Manager></Properties>");
+    assert_eq!(output, expected);
+    assert_eq!(decode(output.as_bytes()).unwrap(), target);
+}
+
+#[test]
+fn equal_target_is_an_exact_noop() {
+    assert!(splice(WORD.as_bytes(), &word()).unwrap().is_none());
+}
+
+#[test]
+fn new_elements_use_the_root_prefix_and_expand_empty_roots() {
+    let prefixed = r#"<ap:Properties xmlns:ap="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><ap:Company/></ap:Properties>"#;
+    let target = Props::new().company("C").manager("M");
+    let output = String::from_utf8(splice(prefixed.as_bytes(), &target).unwrap().unwrap()).unwrap();
+    assert_eq!(
+        output,
+        r#"<ap:Properties xmlns:ap="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"><ap:Company>C</ap:Company><ap:Manager>M</ap:Manager></ap:Properties>"#
+    );
+
+    let empty =
+        r#"<Properties xmlns="http://purl.oclc.org/ooxml/officeDocument/extendedProperties" />"#;
+    let output = String::from_utf8(splice(empty.as_bytes(), &target).unwrap().unwrap()).unwrap();
+    assert_eq!(
+        output,
+        r#"<Properties xmlns="http://purl.oclc.org/ooxml/officeDocument/extendedProperties" ><Manager>M</Manager><Company>C</Company></Properties>"#
+    );
+    assert_eq!(decode(output.as_bytes()).unwrap(), target);
+}
+
+#[test]
+fn text_round_trips_markup_and_carriage_returns() {
+    let target = Props::new().company("a & b < c > d\r\ne\t\"'");
+    let xml = encode_new(&target).unwrap();
+    assert_eq!(decode(&xml).unwrap(), target);
+    let edited = splice(WORD.as_bytes(), &Props { ..target.clone() })
+        .unwrap()
+        .unwrap();
+    assert_eq!(decode(&edited).unwrap(), target);
+}
+
+#[test]
+fn reads_are_strict() {
+    let wrap = |body: &str| {
+        format!(
+            r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">{body}</Properties>"#
+        )
+    };
+    for body in [
+        "<Pages>many</Pages>",
+        "<Pages>1</Pages><Pages>2</Pages>",
+        "<ScaleCrop>yes</ScaleCrop>",
+        "<Company><b/></Company>",
+        "loose text",
+    ] {
+        assert!(
+            matches!(decode(wrap(body).as_bytes()), Err(Error::Invalid(_))),
+            "{body}"
+        );
+    }
+    assert!(matches!(
+        decode(br#"<Properties xmlns="urn:other"/>"#),
+        Err(Error::Invalid(_))
+    ));
+    let mce = r#"<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties" xmlns:mc="http://schemas.openxmlformats.org/markup-compatibility/2006"/>"#;
+    assert!(matches!(decode(mce.as_bytes()), Err(Error::Invalid(_))));
+    // Whitespace around numbers and booleans collapses, as xsd defines.
+    let lenient = wrap("<Pages> +4 </Pages><ScaleCrop>\n1\n</ScaleCrop><Unknown><x/></Unknown>");
+    let props = decode(lenient.as_bytes()).unwrap();
+    assert_eq!(props.pages, Some(4));
+    assert_eq!(props.scale_crop, Some(true));
+}
+
+#[test]
+fn values_xml_cannot_carry_are_refused() {
+    let props = Props::new().company("bad\u{1}text");
+    assert!(matches!(encode_new(&props), Err(Error::Invalid(_))));
+    assert!(matches!(
+        splice(WORD.as_bytes(), &props),
+        Err(Error::Invalid(_))
+    ));
+}
+
+fn package_with(xml: &[u8]) -> OpcPackage {
+    let mut package = OpcPackage::new();
+    package.add_part(Box::new(BlobPart::new(
+        PackURI::new("/docProps/app.xml").unwrap(),
+        ct::OFC_EXTENDED_PROPERTIES.to_owned(),
+        xml.to_vec(),
+    )));
+    package.relate_to("docProps/app.xml", rt::EXTENDED_PROPERTIES);
+    package
+}
+
+fn sign(package: &mut OpcPackage) {
+    package.add_part(Box::new(BlobPart::new(
+        PackURI::new("/_xmlsignatures/origin.sigs").unwrap(),
+        ct::OPC_DIGITAL_SIGNATURE_ORIGIN.to_owned(),
+        Vec::new(),
+    )));
+    package.relate_to("_xmlsignatures/origin.sigs", rt::DIGITAL_SIGNATURE_ORIGIN);
+    assert!(package.is_signed());
+}
+
+#[test]
+fn package_write_creates_edits_and_clears_the_graph() {
+    let mut package = OpcPackage::new();
+    assert_eq!(read(&package).unwrap(), None);
+    assert!(write(&mut package, Props::new().company("Litchi")).unwrap());
+    assert_eq!(
+        read(&package).unwrap(),
+        Some(Props::new().company("Litchi"))
+    );
+    let part = package
+        .get_part(&PackURI::new("/docProps/app.xml").unwrap())
+        .unwrap();
+    assert_eq!(part.content_type(), ct::OFC_EXTENDED_PROPERTIES);
+    assert!(!write(&mut package, Props::new().company("Litchi")).unwrap());
+    assert!(write(&mut package, Props::new().manager("Ada")).unwrap());
+    assert_eq!(read(&package).unwrap(), Some(Props::new().manager("Ada")));
+    assert!(clear(&mut package).unwrap());
+    assert!(!clear(&mut package).unwrap());
+    assert_eq!(read(&package).unwrap(), None);
+    assert!(
+        package
+            .rels()
+            .iter()
+            .all(|relationship| { relationship.reltype() != rt::EXTENDED_PROPERTIES })
+    );
+}
+
+#[test]
+fn signed_packages_keep_noops_and_refuse_changes() {
+    let mut package = package_with(WORD.as_bytes());
+    sign(&mut package);
+    assert!(!write(&mut package, word()).unwrap());
+    assert!(matches!(
+        write(&mut package, Props::new()),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert!(matches!(
+        clear(&mut package),
+        Err(Error::Opc(OpcError::SignedSourceRequiresExplicitPolicy))
+    ));
+    assert_eq!(read(&package).unwrap(), Some(word()));
+    assert!(package.is_signed());
+    package.unsign();
+    assert!(write(&mut package, Props::new()).unwrap());
+    assert_eq!(read(&package).unwrap(), Some(Props::new()));
+}
+
+#[test]
+fn graph_anomalies_are_errors() {
+    let mut orphan = OpcPackage::new();
+    orphan.add_part(Box::new(BlobPart::new(
+        PackURI::new("/docProps/app.xml").unwrap(),
+        ct::OFC_EXTENDED_PROPERTIES.to_owned(),
+        WORD.as_bytes().to_vec(),
+    )));
+    assert!(matches!(read(&orphan), Err(Error::Relationship(_))));
+
+    let mut shared = package_with(WORD.as_bytes());
+    shared.relate_to("docProps/app.xml", "urn:test:other");
+    assert!(matches!(clear(&mut shared), Err(Error::Relationship(_))));
+    assert_eq!(read(&shared).unwrap(), Some(word()));
+}

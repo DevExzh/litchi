@@ -141,6 +141,7 @@ pub mod captions {
     };
 }
 pub mod comment;
+mod cp_range;
 // The parsed document owner is intentionally private; `Document` is exposed
 // directly at the crate facade instead of behind an outer `document` module.
 pub mod builder;
@@ -195,7 +196,11 @@ pub mod writer;
 pub use bookmark::Bookmark;
 pub use builder::Builder;
 pub use comment::{Comment, DateTime, ExtendedMetadata};
-pub use document::{BodyParagraphs, Document};
+pub use cp_range::CpRange;
+pub use document::{
+    BodyParagraphs, Document, HeaderFooterSlot, StoryBlock, StoryBlockKind, StoryBlocks,
+    StoryIndexDiagnostics,
+};
 pub use embedded_object::{Editor, WriteOptions};
 pub use encryption::EncryptionProfile;
 pub use equation::{EQUATION_3_CLSID, MtefEquation, MtefEquationWriteOptions};
@@ -312,6 +317,7 @@ pub use parts::fields::{
     ReferenceField, ReferenceFieldKind, ReferenceFieldOption, ReferencedDocumentField,
 };
 pub use parts::fields::{StyleReferenceField, StyleReferenceFieldOption};
+pub use parts::fonts::{Font, FontFamily, FontPitch, FontTable};
 pub use parts::form_fields::{
     CheckBoxState, FormFieldData, FormFieldDataKind, FormFieldTextKind, NilPicfAndBinData,
 };

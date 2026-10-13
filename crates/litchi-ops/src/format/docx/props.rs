@@ -51,7 +51,7 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
             None => None,
         },
         Value::Equation(block) => equation_latex(block)?.map(Cow::Owned),
-        Value::Comment(comment) => Some(Cow::Owned(comment.text()?)),
+        Value::Comment(comment) => Some(Cow::Owned(comment_text(comment)?)),
         Value::Picture(_) => None,
         Value::Document
         | Value::Body(_)
@@ -229,7 +229,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
             author: comment.author().to_owned(),
             initials: comment.initials().map(str::to_owned),
             date: comment.date().map(str::to_owned),
-            text: comment.text()?,
+            text: comment_text(comment)?,
         })),
         Value::Picture(picture) => Props::Picture(Arc::clone(picture)),
         Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
@@ -484,9 +484,11 @@ fn document<'a>(metadata: &Metadata, index: usize) -> Option<NodeValue<'a>> {
         D_REVISION => text(&metadata.revision),
         D_CREATED => metadata
             .created
+            .and_then(litchi_core::metadata::Timestamp::utc)
             .map(|at| NodeValue::Text(Cow::Owned(at.format("%Y-%m-%dT%H:%M:%SZ").to_string()))),
         D_MODIFIED => metadata
             .modified
+            .and_then(litchi_core::metadata::Timestamp::utc)
             .map(|at| NodeValue::Text(Cow::Owned(at.format("%Y-%m-%dT%H:%M:%SZ").to_string()))),
         _ => None,
     }
@@ -772,6 +774,24 @@ fn picture_value<'a>(
 // ---------------------------------------------------------------------------
 // Comment
 // ---------------------------------------------------------------------------
+
+/// A comment's text: its paragraphs' text, one per line, as the document
+/// text separates body paragraphs.
+fn comment_text(comment: &litchi_docx::comment::Comment) -> Result<String> {
+    let blocks = comment.blocks()?;
+    let mut text = String::new();
+    for (index, paragraph) in blocks
+        .iter()
+        .filter_map(|block| block.paragraph())
+        .enumerate()
+    {
+        if index > 0 {
+            text.push('\n');
+        }
+        text.push_str(&paragraph.text()?);
+    }
+    Ok(text)
+}
 
 fn comment_value<'a>(comment: &CommentProps, index: usize) -> Option<NodeValue<'a>> {
     const ID: usize = index_of(super::spec::COMMENT_PROPS, "id");

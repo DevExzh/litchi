@@ -21,15 +21,11 @@ pub(crate) fn create(options: &CreateOptions) -> Result<Xlsx> {
             "use Conformance::Transitional; Strict authoring is not integrated",
         ));
     }
-    if options.metadata_value().is_some() {
-        return Err(unsupported_option(
-            "the XLSX creator cannot author initial unified metadata",
-            "omit initial metadata; unified XLSX metadata authoring is not integrated",
-        ));
-    }
-
     let workbook = litchi_xlsx::Package::new().map_err(Error::from)?;
-    Xlsx::from_workbook(workbook, &OpenOptions::new())
+    match options.metadata_value() {
+        Some(metadata) => super::metadata::create(workbook, metadata),
+        None => Xlsx::from_workbook(workbook, &OpenOptions::new()),
+    }
 }
 
 fn unsupported_option(message: &'static str, suggestion: &'static str) -> Error {
@@ -50,11 +46,36 @@ mod tests {
     }
 
     #[test]
+    fn initial_metadata_is_authored_and_unstorable_fields_are_refused() {
+        let metadata = litchi_core::Metadata {
+            title: Some("Budget".to_owned()),
+            company: Some("Litchi".to_owned()),
+            ..litchi_core::Metadata::default()
+        };
+        let workbook = create(&CreateOptions::new().metadata(metadata)).expect("create XLSX");
+        assert_eq!(
+            workbook.metadata().unwrap().unwrap().title.as_deref(),
+            Some("Budget")
+        );
+        assert_eq!(
+            workbook.metadata().unwrap().unwrap().company.as_deref(),
+            Some("Litchi")
+        );
+
+        let error = create(&CreateOptions::new().metadata(litchi_core::Metadata {
+            codepage: Some(1252),
+            ..litchi_core::Metadata::default()
+        }))
+        .expect_err("codepage is not an OOXML property");
+        assert_eq!(error.code(), Code::UnsupportedProperty);
+        assert_eq!(error.property(), Some("codepage"));
+    }
+
+    #[test]
     fn unsupported_creator_options_are_typed_refusals() {
         for options in [
             CreateOptions::new().flavor(Flavor::Template),
             CreateOptions::new().conformance(Conformance::Strict),
-            CreateOptions::new().metadata(litchi_core::Metadata::default()),
         ] {
             let error = create(&options).expect_err("unsupported option");
             assert_eq!(error.code(), Code::UnsupportedCapability);

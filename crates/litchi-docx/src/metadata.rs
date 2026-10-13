@@ -32,7 +32,7 @@
 //! # Ok::<(), Box<dyn std::error::Error>>(())
 //! ```
 
-pub use litchi_ooxml_common::properties::Props;
+pub use litchi_core::Metadata;
 
 use crate::Package;
 
@@ -110,20 +110,20 @@ impl Diagnostics {
 /// the value it published. `None` is an absent core-properties part.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Patch {
-    base: Option<Props>,
-    target: Option<Props>,
+    base: Option<Metadata>,
+    target: Option<Metadata>,
 }
 
 impl Patch {
     /// The core properties the patch expects to find.
     #[must_use]
-    pub fn base(&self) -> Option<&Props> {
+    pub fn base(&self) -> Option<&Metadata> {
         self.base.as_ref()
     }
 
     /// The core properties the patch publishes.
     #[must_use]
-    pub fn target(&self) -> Option<&Props> {
+    pub fn target(&self) -> Option<&Metadata> {
         self.target.as_ref()
     }
 
@@ -198,12 +198,12 @@ impl std::fmt::Debug for Commit {
 #[derive(Clone)]
 pub struct Edit {
     source: Package,
-    base: Option<Props>,
-    staged: Option<Props>,
+    base: Option<Metadata>,
+    staged: Option<Metadata>,
 }
 
 impl Edit {
-    pub(crate) fn new(source: Package, base: Option<Props>) -> Self {
+    pub(crate) fn new(source: Package, base: Option<Metadata>) -> Self {
         Self {
             staged: base.clone(),
             source,
@@ -213,20 +213,20 @@ impl Edit {
 
     /// The staged core properties.
     #[must_use]
-    pub fn metadata(&self) -> Option<&Props> {
+    pub fn metadata(&self) -> Option<&Metadata> {
         self.staged.as_ref()
     }
 
     /// Replace the staged core properties with `props`.
-    pub fn set(&mut self, props: Props) -> &mut Self {
+    pub fn set(&mut self, props: Metadata) -> &mut Self {
         self.staged = Some(props);
         self
     }
 
     /// Change the staged core properties in place, starting from an empty
     /// value when the package has none.
-    pub fn update(&mut self, change: impl FnOnce(&mut Props)) -> &mut Self {
-        change(self.staged.get_or_insert_with(Props::default));
+    pub fn update(&mut self, change: impl FnOnce(&mut Metadata)) -> &mut Self {
+        change(self.staged.get_or_insert_with(Metadata::default));
         self
     }
 
@@ -269,12 +269,13 @@ impl std::fmt::Debug for Edit {
     }
 }
 
-/// Check every text-valued property against [`MAX_PROPERTY_TEXT_BYTES`].
-pub(crate) fn admit(props: &Props) -> Result<()> {
+/// Check every text-valued property core properties store against
+/// [`MAX_PROPERTY_TEXT_BYTES`].
+pub(crate) fn admit(props: &Metadata) -> Result<()> {
     let texts = [
         props.title.as_deref(),
         props.subject.as_deref(),
-        props.creator.as_deref(),
+        props.author.as_deref(),
         props.description.as_deref(),
         props.identifier.as_deref(),
         props.last_modified_by.as_deref(),
@@ -284,10 +285,7 @@ pub(crate) fn admit(props: &Props) -> Result<()> {
         props.version.as_deref(),
         props.language.as_deref(),
     ];
-    let keywords = props
-        .keywords
-        .as_ref()
-        .map_or(0, |keywords| keywords.joined().len());
+    let keywords = props.keywords.as_ref().map_or(0, String::len);
     let observed = texts
         .into_iter()
         .flatten()
@@ -316,7 +314,7 @@ mod tests {
         let mut edit = package.edit_metadata();
         edit.update(|props| {
             props.title = Some("T".to_owned());
-            props.creator = Some("A".to_owned());
+            props.author = Some("A".to_owned());
         });
         let commit = edit.commit()?;
         assert!(commit.diagnostics().changed());
@@ -333,7 +331,7 @@ mod tests {
         assert_eq!(
             reopened
                 .metadata()
-                .and_then(|props| props.creator.as_deref()),
+                .and_then(|props| props.author.as_deref()),
             Some("A")
         );
         Ok(())

@@ -37,6 +37,14 @@ the re-export, the `admit` field list and the call sites of
 `Edit::{set, update}` change; the family shape does not. This change does not
 edit `litchi-ooxml-common/src/properties`.
 
+**Update after merging 0253.** Step 6 merged as record 0253, and this
+branch merged it. The value type is now `litchi_core::Metadata`,
+re-exported as `metadata::Metadata`, and `admit` checks `author`. As
+predicted, nothing else in the family changed. The docx family still wraps
+the core codec only. Staging application and custom properties through the
+shared `litchi_ooxml_common::properties` engine, as pptx, xlsx and xlsb do,
+is a follow-up.
+
 `Package::{props, props_mut, put_props, clear_props}` are deleted. The package
 slot still exists internally, so the internal retry tests keep using it
 directly.

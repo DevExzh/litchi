@@ -480,9 +480,10 @@ impl AttachedGlossary {
                 (start_cp, end_cp),
                 self.stylesheet.as_ref(),
             )?;
-            for (_, properties, runs) in extractor.extract_paragraphs()? {
-                let mut run_objects = Vec::with_capacity(runs.len());
-                for (text, properties) in runs {
+            for extracted in extractor.extract_paragraphs()? {
+                let mut run_objects = Vec::with_capacity(extracted.runs.len());
+                for extracted_run in extracted.runs {
+                    let (text, properties) = (extracted_run.text, extracted_run.properties);
                     let image_offset = properties.pic_offset.filter(|offset| {
                         self.images
                             .binary_search_by_key(offset, super::super::image::Image::pic_offset)
@@ -493,12 +494,15 @@ impl AttachedGlossary {
                     } else {
                         Run::new(text, properties)
                     };
+                    run.set_cp_range(extracted_run.range);
                     run.resolve_revisions(&self.revision_authors)?;
                     run_objects.push(run);
                 }
                 let mut paragraph = Paragraph::new(String::new());
                 paragraph.set_runs(run_objects);
-                paragraph.set_properties(properties);
+                paragraph.set_properties(extracted.properties);
+                // Positions in the attached glossary document's own CP space.
+                paragraph.set_cp_range(extracted.range, extracted.marked);
                 paragraph.resolve_revision(&self.revision_authors)?;
                 output.push(paragraph);
             }
