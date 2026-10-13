@@ -180,6 +180,28 @@ impl Workbook {
     }
     /// Translate a public worksheet ordinal to the full workbook sheet-catalog
     /// position used by formula and package metadata.
+    /// The workbook's defined names in record order, with their scope and
+    /// formula text.
+    ///
+    /// # Errors
+    ///
+    /// Returns the record and defined-name decoding errors of the workbook
+    /// stream.
+    pub fn defined_name_entries(
+        &self,
+    ) -> crate::package::error::Result<Vec<crate::named_ranges::Entry>> {
+        let part = self.package.main_document_part()?;
+        crate::named_ranges::read_entries(part.blob(), &self.formula_context)
+    }
+
+    /// The worksheet ordinal of a complete-catalog position, when that tab is
+    /// a worksheet.
+    pub(crate) fn worksheet_for_catalog_position(&self, catalog_position: usize) -> Option<usize> {
+        self.worksheet_positions
+            .iter()
+            .position(|position| *position == catalog_position)
+    }
+
     pub(crate) fn catalog_position_for_worksheet(
         &self,
         index: usize,

@@ -1551,6 +1551,30 @@ Wave residue that still exposes a glossary-banned name (owner: record 0248):
 | pptx, xlsx, opc, ops | names listed in record 0248 §2 | §2–§4 | Phase B steps 4–5, ops follow-ups |
 | xlsb | `Package::into_workbook`; mutating `Workbook` verbs (`edit_opc`, `put_*`, `set_*`, `sign`); scoped `x_with_limits`/`edit_x_with_limits` read and edit entries | `Package::workbook()` projection; `edit_x()`/`apply_x()` families | record 0261 §8 |
 
+## XLSB W2 residue and P0 writes (record 0261)
+
+- Ingress: `litchi_xlsb::OpenOptions` (`source_limits`, `external_link_limits`,
+  `leniency`, `parse_drawings`, `cache_limits`, `execution_context`) on
+  `Package::{open, from_bytes, from_reader, from_opc}_with_options`,
+  `Workbook::{new, from_opc_package}_with_options` and
+  `SourceBackedWorkbook::{from_reader, from_read_at}_with_options`. A policy
+  an owner cannot honour is `PackageError::UnsupportedOpenPolicy { policy:
+  OpenPolicy }`. `Package::from_bytes` borrows `&[u8]`.
+- Edits: `Package::edit_with_options(structure::EditOptions)` and
+  `Package::edit_cell_values_with_options(selector, cell_values::EditOptions)`.
+- Renames: `raw::Writer` → `raw::Encoder`; nested `ReadLimits`/`Limits` →
+  `SemanticLimits` (data_model, calculation_chain, volatile_dependencies,
+  xml_maps). `cell_values::LimitKind` with `PackageError::Limit`.
+- Writes: `cell_values::Edit::{set_format(reference, &Format),
+  set_formula_text}` (`Format`, `BorderLine` are partial changes; unnamed
+  attributes keep their records); `structure::Edit::{merge_cells,
+  unmerge_cells, set_defined_name, remove_defined_name}` (durable tags 11 and
+  12). Reads: `named_ranges::Entry` via `{Workbook,
+  SourceBackedWorkbook}::defined_name_entries`.
+- Source-owner metadata: `SourceBackedWorkbook::{metadata, app_props,
+  edit_metadata, write_to, has_metadata_edits}` with
+  `metadata::source::{Edit, Commit}`.
+
 ## Legacy OLE metadata (record 0254)
 
 DOC, XLS and PPT author and edit document properties through the shared

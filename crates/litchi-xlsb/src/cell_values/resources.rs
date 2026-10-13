@@ -113,7 +113,7 @@ fn write_authored_border_side<W: std::io::Write>(
     Ok(())
 }
 
-const fn border_style_bits(style: crate::styles::BorderStyle) -> u8 {
+pub(super) const fn border_style_bits(style: crate::styles::BorderStyle) -> u8 {
     match style {
         crate::styles::BorderStyle::None => 0,
         crate::styles::BorderStyle::Thin => 1,
@@ -151,7 +151,7 @@ fn write_authored_color<W: std::io::Write>(
     Ok(())
 }
 
-const fn horizontal_bits(value: crate::styles::HorizontalAlignment) -> u8 {
+pub(super) const fn horizontal_bits(value: crate::styles::HorizontalAlignment) -> u8 {
     match value {
         crate::styles::HorizontalAlignment::General => 0,
         crate::styles::HorizontalAlignment::Left => 1,
@@ -164,7 +164,7 @@ const fn horizontal_bits(value: crate::styles::HorizontalAlignment) -> u8 {
     }
 }
 
-const fn vertical_bits(value: crate::styles::VerticalAlignment) -> u8 {
+pub(super) const fn vertical_bits(value: crate::styles::VerticalAlignment) -> u8 {
     match value {
         crate::styles::VerticalAlignment::Top => 0,
         crate::styles::VerticalAlignment::Center => 1,
@@ -295,7 +295,7 @@ fn has_workbook_resource_relationship(
         }))
 }
 
-fn intern_payload(
+pub(super) fn intern_payload(
     styles: &mut Vec<u8>,
     begin: Kind,
     end: Kind,
@@ -313,7 +313,7 @@ fn intern_payload(
         .map_err(|_| Error::UnsupportedFeature("authored style resource index exceeds u16".into()))
 }
 
-fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u16> {
+pub(super) fn intern_number_format(styles: &mut Vec<u8>, code: &str) -> Result<u16> {
     let formats = collection(styles, kind::BEGIN_FMTS, kind::END_FMTS, kind::FMT)?;
     for payload in &formats {
         let (id, existing) = crate::styles::parse_num_fmt(payload).map_err(map_style_error)?;
@@ -781,7 +781,12 @@ fn transfer_number_format(source: &[u8], target: &mut Vec<u8>, xf: &mut [u8]) ->
     Ok(())
 }
 
-fn collection(source: &[u8], begin: Kind, end: Kind, item: Kind) -> Result<Vec<Vec<u8>>> {
+pub(super) fn collection(
+    source: &[u8],
+    begin: Kind,
+    end: Kind,
+    item: Kind,
+) -> Result<Vec<Vec<u8>>> {
     let mut in_collection = false;
     let mut values = Vec::new();
     for record in Records::new(source) {

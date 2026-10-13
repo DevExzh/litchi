@@ -1315,6 +1315,22 @@ impl SourceBackedWorkbook {
         Ok(is_1904)
     }
 
+    /// The workbook's defined names in record order, with their scope and
+    /// formula text. Only the workbook stream is read.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and decoding errors of the
+    /// workbook stream.
+    pub fn defined_name_entries(&self) -> Result<Vec<crate::named_ranges::Entry>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let data = self.inner.package.main_document_part()?.data()?;
+        let entries =
+            crate::named_ranges::read_entries(data.as_bytes(), &self.inner.formula_context);
+        postflight_package(&self.inner.package)?;
+        entries
+    }
+
     /// Return content-free deferred-Part cache diagnostics.
     #[must_use]
     pub fn cache_diagnostics(&self) -> SourceCacheDiagnostics {
@@ -1526,6 +1542,18 @@ impl SourceBackedWorksheet {
     /// Resolve one materialized cell's local style through the source-owned
     /// stylesheet cache. The cell and stylesheet remain tied to this source
     /// generation; no eager workbook reconstruction is performed.
+    /// The workbook styles table, parsed once per owner on first use.
+    ///
+    /// # Errors
+    ///
+    /// Returns the source-change, execution and styles-part errors.
+    pub fn styles(&self) -> Result<Arc<StylesTable>> {
+        let _ = preflight_package(&self.inner.package)?;
+        let styles = self.inner.styles()?;
+        postflight_package(&self.inner.package)?;
+        Ok(styles)
+    }
+
     pub fn style_for_cell(
         &self,
         cell: &crate::package::Cell,

@@ -262,9 +262,7 @@ fn open_workbook_fixture(bytes: &[u8]) -> ToleranceReport {
     let workbook = Workbook::new(Cursor::new(bytes.to_vec())).unwrap();
     let report = workbook.tolerance_report().clone();
     assert_eq!(
-        Package::from_bytes(bytes)
-            .unwrap()
-            .tolerance_report(),
+        Package::from_bytes(bytes).unwrap().tolerance_report(),
         &report
     );
     for index in 0..workbook.worksheet_count() {

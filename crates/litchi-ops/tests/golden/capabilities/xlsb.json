@@ -417,7 +417,7 @@
         "formula": {
           "type": "string",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "cachedValue": {
@@ -450,10 +450,170 @@
           "set": false,
           "get": true
         },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.left": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.left.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.right": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.right.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.top": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.top.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.bottom": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.bottom.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
         "alignment.wrapText": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "alignment.horizontal": {
@@ -469,7 +629,7 @@
             "distributed"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "alignment.vertical": {
@@ -482,25 +642,25 @@
             "distributed"
           ],
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "alignment.textRotation": {
           "type": "int",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "alignment.indent": {
           "type": "int",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "alignment.shrinkToFit": {
           "type": "bool",
           "add": false,
-          "set": false,
+          "set": true,
           "get": true
         },
         "alignment.readingOrder": {
@@ -511,7 +671,13 @@
             "rtl"
           ],
           "add": false,
-          "set": false,
+          "set": true,
+          "get": true
+        },
+        "numberformat": {
+          "type": "string",
+          "add": false,
+          "set": true,
           "get": true
         },
         "merge": {
@@ -537,6 +703,34 @@
           "add": false,
           "set": true,
           "get": false
+        },
+        "border.all": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
         }
       },
       "predicates": {
@@ -545,7 +739,14 @@
           "text",
           "type",
           "value"
-        ]
+        ],
+        "aliases": {
+          "bold": "font.bold",
+          "color": "font.color",
+          "font": "font.name",
+          "italic": "font.italic",
+          "size": "font.size"
+        }
       }
     },
     {
@@ -577,11 +778,285 @@
           "set": true,
           "get": false
         },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
         "clear": {
           "type": "bool",
           "add": false,
           "set": true,
           "get": false
+        },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "font.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "fill": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.all.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.left": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.left.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.right": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.right.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.top": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.top.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.bottom": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot",
+            "none"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "border.bottom.color": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "numberformat": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.textRotation": {
+          "type": "int",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.indent": {
+          "type": "int",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "alignment.readingOrder": {
+          "type": "enum",
+          "values": [
+            "context",
+            "ltr",
+            "rtl"
+          ],
+          "add": false,
+          "set": true,
+          "get": false
+        },
+        "merge": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
         }
       }
     },
@@ -836,7 +1311,19 @@
       "properties": {
         "name": {
           "type": "string",
-          "add": false,
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "ref": {
+          "type": "string",
+          "add": true,
+          "set": true,
+          "get": true
+        },
+        "scope": {
+          "type": "string",
+          "add": true,
           "set": false,
           "get": true
         }
@@ -1501,46 +1988,6 @@
     {
       "subject": "property",
       "element": "cell",
-      "key": "font.bold",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project font records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "font.italic",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project font records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "strike",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project font records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "underline",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project font records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "font.color",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project font records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
       "key": "superscript",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4d)",
@@ -1550,22 +1997,6 @@
       "subject": "property",
       "element": "cell",
       "key": "subscript",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project font records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "font.size",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project font records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "font.name",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4d)",
       "reason": "the XLSB node does not project font records into cell properties"
@@ -1645,14 +2076,6 @@
     {
       "subject": "property",
       "element": "cell",
-      "key": "fill",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project fill records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
       "key": "fillPattern",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4d)",
@@ -1665,70 +2088,6 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4d)",
       "reason": "the XLSB node does not project fill records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "border.left",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project border records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "border.left.color",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project border records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "border.right",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project border records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "border.right.color",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project border records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "border.top",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project border records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "border.top.color",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project border records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "border.bottom",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project border records into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "border.bottom.color",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not project border records into cell properties"
     },
     {
       "subject": "property",
@@ -1797,14 +2156,6 @@
     {
       "subject": "property",
       "element": "cell",
-      "key": "numberformat",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB node does not resolve number-format codes into cell properties"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
       "key": "link",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4x)",
@@ -1853,26 +2204,10 @@
     {
       "subject": "property",
       "element": "namedrange",
-      "key": "ref",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB defined-name catalog exposes only the authored name"
-    },
-    {
-      "subject": "property",
-      "element": "namedrange",
-      "key": "scope",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB defined-name catalog exposes only the authored name"
-    },
-    {
-      "subject": "property",
-      "element": "namedrange",
       "key": "comment",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB defined-name catalog exposes only the authored name"
+      "reason": "the XLSB defined-name projection reads name, ref and scope; BrtName comments are not projected yet"
     },
     {
       "subject": "property",
@@ -1880,7 +2215,7 @@
       "key": "volatile",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB defined-name catalog exposes only the authored name"
+      "reason": "the XLSB defined-name projection reads name, ref and scope; macro and volatile flags are not projected yet"
     },
     {
       "subject": "property",
@@ -1888,7 +2223,7 @@
       "key": "hidden",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4d)",
-      "reason": "the XLSB defined-name catalog exposes only the authored name"
+      "reason": "the XLSB defined-name projection reads name, ref and scope; the hidden flag is not projected yet"
     },
     {
       "subject": "property",
@@ -1897,14 +2232,6 @@
       "code": "unsupported_capability",
       "followUp": "M1-extended (R4x)",
       "reason": "XLSB column styles are not projected into column nodes yet"
-    },
-    {
-      "subject": "property",
-      "element": "range",
-      "key": "merge",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R4x)",
-      "reason": "XLSB ranges do not report whether they are merged yet"
     },
     {
       "subject": "operation",

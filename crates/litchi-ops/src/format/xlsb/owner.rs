@@ -165,6 +165,37 @@ impl fmt::Debug for Catalog {
     }
 }
 
+/// A cell format with the records it names, cloned from the owner's
+/// stylesheet: the font, fill and border when they are not the workbook's
+/// default records, and the number-format code when it is not `General`.
+#[derive(Clone)]
+pub(crate) struct ResolvedStyle {
+    pub(crate) xf: CellFormat,
+    pub(crate) font: Option<litchi_xlsb::styles::Font>,
+    pub(crate) fill: Option<litchi_xlsb::styles::Fill>,
+    pub(crate) border: Option<litchi_xlsb::package::styles::Border>,
+    pub(crate) number_format: Option<String>,
+}
+
+impl ResolvedStyle {
+    fn resolve(xf: CellFormat, styles: &litchi_xlsb::package::styles_table::StylesTable) -> Self {
+        let record = |id: u32| usize::try_from(id).ok().filter(|index| *index != 0);
+        let font = record(xf.font_id).and_then(|index| styles.get_font(index).cloned());
+        let fill = record(xf.fill_id).and_then(|index| styles.get_fill(index).cloned());
+        let border = record(xf.border_id).and_then(|index| styles.get_border(index).cloned());
+        let number_format = (xf.num_fmt_id != 0)
+            .then(|| styles.get_num_fmt(xf.num_fmt_id).map(str::to_owned))
+            .flatten();
+        Self {
+            xf,
+            font,
+            fill,
+            border,
+            number_format,
+        }
+    }
+}
+
 /// A selected tab.  Eager handles retain the cheap facade clone and semantic
 /// facts; source handles additionally retain the leaf's source-bound tab
 /// handle.  Neither variant parses a worksheet during selection.
@@ -312,15 +343,24 @@ impl SheetHandle {
         }
     }
 
-    /// Resolve a materialized cell's style through the owner-scoped leaf
-    /// stylesheet.  Style parsing remains lazy on source owners.
-    pub(crate) fn style_for_cell(&self, cell: &Cell) -> Result<Option<CellFormat>> {
+    /// Resolve a materialized cell's style, with its font, fill, border and
+    /// number-format records, through the owner-scoped leaf stylesheet.
+    /// Style parsing remains lazy on source owners.
+    pub(crate) fn style_for_cell(&self, cell: &Cell) -> Result<Option<ResolvedStyle>> {
         match self {
             Self::Eager { file, .. } => match &file.0.owner {
-                XlsbOwner::Eager(workbook) => Ok(workbook.style_for_cell(cell).cloned()),
+                XlsbOwner::Eager(workbook) => Ok(workbook
+                    .style_for_cell(cell)
+                    .map(|xf| ResolvedStyle::resolve(xf.clone(), workbook.styles()))),
                 XlsbOwner::Source(_) => Err(internal("XLSB eager handle lost its owner state")),
             },
-            Self::Source { sheet, .. } => sheet.style_for_cell(cell).map_err(Into::into),
+            Self::Source { sheet, .. } => {
+                let Some(xf) = sheet.style_for_cell(cell)? else {
+                    return Ok(None);
+                };
+                let styles = sheet.styles()?;
+                Ok(Some(ResolvedStyle::resolve(xf, &styles)))
+            },
         }
     }
 
@@ -427,6 +467,18 @@ impl Xlsb {
                 .map(|position| position.map(Position::new))
                 .map_err(Into::into),
             XlsbOwner::Eager(workbook) => Ok(workbook.active_catalog_position().map(Position::new)),
+        })
+    }
+
+    /// The workbook's defined names with their scope and formula text, in
+    /// record order (the order of [`Self::defined_names`]).
+    pub(crate) fn defined_name_entries(&self) -> Result<Vec<litchi_xlsb::named_ranges::Entry>> {
+        self.0.owner.finish(|| match &self.0.owner {
+            XlsbOwner::Source(workbook) => workbook
+                .workbook()
+                .defined_name_entries()
+                .map_err(Into::into),
+            XlsbOwner::Eager(workbook) => workbook.defined_name_entries().map_err(Into::into),
         })
     }
 

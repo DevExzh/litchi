@@ -936,6 +936,38 @@ impl Edit {
         Ok(())
     }
 
+    /// Turn an existing value cell into a formula cell with `cache` as its
+    /// cached result, retaining the cell header.
+    pub(crate) fn replace_with_formula(
+        &mut self,
+        reference: Reference,
+        cache: Value,
+        formula: CellFormula,
+    ) -> Result<()> {
+        if !cache.is_formula_cache() {
+            return Err(Error::InvalidFormula(
+                "a formula cell needs a Formula*Cache value".to_string(),
+            ));
+        }
+        validate_value_with_limits(&cache, self.limits)?;
+        if let Some(cell) = self.inserted.get_mut(&reference) {
+            cell.value = cache;
+            cell.formula = Some(formula);
+            return Ok(());
+        }
+        self.removed.remove(&reference);
+        let index = self.indexed_index(reference)?.ok_or_else(|| {
+            Error::UnsupportedFeature(format!(
+                "cell ({}, {}) is absent or uses an unsupported cell-record family",
+                reference.row(),
+                reference.column()
+            ))
+        })?;
+        self.entries[index].cell.value = cache;
+        self.entries[index].cell.formula = Some(formula);
+        Ok(())
+    }
+
     fn indexed_index(&self, reference: Reference) -> Result<Option<usize>> {
         match self.index.get(&reference) {
             None => Ok(None),

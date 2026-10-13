@@ -19,7 +19,8 @@ use super::children::Children;
 pub(crate) use super::owner::SheetHandle;
 use super::spec::{
     CELL_PROPS, COLUMN_PROPS, CellKey, ColumnKey, Kind, NAMED_RANGE_PROPS, NamedRangeKey,
-    ROW_PROPS, RowKey, SHEET_PROPS, SheetKey, TABLE_PROPS, TableKey, WORKBOOK_PROPS, WorkbookKey,
+    RANGE_MERGE_INDEX, RANGE_PROPS, ROW_PROPS, RowKey, SHEET_PROPS, SheetKey, TABLE_PROPS,
+    TableKey, WORKBOOK_PROPS, WorkbookKey,
 };
 use super::{Xlsb, XlsbOwner};
 use crate::error::{Code, Error, Result};
@@ -28,7 +29,7 @@ use crate::node::{
     Children as ViewChildren, Format, NodePath, PathStep, Preview, Project, Source, Value,
     ViewOptions,
 };
-use crate::value::Length;
+use crate::value::{Color, Length};
 
 /// The text of an in-grid coordinate with no stored record.
 pub(super) const MISSING_TEXT: &str = "(empty)";
@@ -205,6 +206,18 @@ impl Grid {
             .map_err(|_| Error::new(Code::InvalidPath, "invalid XLSB worksheet extent"))
     }
 
+    /// Whether `rect` is exactly one merged range.
+    pub(super) fn is_merged(&self, rect: Rect) -> bool {
+        let first = rect.start();
+        let (end_row, end_column) = rect.end();
+        self.leaf.worksheet().merged_cells().iter().any(|merge| {
+            merge.row_first == first.row().get()
+                && merge.col_first == first.column().get()
+                && merge.row_last.saturating_add(1) == end_row
+                && merge.col_last.saturating_add(1) == end_column
+        })
+    }
+
     pub(super) fn merge(&self, at: Address) -> Result<Option<(Rect, bool)>> {
         if self.cached_only {
             return Err(unsupported(
@@ -241,10 +254,9 @@ impl Grid {
         let Some(cell) = self.record(at)? else {
             return Ok(None);
         };
-        Ok(self
-            .handle
-            .style_for_cell(cell)?
-            .map(|xf| StyleFormat { xf }))
+        Ok(self.handle.style_for_cell(cell)?.map(|style| StyleFormat {
+            style: Box::new(style),
+        }))
     }
 
     pub(super) fn row_indices(&self) -> Result<Vec<u32>> {
@@ -596,7 +608,17 @@ impl<'f> Node<'f> {
                 },
             ),
             Item::Cell(cell) => (CELL_PROPS, Props::Cell(cell.props()?)),
-            Item::Range(_) => return Ok(Format::empty()),
+            Item::Range(range) => {
+                if range.grid.cached_only() {
+                    return Ok(Format::empty());
+                }
+                (
+                    RANGE_PROPS,
+                    Props::Range {
+                        merged: range.grid.is_merged(range.rect),
+                    },
+                )
+            },
             Item::Row(row) => {
                 if row.grid.cached_only() {
                     return Ok(Format::empty());
@@ -613,10 +635,25 @@ impl<'f> Node<'f> {
             },
             Item::Table(table) => (TABLE_PROPS, Props::Table(&table.part)),
             Item::NamedRange(index) => {
-                let Some(name) = defined_names(self.file)?.get(*index).cloned() else {
+                let Some(entry) = self.file.defined_name_entries()?.into_iter().nth(*index) else {
                     return Ok(Format::empty());
                 };
-                (NAMED_RANGE_PROPS, Props::NamedRange { name })
+                let scope = match entry.scope {
+                    Some(position) => Some(
+                        self.file
+                            .catalog()?
+                            .get(position)
+                            .map(|tab| tab.name().to_owned())
+                            .ok_or_else(|| {
+                                Error::new(
+                                    Code::CorruptFile,
+                                    "an XLSB defined name names a missing scope sheet",
+                                )
+                            })?,
+                    ),
+                    None => None,
+                };
+                (NAMED_RANGE_PROPS, Props::NamedRange { entry, scope })
             },
         };
         Ok(Format::new(table, Source::Xlsb(props)))
@@ -827,11 +864,12 @@ pub(super) fn table_label(table: &TableItem) -> &str {
         .unwrap_or_default()
 }
 
-/// A normalized local style snapshot.  The source route currently exposes
-/// only the XF, while the eager route also resolves component records.
+/// A normalized local style snapshot: the cell XF with the font, fill,
+/// border and number-format records it names, resolved through the owner's
+/// stylesheet on both owner routes.
 #[derive(Clone)]
 struct StyleFormat {
-    xf: xlsb::package::styles_table::CellFormat,
+    style: Box<super::owner::ResolvedStyle>,
 }
 
 /// A node's property source.  Debug intentionally reports only the variant;
@@ -851,7 +889,11 @@ pub(crate) enum Props<'a> {
     Column(Option<xlsb::sheet::ColumnInfo>),
     Table(&'a xlsb::package::table::Table),
     NamedRange {
-        name: String,
+        entry: xlsb::named_ranges::Entry,
+        scope: Option<String>,
+    },
+    Range {
+        merged: bool,
     },
 }
 
@@ -872,6 +914,7 @@ impl fmt::Debug for Props<'_> {
             Self::Column(_) => "Column",
             Self::Table(_) => "Table",
             Self::NamedRange { .. } => "NamedRange",
+            Self::Range { .. } => "Range",
         };
         f.debug_tuple("Props").field(&name).finish()
     }
@@ -902,8 +945,18 @@ impl<'a> Props<'a> {
                 .as_ref()
                 .and_then(|column| column_value(column, ColumnKey::at(index)?)),
             Self::Table(table) => table_value(table, TableKey::at(index)?),
-            Self::NamedRange { name } => match NamedRangeKey::at(index)? {
-                NamedRangeKey::Name => Some(Value::Text(Cow::Owned(name.clone()))),
+            Self::Range { merged } => {
+                (index == RANGE_MERGE_INDEX && *merged).then_some(Value::Bool(true))
+            },
+            Self::NamedRange { entry, scope } => match NamedRangeKey::at(index)? {
+                NamedRangeKey::Name => Some(Value::Text(Cow::Owned(entry.name.clone()))),
+                NamedRangeKey::Ref => entry
+                    .formula
+                    .as_ref()
+                    .map(|formula| Value::Text(Cow::Owned(formula.clone()))),
+                NamedRangeKey::Scope => Some(Value::Text(Cow::Owned(
+                    scope.clone().unwrap_or_else(|| "workbook".to_owned()),
+                ))),
             },
         }
     }
@@ -1210,9 +1263,43 @@ pub(super) fn raw_value(cell: &xlsb::Cell) -> Value<'static> {
     raw(cell.value()).unwrap_or_else(|| Value::Text(Cow::Owned(display_text(cell).into_owned())))
 }
 
+/// A key read from a cell's local formatting, with OfficeCLI's omissions:
+/// the font, fill and border keys only when the format names a record other
+/// than the workbook's default one, flags only when set, and colors only when
+/// they are direct RGB.
 fn format_value(format: &StyleFormat, key: CellKey) -> Option<Value<'_>> {
-    let alignment = format.xf.alignment.as_ref();
+    let style = &format.style;
+    let alignment = style.xf.alignment.as_ref();
+    let font = style.font.as_ref();
+    let border = style.border.as_ref();
     match key {
+        CellKey::Bold => font?.bold.then_some(Value::Bool(true)),
+        CellKey::Italic => font?.italic.then_some(Value::Bool(true)),
+        CellKey::Strike => font?.strike.then_some(Value::Bool(true)),
+        CellKey::Underline => font?.underline.then_some(Value::Token("single")),
+        CellKey::FontColor => font?.color.map(argb_color),
+        CellKey::FontSize => font.map(|font| points(font.size)),
+        CellKey::FontName => font.map(|font| Value::Text(Cow::Owned(font.name.clone()))),
+        CellKey::Fill => {
+            let fill = style.fill.as_ref()?;
+            (fill.pattern_type == 1)
+                .then_some(fill.fg_color)
+                .flatten()
+                .map(argb_color)
+        },
+        CellKey::BorderLeft => side_line(border?.left.as_ref()),
+        CellKey::BorderLeftColor => side_color(border?.left.as_ref()),
+        CellKey::BorderRight => side_line(border?.right.as_ref()),
+        CellKey::BorderRightColor => side_color(border?.right.as_ref()),
+        CellKey::BorderTop => side_line(border?.top.as_ref()),
+        CellKey::BorderTopColor => side_color(border?.top.as_ref()),
+        CellKey::BorderBottom => side_line(border?.bottom.as_ref()),
+        CellKey::BorderBottomColor => side_color(border?.bottom.as_ref()),
+        CellKey::NumberFormat => style
+            .number_format
+            .as_ref()
+            .filter(|code| code.as_str() != "General")
+            .map(|code| Value::Text(Cow::Owned(code.clone()))),
         CellKey::WrapText => alignment
             .filter(|alignment| alignment.wrap_text)
             .map(|_| Value::Bool(true)),
@@ -1244,6 +1331,40 @@ fn format_value(format: &StyleFormat, key: CellKey) -> Option<Value<'_>> {
         | CellKey::Merge
         | CellKey::MergeAnchor => None,
     }
+}
+
+/// A direct ARGB color as OfficeCLI reads it back.
+fn argb_color(argb: u32) -> Value<'static> {
+    let [alpha, red, green, blue] = argb.to_be_bytes();
+    Value::Color(Color::rgba(red, green, blue, alpha))
+}
+
+fn side_line(side: Option<&xlsb::package::styles::BorderSide>) -> Option<Value<'static>> {
+    use xlsb::package::styles::BorderStyle;
+    Some(Value::Token(match side?.style {
+        BorderStyle::None => return None,
+        BorderStyle::Thin => "thin",
+        BorderStyle::Medium => "medium",
+        BorderStyle::Dashed => "dashed",
+        BorderStyle::Dotted => "dotted",
+        BorderStyle::Thick => "thick",
+        BorderStyle::Double => "double",
+        BorderStyle::Hair => "hair",
+        BorderStyle::MediumDashed => "mediumDashed",
+        BorderStyle::DashDot => "dashDot",
+        BorderStyle::MediumDashDot => "mediumDashDot",
+        BorderStyle::DashDotDot => "dashDotDot",
+        BorderStyle::MediumDashDotDot => "mediumDashDotDot",
+        BorderStyle::SlantDashDot => "slantDashDot",
+    }))
+}
+
+fn side_color(side: Option<&xlsb::package::styles::BorderSide>) -> Option<Value<'static>> {
+    let side = side?;
+    if side.style == xlsb::package::styles::BorderStyle::None {
+        return None;
+    }
+    side.color.map(argb_color)
 }
 
 fn horizontal(value: xlsb::package::styles::HorizontalAlignment) -> Value<'static> {

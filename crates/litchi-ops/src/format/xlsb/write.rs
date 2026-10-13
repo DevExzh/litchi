@@ -13,9 +13,9 @@ use std::path::Path as FilePath;
 use caseless::Caseless as _;
 use litchi_core::selector::{CellRange, Path, Predicate, Step};
 use litchi_core::{FileFormat, Position};
-use litchi_xlsb::cell_values::structure::{
-    Edit as NativeStructureEdit, EditOptions as NativeStructureOptions,
-};
+use litchi_xlsb::cell_values::structure::Edit as NativeStructureEdit;
+pub(super) use litchi_xlsb::cell_values::structure::EditOptions as NativeStructureOptions;
+use litchi_xlsb::cell_values::{BorderLine as NativeBorderLine, Format as NativeFormat};
 use litchi_xlsb::cell_values::{
     Edit as NativeCellEdit, EditOptions as NativeCellOptions, Patch as NativeCellPatch, Reference,
     Scalar as NativeScalar, TransferLimits, structure::Patch as NativeStructurePatch,
@@ -148,12 +148,17 @@ impl Commit {
         }
     }
 
+    /// The retained native proof.
+    pub(super) const fn patch(&self) -> &Patch {
+        &self.patch
+    }
+
     /// Consume the result for explicit transaction history.
     pub(crate) fn into_parts(self) -> (Xlsb, Patch) {
         (self.after, self.patch)
     }
 
-    fn from_native(
+    pub(super) fn from_native(
         base: &Xlsb,
         native: litchi_xlsb::cell_values::structure::Commit,
     ) -> Result<Self> {
@@ -278,6 +283,13 @@ pub(crate) fn set_with_limits<'p, 'v>(
     if let Some(commit) = file.try_set_metadata(&target, &props)? {
         return Ok(commit);
     }
+    if let Some(commit) = super::merge_write::set_merges_with_limits(file, &target, &props, limits)?
+    {
+        return Ok(commit);
+    }
+    if let Some(commit) = super::name_write::try_set_named_range(file, &target, &props, limits)? {
+        return Ok(commit);
+    }
     if let Some(commit) = set_cells_with_limits(file, &target, &props, limits)? {
         return Ok(commit);
     }
@@ -305,10 +317,13 @@ pub(crate) fn add_with_limits<'p, 'n>(
         )
         .with_format(FileFormat::Xlsb));
     }
+    if node.kind().eq_ignore_ascii_case("namedrange") {
+        return super::name_write::add_named_range(file, &node, limits);
+    }
     if !node.kind().eq_ignore_ascii_case("sheet") {
         return Err(Error::new(
             Code::UnsupportedElement,
-            "the XLSB structural verb supports worksheet sheets only",
+            "the XLSB structural verb supports worksheet sheets and defined names only",
         )
         .with_format(FileFormat::Xlsb));
     }
@@ -438,6 +453,9 @@ pub(crate) fn remove_with_limits(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     file.admit_edit()?;
+    if let Some(commit) = super::name_write::try_remove_named_range(file, &target, limits)? {
+        return Ok(commit);
+    }
     if let Some(targets) = resolve_sheet_removal_targets(file, &target, limits)? {
         return remove_sheets_with_limits(file, targets, limits);
     }
@@ -871,6 +889,8 @@ fn set_sheet_with_limits(
 #[derive(Debug, Clone)]
 struct CellAssignments {
     value: Option<NativeScalar>,
+    formula: Option<String>,
+    format: NativeFormat,
     staged_bytes: usize,
 }
 
@@ -965,10 +985,7 @@ fn set_cells_with_limits(
                 .with_format(FileFormat::Xlsb)
             })?;
         for target in targets {
-            if let Some(value) = assignments.value.as_ref() {
-                edit.set_scalar(target.reference, value.clone())
-                    .map_err(native_error)?;
-            }
+            apply_cell_assignments(&mut edit, target.reference, &assignments)?;
         }
         let native = edit.commit().map_err(native_error)?;
         let (next, patch) = native.into_parts();
@@ -994,66 +1011,388 @@ fn set_cells_with_limits(
     Ok(Some(commit))
 }
 
+/// Stage one cell's admitted payload and format in a native cell edit: the
+/// value or formula first, then the partial format change.
+fn apply_cell_assignments(
+    edit: &mut NativeCellEdit,
+    reference: Reference,
+    assignments: &CellAssignments,
+) -> Result<()> {
+    if let Some(value) = assignments.value.as_ref() {
+        edit.set_scalar(reference, value.clone())
+            .map_err(native_error)?;
+    }
+    if let Some(formula) = assignments.formula.as_deref() {
+        edit.set_formula_text(reference, formula)
+            .map_err(|error| caller_value_error(error, "formula"))?;
+    }
+    if !assignments.format.is_empty() {
+        edit.set_format(reference, &assignments.format)
+            .map_err(native_error)?;
+    }
+    Ok(())
+}
+
+/// Classify a leaf refusal of a caller-supplied value: invalid text is
+/// `invalid_value` on the property; other failures keep their class.
+fn caller_value_error(error: litchi_xlsb::package::PackageError, property: &'static str) -> Error {
+    match error {
+        litchi_xlsb::package::PackageError::InvalidFormula(_)
+        | litchi_xlsb::package::PackageError::InvalidCellReference(_)
+        | litchi_xlsb::package::PackageError::InvalidFormat(_) => Error::new(
+            Code::InvalidValue,
+            format!("the XLSB {property} value is not valid"),
+        )
+        .with_format(FileFormat::Xlsb)
+        .with_property(property),
+        error => native_error(error).with_property(property),
+    }
+}
+
 fn admit_cell_properties(props: &Props<'_>, limits: &SemanticLimits) -> Result<CellAssignments> {
     let mut assignments = CellAssignments {
         value: None,
+        formula: None,
+        format: NativeFormat::default(),
         staged_bytes: WRITE_ENTRY_OVERHEAD,
     };
+    let mut clear = false;
+    let mut seen = Vec::<CellSetter>::new();
+    // `border.all` fans out to the four sides; a side named in the same set
+    // overrides it. Colors need a line style in the same set.
+    let mut all_line: Option<Option<litchi_xlsb::styles::BorderStyle>> = None;
+    let mut all_color: Option<u32> = None;
+    let mut lines: [Option<Option<litchi_xlsb::styles::BorderStyle>>; 4] = [None; 4];
+    let mut colors: [Option<u32>; 4] = [None; 4];
     for (key, value) in props.iter() {
         let (_, entry) = CELL_WRITE_TABLE
             .resolve(key.as_str())
             .map_err(|error| error.with_property(key.as_str().to_owned()))?;
         let entry = *entry;
         entry
-            .prepare(Operation::Set, value, |setter, value| match setter {
-                CellSetter::Value => {
-                    if assignments.value.is_some() {
-                        return Err(duplicate_cell_property("value"));
-                    }
-                    let scalar = match value {
-                        Some(value) => native_scalar(value)?,
-                        None => NativeScalar::Blank,
-                    };
-                    let bytes = native_scalar_bytes(&scalar);
-                    assignments.staged_bytes = assignments
-                        .staged_bytes
-                        .checked_add(bytes)
-                        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
-                    assignments.value = Some(scalar);
-                    Ok(())
-                },
-                CellSetter::Clear => {
-                    if assignments.value.is_some() {
-                        return Err(Error::new(
-                            Code::InvalidArgument,
-                            "cell properties value and clear cannot be supplied together",
-                        )
-                        .with_format(FileFormat::Xlsb)
-                        .with_property("clear"));
-                    }
-                    let Some(Scalar::Bool(true)) = value else {
-                        return Err(Error::new(Code::InvalidValue, "clear must be true")
-                            .with_format(FileFormat::Xlsb)
-                            .with_property("clear"));
-                    };
-                    assignments.staged_bytes = assignments
-                        .staged_bytes
-                        .checked_add(1)
-                        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
-                    assignments.value = Some(NativeScalar::Blank);
-                    Ok(())
-                },
+            .prepare(Operation::Set, value, |setter, value| {
+                if seen.contains(&setter) {
+                    return Err(duplicate_cell_property(entry.spec.name));
+                }
+                seen.try_reserve(1)
+                    .map_err(|_| allocation("XLSB cell property set"))?;
+                seen.push(setter);
+                let property = entry.spec.name;
+                let format = &mut assignments.format;
+                match setter {
+                    CellSetter::Value => {
+                        let scalar = match value {
+                            Some(value) => native_scalar(value)?,
+                            None => NativeScalar::Blank,
+                        };
+                        let bytes = native_scalar_bytes(&scalar);
+                        assignments.staged_bytes = assignments
+                            .staged_bytes
+                            .checked_add(bytes)
+                            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                        assignments.value = Some(scalar);
+                    },
+                    CellSetter::Clear => {
+                        let Some(Scalar::Bool(true)) = value else {
+                            return Err(Error::new(Code::InvalidValue, "clear must be true")
+                                .with_format(FileFormat::Xlsb)
+                                .with_property("clear"));
+                        };
+                        clear = true;
+                        assignments.staged_bytes = assignments
+                            .staged_bytes
+                            .checked_add(1)
+                            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                    },
+                    CellSetter::Formula => {
+                        let Some(Scalar::Text(text)) = value else {
+                            return Err(invalid_cell_value(property, "formula must be text"));
+                        };
+                        assignments.staged_bytes = assignments
+                            .staged_bytes
+                            .checked_add(text.len())
+                            .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                        assignments.formula = Some(text.to_owned());
+                    },
+                    CellSetter::Bold => format.bold = Some(cell_bool(value, property)?),
+                    CellSetter::Italic => format.italic = Some(cell_bool(value, property)?),
+                    CellSetter::Strike => format.strike = Some(cell_bool(value, property)?),
+                    CellSetter::Underline => {
+                        format.underline = Some(matches!(value, Some(Scalar::Token("single"))));
+                    },
+                    CellSetter::FontName => {
+                        let Some(Scalar::Text(name)) = value else {
+                            return Err(invalid_cell_value(property, "font name must be text"));
+                        };
+                        format.font_name = Some(name.to_owned());
+                    },
+                    CellSetter::FontSize => {
+                        let Some(Scalar::Length(size)) = value else {
+                            return Err(invalid_cell_value(property, "font size must be a length"));
+                        };
+                        format.font_size = Some(size.points());
+                    },
+                    CellSetter::FontColor => format.font_color = Some(cell_color(value, property)?),
+                    CellSetter::Fill => format.fill = Some(cell_color(value, property)?),
+                    CellSetter::BorderAll => all_line = Some(border_line(value)),
+                    CellSetter::BorderAllColor => {
+                        all_color = cell_color(value, property)?;
+                    },
+                    CellSetter::BorderLeft
+                    | CellSetter::BorderRight
+                    | CellSetter::BorderTop
+                    | CellSetter::BorderBottom => {
+                        lines[border_side(setter)] = Some(border_line(value));
+                    },
+                    CellSetter::BorderLeftColor
+                    | CellSetter::BorderRightColor
+                    | CellSetter::BorderTopColor
+                    | CellSetter::BorderBottomColor => {
+                        colors[border_side(setter)] = cell_color(value, property)?;
+                    },
+                    CellSetter::NumberFormat => {
+                        let Some(Scalar::Text(code)) = value else {
+                            return Err(invalid_cell_value(property, "number format must be text"));
+                        };
+                        format.number_format = Some(code.to_owned());
+                    },
+                    CellSetter::Horizontal => {
+                        format.horizontal = Some(match value {
+                            Some(Scalar::Token(token)) => horizontal_token(token),
+                            _ => {
+                                return Err(invalid_cell_value(
+                                    property,
+                                    "horizontal alignment must be a token",
+                                ));
+                            },
+                        });
+                    },
+                    CellSetter::Vertical => {
+                        format.vertical = Some(match value {
+                            Some(Scalar::Token(token)) => vertical_token(token),
+                            _ => {
+                                return Err(invalid_cell_value(
+                                    property,
+                                    "vertical alignment must be a token",
+                                ));
+                            },
+                        });
+                    },
+                    CellSetter::WrapText => format.wrap_text = Some(cell_bool(value, property)?),
+                    CellSetter::ShrinkToFit => {
+                        format.shrink_to_fit = Some(cell_bool(value, property)?);
+                    },
+                    CellSetter::TextRotation => {
+                        let rotation = cell_byte(value, property)?;
+                        if rotation > 180 && rotation != 255 {
+                            return Err(invalid_cell_value(
+                                property,
+                                "text rotation must be 0..=180 or 255",
+                            ));
+                        }
+                        format.rotation = Some(rotation);
+                    },
+                    CellSetter::Indent => format.indent = Some(cell_byte(value, property)?),
+                    CellSetter::ReadingOrder => {
+                        format.reading_order = Some(match value {
+                            Some(Scalar::Token("ltr")) => 1,
+                            Some(Scalar::Token("rtl")) => 2,
+                            _ => 0,
+                        });
+                    },
+                }
+                Ok(())
             })
             .map_err(|error| error.with_format(FileFormat::Xlsb))?;
     }
-    if assignments.value.is_none() && !props.is_empty() {
+    for (side, line) in lines.iter_mut().enumerate() {
+        if line.is_none() && all_line.is_some() {
+            *line = all_line;
+        }
+        if colors[side].is_none() {
+            colors[side] = all_color;
+        }
+        let color = colors[side];
+        let resolved = match *line {
+            Some(Some(style)) => Some(Some(NativeBorderLine { style, color })),
+            Some(None) => {
+                if color.is_some() {
+                    return Err(invalid_cell_value(
+                        "border.color",
+                        "a border color cannot be set on a removed line",
+                    ));
+                }
+                Some(None)
+            },
+            None => {
+                if color.is_some() {
+                    return Err(Error::new(
+                        Code::InvalidArgument,
+                        "an XLSB border color needs its line style in the same set",
+                    )
+                    .with_format(FileFormat::Xlsb)
+                    .with_suggestion(
+                        "set `border.<side>` (or `border.all`) together with its color",
+                    ));
+                }
+                None
+            },
+        };
+        let target = &mut assignments.format;
+        match side {
+            0 => target.border_left = resolved,
+            1 => target.border_right = resolved,
+            2 => target.border_top = resolved,
+            _ => target.border_bottom = resolved,
+        }
+    }
+    if clear {
+        if assignments.value.is_some() {
+            return Err(Error::new(
+                Code::InvalidArgument,
+                "cell properties value and clear cannot be supplied together",
+            )
+            .with_format(FileFormat::Xlsb)
+            .with_property("clear"));
+        }
+        assignments.value = Some(NativeScalar::Blank);
+    }
+    if assignments.formula.is_some() && assignments.value.is_some() {
         return Err(Error::new(
             Code::InvalidArgument,
-            "an XLSB cell write requires value or clear",
+            "cell properties formula and value (or clear) cannot be supplied together",
+        )
+        .with_format(FileFormat::Xlsb)
+        .with_property("formula"));
+    }
+    assignments
+        .format
+        .validate()
+        .map_err(|error| caller_value_error(error, "format"))?;
+    if assignments.value.is_none()
+        && assignments.formula.is_none()
+        && assignments.format.is_empty()
+        && !props.is_empty()
+    {
+        return Err(Error::new(
+            Code::InvalidArgument,
+            "an XLSB cell write requires value, clear, formula or a format property",
         )
         .with_format(FileFormat::Xlsb));
     }
     Ok(assignments)
+}
+
+const fn border_side(setter: CellSetter) -> usize {
+    match setter {
+        CellSetter::BorderLeft | CellSetter::BorderLeftColor => 0,
+        CellSetter::BorderRight | CellSetter::BorderRightColor => 1,
+        CellSetter::BorderTop | CellSetter::BorderTopColor => 2,
+        _ => 3,
+    }
+}
+
+fn border_line(value: Option<Scalar<'_>>) -> Option<litchi_xlsb::styles::BorderStyle> {
+    use litchi_xlsb::styles::BorderStyle;
+    let Some(Scalar::Token(token)) = value else {
+        return None;
+    };
+    Some(match token {
+        "thin" => BorderStyle::Thin,
+        "medium" => BorderStyle::Medium,
+        "dashed" => BorderStyle::Dashed,
+        "dotted" => BorderStyle::Dotted,
+        "thick" => BorderStyle::Thick,
+        "double" => BorderStyle::Double,
+        "hair" => BorderStyle::Hair,
+        "mediumDashed" => BorderStyle::MediumDashed,
+        "dashDot" => BorderStyle::DashDot,
+        "mediumDashDot" => BorderStyle::MediumDashDot,
+        "dashDotDot" => BorderStyle::DashDotDot,
+        "mediumDashDotDot" => BorderStyle::MediumDashDotDot,
+        "slantDashDot" => BorderStyle::SlantDashDot,
+        _ => return None,
+    })
+}
+
+fn horizontal_token(token: &str) -> litchi_xlsb::styles::HorizontalAlignment {
+    use litchi_xlsb::styles::HorizontalAlignment;
+    match token {
+        "left" => HorizontalAlignment::Left,
+        "center" => HorizontalAlignment::Center,
+        "right" => HorizontalAlignment::Right,
+        "fill" => HorizontalAlignment::Fill,
+        "justify" => HorizontalAlignment::Justify,
+        "centerContinuous" => HorizontalAlignment::CenterContinuous,
+        "distributed" => HorizontalAlignment::Distributed,
+        _ => HorizontalAlignment::General,
+    }
+}
+
+fn vertical_token(token: &str) -> litchi_xlsb::styles::VerticalAlignment {
+    use litchi_xlsb::styles::VerticalAlignment;
+    match token {
+        "top" => VerticalAlignment::Top,
+        "center" => VerticalAlignment::Center,
+        "justify" => VerticalAlignment::Justify,
+        "distributed" => VerticalAlignment::Distributed,
+        _ => VerticalAlignment::Bottom,
+    }
+}
+
+fn cell_bool(value: Option<Scalar<'_>>, property: &'static str) -> Result<bool> {
+    match value {
+        Some(Scalar::Bool(value)) => Ok(value),
+        _ => Err(invalid_cell_value(property, "the property must be boolean")),
+    }
+}
+
+fn cell_byte(value: Option<Scalar<'_>>, property: &'static str) -> Result<u8> {
+    match value {
+        Some(Scalar::Int(value)) => u8::try_from(value)
+            .map_err(|_| invalid_cell_value(property, "the integer is outside its field")),
+        _ => Err(invalid_cell_value(
+            property,
+            "the property must be an integer",
+        )),
+    }
+}
+
+/// A direct RGB color, or `None` for a null (automatic color, no fill).
+fn cell_color(value: Option<Scalar<'_>>, property: &'static str) -> Result<Option<u32>> {
+    let Some(value) = value else {
+        return Ok(None);
+    };
+    let Scalar::Color(color) = value else {
+        return Err(invalid_cell_value(property, "the property must be a color"));
+    };
+    if !color.transforms().is_empty() || color.spreadsheet_tint().is_some() {
+        return Err(invalid_cell_value(
+            property,
+            "XLSB colors take no transforms or tint",
+        ));
+    }
+    match color.base() {
+        crate::value::Base::Rgb(rgb) => Ok(Some(u32::from_be_bytes([
+            rgb.alpha(),
+            rgb.red(),
+            rgb.green(),
+            rgb.blue(),
+        ]))),
+        _ => Err(Error::new(
+            Code::UnsupportedCapability,
+            "XLSB formatting writes direct RGB colors only",
+        )
+        .with_format(FileFormat::Xlsb)
+        .with_property(property)
+        .with_suggestion("use an RGB color such as `1F4E79`")),
+    }
+}
+
+fn invalid_cell_value(property: &'static str, message: &'static str) -> Error {
+    Error::new(Code::InvalidValue, message)
+        .with_format(FileFormat::Xlsb)
+        .with_property(property)
 }
 
 fn native_scalar(value: Scalar<'_>) -> Result<NativeScalar> {
@@ -1711,7 +2050,7 @@ fn check_limits(
     Ok(())
 }
 
-fn check_snapshot_limits(patch: &Patch, limits: &SemanticLimits) -> Result<()> {
+pub(super) fn check_snapshot_limits(patch: &Patch, limits: &SemanticLimits) -> Result<()> {
     let observed = patch.snapshot_bytes();
     if observed > limits.max_snapshot_bytes() {
         return Err(snapshot_limit(observed, limits.max_snapshot_bytes()));
@@ -1759,7 +2098,7 @@ fn allocation(resource: &'static str) -> Error {
         .with_suggestion(resource)
 }
 
-fn native_error(error: litchi_xlsb::package::PackageError) -> Error {
+pub(super) fn native_error(error: litchi_xlsb::package::PackageError) -> Error {
     Error::from(error).with_format(FileFormat::Xlsb)
 }
 
@@ -2301,6 +2640,11 @@ pub(crate) mod coalesce {
                     },
                     Err(error) => return Err(error),
                 };
+                if assignments.formula.is_some() || !assignments.format.is_empty() {
+                    // Formulas and formats are staged by the ordinary cell
+                    // route; the payload run carries scalar values only.
+                    return Ok(None);
+                }
                 let Some(value) = assignments.value.as_ref().cloned() else {
                     // Empty property sets retain XLSX's admitted no-op
                     // behavior, but do not enter a payload run.
