@@ -23,9 +23,12 @@
     )
 )]
 
+mod format;
 mod layout;
 mod structural;
 mod tabs;
+
+pub use format::FormatChange;
 
 use crate::records::{BoundSheetRecord, Encoding, SheetType};
 use crate::workbook::{KeptCells, ValidationWorkbook};
@@ -2944,6 +2947,94 @@ impl Edit {
             before: Some((cell.storage, cell.value.clone(), cell.style)),
             after: Some((cell.storage, cell.value.clone(), style)),
         })
+    }
+
+    /// Changes one cell's alignment, border styles or fill.
+    ///
+    /// The cell's effective XF is rewritten with the requested fields; an
+    /// identical effective XF is reused, otherwise one XF resource is
+    /// authored in this edit. An absent coordinate gains a formatting-only
+    /// `Blank` cell whose base is the workbook's default cell XF. An empty or
+    /// ineffective change is an exact no-op.
+    ///
+    /// ```
+    /// use litchi_xls::cell_values::{FormatChange, Reference, Selector, Snapshot};
+    /// use litchi_xls::HorizontalAlignment;
+    /// # let mut builder = litchi_xls::Builder::new();
+    /// # let sheet = builder.add_worksheet("Data")?;
+    /// # builder.write_number(sheet, 0, 0, 1.0)?;
+    /// # let bytes = builder.build()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// let mut change = FormatChange::default();
+    /// change.horizontal = Some(HorizontalAlignment::Right);
+    /// edit.set_cell_format(Selector::Position(0), Reference::new(0, 0)?, &change)?;
+    /// assert!(edit.commit()?.diagnostics().changed());
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed indent, palette-color, selector, formula-dependency,
+    /// style-resource or bound refusal without staging.
+    pub fn set_cell_format(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        change: &FormatChange,
+    ) -> Result<()> {
+        if change.is_empty() {
+            return Ok(());
+        }
+        let sheet = self.require_sheet(selector, "cell format")?;
+        let current = self.source.inner.sheets[sheet]
+            .unique_entry_index(reference)?
+            .map(|index| self.source.inner.sheets[sheet].entries[index].cell.style);
+        let base = match current {
+            Some(style) => style,
+            None => scalar_default_style(&self.source)?,
+        };
+        let payload = self
+            .effective_xf_payload(base)
+            .ok_or_else(|| Error::UnsafeEdit("cell XF resource is absent".into()))?
+            .to_vec();
+        let palette = if change.fill_foreground.is_some() || change.fill_background.is_some() {
+            format::workbook_palette(&self.source.inner.workbook_stream)?
+        } else {
+            crate::Palette::default()
+        };
+        let target = format::apply(&payload, change, &palette)?;
+        if target == payload {
+            return Ok(());
+        }
+        let mut staged = self.clone();
+        let style = match staged.effective_style_with_payload(&target) {
+            Some(style) => style,
+            None => staged.author_style(&target)?,
+        };
+        match current {
+            Some(_) => staged.set_style(
+                Selector::Position(staged.source.inner.sheets[sheet].workbook_index),
+                reference,
+                style,
+            )?,
+            None => staged.insert_cell_with_style(
+                Selector::Position(staged.source.inner.sheets[sheet].workbook_index),
+                reference,
+                Value::Blank,
+                style,
+            )?,
+        }
+        *self = staged;
+        Ok(())
+    }
+
+    /// An effective cell XF whose payload equals `payload`.
+    fn effective_style_with_payload(&self, payload: &[u8]) -> Option<StyleIndex> {
+        (0..self.effective_xf_count())
+            .filter_map(|index| u16::try_from(index).ok())
+            .map(StyleIndex)
+            .find(|style| self.effective_xf_payload(*style) == Some(payload))
     }
 
     /// Duplicates an existing XF into a newly authored workbook resource.
@@ -9824,3 +9915,6 @@ mod formula_tests;
 
 #[cfg(test)]
 mod layout_tests;
+
+#[cfg(test)]
+mod format_tests;

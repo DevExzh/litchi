@@ -39,6 +39,8 @@ enum CellAssignment {
     Clear,
     /// A formula expression without its leading `=`.
     Formula(String),
+    /// Alignment, border-style and fill changes to the cell XF.
+    Format(litchi_xls::cell_values::FormatChange),
     Noop,
 }
 
@@ -209,6 +211,17 @@ fn set_cells_with_limits(
     if limits.max_operations() < 1 {
         return Err(operation_limit(1, limits.max_operations()));
     }
+    if let CellAssignment::Format(change) = &plan.assignment {
+        // Formatting rewrites only the cell's XF reference, so formula cells
+        // and absent coordinates are admitted alike.
+        let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+        for target in targets {
+            edit.set_cell_format(Selector::Position(target.sheet), target.reference, change)
+                .map_err(format_error)?;
+        }
+        let native = edit.commit().map_err(native_edit_error)?;
+        return finish_commit(file, native, 1, limits);
+    }
     if targets
         .iter()
         .any(|target| target.present && target.formula)
@@ -216,7 +229,7 @@ fn set_cells_with_limits(
         let property = match &plan.assignment {
             CellAssignment::Clear => "clear",
             CellAssignment::Formula(_) => "formula",
-            CellAssignment::Value(_) | CellAssignment::Noop => "value",
+            CellAssignment::Value(_) | CellAssignment::Format(_) | CellAssignment::Noop => "value",
         };
         return Err(Error::new(
             Code::UnsupportedCapability,
@@ -257,6 +270,7 @@ fn set_cells_with_limits(
             CellAssignment::Value(value) => value.clone(),
             CellAssignment::Clear => unreachable!("clear handled above"),
             CellAssignment::Formula(_) => unreachable!("formula handled above"),
+            CellAssignment::Format(_) => unreachable!("format handled above"),
             CellAssignment::Noop => unreachable!("no-op handled above"),
         };
         if target.present {
@@ -376,6 +390,44 @@ fn admit_cell_property(props: &Props<'_>, limits: &SemanticLimits) -> Result<Cel
                     assignment = CellAssignment::Clear;
                     Ok(())
                 },
+                CellSetter::Horizontal
+                | CellSetter::Vertical
+                | CellSetter::WrapText
+                | CellSetter::Indent
+                | CellSetter::ShrinkToFit
+                | CellSetter::BorderLeft
+                | CellSetter::BorderRight
+                | CellSetter::BorderTop
+                | CellSetter::BorderBottom
+                | CellSetter::FillPattern
+                | CellSetter::Fill
+                | CellSetter::FillBg => {
+                    let change = match &mut assignment {
+                        CellAssignment::Noop => {
+                            assignment = CellAssignment::Format(Default::default());
+                            let CellAssignment::Format(change) = &mut assignment else {
+                                unreachable!("the format assignment was just installed")
+                            };
+                            change
+                        },
+                        CellAssignment::Format(change) => change,
+                        CellAssignment::Value(_)
+                        | CellAssignment::Clear
+                        | CellAssignment::Formula(_) => {
+                            return Err(Error::new(
+                                Code::InvalidArgument,
+                                "XLS cell formatting is set separately from value, clear and formula",
+                            )
+                            .with_format(FileFormat::Xls)
+                            .with_suggestion("apply the formatting in its own set call"));
+                        },
+                    };
+                    stage_format(change, setter, value)?;
+                    staged_bytes = staged_bytes
+                        .checked_add(8)
+                        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                    Ok(())
+                },
                 CellSetter::Formula => {
                     if !matches!(assignment, CellAssignment::Noop) {
                         return Err(Error::new(
@@ -409,6 +461,104 @@ fn admit_cell_property(props: &Props<'_>, limits: &SemanticLimits) -> Result<Cel
         assignment,
         staged_bytes,
     })
+}
+
+/// Record one formatting assignment; each field may be named once.
+fn stage_format(
+    change: &mut litchi_xls::cell_values::FormatChange,
+    setter: CellSetter,
+    value: Option<Scalar<'_>>,
+) -> Result<()> {
+    use super::style;
+    let invalid = |property: &'static str| {
+        Error::new(
+            Code::InvalidValue,
+            "the XLS cell format value is not supported",
+        )
+        .with_format(FileFormat::Xls)
+        .with_property(property)
+    };
+    let duplicate = |property: &'static str| {
+        Error::new(
+            Code::InvalidArgument,
+            "the same XLS cell property was supplied more than once",
+        )
+        .with_format(FileFormat::Xls)
+        .with_property(property)
+    };
+    let token = |value: &Option<Scalar<'_>>| match value {
+        Some(Scalar::Token(token)) => Some(*token),
+        _ => None,
+    };
+    macro_rules! assign {
+        ($field:ident, $property:literal, $value:expr) => {{
+            let value = $value.ok_or_else(|| invalid($property))?;
+            if change.$field.replace(value).is_some() {
+                return Err(duplicate($property));
+            }
+        }};
+    }
+    match setter {
+        CellSetter::Horizontal => assign!(
+            horizontal,
+            "alignment.horizontal",
+            token(&value).and_then(style::horizontal)
+        ),
+        CellSetter::Vertical => assign!(
+            vertical,
+            "alignment.vertical",
+            token(&value).and_then(style::vertical)
+        ),
+        CellSetter::WrapText => assign!(
+            wrap_text,
+            "alignment.wrapText",
+            match value {
+                Some(Scalar::Bool(value)) => Some(value),
+                _ => None,
+            }
+        ),
+        CellSetter::Indent => assign!(
+            indent,
+            "alignment.indent",
+            match value {
+                Some(Scalar::Int(value)) => u8::try_from(value).ok().filter(|value| *value <= 15),
+                _ => None,
+            }
+        ),
+        CellSetter::ShrinkToFit => assign!(
+            shrink_to_fit,
+            "alignment.shrinkToFit",
+            match value {
+                Some(Scalar::Bool(value)) => Some(value),
+                _ => None,
+            }
+        ),
+        CellSetter::BorderLeft => {
+            assign!(border_left, "border.left", style::border(token(&value)))
+        },
+        CellSetter::BorderRight => {
+            assign!(border_right, "border.right", style::border(token(&value)))
+        },
+        CellSetter::BorderTop => assign!(border_top, "border.top", style::border(token(&value))),
+        CellSetter::BorderBottom => {
+            assign!(border_bottom, "border.bottom", style::border(token(&value)))
+        },
+        CellSetter::FillPattern => assign!(
+            fill_pattern,
+            "fillPattern",
+            token(&value).and_then(style::fill_pattern)
+        ),
+        CellSetter::Fill => {
+            assign!(fill_foreground, "fill", style::rgb(value));
+            // A bare fill color is a solid fill, as in the XLSX adapter.
+            if change.fill_pattern.is_none() {
+                change.fill_pattern = Some(litchi_xls::FillPattern::Solid);
+            }
+        },
+        CellSetter::FillBg => assign!(fill_background, "fillBg", style::rgb(value)),
+        CellSetter::Value | CellSetter::Clear | CellSetter::Formula => {},
+    }
+    Ok(())
 }
 
 fn native_scalar(value: Scalar<'_>) -> Result<NativeValue> {
@@ -784,6 +934,22 @@ fn invalid_formula() -> Error {
     .with_property("formula")
 }
 
+/// Map a native format refusal: a color outside the workbook palette is an
+/// invalid value for this workbook.
+fn format_error(error: litchi_xls::package::edit::Error) -> Error {
+    use litchi_xls::package::edit::Error as Native;
+    match &error {
+        Native::CellValues(litchi_xls::Error::UnsupportedFeature(_)) => Error::new(
+            Code::InvalidValue,
+            "the XLS fill color is not an entry of the workbook palette",
+        )
+        .with_format(FileFormat::Xls)
+        .with_property("fill")
+        .with_suggestion("use one of the workbook's 56 palette colors"),
+        _ => native_edit_error(error),
+    }
+}
+
 /// Map a native formula refusal: an expression the BIFF8 tokenizer cannot
 /// encode is an invalid value, not a corrupt workbook.
 fn formula_error(error: litchi_xls::package::edit::Error) -> Error {
@@ -992,7 +1158,7 @@ pub(crate) mod coalesce {
                 // removal and an authored Formula, not a scalar staging.
                 if matches!(
                     admitted.assignment,
-                    CellAssignment::Noop | CellAssignment::Formula(_)
+                    CellAssignment::Noop | CellAssignment::Formula(_) | CellAssignment::Format(_)
                 ) {
                     return Ok(None);
                 }
@@ -1020,12 +1186,16 @@ pub(crate) mod coalesce {
                     CellAssignment::Clear => {
                         target.present && current.as_ref() != Some(&NativeValue::Blank)
                     },
-                    CellAssignment::Formula(_) | CellAssignment::Noop => false,
+                    CellAssignment::Formula(_)
+                    | CellAssignment::Format(_)
+                    | CellAssignment::Noop => false,
                 };
                 let action = match admitted.assignment {
                     CellAssignment::Value(value) => Action::Set(value),
                     CellAssignment::Clear => Action::Clear,
-                    CellAssignment::Formula(_) | CellAssignment::Noop => return Ok(None),
+                    CellAssignment::Formula(_)
+                    | CellAssignment::Format(_)
+                    | CellAssignment::Noop => return Ok(None),
                 };
                 Ok(Some(Plan {
                     target,

@@ -716,6 +716,24 @@ impl Edit {
             .map_err(Error::from)
     }
 
+    /// Change one cell's alignment, border styles or fill; see
+    /// [`cell_values::Edit::set_cell_format`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a typed indent, palette-color, selector, dependency,
+    /// style-resource or bound refusal without staging.
+    pub fn set_cell_format<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        change: &cell_values::FormatChange,
+    ) -> Result<()> {
+        self.inner
+            .set_cell_format(selector.into(), reference, change)
+            .map_err(Error::from)
+    }
+
     /// Remove one supported cell record.
     pub fn remove_cell<'a>(
         &mut self,

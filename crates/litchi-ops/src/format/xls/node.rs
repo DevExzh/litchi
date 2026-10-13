@@ -315,12 +315,14 @@ impl<'f> Node<'f> {
                     visibility: sheet.handle.visibility(),
                 },
             ),
-            Item::Cell(_) => (
-                CELL_PROPS,
-                Props::Cell(CellProps {
-                    state: self.cell_state()?,
-                }),
-            ),
+            Item::Cell(_) => {
+                let state = self.cell_state()?;
+                let styles = match state {
+                    CellState::Stored(_) => Some(styles(self.file)?),
+                    CellState::Missing | CellState::Stub => None,
+                };
+                (CELL_PROPS, Props::Cell(CellProps { state, styles }))
+            },
             Item::Range(_) => return Ok(Format::empty()),
             Item::Row(row) => (
                 ROW_PROPS,
@@ -367,6 +369,18 @@ pub(crate) enum Props<'a> {
 
 pub(crate) struct CellProps<'a> {
     state: CellState<'a>,
+    styles: Option<super::style::Styles<'a>>,
+}
+
+/// The formatting tables of a file's cells.
+fn styles(file: &Xls) -> Result<super::style::Styles<'_>> {
+    Ok(match file.owner().source_workbook() {
+        Some(source) => super::style::Styles::Source {
+            formatting: source.formatting()?,
+            tables: source.style_tables()?,
+        },
+        None => super::style::Styles::Eager(file.owner().reader_ref()?),
+    })
 }
 
 impl fmt::Debug for Props<'_> {
@@ -467,6 +481,12 @@ impl<'a> CellProps<'a> {
                 _ => None,
             },
             CellKey::Empty => matches!(value, CellValue::Empty).then_some(Value::Bool(true)),
+            key => match (self.state, &self.styles) {
+                (CellState::Stored(cell), Some(styles)) => {
+                    super::style::value(styles, cell.xf, key)
+                },
+                _ => None,
+            },
         }
     }
 }

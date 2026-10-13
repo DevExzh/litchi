@@ -378,6 +378,242 @@
           "set": false,
           "get": true
         },
+        "font.bold": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.italic": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "strike": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "underline": {
+          "type": "enum",
+          "values": [
+            "single",
+            "double",
+            "singleAccounting",
+            "doubleAccounting"
+          ],
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.color": {
+          "type": "color",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.size": {
+          "type": "font-size",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "font.name": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "fill": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fillPattern": {
+          "type": "enum",
+          "values": [
+            "none",
+            "solid",
+            "mediumGray",
+            "darkGray",
+            "lightGray",
+            "darkHorizontal",
+            "darkVertical",
+            "darkDown",
+            "darkUp",
+            "darkGrid",
+            "darkTrellis",
+            "lightHorizontal",
+            "lightVertical",
+            "lightDown",
+            "lightUp",
+            "lightGrid",
+            "lightTrellis",
+            "gray125",
+            "gray0625"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "fillBg": {
+          "type": "color",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.left": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.right": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.top": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "border.bottom": {
+          "type": "enum",
+          "values": [
+            "thin",
+            "medium",
+            "dashed",
+            "dotted",
+            "thick",
+            "double",
+            "hair",
+            "mediumDashed",
+            "dashDot",
+            "mediumDashDot",
+            "dashDotDot",
+            "mediumDashDotDot",
+            "slantDashDot"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.wrapText": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.horizontal": {
+          "type": "enum",
+          "values": [
+            "general",
+            "left",
+            "center",
+            "right",
+            "fill",
+            "justify",
+            "centerContinuous",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.vertical": {
+          "type": "enum",
+          "values": [
+            "top",
+            "center",
+            "bottom",
+            "justify",
+            "distributed"
+          ],
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.indent": {
+          "type": "int",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "alignment.shrinkToFit": {
+          "type": "bool",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "protection.locked": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "protection.hidden": {
+          "type": "bool",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "numberformat": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "value": {
           "type": "scalar",
           "add": false,
@@ -397,7 +633,14 @@
           "text",
           "type",
           "value"
-        ]
+        ],
+        "aliases": {
+          "bold": "font.bold",
+          "color": "font.color",
+          "font": "font.name",
+          "italic": "font.italic",
+          "size": "font.size"
+        }
       }
     },
     {
@@ -1310,8 +1553,8 @@
       "element": "cell",
       "context": "non-scalar-properties",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS formatting setters",
-      "reason": "the XLS writer accepts scalar value, clear and formula payloads; formatting and other cell metadata remain read-only"
+      "followUp": "M2 XLS font, number-format and protection setters",
+      "reason": "alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula"
     },
     {
       "subject": "operation",

@@ -19,30 +19,100 @@ pub(crate) use workbook::{
 };
 
 /// The cell properties projected by the native BIFF reader: the type, the
-/// rendered formula text (without its leading `=`) and its cached result, and
-/// the blank fact.
+/// rendered formula text (without its leading `=`) and its cached result, the
+/// blank fact, and the cell XF's font, fill, border, alignment, protection
+/// and number format.  Formatting keys report only non-default values.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CellKey {
     Type,
     Formula,
     CachedValue,
     Empty,
+    Bold,
+    Italic,
+    Strike,
+    Underline,
+    FontColor,
+    FontSize,
+    FontName,
+    Fill,
+    FillPattern,
+    FillBg,
+    BorderLeft,
+    BorderRight,
+    BorderTop,
+    BorderBottom,
+    WrapText,
+    Horizontal,
+    Vertical,
+    Indent,
+    ShrinkToFit,
+    Locked,
+    FormulaHidden,
+    NumFmtId,
+    NumberFormat,
 }
 
-impl CellKey {
-    const ALL: &'static [Self] = &[Self::Type, Self::Formula, Self::CachedValue, Self::Empty];
+/// Each [`CellKey`] with its shared workbook property name, in table order.
+const CELL_KEYS: [(CellKey, &str); 27] = [
+    (CellKey::Type, "type"),
+    (CellKey::Formula, "formula"),
+    (CellKey::CachedValue, "cachedValue"),
+    (CellKey::Empty, "empty"),
+    (CellKey::Bold, "font.bold"),
+    (CellKey::Italic, "font.italic"),
+    (CellKey::Strike, "strike"),
+    (CellKey::Underline, "underline"),
+    (CellKey::FontColor, "font.color"),
+    (CellKey::FontSize, "font.size"),
+    (CellKey::FontName, "font.name"),
+    (CellKey::Fill, "fill"),
+    (CellKey::FillPattern, "fillPattern"),
+    (CellKey::FillBg, "fillBg"),
+    (CellKey::BorderLeft, "border.left"),
+    (CellKey::BorderRight, "border.right"),
+    (CellKey::BorderTop, "border.top"),
+    (CellKey::BorderBottom, "border.bottom"),
+    (CellKey::WrapText, "alignment.wrapText"),
+    (CellKey::Horizontal, "alignment.horizontal"),
+    (CellKey::Vertical, "alignment.vertical"),
+    (CellKey::Indent, "alignment.indent"),
+    (CellKey::ShrinkToFit, "alignment.shrinkToFit"),
+    (CellKey::Locked, "protection.locked"),
+    (CellKey::FormulaHidden, "protection.hidden"),
+    (CellKey::NumFmtId, "numFmtId"),
+    (CellKey::NumberFormat, "numberformat"),
+];
 
+impl CellKey {
     pub(crate) fn at(index: usize) -> Option<Self> {
-        Self::ALL.get(index).copied()
+        CELL_KEYS.get(index).map(|(key, _)| *key)
     }
 }
 
-pub(crate) static CELL_PROPS: &[PropSpec] = &[
-    SHARED_CELL_PROPS[0],
-    SHARED_CELL_PROPS[1],
-    SHARED_CELL_PROPS[2],
-    SHARED_CELL_PROPS[6],
-];
+/// The shared workbook cell property spec named `name`.
+const fn shared_cell_prop(name: &str) -> PropSpec {
+    let mut index = 0;
+    while index < SHARED_CELL_PROPS.len() {
+        if same_name(SHARED_CELL_PROPS[index].name, name) {
+            return SHARED_CELL_PROPS[index];
+        }
+        index += 1;
+    }
+    panic!("XLS cell key is not a shared workbook cell property")
+}
+
+const fn cell_props() -> [PropSpec; CELL_KEYS.len()] {
+    let mut props = [PropSpec::new("", ValueType::Text); CELL_KEYS.len()];
+    let mut index = 0;
+    while index < CELL_KEYS.len() {
+        props[index] = shared_cell_prop(CELL_KEYS[index].1);
+        index += 1;
+    }
+    props
+}
+
+pub(crate) static CELL_PROPS: &[PropSpec] = &cell_props();
 
 /// The scalar cell payloads admitted by the initial unified XLS writer.
 ///
@@ -58,6 +128,28 @@ pub(crate) enum CellSetter {
     Value,
     Clear,
     Formula,
+    Horizontal,
+    Vertical,
+    WrapText,
+    Indent,
+    ShrinkToFit,
+    BorderLeft,
+    BorderRight,
+    BorderTop,
+    BorderBottom,
+    FillPattern,
+    Fill,
+    FillBg,
+}
+
+/// One XF-backed cell formatting setter.
+const fn format_entry(name: &'static str, setter: CellSetter, clear: bool) -> Entry<CellSetter> {
+    Entry {
+        spec: shared_cell_prop(name),
+        access: Access::Set(setter),
+        constraint: Constraint::None,
+        clear,
+    }
 }
 
 const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
@@ -70,7 +162,7 @@ const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
     spec
 }
 
-pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 3, 0> = Table::new(
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 15, 0> = Table::new(
     [
         Entry {
             spec: write_only("value", ValueType::Scalar),
@@ -90,6 +182,23 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 3, 0> = Table::new(
             constraint: Constraint::None,
             clear: false,
         },
+        format_entry("alignment.horizontal", CellSetter::Horizontal, false),
+        format_entry("alignment.vertical", CellSetter::Vertical, false),
+        format_entry("alignment.wrapText", CellSetter::WrapText, false),
+        Entry {
+            spec: shared_cell_prop("alignment.indent"),
+            access: Access::Set(CellSetter::Indent),
+            constraint: Constraint::Int { min: 0, max: 15 },
+            clear: false,
+        },
+        format_entry("alignment.shrinkToFit", CellSetter::ShrinkToFit, false),
+        format_entry("border.left", CellSetter::BorderLeft, true),
+        format_entry("border.right", CellSetter::BorderRight, true),
+        format_entry("border.top", CellSetter::BorderTop, true),
+        format_entry("border.bottom", CellSetter::BorderBottom, true),
+        format_entry("fillPattern", CellSetter::FillPattern, false),
+        format_entry("fill", CellSetter::Fill, false),
+        format_entry("fillBg", CellSetter::FillBg, false),
     ],
     [],
 );
@@ -605,8 +714,8 @@ pub(crate) static WRITE_GAPS: [GapSpec; 10] = [
         "set",
         "cell",
         "non-scalar-properties",
-        "M2 XLS formatting setters",
-        "the XLS writer accepts scalar value, clear and formula payloads; formatting and other cell metadata remain read-only",
+        "M2 XLS font, number-format and protection setters",
+        "alignment, border line styles and palette fill colors are written through a reused or authored XF; font, border colors, number format, protection, rotation and reading order are read-only because a new XF must keep an existing font/number-format/protection prefix, and formatting is set in its own call rather than together with value, clear or formula",
     ),
     operation_gap(
         "set",

@@ -216,6 +216,8 @@ pub(super) struct CellData {
     /// Rendered formula text with its leading `=`, when the cell is a formula
     /// whose tokens render.
     pub(super) formula_text: Option<Arc<str>>,
+    /// The record's cell format index.
+    pub(super) xf: u16,
 }
 
 impl CellData {
@@ -224,6 +226,7 @@ impl CellData {
             value: cell.value().clone(),
             formula: cell.is_formula(),
             formula_text: cell.formula().map(Arc::from),
+            xf: cell.xf_index(),
         }
     }
 
@@ -251,6 +254,7 @@ impl CellData {
             value: cell.value().clone(),
             formula: cell.is_formula(),
             formula_text,
+            xf: cell.xf_index(),
         })
     }
 }
@@ -280,6 +284,7 @@ impl Grid {
                         value: cell.value().clone(),
                         formula: cell.is_formula(),
                         formula_text: cell.formula().map(Arc::from),
+                        xf: cell.xf_index(),
                     },
                 );
                 Ok(())

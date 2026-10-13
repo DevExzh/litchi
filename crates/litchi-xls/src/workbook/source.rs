@@ -473,6 +473,7 @@ struct SourceInner {
     worksheet_names: Box<[String]>,
     sst: Arc<SharedStringSstScan>,
     formatting: Arc<Formatting>,
+    styles: Option<Arc<StyleTables>>,
     encoding: Encoding,
     limits: SourceBackedLimits,
     leniency: Leniency,
@@ -607,6 +608,7 @@ impl SourceBackedWorksheetDescriptor {
 pub struct SourceBackedCell {
     formula: bool,
     formula_text: Option<Arc<str>>,
+    xf: u16,
     row: u32,
     column: u32,
     value: litchi_core::sheet::CellValue,
@@ -617,6 +619,13 @@ impl SourceBackedCell {
     #[must_use]
     pub const fn is_formula(&self) -> bool {
         self.formula
+    }
+
+    /// The record's `ixfe` cell format index; resolve it with
+    /// [`crate::Formatting::resolved_cell_format`].
+    #[must_use]
+    pub const fn xf_index(&self) -> u16 {
+        self.xf
     }
 
     /// Formula text rendered from the cell's BIFF tokens, with its leading
@@ -1280,6 +1289,7 @@ impl SourceBackedWorkbook {
             worksheet_names: worksheet_names.into_boxed_slice(),
             sst: Arc::new(parsed.sst),
             formatting: Arc::new(parsed.formatting),
+            styles: parsed.styles.map(Arc::new),
             encoding: parsed.encoding,
             limits,
             leniency: options.leniency(),
@@ -1477,6 +1487,29 @@ impl SourceBackedWorkbook {
             .worksheet_by_index(worksheet_index)?
             .ok_or_else(|| SourceBackedError::WorksheetNotFound(worksheet_index.to_string()))?;
         worksheet.cell(row, column)
+    }
+
+    /// The workbook's number formats and XF table.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-change error when the source no longer matches.
+    pub fn formatting(&self) -> Result<Arc<Formatting>> {
+        self.metadata(|inner| Arc::clone(&inner.formatting))
+    }
+
+    /// The workbook's font table and color palette.
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-change error, or a typed refusal when the open could
+    /// not read the `Font` or `Palette` records under its leniency policy.
+    pub fn style_tables(&self) -> Result<Arc<StyleTables>> {
+        self.metadata(|inner| inner.styles.clone())?.ok_or_else(|| {
+            SourceBackedError::InvalidData(
+                "the workbook's Font or Palette records are not readable".into(),
+            )
+        })
     }
 
     /// Looks up one cell value by worksheet index and zero-based coordinates.
@@ -1832,8 +1865,69 @@ struct ParsedGlobals {
     sheets: Vec<SheetEntry>,
     sst: SharedStringSstScan,
     formatting: Formatting,
+    styles: Option<StyleTables>,
     encoding: Encoding,
     tolerance: ToleranceReport,
+}
+
+/// The workbook's font table and color palette, for cell formatting reads.
+#[derive(Debug, Clone, Default)]
+pub struct StyleTables {
+    fonts: Vec<crate::font::Font>,
+    palette: crate::Palette,
+}
+
+impl StyleTables {
+    /// Fonts in record order.
+    #[must_use]
+    pub fn fonts(&self) -> &[crate::font::Font] {
+        &self.fonts
+    }
+
+    /// The font an XF's logical font index names.
+    #[must_use]
+    pub fn font(&self, index: u16) -> Option<&crate::font::Font> {
+        self.fonts.iter().find(|font| font.index() == index)
+    }
+
+    /// The workbook color palette.
+    #[must_use]
+    pub const fn palette(&self) -> &crate::Palette {
+        &self.palette
+    }
+
+    /// Parse `Font` and `Palette` records from the globals the open already
+    /// read. The scratch tolerance log keeps the open's own repair report and
+    /// refusal behavior unchanged; a table this parse cannot read is reported
+    /// when a caller asks for it.
+    fn parse(records: &[RecordRef<'_>], leniency: Leniency) -> Option<Self> {
+        let mut tolerance = ToleranceLog::new(leniency);
+        let mut fonts = Vec::new();
+        let mut palette = crate::Palette::default();
+        let mut palette_seen = 0_u32;
+        for record in records {
+            match record.kind().get() {
+                crate::font::FONT_RECORD_TYPE => {
+                    let index = crate::font::logical_font_index(fonts.len()).ok()?;
+                    fonts.push(
+                        crate::font::Font::parse_record(index, record.payload(), &mut tolerance)
+                            .ok()?,
+                    );
+                },
+                0x0092 => {
+                    palette = crate::Palette::parse_unique_record(
+                        record.payload(),
+                        u32::try_from(record.offset()).unwrap_or(u32::MAX),
+                        &mut palette_seen,
+                        tolerance.report_mut(),
+                    )
+                    .ok()?;
+                },
+                _ => {},
+            }
+        }
+        Some(Self { fonts, palette })
+    }
 }
 
 fn descriptor(sheet: &SheetEntry) -> SourceBackedWorksheetDescriptor {
@@ -2391,6 +2485,7 @@ fn parse_globals(
     })?;
     let formatting =
         Formatting::parse_globals(&records, &mut tolerance).map_err(SourceBackedError::Parse)?;
+    let styles = StyleTables::parse(&records, leniency);
     let sst = scan_shared_string_records(&sst_refs, tolerance.report_mut())
         .map_err(map_shared_string_error)?;
 
@@ -2436,6 +2531,7 @@ fn parse_globals(
         sheets,
         sst,
         formatting,
+        styles,
         encoding,
         tolerance: tolerance.into_report(),
     })
@@ -3308,6 +3404,7 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
             self.found = Some(SourceBackedCell {
                 formula: matches!(record, CellRecord::Formula { .. }),
                 formula_text: target.formula,
+                xf: cell_xf_index(record),
                 row: u32::from(self.row),
                 column: u32::from(self.column),
                 value: target.value,
@@ -3407,6 +3504,7 @@ where
         (self.visitor)(SourceBackedCell {
             formula: matches!(record, CellRecord::Formula { .. }),
             formula_text: cell.formula_arc(),
+            xf: cell_xf_index(record),
             row: u32::from(record.row()),
             column: u32::from(record.col()),
             value,
@@ -3846,6 +3944,7 @@ fn replay_indexed_cell(
             found = Some(SourceBackedCell {
                 formula: slot.kind == 0x0006,
                 formula_text: target.formula,
+                xf: slot.xf,
                 row: u32::from(row),
                 column: u32::from(column),
                 value: target.value,
