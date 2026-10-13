@@ -114,3 +114,46 @@ Unified (`litchi-ops`), registry entries flipped to `set`:
 - Not done: the scoped families keep their `Snapshot::edit()` entry and the
   crate error; the `Package::{x, edit_x, apply_x}` reshape and per-family
   `Error`/`LimitKind` are a follow-up.
+
+## 5. Paired measurement: run formatting
+
+Route family `pptx_{eager,source}_{native_primary,unified_file_set}_run_format_v1`
+(new harness `tools/perf-baseline/unified-pptx-text-format`). One sample sets
+`bold`, `size` 24pt and `color` 1F4E79 on `/slide[1]/shape[1]/paragraph[1]/run[1]`;
+the native leg is one `Edit::set_text_properties` call plus one commit, the
+unified leg one prepared `File::set`. Generated one-slide decks of 1–10,000
+text boxes, both owners, 9 ABBA rounds (18 samples per leg), release build
+(`debug = 1`), `taskset -c 30`, shared 32-core host (load ≈ 8–12 from other
+agents). Binary SHA-256
+`1735a2c30eacb6a2da38fe4ac246ab1902ea32b9dbfc8105a3a0d98b4b8da43f`, built at
+commit 0de12f04d5 with
+`CARGO_TARGET_DIR=target/bench CARGO_NET_OFFLINE=true cargo build --release --manifest-path tools/perf-baseline/unified-pptx-text-format/Cargo.toml`.
+Warm-up outputs were byte-identical between legs in every case. Raw results:
+`docs/unified-ops/results/0252-pptx-p0-writes/run-format-trial-{1,2,3}.json`.
+
+| owner | shapes | native median µs (t1/t2/t3) | unified median µs | unified/native |
+|---|---|---|---|---|
+| eager | 1 | 305.5 / 302.2 / 301.9 | 318.8 / 321.1 / 314.4 | 1.044 / 1.062 / 1.042 |
+| eager | 10 | 418.3 / 418.0 / 416.7 | 454.8 / 453.3 / 450.4 | 1.087 / 1.085 / 1.081 |
+| eager | 100 | 1496.5 / 1498.4 / 1501.9 | 1762.0 / 1765.6 / 1758.7 | 1.177 / 1.178 / 1.171 |
+| eager | 1000 | 12030.1 / 12088.5 / 12170.6 | 14607.9 / 14670.1 / 14579.1 | 1.214 / 1.214 / 1.198 |
+| eager | 10000 | 116708.6 / 117570.0 / 118087.9 | 142280.8 / 143775.8 / 141843.3 | 1.219 / 1.223 / 1.201 |
+| source | 1 | 56.7 / 56.4 / 56.6 | 61.3 / 60.9 / 61.0 | 1.082 / 1.080 / 1.077 |
+| source | 10 | 271.6 / 270.6 / 270.7 | 279.4 / 279.2 / 276.5 | 1.028 / 1.032 / 1.021 |
+| source | 100 | 2360.1 / 2399.9 / 2386.9 | 2398.0 / 2429.0 / 2401.9 | 1.016 / 1.012 / 1.006 |
+| source | 1000 | 23652.8 / 23588.4 / 23407.5 | 23922.1 / 23918.8 / 23492.3 | 1.011 / 1.014 / 1.004 |
+| source | 10000 | 234679.3 / 236586.0 / 234624.8 | 237656.6 / 238103.3 / 235161.8 | 1.013 / 1.006 / 1.002 |
+
+Verdict against the single-set budget (≤ 10 %):
+- source owner (the default open route): **met** at every size (0.2–8.2 %);
+- eager owner: met at 1 and 10 shapes (4–9 %), **missed** at 100–10,000
+  shapes (17–22 %). The overhead grows with slide size: the unified path
+  resolves `/slide/shape/paragraph/run` by reading the eager slide's shape
+  scene and text body, which the eager owner does not cache between calls,
+  while the native leg is handed the positions. Follow-up: an eager scene
+  cache in the PPTX node layer (plan step 8 owns `format/pptx/node.rs`), or
+  a resolve-free fast path for direct positional run paths.
+
+Not measured: paragraph, shape-level and cell formatting, query fan-out, and
+the 1k-op batch for text formatting (batches reuse per-item `set`; the
+shape coalescer declines formatting payloads).
