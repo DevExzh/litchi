@@ -213,6 +213,24 @@ impl<'f> Nav<'f> {
                     None => Lookup::Missing,
                 }
             },
+            (Kind::Chart, select) => {
+                let count = file.sheet_chart_count(position)?;
+                let index = match select {
+                    Select::Ordinal(ordinal) => Some(ordinal.get()),
+                    Select::None => Some(0),
+                    Select::Last => count.checked_sub(1),
+                    _ => return Ok(Lookup::NotApplicable),
+                };
+                match index.filter(|index| *index < count) {
+                    Some(index) => match file.sheet_chart(position, index)? {
+                        Some(summary) => {
+                            Self::found(Node::new_chart(file, position, index, summary))
+                        },
+                        None => Lookup::Missing,
+                    },
+                    None => Lookup::Missing,
+                }
+            },
             (Kind::Table, select) => {
                 let tables = sheet.handle.tables()?;
                 let index = match select {
@@ -355,7 +373,9 @@ impl<'f> Navigate<'f> for Nav<'f> {
         step: &Resolved<'_, Kind>,
     ) -> Result<Lookup<Node<'f>, GapSpec>> {
         self.file.0.owner.finish(|| {
-            if let Some(gap) = step.kind.spec().gap {
+            // The XLSX table, not the shared workbook one: XLSX reads the
+            // chart elements the shared table lists as gaps (record 0270).
+            if let Some(gap) = SPEC.elements[step.kind as usize].gap {
                 return Ok(Lookup::Gap(gap));
             }
             match (parent.item(), step.kind) {
@@ -363,6 +383,13 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 (Item::Workbook, Kind::NamedRange) => self.named_range(step.select),
                 (Item::Workbook, Kind::Table) => self.workbook_table(step.select),
                 (Item::Sheet(sheet), kind) => self.in_sheet(sheet, kind, step.select),
+                (Item::Chart(chart), Kind::Series | Kind::Axis) => Ok(chart_child(
+                    self.file,
+                    parent,
+                    chart,
+                    step.kind,
+                    step.select,
+                )),
                 _ => Ok(Lookup::NotApplicable),
             }
         })
@@ -389,6 +416,15 @@ impl<'f> Navigate<'f> for Nav<'f> {
                 },
                 (Item::Sheet(sheet), Kind::Table) => {
                     out.kind("table", sheet.handle.tables()?.len());
+                },
+                (Item::Sheet(sheet), Kind::Chart) => {
+                    out.kind("chart", file.sheet_chart_count(sheet.position)?);
+                },
+                (Item::Chart(chart), Kind::Series) => {
+                    out.kind("series", chart.summary.series.len());
+                },
+                (Item::Chart(chart), Kind::Axis) => {
+                    out.kind("axis", chart.summary.axes.len());
                 },
                 (Item::Sheet(sheet), Kind::Row | Kind::Column) => {
                     if let Some(extent) = sheet.grid()?.extents()?.stored() {
@@ -438,7 +474,8 @@ impl<'f> Inspect<'f> for Nav<'f> {
                 Item::NamedRange(index) => defined_names(self.file)
                     .get(*index)
                     .map(|name| Cow::Borrowed(name.name.as_str())),
-                Item::Workbook | Item::Range(_) => None,
+                Item::Chart(chart) => chart.summary.title.as_deref().map(Cow::Borrowed),
+                Item::Workbook | Item::Range(_) | Item::Series(_) | Item::Axis(_) => None,
             })
         })
     }
@@ -524,4 +561,46 @@ fn joined_text(grid: &super::node::Grid, rect: Rect) -> Result<String> {
         out.push_str(display_text(cell));
     }
     Ok(out)
+}
+
+/// A worksheet chart's series (by position) or axis (by position or
+/// `@role`).
+fn chart_child<'f>(
+    file: &'f Xlsx,
+    parent: &Node<'f>,
+    chart: &super::node::ChartItem,
+    kind: Kind,
+    select: Select<'_>,
+) -> Lookup<Node<'f>, GapSpec> {
+    let count = if kind == Kind::Series {
+        chart.summary.series.len()
+    } else {
+        chart.summary.axes.len()
+    };
+    let index = match select {
+        Select::Ordinal(ordinal) => Some(ordinal.get()),
+        Select::None => Some(0),
+        Select::Last => count.checked_sub(1),
+        Select::Identity(identities) if kind == Kind::Axis => {
+            let mut found = None;
+            for (identity, value) in identities.iter() {
+                if !identity.key.eq_ignore_ascii_case("role") {
+                    return Lookup::NotApplicable;
+                }
+                found = crate::format::chart::Role::parse(value)
+                    .and_then(|role| chart.summary.axes.iter().position(|axis| axis.role == role));
+            }
+            found
+        },
+        _ => return Lookup::NotApplicable,
+    };
+    match index.filter(|index| *index < count) {
+        Some(index) => Lookup::Found(Node::new_chart_part(
+            file,
+            parent.sheet_position(),
+            kind,
+            chart.with_child(index),
+        )),
+        None => Lookup::Missing,
+    }
 }

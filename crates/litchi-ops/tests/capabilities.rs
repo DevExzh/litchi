@@ -464,6 +464,10 @@ fn xlsx_reports_keep_selection_semantic_and_declare_cell_and_sheet_writes() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
+        // Chart writes have their own report test (`tests/charts.rs`).
+        if matches!(element.name(), "chart" | "series" | "axis") {
+            continue;
+        }
         for property in element.properties() {
             let cell_write = matches!(element.name(), "cell" | "range")
                 && matches!(
@@ -612,6 +616,10 @@ fn pptx_reports_selection_and_structural_writes() {
         assert!(element.paths().all(|(path, _)| {
             !path.contains("<id>") && !path.contains("[@id=") && !path.contains("[@rId=")
         }));
+        // Chart writes have their own report test (`tests/charts.rs`).
+        if matches!(element.name(), "chart" | "series" | "axis") {
+            continue;
+        }
         for property in element.properties() {
             let text_write =
                 matches!(element.name(), "shape" | "placeholder") && property.name() == "text";
@@ -666,7 +674,8 @@ fn pptx_reports_selection_and_structural_writes() {
     ] {
         let operations = caps.element(kind).unwrap().operations();
         assert!(operations.remove, "{kind}");
-        assert!(!operations.set, "{kind}");
+        // Charts are settable (record 0270).
+        assert_eq!(operations.set, kind == "chart", "{kind}");
     }
     let slide = caps.element("slide").unwrap();
     assert!(slide.operations().set);

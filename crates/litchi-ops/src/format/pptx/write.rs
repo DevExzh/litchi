@@ -212,6 +212,9 @@ impl Pptx {
             };
             return self.set_comment(comment.slide, comment.index, &props, limits);
         }
+        if let Some(commit) = self.try_set_chart(&target, &props, limits)? {
+            return Ok(commit);
+        }
         if notes::accepts(&target, &props) {
             return self.set_notes(target, &props, limits);
         }

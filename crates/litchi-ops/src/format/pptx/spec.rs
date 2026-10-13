@@ -611,6 +611,49 @@ props! {
 }
 
 props! {
+    /// A chart frame (`ChartToNode`): the frame properties, then what its
+    /// chart part says (record 0270). The keys up to `zorder` are
+    /// [`FRAME_PROPS`] in the same order.
+    CHART_PROPS, ChartKey {
+        Name = "name": ValueType::Text,
+        Id = "id": ValueType::Int; raw,
+        Alt = "alt": ValueType::Text,
+        X = "x": POSITION,
+        Y = "y": POSITION,
+        Width = "width": EXTENT,
+        Height = "height": EXTENT,
+        Rotation = "rotation": ValueType::Number,
+        FlipH = "flipH": ValueType::Bool,
+        FlipV = "flipV": ValueType::Bool,
+        Zorder = "zorder": ValueType::Int,
+        ChartType = "chartType": ValueType::Text,
+        Title = "title": ValueType::Text,
+        Legend = "legend": ValueType::Text,
+        Categories = "categories": ValueType::Text,
+        CatTitle = "catTitle": ValueType::Text,
+    }
+}
+
+props! {
+    /// A chart series (`chart-series`): its name, values and categories.
+    SERIES_PROPS, SeriesKey {
+        Name = "name": ValueType::Text,
+        Values = "values": ValueType::Text,
+        Categories = "categories": ValueType::Text,
+    }
+}
+
+props! {
+    /// A chart axis (`chart-axis`): its role and title.
+    AXIS_PROPS, AxisKey {
+        Role = "role": ValueType::Text,
+        Title = "title": ValueType::Text,
+    }
+}
+
+const _: () = assert!(ChartKey::Zorder as usize + 1 == FRAME_PROPS.len());
+
+props! {
     /// A table (`TableToNode`), whose geometry OfficeCLI prints lossily.
     TABLE_PROPS, TableKey {
         Name = "name": ValueType::Text,
@@ -773,7 +816,6 @@ const MEDIA: &str =
 const ALTERNATE: &str =
     "zoom and 3D-model frames sit in markup-compatibility content the scene reads as its fallback";
 const MASTERS: &str = "the presentation theme is not readable on the owner yet";
-const CHART_PARTS: &str = "chart frames are not mapped to their chart parts yet";
 const NOTES_PARTS: &str =
     "notes slides are read through /slide[N]/notes; their parts have no adapter node";
 
@@ -798,8 +840,6 @@ static ANIMATION_GAP: GapSpec = element_gap(
     "M1-extended",
     "the timing tree is not read per shape yet",
 );
-static SERIES_GAP: GapSpec = element_gap("series", "L-PPTX-R8", CHART_PARTS);
-static AXIS_GAP: GapSpec = element_gap("axis", "L-PPTX-R8", CHART_PARTS);
 static COLUMN_GAP: GapSpec = element_gap(
     "col",
     "L-PPTX-R8",
@@ -1083,7 +1123,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &[Series, Axis, Animation],
             SHAPE_IDS,
             &["/slide[N]/chart[@id=ID]", "/slide[N]/chart[N]"],
-            FRAME_PROPS,
+            CHART_PROPS,
         ),
         element(
             Group,
@@ -1304,23 +1344,31 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             &["/slide[N]/shape[N]/animation[N]"],
             &ANIMATION_GAP,
         ),
-        gap(
+        element(
             Series,
             "series",
             &["series"],
             &[Chart],
             &[],
-            &["/slide[N]/chart[N]/series[N]"],
-            &SERIES_GAP,
+            &["id"],
+            &[
+                "/slide[N]/chart[N]/series[N]",
+                "/slide[N]/chart[N]/series[@id=ID]",
+            ],
+            SERIES_PROPS,
         ),
-        gap(
+        element(
             Axis,
             "axis",
             &["axis"],
             &[Chart],
             &[],
-            &["/slide[N]/chart[N]/axis[@role=ROLE]"],
-            &AXIS_GAP,
+            &["role"],
+            &[
+                "/slide[N]/chart[N]/axis[@role=ROLE]",
+                "/slide[N]/chart[N]/axis[N]",
+            ],
+            AXIS_PROPS,
         ),
         gap(
             Col,
@@ -1424,12 +1472,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             "rowspan",
             "L-PPTX-R8",
             "the table reader does not read cell properties yet",
-        ),
-        property_gap(
-            "chart",
-            "chartType",
-            "L-PPTX-R8",
-            "chart frames are not mapped to their chart parts yet",
         ),
         property_gap(
             "picture",
@@ -1837,3 +1879,188 @@ pub(super) const PICTURE_WRITE_TABLE: crate::registry::Table<
 );
 pub(crate) const PICTURE_CAPABILITY_PROPS: &[PropSpec] = &PICTURE_WRITE_TABLE.readable();
 pub(crate) const SLIDE_CAPABILITY_PROPS: &[PropSpec] = &SLIDE_WRITE_TABLE.readable();
+
+/// Chart assignments (record 0270): `add` builds a chart, `set` edits the
+/// title, legend, categories and category-axis title of an existing one.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum ChartSetter {
+    Name,
+    X,
+    Y,
+    Width,
+    Height,
+    ChartType,
+    Title,
+    Legend,
+    Categories,
+    CatTitle,
+    Data,
+    AxisTitle,
+    /// A formatting key ([`crate::format::chart::FORMAT_PROPS`]).
+    Format(crate::format::chart::FormatKey),
+    /// `series{N}`, by its zero-based number.
+    Numbered(u8),
+}
+const CHART_FORMAT_START: usize = CHART_PROPS.len() + 2;
+const CHART_NUMBERED_START: usize = CHART_FORMAT_START + crate::format::chart::FORMAT_PROPS.len();
+const CHART_WRITE_COUNT: usize =
+    CHART_NUMBERED_START + crate::format::chart::NUMBERED_SERIES_PROPS.len();
+const fn chart_write_entries() -> [crate::registry::Entry<ChartSetter>; CHART_WRITE_COUNT] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(CHART_PROPS[0]); CHART_WRITE_COUNT];
+    let mut index = 0;
+    while index < CHART_PROPS.len() {
+        let spec = CHART_PROPS[index];
+        let access = if index == ChartKey::Name as usize {
+            Some(Access::Add(ChartSetter::Name))
+        } else if index == ChartKey::X as usize {
+            Some(Access::Add(ChartSetter::X))
+        } else if index == ChartKey::Y as usize {
+            Some(Access::Add(ChartSetter::Y))
+        } else if index == ChartKey::Width as usize {
+            Some(Access::Add(ChartSetter::Width))
+        } else if index == ChartKey::Height as usize {
+            Some(Access::Add(ChartSetter::Height))
+        } else if index == ChartKey::ChartType as usize {
+            Some(Access::Add(ChartSetter::ChartType))
+        } else if index == ChartKey::Title as usize {
+            Some(Access::SetAndAdd(ChartSetter::Title))
+        } else if index == ChartKey::Legend as usize {
+            Some(Access::SetAndAdd(ChartSetter::Legend))
+        } else if index == ChartKey::Categories as usize {
+            Some(Access::SetAndAdd(ChartSetter::Categories))
+        } else if index == ChartKey::CatTitle as usize {
+            Some(Access::SetAndAdd(ChartSetter::CatTitle))
+        } else {
+            None
+        };
+        entries[index] = match access {
+            Some(access) => Entry {
+                spec,
+                access,
+                constraint: if index == ChartKey::Width as usize
+                    || index == ChartKey::Height as usize
+                {
+                    Constraint::Length {
+                        min: crate::value::Length::from_emu(1),
+                        max: crate::value::Length::from_emu(i64::MAX),
+                    }
+                } else {
+                    Constraint::None
+                },
+                clear: index == ChartKey::Title as usize || index == ChartKey::CatTitle as usize,
+            },
+            None => Entry::read(spec),
+        };
+        index += 1;
+    }
+    entries[CHART_PROPS.len()] = Entry {
+        spec: write_only("data", ValueType::Text),
+        access: Access::Add(ChartSetter::Data),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    };
+    entries[CHART_PROPS.len() + 1] = Entry {
+        spec: write_only("axisTitle", ValueType::Text),
+        access: Access::Add(ChartSetter::AxisTitle),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    let mut format = 0;
+    while format < crate::format::chart::FORMAT_PROPS.len() {
+        let (key, spec) = crate::format::chart::FORMAT_PROPS[format];
+        entries[CHART_FORMAT_START + format] = Entry {
+            spec,
+            access: Access::Add(ChartSetter::Format(key)),
+            constraint: Constraint::None,
+            clear: false,
+        };
+        format += 1;
+    }
+    let mut number = 0;
+    while number < crate::format::chart::NUMBERED_SERIES_PROPS.len() {
+        entries[CHART_NUMBERED_START + number] = Entry {
+            spec: crate::format::chart::NUMBERED_SERIES_PROPS[number],
+            access: Access::Add(ChartSetter::Numbered(number as u8)),
+            constraint: Constraint::NotEmpty,
+            clear: false,
+        };
+        number += 1;
+    }
+    entries
+}
+const _: () = assert!(
+    CHART_WRITE_COUNT <= 64,
+    "chart adds track assignments in a u64"
+);
+pub(super) const CHART_WRITE_TABLE: crate::registry::Table<ChartSetter, CHART_WRITE_COUNT, 3> =
+    crate::registry::Table::new(
+        chart_write_entries(),
+        [
+            crate::registry::Alias {
+                name: "type",
+                entry: ChartKey::ChartType as usize,
+            },
+            crate::registry::Alias {
+                name: "htitle",
+                entry: ChartKey::CatTitle as usize,
+            },
+            crate::registry::Alias {
+                name: "vtitle",
+                entry: CHART_PROPS.len() + 1,
+            },
+        ],
+    );
+pub(crate) const CHART_CAPABILITY_PROPS: &[PropSpec] = &CHART_WRITE_TABLE.readable();
+
+/// Chart-series assignments (record 0270).
+#[derive(Clone, Copy)]
+pub(super) enum SeriesSetter {
+    Name,
+    Values,
+}
+const fn series_write_entries() -> [crate::registry::Entry<SeriesSetter>; SERIES_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(SERIES_PROPS[0]); SERIES_PROPS.len()];
+    entries[SeriesKey::Name as usize] = Entry {
+        spec: SERIES_PROPS[SeriesKey::Name as usize],
+        access: Access::Set(SeriesSetter::Name),
+        constraint: Constraint::None,
+        clear: false,
+    };
+    entries[SeriesKey::Values as usize] = Entry {
+        spec: SERIES_PROPS[SeriesKey::Values as usize],
+        access: Access::Set(SeriesSetter::Values),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    };
+    entries[SeriesKey::Categories as usize] =
+        Entry::read(SERIES_PROPS[SeriesKey::Categories as usize]);
+    entries
+}
+pub(super) const SERIES_WRITE_TABLE: crate::registry::Table<
+    SeriesSetter,
+    { SERIES_PROPS.len() },
+    0,
+> = crate::registry::Table::new(series_write_entries(), []);
+pub(crate) const SERIES_CAPABILITY_PROPS: &[PropSpec] = &SERIES_WRITE_TABLE.readable();
+
+/// Chart-axis assignments (record 0270).
+#[derive(Clone, Copy)]
+pub(super) enum AxisSetter {
+    Title,
+}
+const fn axis_write_entries() -> [crate::registry::Entry<AxisSetter>; AXIS_PROPS.len()] {
+    use crate::registry::{Access, Constraint, Entry};
+    let mut entries = [Entry::read(AXIS_PROPS[0]); AXIS_PROPS.len()];
+    entries[AxisKey::Title as usize] = Entry {
+        spec: AXIS_PROPS[AxisKey::Title as usize],
+        access: Access::Set(AxisSetter::Title),
+        constraint: Constraint::None,
+        clear: true,
+    };
+    entries
+}
+pub(super) const AXIS_WRITE_TABLE: crate::registry::Table<AxisSetter, { AXIS_PROPS.len() }, 0> =
+    crate::registry::Table::new(axis_write_entries(), []);
+pub(crate) const AXIS_CAPABILITY_PROPS: &[PropSpec] = &AXIS_WRITE_TABLE.readable();

@@ -236,7 +236,7 @@ fn compile_time_findings_are_diagnostics_or_errors() {
     );
     for (selector, code) in [
         ("comment", Code::UnsupportedCapability),
-        ("chart[1]", Code::UnsupportedCapability),
+        ("pivottable[1]", Code::UnsupportedCapability),
         ("cell[link=x]", Code::UnsupportedCapability),
         ("cell[computedValue=1]", Code::UnsupportedCapability),
         ("paragraph", Code::UnsupportedPath),

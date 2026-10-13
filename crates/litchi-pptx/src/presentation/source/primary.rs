@@ -818,6 +818,22 @@ impl Slide {
         Ok(None)
     }
 
+    /// The chart-space XML of the ordinary chart this slide relates through
+    /// `relationship_id`, or `None` when it has no such chart.
+    ///
+    /// A restored slide carries no chart relationships (they are dependency
+    /// edges that slide removal refuses), so only a physical source slide
+    /// can answer `Some`.
+    pub fn chart_xml(&self, relationship_id: &str) -> Result<Option<Vec<u8>>> {
+        self.package.check()?;
+        let result = match self.physical_source_slide() {
+            Some(slide) => slide.chart_xml(relationship_id),
+            None => Ok(None),
+        };
+        self.package.check()?;
+        result
+    }
+
     /// Acquire the effective slide's optional legacy comments snapshot.
     ///
     /// Legacy comments are a dependency of a slide removal and are therefore

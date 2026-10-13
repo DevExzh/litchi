@@ -236,6 +236,27 @@ impl Workbook {
         Ok(Self { bytes })
     }
 
+    /// Generate the workbook an authored chart spec with a
+    /// [`Binding::Sheet`](litchi_drawingml::chart::authoring::Binding::Sheet)
+    /// binding refers to: the spec's
+    /// [`sheet_layout`](litchi_drawingml::chart::authoring::Spec::sheet_layout)
+    /// on `Sheet1`. The same spec always produces the same bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the spec is invalid or the workbook exceeds its
+    /// byte limit.
+    pub fn from_spec(spec: &litchi_drawingml::chart::authoring::Spec) -> Result<Self> {
+        let bytes = super::package::generate_spec(spec)?;
+        if bytes.len() > MAX_WORKBOOK_BYTES {
+            return Err(Error::Limit {
+                resource: "embedded workbook bytes",
+                limit: MAX_WORKBOOK_BYTES,
+            });
+        }
+        Ok(Self { bytes })
+    }
+
     /// Borrow the generated XLSX bytes without copying.
     #[must_use]
     pub fn as_bytes(&self) -> &[u8] {

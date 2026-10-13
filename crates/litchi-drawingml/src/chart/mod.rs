@@ -74,6 +74,7 @@
 //! # Ok::<(), std::io::Error>(())
 //! ```
 
+pub mod authoring;
 pub mod axis;
 pub mod bubble;
 pub mod data;

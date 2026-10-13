@@ -13,6 +13,8 @@
 
 #[cfg(any(feature = "xlsx", feature = "xlsb"))]
 mod cell_text;
+#[cfg(any(feature = "pptx", feature = "xlsx"))]
+pub(crate) mod chart;
 #[cfg(feature = "doc")]
 pub mod doc;
 #[cfg(feature = "docx")]

@@ -66,6 +66,9 @@ impl Pptx {
         {
             return self.add_picture(parent, node, limits);
         }
+        if node.kind().eq_ignore_ascii_case("chart") {
+            return self.add_chart(parent, node, limits);
+        }
         if node.kind().eq_ignore_ascii_case("comment") {
             return self.add_comment(parent, node, limits);
         }
@@ -87,7 +90,7 @@ impl Pptx {
         if !node.kind().eq_ignore_ascii_case("slide") {
             return Err(error(
                 Code::UnsupportedElement,
-                "PPTX insertion currently supports slides, text-box shapes, pictures and comments",
+                "PPTX insertion currently supports slides, text-box shapes, pictures, charts and comments",
             ));
         }
         let mut layout = None;

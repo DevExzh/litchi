@@ -1169,6 +1169,29 @@ const fn xlsx_gaps() -> [GapSpec; XLSX_GAP_COUNT] {
 
 static XLSX_GAPS: [GapSpec; XLSX_GAP_COUNT] = xlsx_gaps();
 
+/// The chart elements the shared workbook vocabulary lists as gaps, read
+/// and written by the XLSX adapter (record 0270).
+const XLSX_CHART: ElementSpec<Kind> = ElementSpec {
+    props: super::chart::CHART_PROPS,
+    gap: None,
+    ..workbook::SPEC.elements[9]
+};
+const XLSX_SERIES: ElementSpec<Kind> = ElementSpec {
+    props: super::chart::SERIES_PROPS,
+    gap: None,
+    ..workbook::SPEC.elements[10]
+};
+const XLSX_AXIS: ElementSpec<Kind> = ElementSpec {
+    props: super::chart::AXIS_PROPS,
+    identities: &["role"],
+    gap: None,
+    paths: &[
+        "/<sheet>/chart[N]/axis[@role=<role>]",
+        "/<sheet>/chart[N]/axis[N]",
+    ],
+    ..workbook::SPEC.elements[11]
+};
+
 // Keep the shared workbook topology and all non-XLSX-specific gaps, replacing
 // only the range property table and its former capability gap.  XLSB retains
 // the shared range gap in its own local SPEC.
@@ -1206,18 +1229,9 @@ static XLSX_ELEMENTS: [ElementSpec<Kind>; 26] = [
         &workbook::SPEC.elements[8],
         workbook::SPEC.elements[8].props,
     ),
-    with_props(
-        &workbook::SPEC.elements[9],
-        workbook::SPEC.elements[9].props,
-    ),
-    with_props(
-        &workbook::SPEC.elements[10],
-        workbook::SPEC.elements[10].props,
-    ),
-    with_props(
-        &workbook::SPEC.elements[11],
-        workbook::SPEC.elements[11].props,
-    ),
+    XLSX_CHART,
+    XLSX_SERIES,
+    XLSX_AXIS,
     with_props(
         &workbook::SPEC.elements[12],
         workbook::SPEC.elements[12].props,

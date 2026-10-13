@@ -2633,7 +2633,7 @@ impl Element {
                 && self.retains_source != Some(false)
                 && matches!(
                     self.data().canonical,
-                    "cell" | "range" | "sheet" | "row" | "col"
+                    "cell" | "range" | "sheet" | "row" | "col" | "chart" | "series" | "axis"
                 )
                 && readable);
         #[cfg(feature = "xlsb")]
@@ -2652,7 +2652,10 @@ impl Element {
         let settable = settable
             || (self.adapter == Adapter::Pptx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "slide" | "shape" | "placeholder")
+                && matches!(
+                    self.data().canonical,
+                    "slide" | "shape" | "placeholder" | "chart" | "series" | "axis"
+                )
                 && readable);
         #[cfg(feature = "ppt")]
         let settable = settable
@@ -2688,7 +2691,7 @@ impl Element {
         let structural = structural
             || (self.adapter == Adapter::Xlsx
                 && self.retains_source != Some(false)
-                && self.data().canonical == "sheet"
+                && matches!(self.data().canonical, "sheet" | "chart")
                 && readable);
         #[cfg(feature = "pptx")]
         let add = structural
@@ -2696,7 +2699,7 @@ impl Element {
                 && self.retains_source != Some(false)
                 && match self.data().canonical {
                     "slide" => self.pptx_slide_add == Some(true),
-                    "shape" => self.pptx_shape_add == Some(true),
+                    "shape" | "chart" => self.pptx_shape_add == Some(true),
                     _ => false,
                 }
                 && readable);
@@ -2865,6 +2868,9 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "sheet" => crate::format::xlsx::SHEET_CAPABILITY_PROPS,
                 "row" => crate::format::xlsx::ROW_CAPABILITY_PROPS,
                 "col" => crate::format::xlsx::COLUMN_CAPABILITY_PROPS,
+                "chart" => crate::format::xlsx::CHART_CAPABILITY_PROPS,
+                "series" => crate::format::xlsx::SERIES_CAPABILITY_PROPS,
+                "axis" => crate::format::xlsx::AXIS_CAPABILITY_PROPS,
                 _ => props,
             }
         } else { props };
@@ -2891,6 +2897,9 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "notes" => crate::format::pptx::NOTES_CAPABILITY_PROPS,
                 "comment" => crate::format::pptx::COMMENT_CAPABILITY_PROPS,
                 "picture" => crate::format::pptx::PICTURE_CAPABILITY_PROPS,
+                "chart" => crate::format::pptx::CHART_CAPABILITY_PROPS,
+                "series" => crate::format::pptx::SERIES_CAPABILITY_PROPS,
+                "axis" => crate::format::pptx::AXIS_CAPABILITY_PROPS,
                 _ => props,
             }
         } else {

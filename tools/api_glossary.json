@@ -2682,7 +2682,8 @@
       ],
       "families": [
         "litchi_xlsx::workbook::edit",
-        "litchi_xlsx::metadata"
+        "litchi_xlsx::metadata",
+        "litchi_xlsx::chart::edit"
       ]
     },
     {
@@ -3213,7 +3214,8 @@
       ],
       "families": [
         "litchi_xlsx::workbook::edit",
-        "litchi_xlsx::metadata"
+        "litchi_xlsx::metadata",
+        "litchi_xlsx::chart::edit"
       ]
     },
     {

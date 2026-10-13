@@ -476,7 +476,7 @@ fn validate_image_leaf(part: &dyn Part) -> Result<()> {
     Ok(())
 }
 
-pub(super) fn attach_worksheet(xml: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
+pub(crate) fn attach_worksheet(xml: &[u8], relationship_id: &str) -> Result<Vec<u8>> {
     let layout = worksheet_layout(xml)?;
     if layout.drawing_reference.is_some() {
         return Err(unsupported("merging into an existing worksheet drawing"));

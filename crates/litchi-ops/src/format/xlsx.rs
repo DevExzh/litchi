@@ -58,6 +58,7 @@ use crate::options::{OpenOptions, SourceMode};
 #[doc(hidden)]
 #[path = "xlsx/support.rs"]
 pub mod __unified;
+mod chart;
 mod children;
 pub(crate) mod create;
 mod dimension_write;
@@ -75,6 +76,7 @@ mod structure;
 mod views;
 pub(crate) mod write;
 
+pub(crate) use chart::{AXIS_CAPABILITY_PROPS, CHART_CAPABILITY_PROPS, SERIES_CAPABILITY_PROPS};
 pub(crate) use children::Children;
 pub(crate) use nav::Nav;
 pub use node::Node;

@@ -11,6 +11,7 @@
 //! | shape | the paragraphs of its text body |
 //! | paragraph | its runs and line breaks (fields are not listed, as in OfficeCLI) |
 //! | table | its rows; a row, its cells |
+//! | chart | its series, then its axes (record 0270) |
 //!
 //! Each child is read when it is pulled, so a walk that stops early decodes
 //! no later sibling; a slide's scene is read when the iterator is built for
@@ -120,6 +121,8 @@ enum State {
         next: u32,
         end: u32,
     },
+    /// A chart's series, then its axes (record 0270).
+    Chart(std::vec::IntoIter<Item>),
 }
 
 /// The shape-tree kinds, in counter-slot order.
@@ -428,6 +431,9 @@ impl<'f> Children<'f> {
                         }),
                     )));
                 },
+                State::Chart(items) => {
+                    return Ok(items.next().map(|item| Node::new(file, item)));
+                },
                 State::Cells { row, next, end } => {
                     if *next >= *end {
                         return Ok(None);
@@ -599,6 +605,17 @@ impl State {
                         next: 0,
                     },
                     None => Self::Done,
+                },
+                Kind::Chart if kinds.contains(Kind::Series) || kinds.contains(Kind::Axis) => {
+                    let items: Vec<Item> = super::chart::children(file, tree)?
+                        .into_iter()
+                        .filter(|item| match item {
+                            Item::Series(_) => kinds.contains(Kind::Series),
+                            Item::Axis(_) => kinds.contains(Kind::Axis),
+                            _ => false,
+                        })
+                        .collect();
+                    Self::Chart(items.into_iter())
                 },
                 Kind::Table if kinds.contains(Kind::Row) => {
                     let (rows, _) = text::table_shape(&tree.handle)?;

@@ -292,6 +292,35 @@ impl<'a> Slide<'a> {
         package::slide_charts(self.package, &self.part)
     }
 
+    /// The chart-space XML of the ordinary chart this slide relates through
+    /// `relationship_id` (a chart frame's payload relationship), or `None`
+    /// when the slide has no such chart relationship.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an external relationship or a target that is
+    /// not a chart part.
+    pub fn chart_xml(&self, relationship_id: &str) -> Result<Option<&'a [u8]>> {
+        let Some(relationship) = self.part.part().rels().get(relationship_id) else {
+            return Ok(None);
+        };
+        if !crate::parts::is_relationship_type(
+            relationship.reltype(),
+            litchi_opc::constants::relationship_type::CHART,
+            "chart",
+        ) {
+            return Ok(None);
+        }
+        if relationship.is_external() {
+            return Err(crate::Error::Relationship(
+                "chart relationships cannot be external".to_owned(),
+            ));
+        }
+        let target = relationship.target_partname()?;
+        let part = crate::chart::Part::from_part(self.package.get_part(&target)?)?;
+        Ok(Some(part.part().blob()))
+    }
+
     /// Resolve Microsoft `ChartEx` parts attached to this slide.
     ///
     /// # Errors

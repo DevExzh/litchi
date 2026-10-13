@@ -818,6 +818,32 @@ impl SourceSlide {
         })
     }
 
+    /// The chart-space XML of the ordinary chart this slide relates through
+    /// `relationship_id` (a chart frame's payload relationship), or `None`
+    /// when the slide has no such chart relationship.
+    ///
+    /// # Errors
+    /// Returns typed source, execution, limit, relationship or XML errors.
+    pub fn chart_xml(&self, relationship_id: &str) -> Result<Option<Vec<u8>>> {
+        with_fences(&self.owner, || {
+            let slide_part = self.owner.package.part(&self.data.part_uri)?;
+            let Some(relationship) = slide_part.rels().get(relationship_id) else {
+                return Ok(None);
+            };
+            if !is_relationship_type(relationship.reltype(), CHART_REL, "chart") {
+                return Ok(None);
+            }
+            if relationship.target_mode() == TargetMode::External {
+                return Err(Error::Invalid(
+                    "source chart relationship must be internal".into(),
+                ));
+            }
+            let target = relationship.target_partname()?;
+            let part = load_part(&self.owner, &target, CT_CHART, MAX_CHART_XML)?;
+            Ok(Some(part.blob().to_vec()))
+        })
+    }
+
     /// Acquire the chart at a positional relationship index.
     ///
     /// # Errors
