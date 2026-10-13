@@ -14,6 +14,9 @@ use litchi_core::sheet::Cell as _;
 pub(crate) struct Children<'f> {
     file: &'f Xls,
     state: State<'f>,
+    /// View children fence each step; query-walk children run inside the
+    /// walker's own per-advance fence.
+    fenced: bool,
 }
 
 enum State<'f> {
@@ -182,7 +185,11 @@ impl SheetItems {
 
 impl<'f> Children<'f> {
     fn new(file: &'f Xls, state: State<'f>) -> Self {
-        Self { file, state }
+        Self {
+            file,
+            state,
+            fenced: true,
+        }
     }
 
     pub(super) fn view(node: &Node<'f>, options: &ViewOptions) -> Result<Self> {
@@ -238,7 +245,15 @@ impl<'f> Children<'f> {
         Ok(Self::new(file, state))
     }
 
+    /// The query walker's children of `node`; the walker fences each advance,
+    /// so these steps add no source probe of their own.
     pub(super) fn walk(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
+        let mut children = Self::walk_children(node, kinds)?;
+        children.fenced = false;
+        Ok(children)
+    }
+
+    fn walk_children(node: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
         let file = node.file();
         let state = match node.item() {
             Item::Workbook if kinds.contains(Kind::Sheet) => State::Sheets {
@@ -384,7 +399,12 @@ impl<'f> Iterator for Children<'f> {
         if matches!(self.state, State::Done) {
             return None;
         }
-        match self.file.finish(|| self.step()) {
+        let step = if self.fenced {
+            self.file.finish(|| self.step())
+        } else {
+            self.step()
+        };
+        match step {
             Ok(Some(node)) => Some(Ok(node)),
             Ok(None) => {
                 self.state = State::Done;

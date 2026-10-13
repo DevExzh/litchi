@@ -264,13 +264,13 @@ impl Xls {
 
     /// Run one read against the retained native owner, fencing both the
     /// source-backed and eager routes.  The native source owner itself keeps
-    /// the payload scan lazy; this wrapper only checks the captured source
-    /// version before and after the operation.
+    /// the payload scan lazy; this wrapper checks the captured source version
+    /// once, after the operation.  Source versions only advance, so one
+    /// probe after the read detects a change made before or during it, and a
+    /// freshness failure takes precedence over the operation's own result.
     pub(crate) fn finish<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
-        self.check_source()?;
         let value = operation();
-        let freshness = self.check_source();
-        match freshness {
+        match self.check_source() {
             Err(error) => Err(error),
             Ok(()) => value,
         }

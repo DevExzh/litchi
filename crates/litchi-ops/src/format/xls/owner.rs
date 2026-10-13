@@ -6,7 +6,6 @@
 //! one immutable, sparse grid.  The grid is materialized only when a path,
 //! query, view or child walk first needs worksheet payload.
 
-use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use litchi_core::sheet::{Cell, CellValue};
@@ -16,30 +15,31 @@ use super::Xls;
 use crate::error::{Code, Error, Result};
 use crate::path::vocabulary::Case;
 
-/// A worksheet descriptor whose BIFF payload remains unopened.
-#[derive(Clone)]
-pub(super) struct SheetHandle {
-    package: Package,
+/// A worksheet descriptor whose BIFF payload remains unopened.  It borrows
+/// the immutable owner and its cached tab catalog, so resolving a tab copies
+/// nothing.
+#[derive(Clone, Copy)]
+pub(super) struct SheetHandle<'f> {
+    package: &'f Package,
     /// Position in the complete BoundSheet8 catalog.
     position: usize,
-    metadata: SheetMetadata,
+    metadata: &'f SheetMetadata,
 }
 
 pub(super) type EagerCells<'a> = Box<dyn Iterator<Item = &'a litchi_xls::Cell> + Send + Sync + 'a>;
 
-impl SheetHandle {
-    pub(super) fn at(file: &Xls, position: usize) -> Result<Option<Self>> {
-        let workbook = file.owner().workbook();
-        let Some(entry) = workbook.sheet(position)? else {
+impl<'f> SheetHandle<'f> {
+    pub(super) fn at(file: &'f Xls, position: usize) -> Result<Option<Self>> {
+        let Some(entry) = file.owner().sheet_catalog()?.get(position) else {
             return Ok(None);
         };
         Ok(Some(Self::from_metadata(file, position, entry)))
     }
 
-    pub(super) fn named(file: &Xls, name: &str, case: Case) -> Result<Option<Self>> {
-        let names = file.owner().workbook().sheets()?;
-        let mut found: Option<(usize, SheetMetadata)> = None;
-        for (position, candidate) in names.into_iter().enumerate() {
+    pub(super) fn named(file: &'f Xls, name: &str, case: Case) -> Result<Option<Self>> {
+        let names = file.owner().sheet_catalog()?;
+        let mut found: Option<(usize, &'f SheetMetadata)> = None;
+        for (position, candidate) in names.iter().enumerate() {
             if case.matches(candidate.name(), name) {
                 if found.is_some() {
                     return Err(Error::new(
@@ -54,9 +54,9 @@ impl SheetHandle {
         Ok(found.map(|(position, entry)| Self::from_metadata(file, position, entry)))
     }
 
-    fn from_metadata(file: &Xls, position: usize, entry: SheetMetadata) -> Self {
+    fn from_metadata(file: &'f Xls, position: usize, entry: &'f SheetMetadata) -> Self {
         Self {
-            package: file.owner().clone(),
+            package: file.owner(),
             position,
             metadata: entry,
         }
@@ -66,7 +66,7 @@ impl SheetHandle {
         self.position
     }
 
-    pub(super) fn name(&self) -> &str {
+    pub(super) fn name(&self) -> &'f str {
         self.metadata.name()
     }
 
@@ -87,7 +87,7 @@ impl SheetHandle {
             )
             .with_format(litchi_core::FileFormat::Xls)
         })?;
-        Grid::from_package(&self.package, worksheet_index)
+        Grid::from_package(self.package, worksheet_index)
     }
 
     /// Read one cell without materializing the complete sparse worksheet.
@@ -106,7 +106,7 @@ impl SheetHandle {
         if let Some(source) = self.package.source_workbook() {
             return source
                 .cell_by_index(worksheet_index, at.0, at.1)?
-                .map(|cell| CellData::from_source(&self.package, worksheet_index, &cell))
+                .map(|cell| CellData::from_source(self.package, worksheet_index, &cell))
                 .transpose();
         }
         let reader = self.package.reader_ref()?;
@@ -151,7 +151,7 @@ impl SheetHandle {
         }))
     }
 
-    fn eager_worksheet(&self) -> Result<&litchi_xls::Worksheet> {
+    fn eager_worksheet(&self) -> Result<&'f litchi_xls::Worksheet> {
         let worksheet_index = self.metadata.parsed_worksheet_index().ok_or_else(|| {
             Error::new(
                 Code::UnsupportedCapability,
@@ -168,7 +168,7 @@ impl SheetHandle {
     /// Borrow the eager worksheet's native cell iterator when the owner has
     /// already parsed its cells. Returning `None` preserves the source-backed
     /// fallback until a resumable positional cell cursor is available.
-    pub(super) fn eager_cells<'f>(&self, file: &'f Xls) -> Result<Option<EagerCells<'f>>> {
+    pub(super) fn eager_cells(&self, file: &'f Xls) -> Result<Option<EagerCells<'f>>> {
         if self.package.source_workbook().is_some() {
             return Ok(None);
         }
@@ -259,26 +259,26 @@ impl CellData {
     }
 }
 
-/// A lazily materialized worksheet grid.
+/// A lazily materialized worksheet grid: stored cells sorted by
+/// `(row, column)`.  A duplicate coordinate keeps its last physical record,
+/// as the worksheet projection does.
 #[derive(Debug, Clone)]
 pub(super) struct Grid {
-    cells: Arc<BTreeMap<(u32, u32), CellData>>,
+    cells: Arc<[((u32, u32), CellData)]>,
     extent: Option<(u32, u32, u32, u32)>,
 }
 
 impl Grid {
     fn from_package(package: &Package, position: usize) -> Result<Self> {
-        let mut cells = BTreeMap::new();
+        let mut cells: Vec<((u32, u32), CellData)> = Vec::new();
         if let Some(source) = package.source_workbook() {
             let worksheet = source
                 .worksheet_by_index(position)?
                 .ok_or_else(|| missing_sheet(position))?;
-            let mut fallback = Vec::new();
+            let mut fallback = false;
             worksheet.visit_cells(|cell| {
-                if cell.is_formula() && cell.formula().is_none() {
-                    fallback.push((cell.row(), cell.column()));
-                }
-                cells.insert(
+                fallback |= cell.is_formula() && cell.formula().is_none();
+                cells.push((
                     (cell.row(), cell.column()),
                     CellData {
                         value: cell.value().clone(),
@@ -286,18 +286,18 @@ impl Grid {
                         formula_text: cell.formula().map(Arc::from),
                         xf: cell.xf_index(),
                     },
-                );
+                ));
                 Ok(())
             })?;
-            if !fallback.is_empty() {
+            if fallback {
                 let reader = package.reader_ref()?;
                 let eager = reader
                     .xls_worksheet(position)
                     .map_err(|error| worksheet_error(error.to_string()))?;
-                for at in fallback {
-                    if let Some(cell) = cells.get_mut(&at) {
+                for ((row, column), cell) in &mut cells {
+                    if cell.formula && cell.formula_text.is_none() {
                         cell.formula_text = eager
-                            .get_cell(at.0, at.1)
+                            .get_cell(*row, *column)
                             .and_then(litchi_xls::Cell::formula)
                             .map(Arc::from);
                     }
@@ -308,12 +308,27 @@ impl Grid {
             let worksheet = reader
                 .xls_worksheet(position)
                 .map_err(|error| worksheet_error(error.to_string()))?;
-            for cell in worksheet.stored_cells() {
-                cells.insert((cell.row(), cell.column()), CellData::from_eager(cell));
+            cells.extend(
+                worksheet
+                    .stored_cells()
+                    .map(|cell| ((cell.row(), cell.column()), CellData::from_eager(cell))),
+            );
+        }
+        // Physical record order is usually row-major already; a stable sort
+        // keeps duplicate coordinates in record order so the last one wins.
+        if !cells.is_sorted_by(|left, right| left.0 < right.0) {
+            cells.sort_by_key(|(at, _)| *at);
+            let mut deduplicated: Vec<((u32, u32), CellData)> = Vec::with_capacity(cells.len());
+            for entry in cells {
+                match deduplicated.last_mut() {
+                    Some(last) if last.0 == entry.0 => *last = entry,
+                    _ => deduplicated.push(entry),
+                }
             }
+            cells = deduplicated;
         }
         let extent: Option<(u32, u32, u32, u32)> =
-            cells.keys().fold(None, |extent, &(row, column)| {
+            cells.iter().fold(None, |extent, &((row, column), _)| {
                 Some(match extent {
                     None => (row, column, row, column),
                     Some((first_row, first_column, last_row, last_column)) => (
@@ -325,13 +340,16 @@ impl Grid {
                 })
             });
         Ok(Self {
-            cells: Arc::new(cells),
+            cells: Arc::from(cells),
             extent,
         })
     }
 
     pub(super) fn record(&self, at: (u32, u32)) -> Option<&CellData> {
-        self.cells.get(&at)
+        self.cells
+            .binary_search_by_key(&at, |(key, _)| *key)
+            .ok()
+            .map(|index| &self.cells[index].1)
     }
 
     pub(super) fn cells_in(
@@ -339,10 +357,15 @@ impl Grid {
         rect: (u32, u32, u32, u32),
     ) -> impl Iterator<Item = ((u32, u32), &CellData)> {
         let (first_row, first_column, last_row, last_column) = rect;
-        self.cells
-            .range((first_row, 0)..=(last_row, u32::MAX))
+        let start = self.cells.partition_point(|(at, _)| *at < (first_row, 0));
+        let end = self
+            .cells
+            .partition_point(|(at, _)| at.0 <= last_row)
+            .max(start);
+        self.cells[start..end]
+            .iter()
             .filter(move |((_, column), _)| *column >= first_column && *column <= last_column)
-            .map(|(&(row, column), cell)| ((row, column), cell))
+            .map(|(at, cell)| (*at, cell))
     }
 
     pub(super) fn extents(&self) -> Option<(u32, u32, u32, u32)> {
@@ -350,8 +373,11 @@ impl Grid {
     }
 
     pub(super) fn row_indices(&self) -> Vec<u32> {
-        let mut rows = self.cells.keys().map(|(row, _)| *row).collect::<Vec<_>>();
-        rows.sort_unstable();
+        let mut rows = self
+            .cells
+            .iter()
+            .map(|((row, _), _)| *row)
+            .collect::<Vec<_>>();
         rows.dedup();
         rows
     }
@@ -359,8 +385,8 @@ impl Grid {
     pub(super) fn column_ranges(&self) -> Vec<(u32, u32)> {
         let mut columns = self
             .cells
-            .keys()
-            .map(|(_, column)| *column)
+            .iter()
+            .map(|((_, column), _)| *column)
             .collect::<Vec<_>>();
         columns.sort_unstable();
         columns.dedup();
@@ -393,7 +419,7 @@ pub(super) trait LayoutLookup {
     fn and_then_column(self, column: u32) -> Result<Option<ColumnLayout>>;
 }
 
-impl LayoutLookup for Option<SheetHandle> {
+impl LayoutLookup for Option<SheetHandle<'_>> {
     fn and_then_row(self, row: u32) -> Result<Option<RowLayout>> {
         self.map_or(Ok(None), |handle| handle.row_layout(row))
     }

@@ -27,16 +27,16 @@ use crate::node::{
 #[derive(Clone)]
 pub struct Node<'f> {
     file: &'f Xls,
-    item: Item,
+    item: Item<'f>,
     steps: [PathStep<'f>; 2],
     depth: u8,
     sheet: usize,
 }
 
 #[derive(Clone)]
-pub(super) enum Item {
+pub(super) enum Item<'f> {
     Workbook,
-    Sheet(Sheet),
+    Sheet(Sheet<'f>),
     Cell(CellItem),
     Range(RangeItem),
     Row(RowItem),
@@ -55,14 +55,14 @@ pub(super) fn defined_names(file: &Xls) -> Result<&[litchi_xls::DefinedName]> {
 }
 
 #[derive(Clone)]
-pub(super) struct Sheet {
+pub(super) struct Sheet<'f> {
     pub(super) position: usize,
-    pub(super) handle: SheetHandle,
+    pub(super) handle: SheetHandle<'f>,
     grid: OnceLock<Grid>,
 }
 
-impl Sheet {
-    pub(super) fn new(position: usize, handle: SheetHandle) -> Self {
+impl<'f> Sheet<'f> {
+    pub(super) fn new(position: usize, handle: SheetHandle<'f>) -> Self {
         Self {
             position,
             handle,
@@ -130,7 +130,7 @@ impl<'f> Node<'f> {
         }
     }
 
-    pub(super) fn new_sheet(file: &'f Xls, sheet: Sheet) -> Self {
+    pub(super) fn new_sheet(file: &'f Xls, sheet: Sheet<'f>) -> Self {
         let position = sheet.position;
         Self {
             file,
@@ -141,7 +141,7 @@ impl<'f> Node<'f> {
         }
     }
 
-    fn in_sheet(file: &'f Xls, sheet: usize, item: Item, tail: PathStep<'f>) -> Self {
+    fn in_sheet(file: &'f Xls, sheet: usize, item: Item<'f>, tail: PathStep<'f>) -> Self {
         Self {
             file,
             item,
@@ -241,7 +241,7 @@ impl<'f> Node<'f> {
         self.file
     }
 
-    pub(super) fn item(&self) -> &Item {
+    pub(super) fn item(&self) -> &Item<'f> {
         &self.item
     }
 
@@ -305,7 +305,7 @@ impl<'f> Node<'f> {
         }
     }
 
-    fn sheet_handle(&self) -> Result<Option<SheetHandle>> {
+    fn sheet_handle(&self) -> Result<Option<SheetHandle<'f>>> {
         SheetHandle::at(self.file, self.sheet)
     }
 
@@ -335,7 +335,7 @@ impl<'f> Node<'f> {
         self.file.finish(|| self.props_unfenced())
     }
 
-    fn props_unfenced(&self) -> Result<Format<'_>> {
+    pub(super) fn props_unfenced(&self) -> Result<Format<'_>> {
         let (table, props) = match &self.item {
             Item::Workbook => {
                 let metadata = self.file.owner().metadata()?;

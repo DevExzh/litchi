@@ -98,7 +98,7 @@ impl<'f> Nav<'f> {
 
     fn in_sheet(
         self,
-        sheet: &Sheet,
+        sheet: &Sheet<'_>,
         kind: Kind,
         select: Select<'_>,
     ) -> Result<Lookup<Node<'f>, GapSpec>> {
@@ -189,8 +189,15 @@ pub(super) fn tab_count(file: &Xls) -> Result<usize> {
     file.owner().workbook().sheet_count().map_err(Into::into)
 }
 
-pub(super) fn finish<T>(file: &Xls, operation: impl FnOnce() -> Result<T>) -> Result<T> {
-    file.finish(operation)
+/// Run one navigation step.
+///
+/// The generic resolver fences a whole path resolution and the query walker
+/// fences every advance with [`Navigate::check_source`], and every
+/// `Navigate`/`Inspect` call below runs inside one of those fences.  A step
+/// therefore adds no source-version probe of its own: on a positional owner
+/// each probe is a file-metadata system call.
+pub(super) fn finish<T>(_file: &Xls, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+    operation()
 }
 
 impl<'f> Navigate<'f> for Nav<'f> {
@@ -314,7 +321,7 @@ impl<'f> Inspect<'f> for Nav<'f> {
     }
 
     fn format<'n>(&'n self, node: &'n Node<'f>) -> Result<Format<'n>> {
-        finish(self.file, || node.props())
+        finish(self.file, || node.props_unfenced())
     }
 
     fn number(&self, node: &Node<'f>) -> Option<usize> {
