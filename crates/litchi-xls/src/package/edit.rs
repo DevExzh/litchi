@@ -630,6 +630,24 @@ impl Edit {
             .map_err(Error::from)
     }
 
+    /// Write one formula cell, replacing an existing scalar cell in place;
+    /// see [`cell_values::Edit::set_formula`].
+    ///
+    /// # Errors
+    ///
+    /// Returns a tokenizer, token-size, existing-formula, style, dependency
+    /// or transaction-bound refusal without partially staging.
+    pub fn set_formula<'a>(
+        &mut self,
+        selector: impl Into<cell_values::Selector<'a>>,
+        reference: cell_values::Reference,
+        expression: &str,
+    ) -> Result<()> {
+        self.inner
+            .set_formula(selector.into(), reference, expression)
+            .map_err(Error::from)
+    }
+
     /// Remove one supported cell record.
     pub fn remove_cell<'a>(
         &mut self,

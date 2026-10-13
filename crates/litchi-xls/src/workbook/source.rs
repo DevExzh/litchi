@@ -606,6 +606,7 @@ impl SourceBackedWorksheetDescriptor {
 #[derive(Debug, Clone, PartialEq)]
 pub struct SourceBackedCell {
     formula: bool,
+    formula_text: Option<Arc<str>>,
     row: u32,
     column: u32,
     value: litchi_core::sheet::CellValue,
@@ -616,6 +617,19 @@ impl SourceBackedCell {
     #[must_use]
     pub const fn is_formula(&self) -> bool {
         self.formula
+    }
+
+    /// Formula text rendered from the cell's BIFF tokens, with its leading
+    /// `=`.
+    ///
+    /// The positional owner renders without the workbook's name and
+    /// external-sheet tables, so a formula that needs them (a 3-D or named
+    /// reference) returns `None` here although [`Self::is_formula`] is true;
+    /// the eager reader's `Cell::formula` renders those with the full
+    /// workbook context.
+    #[must_use]
+    pub fn formula(&self) -> Option<&str> {
+        self.formula_text.as_deref()
     }
 
     /// Zero-based row.
@@ -3282,7 +3296,7 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
         if record.row() != self.row || record.col() != self.column {
             return Ok(());
         }
-        if let Some(value) = target_cell_value(record, scan.owner, scan.execution, strings)? {
+        if let Some(target) = target_cell_value(record, scan.owner, scan.execution, strings)? {
             if COLLECT_INDEX
                 && matches!(record, CellRecord::LabelSst { .. })
                 && let Some(index) = self.index.as_mut()
@@ -3293,9 +3307,10 @@ impl<const COLLECT_INDEX: bool> CellSink for TargetCell<'_, COLLECT_INDEX> {
             }
             self.found = Some(SourceBackedCell {
                 formula: matches!(record, CellRecord::Formula { .. }),
+                formula_text: target.formula,
                 row: u32::from(self.row),
                 column: u32::from(self.column),
-                value,
+                value: target.value,
             });
         }
         Ok(())
@@ -3344,14 +3359,23 @@ fn target_cell_value(
     owner: &SourceInner,
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
-) -> Result<Option<litchi_core::sheet::CellValue>> {
+) -> Result<Option<SelectedCell>> {
     let cell = Cell::from_record_with_formula_context(record, None, None, Some(&owner.formatting));
     let value = if let Some(string_index) = cell.shared_string_index() {
         resolve_shared_string(owner, string_index, execution, strings)?
     } else {
         cell.value().clone()
     };
-    Ok(Some(value))
+    Ok(Some(SelectedCell {
+        value,
+        formula: cell.formula_arc(),
+    }))
+}
+
+/// One selected cell's semantic value and context-free rendered formula.
+struct SelectedCell {
+    value: litchi_core::sheet::CellValue,
+    formula: Option<Arc<str>>,
 }
 
 /// The whole-sheet sink: reports every stored cell in stream order and retains
@@ -3382,6 +3406,7 @@ where
         };
         (self.visitor)(SourceBackedCell {
             formula: matches!(record, CellRecord::Formula { .. }),
+            formula_text: cell.formula_arc(),
             row: u32::from(record.row()),
             column: u32::from(record.col()),
             value,
@@ -3815,14 +3840,15 @@ fn replay_indexed_cell(
             .cfb
             .stream_cursor_at_hinted(&refs, slot.stream_offset, &mut chain)
             .map_err(SourceBackedError::from)?;
-        if let Some(value) =
+        if let Some(target) =
             replay_indexed_slot(owner, sheet.end, slot, &mut cursor, execution, &mut strings)?
         {
             found = Some(SourceBackedCell {
                 formula: slot.kind == 0x0006,
+                formula_text: target.formula,
                 row: u32::from(row),
                 column: u32::from(column),
-                value,
+                value: target.value,
             });
         }
     }
@@ -3843,7 +3869,7 @@ fn replay_indexed_slot(
     cursor: &mut SharedOleStreamCursor<'_>,
     execution: Option<&ExecutionContext>,
     strings: &mut SharedStringResolver<'_>,
-) -> Result<Option<litchi_core::sheet::CellValue>> {
+) -> Result<Option<SelectedCell>> {
     let (kind, payload) = read_indexed_frame(cursor, upper_bound)?;
     if kind != slot.kind {
         return Err(SourceBackedError::InvalidData(

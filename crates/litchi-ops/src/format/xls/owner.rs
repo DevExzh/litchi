@@ -9,7 +9,7 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use litchi_core::sheet::{Cell, CellValue, WorkbookTrait};
+use litchi_core::sheet::{Cell, CellValue};
 use litchi_xls::{Package, SheetKind, SheetMetadata, SheetVisibility};
 
 use super::Xls;
@@ -104,21 +104,16 @@ impl SheetHandle {
             .with_format(litchi_core::FileFormat::Xls)
         })?;
         if let Some(source) = self.package.source_workbook() {
-            return Ok(source
+            return source
                 .cell_by_index(worksheet_index, at.0, at.1)?
-                .map(|cell| CellData {
-                    value: cell.value().clone(),
-                    formula: cell.is_formula(),
-                }));
+                .map(|cell| CellData::from_source(&self.package, worksheet_index, &cell))
+                .transpose();
         }
         let reader = self.package.reader_ref()?;
         let worksheet = reader
             .xls_worksheet(worksheet_index)
             .map_err(|error| worksheet_error(error.to_string()))?;
-        Ok(worksheet.get_cell(at.0, at.1).map(|cell| CellData {
-            value: cell.value().clone(),
-            formula: cell.is_formula(),
-        }))
+        Ok(worksheet.get_cell(at.0, at.1).map(CellData::from_eager))
     }
 
     /// Borrow the eager worksheet's native cell iterator when the owner has
@@ -143,13 +138,52 @@ impl SheetHandle {
     }
 }
 
-/// One owned sparse cell snapshot.  Formula text is not part of the common
-/// source-backed native cell projection, so the adapter reports only the
-/// scalar value and retains the eager route's formula bit for statistics.
+/// One owned sparse cell snapshot: the semantic (cached) value, the formula
+/// bit used by statistics, and the rendered formula text.
 #[derive(Debug, Clone)]
 pub(super) struct CellData {
     pub(super) value: CellValue,
     pub(super) formula: bool,
+    /// Rendered formula text with its leading `=`, when the cell is a formula
+    /// whose tokens render.
+    pub(super) formula_text: Option<Arc<str>>,
+}
+
+impl CellData {
+    pub(super) fn from_eager(cell: &litchi_xls::Cell) -> Self {
+        Self {
+            value: cell.value().clone(),
+            formula: cell.is_formula(),
+            formula_text: cell.formula().map(Arc::from),
+        }
+    }
+
+    /// The positional owner renders formulas without the workbook's name and
+    /// external-sheet tables.  A formula that needs them falls back to the
+    /// eager reader's complete rendering; that compatibility escape
+    /// materializes the workbook once and is cached by the native owner.
+    fn from_source(
+        package: &Package,
+        worksheet: usize,
+        cell: &litchi_xls::SourceBackedCell,
+    ) -> Result<Self> {
+        let formula_text = match cell.formula() {
+            Some(text) => Some(Arc::from(text)),
+            None if cell.is_formula() => package
+                .reader_ref()?
+                .xls_worksheet(worksheet)
+                .map_err(|error| worksheet_error(error.to_string()))?
+                .get_cell(cell.row(), cell.column())
+                .and_then(litchi_xls::Cell::formula)
+                .map(Arc::from),
+            None => None,
+        };
+        Ok(Self {
+            value: cell.value().clone(),
+            formula: cell.is_formula(),
+            formula_text,
+        })
+    }
 }
 
 /// A lazily materialized worksheet grid.
@@ -166,30 +200,42 @@ impl Grid {
             let worksheet = source
                 .worksheet_by_index(position)?
                 .ok_or_else(|| missing_sheet(position))?;
+            let mut fallback = Vec::new();
             worksheet.visit_cells(|cell| {
+                if cell.is_formula() && cell.formula().is_none() {
+                    fallback.push((cell.row(), cell.column()));
+                }
                 cells.insert(
                     (cell.row(), cell.column()),
                     CellData {
                         value: cell.value().clone(),
                         formula: cell.is_formula(),
+                        formula_text: cell.formula().map(Arc::from),
                     },
                 );
                 Ok(())
             })?;
+            if !fallback.is_empty() {
+                let reader = package.reader_ref()?;
+                let eager = reader
+                    .xls_worksheet(position)
+                    .map_err(|error| worksheet_error(error.to_string()))?;
+                for at in fallback {
+                    if let Some(cell) = cells.get_mut(&at) {
+                        cell.formula_text = eager
+                            .get_cell(at.0, at.1)
+                            .and_then(litchi_xls::Cell::formula)
+                            .map(Arc::from);
+                    }
+                }
+            }
         } else {
             let reader = package.reader_ref()?;
-            let worksheet = WorkbookTrait::worksheet_by_index(reader, position)
+            let worksheet = reader
+                .xls_worksheet(position)
                 .map_err(|error| worksheet_error(error.to_string()))?;
-            let mut iterator = worksheet.cells();
-            while let Some(cell) = iterator.next() {
-                let cell = cell.map_err(|error| worksheet_error(error.to_string()))?;
-                cells.insert(
-                    (cell.row(), cell.column()),
-                    CellData {
-                        value: cell.value().clone(),
-                        formula: cell.is_formula(),
-                    },
-                );
+            for cell in worksheet.stored_cells() {
+                cells.insert((cell.row(), cell.column()), CellData::from_eager(cell));
             }
         }
         let extent: Option<(u32, u32, u32, u32)> =

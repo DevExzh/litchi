@@ -297,10 +297,7 @@ impl<'f> Children<'f> {
                     return Ok(None);
                 };
                 let at = (cell.row(), cell.column());
-                let data = CellData {
-                    value: cell.value().clone(),
-                    formula: cell.is_formula(),
-                };
+                let data = CellData::from_eager(cell);
                 Ok(Some(Node::new_cell(
                     self.file,
                     *sheet,

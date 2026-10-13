@@ -443,6 +443,19 @@ impl<'a> CellProps<'a> {
         };
         match key {
             CellKey::Type => Some(Value::Token(cell_type(value))),
+            CellKey::Formula => match self.state {
+                CellState::Stored(cell) => cell.formula_text.as_deref().map(|formula| {
+                    Value::Text(Cow::Borrowed(formula.strip_prefix('=').unwrap_or(formula)))
+                }),
+                _ => None,
+            },
+            CellKey::CachedValue => match self.state {
+                CellState::Stored(cell) if cell.formula => {
+                    let cached = display_value(value);
+                    (!cached.is_empty()).then_some(Value::Text(cached))
+                },
+                _ => None,
+            },
             CellKey::Empty => matches!(value, CellValue::Empty).then_some(Value::Bool(true)),
         }
     }

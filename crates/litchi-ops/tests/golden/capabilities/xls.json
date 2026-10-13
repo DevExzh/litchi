@@ -360,6 +360,18 @@
           "set": false,
           "get": true
         },
+        "formula": {
+          "type": "string",
+          "add": false,
+          "set": true,
+          "get": true
+        },
+        "cachedValue": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
         "empty": {
           "type": "bool",
           "add": false,
@@ -1164,22 +1176,6 @@
     {
       "subject": "property",
       "element": "cell",
-      "key": "formula",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "the Package cell projection retains formula classification and cached scalar values but not formula token text"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
-      "key": "cachedValue",
-      "code": "unsupported_capability",
-      "followUp": "M1-extended (R6b)",
-      "reason": "the legacy source-backed cell projection does not expose a separate cached-value property"
-    },
-    {
-      "subject": "property",
-      "element": "cell",
       "key": "evaluated",
       "code": "unsupported_capability",
       "followUp": "M1-extended (R6b)",
@@ -1332,8 +1328,8 @@
       "element": "cell",
       "context": "non-scalar-properties",
       "code": "unsupported_capability",
-      "followUp": "M2 XLS formatting and formula setters",
-      "reason": "the XLS writer accepts scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only"
+      "followUp": "M2 XLS formatting setters",
+      "reason": "the XLS writer accepts scalar value, clear and formula payloads; formatting and other cell metadata remain read-only"
     },
     {
       "subject": "operation",
@@ -1341,8 +1337,8 @@
       "element": "cell",
       "context": "existing-formula-cells",
       "code": "unsupported_capability",
-      "followUp": "M4 XLS formula-token and formula-cache writes",
-      "reason": "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the writer refuses the operation"
+      "followUp": "M4 XLS dependency-aware formula replacement",
+      "reason": "an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set"
     },
     {
       "subject": "operation",

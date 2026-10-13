@@ -2107,43 +2107,6 @@ fn rebuild_sheet(
     }
 
     let mut rows = collect_rows(worksheet, row_records)?;
-    for operation in operations {
-        match operation {
-            StructuralChange::Cell {
-                reference,
-                before,
-                after,
-                ..
-            } => {
-                apply_cell_change(
-                    &mut rows,
-                    *reference,
-                    before.as_ref(),
-                    after.as_ref(),
-                    source,
-                    resources,
-                    shared_strings,
-                )?;
-            },
-            StructuralChange::Rows {
-                start,
-                count,
-                insert,
-                ..
-            } => {
-                shift_rows(&mut rows, *start, *count, *insert)?;
-            },
-            StructuralChange::Columns {
-                start,
-                count,
-                insert,
-                ..
-            } => {
-                shift_columns(&mut rows, *start, *count, *insert)?;
-            },
-            StructuralChange::RenameSheet { .. } => {},
-        }
-    }
     let mut formula_resources: Vec<_> = resources
         .iter()
         .filter(|resource| {
@@ -2151,16 +2114,27 @@ fn rebuild_sheet(
         })
         .collect();
     formula_resources.sort_by_key(|resource| super::resource_target(resource));
-    for resource in formula_resources {
-        if let super::ResourceChange::FormulaCell {
-            sheet: _,
-            reference,
-            style,
-            tokens,
-            insert,
-        } = resource
-        {
-            apply_formula_cell_resource(&mut rows, *reference, *style, tokens, *insert)?;
+    // Authored Formula removals vacate their cells before cell operations
+    // run, and insertions follow them, so a scalar and an authored Formula
+    // can replace each other at one coordinate in either direction.
+    for insert_phase in [false, true] {
+        if insert_phase {
+            for operation in operations {
+                apply_rebuild_operation(&mut rows, operation, source, resources, shared_strings)?;
+            }
+        }
+        for resource in &formula_resources {
+            if let super::ResourceChange::FormulaCell {
+                sheet: _,
+                reference,
+                style,
+                tokens,
+                insert,
+            } = resource
+                && *insert == insert_phase
+            {
+                apply_formula_cell_resource(&mut rows, *reference, *style, tokens, *insert)?;
+            }
         }
     }
     patch_row_extents(&mut rows)?;
@@ -2234,6 +2208,51 @@ fn rebuild_sheet(
     result.extend_from_slice(&worksheet[row_table_end..]);
     patch_coordinate_dependencies(&mut result, operations)?;
     Ok(result)
+}
+
+fn apply_rebuild_operation(
+    rows: &mut BTreeMap<u16, RowData>,
+    operation: &StructuralChange,
+    source: &super::Snapshot,
+    resources: &[super::ResourceChange],
+    shared_strings: &[String],
+) -> Result<()> {
+    match operation {
+        StructuralChange::Cell {
+            reference,
+            before,
+            after,
+            ..
+        } => {
+            apply_cell_change(
+                rows,
+                *reference,
+                before.as_ref(),
+                after.as_ref(),
+                source,
+                resources,
+                shared_strings,
+            )?;
+        },
+        StructuralChange::Rows {
+            start,
+            count,
+            insert,
+            ..
+        } => {
+            shift_rows(rows, *start, *count, *insert)?;
+        },
+        StructuralChange::Columns {
+            start,
+            count,
+            insert,
+            ..
+        } => {
+            shift_columns(rows, *start, *count, *insert)?;
+        },
+        StructuralChange::RenameSheet { .. } => {},
+    }
+    Ok(())
 }
 
 fn axis_shift(operation: &StructuralChange) -> Option<AxisShift> {

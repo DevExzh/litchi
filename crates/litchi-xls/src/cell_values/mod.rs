@@ -2705,6 +2705,116 @@ impl Edit {
         })
     }
 
+    /// Writes one formula cell from the writer's bounded BIFF8 tokenizer.
+    ///
+    /// An absent coordinate receives a new Formula record with the
+    /// workbook's default XF, exactly as [`Self::insert_formula`] does. An
+    /// existing scalar cell (including a packed `MulRk`/`MulBlank` member) is
+    /// replaced in the same edit: its record is removed and the Formula is
+    /// authored with the cell's existing XF. The authored record carries an
+    /// empty cached result and `fAlwaysCalc`, so a spreadsheet application
+    /// recalculates it; this crate does not evaluate the expression.
+    /// Existing Formula records are refused because shared, array and table
+    /// owners and string caches need a dependency-aware rewrite.
+    ///
+    /// ```
+    /// use litchi_xls::cell_values::{Reference, Selector, Snapshot, Storage};
+    /// # let mut builder = litchi_xls::Builder::new();
+    /// # let sheet = builder.add_worksheet("Data")?;
+    /// # builder.write_number(sheet, 0, 0, 2.0)?;
+    /// # builder.write_number(sheet, 0, 1, 7.0)?;
+    /// # let bytes = builder.build()?.to_bytes()?;
+    /// let source = Snapshot::from_bytes(bytes)?;
+    /// let mut edit = source.edit();
+    /// let b1 = Reference::new(0, 1)?;
+    /// edit.set_formula(Selector::Name("Data"), b1, "A1*3")?;
+    /// let target = edit.commit()?.into_parts().0;
+    /// let cell = target.worksheet(Selector::Position(0))?.unwrap().cell(b1)?.unwrap();
+    /// assert_eq!(cell.storage(), Storage::Formula);
+    /// # Ok::<(), Box<dyn std::error::Error>>(())
+    /// ```
+    ///
+    /// # Errors
+    ///
+    /// Returns a tokenizer, token-size, existing-formula, style, dependency,
+    /// allocation, or transaction-bound refusal without partially staging.
+    pub fn set_formula(
+        &mut self,
+        selector: Selector<'_>,
+        reference: Reference,
+        expression: &str,
+    ) -> Result<()> {
+        let sheet = self.require_sheet(selector, "Formula write")?;
+        let current = self.source.inner.sheets[sheet]
+            .unique_entry_index(reference)?
+            .map(|index| self.source.inner.sheets[sheet].entries[index].cell.clone());
+        let Some(cell) = current else {
+            return self.insert_formula(
+                Selector::Position(self.source.inner.sheets[sheet].workbook_index),
+                reference,
+                expression,
+            );
+        };
+        if cell.storage == Storage::Formula {
+            return Err(Error::UnsafeEdit(
+                "existing Formula records require a dependency-aware formula rewrite".into(),
+            ));
+        }
+        if expression.is_empty() {
+            return Err(Error::InvalidData(
+                "authored Formula expression must be nonempty".into(),
+            ));
+        }
+        let parsed = crate::writer::FormulaTokenizer::new().tokenize(expression)?;
+        let tokens = crate::writer::formula::encode_ptg_tokens(&parsed)?;
+        if tokens.is_empty() || tokens.len() > MAX_FORMULA_TOKEN_BYTES {
+            return Err(Error::UnsafeEdit(
+                "authored Formula token bytes are empty or exceed the BIFF8 record limit".into(),
+            ));
+        }
+        let mut staged = self.clone();
+        staged.stage_structural(StructuralChange::Cell {
+            sheet,
+            reference,
+            before: Some((cell.storage, cell.value.clone(), cell.style)),
+            after: None,
+        })?;
+        staged.stage_resource(ResourceChange::FormulaCell {
+            sheet,
+            reference,
+            style: cell.style,
+            tokens,
+            insert: true,
+        })?;
+        *self = staged;
+        Ok(())
+    }
+
+    /// Whether this edit removes the authored Formula at one coordinate.
+    fn staged_formula_removal(&self, sheet: usize, reference: Reference) -> bool {
+        self.resource_changes.iter().any(|resource| {
+            matches!(resource, ResourceChange::FormulaCell { insert: false, .. })
+                && formula_resource_cell(resource) == Some((sheet, reference))
+        })
+    }
+
+    /// Whether this edit removes the source cell at one coordinate.
+    fn staged_removal(&self, sheet: usize, reference: Reference) -> bool {
+        self.structural_index
+            .cell(sheet, reference)
+            .and_then(|index| self.structural_changes.get(index))
+            .is_some_and(|change| {
+                matches!(
+                    change,
+                    StructuralChange::Cell {
+                        before: Some(_),
+                        after: None,
+                        ..
+                    }
+                )
+            })
+    }
+
     /// Inserts a previously absent scalar cell with an existing XF resource.
     ///
     /// # Errors
@@ -2745,6 +2855,7 @@ impl Edit {
         if self.source.inner.sheets[sheet]
             .unique_entry_index(reference)?
             .is_some()
+            && !self.staged_formula_removal(sheet, reference)
         {
             return Err(Error::UnsafeEdit(
                 "BIFF8 cell insertion target is occupied".into(),
@@ -3121,8 +3232,12 @@ impl Edit {
                 insert,
             } => {
                 self.require_effective_style(*style)?;
+                // A staged removal of the same coordinate is the one cell
+                // operation an authored Formula may follow: together they
+                // replace a scalar cell with a formula.
+                let replaced = self.staged_removal(*sheet, *reference);
                 if self.structural_index.axis(*sheet).is_some()
-                    || self.structural_index.has_cell_sheet(*sheet)
+                    || (self.structural_index.cell(*sheet, *reference).is_some() && !replaced)
                 {
                     return Err(Error::UnsafeEdit(
                         "authored Formula cannot overlap another structural worksheet edit".into(),
@@ -3148,7 +3263,7 @@ impl Edit {
                 let current = sheet_data
                     .unique_entry_index(*reference)?
                     .map(|index| &sheet_data.entries[index]);
-                if *insert && current.is_some() {
+                if *insert && current.is_some() && !replaced {
                     return Err(Error::UnsafeEdit(
                         "authored Formula insertion target is occupied".into(),
                     ));
@@ -3534,12 +3649,32 @@ impl Edit {
     fn stage_structural(&mut self, change: StructuralChange) -> Result<()> {
         self.require_no_tab_change()?;
         let sheet = operation_sheet_index(&change);
-        if !matches!(change, StructuralChange::RenameSheet { .. })
-            && self.resource_changes.iter().any(|resource| {
-                formula_resource_cell(resource)
-                    .is_some_and(|(resource_sheet, _)| resource_sheet == sheet)
+        // An authored Formula is placed after the worksheet's cell operations
+        // in one row-block rebuild. Axis shifts would move it, and a cell
+        // operation at its own coordinate would race it; operations at other
+        // coordinates compose.
+        if self.resource_changes.iter().any(|resource| {
+            formula_resource_cell(resource).is_some_and(|(resource_sheet, reference)| {
+                resource_sheet == sheet
+                    && match &change {
+                        StructuralChange::Rows { .. } | StructuralChange::Columns { .. } => true,
+                        // A scalar may take the place of a removed authored
+                        // Formula: removals are rebuilt before cell inserts.
+                        StructuralChange::Cell { before: None, .. }
+                            if matches!(
+                                resource,
+                                ResourceChange::FormulaCell { insert: false, .. }
+                            ) =>
+                        {
+                            false
+                        },
+                        StructuralChange::Cell {
+                            reference: target, ..
+                        } => *target == reference,
+                        StructuralChange::RenameSheet { .. } => false,
+                    }
             })
-        {
+        }) {
             return Err(Error::UnsafeEdit(
                 "structural worksheet edit overlaps an authored Formula".into(),
             ));
@@ -3870,7 +4005,12 @@ impl Edit {
             Snapshot::open_package(package, Some(rendered), None)?
         };
         verify_readback(&snapshot, &self.changes)?;
-        verify_structural_readback(&snapshot, &self.source, &self.structural_changes)?;
+        verify_structural_readback(
+            &snapshot,
+            &self.source,
+            &self.structural_changes,
+            &self.resource_changes,
+        )?;
         verify_resource_readback(&snapshot, &self.resource_changes)?;
         let patch = Patch::new(
             Arc::clone(&self.source.inner.bytes),
@@ -5592,6 +5732,9 @@ fn authored_formula_record_matches(
     style: StyleIndex,
     tokens: &[u8],
 ) -> Result<bool> {
+    if entry.cell.storage != Storage::Formula {
+        return Ok(false);
+    }
     let mut expected = Vec::new();
     crate::writer::biff::write_formula(
         &mut expected,
@@ -5817,7 +5960,9 @@ fn semantic_operation_order(operation: &PatchOperation) -> u8 {
             | "xf.author"
             | "xf.duplicate"
             | "xf.remove"
-            | "formula.insert"
+            // A removed authored Formula vacates its cell before cell
+            // operations; an inserted one follows them (same order as the
+            // `sheet/N/cell` targets, which sort first).
             | "formula.remove"
     ) {
         0
@@ -6192,12 +6337,14 @@ fn apply_formula_semantic(
     let current = sheet_data
         .unique_entry_index(reference)?
         .map(|index| &sheet_data.entries[index]);
-    if !expected && current.is_some() {
+    let replaced = transaction.staged_removal(sheet, reference);
+    if !expected && current.is_some() && !replaced {
         return Err(Error::UnsafeEdit(
             "Formula insertion precondition target is occupied".into(),
         ));
     }
     let present = match current {
+        Some(_) if replaced => false,
         Some(entry) => authored_formula_record_matches(source, entry, reference, style, &tokens)?,
         None => false,
     };
@@ -6298,8 +6445,11 @@ fn apply_structural_cell_semantic(
     let (sheet_position, reference) = parse_semantic_target(&operation.target)?;
     let sheet_index = verify_semantic_sheet(source, sheet_names, sheet_position, operation)?;
     let sheet = &source.inner.sheets[sheet_index];
+    // A Formula this patch already removed no longer occupies its cell.
+    let vacated = transaction.staged_formula_removal(sheet_index, reference);
     let current = sheet
         .unique_entry_index(reference)?
+        .filter(|_| !vacated)
         .map(|index| &sheet.entries[index])
         .map(|entry| {
             (
@@ -6318,7 +6468,7 @@ fn apply_structural_cell_semantic(
             "structural cell patch precondition is stale".into(),
         ));
     }
-    if let Some(index) = sheet.unique_entry_index(reference)? {
+    if let Some(index) = sheet.unique_entry_index(reference)?.filter(|_| !vacated) {
         let entry = &sheet.entries[index];
         verify_formula_dependency(source, entry, operation)?;
     }
@@ -8914,9 +9064,22 @@ fn verify_structural_readback(
     snapshot: &Snapshot,
     source: &Snapshot,
     changes: &[StructuralChange],
+    resources: &[ResourceChange],
 ) -> Result<()> {
     for change in changes {
         match change {
+            StructuralChange::Cell {
+                sheet,
+                reference,
+                after: None,
+                ..
+            } if resources
+                .iter()
+                .any(|resource| formula_resource_cell(resource) == Some((*sheet, *reference))) =>
+            {
+                // An authored Formula replaced this cell; the resource
+                // readback verifies the replacement record.
+            },
             StructuralChange::Cell {
                 sheet,
                 reference,
@@ -9181,3 +9344,6 @@ mod index_tests;
 
 #[cfg(test)]
 mod tab_tests;
+
+#[cfg(test)]
+mod formula_tests;

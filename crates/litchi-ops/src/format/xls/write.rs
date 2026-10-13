@@ -37,6 +37,8 @@ pub(crate) struct WriteCommit {
 enum CellAssignment {
     Value(NativeValue),
     Clear,
+    /// A formula expression without its leading `=`.
+    Formula(String),
     Noop,
 }
 
@@ -209,10 +211,10 @@ fn set_cells_with_limits(
         .iter()
         .any(|target| target.present && target.formula)
     {
-        let property = if matches!(&plan.assignment, CellAssignment::Clear) {
-            "clear"
-        } else {
-            "value"
+        let property = match &plan.assignment {
+            CellAssignment::Clear => "clear",
+            CellAssignment::Formula(_) => "formula",
+            CellAssignment::Value(_) | CellAssignment::Noop => "value",
         };
         return Err(Error::new(
             Code::UnsupportedCapability,
@@ -223,6 +225,20 @@ fn set_cells_with_limits(
     }
 
     let mut edit = file.editable_package()?.edit().map_err(native_edit_error)?;
+    if let CellAssignment::Formula(expression) = &plan.assignment {
+        // Each coordinate is written once: an absent cell gains a Formula,
+        // and a scalar cell is replaced with one keeping its XF.
+        for target in targets {
+            edit.set_formula(
+                Selector::Position(target.sheet),
+                target.reference,
+                expression,
+            )
+            .map_err(formula_error)?;
+        }
+        let native = edit.commit().map_err(native_edit_error)?;
+        return finish_commit(file, native, 1, limits);
+    }
     for target in targets {
         let selector = Selector::Position(target.sheet);
         if matches!(&plan.assignment, CellAssignment::Clear) {
@@ -238,6 +254,7 @@ fn set_cells_with_limits(
         let value = match &plan.assignment {
             CellAssignment::Value(value) => value.clone(),
             CellAssignment::Clear => unreachable!("clear handled above"),
+            CellAssignment::Formula(_) => unreachable!("formula handled above"),
             CellAssignment::Noop => unreachable!("no-op handled above"),
         };
         if target.present {
@@ -355,6 +372,32 @@ fn admit_cell_property(props: &Props<'_>, limits: &SemanticLimits) -> Result<Cel
                         .checked_add(1)
                         .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
                     assignment = CellAssignment::Clear;
+                    Ok(())
+                },
+                CellSetter::Formula => {
+                    if !matches!(assignment, CellAssignment::Noop) {
+                        return Err(Error::new(
+                            Code::InvalidArgument,
+                            "cell properties value, clear and formula are mutually exclusive",
+                        )
+                        .with_format(FileFormat::Xls)
+                        .with_property("formula"));
+                    }
+                    let Some(Scalar::Text(expression)) = value else {
+                        return Err(invalid_formula());
+                    };
+                    // OfficeCLI and the XLSX adapter spell formulas without
+                    // the leading `=`; the readback omits it as well.
+                    if expression.is_empty()
+                        || expression.starts_with('=')
+                        || expression.encode_utf16().count() > MAX_FORMULA_UNITS
+                    {
+                        return Err(invalid_formula());
+                    }
+                    staged_bytes = staged_bytes
+                        .checked_add(expression.len())
+                        .ok_or_else(|| staged_limit(usize::MAX, limits.max_staged_bytes()))?;
+                    assignment = CellAssignment::Formula(expression.to_owned());
                     Ok(())
                 },
             })
@@ -726,6 +769,41 @@ fn duplicate_sheet_property() -> Error {
     .with_property("name")
 }
 
+/// Excel's formula-text bound (8,192 characters); the BIFF8 token bound is
+/// checked by the native tokenizer.
+const MAX_FORMULA_UNITS: usize = 8_192;
+
+fn invalid_formula() -> Error {
+    Error::new(
+        Code::InvalidValue,
+        "an XLS formula requires nonempty expression text without a leading '='",
+    )
+    .with_format(FileFormat::Xls)
+    .with_property("formula")
+}
+
+/// Map a native formula refusal: an expression the BIFF8 tokenizer cannot
+/// encode is an invalid value, not a corrupt workbook.
+fn formula_error(error: litchi_xls::package::edit::Error) -> Error {
+    use litchi_xls::package::edit::Error as Native;
+    match &error {
+        Native::CellValues(
+            litchi_xls::Error::InvalidFormula(_)
+            | litchi_xls::Error::InvalidCellReference(_)
+            | litchi_xls::Error::InvalidData(_),
+        ) => Error::new(
+            Code::InvalidValue,
+            "the XLS formula expression cannot be encoded as BIFF8 tokens",
+        )
+        .with_format(FileFormat::Xls)
+        .with_property("formula")
+        .with_suggestion(
+            "use same-sheet references, numbers, text, operators and built-in functions",
+        ),
+        _ => native_edit_error(error),
+    }
+}
+
 fn invalid_scalar() -> Error {
     Error::new(
         Code::InvalidValue,
@@ -908,7 +986,12 @@ pub(crate) mod coalesce {
                     return Ok(None);
                 }
                 let admitted = admit_cell_property(props, limits)?;
-                if matches!(admitted.assignment, CellAssignment::Noop) {
+                // Formula writes keep the ordinary handler: each one is a
+                // removal and an authored Formula, not a scalar staging.
+                if matches!(
+                    admitted.assignment,
+                    CellAssignment::Noop | CellAssignment::Formula(_)
+                ) {
                     return Ok(None);
                 }
                 let Some((target, current)) = direct_target(self, target, limits, source)? else {
@@ -935,12 +1018,12 @@ pub(crate) mod coalesce {
                     CellAssignment::Clear => {
                         target.present && current.as_ref() != Some(&NativeValue::Blank)
                     },
-                    CellAssignment::Noop => false,
+                    CellAssignment::Formula(_) | CellAssignment::Noop => false,
                 };
                 let action = match admitted.assignment {
                     CellAssignment::Value(value) => Action::Set(value),
                     CellAssignment::Clear => Action::Clear,
-                    CellAssignment::Noop => return Ok(None),
+                    CellAssignment::Formula(_) | CellAssignment::Noop => return Ok(None),
                 };
                 Ok(Some(Plan {
                     target,

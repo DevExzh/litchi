@@ -18,26 +18,31 @@ pub(crate) use workbook::{
     WORKBOOK_PROPS as SHARED_WORKBOOK_PROPS, WorkbookKey,
 };
 
-/// The cell properties projected by the native BIFF reader. Formula text is
-/// intentionally absent: the common Package projection retains values and a
-/// formula bit, while source-backed cells do not retain formula tokens. The
-/// initial scalar writer therefore excludes existing formula cells until it
-/// can update formula tokens and their cached results together.
+/// The cell properties projected by the native BIFF reader: the type, the
+/// rendered formula text (without its leading `=`) and its cached result, and
+/// the blank fact.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum CellKey {
     Type,
+    Formula,
+    CachedValue,
     Empty,
 }
 
 impl CellKey {
-    const ALL: &'static [Self] = &[Self::Type, Self::Empty];
+    const ALL: &'static [Self] = &[Self::Type, Self::Formula, Self::CachedValue, Self::Empty];
 
     pub(crate) fn at(index: usize) -> Option<Self> {
         Self::ALL.get(index).copied()
     }
 }
 
-pub(crate) static CELL_PROPS: &[PropSpec] = &[SHARED_CELL_PROPS[0], SHARED_CELL_PROPS[6]];
+pub(crate) static CELL_PROPS: &[PropSpec] = &[
+    SHARED_CELL_PROPS[0],
+    SHARED_CELL_PROPS[1],
+    SHARED_CELL_PROPS[2],
+    SHARED_CELL_PROPS[6],
+];
 
 /// The scalar cell payloads admitted by the initial unified XLS writer.
 ///
@@ -52,6 +57,7 @@ pub(crate) static CELL_PROPS: &[PropSpec] = &[SHARED_CELL_PROPS[0], SHARED_CELL_
 pub(crate) enum CellSetter {
     Value,
     Clear,
+    Formula,
 }
 
 const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
@@ -64,7 +70,7 @@ const fn write_only(name: &'static str, ty: ValueType) -> PropSpec {
     spec
 }
 
-pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 2, 0> = Table::new(
+pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 3, 0> = Table::new(
     [
         Entry {
             spec: write_only("value", ValueType::Scalar),
@@ -75,6 +81,12 @@ pub(crate) const CELL_WRITE_TABLE: Table<CellSetter, 2, 0> = Table::new(
         Entry {
             spec: write_only("clear", ValueType::Bool),
             access: Access::Set(CellSetter::Clear),
+            constraint: Constraint::None,
+            clear: false,
+        },
+        Entry {
+            spec: SHARED_CELL_PROPS[1],
+            access: Access::Set(CellSetter::Formula),
             constraint: Constraint::None,
             clear: false,
         },
@@ -128,6 +140,7 @@ const fn same_name(left: &str, right: &str) -> bool {
 /// [`CELL_PROPS`] prevents a write-only key from becoming queryable or being
 /// emitted by the read node view.
 const fn cell_capability_array() -> [PropSpec; CELL_PROPS.len() + 2] {
+    // `value` and `clear` are write-only; `formula` is both read and set.
     let mut props = [PropSpec::new("", ValueType::Text); CELL_PROPS.len() + 2];
     let mut index = 0;
     while index < CELL_PROPS.len() {
@@ -224,18 +237,6 @@ static ACTIVE_TAB_GAP: GapSpec = property_gap(
     "activeTab",
     "M1-extended (R6b)",
     "the legacy XLS Package read bridge does not project the workbook window selection",
-);
-static FORMULA_GAP: GapSpec = property_gap(
-    "cell",
-    "formula",
-    "M1-extended (R6b)",
-    "the Package cell projection retains formula classification and cached scalar values but not formula token text",
-);
-static CACHED_VALUE_GAP: GapSpec = property_gap(
-    "cell",
-    "cachedValue",
-    "M1-extended (R6b)",
-    "the legacy source-backed cell projection does not expose a separate cached-value property",
 );
 static EVALUATED_GAP: GapSpec = property_gap(
     "cell",
@@ -452,8 +453,6 @@ pub(crate) static SPEC: FormatSpec<Kind> = FormatSpec {
             reason: "text, outline and cell statistics cover ordinary worksheets; chart and macro payloads remain unprojected",
         },
         ACTIVE_TAB_GAP,
-        FORMULA_GAP,
-        CACHED_VALUE_GAP,
         EVALUATED_GAP,
         ARRAY_FORMULA_GAP,
         ARRAY_REF_GAP,
@@ -572,15 +571,15 @@ pub(crate) static WRITE_GAPS: [GapSpec; 9] = [
         "set",
         "cell",
         "non-scalar-properties",
-        "M2 XLS formatting and formula setters",
-        "the XLS writer accepts scalar value and clear payloads; formulas, formatting and other cell metadata remain read-only",
+        "M2 XLS formatting setters",
+        "the XLS writer accepts scalar value, clear and formula payloads; formatting and other cell metadata remain read-only",
     ),
     operation_gap(
         "set",
         "cell",
         "existing-formula-cells",
-        "M4 XLS formula-token and formula-cache writes",
-        "scalar replacement and null or explicit clear on an existing formula cell would change its cached result without changing formula tokens, so the writer refuses the operation",
+        "M4 XLS dependency-aware formula replacement",
+        "an existing Formula record (possibly a shared, array or table owner, or a string-cache group) is not replaced by a value, clear or new formula; authored formulas use the BIFF8 tokenizer, which refuses 3-D, external and name references, and carry an empty cached result with always-recalculate set",
     ),
     operation_gap(
         "set",
