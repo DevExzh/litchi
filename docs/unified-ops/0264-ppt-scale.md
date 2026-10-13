@@ -5,8 +5,9 @@ at `a1120b3d3d`. It follows the performance finding of
 [0260](0260-ppt-p0-surface.md) ("10k scaling: still super-linear") and the
 coalescing and aggregate publication of [0218](0218-ppt-shape-coalescing.md)
 and [0220](0220-ppt-aggregate-text-publication.md). Owned: `crates/litchi-ppt`.
-No `litchi-ops` file changed. The harness gained one profiling mode. No
-public API changed, so the glossary has no new rows.
+The harness gained one profiling mode. The §4 bound change (owner approved
+2026-10-14) raised two public constants; the glossary row "PPT chunked text
+publication" was updated with it, and one `litchi-ops` test was adapted.
 
 ## Problem
 
@@ -169,7 +170,7 @@ the chained bytes equal edits on freshly opened packages.
   validation open of the candidate also serves the incremental readback.
   It was opened twice, each time with a copy.
 
-### 4. The 4096 hard bound: measured, not changed
+### 4. The 4096 hard bound: owner approved 2026-10-14, applied
 
 With items 1 to 3 in place, an experimental build raised
 `DEFAULT_MAX_OPERATIONS` and `MAX_SHAPE_TEXT_CHUNK_SELECTIONS` to 16384. It
@@ -192,13 +193,57 @@ the changed shapes, per operation. The remaining excess is per publication:
 Native phases at 10k: open + stage + commit = 2.1 + 50.7 + 2.7 ms with three
 publications, against 0.4 + 32.9 + 1.1 ms with one.
 
-**Policy proposal, for the owner:** raise the primary PPT edit bound and the
-aggregate shape-text selection bound from 4096 to 16384. Keep the 256-item
-inner chunk and every other bound. This is now the measured cost: per-op
-cost at 10k becomes 1.07× that of 1k, against 1.67× with the current bound.
-Retained state per operation is the before/after text of each change. The
-bound remains finite and is still checked before native work. Until the
-owner decides, the bound stays 4096 and the ~1.2× target is not met at 10k.
+**Policy proposal (approved by the owner 2026-10-14 and applied).** The
+proposal: raise the primary PPT edit bound and the aggregate shape-text
+selection bound from 4096 to 16384, and keep the 256-item inner chunk and
+every other bound. Retained state per operation is the before/after text
+of each change. The bound remains finite and is still checked before native
+work.
+
+What changed:
+
+- `package::edit::DEFAULT_MAX_OPERATIONS` (and so `MAX_OPERATIONS`) and
+  `slide_order::MAX_SHAPE_TEXT_CHUNK_SELECTIONS` are now 16384, with their
+  doc comments.
+- `MAX_SHAPE_TEXT_REPLACEMENTS` (256) and `MAX_SHAPE_TEXT_CHUNKS` (4096) are
+  unchanged.
+
+Effect on callers:
+
+- `litchi-ops`' PPT coalescer, the query-fanout path and the harness derive
+  their rollover from `MAX_OPERATIONS`, so they follow without code change.
+- One past the native bound (16385 sets) exceeds the default unified
+  operation bound (10,000), so `ppt_coalesced_set`'s rollover test now
+  selects wider `SemanticLimits`.
+
+Tests:
+
+- `chunked_text_publication` now pins exactly 16384 selections as one
+  publication, and 16640 selections as a refusal.
+- The 4096/4097 chunk-count tests are unchanged.
+
+Measured after the change: release, CPU 29, binary-level ABBA twice, 21
+batch rounds per run, host load 7 to 8.5. Evidence:
+[results/0264-ppt-bound.json](results/0264-ppt-bound.json).
+
+| Batch | 4096 bound native / unified ms | 16384 bound native / unified ms | New / old (native / unified) | Pair ratio old → new |
+|---|---:|---:|---:|---:|
+| 1k | 3.061 / 3.349 | 3.031 / 3.335 | 0.990 / 0.996 | 1.096 → 1.099 |
+| 4096 | 12.250 / 13.443 | 12.307 / 13.550 | 1.005 / 1.008 | 1.100 → 1.101 |
+| 10k | 45.85 / 57.27 | 33.01 / 36.25 | 0.720 / 0.633 | 1.247 → 1.098 |
+
+1k→10k is now 10.89× native and 10.87× unified: per-operation cost at 10k
+is **1.09×** that of 1k on both legs (the target was ~1.2×). The 10k batch
+publishes once. Native phases at 10k are open + stage + commit =
+0.38 + 32.9 + 1.1 ms. The 1k and 4096 batches take the same path as before
+and are unchanged within noise.
+
+One consequence for the harness: the record-0220 routes
+`ppt_text_batch_*_10000_aggregate_v2` derive their expected commit count
+from the bound, so they now qualify one publication, not three. Their
+output bytes therefore differ from the frozen 0220 evidence, which stays
+unchanged. The routes were not renamed here (the harness change was
+limited to new route names); the coordinator may want a `_v3` name.
 
 ## Performance
 
@@ -275,29 +320,22 @@ edit open and commit.
 | `cargo clippy -p litchi-ppt -p litchi-ops -p litchi -p litchi-py --all-targets --all-features -- -D warnings` | 0 |
 | `cargo clippy -p litchi-ops --no-default-features --features ppt --all-targets -- -D warnings` | 0 |
 | `cargo test -p litchi-ppt --all-features --no-fail-fast` (1,481 tests) | 0 |
-| `cargo test -p litchi-ops --all-features --no-fail-fast` (1,877 pass, 1 fail) | 101 (see below) |
+| `cargo test -p litchi-ops --all-features --no-fail-fast` (1,878) | 0 |
 | `cargo test -p litchi --all-features --no-fail-fast` (260) | 0 |
 | `RUSTDOCFLAGS=-Dwarnings cargo doc --no-deps --all-features -p litchi-ppt` | 0 |
 | `python3 tools/check_crate_boundaries.py` | 0 |
 | `python3 tools/non_iwork_gate.py verify` | 0 |
-| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (21 profiles, 949 bans) | 0 |
+| `RUSTC_BOOTSTRAP=1 python3 tools/check_api_glossary.py` (21 profiles, 1043 bans) | 0 |
 
-After the last trunk merge (`46c7906174`, which brought 0261 and 0262) one
-`litchi-ops` test fails: `query_corpus_differential`
-(`corpus_queries_return_what_they_returned_before`). All 26 differing
-digests are DOCX rows ("expected 60 opened, found 68"). The cause is
-trunk's own merge: record 0262 pinned the digests before the DOCX fixtures
-of 0251 reached `test-data`. This branch changes no DOCX code or fixture,
-every PPT row matches, and the same suite passed (1,857 tests) after the
-earlier merge that brought 0251 without 0262. It is reported to the
-coordinator, not re-blessed here.
+These gates were run after the §4 bound change, on trunk `f592aecf28`.
+Trunk carries the fix for the DOCX query-digest failure seen at the
+earlier merge (`4d1afe92bc`).
 
 No capability or registry row changed, so no golden was re-blessed. Python
-is unaffected: no public API changed.
+and the CLI do not expose the two constants and are unaffected.
 
 ## Follow-ups
 
-- The owner's decision on the 16384 bound proposal (§4).
 - The remaining per-publication costs are O(file):
   - the CFB write of the growing append-only stream (`litchi-cfb`, not
     owned here);

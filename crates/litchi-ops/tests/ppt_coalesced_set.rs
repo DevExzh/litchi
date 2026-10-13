@@ -19,7 +19,7 @@ use litchi_ppt::writer::Builder;
 const FIRST: &str = "/slide[1]/shape[1]";
 const SECOND: &str = "/slide[1]/shape[2]";
 const DIRECT_COUNT: usize = 1_000;
-const NATIVE_ROLLOVER: usize = 4_096;
+const NATIVE_ROLLOVER: usize = 16_384;
 
 fn fixture() -> Vec<u8> {
     let mut builder = Builder::new();
@@ -516,7 +516,7 @@ fn poisoned_edits_retain_the_first_wire_index_and_discard_staged_changes() {
 }
 
 #[test]
-fn explicit_limits_and_native_4096_rollover_preserve_atomicity() {
+fn explicit_limits_and_native_operation_rollover_preserve_atomicity() {
     let source = eager(&fixture());
     let before = source.to_bytes().expect("source bytes");
     for limits in [
@@ -540,11 +540,22 @@ fn explicit_limits_and_native_4096_rollover_preserve_atomicity() {
         assert_eq!(source.to_bytes().expect("limit rollback"), before);
     }
 
+    // One past the native primary-edit bound (16384 since record 0264)
+    // exceeds the default unified operation bound, so select wider limits.
     let bytes = many_shapes(NATIVE_ROLLOVER + 1);
     let source = eager(&bytes);
     let before = source.to_bytes().expect("rollover source");
+    let wide = SemanticLimits::builder()
+        .max_operations(1 << 20)
+        .expect("operation limit")
+        .max_snapshot_bytes(1 << 30)
+        .expect("snapshot limit")
+        .max_staged_bytes(1 << 30)
+        .expect("staging limit")
+        .build()
+        .expect("limits");
     let commit = source
-        .edit(|edit| {
+        .edit_with_limits(&wide, |edit| {
             for index in 1..=NATIVE_ROLLOVER + 1 {
                 edit.set(
                     format!("/slide[1]/shape[{index}]").as_str(),

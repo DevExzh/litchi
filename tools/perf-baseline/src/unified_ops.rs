@@ -3657,7 +3657,13 @@ mod tests {
             SemanticLimits::default().max_snapshot_bytes()
         );
         assert_eq!(
-            ppt_text_batch_limits(10_000)
+            ppt_text_batch_limits(PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT)
+                .expect("default profile at the native bound")
+                .max_snapshot_bytes(),
+            SemanticLimits::default().max_snapshot_bytes()
+        );
+        assert_eq!(
+            ppt_text_batch_limits(PPT_TEXT_BATCH_NATIVE_OPERATION_LIMIT + 1)
                 .expect("large profile")
                 .max_snapshot_bytes(),
             PPT_TEXT_BATCH_LARGE_SNAPSHOT_LIMIT

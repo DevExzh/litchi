@@ -28,7 +28,7 @@ use litchi_ppt::text_edit::Target;
 use litchi_ppt::{CurrentUser, OpenOptions, Package, Record, RecordType, SourceLimits};
 
 const MAX_CHUNK: usize = 256;
-const MAX_AGGREGATE: usize = 4096;
+const MAX_AGGREGATE: usize = 16384;
 
 fn fixture(slide_count: usize, textboxes_per_slide: usize) -> Vec<u8> {
     let mut writer = litchi_ppt::writer::Builder::new();
@@ -460,7 +460,7 @@ fn aggregate_exact_chunk_boundary_publishes_once_and_round_trips_exactly() {
 }
 
 #[test]
-fn aggregate_exact_4096_selection_limit_is_one_publication_and_matches_old_chunks() {
+fn aggregate_exact_selection_limit_is_one_publication_and_matches_old_chunks() {
     let source = package(1, MAX_AGGREGATE);
     let source_bytes = source.to_bytes().expect("source bytes");
     let source_unrelated = unrelated_shapes(&source, MAX_AGGREGATE);
@@ -469,7 +469,7 @@ fn aggregate_exact_4096_selection_limit_is_one_publication_and_matches_old_chunk
     assert!(chunks.iter().all(|chunk| chunk.len() == MAX_CHUNK));
     let chunk_refs = chunks.iter().map(Vec::as_slice).collect::<Vec<_>>();
 
-    let mut aggregate = source.edit().expect("start 4096 aggregate edit");
+    let mut aggregate = source.edit().expect("start exact-limit aggregate edit");
     assert_eq!(
         aggregate
             .set_shape_text_chunks(&chunk_refs)
@@ -477,7 +477,7 @@ fn aggregate_exact_4096_selection_limit_is_one_publication_and_matches_old_chunk
         MAX_AGGREGATE
     );
     assert_eq!(aggregate.operation_count(), MAX_AGGREGATE);
-    let aggregate_commit = aggregate.commit().expect("commit 4096 aggregate");
+    let aggregate_commit = aggregate.commit().expect("commit exact-limit aggregate");
     let aggregate_bytes = aggregate_commit
         .package()
         .to_bytes()
@@ -564,7 +564,7 @@ fn chunk_count_chunk_size_and_aggregate_limits_are_atomic_and_retryable() {
     );
     assert_eq!(edit.operation_count(), 0);
 
-    let over_aggregate = (0..17)
+    let over_aggregate = (0..MAX_AGGREGATE / MAX_CHUNK + 1)
         .map(|chunk| {
             (0..MAX_CHUNK)
                 .map(|shape| {
@@ -579,7 +579,7 @@ fn chunk_count_chunk_size_and_aggregate_limits_are_atomic_and_retryable() {
     let over_aggregate_refs = over_aggregate.iter().map(Vec::as_slice).collect::<Vec<_>>();
     assert!(
         edit.set_shape_text_chunks(&over_aggregate_refs).is_err(),
-        "more than 4096 aggregate selections must be refused"
+        "more than 16384 aggregate selections must be refused"
     );
     assert_eq!(edit.operation_count(), 0);
 
