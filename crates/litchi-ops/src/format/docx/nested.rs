@@ -72,6 +72,71 @@ impl Docx {
                 let commit = edit.commit(self)?;
                 Ok((commit, path_with(parent, Some((Kind::Row, raw)))))
             },
+            (NewKind::Hyperlink, Kind::Paragraph) => {
+                let owner = element_path(parent)?;
+                let Value::Paragraph { paragraph, .. } = &parent.value else {
+                    return Err(refusal("the hyperlink parent holds no paragraph"));
+                };
+                let locations = run_locations(self, paragraph)?;
+                let at = sibling_position(self, parent, Kind::Run, locations.len(), placement)?;
+                let direct = match at {
+                    None => None,
+                    Some(index) if index == locations.len() => None,
+                    Some(index) => match locations.get(index).map(Vec::as_slice) {
+                        Some([ElementStep::Run(run)]) => Some(*run),
+                        _ => {
+                            return Err(refusal(
+                                "a hyperlink can only be added beside a direct run of the paragraph",
+                            ));
+                        },
+                    },
+                };
+                let (target, run) = new_hyperlink(node.props())?;
+                // The hyperlink's position is its ordinal among the
+                // paragraph's direct hyperlinks.
+                self.owner().check_source()?;
+                let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
+                let WorkEdit::Eager(eager) = &mut edit else {
+                    return Err(refusal("hyperlinks need the owning package editor"));
+                };
+                let position = eager
+                    .insert_hyperlink_at(&owner, direct, &target, &run)
+                    .map_err(Error::from)?;
+                let commit = edit.commit(self)?;
+                Ok((commit, path_with(parent, Some((Kind::Hyperlink, position)))))
+            },
+            (NewKind::Comment, Kind::Paragraph | Kind::Run) => {
+                // A paragraph parent comments the whole paragraph; a run
+                // parent comments that direct run.
+                let path = element_path(parent)?;
+                let (paragraph, range) = if parent.element_kind() == Kind::Paragraph {
+                    (path, None)
+                } else {
+                    match path.split_last() {
+                        Some((paragraph, ElementStep::Run(run))) => (paragraph, Some((run, run))),
+                        _ => {
+                            return Err(refusal(
+                                "a comment can only be anchored on a direct run of a paragraph",
+                            ));
+                        },
+                    }
+                };
+                let comment = new_comment(node.props())?;
+                self.owner().check_source()?;
+                let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
+                let WorkEdit::Eager(eager) = &mut edit else {
+                    return Err(refusal("comments need the owning package editor"));
+                };
+                let id = eager
+                    .add_comment_at(&paragraph, range, &comment)
+                    .map_err(Error::from)?;
+                let commit = edit.commit(self)?;
+                let ordinal = super::nav::comments(commit.file())?
+                    .iter()
+                    .position(|comment| comment.id() == id)
+                    .ok_or_else(|| refusal("the new comment is not in the comments part"))?;
+                Ok((commit, comment_path(ordinal)))
+            },
             (NewKind::Run, Kind::Paragraph) => {
                 let owner = element_path(parent)?;
                 let Value::Paragraph { paragraph, .. } = &parent.value else {
@@ -116,8 +181,15 @@ impl Docx {
     /// run in reverse raw order so no removal shifts a later one.
     pub(super) fn remove_nested(&self, editor: DocxEditor, nodes: &[Node<'_>]) -> Result<Commit> {
         let mut paths = Vec::with_capacity(nodes.len());
+        let mut comments = Vec::new();
         for node in nodes {
             match node.element_kind() {
+                Kind::Comment => {
+                    let Value::Comment(comment) = &node.value else {
+                        return Err(refusal("the comment node holds no comment"));
+                    };
+                    comments.push(comment.id());
+                },
                 Kind::Paragraph
                 | Kind::Run
                 | Kind::Hyperlink
@@ -150,7 +222,20 @@ impl Docx {
             .map(|(_, path)| path.clone())
             .collect();
         self.owner().check_source()?;
+        let editor = if comments.is_empty() {
+            editor
+        } else {
+            self.eager_editor(editor)?
+        };
         let mut edit = WorkEdit::from(editor)?;
+        comments.sort_unstable();
+        comments.dedup();
+        for id in comments {
+            let WorkEdit::Eager(eager) = &mut edit else {
+                return Err(refusal("comments need the owning package editor"));
+            };
+            eager.remove_comment(id).map_err(Error::from)?;
+        }
         for path in &removable {
             edit.remove_element_at(path)?;
         }
@@ -560,6 +645,150 @@ fn new_table(props: &Props<'_>) -> Result<NewTable> {
         }
     }
     Ok(table)
+}
+
+/// A new hyperlink's target and run from its add properties: exactly one of
+/// `url` and `anchor`, its `text`, and its run formatting. Without explicit
+/// formatting the run gets OfficeCLI's fallback hyperlink look (color
+/// `0563C1`, single underline).
+fn new_hyperlink(
+    props: &Props<'_>,
+) -> Result<(
+    litchi_docx::document::HyperlinkTarget,
+    litchi_docx::document::NewRun,
+)> {
+    use super::setters::Setter;
+    let mut url = None::<String>;
+    let mut anchor = None::<String>;
+    let mut text = String::new();
+    let mut properties = litchi_docx::properties::Run::default();
+    let mut styled = false;
+    for (key, value) in props.iter() {
+        let (_, entry) = super::spec::HYPERLINK_REGISTRY
+            .resolve(key.as_str())
+            .map_err(|error| error.with_property(key.as_str().to_owned()))?;
+        entry
+            .prepare(Operation::Add, value, |setter, value| {
+                let as_text = |value: Option<crate::value::Scalar<'_>>| match value {
+                    Some(crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text)) => {
+                        text.to_owned()
+                    },
+                    Some(scalar) => scalar.to_string(),
+                    None => String::new(),
+                };
+                match setter {
+                    Setter::HyperlinkUrl => url = Some(as_text(value)),
+                    Setter::HyperlinkAnchor => anchor = Some(as_text(value)),
+                    Setter::HyperlinkText => text = as_text(value),
+                    other => {
+                        styled |= matches!(
+                            other,
+                            Setter::RunColor | Setter::RunUnderline | Setter::RunStyle
+                        );
+                        other.apply_run(&mut properties, value)?;
+                    },
+                }
+                Ok(())
+            })
+            .map_err(|error| {
+                error
+                    .with_property(key.as_str().to_owned())
+                    .with_format(FileFormat::Docx)
+            })?;
+    }
+    let target = match (url, anchor) {
+        (Some(url), None) => litchi_docx::document::HyperlinkTarget::Url(url),
+        (None, Some(anchor)) => litchi_docx::document::HyperlinkTarget::Anchor(anchor),
+        _ => {
+            return Err(Error::new(
+                Code::MissingProperty,
+                "a new DOCX hyperlink needs exactly one of url and anchor",
+            )
+            .with_property("url")
+            .with_format(FileFormat::Docx));
+        },
+    };
+    if !styled {
+        Setter::RunColor.apply_run(
+            &mut properties,
+            Some(crate::value::Scalar::Color(crate::value::Color::rgb(
+                0x05, 0x63, 0xC1,
+            ))),
+        )?;
+        Setter::RunUnderline
+            .apply_run(&mut properties, Some(crate::value::Scalar::Token("single")))?;
+    }
+    Ok((
+        target,
+        litchi_docx::document::NewRun::new(text).with_properties(properties),
+    ))
+}
+
+/// The unified path of the comment at `ordinal` in the comments part.
+fn comment_path(ordinal: usize) -> Path<'static> {
+    use litchi_core::selector::{Predicate, Step};
+    Path::from_steps([
+        Step::new("comments"),
+        Step::new("comment").with(Predicate::Index(Position::new(ordinal))),
+    ])
+}
+
+/// A new comment from its add properties: `author` is required, `text`,
+/// `initials` and `date` are optional.
+fn new_comment(props: &Props<'_>) -> Result<litchi_docx::document::NewComment> {
+    use super::setters::Setter;
+    let mut author = None::<String>;
+    let mut initials = None::<String>;
+    let mut date = None::<String>;
+    let mut text = String::new();
+    for (key, value) in props.iter() {
+        let (_, entry) = super::spec::COMMENT_REGISTRY
+            .resolve(key.as_str())
+            .map_err(|error| error.with_property(key.as_str().to_owned()))?;
+        entry
+            .prepare(Operation::Add, value, |setter, value| {
+                let value = match value {
+                    Some(crate::value::Scalar::Text(text) | crate::value::Scalar::Token(text)) => {
+                        text.to_owned()
+                    },
+                    Some(scalar) => scalar.to_string(),
+                    None => String::new(),
+                };
+                match setter {
+                    Setter::CommentAuthor => author = Some(value),
+                    Setter::CommentInitials => initials = Some(value),
+                    Setter::CommentDate => date = Some(value),
+                    Setter::CommentText => text = value,
+                    _ => {
+                        return Err(Error::new(
+                            Code::UnsupportedProperty,
+                            "the property does not seed a DOCX comment",
+                        ));
+                    },
+                }
+                Ok(())
+            })
+            .map_err(|error| {
+                error
+                    .with_property(key.as_str().to_owned())
+                    .with_format(FileFormat::Docx)
+            })?;
+    }
+    let Some(author) = author else {
+        return Err(
+            Error::new(Code::MissingProperty, "a new DOCX comment needs its author")
+                .with_property("author")
+                .with_format(FileFormat::Docx),
+        );
+    };
+    let mut comment = litchi_docx::document::NewComment::new(author, text);
+    if let Some(initials) = initials {
+        comment = comment.with_initials(initials);
+    }
+    if let Some(date) = date {
+        comment = comment.with_date(date);
+    }
+    Ok(comment)
 }
 
 /// A new row's cell count from its add properties.

@@ -50,9 +50,13 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
             None => None,
         },
         Value::Equation(block) => equation_latex(block)?.map(Cow::Owned),
-        Value::Document | Value::Body(_) | Value::Table(_) | Value::Row(_) | Value::Section(_) => {
-            None
-        },
+        Value::Comment(comment) => Some(Cow::Owned(comment.text()?)),
+        Value::Document
+        | Value::Body(_)
+        | Value::Table(_)
+        | Value::Row(_)
+        | Value::Section(_)
+        | Value::Comments => None,
     })
 }
 
@@ -125,7 +129,8 @@ pub(super) fn style<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
 /// body whose blocks no request has read (M1-Δ1).
 pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
     let count = match &node.value {
-        Value::Document => 1,
+        Value::Document => 1 + usize::from(super::nav::has_comments(node.docx)?),
+        Value::Comments => super::nav::comments(node.docx)?.len(),
         Value::Body(lock) => match lock.get() {
             Some(blocks) => listed_blocks(blocks),
             None => return Ok(None),
@@ -141,7 +146,11 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
         },
         Value::Row(row) => row.cell_count()?,
         Value::Paragraph { paragraph, .. } => paragraph.addressable_runs()?.len(),
-        Value::Run(_) | Value::Hyperlink(_) | Value::Equation(_) | Value::Section(_) => 0,
+        Value::Run(_)
+        | Value::Hyperlink(_)
+        | Value::Equation(_)
+        | Value::Section(_)
+        | Value::Comment(_) => 0,
     };
     Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
 }
@@ -212,7 +221,14 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
             None => Props::None,
         },
         Value::Equation(_) => Props::Equation,
-        Value::Body(_) | Value::Section(_) => Props::None,
+        Value::Comment(comment) => Props::Comment(Box::new(CommentProps {
+            id: comment.id(),
+            author: comment.author().to_owned(),
+            initials: comment.initials().map(str::to_owned),
+            date: comment.date().map(str::to_owned),
+            text: comment.text()?,
+        })),
+        Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
     };
     let invalid = match &props {
         Props::Paragraph { props, .. } => {
@@ -255,6 +271,15 @@ pub(crate) struct TableProps {
     columns: usize,
 }
 
+/// A comment's identity, author and text.
+pub(crate) struct CommentProps {
+    id: u32,
+    author: String,
+    initials: Option<String>,
+    date: Option<String>,
+    text: String,
+}
+
 /// A content control's identity.
 pub(crate) struct SdtProps {
     alias: Option<String>,
@@ -285,6 +310,7 @@ pub(crate) enum Props<'a> {
     Row(Box<direct::Row>),
     Cell(Box<direct::Cell>),
     Sdt(Box<SdtProps>),
+    Comment(Box<CommentProps>),
 }
 
 impl<'a> Props<'a> {
@@ -301,6 +327,7 @@ impl<'a> Props<'a> {
             Self::Row(props) => row(props, index),
             Self::Cell(props) => cell(props, index),
             Self::Sdt(sdt) => sdt_value(sdt, index),
+            Self::Comment(comment) => comment_value(comment, index),
         }
     }
 }
@@ -318,6 +345,7 @@ impl std::fmt::Debug for Props<'_> {
             Self::Row(_) => "Props::Row",
             Self::Cell(_) => "Props::Cell",
             Self::Sdt(_) => "Props::Sdt",
+            Self::Comment(_) => "Props::Comment",
         })
     }
 }
@@ -707,6 +735,26 @@ fn run<'a>(props: &direct::Run, index: usize) -> Option<NodeValue<'a>> {
         R_POSITION => props.position.and_then(|position| half_points(position.0)),
         R_CHAR_SPACING => props.character_spacing.and_then(|spacing| twips(spacing.0)),
         R_STYLE => props.style.as_deref().map(owned),
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Comment
+// ---------------------------------------------------------------------------
+
+fn comment_value<'a>(comment: &CommentProps, index: usize) -> Option<NodeValue<'a>> {
+    const ID: usize = index_of(super::spec::COMMENT_PROPS, "id");
+    const AUTHOR: usize = index_of(super::spec::COMMENT_PROPS, "author");
+    const INITIALS: usize = index_of(super::spec::COMMENT_PROPS, "initials");
+    const DATE: usize = index_of(super::spec::COMMENT_PROPS, "date");
+    const TEXT: usize = index_of(super::spec::COMMENT_PROPS, "text");
+    match index {
+        ID => Some(NodeValue::Int(i64::from(comment.id))),
+        AUTHOR => text_of(Some(&comment.author)),
+        INITIALS => text_of(comment.initials.as_ref()),
+        DATE => text_of(comment.date.as_ref()),
+        TEXT => Some(owned(&comment.text)),
         _ => None,
     }
 }

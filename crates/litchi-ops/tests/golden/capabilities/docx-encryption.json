@@ -112,6 +112,10 @@
         {
           "element": "body",
           "pathSegment": "body"
+        },
+        {
+          "element": "comments",
+          "pathSegment": "comments"
         }
       ],
       "properties": {
@@ -1140,7 +1144,7 @@
       "element": "hyperlink",
       "parent": "paragraph",
       "operations": {
-        "add": false,
+        "add": true,
         "set": true,
         "get": true,
         "query": true,
@@ -1154,13 +1158,13 @@
       "properties": {
         "url": {
           "type": "string",
-          "add": false,
-          "set": false,
+          "add": true,
+          "set": true,
           "get": true
         },
         "anchor": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1184,7 +1188,7 @@
         },
         "font": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1196,25 +1200,25 @@
         },
         "size": {
           "type": "font-size",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "bold": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "italic": {
           "type": "bool",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
         "color": {
           "type": "color",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1240,7 +1244,7 @@
             "wavyHeavy",
             "wavyDouble"
           ],
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -1283,7 +1287,7 @@
         },
         "rStyle": {
           "type": "string",
-          "add": false,
+          "add": true,
           "set": false,
           "get": true
         },
@@ -2078,8 +2082,8 @@
       "operations": {
         "add": false,
         "set": false,
-        "get": false,
-        "query": false,
+        "get": true,
+        "query": true,
         "remove": false
       },
       "paths": {
@@ -2087,11 +2091,19 @@
           "/comments"
         ]
       },
+      "children": [
+        {
+          "element": "comment",
+          "pathSegment": "comment"
+        }
+      ],
       "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "the comments part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2099,22 +2111,55 @@
       "element": "comment",
       "parent": "comments",
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
-        "query": false,
-        "remove": false
+        "get": true,
+        "query": true,
+        "remove": true
       },
       "paths": {
         "positional": [
           "/comments/comment[N]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "L-DOCX-R5",
-        "reason": "comment stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
+      "properties": {
+        "id": {
+          "type": "int",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "author": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "initials": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "date": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "text": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        }
+      },
+      "predicates": {
+        "keys": [
+          "style",
+          "text",
+          "type"
+        ]
       }
     },
     {
@@ -2646,20 +2691,6 @@
       "code": "unsupported_capability",
       "followUp": "L-DOCX-R5",
       "reason": "endnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "comments",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "the comments part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
-    },
-    {
-      "subject": "element",
-      "element": "comment",
-      "code": "unsupported_capability",
-      "followUp": "L-DOCX-R5",
-      "reason": "comment stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet"
     },
     {
       "subject": "element",

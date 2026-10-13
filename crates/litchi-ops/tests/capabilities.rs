@@ -138,9 +138,10 @@ fn ordinary_reports_hide_native_selection_fields() {
         // are added and removed; cells, hyperlinks and content controls are
         // removed.
         let (set, add, remove) = match element.name() {
-            "paragraph" | "run" => (true, true, true),
-            "hyperlink" | "cell" => (true, false, true),
-            "table" | "row" => (false, true, true),
+            "paragraph" | "run" | "hyperlink" => (true, true, true),
+            "cell" => (true, false, true),
+            // Record 0251c: comments are added and removed.
+            "table" | "row" | "comment" => (false, true, true),
             "sdt" => (false, false, true),
             _ => (false, false, false),
         };
@@ -208,6 +209,31 @@ fn ordinary_reports_hide_native_selection_fields() {
                     assert!(!property.set(), "{}", property.name());
                     assert!(!property.add(), "{}", property.name());
                 }
+            } else if element.name() == "hyperlink"
+                && matches!(
+                    property.name(),
+                    "url"
+                        | "anchor"
+                        | "font"
+                        | "size"
+                        | "bold"
+                        | "italic"
+                        | "color"
+                        | "underline"
+                        | "rStyle"
+                )
+            {
+                // Record 0251b: the target and the run formatting seed a new
+                // hyperlink; only `url` changes an existing one.
+                assert!(property.get(), "hyperlink {}", property.name());
+                assert!(property.add(), "hyperlink {}", property.name());
+                assert_eq!(property.set(), property.name() == "url");
+            } else if element.name() == "comment" && property.name() != "id" {
+                // Record 0251c: author, initials, date and text seed a new
+                // comment.
+                assert!(property.get(), "comment {}", property.name());
+                assert!(!property.set(), "comment {}", property.name());
+                assert!(property.add(), "comment {}", property.name());
             } else if property.name() == "text" {
                 // `text` of a hyperlink or cell is write-only.
                 assert!(!property.get(), "{} text", element.name());

@@ -102,6 +102,40 @@ pub(super) fn inlines(docx: &Docx, paragraph: &Paragraph) -> Result<Vec<Inline>>
     })
 }
 
+/// Whether the main document relates a comments part.
+pub(super) fn has_comments(docx: &Docx) -> Result<bool> {
+    let comments = |relationship: &litchi_opc::rel::Relationship| {
+        !relationship.is_external()
+            && matches!(
+                relationship.reltype(),
+                litchi_opc::constants::relationship_type::COMMENTS
+                    | litchi_opc::constants::relationship_type::STRICT_COMMENTS
+            )
+    };
+    let result = match docx.owner() {
+        DocxOwner::Eager(package) => Ok(package
+            .opc_package()
+            .main_document_part()?
+            .rels()
+            .iter()
+            .any(comments)),
+        DocxOwner::Source(package) => package
+            .source_backed_package()
+            .and_then(|source| Ok(source.main_document_part()?.rels().iter().any(comments)))
+            .map_err(Error::from),
+    };
+    docx.owner().finish(result)
+}
+
+/// The comments of the main document, in part order.
+pub(super) fn comments(docx: &Docx) -> Result<Vec<litchi_docx::comment::Comment>> {
+    let result = match docx.owner() {
+        DocxOwner::Eager(package) => package.document()?.comments().map_err(Error::from),
+        DocxOwner::Source(package) => package.comments().map_err(Error::from),
+    };
+    docx.owner().finish(result)
+}
+
 /// What a container selection picked.
 enum Pick {
     /// The block, from the container's index.
@@ -332,6 +366,54 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     },
                     Pick::Missing => Lookup::Missing,
                     Pick::NotApplicable => Lookup::NotApplicable,
+                })
+            },
+            (Value::Document, Kind::Comments) => {
+                let found = match step.select {
+                    Select::None | Select::Last => true,
+                    Select::Ordinal(position) => position.get() == 0,
+                    _ => return Ok(Lookup::NotApplicable),
+                };
+                if !found || !has_comments(self.docx)? {
+                    return Ok(Lookup::Missing);
+                }
+                Ok(Lookup::Found(Node::new(
+                    self.docx,
+                    Kind::Comments,
+                    Value::Comments,
+                    address.with(Step::new(Kind::Comments, 0)),
+                )))
+            },
+            (Value::Comments, Kind::Comment) => {
+                let comments = comments(self.docx)?;
+                let picked = if let Select::Identity(identities) = &step.select {
+                    let mut wanted = None;
+                    for (_, value) in identities.iter() {
+                        let id = value.trim().parse::<u32>().map_err(|_| {
+                            Error::new(crate::Code::InvalidPath, "invalid comment identifier")
+                        })?;
+                        if wanted.is_some_and(|held| held != id) {
+                            wanted = None;
+                            break;
+                        }
+                        wanted = Some(id);
+                    }
+                    Some(wanted.and_then(|id| comments.iter().position(|c| c.id() == id)))
+                } else {
+                    pick_index(comments.len(), &step.select)
+                };
+                Ok(match picked {
+                    Some(Some(index)) => {
+                        let comment = comments.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Comment,
+                            Value::Comment(Arc::new(comment)),
+                            address.with(Step::new(Kind::Comment, ordinal(index))),
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
                 })
             },
             (Value::Table(_), Kind::Row) => {

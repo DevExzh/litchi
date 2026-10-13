@@ -2,7 +2,8 @@
 
 use super::super::model::{Error, MutableDocument, PackURI, Package, Result};
 use super::transfer::{
-    apply_transfer_graph, relationship_graph_digest, relationship_graph_digest_opc,
+    apply_graph_change, apply_transfer_graph, relationship_graph_digest,
+    relationship_graph_digest_opc,
 };
 use litchi_opc::OpcError;
 
@@ -181,6 +182,16 @@ impl Package {
         let source = self.document_patch_source(patch)?;
         self.validate_transfer_operations(patch.operations())?;
         let graph_transition = transfer_graph_transition(patch.operations())?;
+        let graph_changes: Vec<(std::sync::Arc<crate::document::GraphChange>, bool)> = patch
+            .operations()
+            .iter()
+            .filter_map(|operation| match operation {
+                crate::document::Operation::ChangeGraph { change, forward } => {
+                    Some((std::sync::Arc::clone(change), *forward))
+                },
+                _ => None,
+            })
+            .collect();
         let candidate = match source {
             DocumentPatchSource::Reused(candidate) => candidate,
             DocumentPatchSource::Rescanned(current) => patch.apply(&current)?,
@@ -201,6 +212,10 @@ impl Package {
             None => MainReplacement::Copied(candidate.xml_bytes().to_vec()),
         };
         self.edit_semantic_opc("apply", move |opc| {
+            for (change, forward) in &graph_changes {
+                apply_graph_change(opc, change, *forward)
+                    .map_err(|error| Error::InvalidFormat(error.to_string()))?;
+            }
             if let Some((graph, insert, expected_digest)) = graph_transition {
                 apply_transfer_graph(opc, &graph, insert)
                     .map_err(|error| Error::InvalidFormat(error.to_string()))?;
@@ -317,6 +332,15 @@ impl Package {
                     return Err(crate::document::Error::StaleSource);
                 }
             }
+        }
+        if patch
+            .operations()
+            .iter()
+            .any(|operation| operation.op == "graph.change")
+        {
+            return Err(crate::document::Error::InvalidDurable(
+                "package graph changes publish through Package::apply".into(),
+            ));
         }
         let transfer_operations = crate::document::durable_transfer_operations(patch)?;
         let graph_transition = transfer_graph_transition(&transfer_operations)?;
@@ -546,7 +570,8 @@ fn transfer_graph_transition(
             | crate::document::Operation::RemoveRun { .. }
             | crate::document::Operation::ReplaceElement { .. }
             | crate::document::Operation::InsertElement { .. }
-            | crate::document::Operation::RemoveElement { .. } => None,
+            | crate::document::Operation::RemoveElement { .. }
+            | crate::document::Operation::ChangeGraph { .. } => None,
         };
         if let Some(selected_transition) = candidate {
             if selected.is_some() {

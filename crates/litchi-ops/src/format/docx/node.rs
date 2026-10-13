@@ -80,6 +80,10 @@ pub(super) enum Value {
     Run(Run),
     /// A hyperlink with its relationship resolved.
     Hyperlink(Arc<InlineHyperlink>),
+    /// The comments part.
+    Comments,
+    /// One comment of the comments part.
+    Comment(Arc<litchi_docx::comment::Comment>),
 }
 
 /// One direct child of a block container: the container's index and the

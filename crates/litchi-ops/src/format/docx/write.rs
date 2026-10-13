@@ -187,6 +187,19 @@ impl Docx {
         }
         let assignments = admit_assignments(targets[0].kind, &props)?;
         self.owner().check_source()?;
+        // A hyperlink target change stages a relationship, which only the
+        // owning package publishes.
+        let editor = if assignments.iter().any(|assignment| {
+            matches!(
+                assignment.entry.access,
+                crate::registry::Access::Set(Setter::HyperlinkUrl)
+                    | crate::registry::Access::SetAndAdd(Setter::HyperlinkUrl)
+            )
+        }) {
+            self.eager_editor(editor)?
+        } else {
+            editor
+        };
 
         let mut editor = WorkEdit::from(editor)?;
         if editor.bulk_paragraph_text(&targets, &assignments)? {
@@ -198,6 +211,29 @@ impl Docx {
             }
         }
         editor.commit(self)
+    }
+
+    /// An editor over the owning package: package-graph changes
+    /// (relationships, new parts) publish only through it. A source-backed
+    /// owner is materialized once; the committed handle is eager.
+    pub(super) fn eager_editor(&self, editor: DocxEditor) -> Result<DocxEditor> {
+        match editor {
+            DocxEditor::Source(_) => {
+                let super::DocxOwner::Source(package) = self.owner() else {
+                    return Err(Error::new(
+                        Code::InternalError,
+                        "a source editor came from an eager DOCX owner",
+                    ));
+                };
+                let owned = self.owner().finish(
+                    package
+                        .to_owned_package_preserving_source()
+                        .map_err(Error::from),
+                )?;
+                Ok(DocxEditor::Edit(Box::new(owned.edit()?)))
+            },
+            editor => Ok(editor),
+        }
     }
 
     pub(super) fn resolve_targets<'f>(&'f self, target: &TargetArg<'_>) -> Result<Vec<Node<'f>>> {
@@ -386,6 +422,21 @@ impl WorkEdit {
                             .map(|_| ())
                             .map_err(Error::from))
                     };
+                }
+                if setter == Setter::HyperlinkUrl {
+                    let url = text_value(value)?;
+                    let Self::Eager(edit) = self else {
+                        return Err(Error::new(
+                            Code::InternalError,
+                            "a hyperlink target change needs the owning package editor",
+                        ));
+                    };
+                    edit.set_hyperlink_target_at(
+                        path,
+                        &litchi_docx::document::HyperlinkTarget::Url(url),
+                    )
+                    .map_err(Error::from)?;
+                    return Ok(());
                 }
                 let mut failure = None;
                 match kind {

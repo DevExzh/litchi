@@ -47,7 +47,7 @@ pub mod snapshot {
 }
 
 pub use limit::LimitKind;
-pub use owned::{Commit, Edit};
+pub use owned::{Commit, Edit, HyperlinkTarget, NewComment};
 
 pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;
 pub(crate) use transaction::validate_paragraph_text;
@@ -59,7 +59,7 @@ pub(crate) use blocks::{BlockIndex, ContainerRoot, index as index_blocks};
 pub use model::{Block, Document, Element, ImageWatermarkPart, OpaqueBlock};
 pub use transaction::{
     BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics,
-    ElementAnchor, ElementPath, ElementStep, Error, History, HistoryLimits,
+    ElementAnchor, ElementPath, ElementStep, Error, GraphChange, History, HistoryLimits,
     HyperlinkTextReplacement, JoinError, MAX_NEW_TABLE_DIMENSION, MergeChoice, NewParagraph,
     NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
     ParagraphTransfer, Patch, PreparedEdit, Refusal, Result, RevisionAction, RevisionKind,

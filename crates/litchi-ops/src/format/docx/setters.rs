@@ -24,6 +24,10 @@ pub(crate) enum Setter {
     HyperlinkText,
     /// A table cell's text, replacing its content with one paragraph.
     CellText,
+    /// A hyperlink's external target (record 0251b).
+    HyperlinkUrl,
+    /// A new hyperlink's bookmark target.
+    HyperlinkAnchor,
     /// A new table's row count.
     TableRows,
     /// A new table's column count.
@@ -36,6 +40,14 @@ pub(crate) enum Setter {
     TableData,
     /// A new row's cell count.
     RowColumns,
+    /// A new comment's author (record 0251c).
+    CommentAuthor,
+    /// A new comment's author initials.
+    CommentInitials,
+    /// A new comment's date.
+    CommentDate,
+    /// A new comment's text.
+    CommentText,
     ParagraphStyle,
     ParagraphAlign,
     ParagraphSpaceBefore,

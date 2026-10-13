@@ -36,8 +36,15 @@ pub(crate) struct Children<'f> {
 
 enum Source {
     Done,
-    /// The root's single child, the body.
+    /// The root's children: the body, then the comments part.
     Root,
+    /// The root's comments part, when the document has one.
+    CommentsRoot,
+    /// The comments of the comments part.
+    Comments {
+        comments: vec::IntoIter<litchi_docx::comment::Comment>,
+        next: u32,
+    },
     /// The direct blocks of a block container, from `next` on.
     Blocks {
         container: Blocks,
@@ -70,6 +77,11 @@ impl<'f> Children<'f> {
     pub(super) fn of(parent: &Node<'f>, kinds: KindSet<Kind>) -> Result<Self> {
         let source = match &parent.value {
             Value::Document if kinds.contains(Kind::Body) => Source::Root,
+            Value::Document if kinds.contains(Kind::Comments) => Source::CommentsRoot,
+            Value::Comments if kinds.contains(Kind::Comment) => Source::Comments {
+                comments: nav::comments(parent.docx)?.into_iter(),
+                next: 0,
+            },
             Value::Body(_) | Value::Cell(_) | Value::Sdt(_) if wants_blocks(kinds) => {
                 match container_of(parent)? {
                     Some(container) => Source::Blocks { container, next: 0 },
@@ -111,12 +123,44 @@ impl<'f> Children<'f> {
             match &mut self.source {
                 Source::Done => return None,
                 Source::Root => {
-                    self.source = Source::Done;
+                    self.source = Source::CommentsRoot;
+                    if !self.kinds.contains(Kind::Body) {
+                        continue;
+                    }
                     return Some(Ok(Node::new(
                         self.docx,
                         Kind::Body,
                         Value::Body(std::sync::OnceLock::new()),
                         self.address.with(Step::new(Kind::Body, 0)),
+                    )));
+                },
+                Source::CommentsRoot => {
+                    self.source = Source::Done;
+                    if !self.kinds.contains(Kind::Comments) {
+                        continue;
+                    }
+                    match nav::has_comments(self.docx) {
+                        Ok(true) => {
+                            return Some(Ok(Node::new(
+                                self.docx,
+                                Kind::Comments,
+                                Value::Comments,
+                                self.address.with(Step::new(Kind::Comments, 0)),
+                            )));
+                        },
+                        Ok(false) => return None,
+                        Err(error) => return Some(Err(error)),
+                    }
+                },
+                Source::Comments { comments, next } => {
+                    let comment = comments.next()?;
+                    let ordinal = *next;
+                    *next += 1;
+                    return Some(Ok(Node::new(
+                        self.docx,
+                        Kind::Comment,
+                        Value::Comment(Arc::new(comment)),
+                        self.address.with(Step::new(Kind::Comment, ordinal)),
                     )));
                 },
                 Source::Blocks { container, next } => {

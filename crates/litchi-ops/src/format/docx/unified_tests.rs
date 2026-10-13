@@ -1029,6 +1029,24 @@ fn native_query_predicates_require_raw_admission() {
 fn capabilities_match_live_paths_queries_and_views() {
     let file = report();
     let caps = file.capabilities();
+    // The report has no comments part; comment paths are checked on a copy
+    // with one added (record 0251c).
+    let commented = file
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("comment")
+                .prop("author", "Ada")
+                .prop("text", "note"),
+        )
+        .expect("add a comment")
+        .into_file();
+    let file_for = |name: &str| {
+        if matches!(name, "comments" | "comment") {
+            &commented
+        } else {
+            &file
+        }
+    };
     for element in caps.elements() {
         if !element.operations().get {
             continue;
@@ -1044,7 +1062,7 @@ fn capabilities_match_live_paths_queries_and_views() {
                     "/body/tbl[1]/tr[1]/tc[1]/tbl",
                     "/body/tbl[1]/tr[2]/tc[1]/tbl",
                 );
-            let node = file
+            let node = file_for(element.name())
                 .get(path.as_str())
                 .unwrap_or_else(|error| panic!("{path}: {error}"));
             assert_eq!(node.kind(), element.name());
@@ -1054,7 +1072,8 @@ fn capabilities_match_live_paths_queries_and_views() {
         }
         if element.operations().query {
             assert!(
-                file.query(element.name())
+                file_for(element.name())
+                    .query(element.name())
                     .unwrap()
                     .first()
                     .unwrap()

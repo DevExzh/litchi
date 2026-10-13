@@ -146,13 +146,10 @@ fn hyperlink_runs_and_hyperlink_text_are_writable() {
         assert_eq!(text(&file, "/body/p[1]/r[2]"), "new link");
         let xml = document_xml(&file);
         assert!(xml.contains(r#"<w:hyperlink r:id="rIdLink"><w:r><w:rPr><w:i/></w:rPr><w:t>new link</w:t></w:r></w:hyperlink>"#), "{xml}");
-        // Hyperlinks accept only their text.
+        // Run formatting of an existing hyperlink goes through its runs.
         let error = file
-            .set(
-                "/body/p[1]/hyperlink[1]",
-                props! { "url" => "https://other.test/" },
-            )
-            .expect_err("url is not writable here");
+            .set("/body/p[1]/hyperlink[1]", props! { "bold" => true })
+            .expect_err("bold seeds a new hyperlink only");
         assert_eq!(error.code(), Code::UnsupportedProperty);
     }
 }
@@ -309,4 +306,162 @@ fn nested_positions_honor_explicit_placement() {
     assert_eq!(added.path.to_string(), "/body/tbl[1]/tr[1]/tc[1]/p[1]");
     let file = added.into_file();
     assert_eq!(text(&file, "/body/tbl[1]/tr[1]/tc[1]/p[2]"), "A1");
+}
+
+fn property(file: &File, path: &str, key: &str) -> Option<String> {
+    file.get(path)
+        .unwrap_or_else(|error| panic!("{path}: {error}"))
+        .view()
+        .format()
+        .unwrap_or_else(|error| panic!("{path} format: {error}"))
+        .find(|property| property.key() == key)
+        .map(|property| property.to_string())
+}
+
+#[test]
+fn hyperlinks_are_added_and_retargeted_on_both_owners() {
+    for eager in [false, true] {
+        let file = open(eager, fixture());
+        let added = file
+            .add(
+                "/body/tbl[1]/tr[1]/tc[1]/p[1]",
+                NewNode::new("hyperlink")
+                    .prop("url", "https://example.test/new?x=1&y=2")
+                    .prop("text", " more"),
+            )
+            .unwrap_or_else(|error| panic!("hyperlink add: {error}"));
+        assert_eq!(
+            added.path.to_string(),
+            "/body/tbl[1]/tr[1]/tc[1]/p[1]/hyperlink[1]"
+        );
+        let file = added.into_file();
+        let link = "/body/tbl[1]/tr[1]/tc[1]/p[1]/hyperlink[1]";
+        assert_eq!(
+            property(&file, link, "url").as_deref(),
+            Some("https://example.test/new?x=1&y=2")
+        );
+        assert_eq!(text(&file, "/body/tbl[1]/tr[1]/tc[1]/p[1]"), "A1 more");
+        assert_eq!(property(&file, link, "color").as_deref(), Some("#0563C1"));
+
+        // A bookmark hyperlink in the body, then a retarget to a URL.
+        let file = file
+            .add(
+                "/body/p[1]",
+                NewNode::new("link")
+                    .prop("anchor", "Top")
+                    .prop("text", "top")
+                    .prop("bold", true)
+                    .at(Placement::Start),
+            )
+            .unwrap_or_else(|error| panic!("anchor hyperlink add: {error}"))
+            .into_file();
+        assert_eq!(
+            property(&file, "/body/p[1]/hyperlink[1]", "anchor").as_deref(),
+            Some("Top")
+        );
+        assert_eq!(text(&file, "/body/p[1]"), "topLead link");
+        let file = file
+            .set(
+                "/body/p[1]/hyperlink[1]",
+                props! { "url" => "https://example.test/top" },
+            )
+            .unwrap_or_else(|error| panic!("hyperlink retarget: {error}"));
+        assert_eq!(
+            property(&file, "/body/p[1]/hyperlink[1]", "url").as_deref(),
+            Some("https://example.test/top")
+        );
+        assert_eq!(property(&file, "/body/p[1]/hyperlink[1]", "anchor"), None);
+        let reopened = reopen(&file, eager);
+        assert_eq!(
+            property(&reopened, link, "url").as_deref(),
+            Some("https://example.test/new?x=1&y=2")
+        );
+        assert_eq!(
+            property(&reopened, "/body/p[1]/hyperlink[1]", "url").as_deref(),
+            Some("https://example.test/top")
+        );
+        // Both targets are required to be exclusive.
+        let error = reopened
+            .add(
+                "/body/p[1]",
+                NewNode::new("hyperlink").prop("text", "nowhere"),
+            )
+            .expect_err("a hyperlink needs a target");
+        assert_eq!(error.code(), Code::MissingProperty);
+    }
+}
+
+#[test]
+fn comments_are_added_read_and_removed_on_both_owners() {
+    for eager in [false, true] {
+        let file = open(eager, fixture());
+        assert!(file.get("/comments").is_err(), "no comments part yet");
+        let added = file
+            .add(
+                "/body/p[1]",
+                NewNode::new("comment")
+                    .prop("author", "Ada")
+                    .prop("initials", "AL")
+                    .prop("date", "2026-10-13T00:00:00Z")
+                    .prop("text", "Check the lead"),
+            )
+            .unwrap_or_else(|error| panic!("comment add: {error}"));
+        assert_eq!(added.path.to_string(), "/comments/comment[1]");
+        let file = added.into_file();
+        let first = "/comments/comment[1]";
+        assert_eq!(text(&file, first), "Check the lead");
+        assert_eq!(property(&file, first, "author").as_deref(), Some("Ada"));
+        assert_eq!(property(&file, first, "initials").as_deref(), Some("AL"));
+        assert_eq!(
+            property(&file, first, "date").as_deref(),
+            Some("2026-10-13T00:00:00Z")
+        );
+        let id = property(&file, first, "id").expect("comment id");
+        let raw = format!("/comments/comment[@commentId={id}]");
+        let by_id = file
+            .get(litchi_ops::path::raw::path(raw.as_str()).expect("raw native-id path"))
+            .unwrap_or_else(|error| panic!("{raw}: {error}"));
+        assert_eq!(
+            by_id.view().text().expect("comment text").as_deref(),
+            Some("Check the lead")
+        );
+        // The commented paragraph keeps its text.
+        assert_eq!(text(&file, "/body/p[1]"), "Lead link");
+
+        // A second comment, anchored on a cell run, joins the part.
+        let added = file
+            .add(
+                "/body/tbl[1]/tr[2]/tc[1]/p[1]/r[1]",
+                NewNode::new("comment")
+                    .prop("author", "Bo")
+                    .prop("text", "Cell note"),
+            )
+            .unwrap_or_else(|error| panic!("run comment add: {error}"));
+        assert_eq!(added.path.to_string(), "/comments/comment[2]");
+        let file = added.into_file();
+        let xml = document_xml(&file);
+        assert_eq!(xml.matches("<w:commentReference").count(), 2, "{xml}");
+        let reopened = reopen(&file, eager);
+        assert_eq!(text(&reopened, "/comments/comment[2]"), "Cell note");
+        assert_eq!(
+            property(&reopened, "/comments/comment[2]", "author").as_deref(),
+            Some("Bo")
+        );
+
+        // Removal strips the entry and its anchors.
+        let removed = reopened
+            .remove("/comments/comment[1]")
+            .unwrap_or_else(|error| panic!("comment remove: {error}"));
+        assert_eq!(text(&removed, "/comments/comment[1]"), "Cell note");
+        assert!(removed.get("/comments/comment[2]").is_err());
+        let xml = document_xml(&removed);
+        assert_eq!(xml.matches("<w:commentReference").count(), 1, "{xml}");
+        assert_eq!(text(&removed, "/body/p[1]"), "Lead link");
+
+        // An author is required.
+        let error = removed
+            .add("/body/p[1]", NewNode::new("comment").prop("text", "anon"))
+            .expect_err("a comment needs an author");
+        assert_eq!(error.code(), Code::MissingProperty);
+    }
 }

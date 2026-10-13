@@ -137,7 +137,14 @@ impl Docx {
             (NewKind::Run, _) => {
                 return Err(refusal("a DOCX run can only be added under a paragraph"));
             },
-            (NewKind::Paragraph | NewKind::Table | NewKind::Row, _) => {
+            (
+                NewKind::Paragraph
+                | NewKind::Table
+                | NewKind::Row
+                | NewKind::Hyperlink
+                | NewKind::Comment,
+                _,
+            ) => {
                 return self.add_nested(editor, &parent, kind, &node);
             },
         };
@@ -323,6 +330,8 @@ pub(super) enum NewKind {
     Run,
     Table,
     Row,
+    Hyperlink,
+    Comment,
 }
 
 enum PlannedNode {
@@ -355,6 +364,10 @@ fn new_kind(name: &str) -> Result<NewKind> {
         Ok(NewKind::Table)
     } else if name.eq_ignore_ascii_case("tr") || name.eq_ignore_ascii_case("row") {
         Ok(NewKind::Row)
+    } else if name.eq_ignore_ascii_case("hyperlink") || name.eq_ignore_ascii_case("link") {
+        Ok(NewKind::Hyperlink)
+    } else if name.eq_ignore_ascii_case("comment") {
+        Ok(NewKind::Comment)
     } else {
         Err(Error::new(
             Code::UnsupportedElement,

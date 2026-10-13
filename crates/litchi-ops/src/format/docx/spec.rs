@@ -179,7 +179,7 @@ impl Kind {
 
     /// Whether a path step names the kind without an index (`/body`).
     pub(crate) const fn is_singleton(self) -> bool {
-        matches!(self, Self::Body)
+        matches!(self, Self::Body | Self::Comments)
     }
 }
 
@@ -641,22 +641,27 @@ crate::registry::registry! {
 // formatting of its first run that holds text.
 crate::registry::registry! {
     pub(crate) HYPERLINK_PROPS, HYPERLINK_REGISTRY: Setter {
-    crate::registry::Entry::read(PropSpec::new("url", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("anchor", ValueType::Text)),
+    crate::registry::Entry {
+        spec: PropSpec::new("url", ValueType::Text),
+        access: crate::registry::Access::SetAndAdd(Setter::HyperlinkUrl),
+        constraint: Constraint::NotEmpty,
+        clear: false,
+    },
+    read_add("anchor", ValueType::Text, Setter::HyperlinkAnchor, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("docLocation", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("tooltip", ValueType::Text)),
     crate::registry::Entry::read(PropSpec::new("tgtFrame", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("font", ValueType::Text)),
+    read_add("font", ValueType::Text, Setter::RunFontLatin, Constraint::NotEmpty),
     crate::registry::Entry::read(PropSpec::new("font.cs", ValueType::Text)),
-    crate::registry::Entry::read(PropSpec::new("size", ValueType::Length(LengthSpec::FONT_SIZE))),
-    crate::registry::Entry::read(PropSpec::new("bold", ValueType::Bool)),
-    crate::registry::Entry::read(PropSpec::new("italic", ValueType::Bool)),
-    crate::registry::Entry::read(PropSpec::new("color", ValueType::Color(ColorContext::Word))),
-    crate::registry::Entry::read(PropSpec::new("underline", ValueType::Token(&UNDERLINE))),
+    read_add("size", ValueType::Length(LengthSpec::FONT_SIZE), Setter::RunSize, Constraint::None),
+    read_add("bold", ValueType::Bool, Setter::RunBold, Constraint::None),
+    read_add("italic", ValueType::Bool, Setter::RunItalic, Constraint::None),
+    read_add("color", ValueType::Color(ColorContext::Word), Setter::RunColor, Constraint::None),
+    read_add("underline", ValueType::Token(&UNDERLINE), Setter::RunUnderline, Constraint::None),
     crate::registry::Entry::read(PropSpec::new("underline.color", ValueType::Color(ColorContext::Word))),
     crate::registry::Entry::read(PropSpec::new("strike", ValueType::Bool)),
     crate::registry::Entry::read(PropSpec::new("highlight", ValueType::Token(&HIGHLIGHT))),
-    crate::registry::Entry::read(PropSpec::new("rStyle", ValueType::Text)),
+    read_add("rStyle", ValueType::Text, Setter::RunStyle, Constraint::NotEmpty),
     write_only("text", ValueType::Text, Setter::HyperlinkText),
     }
 }
@@ -735,6 +740,18 @@ crate::registry::registry! {
     }
 }
 
+// A comment of the comments part (record 0251c): its identity, author and
+// text; `text` and the author's details seed a new comment.
+crate::registry::registry! {
+    pub(crate) COMMENT_PROPS, COMMENT_REGISTRY: Setter {
+    crate::registry::Entry::read(PropSpec::new("id", ValueType::Int)),
+    read_add("author", ValueType::Text, Setter::CommentAuthor, Constraint::NotEmpty),
+    read_add("initials", ValueType::Text, Setter::CommentInitials, Constraint::NotEmpty),
+    read_add("date", ValueType::Text, Setter::CommentDate, Constraint::NotEmpty),
+    read_add("text", ValueType::Text, Setter::CommentText, Constraint::None),
+    }
+}
+
 // `SdtBlockToNode`: the content control's identity.
 crate::registry::registry! {
     pub(crate) SDT_PROPS, SDT_REGISTRY: () {
@@ -799,8 +816,6 @@ gaps! {
     FOOTNOTE_GAP: "footnote", "L-DOCX-R5", "footnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
     ENDNOTES_GAP: "endnotes", "L-DOCX-R5", "the endnotes part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
     ENDNOTE_GAP: "endnote", "L-DOCX-R5", "endnote stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    COMMENTS_GAP: "comments", "L-DOCX-R5", "the comments part is read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
-    COMMENT_GAP: "comment", "L-DOCX-R5", "comment stories are read through L-DOCX-R5's story documents, which the DOCX adapter does not wire yet";
     STYLES_GAP: "styles", "L-DOCX-R6 (R4x)", "the styles part has no node adapter yet";
     STYLE_GAP: "style", "L-DOCX-R6 (R4x)", "styles have no node adapter yet";
     NUMBERING_GAP: "numbering", "L-DOCX-R6 (R4x)", "the numbering part has no node adapter yet";
@@ -896,7 +911,7 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 "document",
                 &["document"],
                 &[],
-                &[K::Body],
+                &[K::Body, K::Comments],
                 &["/"],
                 DOCUMENT_PROPS,
             ),
@@ -1049,21 +1064,26 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/endnote[N]", "/endnotes/endnote[N]"],
                 &ENDNOTE_GAP,
             ),
-            gap(
+            element(
                 K::Comments,
                 "comments",
                 &["comments"],
                 &[K::Document],
+                &[K::Comment],
                 &["/comments"],
-                &COMMENTS_GAP,
+                &[],
             ),
-            gap(
-                K::Comment,
-                "comment",
-                &["comment"],
-                &[K::Comments],
-                &["/comments/comment[N]"],
-                &COMMENT_GAP,
+            identities(
+                element(
+                    K::Comment,
+                    "comment",
+                    &["comment"],
+                    &[K::Comments],
+                    &[],
+                    &["/comments/comment[N]", "/comments/comment[@commentId=X]"],
+                    COMMENT_PROPS,
+                ),
+                &["commentId"],
             ),
             gap(
                 K::Styles,

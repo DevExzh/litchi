@@ -2732,7 +2732,10 @@ impl Element {
             {
                 self.adapter == Adapter::Docx
                     && self.retains_source != Some(false)
-                    && matches!(self.data().canonical, "p" | "r" | "tbl" | "tr")
+                    && matches!(
+                        self.data().canonical,
+                        "p" | "r" | "tbl" | "tr" | "hyperlink" | "comment"
+                    )
                     && readable
             }
             #[cfg(not(feature = "docx"))]
@@ -2789,13 +2792,13 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let remove = structural;
-        // DOCX cells, hyperlinks and content controls are removable but not
-        // yet addable (record 0251a).
+        // DOCX cells and content controls are removable but not yet
+        // addable (record 0251a).
         #[cfg(feature = "docx")]
         let remove = remove
             || (self.adapter == Adapter::Docx
                 && self.retains_source != Some(false)
-                && matches!(self.data().canonical, "tc" | "hyperlink" | "sdt")
+                && matches!(self.data().canonical, "tc" | "sdt")
                 && readable);
         #[cfg(feature = "xlsb")]
         let remove = remove

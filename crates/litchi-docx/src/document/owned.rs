@@ -8,6 +8,11 @@ use super::{
 use crate::Package;
 use litchi_core::Position;
 
+mod comments;
+mod graph;
+pub use comments::NewComment;
+pub use graph::HyperlinkTarget;
+
 /// An isolated main-document edit retaining its complete source package.
 ///
 /// `P` defaults to the eager [`crate::Package`]; source-backed owners use

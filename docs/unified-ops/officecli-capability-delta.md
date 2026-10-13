@@ -18,8 +18,8 @@ fails while a golden differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `8e777a64f1aaa5270ee703f061649e221aa40c0a82cc98bdee69ae319e3cb5f4` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `f6cd484efa2157b225e98fea4faf3b278f2619c06c0ae8214c5ede1d9dc29731` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `ee587eccb6491fe4014fb067d54b8ddf46cc9a02be1e3de4cabb20d8bf176b91` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `82be804ef4c943f73a9e6bb5a7b5c1e1f592079d2ca4b1a469f6ae75f42d2d2e` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `0c1d087c21028c60fd6ef79c2d6df73b31826f95b48cc12cbf6f8d57193d56df` |
@@ -48,7 +48,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
-| docx | 11 | 24 | 0 | 0 | 9 | 2 | 5 |
+| docx | 12 | 23 | 0 | 0 | 9 | 2 | 5 |
 | xlsx | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | xls | 6 | 32 | 0 | 0 | 1 | 2 | 1 |
@@ -58,7 +58,7 @@ Properties:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 166 | 4 | 428 | 0 | 66 | 2 | 295 | 27 |
+| docx | 171 | 4 | 418 | 0 | 68 | 2 | 298 | 27 |
 | xlsx | 89 | 16 | 489 | 0 | 18 | 1 | 78 | 62 |
 | xlsb | 56 | 45 | 489 | 0 | 22 | 1 | 78 | 2 |
 | xls | 18 | 17 | 509 | 0 | 22 | 1 | 124 | 0 |
@@ -77,7 +77,7 @@ Properties:
 | chart-axis |  | missing |  |
 | chart-series |  | missing |  |
 | chart | chart | gap | R4x |
-| comment | comment | gap | L-DOCX-R5 |
+| comment | comment | supported |  |
 | diagram |  | missing |  |
 | document | document | supported |  |
 | endnote | endnote | gap | L-DOCX-R5 |
@@ -118,7 +118,7 @@ Properties:
 | watermark | watermark | gap | R4x |
 |  | footnotes | litchi-only | L-DOCX-R5 |
 |  | endnotes | litchi-only | L-DOCX-R5 |
-|  | comments | litchi-only | L-DOCX-R5 |
+|  | comments | litchi-only |  |
 |  | settings | litchi-only | L-DOCX-R6 (R4x) |
 |  | theme | litchi-only | L-DOCX-R6 (R4x) |
 
@@ -298,16 +298,16 @@ Properties:
 | chart | `varyColors` | string | asg | element gap | R4x |
 | chart | `view3d` | string | asg | element gap | R4x |
 | chart | `width` | length | asg | element gap | R4x |
-| comment | `id` | number | --g | element gap | L-DOCX-R5 |
-| comment | `anchoredTo` | string | --g | element gap | L-DOCX-R5 |
-| comment | `runStart` | int | a-- | element gap | L-DOCX-R5 |
-| comment | `range` | bool | a-- | element gap | L-DOCX-R5 |
-| comment | `parentId` | number | a-g | element gap | L-DOCX-R5 |
-| comment | `done` | bool | asg | element gap | L-DOCX-R5 |
-| comment | `date` | string | asg | element gap | L-DOCX-R5 |
-| comment | `initials` | string | asg | element gap | L-DOCX-R5 |
-| comment | `author` | string | asg | element gap | L-DOCX-R5 |
-| comment | `text` | string | asg | element gap | L-DOCX-R5 |
+| comment | `id` | number | --g | supported |  |
+| comment | `anchoredTo` | string | --g | missing |  |
+| comment | `runStart` | int | a-- | write-only | M2 |
+| comment | `range` | bool | a-- | write-only | M2 |
+| comment | `parentId` | number | a-g | missing |  |
+| comment | `done` | bool | asg | missing |  |
+| comment | `date` | string | asg | supported |  |
+| comment | `initials` | string | asg | supported |  |
+| comment | `author` | string | asg | supported |  |
+| comment | `text` | string | asg | supported |  |
 | diagram | `mermaid` | string | a-- | write-only |  |
 | diagram | `src` | string | a-- | write-only |  |
 | diagram | `width` | length | a-- | write-only |  |

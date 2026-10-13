@@ -985,6 +985,31 @@ impl Package {
         }
     }
 
+    /// The comments of the main document's comments part, in part order;
+    /// empty when the document has none.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the source changed or the comments part is
+    /// unreadable or malformed.
+    pub fn comments(&self) -> Result<Vec<crate::comment::Comment>> {
+        let package = self.source_backed_package()?;
+        let main = package.main_document_part()?;
+        let Some(relationship) = main.rels().iter().find(|relationship| {
+            !relationship.is_external()
+                && matches!(
+                    relationship.reltype(),
+                    litchi_opc::constants::relationship_type::COMMENTS
+                        | litchi_opc::constants::relationship_type::STRICT_COMMENTS
+                )
+        }) else {
+            return Ok(Vec::new());
+        };
+        let target = relationship.target_partname()?;
+        let payload = package.part(&target)?.data()?.into_arc()?;
+        crate::comment::Comment::extract_from_payload(&payload)
+    }
+
     /// Read relationship-selected OOXML core properties without loading the
     /// main document or unrelated package members. Retained owners resolve the
     /// effective graph, including edited relationships and property payloads.

@@ -1222,6 +1222,218 @@ impl Edit {
             };
         }
         self.ensure_unmanaged("insert_run_at")?;
+        let conformance = self.projected.conformance;
+        self.insert_inline(owner, at, b"r", |prefix| {
+            run_markup(prefix, conformance, new_run).map_err(spliced(Position::new(0)))
+        })
+    }
+
+    /// Whether the edited document is Strict OOXML.
+    pub(crate) fn is_strict(&self) -> bool {
+        matches!(self.projected.conformance, Conformance::Strict)
+    }
+
+    /// Insert a hyperlink holding `new_run` into the paragraph at
+    /// `paragraph`, before its direct run `at`, and return its position
+    /// among the paragraph's direct hyperlinks. Exactly one of
+    /// `relationship` (an `r:id`) and `anchor` (a `w:anchor`) is given; the
+    /// relationship itself is the caller's to stage.
+    pub(crate) fn insert_hyperlink_markup_at(
+        &mut self,
+        paragraph: &ElementPath,
+        at: Option<Position>,
+        relationship: Option<&str>,
+        anchor: Option<&str>,
+        new_run: &NewRun,
+    ) -> Result<Position> {
+        self.ensure_unmanaged("insert_hyperlink_at")?;
+        if paragraph.steps().last().map(|step| step.local()) != Some(b"p".as_slice()) {
+            return Err(not_found());
+        }
+        let conformance = self.projected.conformance;
+        self.insert_inline(paragraph, at, b"hyperlink", |prefix| {
+            hyperlink_markup(prefix, conformance, relationship, anchor, new_run)
+        })
+    }
+
+    /// Point the hyperlink at `hyperlink` to the relationship `relationship`
+    /// or the bookmark `anchor`, keeping its other attributes and its runs.
+    pub(crate) fn retarget_hyperlink_at(
+        &mut self,
+        hyperlink: &ElementPath,
+        relationship: Option<&str>,
+        anchor: Option<&str>,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("set_hyperlink_target_at")?;
+        let (located, inherited) = self.element_with_scope(hyperlink, b"hyperlink")?;
+        let before = self.element_bytes(located)?;
+        let after = retarget_markup(
+            &before,
+            &inherited,
+            self.projected.conformance,
+            relationship,
+            anchor,
+        )?;
+        if after == before.as_slice() {
+            return Ok(self);
+        }
+        self.replace_element(hyperlink, &before, &Arc::new(after))
+    }
+
+    /// Anchor comment `id` in the paragraph at `paragraph`: a range around
+    /// its direct runs `range` (inclusive), or around all its content for
+    /// `None`, followed by the comment's reference run.
+    pub(crate) fn anchor_comment_at(
+        &mut self,
+        paragraph: &ElementPath,
+        range: Option<(Position, Position)>,
+        id: u32,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("add_comment_at")?;
+        let (located, inherited) = self.element_with_scope(paragraph, b"p")?;
+        let before = self.element_bytes(located)?;
+        let base = match super::root_tag(&before)? {
+            (_, true) => {
+                let mut open = opened(&before)?;
+                open.extend_from_slice(b"</");
+                open.extend_from_slice(super::tag_name(&before)?);
+                open.push(b'>');
+                open
+            },
+            (_, false) => before.to_vec(),
+        };
+        let layout = element_children(&base, b"p", &inherited)?;
+        let (start_child, end_child) = match range {
+            Some((first, last)) => {
+                if last < first {
+                    return Err(refusal(Refusal::InvalidPropertyValue));
+                }
+                let start = layout
+                    .index_of(b"r", first)
+                    .ok_or_else(|| refusal(Refusal::RunNotFound))?;
+                let end = layout
+                    .index_of(b"r", last)
+                    .ok_or_else(|| refusal(Refusal::RunNotFound))?;
+                (start, end + 1)
+            },
+            None => (
+                layout
+                    .children
+                    .iter()
+                    .position(|child| child.2.as_deref() != Some(b"pPr"))
+                    .unwrap_or(layout.children.len()),
+                layout.children.len(),
+            ),
+        };
+        let start = layout
+            .insertion_offset(start_child)
+            .ok_or_else(|| refusal(Refusal::RunNotFound))?;
+        let end = layout
+            .insertion_offset(end_child)
+            .ok_or_else(|| refusal(Refusal::RunNotFound))?;
+        let prefix = layout.prefix.clone().unwrap_or_default();
+        let (prefix, declare) = if prefix.is_empty() {
+            (b"w".to_vec(), Some(self.projected.conformance.namespace()))
+        } else {
+            (prefix, None)
+        };
+        let marker = |local: &str| {
+            let mut xml = Vec::new();
+            open(&mut xml, &prefix, local);
+            if let Some(namespace) = declare {
+                xml.extend_from_slice(b" xmlns:");
+                xml.extend_from_slice(&prefix);
+                xml.extend_from_slice(b"=\"");
+                xml.extend_from_slice(namespace.as_bytes());
+                xml.push(b'"');
+            }
+            attribute(&mut xml, &prefix, "id", &id.to_string());
+            xml.extend_from_slice(b"/>");
+            xml
+        };
+        let mut reference = Vec::new();
+        open(&mut reference, &prefix, "r");
+        if let Some(namespace) = declare {
+            reference.extend_from_slice(b" xmlns:");
+            reference.extend_from_slice(&prefix);
+            reference.extend_from_slice(b"=\"");
+            reference.extend_from_slice(namespace.as_bytes());
+            reference.push(b'"');
+        }
+        reference.push(b'>');
+        open(&mut reference, &prefix, "rPr");
+        reference.push(b'>');
+        open(&mut reference, &prefix, "rStyle");
+        attribute(&mut reference, &prefix, "val", "CommentReference");
+        reference.extend_from_slice(b"/>");
+        close(&mut reference, &prefix, "rPr");
+        open(&mut reference, &prefix, "commentReference");
+        attribute(&mut reference, &prefix, "id", &id.to_string());
+        reference.extend_from_slice(b"/>");
+        close(&mut reference, &prefix, "r");
+        let start_marker = marker("commentRangeStart");
+        let end_marker = marker("commentRangeEnd");
+        let mut after = buffer(staging_add(
+            base.len(),
+            start_marker.len() + end_marker.len() + reference.len(),
+        )?)?;
+        after.extend_from_slice(&base[..start]);
+        after.extend_from_slice(&start_marker);
+        after.extend_from_slice(&base[start..end]);
+        after.extend_from_slice(&end_marker);
+        after.extend_from_slice(&reference);
+        after.extend_from_slice(&base[end..]);
+        self.replace_element(paragraph, &before, &Arc::new(after))
+    }
+
+    /// The largest comment identifier the main document's range markers and
+    /// references use.
+    pub(crate) fn max_comment_marker_id(&self) -> Result<Option<u32>> {
+        let mut maximum = None;
+        scan_comment_markers(self.projected.xml_bytes(), |_, id, _| {
+            maximum = maximum.max(Some(id));
+        })?;
+        Ok(maximum)
+    }
+
+    /// Remove every range marker of comment `id`, and every run holding its
+    /// reference, from the main document. Returns whether anything changed.
+    pub(crate) fn strip_comment_markers(&mut self, id: u32) -> Result<bool> {
+        self.ensure_unmanaged("remove_comment")?;
+        let mut changed = false;
+        let families: [(usize, fn(Position) -> ElementStep); 3] = [
+            (self.projected.paragraphs.len(), ElementStep::Paragraph),
+            (self.projected.tables.len(), ElementStep::Table),
+            (
+                self.projected.block_controls.len(),
+                ElementStep::ContentControl,
+            ),
+        ];
+        for (count, step) in families {
+            for index in 0..count {
+                let path = ElementPath::new([step(Position::new(index))]);
+                let located = locate(&self.projected, path.steps())?;
+                let before = self.element_bytes(located)?;
+                if let Some(after) = without_comment_markers(&before, id)? {
+                    self.replace_element(&path, &before, &Arc::new(after))?;
+                    changed = true;
+                }
+            }
+        }
+        Ok(changed)
+    }
+
+    /// Insert inline markup (a run or a hyperlink) into a paragraph or
+    /// hyperlink before its direct run `at` (after its last child for
+    /// `None`), and return its position among the owner's direct `counted`
+    /// children.
+    fn insert_inline(
+        &mut self,
+        owner: &ElementPath,
+        at: Option<Position>,
+        counted: &[u8],
+        markup: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
+    ) -> Result<Position> {
         let local = owner
             .steps()
             .last()
@@ -1258,13 +1470,12 @@ impl Edit {
             return Err(refusal(Refusal::FieldInterior));
         }
         let prefix = layout.prefix.clone().unwrap_or_default();
-        let xml = run_markup(&prefix, self.projected.conformance, new_run)
-            .map_err(spliced(Position::new(0)))?;
+        let xml = markup(&prefix)?;
         let mut after = buffer(staging_add(base.len(), xml.len())?)?;
         after.extend_from_slice(&base[..offset]);
         after.extend_from_slice(&xml);
         after.extend_from_slice(&base[offset..]);
-        let position = layout.count_before(b"r", child);
+        let position = layout.count_before(counted, child);
         self.replace_element(owner, &before, &Arc::new(after))?;
         Ok(Position::new(position))
     }
@@ -1836,4 +2047,250 @@ fn grid_widths(xml: &[u8], table: &Children) -> Result<Vec<Option<u32>>> {
             _ => {},
         }
     }
+}
+
+const RELATIONSHIPS_NAMESPACE: &str =
+    "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
+const STRICT_RELATIONSHIPS_NAMESPACE: &str =
+    "http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+fn relationships_namespace(conformance: Conformance) -> &'static str {
+    match conformance {
+        Conformance::Strict => STRICT_RELATIONSHIPS_NAMESPACE,
+        Conformance::Transitional => RELATIONSHIPS_NAMESPACE,
+    }
+}
+
+/// The markup of a new hyperlink holding one run. The relationships
+/// namespace is declared on the hyperlink itself, so its `r:id` resolves
+/// whatever the document root binds.
+fn hyperlink_markup(
+    prefix: &[u8],
+    conformance: Conformance,
+    relationship: Option<&str>,
+    anchor: Option<&str>,
+    run: &NewRun,
+) -> Result<Vec<u8>> {
+    let (prefix, declare) = if prefix.is_empty() {
+        (b"w".as_slice(), true)
+    } else {
+        (prefix, false)
+    };
+    let run = run_markup(prefix, conformance, run).map_err(spliced(Position::new(0)))?;
+    let mut xml = buffer(staging_add(run.len(), 512)?)?;
+    open(&mut xml, prefix, "hyperlink");
+    if declare {
+        xml.extend_from_slice(b" xmlns:");
+        xml.extend_from_slice(prefix);
+        xml.extend_from_slice(b"=\"");
+        xml.extend_from_slice(conformance.namespace().as_bytes());
+        xml.push(b'"');
+    }
+    match (relationship, anchor) {
+        (Some(relationship), None) => {
+            xml.extend_from_slice(b" xmlns:r=\"");
+            xml.extend_from_slice(relationships_namespace(conformance).as_bytes());
+            xml.extend_from_slice(b"\" r:id=\"");
+            super::super::append_literal_escaped_xml(&mut xml, relationship);
+            xml.push(b'"');
+            attribute(&mut xml, prefix, "history", "1");
+        },
+        (None, Some(anchor)) => {
+            xml.push(b' ');
+            qualified_name(&mut xml, prefix, "anchor");
+            xml.extend_from_slice(b"=\"");
+            super::super::append_literal_escaped_xml(&mut xml, anchor);
+            xml.push(b'"');
+            attribute(&mut xml, prefix, "history", "1");
+        },
+        _ => return Err(refusal(Refusal::InvalidPropertyValue)),
+    }
+    xml.push(b'>');
+    xml.extend_from_slice(&run);
+    close(&mut xml, prefix, "hyperlink");
+    ensure_utf8(&xml)?;
+    Ok(xml)
+}
+
+/// A hyperlink with its relationship reference and bookmark replaced: the
+/// start tag keeps every other attribute as written.
+fn retarget_markup(
+    xml: &[u8],
+    inherited: &[(Option<Vec<u8>>, Vec<u8>)],
+    conformance: Conformance,
+    relationship: Option<&str>,
+    anchor: Option<&str>,
+) -> Result<Vec<u8>> {
+    let (tag_end, empty) = super::root_tag(xml)?;
+    let mut reader = NsReader::from_reader(&xml[..tag_end]);
+    super::seed_namespaces(&mut reader, inherited)
+        .map_err(|()| invalid("invalid inherited Word namespace"))?;
+    let event = reader
+        .read_event()
+        .map_err(|_| Error::Document(crate::Error::Xml("invalid hyperlink tag".into())))?;
+    let element = match event {
+        Event::Start(element) | Event::Empty(element) => element,
+        _ => return Err(invalid("hyperlink fragment has no start tag")),
+    };
+    let name = element.name();
+    let element_prefix = name.prefix().map(|prefix| prefix.into_inner().to_vec());
+    let mut output = buffer(staging_add(xml.len(), 512)?)?;
+    output.push(b'<');
+    output.extend_from_slice(name.as_ref());
+    for attribute_result in element.unchecked_attributes() {
+        let attribute = attribute_result.map_err(|_| {
+            Error::Document(crate::Error::Xml("invalid hyperlink attribute".into()))
+        })?;
+        let key = attribute.key;
+        let local = key.local_name();
+        let (namespace, _) = reader.resolver().resolve_attribute(key);
+        let relationship_id = local.as_ref() == b"id"
+            && matches!(
+                namespace,
+                quick_xml::name::ResolveResult::Bound(quick_xml::name::Namespace(uri))
+                    if uri == RELATIONSHIPS_NAMESPACE.as_bytes()
+                        || uri == STRICT_RELATIONSHIPS_NAMESPACE.as_bytes()
+            );
+        let bookmark = local.as_ref() == b"anchor"
+            && key.prefix().map(|prefix| prefix.into_inner().to_vec()) == element_prefix;
+        let relationship_declaration = relationship.is_some() && key.as_ref() == b"xmlns:r";
+        if relationship_id || bookmark || relationship_declaration {
+            continue;
+        }
+        output.push(b' ');
+        output.extend_from_slice(key.as_ref());
+        output.extend_from_slice(b"=\"");
+        for byte in attribute.value.iter() {
+            if *byte == b'"' {
+                output.extend_from_slice(b"&quot;");
+            } else {
+                output.push(*byte);
+            }
+        }
+        output.push(b'"');
+    }
+    let prefix = element_prefix.unwrap_or_default();
+    match (relationship, anchor) {
+        (Some(relationship), None) => {
+            output.extend_from_slice(b" xmlns:r=\"");
+            output.extend_from_slice(relationships_namespace(conformance).as_bytes());
+            output.extend_from_slice(b"\" r:id=\"");
+            super::super::append_literal_escaped_xml(&mut output, relationship);
+            output.push(b'"');
+        },
+        (None, Some(anchor)) => {
+            output.push(b' ');
+            qualified_name(&mut output, &prefix, "anchor");
+            output.extend_from_slice(b"=\"");
+            super::super::append_literal_escaped_xml(&mut output, anchor);
+            output.push(b'"');
+        },
+        _ => return Err(refusal(Refusal::InvalidPropertyValue)),
+    }
+    output.extend_from_slice(if empty { b"/>" } else { b">" });
+    output.extend_from_slice(&xml[tag_end..]);
+    ensure_utf8(&output)?;
+    Ok(output)
+}
+
+/// Visit every `commentRangeStart`, `commentRangeEnd` and
+/// `commentReference` of a fragment: `(element range, id, local name)`.
+fn scan_comment_markers(
+    xml: &[u8],
+    mut visit: impl FnMut((usize, usize), u32, &[u8]),
+) -> Result<()> {
+    let mut reader = quick_xml::Reader::from_reader(xml);
+    let origin = ReaderOrigin::of(xml);
+    loop {
+        let start = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Word fragment offset overflow"))?;
+        let event = reader
+            .read_event()
+            .map_err(|_| Error::Document(crate::Error::Xml("invalid Word XML".into())))?;
+        let end = origin
+            .offset(reader.buffer_position())
+            .ok_or_else(|| invalid("Word fragment offset overflow"))?;
+        match event {
+            Event::Start(element) | Event::Empty(element)
+                if matches!(
+                    element.local_name().as_ref(),
+                    b"commentRangeStart" | b"commentRangeEnd" | b"commentReference"
+                ) =>
+            {
+                let id = element
+                    .unchecked_attributes()
+                    .filter_map(std::result::Result::ok)
+                    .find(|attribute| attribute.key.local_name().as_ref() == b"id")
+                    .and_then(|attribute| std::str::from_utf8(&attribute.value).ok()?.parse().ok());
+                if let Some(id) = id {
+                    visit((start, end), id, element.local_name().as_ref());
+                }
+            },
+            Event::Eof => return Ok(()),
+            _ => {},
+        }
+    }
+}
+
+/// The fragment without comment `id`'s range markers and reference runs,
+/// or `None` when it holds none.
+fn without_comment_markers(xml: &[u8], id: u32) -> Result<Option<Vec<u8>>> {
+    let mut removals: Vec<(usize, usize)> = Vec::new();
+    let mut references = Vec::new();
+    scan_comment_markers(xml, |range, found, local| {
+        if found == id {
+            if local == b"commentReference" {
+                references.push(range.0);
+            } else {
+                removals.push(range);
+            }
+        }
+    })?;
+    if removals.is_empty() && references.is_empty() {
+        return Ok(None);
+    }
+    // A reference is removed with the run that holds it.
+    if !references.is_empty() {
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        let origin = ReaderOrigin::of(xml);
+        let mut runs: Vec<usize> = Vec::new();
+        loop {
+            let start = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("Word fragment offset overflow"))?;
+            let event = reader
+                .read_event()
+                .map_err(|_| Error::Document(crate::Error::Xml("invalid Word XML".into())))?;
+            let end = origin
+                .offset(reader.buffer_position())
+                .ok_or_else(|| invalid("Word fragment offset overflow"))?;
+            match event {
+                Event::Start(element) if element.local_name().as_ref() == b"r" => runs.push(start),
+                Event::End(element) if element.local_name().as_ref() == b"r" => {
+                    if let Some(run_start) = runs.pop()
+                        && references
+                            .iter()
+                            .any(|reference| *reference > run_start && *reference < end)
+                    {
+                        removals.push((run_start, end));
+                    }
+                },
+                Event::Eof => break,
+                _ => {},
+            }
+        }
+    }
+    removals.sort_unstable();
+    let mut output = buffer(xml.len())?;
+    let mut cursor = 0usize;
+    for (start, end) in removals {
+        if start < cursor {
+            continue;
+        }
+        output.extend_from_slice(&xml[cursor..start]);
+        cursor = end;
+    }
+    output.extend_from_slice(&xml[cursor..]);
+    Ok(Some(output))
 }

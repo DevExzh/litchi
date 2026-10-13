@@ -110,6 +110,51 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .into_file())
         },
     )?);
+    let body_paragraph = ElementPath::new([ElementStep::Paragraph(Position::new(150))]);
+    let link_run = litchi_docx::document::NewRun::new("site");
+    cases.push(measure(
+        "hyperlink_add_url",
+        || {
+            let mut edit = package.edit()?;
+            edit.insert_hyperlink_at(
+                &body_paragraph,
+                None,
+                &litchi_docx::document::HyperlinkTarget::Url("https://example.test/".to_owned()),
+                &link_run,
+            )?;
+            Ok(edit.commit()?.into_package())
+        },
+        || {
+            Ok(file
+                .add(
+                    "/body/p[151]",
+                    NewNode::new("hyperlink")
+                        .prop("url", "https://example.test/")
+                        .prop("text", "site")
+                        .prop("rStyle", "Hyperlink"),
+                )?
+                .into_file())
+        },
+    )?);
+    let note = litchi_docx::document::NewComment::new("Ada", "Check this");
+    cases.push(measure(
+        "comment_add_paragraph",
+        || {
+            let mut edit = package.edit()?;
+            edit.add_comment_at(&body_paragraph, None, &note)?;
+            Ok(edit.commit()?.into_package())
+        },
+        || {
+            Ok(file
+                .add(
+                    "/body/p[151]",
+                    NewNode::new("comment")
+                        .prop("author", "Ada")
+                        .prop("text", "Check this"),
+                )?
+                .into_file())
+        },
+    )?);
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

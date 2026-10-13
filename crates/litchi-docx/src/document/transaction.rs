@@ -450,6 +450,34 @@ pub(crate) struct TransferRelationship {
     pub(crate) external: bool,
 }
 
+/// A package-graph change staged with a main-document edit (record 0251b):
+/// relationships added to the main part, new parts related from it, and
+/// exact replacements of existing parts. Applied forward, it requires every
+/// relationship and new part to be absent and every replaced part to hold its
+/// `before` bytes; applied backward, the reverse.
+#[derive(Clone, PartialEq, Eq)]
+pub struct GraphChange {
+    pub(crate) relationships: Arc<[TransferRelationship]>,
+    pub(crate) parts: Arc<[TransferPart]>,
+    pub(crate) replaced: Arc<[ReplacedPart]>,
+}
+
+impl GraphChange {
+    /// Whether the change holds nothing.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.relationships.is_empty() && self.parts.is_empty() && self.replaced.is_empty()
+    }
+}
+
+/// One exact replacement of an existing part's payload.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(crate) struct ReplacedPart {
+    pub(crate) name: String,
+    pub(crate) before: Arc<Vec<u8>>,
+    pub(crate) after: Arc<Vec<u8>>,
+}
+
 impl RevisionKind {
     const fn local_name(self) -> &'static [u8] {
         match self {
@@ -2384,6 +2412,16 @@ pub enum Operation {
         /// Exact element XML required at the index.
         xml: Arc<Vec<u8>>,
     },
+    /// Apply (`forward`) or undo a package-graph change published with the
+    /// main document. It changes no main-document XML; package publication
+    /// applies it. Recorded by the relationship and part verbs of the
+    /// package-bound edit.
+    ChangeGraph {
+        /// The change.
+        change: Arc<GraphChange>,
+        /// Whether the change is applied (`true`) or undone.
+        forward: bool,
+    },
 }
 
 impl Operation {
@@ -2418,9 +2456,9 @@ impl Operation {
             | Self::ReplaceElement { .. }
             | Self::InsertElement { .. }
             | Self::RemoveElement { .. } => true,
-            Self::InsertTransferredParagraph { .. } | Self::RemoveTransferredParagraph { .. } => {
-                false
-            },
+            Self::InsertTransferredParagraph { .. }
+            | Self::RemoveTransferredParagraph { .. }
+            | Self::ChangeGraph { .. } => false,
         }
     }
 
@@ -2777,6 +2815,10 @@ impl Operation {
                 container: container.clone(),
                 child: *child,
                 xml: Arc::clone(xml),
+            },
+            Self::ChangeGraph { change, forward } => Self::ChangeGraph {
+                change: Arc::clone(change),
+                forward: !forward,
             },
         }
     }
@@ -5793,6 +5835,9 @@ impl Edit {
                 child,
                 xml,
             } => self.remove_element(container, *child, xml),
+            Operation::ChangeGraph { change, forward } => {
+                self.stage_graph_change(Arc::clone(change), *forward)
+            },
         }
     }
 
@@ -6469,6 +6514,29 @@ impl Edit {
         }))
     }
 
+    /// Record a package-graph change; the main-document XML is unchanged.
+    pub(crate) fn stage_graph_change(
+        &mut self,
+        change: Arc<GraphChange>,
+        forward: bool,
+    ) -> Result<&mut Self> {
+        self.ensure_unmanaged("change_graph")?;
+        self.reserve_operation()?;
+        self.operations
+            .push(Operation::ChangeGraph { change, forward });
+        Ok(self)
+    }
+
+    /// The package-graph changes staged so far, in order.
+    pub(crate) fn staged_graph_changes(&self) -> impl Iterator<Item = (&GraphChange, bool)> + '_ {
+        self.operations
+            .iter()
+            .filter_map(|operation| match operation {
+                Operation::ChangeGraph { change, forward } => Some((change.as_ref(), *forward)),
+                _ => None,
+            })
+    }
+
     fn ensure_unmanaged(&self, operation: &'static str) -> Result<()> {
         if self.projected.is_managed() {
             return Err(Error::Document(crate::Error::UnsafeEdit {
@@ -6594,6 +6662,10 @@ impl Patch {
     #[must_use]
     pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
+            && !self
+                .operations()
+                .iter()
+                .any(|operation| matches!(operation, Operation::ChangeGraph { .. }))
     }
 
     /// Return the exact inverse patch.
@@ -6749,7 +6821,8 @@ fn operation_string_bytes(operation: &Operation) -> usize {
             before.capacity().saturating_add(after.capacity())
         },
         Operation::InsertTransferredParagraph { .. }
-        | Operation::RemoveTransferredParagraph { .. } => 0,
+        | Operation::RemoveTransferredParagraph { .. }
+        | Operation::ChangeGraph { .. } => 0,
         Operation::ReplaceRunProperties { before, after, .. }
         | Operation::ReplaceParagraphProperties { before, after, .. } => {
             before.capacity().saturating_add(after.capacity())

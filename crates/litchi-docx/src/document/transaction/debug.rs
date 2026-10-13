@@ -61,6 +61,16 @@ impl fmt::Debug for ParagraphTransfer {
     }
 }
 
+impl fmt::Debug for GraphChange {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.debug_struct("GraphChange")
+            .field("relationships", &self.relationships.len())
+            .field("parts", &self.parts.len())
+            .field("replaced", &self.replaced.len())
+            .finish()
+    }
+}
+
 impl fmt::Debug for TransferGraph {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         f.debug_struct("TransferGraph")
@@ -108,6 +118,7 @@ impl fmt::Debug for Operation {
             Self::ReplaceElement { .. } => "ReplaceElement",
             Self::InsertElement { .. } => "InsertElement",
             Self::RemoveElement { .. } => "RemoveElement",
+            Self::ChangeGraph { .. } => "ChangeGraph",
             Self::InsertParagraph { .. } => "InsertParagraph",
             Self::RemoveParagraph { .. } => "RemoveParagraph",
             Self::InsertTransferredParagraph { .. } => "InsertTransferredParagraph",
