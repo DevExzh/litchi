@@ -21,17 +21,19 @@ differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `5a8edde9124a45f8e3e1a90d6877211fd94cf2b1bc6f75b3f969f290cd59f6b6` |
-| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `3a1cc3f959c8f9e4f42414bed26990ce7b8392ca9678ce0d79a39f8256218140` |
-| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `058012097bee2177a9b74042591068db0216f738ba762b0747ffdf5d99915764` |
-| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `b80c09f5723f4a3da889e473913cb9abfb9bf4cf31aecd4e2deafb79859b9b7f` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `aecaf9f83fb9a289d0eb3741f849947ca500f867605953c48bc6ffaab0f59dee` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `0160cdb4a607e6fbe773387c14cc398f7553d1119fd386db70e54b80311f1464` |
-| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `12690d951e7900bead6edaedb44e44154a94f73bfc3fee9a3f7f4e2d797bdfa3` |
-| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `b79c62d11b084a6d64eab2536ad000a17ebb8bedf67380dbf46557265eb55b5e` |
-| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `2326a7db7ac883ceb3b53fc9bfddfd88f2462408886140b195be269f04477baa` |
-| golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `e5ce90bdf0f83b73b5d7a306bee39269cc4f07f3896861578948eebfc37b9cde` |
-| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `ae0f1017dafeb5b37b879c5b2618a93206b664e5d70e4baf681287c7c8562ded` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx.json` | `139c594a2f560a90482c753a0329783d25bbe8b4c3e91568a9e4248876e7af82` |
+| golden | `crates/litchi-ops/tests/golden/registry/docx-encryption.json` | `d3f12d7418d7cad326a8db6fdf4ad4b445e30f12932ded53bcee908625c017ec` |
+| golden | `crates/litchi-ops/tests/golden/registry/doc.json` | `85c16b486c3dadd7565c8855656c93f20bba6a09d62bf7dbee7e67603a0f6a54` |
+| golden | `crates/litchi-ops/tests/golden/registry/rtf.json` | `a6ee55a8d6d82990eadbd51ff37fa1d108e4093a9da73d89ed0a0b9a71510990` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx.json` | `a23bc5ede1ae767e43b4b29ecfeacec0284fd404696c419fad9a6027c7524d39` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsx-encryption.json` | `93bfa743cdb170045c8ae7c726aa622f90611b7c3b13e0f6424f7295c3a434cd` |
+| golden | `crates/litchi-ops/tests/golden/registry/xlsb.json` | `ed42211205eb0476cc90d02802f88c447b9bcf6ae4a28c54816704539152e06f` |
+| golden | `crates/litchi-ops/tests/golden/registry/xls.json` | `299bb82c87cfef0c27ecfe8bd4fb7df4982635a954c5fa57ac58897900e0e2fa` |
+| golden | `crates/litchi-ops/tests/golden/registry/pptx.json` | `aacdf00a1d10834d59799fe149b44a78b0a9a6157437fe2f2a78c8841aa51d86` |
+| golden | `crates/litchi-ops/tests/golden/registry/ppt.json` | `2038cde02828395f020df3d9b9732cc9350ce839bba5bc5aee3089cdd0e81fab` |
+| golden | `crates/litchi-ops/tests/golden/registry/odp.json` | `4b97c200a9d8e2b81e4625ba6888add00e49c483d67fed1ac7be39801f668cf8` |
+| golden | `crates/litchi-ops/tests/golden/registry/ods.json` | `0c1b9c65f4c932c9ef36d6f1d61183724b98354c9c1a0d04adaada0505ca1fb4` |
+| golden | `crates/litchi-ops/tests/golden/registry/odt.json` | `530031295ae44a24667d22c7270cebc1afe59c456466d71014d85fe657180b3a` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -71,13 +73,15 @@ Elements:
 |---|---|---|---|---|---|---|---|
 | docx | 13 | 22 | 0 | 0 | 9 | 2 | 5 |
 | doc | 15 | 11 | 0 | 0 | 18 | 2 | 1 |
-| rtf | 7 | 12 | 0 | 0 | 25 | 2 | 0 |
+| rtf | 22 | 8 | 0 | 0 | 14 | 2 | 1 |
 | xlsx | 11 | 27 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | xls | 7 | 31 | 0 | 0 | 1 | 2 | 1 |
 | pptx | 25 | 8 | 0 | 0 | 0 | 1 | 8 |
 | ppt | 15 | 18 | 0 | 0 | 0 | 1 | 8 |
 | odp | 21 | 8 | 0 | 0 | 4 | 1 | 6 |
+| ods | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
+| odt | 19 | 12 | 0 | 0 | 13 | 2 | 5 |
 
 Property reads:
 
@@ -85,13 +89,15 @@ Property reads:
 |---|---|---|---|---|---|---|---|---|
 | docx | 138 | 3 | 391 | 0 | 113 | 2 | 314 | 28 |
 | doc | 39 | 0 | 231 | 0 | 205 | 1 | 485 | 38 |
-| rtf | 25 | 0 | 225 | 0 | 196 | 1 | 514 | 39 |
+| rtf | 68 | 0 | 143 | 0 | 203 | 1 | 546 | 34 |
 | xlsx | 101 | 16 | 328 | 0 | 100 | 1 | 145 | 145 |
 | xlsb | 78 | 29 | 489 | 0 | 24 | 1 | 70 | 30 |
 | xls | 56 | 4 | 504 | 0 | 24 | 1 | 102 | 0 |
 | pptx | 167 | 22 | 70 | 0 | 144 | 0 | 284 | 249 |
 | ppt | 41 | 3 | 318 | 0 | 48 | 0 | 277 | 47 |
 | odp | 70 | 3 | 80 | 0 | 123 | 0 | 411 | 65 |
+| ods | 25 | 11 | 501 | 0 | 26 | 1 | 127 | 6 |
+| odt | 63 | 0 | 199 | 0 | 168 | 1 | 530 | 45 |
 
 Property writes:
 
@@ -99,13 +105,15 @@ Property writes:
 |---|---|---|---|---|---|---|
 | docx | 92 | 30 | 674 | 0 | 12 | 181 |
 | doc | 1 | 13 | 782 | 0 | 21 | 182 |
-| rtf | 12 | 9 | 775 | 0 | 33 | 171 |
+| rtf | 12 | 15 | 769 | 0 | 22 | 177 |
 | xlsx | 21 | 69 | 454 | 0 | 149 | 143 |
 | xlsb | 8 | 26 | 510 | 0 | 31 | 146 |
 | xls | 1 | 19 | 524 | 0 | 0 | 147 |
 | pptx | 53 | 55 | 453 | 0 | 133 | 242 |
 | ppt | 0 | 14 | 547 | 0 | 16 | 157 |
 | odp | 3 | 37 | 521 | 0 | 17 | 174 |
+| ods | 6 | 5 | 533 | 0 | 6 | 147 |
+| odt | 12 | 32 | 752 | 0 | 31 | 179 |
 
 ## docx
 
@@ -2281,64 +2289,65 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 
 | OfficeCLI element | Litchi element | Status | Follow-up |
 |---|---|---|---|
-| abstractNum |  | missing |  |
+| abstractNum | abstractNum | supported |  |
 | body | body | supported |  |
-| bookmark |  | missing |  |
+| bookmark |  | gap | unified RTF retained-node projection |
 | bookmarkEnd |  | missing |  |
 | chart-axis |  | missing |  |
 | chart-series |  | missing |  |
 | chart |  | missing |  |
-| comment |  | gap | unified RTF retained-node projection |
+| comment | comment | supported |  |
 | diagram |  | missing |  |
 | document | document | supported |  |
-| endnote |  | gap | unified RTF retained-node projection |
-| equation |  | missing |  |
-| field |  | missing |  |
+| endnote | endnote | supported |  |
+| equation |  | gap | unified RTF retained-node projection |
+| field |  | gap | unified RTF retained-node projection |
 | fieldChar |  | missing |  |
-| footer |  | gap | unified RTF retained-node projection |
-| footnote |  | gap | unified RTF retained-node projection |
-| formfield |  | missing |  |
-| header |  | gap | unified RTF retained-node projection |
-| hyperlink |  | gap | unified RTF retained-node projection |
+| footer | footer | supported |  |
+| footnote | footnote | supported |  |
+| formfield |  | gap | unified RTF retained-node projection |
+| header | header | supported |  |
+| hyperlink | hyperlink | supported |  |
 | instrText |  | missing |  |
-| level |  | missing |  |
+| level | level | supported |  |
 | markdown |  | out of scope | an add-time import format, not an element of the document |
-| num |  | missing |  |
-| numbering |  | gap | unified RTF retained-node projection |
+| num | num | supported |  |
+| numbering | numbering | supported |  |
 | ole | run | supported |  |
 | pagebreak | run | supported |  |
 | paragraph | paragraph | supported |  |
 | permStart |  | missing |  |
-| picture | run | supported |  |
+| picture | picture | supported |  |
 | ptab |  | missing |  |
 | raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
-| revision |  | missing |  |
+| revision |  | gap | unified RTF retained-node projection |
 | run | run | supported |  |
 | sdt |  | missing |  |
-| section |  | missing |  |
+| section |  | gap | unified RTF retained-node projection |
 | shape |  | gap | unified RTF retained-node projection |
-| style |  | gap | unified RTF retained-node projection |
-| styles |  | missing |  |
+| style | style | supported |  |
+| styles | styles | supported |  |
 | tab |  | missing |  |
-| cell |  | gap | unified RTF retained-node projection |
+| cell | cell | supported |  |
 | column |  | missing |  |
-| row |  | gap | unified RTF retained-node projection |
-| table |  | gap | unified RTF retained-node projection |
-| textbox |  | missing |  |
+| row | row | supported |  |
+| table | table | supported |  |
+| textbox |  | gap | unified RTF retained-node projection |
 | toc |  | missing |  |
 | watermark |  | missing |  |
+|  | comments | litchi-only |  |
 
 ### Properties
 
 | Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
 |---|---|---|---|---|---|---|---|
 | abstractNum | `id` | int | a-g |  | missing | gap |  |
-| abstractNum | `type` | enum | asg |  | missing | gap |  |
-| abstractNum | `name` | string | asg |  | missing | gap |  |
+| abstractNum | `type` | enum | asg |  | supported | gap | the node's text |
+| abstractNum | `name` | string | asg | --g | supported | gap |  |
 | abstractNum | `styleLink` | string | asg |  | missing | gap |  |
 | abstractNum | `numStyleLink` | string | asg |  | missing | gap |  |
 | abstractNum | `format` | string | a-- |  | write-only | gap |  |
-| abstractNum | `text` | string | a-- |  | write-only | gap |  |
+| abstractNum | `text` | string | a-- |  | supported | gap | the node's text |
 | abstractNum | `start` | int | a-- |  | write-only | gap |  |
 | abstractNum | `indent` | int | a-- |  | write-only | gap |  |
 | abstractNum | `level<N>.format` | string | a-- |  | write-only | gap |  |
@@ -2354,9 +2363,10 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
 | abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
-| bookmark | `name` | string | asg |  | missing | gap |  |
-| bookmark | `text` | string | a-- |  | write-only | gap |  |
-| bookmark | `id` | string | --g |  | missing | — |  |
+| abstractNum | `levels` | int |  | --g | litchi-only | — |  |
+| bookmark | `name` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| bookmark | `text` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| bookmark | `id` | string | --g |  | element gap | — | unified RTF retained-node projection |
 | bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
 | bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
 | chart-axis | `axisFont` | string | --g |  | missing | — |  |
@@ -2504,16 +2514,16 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `varyColors` | string | asg |  | missing | gap |  |
 | chart | `view3d` | string | asg |  | missing | gap |  |
 | chart | `width` | length | asg |  | missing | gap |  |
-| comment | `id` | number | --g |  | element gap | — | unified RTF retained-node projection |
-| comment | `anchoredTo` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| comment | `runStart` | int | a-- |  | element gap | gap | unified RTF retained-node projection |
-| comment | `range` | bool | a-- |  | element gap | gap | unified RTF retained-node projection |
-| comment | `parentId` | number | a-g |  | element gap | gap | unified RTF retained-node projection |
-| comment | `done` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| comment | `date` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| comment | `initials` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| comment | `author` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| comment | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| comment | `id` | number | --g |  | missing | — |  |
+| comment | `anchoredTo` | string | --g |  | missing | — |  |
+| comment | `runStart` | int | a-- |  | write-only | gap |  |
+| comment | `range` | bool | a-- |  | write-only | gap |  |
+| comment | `parentId` | number | a-g |  | missing | gap |  |
+| comment | `done` | bool | asg |  | missing | gap |  |
+| comment | `date` | string | asg | --g | supported | gap |  |
+| comment | `initials` | string | asg | --g | supported | gap |  |
+| comment | `author` | string | asg | --g | supported | gap |  |
+| comment | `text` | string | asg | -sg | supported | partial |  |
 | diagram | `mermaid` | string | a-- |  | write-only | gap |  |
 | diagram | `src` | string | a-- |  | write-only | gap |  |
 | diagram | `width` | length | a-- |  | write-only | gap |  |
@@ -2622,85 +2632,88 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | document | `theme.fontScheme` | string | --g |  | missing | — |  |
 | document | `theme.formatScheme` | string | --g |  | missing | — |  |
 | document | `theme.name` | string | --g |  | missing | — |  |
-| endnote | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `direction` | enum | as- |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `align` | enum | as- |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `font.cs` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `font.ea` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `font.latin` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `bold.cs` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `italic.cs` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `size.cs` | font-size | as- |  | element gap | gap | unified RTF retained-node projection |
-| endnote | `id` | number | --g |  | element gap | — | unified RTF retained-node projection |
-| equation | `mode` | enum | asg |  | missing | gap |  |
-| equation | `formula` | string | as- |  | write-only | gap |  |
-| field | `evaluated` | bool | --g |  | missing | — |  |
-| field | `fieldType` | enum | asg |  | missing | gap |  |
-| field | `name` | string | asg |  | missing | gap |  |
-| field | `id` | string | asg |  | missing | gap |  |
-| field | `expression` | string | as- |  | write-only | gap |  |
-| field | `trueText` | string | as- |  | write-only | gap |  |
-| field | `falseText` | string | as- |  | write-only | gap |  |
-| field | `hyperlink` | bool | as- |  | write-only | gap |  |
-| field | `format` | string | asg |  | missing | gap |  |
-| field | `instruction` | string | asg |  | missing | gap |  |
-| field | `vertAlign` | enum | a-- |  | write-only | gap |  |
-| field | `fldLock` | bool | a-g |  | missing | gap |  |
+| endnote | `text` | string | asg | -sg | supported | partial |  |
+| endnote | `direction` | enum | as- |  | write-only | gap |  |
+| endnote | `align` | enum | as- |  | write-only | gap |  |
+| endnote | `font.cs` | string | as- |  | write-only | gap |  |
+| endnote | `font.ea` | string | as- |  | write-only | gap |  |
+| endnote | `font.latin` | string | as- |  | write-only | gap |  |
+| endnote | `bold.cs` | bool | as- |  | write-only | gap |  |
+| endnote | `italic.cs` | bool | as- |  | write-only | gap |  |
+| endnote | `size.cs` | font-size | as- |  | write-only | gap |  |
+| endnote | `id` | number | --g |  | missing | — |  |
+| endnote | `number` | int |  | --g | litchi-only | — |  |
+| equation | `mode` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| equation | `formula` | string | as- |  | element gap | gap | unified RTF retained-node projection |
+| field | `evaluated` | bool | --g |  | element gap | — | unified RTF retained-node projection |
+| field | `fieldType` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| field | `name` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| field | `id` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| field | `expression` | string | as- |  | element gap | gap | unified RTF retained-node projection |
+| field | `trueText` | string | as- |  | element gap | gap | unified RTF retained-node projection |
+| field | `falseText` | string | as- |  | element gap | gap | unified RTF retained-node projection |
+| field | `hyperlink` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
+| field | `format` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| field | `instruction` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| field | `vertAlign` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
+| field | `fldLock` | bool | a-g |  | element gap | gap | unified RTF retained-node projection |
 | fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
-| footer | `type` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| footer | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| footer | `align` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| footer | `direction` | enum | as- |  | element gap | gap | unified RTF retained-node projection |
-| footer | `font` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| footer | `size` | font-size | asg |  | element gap | gap | unified RTF retained-node projection |
-| footer | `bold` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| footer | `italic` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| footer | `color` | color | asg |  | element gap | gap | unified RTF retained-node projection |
-| footer | `field` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `direction` | enum | as- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `align` | enum | as- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `font.cs` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `font.ea` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `font.latin` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `bold.cs` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `italic.cs` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `size.cs` | font-size | as- |  | element gap | gap | unified RTF retained-node projection |
-| footnote | `id` | number | --g |  | element gap | — | unified RTF retained-node projection |
-| formfield | `type` | enum | asg |  | missing | gap |  |
-| formfield | `name` | string | asg |  | missing | gap |  |
-| formfield | `text` | string | asg |  | missing | gap |  |
-| formfield | `checked` | bool | asg |  | missing | gap |  |
-| formfield | `default` | string | --g |  | missing | — |  |
-| formfield | `enabled` | bool | --g |  | missing | — |  |
-| formfield | `hasFormFieldData` | bool | --g |  | missing | — |  |
-| header | `type` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| header | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| header | `align` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| header | `direction` | enum | as- |  | element gap | gap | unified RTF retained-node projection |
-| header | `font` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| header | `size` | font-size | asg |  | element gap | gap | unified RTF retained-node projection |
-| header | `bold` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| header | `italic` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| header | `color` | color | asg |  | element gap | gap | unified RTF retained-node projection |
-| header | `field` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `url` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `anchor` | string | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `tooltip` | string | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `rStyle` | string | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `color` | color | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `font` | string | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `size` | length | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `underline` | enum | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `bold` | bool | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `italic` | bool | a-g |  | element gap | gap | unified RTF retained-node projection |
-| hyperlink | `docLocation` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| footer | `type` | enum | asg | --g | supported | gap |  |
+| footer | `text` | string | asg | -sg | supported | partial |  |
+| footer | `align` | enum | asg |  | missing | gap |  |
+| footer | `direction` | enum | as- |  | write-only | gap |  |
+| footer | `font` | string | asg |  | missing | gap |  |
+| footer | `size` | font-size | asg |  | missing | gap |  |
+| footer | `bold` | bool | asg |  | missing | gap |  |
+| footer | `italic` | bool | asg |  | missing | gap |  |
+| footer | `color` | color | asg |  | missing | gap |  |
+| footer | `field` | enum | a-- |  | write-only | gap |  |
+| footnote | `text` | string | asg | -sg | supported | partial |  |
+| footnote | `direction` | enum | as- |  | write-only | gap |  |
+| footnote | `align` | enum | as- |  | write-only | gap |  |
+| footnote | `font.cs` | string | as- |  | write-only | gap |  |
+| footnote | `font.ea` | string | as- |  | write-only | gap |  |
+| footnote | `font.latin` | string | as- |  | write-only | gap |  |
+| footnote | `bold.cs` | bool | as- |  | write-only | gap |  |
+| footnote | `italic.cs` | bool | as- |  | write-only | gap |  |
+| footnote | `size.cs` | font-size | as- |  | write-only | gap |  |
+| footnote | `id` | number | --g |  | missing | — |  |
+| footnote | `number` | int |  | --g | litchi-only | — |  |
+| formfield | `type` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| formfield | `name` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| formfield | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| formfield | `checked` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
+| formfield | `default` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| formfield | `enabled` | bool | --g |  | element gap | — | unified RTF retained-node projection |
+| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | unified RTF retained-node projection |
+| header | `type` | enum | asg | --g | supported | gap |  |
+| header | `text` | string | asg | -sg | supported | partial |  |
+| header | `align` | enum | asg |  | missing | gap |  |
+| header | `direction` | enum | as- |  | write-only | gap |  |
+| header | `font` | string | asg |  | missing | gap |  |
+| header | `size` | font-size | asg |  | missing | gap |  |
+| header | `bold` | bool | asg |  | missing | gap |  |
+| header | `italic` | bool | asg |  | missing | gap |  |
+| header | `color` | color | asg |  | missing | gap |  |
+| header | `field` | enum | a-- |  | write-only | gap |  |
+| hyperlink | `url` | string | asg | --g | supported | gap |  |
+| hyperlink | `anchor` | string | a-g | --g | supported | gap |  |
+| hyperlink | `tooltip` | string | a-g | --g | supported | gap |  |
+| hyperlink | `text` | string | asg | --g | supported | gap |  |
+| hyperlink | `rStyle` | string | a-g |  | missing | gap |  |
+| hyperlink | `color` | color | a-g |  | missing | gap |  |
+| hyperlink | `font` | string | a-g |  | missing | gap |  |
+| hyperlink | `size` | length | a-g |  | missing | gap |  |
+| hyperlink | `underline` | enum | a-g |  | missing | gap |  |
+| hyperlink | `bold` | bool | a-g |  | missing | gap |  |
+| hyperlink | `italic` | bool | a-g |  | missing | gap |  |
+| hyperlink | `docLocation` | string | --g |  | missing | — |  |
+| hyperlink | `tgtFrame` | string |  | --g | litchi-only | — |  |
 | instrText | `instruction` | string | -sg |  | missing | gap |  |
 | level | `ilvl` | int | a-g |  | missing | gap |  |
-| level | `format` | string | asg |  | missing | gap |  |
-| level | `lvlText` | string | asg |  | missing | gap |  |
-| level | `start` | int | asg |  | missing | gap |  |
+| level | `format` | string | asg | --g | supported | gap |  |
+| level | `lvlText` | string | asg | --g | supported | gap |  |
+| level | `start` | int | asg | --g | supported | gap |  |
 | level | `indent` | int | asg |  | missing | gap |  |
 | level | `hanging` | int | asg |  | missing | gap |  |
 | level | `justification` | enum | asg |  | missing | gap |  |
@@ -2714,17 +2727,17 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | level | `bold` | bool | as- |  | write-only | gap |  |
 | level | `italic` | bool | as- |  | write-only | gap |  |
 | num | `id` | int | a-g |  | missing | gap |  |
-| num | `abstractNumId` | int | asg |  | missing | gap |  |
+| num | `abstractNumId` | int | asg | --g | supported | gap |  |
 | num | `format` | string | a-- |  | write-only | gap |  |
-| num | `text` | string | a-- |  | write-only | gap |  |
+| num | `text` | string | a-- |  | supported | gap | the node's text |
 | num | `indent` | int | a-- |  | write-only | gap |  |
-| num | `type` | enum | a-- |  | write-only | gap |  |
+| num | `type` | enum | a-- |  | supported | gap | the node's text |
 | num | `start` | int | a-- |  | write-only | gap |  |
 | num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
 | num | `continue` | bool | a-- |  | write-only | gap |  |
 | num | `numId` | int | --g |  | missing | — |  |
-| numbering | `abstractNumCount` | number | --g |  | element gap | — | unified RTF retained-node projection |
-| numbering | `abstractNumId` | number | --g |  | element gap | — | unified RTF retained-node projection |
+| numbering | `abstractNumCount` | number | --g |  | missing | — |  |
+| numbering | `abstractNumId` | number | --g |  | missing | — |  |
 | ole | `objectType` | string | --g |  | missing | — |  |
 | ole | `display` | string | --g |  | missing | — |  |
 | ole | `relId` | string | --g |  | missing | — |  |
@@ -2750,6 +2763,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ole | `caps` | bool |  | asg | litchi-only | litchi-only |  |
 | ole | `smallcaps` | bool |  | asg | litchi-only | litchi-only |  |
 | ole | `outline` | bool |  | asg | litchi-only | litchi-only |  |
+| ole | `rStyle` | string |  | --g | litchi-only | — |  |
 | pagebreak | `type` | enum | a-g |  | supported | gap | the node's text |
 | pagebreak | `breakType` | enum | -sg |  | missing | gap |  |
 | pagebreak | `text` | string |  | asg | litchi-only | litchi-only |  |
@@ -2765,16 +2779,17 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | pagebreak | `caps` | bool |  | asg | litchi-only | litchi-only |  |
 | pagebreak | `smallcaps` | bool |  | asg | litchi-only | litchi-only |  |
 | pagebreak | `outline` | bool |  | asg | litchi-only | litchi-only |  |
+| pagebreak | `rStyle` | string |  | --g | litchi-only | — |  |
 | paragraph | `lineRule` | enum | asg |  | missing | gap |  |
 | paragraph | `align` | enum | asg | -sg | supported | partial |  |
-| paragraph | `style` | string | asg |  | supported | gap | the node's text |
+| paragraph | `style` | string | asg | --g | supported | gap |  |
 | paragraph | `spaceBefore` | length | asg | -sg | supported | partial |  |
 | paragraph | `spaceAfter` | length | asg | -sg | supported | partial |  |
 | paragraph | `spaceBeforeAuto` | boolean | asg |  | missing | gap |  |
 | paragraph | `spaceAfterAuto` | boolean | asg |  | missing | gap |  |
 | paragraph | `listStyle` | enum | asg |  | missing | gap |  |
-| paragraph | `numId` | int | asg |  | missing | gap |  |
-| paragraph | `numLevel` | int | asg |  | missing | gap |  |
+| paragraph | `numId` | int | asg | --g | supported | gap |  |
+| paragraph | `numLevel` | int | asg | --g | supported | gap |  |
 | paragraph | `start` | int | as- |  | write-only | gap |  |
 | paragraph | `bold` | bool | asg |  | missing | gap |  |
 | paragraph | `italic` | bool | asg |  | missing | gap |  |
@@ -2928,8 +2943,8 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | `hAlign` | string | a-g |  | missing | gap |  |
 | picture | `vAlign` | string | a-g |  | missing | gap |  |
 | picture | `link` | string | a-g |  | missing | gap |  |
-| picture | `width` | length | asg |  | missing | gap |  |
-| picture | `height` | length | asg |  | missing | gap |  |
+| picture | `width` | length | asg | --g | supported | gap |  |
+| picture | `height` | length | asg | --g | supported | gap |  |
 | picture | `fallback` | string | a-- |  | write-only | gap |  |
 | picture | `id` | number | --g |  | missing | — |  |
 | picture | `alt` | string | asg |  | missing | gap |  |
@@ -2937,45 +2952,33 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | `fileSize` | number | --g |  | missing | — |  |
 | picture | `relId` | string | --g |  | missing | — |  |
 | picture | `src` | string | as- |  | write-only | gap |  |
-| picture | `text` | string |  | asg | litchi-only | litchi-only |  |
-| picture | `font` | string |  | --g | litchi-only | — |  |
-| picture | `size` | font-size |  | asg | litchi-only | litchi-only |  |
-| picture | `bold` | bool |  | asg | litchi-only | litchi-only |  |
-| picture | `italic` | bool |  | asg | litchi-only | litchi-only |  |
-| picture | `color` | color |  | --g | litchi-only | — |  |
-| picture | `underline` | enum |  | asg | litchi-only | litchi-only |  |
-| picture | `strike` | bool |  | asg | litchi-only | litchi-only |  |
-| picture | `dstrike` | bool |  | asg | litchi-only | litchi-only |  |
-| picture | `vanish` | bool |  | asg | litchi-only | litchi-only |  |
-| picture | `caps` | bool |  | asg | litchi-only | litchi-only |  |
-| picture | `smallcaps` | bool |  | asg | litchi-only | litchi-only |  |
-| picture | `outline` | bool |  | asg | litchi-only | litchi-only |  |
+| picture | `type` | enum |  | --g | litchi-only | — |  |
 | ptab | `align` | enum | asg |  | missing | gap |  |
 | ptab | `relativeTo` | enum | asg |  | missing | gap |  |
 | ptab | `leader` | enum | asg |  | missing | gap |  |
-| revision | `type` | enum | --g |  | missing | — |  |
-| revision | `text` | string | --g |  | missing | — |  |
-| revision | `author` | string | --g |  | missing | — |  |
-| revision | `date` | string | --g |  | missing | — |  |
-| revision | `id` | integer | --g |  | missing | — |  |
-| revision | `nativePath` | string | --g |  | missing | — |  |
-| revision | `action` | enum | -s- |  | write-only | gap |  |
-| revision | `paraMarkIns.author` | string | --g |  | missing | — |  |
-| revision | `paraMarkIns.date` | string | --g |  | missing | — |  |
-| revision | `paraMarkIns.id` | int | --g |  | missing | — |  |
-| revision | `paraMarkDel.author` | string | --g |  | missing | — |  |
-| revision | `paraMarkDel.date` | string | --g |  | missing | — |  |
-| revision | `paraMarkDel.id` | int | --g |  | missing | — |  |
-| revision | `revision.beforeLost` | bool | --g |  | missing | — |  |
-| revision | `sectPrChange.author` | string | --g |  | missing | — |  |
-| revision | `sectPrChange.date` | string | --g |  | missing | — |  |
-| revision | `sectPrChange.id` | string | --g |  | missing | — |  |
-| revision | `tblPrChange.author` | string | --g |  | missing | — |  |
-| revision | `tblPrChange.date` | string | --g |  | missing | — |  |
-| revision | `trPrChange.author` | string | --g |  | missing | — |  |
-| revision | `trPrChange.date` | string | --g |  | missing | — |  |
-| revision | `tcPrChange.author` | string | --g |  | missing | — |  |
-| revision | `tcPrChange.date` | string | --g |  | missing | — |  |
+| revision | `type` | enum | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `text` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `author` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `date` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `id` | integer | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `nativePath` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `action` | enum | -s- |  | element gap | gap | unified RTF retained-node projection |
+| revision | `paraMarkIns.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `paraMarkIns.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `paraMarkIns.id` | int | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `paraMarkDel.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `paraMarkDel.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `paraMarkDel.id` | int | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `revision.beforeLost` | bool | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `sectPrChange.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `sectPrChange.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `sectPrChange.id` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `tblPrChange.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `tblPrChange.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `trPrChange.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `trPrChange.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `tcPrChange.author` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| revision | `tcPrChange.date` | string | --g |  | element gap | — | unified RTF retained-node projection |
 | run | `highlight` | color | asg |  | missing | gap |  |
 | run | `strike` | bool | asg | asg | supported | supported |  |
 | run | `dstrike` | bool | asg | asg | supported | supported |  |
@@ -3054,6 +3057,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `italic` | bool | asg | asg | supported | supported |  |
 | run | `size` | font-size | asg | asg | supported | supported |  |
 | run | `text` | string | asg | asg | supported | supported |  |
+| run | `rStyle` | string |  | --g | litchi-only | — |  |
 | sdt | `type` | enum | a-g |  | missing | gap |  |
 | sdt | `tag` | string | asg |  | missing | gap |  |
 | sdt | `alias` | string | asg |  | missing | gap |  |
@@ -3072,59 +3076,59 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | sdt | `dropDown.lastValue` | string | asg |  | missing | gap |  |
 | sdt | `id` | number | --g |  | missing | — |  |
 | sdt | `editable` | bool | --g |  | missing | — |  |
-| section | `type` | enum | asg |  | missing | gap |  |
-| section | `pageWidth` | length | asg |  | missing | gap |  |
-| section | `pageHeight` | length | asg |  | missing | gap |  |
-| section | `orientation` | enum | asg |  | missing | gap |  |
-| section | `marginTop` | length | asg |  | missing | gap |  |
-| section | `marginBottom` | length | asg |  | missing | gap |  |
-| section | `marginLeft` | length | asg |  | missing | gap |  |
-| section | `marginRight` | length | asg |  | missing | gap |  |
-| section | `marginHeader` | length | asg |  | missing | gap |  |
-| section | `marginFooter` | length | asg |  | missing | gap |  |
-| section | `marginGutter` | length | asg |  | missing | gap |  |
-| section | `columns` | int | asg |  | missing | gap |  |
-| section | `columnSpace` | length | asg |  | missing | gap |  |
-| section | `titlePage` | bool | asg |  | missing | gap |  |
-| section | `pageNumFmt` | enum | asg |  | missing | gap |  |
-| section | `direction` | enum | asg |  | missing | gap |  |
-| section | `rtlGutter` | bool | asg |  | missing | gap |  |
-| section | `pageStart` | int | asg |  | missing | gap |  |
-| section | `lineNumbers` | enum | asg |  | missing | gap |  |
-| section | `lineNumberCountBy` | int | asg |  | missing | gap |  |
-| section | `lineNumberDistance` | int | asg |  | missing | gap |  |
-| section | `headerRef` | string | --g |  | missing | — |  |
-| section | `headerRef.default` | string | --g |  | missing | — |  |
-| section | `headerRef.first` | string | --g |  | missing | — |  |
-| section | `headerRef.even` | string | --g |  | missing | — |  |
-| section | `footerRef` | string | --g |  | missing | — |  |
-| section | `footerRef.default` | string | --g |  | missing | — |  |
-| section | `footerRef.first` | string | --g |  | missing | — |  |
-| section | `footerRef.even` | string | --g |  | missing | — |  |
-| section | `colSpaces` | string | --g |  | missing | — |  |
-| section | `columns.equalWidth` | bool | --g |  | missing | — |  |
-| section | `columns.separator` | bool | --g |  | missing | — |  |
-| section | `pgBorders` | enum | as- |  | write-only | gap |  |
-| section | `pgBorders.top` | string | asg |  | missing | gap |  |
-| section | `pgBorders.left` | string | asg |  | missing | gap |  |
-| section | `pgBorders.bottom` | string | asg |  | missing | gap |  |
-| section | `pgBorders.right` | string | asg |  | missing | gap |  |
-| section | `pgBorders.offsetFrom` | enum | asg |  | missing | gap |  |
-| section | `pgBorders.zOrder` | enum | asg |  | missing | gap |  |
-| section | `pgBorders.display` | enum | asg |  | missing | gap |  |
-| section | `paperSrc.first` | int | asg |  | missing | gap |  |
-| section | `paperSrc.other` | int | asg |  | missing | gap |  |
-| section | `formProt` | bool | asg |  | missing | gap |  |
-| section | `vAlign` | enum | asg |  | missing | gap |  |
-| section | `textDirection` | enum | asg |  | missing | gap |  |
-| section | `footnotePr.numFmt` | enum | asg |  | missing | gap |  |
-| section | `footnotePr.numRestart` | enum | asg |  | missing | gap |  |
-| section | `footnotePr.numStart` | int | asg |  | missing | gap |  |
-| section | `footnotePr.pos` | enum | asg |  | missing | gap |  |
-| section | `endnotePr.numFmt` | enum | asg |  | missing | gap |  |
-| section | `endnotePr.numRestart` | enum | asg |  | missing | gap |  |
-| section | `endnotePr.numStart` | int | asg |  | missing | gap |  |
-| section | `endnotePr.pos` | enum | asg |  | missing | gap |  |
+| section | `type` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pageWidth` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pageHeight` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `orientation` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `marginTop` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `marginBottom` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `marginLeft` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `marginRight` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `marginHeader` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `marginFooter` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `marginGutter` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `columns` | int | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `columnSpace` | length | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `titlePage` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pageNumFmt` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `direction` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `rtlGutter` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pageStart` | int | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `lineNumbers` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `lineNumberCountBy` | int | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `lineNumberDistance` | int | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `headerRef` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `headerRef.default` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `headerRef.first` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `headerRef.even` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `footerRef` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `footerRef.default` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `footerRef.first` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `footerRef.even` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `colSpaces` | string | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `columns.equalWidth` | bool | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `columns.separator` | bool | --g |  | element gap | — | unified RTF retained-node projection |
+| section | `pgBorders` | enum | as- |  | element gap | gap | unified RTF retained-node projection |
+| section | `pgBorders.top` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pgBorders.left` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pgBorders.bottom` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pgBorders.right` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pgBorders.offsetFrom` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pgBorders.zOrder` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `pgBorders.display` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `paperSrc.first` | int | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `paperSrc.other` | int | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `formProt` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `vAlign` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `textDirection` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `footnotePr.numFmt` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `footnotePr.numRestart` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `footnotePr.numStart` | int | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `footnotePr.pos` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `endnotePr.numFmt` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `endnotePr.numRestart` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `endnotePr.numStart` | int | asg |  | element gap | gap | unified RTF retained-node projection |
+| section | `endnotePr.pos` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
 | shape | `geometry` | string | as- |  | element gap | gap | unified RTF retained-node projection |
 | shape | `width` | length | as- |  | element gap | gap | unified RTF retained-node projection |
 | shape | `height` | length | as- |  | element gap | gap | unified RTF retained-node projection |
@@ -3141,184 +3145,184 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | shape | `line.width` | length | as- |  | element gap | gap | unified RTF retained-node projection |
 | shape | `line.style` | string | as- |  | element gap | gap | unified RTF retained-node projection |
 | shape | `alt` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| style | `id` | string | a-g |  | element gap | gap | unified RTF retained-node projection |
-| style | `name` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `type` | enum | a-g |  | element gap | gap | unified RTF retained-node projection |
-| style | `basedOn` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `basedOn.path` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `next` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `linked` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `qFormat` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `uiPriority` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `semiHidden` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `unhideWhenUsed` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `locked` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `customStyle` | bool | a-g |  | element gap | gap | unified RTF retained-node projection |
-| style | `align` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `spaceBefore` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `spaceAfter` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `spaceBeforeAuto` | boolean | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `spaceAfterAuto` | boolean | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `font` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `font.ea` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `font.cs` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `font.asciiTheme` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `font.hAnsiTheme` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `font.eaTheme` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `font.csTheme` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `size` | font-size | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `bold` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `italic` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `color` | color | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `underline` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `strike` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `dstrike` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `highlight` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `caps` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `smallCaps` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `vanish` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `rtl` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `vertAlign` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `charSpacing` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `shading` | color | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `lineSpacing` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `lineRule` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `contextualSpacing` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `outlineLvl` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `kinsoku` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `snapToGrid` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| style | `wordWrap` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| style | `autoSpaceDE` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `autoSpaceDN` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `bidi` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `direction` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `overflowPunct` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `topLinePunct` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| style | `suppressAutoHyphens` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| style | `suppressLineNumbers` | bool | as- |  | element gap | gap | unified RTF retained-node projection |
-| style | `keepNext` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `keepLines` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `pageBreakBefore` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `widowControl` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `pbdr` | string | -s- |  | element gap | gap | unified RTF retained-node projection |
-| style | `numId` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `ilvl` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| style | `effective.alignment` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.alignment.src` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.direction` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.direction.src` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.highlight` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.lineSpacing` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.lineSpacing.src` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.spaceBefore` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.spaceBefore.src` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.spaceAfter` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.spaceAfter.src` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| style | `effective.strike` | bool | --g |  | element gap | — | unified RTF retained-node projection |
+| style | `id` | string | a-g | --g | supported | gap |  |
+| style | `name` | string | asg | --g | supported | gap |  |
+| style | `type` | enum | a-g | --g | supported | gap |  |
+| style | `basedOn` | string | asg | --g | supported | gap |  |
+| style | `basedOn.path` | string | --g |  | missing | — |  |
+| style | `next` | string | asg | --g | supported | gap |  |
+| style | `linked` | string | asg |  | missing | gap |  |
+| style | `qFormat` | bool | asg |  | missing | gap |  |
+| style | `uiPriority` | int | asg |  | missing | gap |  |
+| style | `semiHidden` | bool | asg |  | missing | gap |  |
+| style | `unhideWhenUsed` | bool | asg |  | missing | gap |  |
+| style | `locked` | bool | asg |  | missing | gap |  |
+| style | `customStyle` | bool | a-g |  | missing | gap |  |
+| style | `align` | enum | asg |  | missing | gap |  |
+| style | `spaceBefore` | length | asg |  | missing | gap |  |
+| style | `spaceAfter` | length | asg |  | missing | gap |  |
+| style | `spaceBeforeAuto` | boolean | asg |  | missing | gap |  |
+| style | `spaceAfterAuto` | boolean | asg |  | missing | gap |  |
+| style | `font` | string | asg |  | missing | gap |  |
+| style | `font.ea` | string | asg |  | missing | gap |  |
+| style | `font.cs` | string | asg |  | missing | gap |  |
+| style | `font.asciiTheme` | string | asg |  | missing | gap |  |
+| style | `font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| style | `font.eaTheme` | string | asg |  | missing | gap |  |
+| style | `font.csTheme` | string | asg |  | missing | gap |  |
+| style | `size` | font-size | asg |  | missing | gap |  |
+| style | `bold` | bool | asg |  | missing | gap |  |
+| style | `italic` | bool | asg |  | missing | gap |  |
+| style | `color` | color | asg |  | missing | gap |  |
+| style | `underline` | string | asg |  | missing | gap |  |
+| style | `strike` | bool | asg |  | missing | gap |  |
+| style | `dstrike` | bool | asg |  | missing | gap |  |
+| style | `highlight` | string | asg |  | missing | gap |  |
+| style | `caps` | bool | asg |  | missing | gap |  |
+| style | `smallCaps` | bool | asg |  | missing | gap |  |
+| style | `vanish` | bool | asg |  | missing | gap |  |
+| style | `rtl` | bool | asg |  | missing | gap |  |
+| style | `vertAlign` | enum | asg |  | missing | gap |  |
+| style | `charSpacing` | length | asg |  | missing | gap |  |
+| style | `shading` | color | asg |  | missing | gap |  |
+| style | `lineSpacing` | string | asg |  | missing | gap |  |
+| style | `lineRule` | enum | asg |  | missing | gap |  |
+| style | `contextualSpacing` | bool | asg |  | missing | gap |  |
+| style | `outlineLvl` | int | asg |  | missing | gap |  |
+| style | `kinsoku` | bool | asg |  | missing | gap |  |
+| style | `snapToGrid` | bool | as- |  | write-only | gap |  |
+| style | `wordWrap` | bool | as- |  | write-only | gap |  |
+| style | `autoSpaceDE` | bool | asg |  | missing | gap |  |
+| style | `autoSpaceDN` | bool | asg |  | missing | gap |  |
+| style | `bidi` | bool | asg |  | missing | gap |  |
+| style | `direction` | enum | asg |  | missing | gap |  |
+| style | `overflowPunct` | bool | asg |  | missing | gap |  |
+| style | `topLinePunct` | bool | as- |  | write-only | gap |  |
+| style | `suppressAutoHyphens` | bool | as- |  | write-only | gap |  |
+| style | `suppressLineNumbers` | bool | as- |  | write-only | gap |  |
+| style | `keepNext` | bool | asg |  | missing | gap |  |
+| style | `keepLines` | bool | asg |  | missing | gap |  |
+| style | `pageBreakBefore` | bool | asg |  | missing | gap |  |
+| style | `widowControl` | bool | asg |  | missing | gap |  |
+| style | `pbdr` | string | -s- |  | write-only | gap |  |
+| style | `numId` | int | asg |  | missing | gap |  |
+| style | `ilvl` | int | asg |  | missing | gap |  |
+| style | `effective.alignment` | string | --g |  | missing | — |  |
+| style | `effective.alignment.src` | string | --g |  | missing | — |  |
+| style | `effective.direction` | string | --g |  | missing | — |  |
+| style | `effective.direction.src` | string | --g |  | missing | — |  |
+| style | `effective.highlight` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter.src` | string | --g |  | missing | — |  |
+| style | `effective.strike` | bool | --g |  | missing | — |  |
 | styles | `count` | number | --g |  | missing | — |  |
 | tab | `pos` | length | asg |  | missing | gap |  |
 | tab | `val` | enum | asg |  | missing | gap |  |
 | tab | `leader` | enum | asg |  | missing | gap |  |
-| cell | `width` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `skipGridSync` | bool | -s- |  | element gap | gap | unified RTF retained-node projection |
-| cell | `font` | string | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `size` | font-size | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `bold` | bool | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `italic` | bool | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `underline` | enum | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `strike` | bool | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `color` | color | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `highlight` | color | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `fill` | color | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `align` | enum | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `valign` | enum | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `colspan` | int | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `fitText` | bool | -s- |  | element gap | gap | unified RTF retained-node projection |
-| cell | `textDirection` | enum | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `direction` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `nowrap` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `hideMark` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `tcFitText` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `padding.top` | number | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `padding.bottom` | number | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `padding.left` | number | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `padding.right` | number | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `vmerge` | enum | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `hmerge` | enum | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `cnfStyle` | string | -sg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `border.all` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| cell | `border.bottom` | string | -s- |  | element gap | gap | unified RTF retained-node projection |
-| cell | `border.left` | string | -s- |  | element gap | gap | unified RTF retained-node projection |
-| cell | `border.right` | string | -s- |  | element gap | gap | unified RTF retained-node projection |
-| cell | `border.tl2br` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `border.top` | string | -s- |  | element gap | gap | unified RTF retained-node projection |
-| cell | `border.tr2bl` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| cell | `text` | string | asg |  | element gap | gap | unified RTF retained-node projection |
+| cell | `width` | string | asg | --g | supported | gap |  |
+| cell | `skipGridSync` | bool | -s- |  | write-only | gap |  |
+| cell | `font` | string | -sg |  | missing | gap |  |
+| cell | `size` | font-size | -sg |  | missing | gap |  |
+| cell | `bold` | bool | -sg |  | missing | gap |  |
+| cell | `italic` | bool | -sg |  | missing | gap |  |
+| cell | `underline` | enum | -sg |  | missing | gap |  |
+| cell | `strike` | bool | -sg |  | missing | gap |  |
+| cell | `color` | color | -sg |  | missing | gap |  |
+| cell | `highlight` | color | -sg |  | missing | gap |  |
+| cell | `fill` | color | -sg |  | missing | gap |  |
+| cell | `align` | enum | -sg |  | missing | gap |  |
+| cell | `valign` | enum | -sg | --g | supported | gap |  |
+| cell | `colspan` | int | -sg |  | missing | gap |  |
+| cell | `fitText` | bool | -s- |  | write-only | gap |  |
+| cell | `textDirection` | enum | -sg |  | missing | gap |  |
+| cell | `direction` | enum | asg |  | missing | gap |  |
+| cell | `nowrap` | bool | asg |  | missing | gap |  |
+| cell | `hideMark` | bool | asg |  | missing | gap |  |
+| cell | `tcFitText` | bool | asg |  | missing | gap |  |
+| cell | `padding.top` | number | -sg |  | missing | gap |  |
+| cell | `padding.bottom` | number | -sg |  | missing | gap |  |
+| cell | `padding.left` | number | -sg |  | missing | gap |  |
+| cell | `padding.right` | number | -sg |  | missing | gap |  |
+| cell | `vmerge` | enum | -sg | --g | supported | gap |  |
+| cell | `hmerge` | enum | -sg | --g | supported | gap |  |
+| cell | `cnfStyle` | string | -sg |  | missing | gap |  |
+| cell | `border.all` | string | as- |  | write-only | gap |  |
+| cell | `border.bottom` | string | -s- |  | write-only | gap |  |
+| cell | `border.left` | string | -s- |  | write-only | gap |  |
+| cell | `border.right` | string | -s- |  | write-only | gap |  |
+| cell | `border.tl2br` | string | asg |  | missing | gap |  |
+| cell | `border.top` | string | -s- |  | write-only | gap |  |
+| cell | `border.tr2bl` | string | asg |  | missing | gap |  |
+| cell | `text` | string | asg | -sg | supported | partial |  |
 | column | `width` | length | a-- |  | write-only | gap |  |
 | column | `text` | string | a-- |  | write-only | gap |  |
-| row | `height.exact` | length | as- |  | element gap | gap | unified RTF retained-node projection |
-| row | `header` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| row | `cantSplit` | bool | asg |  | element gap | gap | unified RTF retained-node projection |
-| row | `height.rule` | string | --g |  | element gap | — | unified RTF retained-node projection |
-| row | `cnfStyle` | string | -sg |  | element gap | gap | unified RTF retained-node projection |
-| row | `gridBefore` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| row | `wBefore` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| row | `gridAfter` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| row | `wAfter` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| row | `cellSpacing` | number | -sg |  | element gap | gap | unified RTF retained-node projection |
-| row | `cols` | int | a-- |  | element gap | gap | unified RTF retained-node projection |
-| row | `height` | length | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `colWidths` | string | a-g |  | element gap | gap | unified RTF retained-node projection |
-| table | `direction` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `align` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `indent` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `cellSpacing` | int | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `layout` | enum | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `padding` | int | as- |  | element gap | gap | unified RTF retained-node projection |
-| table | `caption` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `description` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `rowBandSize` | integer | a-g |  | element gap | gap | unified RTF retained-node projection |
-| table | `colBandSize` | integer | a-g |  | element gap | gap | unified RTF retained-node projection |
-| table | `tblLook` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `border.all` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| table | `border.bottom` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| table | `border.horizontal` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| table | `border.left` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| table | `border.right` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| table | `border.top` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| table | `border.vertical` | string | as- |  | element gap | gap | unified RTF retained-node projection |
-| table | `cols` | int | a-g |  | element gap | gap | unified RTF retained-node projection |
-| table | `data` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
-| table | `rows` | int | a-g |  | element gap | gap | unified RTF retained-node projection |
-| table | `width` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| table | `style` | string | asg |  | element gap | gap | unified RTF retained-node projection |
-| textbox | `text` | string | a-- |  | write-only | gap |  |
-| textbox | `width` | length | as- |  | write-only | gap |  |
-| textbox | `height` | length | as- |  | write-only | gap |  |
-| textbox | `geometry` | string | as- |  | write-only | gap |  |
-| textbox | `wrap` | enum | a-- |  | write-only | gap |  |
-| textbox | `hAlign` | enum | a-- |  | write-only | gap |  |
-| textbox | `vAlign` | enum | a-- |  | write-only | gap |  |
-| textbox | `hRelative` | enum | a-- |  | write-only | gap |  |
-| textbox | `vRelative` | enum | a-- |  | write-only | gap |  |
-| textbox | `anchor.x` | length | a-- |  | write-only | gap |  |
-| textbox | `anchor.y` | length | a-- |  | write-only | gap |  |
-| textbox | `fill` | color | as- |  | write-only | gap |  |
-| textbox | `fill.gradient` | string | a-- |  | write-only | gap |  |
-| textbox | `fill.opacity` | string | a-- |  | write-only | gap |  |
-| textbox | `line.color` | color | as- |  | write-only | gap |  |
-| textbox | `line.width` | length | as- |  | write-only | gap |  |
-| textbox | `line.style` | string | as- |  | write-only | gap |  |
-| textbox | `inset.left` | length | a-- |  | write-only | gap |  |
-| textbox | `inset.top` | length | a-- |  | write-only | gap |  |
-| textbox | `inset.right` | length | a-- |  | write-only | gap |  |
-| textbox | `inset.bottom` | length | a-- |  | write-only | gap |  |
-| textbox | `textDirection` | string | a-- |  | write-only | gap |  |
-| textbox | `textAnchor` | string | a-- |  | write-only | gap |  |
-| textbox | `autoFit` | bool | a-- |  | write-only | gap |  |
-| textbox | `rotation` | string | a-- |  | write-only | gap |  |
-| textbox | `shadow` | string | a-- |  | write-only | gap |  |
-| textbox | `alt` | string | a-- |  | write-only | gap |  |
+| row | `height.exact` | length | as- |  | write-only | gap |  |
+| row | `header` | bool | asg | --g | supported | gap |  |
+| row | `cantSplit` | bool | asg | --g | supported | gap |  |
+| row | `height.rule` | string | --g |  | missing | — |  |
+| row | `cnfStyle` | string | -sg |  | missing | gap |  |
+| row | `gridBefore` | int | asg |  | missing | gap |  |
+| row | `wBefore` | string | asg |  | missing | gap |  |
+| row | `gridAfter` | int | asg |  | missing | gap |  |
+| row | `wAfter` | string | asg |  | missing | gap |  |
+| row | `cellSpacing` | number | -sg |  | missing | gap |  |
+| row | `cols` | int | a-- |  | write-only | gap |  |
+| row | `height` | length | asg | --g | supported | gap |  |
+| table | `colWidths` | string | a-g |  | missing | gap |  |
+| table | `direction` | enum | asg |  | missing | gap |  |
+| table | `align` | enum | asg |  | missing | gap |  |
+| table | `indent` | int | asg |  | missing | gap |  |
+| table | `cellSpacing` | int | asg |  | missing | gap |  |
+| table | `layout` | enum | asg |  | missing | gap |  |
+| table | `padding` | int | as- |  | write-only | gap |  |
+| table | `caption` | string | asg |  | missing | gap |  |
+| table | `description` | string | asg |  | missing | gap |  |
+| table | `rowBandSize` | integer | a-g |  | missing | gap |  |
+| table | `colBandSize` | integer | a-g |  | missing | gap |  |
+| table | `tblLook` | string | asg |  | missing | gap |  |
+| table | `border.all` | string | as- |  | write-only | gap |  |
+| table | `border.bottom` | string | as- |  | write-only | gap |  |
+| table | `border.horizontal` | string | as- |  | write-only | gap |  |
+| table | `border.left` | string | as- |  | write-only | gap |  |
+| table | `border.right` | string | as- |  | write-only | gap |  |
+| table | `border.top` | string | as- |  | write-only | gap |  |
+| table | `border.vertical` | string | as- |  | write-only | gap |  |
+| table | `cols` | int | a-g | --g | supported | gap |  |
+| table | `data` | string | a-- |  | write-only | gap |  |
+| table | `rows` | int | a-g | --g | supported | gap |  |
+| table | `width` | string | asg |  | missing | gap |  |
+| table | `style` | string | asg |  | supported | gap | the node's text |
+| textbox | `text` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `width` | length | as- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `height` | length | as- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `geometry` | string | as- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `wrap` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `hAlign` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `vAlign` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `hRelative` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `vRelative` | enum | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `anchor.x` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `anchor.y` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `fill` | color | as- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `fill.gradient` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `fill.opacity` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `line.color` | color | as- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `line.width` | length | as- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `line.style` | string | as- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `inset.left` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `inset.top` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `inset.right` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `inset.bottom` | length | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `textDirection` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `textAnchor` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `autoFit` | bool | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `rotation` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `shadow` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
+| textbox | `alt` | string | a-- |  | element gap | gap | unified RTF retained-node projection |
 | toc | `levels` | string | asg |  | missing | gap |  |
 | toc | `title` | string | asg |  | missing | gap |  |
 | toc | `hyperlinks` | bool | asg |  | missing | gap |  |
@@ -3350,6 +3354,31 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `remove` | `run` | `native-source-closure` | run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and opaque syntax overlapping changed source spans remain unsupported; opaque boundary anchors are projected through text edits | M6 RTF rich run preservation |
 | `move` | `run` | `native-run-edit` | run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls | M6 RTF atomic native run edits |
 | `swap` | `run` | `native-run-edit` | run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls | M6 RTF atomic native run edits |
+| `set` | `paragraph` | `style-application` | paragraph `style`, `numId` and `numLevel` are read-only: applying a style or list requires emitting the referenced definition's properties with the handle | record 0275 follow-up: native RTF style application |
+| `set` | `run` | `style-application` | run `rStyle` is read-only: applying a character style requires emitting its formatting with the `\cs` handle | record 0275 follow-up: native RTF style application |
+| `get` | `paragraph` | `table-cell-paragraphs` | table cells expose their flat text story; per-paragraph cell nodes (`tc/p`) are not projected | record 0275 follow-up: native RTF table structure editor |
+| `get` | `run` | `header-footer-runs` | header/footer paragraphs expose text only; their character runs are not projected | M6 RTF rich run preservation |
+| `set` | `cell` | `native-source-closure` | cell text is spliced into the retained source; cells whose text range contains paragraph resets, destinations or unbalanced groups, nested-table cells, compressed or non-ASCII transports are refused, and cell properties other than `text` are read-only | record 0275 follow-up: native RTF table structure editor |
+| `add` | `table` | `native-table-structure` | the native RTF editor cannot insert tables | record 0275 follow-up: native RTF table structure editor |
+| `remove` | `table` | `native-table-structure` | the native RTF editor cannot remove tables | record 0275 follow-up: native RTF table structure editor |
+| `set` | `table` | `native-table-structure` | table and row properties are read-only | record 0275 follow-up: native RTF table structure editor |
+| `add` | `row` | `native-table-structure` | the native RTF editor cannot insert or remove rows or cells | record 0275 follow-up: native RTF table structure editor |
+| `set` | `header` | `native-source-closure` | header/footer text is spliced per paragraph; a multi-paragraph story is set through `/header[N]/p[M]`, and stories with drawings, fields or page-number events are refused | record 0275 follow-up: native RTF story lifecycle editor |
+| `add` | `header` | `native-story-lifecycle` | the native RTF editor cannot create or remove header/footer stories | record 0275 follow-up: native RTF story lifecycle editor |
+| `set` | `footnote` | `native-source-closure` | note text is spliced into the retained source; notes with drawings, fields or page breaks are refused | record 0275 follow-up: native RTF story lifecycle editor |
+| `add` | `footnote` | `native-story-lifecycle` | the native RTF editor cannot insert or remove footnotes or endnotes | record 0275 follow-up: native RTF story lifecycle editor |
+| `add` | `comment` | `native-story-lifecycle` | the native RTF editor cannot insert or remove comments | record 0275 follow-up: native RTF story lifecycle editor |
+| `set` | `hyperlink` | `native-field-editor` | hyperlink targets and results are read-only field metadata | record 0275 follow-up: native RTF field instruction editor |
+| `add` | `hyperlink` | `native-field-editor` | the native RTF editor cannot insert or remove hyperlink fields | record 0275 follow-up: native RTF field instruction editor |
+| `add` | `picture` | `native-picture-insertion` | the native RTF editor cannot insert `\pict` groups; existing payloads can be replaced natively at equal size only | record 0275 follow-up: native RTF picture insertion |
+| `set` | `picture` | `native-picture-properties` | picture extent and format are read-only | record 0275 follow-up: native RTF picture insertion |
+| `remove` | `picture` | `native-source-closure` | picture removal requires every picture to be a standalone hexadecimal PNG/JPEG body group (no fields, shapes, objects, wrappers or binary payloads) and at most 64 pictures per transaction | record 0275 follow-up: native RTF picture insertion |
+| `set` | `style` | `native-stylesheet-editor` | stylesheet entries are read-only | record 0275 follow-up: native RTF style application |
+| `add` | `style` | `native-stylesheet-editor` | the native RTF editor cannot add or remove stylesheet entries | record 0275 follow-up: native RTF style application |
+| `set` | `abstractNum` | `native-list-editor` | list definitions, overrides and levels are read-only | record 0275 follow-up: native RTF list editor |
+| `add` | `abstractNum` | `native-list-editor` | the native RTF editor cannot add or remove lists | record 0275 follow-up: native RTF list editor |
+| `get` | `body` | `table-order` | the native model keeps tables apart from the paragraph flow, so `/body` lists paragraphs before tables rather than in source order | record 0275 follow-up: native RTF table structure editor |
+| `set` | `cell` | `nested-table-cells` | nested-table cells are neither projected nor editable | record 0275 follow-up: native RTF table structure editor |
 
 ## xlsx
 
@@ -8487,3 +8516,1863 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | `remove` | `shape` | `referenced-object` | an object whose draw:id or xml:id animations or other markup reference is refused; notes-page objects are not removed | M6 ODP reference rewriting |
 | `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the root node's properties | File::metadata(); /metadata node reads with the shared metadata vocabulary |
 | `set` | `presentation` | `extended-metadata` | /metadata writes title, author, subject, description and keywords; the retained meta.xml patcher owns no other field | M6 ODF metadata patcher |
+
+## ods
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+| aboveaverage | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| autofilter | autofilter | gap | ODS adapter follow-up (record 0277) |
+| cell | cell | supported |  |
+| cellis | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| cfextended | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | axis | gap | ODS adapter follow-up (record 0277) |
+| chart-series | series | gap | ODS adapter follow-up (record 0277) |
+| chart | chart | gap | ODS adapter follow-up (record 0277) |
+| colbreak | colbreak | gap | ODS adapter follow-up (record 0277) |
+| colorscale | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| column | column | supported |  |
+| comment | comment | supported |  |
+| conditionalformatting | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| containstext | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| databar | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| detectedtable |  | missing |  |
+| duplicatevalues | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| formulacf | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| hyperlink | hyperlink | gap | ODS adapter follow-up (record 0277) |
+| iconset | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| namedrange | namedrange | supported |  |
+| ole | ole | gap | ODS adapter follow-up (record 0277) |
+| pagebreak | colbreak | gap | ODS adapter follow-up (record 0277) |
+| picture | picture | gap | ODS adapter follow-up (record 0277) |
+| pivottable | pivottable | gap | ODS adapter follow-up (record 0277) |
+| range | range | supported |  |
+| raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| row | row | supported |  |
+| rowbreak | rowbreak | gap | ODS adapter follow-up (record 0277) |
+| run | run | gap | ODS adapter follow-up (record 0277) |
+| shape | shape | gap | ODS adapter follow-up (record 0277) |
+| sheet | sheet | supported |  |
+| slicer | slicer | gap | none: OpenDocument has no slicer element |
+| sort |  | out of scope | a set-only action that reorders rows; M2 write surface |
+| sparkline | sparkline | gap | ODS adapter follow-up (record 0277) |
+| table | table | gap | ODS adapter follow-up (record 0277) |
+| topn | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | conditionalFormatting | gap | ODS adapter follow-up (record 0277) |
+| validation | dataValidation | gap | ODS adapter follow-up (record 0277) |
+| workbook | workbook | supported |  |
+|  | mergeCell | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+| aboveaverage | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `aboveAverage` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `stdDev` | number | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `equalAverage` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| aboveaverage | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| aboveaverage | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| autofilter | `range` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| autofilter | `criteria0` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cell | `value` | string | asg | -s- | write-only | partial |  |
+| cell | `formula` | string | asg | -sg | supported | partial |  |
+| cell | `numberformat` | string | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| cell | `font.bold` | bool | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| cell | `font.italic` | bool | asg |  | missing | gap |  |
+| cell | `font.name` | string | asg |  | missing | gap |  |
+| cell | `font.size` | font-size | asg |  | missing | gap |  |
+| cell | `font.color` | color | asg |  | missing | gap |  |
+| cell | `fill` | color | asg |  | missing | gap |  |
+| cell | `fillPattern` | enum | asg |  | missing | gap |  |
+| cell | `fillBg` | color | asg |  | missing | gap |  |
+| cell | `strike` | bool | asg |  | missing | gap |  |
+| cell | `underline` | enum | asg |  | missing | gap |  |
+| cell | `locked` | bool | as- |  | write-only | gap |  |
+| cell | `protection.locked` | bool | --g |  | missing | — |  |
+| cell | `protection.hidden` | bool | --g |  | missing | — |  |
+| cell | `numFmtId` | number | --g |  | raw-only | — | ADR 0034: native selection requires explicit raw admission |
+| cell | `phonetic` | string | asg |  | missing | gap |  |
+| cell | `quotePrefix` | bool | --g |  | missing | — |  |
+| cell | `alignment.horizontal` | enum | asg |  | missing | gap |  |
+| cell | `alignment.vertical` | enum | asg |  | missing | gap |  |
+| cell | `alignment.wrapText` | bool | asg |  | missing | gap |  |
+| cell | `alignment.readingOrder` | enum | asg |  | missing | gap |  |
+| cell | `merge` | string | as- | --g | supported | gap |  |
+| cell | `ref` | string | a-- |  | write-only | gap |  |
+| cell | `link` | string | asg | --g | supported | gap |  |
+| cell | `tooltip` | string | as- |  | write-only | gap |  |
+| cell | `display` | string | asg |  | missing | gap |  |
+| cell | `type` | enum | asg | --g | supported | gap |  |
+| cell | `runs` | string | a-- |  | write-only | gap |  |
+| cell | `clear` | bool | as- | -s- | write-only | partial |  |
+| cell | `shift` | string | a-- |  | write-only | gap |  |
+| cell | `arrayformula` | string | as- |  | write-only | gap |  |
+| cell | `cachedValue` | string | --g | --g | supported | — |  |
+| cell | `computedValue` | string | --g |  | gap | — | ODS adapter follow-up (record 0277) |
+| cell | `evaluated` | bool | --g |  | missing | — |  |
+| cell | `alignment.indent` | number | asg |  | missing | gap |  |
+| cell | `alignment.shrinkToFit` | bool | asg |  | missing | gap |  |
+| cell | `alignment.textRotation` | number | asg |  | missing | gap |  |
+| cell | `border.diagonal` | string | asg |  | missing | gap |  |
+| cell | `border.diagonal.color` | color | asg |  | missing | gap |  |
+| cell | `border.diagonalDown` | bool | asg |  | missing | gap |  |
+| cell | `border.diagonalUp` | bool | asg |  | missing | gap |  |
+| cell | `border` | string | as- |  | write-only | gap |  |
+| cell | `border.all` | string | as- |  | write-only | gap |  |
+| cell | `border.top` | string | asg |  | missing | gap |  |
+| cell | `border.bottom` | string | asg |  | missing | gap |  |
+| cell | `border.left` | string | asg |  | missing | gap |  |
+| cell | `border.right` | string | asg |  | missing | gap |  |
+| cell | `border.color` | color | as- |  | write-only | gap |  |
+| cell | `arrayref` | string | --g |  | missing | — |  |
+| cell | `mergeAnchor` | bool | --g | --g | supported | — |  |
+| cell | `empty` | bool | --g | --g | supported | — |  |
+| cell | `richtext` | bool | --g |  | missing | — |  |
+| cell | `subscript` | bool | asg |  | missing | gap |  |
+| cell | `superscript` | bool | asg |  | missing | gap |  |
+| cell | `image` | string | as- |  | write-only | gap |  |
+| cell | `alt` | string | asg |  | missing | gap |  |
+| cell | `image.contentType` | string | --g |  | missing | — |  |
+| cell | `image.fileSize` | int | --g |  | missing | — |  |
+| cell | `style` | string |  | -s- | litchi-only | litchi-only |  |
+| cellis | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `operator` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `value` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `value2` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cellis | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| cellis | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| cfextended | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| cfextended | `text` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| cfextended | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `role` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `dispUnits` | enum | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `majorUnit` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `minorUnit` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisFont` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisMax` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisMin` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisNumFmt` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisOrientation` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `axisTitle` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `format` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `labelOffset` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `labelRotation` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `logBase` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `majorGridlines` | bool | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `max` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `min` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `minorGridlines` | bool | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `tickLabelSkip` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-axis | `title` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-axis | `visible` | bool | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `valuesRef` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `trendline.dispEq` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `trendline.dispRSqr` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `alpha` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `outlineColor` | color | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `categories` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `categoriesRef` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `dataLabels.numFmt` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `dataLabels.separator` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `errBars` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `invertIfNeg` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `lineDash` | enum | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `lineWidth` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `marker` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `markerSize` | number | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `markerColor` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `name` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `nameRef` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `scatterStyle` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `secondaryAxis` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart-series | `smooth` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `values` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `bubbleSize` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart-series | `bubbleSizeRef` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dataRange` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `radarStyle` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `roundedCorners` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `valAxisVisible` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `view3d.perspective` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `view3d.rotateX` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `view3d.rotateY` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `anchor` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dispunits` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `x` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `y` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `seriesCount` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `areafill` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `autotitledeleted` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisfont` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axismax` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axismin` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisnumfmt` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisorientation` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisposition` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axistitle` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `axisvisible` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `bubbleScale` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `catAxisVisible` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `catTitle` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `cataxisline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `categories` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `chartFill` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `chartType` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `chartareafill` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `chartborder` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `colorrule` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `colors` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `combosplit` | number | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `combotypes` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `crossBetween` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `crosses` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `crossesAt` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `data` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dataLabels` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dataTable` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `decreaseColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `dispBlanksAs` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `droplines` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `errbars` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `explosion` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `firstSliceAngle` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gapdepth` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gapwidth` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gradient` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gradients` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `gridlines` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `height` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `hilowlines` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `holeSize` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `increaseColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `invertifneg` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `labelPos` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `labelfont` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `labelFont.size` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `labelFont.color` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `labelFont.bold` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `labelFont.name` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| chart | `labeloffset` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `labelrotation` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `leaderlines` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `legend` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `legend.overlay` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `legendFont` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `linedash` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `linewidth` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `logbase` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `majorTickMark` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `majorunit` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `marker` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `markersize` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `markercolor` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `minorGridlines` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `minorTickMark` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `minorunit` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `overlap` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `plotFill` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `plotborder` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `plotvisonly` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `preset` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `referenceline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `scatterstyle` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `secondaryaxis` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `series{N}` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `seriesoutline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `seriesshadow` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `serlines` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `shape` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `showMarker` | string | -sg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `shownegbubbles` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `sizerepresents` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `smooth` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `style` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `tickLabelPos` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `ticklabelskip` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.bold` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.font` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.overlay` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `title.size` | font-size | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `totalColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `transparency` | number | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `trendline` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `updownbars` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `valaxisline` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `varyColors` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `view3d` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| chart | `width` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colbreak | `col` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colbreak | `manual` | bool | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colbreak | `min` | int | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colbreak | `max` | int | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `minColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `maxColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `midColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `midpoint` | number | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| colorscale | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| colorscale | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| column | `name` | string | a-- |  | write-only | gap |  |
+| column | `width` | length | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| column | `hidden` | bool | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| column | `outline` | int | -s- |  | write-only | gap |  |
+| column | `collapsed` | bool | -sg |  | missing | gap |  |
+| column | `numberformat` | string | -sg |  | missing | gap |  |
+| column | `customWidth` | bool | --g |  | missing | — |  |
+| column | `autofit` | bool | -s- |  | write-only | gap |  |
+| comment | `ref` | string | asg | a-g | supported | partial |  |
+| comment | `author` | string | asg | asg | supported | supported |  |
+| comment | `text` | string | asg | asg | supported | supported |  |
+| comment | `date` | string |  | asg | litchi-only | litchi-only |  |
+| conditionalformatting | `type` | enum | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `ref` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `fill` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `operator` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `value` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `value2` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `text` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `rank` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `percent` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `bottom` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `aboveAverage` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `stdDev` | number | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `equalAverage` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `period` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `min` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `max` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `showValue` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `negativeColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `axisColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `axisPosition` | enum | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `minColor` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `maxColor` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `midColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `midPoint` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `iconset` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `reverse` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `formula` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| conditionalformatting | `dxfId` | int | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| containstext | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `text` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| containstext | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| containstext | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| databar | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `min` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `max` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `color` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `showValue` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `negativeColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `axisColor` | color | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `axisPosition` | enum | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `minLength` | number | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `maxLength` | number | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `direction` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| databar | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| databar | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| dateoccurring | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `period` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| dateoccurring | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| dateoccurring | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| detectedtable | `source` | string | --g |  | missing | — |  |
+| detectedtable | `stable` | bool | --g |  | missing | — |  |
+| detectedtable | `ref` | string | --g |  | missing | — |  |
+| detectedtable | `columns` | string | --g |  | missing | — |  |
+| detectedtable | `dataRange` | string | --g |  | missing | — |  |
+| duplicatevalues | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| duplicatevalues | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| formulacf | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `formula` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.italic` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.underline` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.strike` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.size` | font-size | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `font.name` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| formulacf | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| formulacf | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `url` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `ref` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `location` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `display` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| hyperlink | `tooltip` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| iconset | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| iconset | `iconset` | enum | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| iconset | `reverse` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| iconset | `showValue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| iconset | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| iconset | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| namedrange | `name` | string | asg | asg | supported | supported |  |
+| namedrange | `ref` | string | asg | asg | supported | supported |  |
+| namedrange | `scope` | string | asg | a-g | supported | partial |  |
+| namedrange | `comment` | string | asg |  | missing | gap |  |
+| namedrange | `volatile` | bool | asg |  | missing | gap |  |
+| ole | `anchor` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `shapeId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| ole | `contentType` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| ole | `fileSize` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| ole | `objectType` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| ole | `preview` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `progId` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `src` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `oleKind` | enum | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| ole | `embedExt` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pagebreak | `row` | int | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pagebreak | `col` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `title` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `decorative` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `rotation` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `flip` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `flipH` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `flipV` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `flipBoth` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `opacity` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `hyperlink` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `anchor` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `anchorMode` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `shadow` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `glow` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `reflection` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `softEdge` | string | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop.l` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop.r` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop.t` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `crop.b` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `srcRect` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `anchoredTo` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `mergeAnchor` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `x` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `y` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `width` | integer | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `height` | integer | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `cropBottom` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `cropLeft` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `cropRight` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `cropTop` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `name` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `fallback` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `alt` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| picture | `contentType` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `fileSize` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `relId` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| picture | `src` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `source` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `position` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `name` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `style` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `rows` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `cols` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `filters` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `values` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `aggregate` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showDataAs` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `topN` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `sort` | enum | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `layout` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `labelFilter` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `calculatedField` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `repeatLabels` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `blankRows` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `grandTotals` | enum | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `rowGrandTotals` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `colGrandTotals` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `grandTotalCaption` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `subtotals` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `defaultSubtotal` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showRowStripes` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showColStripes` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showRowHeaders` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showColHeaders` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showLastColumn` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `showDrill` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `mergeLabels` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| pivottable | `cacheId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `fieldCount` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `dataFieldCount` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `dataField{N}` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `dataField{N}.showAs` | enum | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `location` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `collapsedFields` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `axisAsDataField` | bool | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| pivottable | `sortByField` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| range | `merge` | bool | -sg | -sg | supported | supported |  |
+| range | `font.bold` | bool | -s- |  | write-only | gap |  |
+| range | `fill` | color | -s- |  | write-only | gap |  |
+| range | `numberformat` | string | -s- |  | write-only | gap |  |
+| range | `alignment.horizontal` | enum | -s- |  | write-only | gap |  |
+| range | `value` | scalar |  | -s- | litchi-only | litchi-only |  |
+| range | `clear` | bool |  | -s- | litchi-only | litchi-only |  |
+| range | `formula` | string |  | -s- | litchi-only | litchi-only |  |
+| range | `style` | string |  | -s- | litchi-only | litchi-only |  |
+| row | `matchedTable` | string | --g |  | missing | — |  |
+| row | `tableSource` | string | --g |  | missing | — |  |
+| row | `cols` | int | a-- |  | write-only | gap |  |
+| row | `height` | length | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| row | `hidden` | bool | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| row | `outline` | int | -s- |  | write-only | gap |  |
+| row | `outlineLevel` | number | --g |  | missing | — |  |
+| row | `collapsed` | bool | -sg |  | missing | gap |  |
+| row | `customHeight` | bool | --g |  | missing | — |  |
+| rowbreak | `row` | int | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| rowbreak | `manual` | bool | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| rowbreak | `min` | int | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| rowbreak | `max` | int | -s- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `subscript` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `superscript` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `bold` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `font` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `italic` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `size` | font-size | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| run | `text` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `hyperlink` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `reflection` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `anchor` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `gradientFill` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `geometry` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `flip` | string | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `flipBoth` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `x` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `y` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `width` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `height` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `align` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `bold` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `fill` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `flipH` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `flipV` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `font` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `glow` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `italic` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `line` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `margin` | length | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `name` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `rotation` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `shadow` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `size` | font-size | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `softEdge` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `text` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `underline` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| shape | `valign` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sheet | `name` | string | asg | asg | supported | supported |  |
+| sheet | `autoFilter` | string | asg |  | missing | gap |  |
+| sheet | `tabColor` | color | asg |  | missing | gap |  |
+| sheet | `hidden` | bool | asg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| sheet | `freeze` | string | -sg |  | missing | gap |  |
+| sheet | `direction` | enum | -sg |  | missing | gap |  |
+| sheet | `zoom` | number | -sg |  | missing | gap |  |
+| sheet | `gridlines` | bool | --g |  | missing | — |  |
+| sheet | `headings` | bool | --g |  | missing | — |  |
+| sheet | `visibility` | enum | --g |  | gap | — | ODS adapter follow-up (record 0277) |
+| sheet | `protect` | bool | -sg |  | missing | gap |  |
+| sheet | `password` | string | -s- |  | write-only | gap |  |
+| sheet | `passwordHash` | string | --g |  | missing | — |  |
+| sheet | `protection.algorithm` | string | --g |  | missing | — |  |
+| sheet | `protection.hash` | string | --g |  | missing | — |  |
+| sheet | `protection.salt` | string | --g |  | missing | — |  |
+| sheet | `protection.spinCount` | number | --g |  | missing | — |  |
+| sheet | `printTitleRows` | string | -s- |  | write-only | gap |  |
+| sheet | `printTitleCols` | string | -s- |  | write-only | gap |  |
+| sheet | `orientation` | string | --g |  | missing | — |  |
+| sheet | `paperSize` | number | --g |  | missing | — |  |
+| sheet | `fitToPage` | string | --g |  | missing | — |  |
+| sheet | `printArea` | string | -sg |  | missing | gap |  |
+| sheet | `margin.top` | string | --g |  | missing | — |  |
+| sheet | `margin.bottom` | string | --g |  | missing | — |  |
+| sheet | `margin.left` | string | --g |  | missing | — |  |
+| sheet | `margin.right` | string | --g |  | missing | — |  |
+| sheet | `margin.header` | string | --g |  | missing | — |  |
+| sheet | `margin.footer` | string | --g |  | missing | — |  |
+| sheet | `header` | string | -sg |  | missing | gap |  |
+| sheet | `footer` | string | -sg |  | missing | gap |  |
+| sheet | `sort` | string | -sg |  | missing | gap |  |
+| sheet | `rowBreaks` | string | --g |  | missing | — |  |
+| sheet | `colBreaks` | string | --g |  | missing | — |  |
+| slicer | `pivotTable` | string | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `field` | string | a-g |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `caption` | string | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `name` | string | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `rowHeight` | number | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `columnCount` | number | asg |  | element gap | gap | none: OpenDocument has no slicer element |
+| slicer | `pivotCacheId` | number | --g |  | element gap | — | none: OpenDocument has no slicer element |
+| slicer | `itemCount` | number | --g |  | element gap | — | none: OpenDocument has no slicer element |
+| slicer | `cache` | string | --g |  | element gap | — | none: OpenDocument has no slicer element |
+| sparkline | `type` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `dataRange` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `location` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `color` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `negativeColor` | color | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `markers` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `highPoint` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lowPoint` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `firstPoint` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lastPoint` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `negative` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `highMarkerColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lowMarkerColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `firstMarkerColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lastMarkerColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `markersColor` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `lineWeight` | number | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `displayEmptyCellsAs` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `displayXAxis` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `rightToLeft` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| sparkline | `dateAxis` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `ref` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `displayName` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `headerRow` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `totalRow` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `autoExpand` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `showFirstColumn` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `showLastColumn` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `showRowStripes` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `showColumnStripes` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `columns` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `totalsRowFunction` | string | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `totalFunction` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| table | `totalLabel` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| table | `name` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| table | `style` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `rank` | number | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `percent` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `bottom` | bool | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| topn | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| topn | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| uniquevalues | `ref` | string | a-g |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `fill` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `font.color` | color | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `font.bold` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `stopIfTrue` | bool | a-- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| uniquevalues | `type` | string | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| uniquevalues | `dxfId` | number | --g |  | element gap | — | ODS adapter follow-up (record 0277) |
+| validation | `type` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `ref` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `allowBlank` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `showError` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `showInput` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `errorTitle` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `promptTitle` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `errorStyle` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `inCellDropdown` | bool | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `showDropDown` | bool | as- |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `operator` | enum | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `formula1` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `formula2` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `prompt` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| validation | `error` | string | asg |  | element gap | gap | ODS adapter follow-up (record 0277) |
+| workbook | `defaultFont` | string | --- |  | write-only | — |  |
+| workbook | `defaultFontSize` | length | --- |  | write-only | — |  |
+| workbook | `author` | string | -sg | --g | supported | gap |  |
+| workbook | `title` | string | -sg | --g | supported | gap |  |
+| workbook | `calc.mode` | enum | -sg |  | missing | gap |  |
+| workbook | `calc.iterate` | bool | -sg |  | missing | gap |  |
+| workbook | `calc.iterateCount` | number | -sg |  | missing | gap |  |
+| workbook | `calc.iterateDelta` | number | -sg |  | missing | gap |  |
+| workbook | `calc.fullPrecision` | bool | -sg |  | missing | gap |  |
+| workbook | `lastModifiedBy` | string | -sg | --g | supported | gap |  |
+| workbook | `created` | string | --g | --g | supported | — |  |
+| workbook | `modified` | string | --g | --g | supported | — |  |
+| workbook | `extended.application` | string | --g |  | missing | — |  |
+| workbook | `category` | string | -sg | --g | supported | gap |  |
+| workbook | `description` | string | -sg | --g | supported | gap |  |
+| workbook | `keywords` | string | -sg | --g | supported | gap |  |
+| workbook | `revisionNumber` | string | -sg | --g | supported | gap |  |
+| workbook | `activeTab` | number | --g |  | gap | — | ODS adapter follow-up (record 0277) |
+| workbook | `firstSheet` | number | --g |  | missing | — |  |
+| workbook | `calc.fullCalcOnLoad` | bool | --g |  | missing | — |  |
+| workbook | `calc.refMode` | string | --g |  | missing | — |  |
+| workbook | `workbook.backupFile` | bool | --g |  | missing | — |  |
+| workbook | `workbook.codeName` | string | --g |  | missing | — |  |
+| workbook | `workbook.date1904` | bool | -sg |  | gap | gap | ODS adapter follow-up (record 0277) |
+| workbook | `workbook.dateCompatibility` | bool | -sg |  | missing | gap |  |
+| workbook | `workbook.filterPrivacy` | bool | -sg |  | missing | gap |  |
+| workbook | `workbook.showObjects` | enum | -sg |  | missing | gap |  |
+| workbook | `workbook.lockStructure` | bool | -sg |  | missing | gap |  |
+| workbook | `workbook.lockWindows` | bool | -sg |  | missing | gap |  |
+| workbook | `workbook.password` | string | -sg |  | missing | gap |  |
+| workbook | `extended.applicationVersion` | string | --g |  | missing | — |  |
+| workbook | `extended.characters` | number | --g |  | missing | — |  |
+| workbook | `extended.company` | string | -sg |  | missing | gap |  |
+| workbook | `extended.lines` | number | --g |  | missing | — |  |
+| workbook | `extended.manager` | string | -sg |  | missing | gap |  |
+| workbook | `extended.pages` | number | --g |  | missing | — |  |
+| workbook | `extended.paragraphs` | number | --g |  | missing | — |  |
+| workbook | `extended.template` | string | -sg |  | missing | gap |  |
+| workbook | `extended.totalTime` | number | --g |  | missing | — |  |
+| workbook | `extended.words` | number | --g |  | missing | — |  |
+| workbook | `subject` | string | -sg | --g | supported | gap |  |
+| workbook | `theme.color.accent1` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent2` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent3` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent4` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent5` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.accent6` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.dk1` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.dk2` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.folHlink` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.hlink` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.lt1` | color | -sg |  | missing | gap |  |
+| workbook | `theme.color.lt2` | color | -sg |  | missing | gap |  |
+| workbook | `theme.colorScheme` | string | --g |  | missing | — |  |
+| workbook | `theme.font.major.eastAsia` | string | -sg |  | missing | gap |  |
+| workbook | `theme.font.major.latin` | string | -sg |  | missing | gap |  |
+| workbook | `theme.font.minor.eastAsia` | string | -sg |  | missing | gap |  |
+| workbook | `theme.font.minor.latin` | string | -sg |  | missing | gap |  |
+| workbook | `theme.fontScheme` | string | --g |  | missing | — |  |
+| workbook | `theme.formatScheme` | string | --g |  | missing | — |  |
+| workbook | `theme.name` | string | --g |  | missing | — |  |
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `query` | `row` | `header-column-predicates` | ODS does not yet bind row predicate names to header columns | ODS adapter follow-up (record 0277) |
+| `query` | `cell` | `styled-blank-cells` | queries enumerate content cells (a value, text, formula, link or merge span); styled blank padding runs are addressable by coordinate only | ODS adapter follow-up (record 0277) |
+| `get` | `metadata` | `path-read` | `set("/metadata", ..)` writes meta.xml; the path is set-only, and reads go through File::metadata() and the workbook root | ODS adapter follow-up (record 0277) |
+| `set` | `metadata` | `unowned-fields` | the leaf metadata patcher owns title, subject, description, keywords and author; lastModifiedBy, created, modified, language, revision, template and custom.<name> are refused until an ODS metadata family lands | ODS adapter follow-up (record 0277) |
+| `set` | `cell` | `formatting-properties` | cell formatting is applied by naming an existing cell style (`style`); direct font, fill, border, alignment and number-format keys need an automatic-style author in the unified layer | ODS adapter follow-up (record 0277) |
+| `set` | `cell` | `formula-evaluation` | an authored OpenFormula is stored inert with the cell's cached value (or none); the unified layer does not evaluate ODS formulas | ODS adapter follow-up (record 0277) |
+| `set` | `sheet` | `producer-table-markup` | a rename copies the table fragment under its new name and drops the original; the leaf refuses sheets with formulas, ranges, drawings, forms, protection or other dependency owners, and the writer refuses names a formula or named range still uses | ODS adapter follow-up (record 0277) |
+| `move` | `sheet` | `native-dependency-closure` | the leaf moves only dependency-free worksheets: formulas, named/database/validation/print ranges, settings, scripts and tracked changes are refused; an added sheet placed before the end is moved the same way | ODS adapter follow-up (record 0277) |
+| `add` | `row` | `logical-row-shift` | rows are inserted, removed, moved and swapped through the leaf's logical row editor, which refuses formulas, merges, ranges, validations, drawings, annotations and other coordinate owners on the worksheet | ODS adapter follow-up (record 0277) |
+| `add` | `col` | `native-editor` | inserting or removing a column that shifts cells needs a logical column editor the leaf does not have | ODS adapter follow-up (record 0277) |
+| `set` | `row` | `layout` | row height and visibility, and column width and visibility, live in automatic styles the unified writer does not author yet | ODS adapter follow-up (record 0277) |
+| `set` | `namedrange` | `scope` | a named range's scope is fixed once added; named expressions are retargeted through `ref` and are not added | ODS adapter follow-up (record 0277) |
+| `set` | `workbook` | `flat-odf` | flat single-XML spreadsheets (.fods) open read-only; their leaf transaction admits scalar cell writes only and is not integrated | ODS adapter follow-up (record 0277) |
+| `batch` | `cell` | `coalescing` | consecutive direct cell value, text, clear and formula sets share one leaf edit; style, merge, range and query sets and every other verb close the run | ODS adapter follow-up (record 0277) |
+
+## odt
+
+### Elements
+
+| OfficeCLI element | Litchi element | Status | Follow-up |
+|---|---|---|---|
+| abstractNum |  | missing |  |
+| body | body | supported |  |
+| bookmark | bookmark | supported |  |
+| bookmarkEnd |  | missing |  |
+| chart-axis |  | missing |  |
+| chart-series |  | missing |  |
+| chart |  | gap | M6 ODT body index (record 0276) |
+| comment | comment | supported |  |
+| diagram |  | missing |  |
+| document | document | supported |  |
+| endnote | endnote | supported |  |
+| equation |  | gap | M6 ODT body index (record 0276) |
+| field |  | gap | M6 ODT body index (record 0276) |
+| fieldChar |  | missing |  |
+| footer |  | gap | M6 ODT body index (record 0276) |
+| footnote | footnote | supported |  |
+| formfield |  | gap | M6 ODT body index (record 0276) |
+| header |  | gap | M6 ODT body index (record 0276) |
+| hyperlink | hyperlink | supported |  |
+| instrText |  | missing |  |
+| level |  | missing |  |
+| markdown |  | out of scope | an add-time import format, not an element of the document |
+| num |  | missing |  |
+| numbering |  | gap | M6 ODT body index (record 0276) |
+| ole | run | supported |  |
+| pagebreak | run | supported |  |
+| paragraph | paragraph | supported |  |
+| permStart |  | missing |  |
+| picture | picture | supported |  |
+| ptab |  | missing |  |
+| raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
+| revision |  | gap | M6 ODT body index (record 0276) |
+| run | run | supported |  |
+| sdt |  | missing |  |
+| section | section | supported |  |
+| shape |  | gap | M6 ODT body index (record 0276) |
+| style | style | supported |  |
+| styles | styles | supported |  |
+| tab |  | gap | M6 ODT body index (record 0276) |
+| cell | cell | supported |  |
+| column |  | gap | M6 ODT body index (record 0276) |
+| row | row | supported |  |
+| table | table | supported |  |
+| textbox | textbox | supported |  |
+| toc |  | gap | M6 ODT body index (record 0276) |
+| watermark |  | missing |  |
+|  | heading | litchi-only |  |
+|  | list | litchi-only |  |
+|  | listItem | litchi-only |  |
+|  | frame | litchi-only |  |
+|  | metadata | litchi-only |  |
+
+### Properties
+
+| Element | Property | Type | OfficeCLI `asg` | Litchi `asg` | Read | Write | Follow-up |
+|---|---|---|---|---|---|---|---|
+| abstractNum | `id` | int | a-g |  | missing | gap |  |
+| abstractNum | `type` | enum | asg |  | missing | gap |  |
+| abstractNum | `name` | string | asg |  | missing | gap |  |
+| abstractNum | `styleLink` | string | asg |  | missing | gap |  |
+| abstractNum | `numStyleLink` | string | asg |  | missing | gap |  |
+| abstractNum | `format` | string | a-- |  | write-only | gap |  |
+| abstractNum | `text` | string | a-- |  | write-only | gap |  |
+| abstractNum | `start` | int | a-- |  | write-only | gap |  |
+| abstractNum | `indent` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.format` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.text` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.start` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.indent` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.hanging` | int | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.justification` | enum | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.suff` | enum | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.font` | string | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.size` | font-size | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.color` | color | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.bold` | bool | a-- |  | write-only | gap |  |
+| abstractNum | `level<N>.italic` | bool | a-- |  | write-only | gap |  |
+| abstractNum | `abstractNumId` | int | --g |  | missing | — |  |
+| bookmark | `name` | string | asg | asg | supported | supported |  |
+| bookmark | `text` | string | a-- |  | supported | gap | the node's text |
+| bookmark | `id` | string | --g |  | missing | — |  |
+| bookmarkEnd | `id` | number | a-g |  | missing | gap |  |
+| bookmarkEnd | `name` | string | a-- |  | write-only | gap |  |
+| chart-axis | `axisFont` | string | --g |  | missing | — |  |
+| chart-axis | `axisMax` | number | --g |  | missing | — |  |
+| chart-axis | `axisMin` | number | --g |  | missing | — |  |
+| chart-axis | `axisNumFmt` | string | --g |  | missing | — |  |
+| chart-axis | `axisOrientation` | string | --g |  | missing | — |  |
+| chart-axis | `axisTitle` | string | --g |  | missing | — |  |
+| chart-axis | `format` | string | -sg |  | missing | gap |  |
+| chart-axis | `labelOffset` | number | --g |  | missing | — |  |
+| chart-axis | `labelRotation` | number | -sg |  | missing | gap |  |
+| chart-axis | `logBase` | number | -sg |  | missing | gap |  |
+| chart-axis | `majorGridlines` | bool | -sg |  | missing | gap |  |
+| chart-axis | `max` | number | -sg |  | missing | gap |  |
+| chart-axis | `min` | number | -sg |  | missing | gap |  |
+| chart-axis | `minorGridlines` | bool | -sg |  | missing | gap |  |
+| chart-axis | `tickLabelSkip` | number | --g |  | missing | — |  |
+| chart-axis | `title` | string | -sg |  | missing | gap |  |
+| chart-axis | `visible` | bool | -sg |  | missing | gap |  |
+| chart-series | `categories` | string | asg |  | missing | gap |  |
+| chart-series | `categoriesRef` | string | --g |  | missing | — |  |
+| chart-series | `color` | color | asg |  | missing | gap |  |
+| chart-series | `dataLabels.numFmt` | string | --g |  | missing | — |  |
+| chart-series | `dataLabels.separator` | string | --g |  | missing | — |  |
+| chart-series | `errBars` | string | -sg |  | missing | gap |  |
+| chart-series | `invertIfNeg` | string | -sg |  | missing | gap |  |
+| chart-series | `lineDash` | enum | -sg |  | missing | gap |  |
+| chart-series | `lineWidth` | number | -sg |  | missing | gap |  |
+| chart-series | `marker` | string | -sg |  | missing | gap |  |
+| chart-series | `markerSize` | number | -sg |  | missing | gap |  |
+| chart-series | `markerColor` | string | -sg |  | missing | gap |  |
+| chart-series | `name` | string | asg |  | missing | gap |  |
+| chart-series | `nameRef` | string | --g |  | missing | — |  |
+| chart-series | `scatterStyle` | string | --g |  | missing | — |  |
+| chart-series | `secondaryAxis` | bool | --g |  | missing | — |  |
+| chart-series | `smooth` | string | -sg |  | missing | gap |  |
+| chart-series | `values` | string | asg |  | missing | gap |  |
+| chart-series | `bubbleSize` | string | a-g |  | missing | gap |  |
+| chart-series | `bubbleSizeRef` | string | a-g |  | missing | gap |  |
+| chart | `dispUnits` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `seriesCount` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `radarstyle` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `roundedcorners` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `valaxisvisible` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `areafill` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `autotitledeleted` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisfont` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axismax` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axismin` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisnumfmt` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisorientation` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisposition` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axistitle` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `axisvisible` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `bubbleScale` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `catAxisVisible` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `catTitle` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `cataxisline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `categories` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `chartFill` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `chartType` | enum | a-g |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `chartareafill` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `chartborder` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `colorrule` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `colors` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `combosplit` | number | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `combotypes` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `crossBetween` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `crosses` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `crossesAt` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `data` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `dataLabels` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `dataTable` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `decreaseColor` | color | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `dispBlanksAs` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `droplines` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `errbars` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `explosion` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `firstSliceAngle` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gapdepth` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gapwidth` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gradient` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gradients` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `gridlines` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `height` | length | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `hilowlines` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `holeSize` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `increaseColor` | color | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `invertifneg` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `labelPos` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `labelfont` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `labelFont.size` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `labelFont.color` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `labelFont.bold` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `labelFont.name` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| chart | `labeloffset` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `labelrotation` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `leaderlines` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `legend` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `legend.overlay` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `legendFont` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `linedash` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `linewidth` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `logbase` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `majorTickMark` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `majorunit` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `marker` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `markersize` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `markercolor` | string | -sg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `minorGridlines` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `minorTickMark` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `minorunit` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `overlap` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `plotFill` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `plotborder` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `plotvisonly` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `preset` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `referenceline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `scatterstyle` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `secondaryaxis` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `series{N}` | string | -s- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `seriesoutline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `seriesshadow` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `serlines` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `shape` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `showMarker` | string | -sg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `shownegbubbles` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `sizerepresents` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `smooth` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `style` | number | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `tickLabelPos` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `ticklabelskip` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.bold` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.color` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.font` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.overlay` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `title.size` | font-size | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `totalColor` | color | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `transparency` | number | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `trendline` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `updownbars` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `valaxisline` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `varyColors` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `view3d` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| chart | `width` | length | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| comment | `id` | number | --g |  | missing | — |  |
+| comment | `anchoredTo` | string | --g |  | missing | — |  |
+| comment | `runStart` | int | a-- |  | write-only | gap |  |
+| comment | `range` | bool | a-- |  | write-only | gap |  |
+| comment | `parentId` | number | a-g |  | missing | gap |  |
+| comment | `done` | bool | asg |  | missing | gap |  |
+| comment | `date` | string | asg | --g | supported | gap |  |
+| comment | `initials` | string | asg |  | missing | gap |  |
+| comment | `author` | string | asg | a-g | supported | partial |  |
+| comment | `text` | string | asg | asg | supported | supported |  |
+| diagram | `mermaid` | string | a-- |  | write-only | gap |  |
+| diagram | `src` | string | a-- |  | write-only | gap |  |
+| diagram | `width` | length | a-- |  | write-only | gap |  |
+| diagram | `height` | length | a-- |  | write-only | gap |  |
+| diagram | `render` | string | a-- |  | write-only | gap |  |
+| diagram | `poster` | boolean | a-- |  | write-only | gap |  |
+| diagram | `theme` | string | a-- |  | write-only | gap |  |
+| diagram | `layout` | string | a-- |  | write-only | gap |  |
+| diagram | `look` | string | a-- |  | write-only | gap |  |
+| diagram | `background` | string | a-- |  | write-only | gap |  |
+| document | `author` | string | -sg |  | missing | gap |  |
+| document | `title` | string | -sg |  | missing | gap |  |
+| document | `keywords` | string | -sg |  | missing | gap |  |
+| document | `description` | string | -sg |  | missing | gap |  |
+| document | `lastModifiedBy` | string | -sg |  | missing | gap |  |
+| document | `category` | string | --g |  | missing | — |  |
+| document | `revisionNumber` | string | --g |  | missing | — |  |
+| document | `created` | string | --g |  | missing | — |  |
+| document | `modified` | string | --g |  | missing | — |  |
+| document | `protection` | enum | --g |  | missing | — |  |
+| document | `protectionEnforced` | bool | --g |  | missing | — |  |
+| document | `docGrid.type` | enum | -sg |  | missing | gap |  |
+| document | `docGrid.linePitch` | number | -sg |  | missing | gap |  |
+| document | `docGrid.charSpace` | number | -sg |  | missing | gap |  |
+| document | `charSpacingControl` | enum | -sg |  | missing | gap |  |
+| document | `compatibility.mode` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.font` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.font.eastAsia` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.font.hAnsi` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.font.complexScript` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.fontSize` | font-size | -sg |  | missing | gap |  |
+| document | `docDefaults.color` | color | -sg |  | missing | gap |  |
+| document | `docDefaults.bold` | bool | -sg |  | missing | gap |  |
+| document | `docDefaults.italic` | bool | -sg |  | missing | gap |  |
+| document | `docDefaults.rtl` | bool | -sg |  | missing | gap |  |
+| document | `docDefaults.alignment` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.spaceBefore` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.spaceAfter` | string | -sg |  | missing | gap |  |
+| document | `docDefaults.lineSpacing` | string | -sg |  | missing | gap |  |
+| document | `autoSpaceDE` | bool | -s- |  | write-only | gap |  |
+| document | `autoSpaceDN` | bool | -s- |  | write-only | gap |  |
+| document | `kinsoku` | bool | -s- |  | write-only | gap |  |
+| document | `overflowPunct` | bool | -s- |  | write-only | gap |  |
+| document | `embedFonts` | bool | -s- |  | write-only | gap |  |
+| document | `embedSystemFonts` | bool | -s- |  | write-only | gap |  |
+| document | `saveSubsetFonts` | bool | -s- |  | write-only | gap |  |
+| document | `mirrorMargins` | bool | -s- |  | write-only | gap |  |
+| document | `gutterAtTop` | bool | -s- |  | write-only | gap |  |
+| document | `bookFoldPrinting` | bool | -s- |  | write-only | gap |  |
+| document | `evenAndOddHeaders` | bool | -sg |  | missing | gap |  |
+| document | `updateFields` | bool | -sg |  | missing | gap |  |
+| document | `recalcFields` | enum | -s- |  | write-only | gap |  |
+| document | `autoHyphenation` | bool | -sg |  | missing | gap |  |
+| document | `trackRevisions` | bool | -sg |  | missing | gap |  |
+| document | `defaultTabStop` | string | -s- |  | write-only | gap |  |
+| document | `displayBackgroundShape` | bool | -s- |  | write-only | gap |  |
+| document | `removePersonalInformation` | bool | -s- |  | write-only | gap |  |
+| document | `removeDateAndTime` | bool | -s- |  | write-only | gap |  |
+| document | `printFormsData` | bool | -s- |  | write-only | gap |  |
+| document | `pageWidth` | length | -sg |  | missing | gap |  |
+| document | `sectPr` | enum | -s- |  | write-only | gap |  |
+| document | `pageHeight` | length | -sg |  | missing | gap |  |
+| document | `orientation` | enum | -sg |  | missing | gap |  |
+| document | `marginTop` | length | -sg |  | missing | gap |  |
+| document | `marginBottom` | length | -sg |  | missing | gap |  |
+| document | `marginLeft` | length | -sg |  | missing | gap |  |
+| document | `marginRight` | length | -sg |  | missing | gap |  |
+| document | `marginHeader` | length | -sg |  | missing | gap |  |
+| document | `marginFooter` | length | -sg |  | missing | gap |  |
+| document | `marginGutter` | length | -sg |  | missing | gap |  |
+| document | `extended.application` | string | --g |  | missing | — |  |
+| document | `bookFoldPrintingSheets` | number | --g |  | missing | — |  |
+| document | `bookFoldReversePrinting` | bool | --g |  | missing | — |  |
+| document | `doNotDisplayPageBoundaries` | bool | --g |  | missing | — |  |
+| document | `columns.equalWidth` | bool | --g |  | missing | — |  |
+| document | `columns.separator` | bool | --g |  | missing | — |  |
+| document | `locale` | string | --g |  | missing | — |  |
+| document | `extended.applicationVersion` | string | --g |  | missing | — |  |
+| document | `extended.characters` | number | --g |  | missing | — |  |
+| document | `extended.company` | string | -sg |  | missing | gap |  |
+| document | `extended.lines` | number | --g |  | missing | — |  |
+| document | `extended.manager` | string | -sg |  | missing | gap |  |
+| document | `extended.pages` | number | --g |  | missing | — |  |
+| document | `extended.paragraphs` | number | --g |  | missing | — |  |
+| document | `extended.template` | string | -sg |  | missing | gap |  |
+| document | `extended.totalTime` | number | --g |  | missing | — |  |
+| document | `extended.words` | number | --g |  | missing | — |  |
+| document | `subject` | string | -sg |  | missing | gap |  |
+| document | `theme.color.accent1` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent2` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent3` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent4` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent5` | color | -sg |  | missing | gap |  |
+| document | `theme.color.accent6` | color | -sg |  | missing | gap |  |
+| document | `theme.color.dk1` | color | -sg |  | missing | gap |  |
+| document | `theme.color.dk2` | color | -sg |  | missing | gap |  |
+| document | `theme.color.folHlink` | color | -sg |  | missing | gap |  |
+| document | `theme.color.hlink` | color | -sg |  | missing | gap |  |
+| document | `theme.color.lt1` | color | -sg |  | missing | gap |  |
+| document | `theme.color.lt2` | color | -sg |  | missing | gap |  |
+| document | `theme.colorScheme` | string | --g |  | missing | — |  |
+| document | `theme.font.major.eastAsia` | string | -sg |  | missing | gap |  |
+| document | `theme.font.major.latin` | string | -sg |  | missing | gap |  |
+| document | `theme.font.minor.eastAsia` | string | -sg |  | missing | gap |  |
+| document | `theme.font.minor.latin` | string | -sg |  | missing | gap |  |
+| document | `theme.fontScheme` | string | --g |  | missing | — |  |
+| document | `theme.formatScheme` | string | --g |  | missing | — |  |
+| document | `theme.name` | string | --g |  | missing | — |  |
+| endnote | `text` | string | asg | asg | supported | supported |  |
+| endnote | `direction` | enum | as- |  | write-only | gap |  |
+| endnote | `align` | enum | as- |  | write-only | gap |  |
+| endnote | `font.cs` | string | as- |  | write-only | gap |  |
+| endnote | `font.ea` | string | as- |  | write-only | gap |  |
+| endnote | `font.latin` | string | as- |  | write-only | gap |  |
+| endnote | `bold.cs` | bool | as- |  | write-only | gap |  |
+| endnote | `italic.cs` | bool | as- |  | write-only | gap |  |
+| endnote | `size.cs` | font-size | as- |  | write-only | gap |  |
+| endnote | `id` | number | --g |  | missing | — |  |
+| endnote | `citation` | string |  | --g | litchi-only | — |  |
+| endnote | `class` | enum |  | --g | litchi-only | — |  |
+| equation | `mode` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| equation | `formula` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `evaluated` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| field | `fieldType` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `name` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `id` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `expression` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `trueText` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `falseText` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `hyperlink` | bool | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `format` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `instruction` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `vertAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| field | `fldLock` | bool | a-g |  | element gap | gap | M6 ODT body index (record 0276) |
+| fieldChar | `fieldCharType` | enum | -sg |  | missing | gap |  |
+| footer | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `align` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `direction` | enum | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `font` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `size` | font-size | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `bold` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `italic` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `color` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| footer | `field` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| footnote | `text` | string | asg | asg | supported | supported |  |
+| footnote | `direction` | enum | as- |  | write-only | gap |  |
+| footnote | `align` | enum | as- |  | write-only | gap |  |
+| footnote | `font.cs` | string | as- |  | write-only | gap |  |
+| footnote | `font.ea` | string | as- |  | write-only | gap |  |
+| footnote | `font.latin` | string | as- |  | write-only | gap |  |
+| footnote | `bold.cs` | bool | as- |  | write-only | gap |  |
+| footnote | `italic.cs` | bool | as- |  | write-only | gap |  |
+| footnote | `size.cs` | font-size | as- |  | write-only | gap |  |
+| footnote | `id` | number | --g |  | missing | — |  |
+| footnote | `citation` | string |  | --g | litchi-only | — |  |
+| footnote | `class` | enum |  | --g | litchi-only | — |  |
+| formfield | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `name` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `checked` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| formfield | `default` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| formfield | `enabled` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| formfield | `hasFormFieldData` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| header | `type` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `text` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `align` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `direction` | enum | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `font` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `size` | font-size | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `bold` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `italic` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `color` | color | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| header | `field` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| hyperlink | `url` | string | asg | asg | supported | supported |  |
+| hyperlink | `anchor` | string | a-g |  | missing | gap |  |
+| hyperlink | `tooltip` | string | a-g | -sg | supported | gap |  |
+| hyperlink | `text` | string | asg | asg | supported | supported |  |
+| hyperlink | `rStyle` | string | a-g |  | missing | gap |  |
+| hyperlink | `color` | color | a-g |  | missing | gap |  |
+| hyperlink | `font` | string | a-g |  | missing | gap |  |
+| hyperlink | `size` | length | a-g |  | missing | gap |  |
+| hyperlink | `underline` | enum | a-g |  | missing | gap |  |
+| hyperlink | `bold` | bool | a-g |  | missing | gap |  |
+| hyperlink | `italic` | bool | a-g |  | missing | gap |  |
+| hyperlink | `docLocation` | string | --g |  | missing | — |  |
+| hyperlink | `tgtFrame` | string |  | -sg | litchi-only | litchi-only |  |
+| instrText | `instruction` | string | -sg |  | missing | gap |  |
+| level | `ilvl` | int | a-g |  | missing | gap |  |
+| level | `format` | string | asg |  | missing | gap |  |
+| level | `lvlText` | string | asg |  | missing | gap |  |
+| level | `start` | int | asg |  | missing | gap |  |
+| level | `indent` | int | asg |  | missing | gap |  |
+| level | `hanging` | int | asg |  | missing | gap |  |
+| level | `justification` | enum | asg |  | missing | gap |  |
+| level | `suff` | enum | as- |  | write-only | gap |  |
+| level | `lvlRestart` | int | as- |  | write-only | gap |  |
+| level | `isLgl` | bool | as- |  | write-only | gap |  |
+| level | `direction` | enum | a-- |  | write-only | gap |  |
+| level | `font` | string | as- |  | write-only | gap |  |
+| level | `size` | font-size | as- |  | write-only | gap |  |
+| level | `color` | color | as- |  | write-only | gap |  |
+| level | `bold` | bool | as- |  | write-only | gap |  |
+| level | `italic` | bool | as- |  | write-only | gap |  |
+| num | `id` | int | a-g |  | missing | gap |  |
+| num | `abstractNumId` | int | asg |  | missing | gap |  |
+| num | `format` | string | a-- |  | write-only | gap |  |
+| num | `text` | string | a-- |  | write-only | gap |  |
+| num | `indent` | int | a-- |  | write-only | gap |  |
+| num | `type` | enum | a-- |  | write-only | gap |  |
+| num | `start` | int | a-- |  | write-only | gap |  |
+| num | `startOverride.<N>` | int | a-- |  | write-only | gap |  |
+| num | `continue` | bool | a-- |  | write-only | gap |  |
+| num | `numId` | int | --g |  | missing | — |  |
+| numbering | `abstractNumCount` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| numbering | `abstractNumId` | number | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| ole | `objectType` | string | --g |  | missing | — |  |
+| ole | `display` | string | --g |  | missing | — |  |
+| ole | `relId` | string | --g |  | missing | — |  |
+| ole | `fileSize` | number | --g |  | missing | — |  |
+| ole | `contentType` | string | a-g |  | missing | gap |  |
+| ole | `height` | length | asg |  | missing | gap |  |
+| ole | `width` | length | asg |  | missing | gap |  |
+| ole | `preview` | string | a-- |  | write-only | gap |  |
+| ole | `progId` | string | asg |  | missing | gap |  |
+| ole | `src` | string | as- |  | write-only | gap |  |
+| ole | `oleKind` | enum | a-- |  | write-only | gap |  |
+| ole | `embedExt` | string | a-- |  | write-only | gap |  |
+| ole | `text` | string |  | asg | litchi-only | litchi-only |  |
+| ole | `style` | string |  | --g | litchi-only | — |  |
+| ole | `bold` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `italic` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `underline` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `strike` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `size` | font-size |  | -sg | litchi-only | litchi-only |  |
+| ole | `color` | color |  | -sg | litchi-only | litchi-only |  |
+| ole | `font` | string |  | -sg | litchi-only | litchi-only |  |
+| ole | `highlight` | color |  | -sg | litchi-only | litchi-only |  |
+| ole | `superscript` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `subscript` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `caps` | bool |  | -sg | litchi-only | litchi-only |  |
+| ole | `smallcaps` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `type` | enum | a-g |  | supported | gap | the node's text |
+| pagebreak | `breakType` | enum | -sg |  | missing | gap |  |
+| pagebreak | `text` | string |  | asg | litchi-only | litchi-only |  |
+| pagebreak | `style` | string |  | --g | litchi-only | — |  |
+| pagebreak | `bold` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `italic` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `underline` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `strike` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `size` | font-size |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `color` | color |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `font` | string |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `highlight` | color |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `superscript` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `subscript` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `caps` | bool |  | -sg | litchi-only | litchi-only |  |
+| pagebreak | `smallcaps` | bool |  | -sg | litchi-only | litchi-only |  |
+| paragraph | `lineRule` | enum | asg |  | missing | gap |  |
+| paragraph | `align` | enum | asg | asg | supported | supported |  |
+| paragraph | `style` | string | asg | asg | supported | supported |  |
+| paragraph | `spaceBefore` | length | asg | -sg | supported | partial |  |
+| paragraph | `spaceAfter` | length | asg | -sg | supported | partial |  |
+| paragraph | `spaceBeforeAuto` | boolean | asg |  | missing | gap |  |
+| paragraph | `spaceAfterAuto` | boolean | asg |  | missing | gap |  |
+| paragraph | `listStyle` | enum | asg |  | missing | gap |  |
+| paragraph | `numId` | int | asg |  | missing | gap |  |
+| paragraph | `numLevel` | int | asg |  | missing | gap |  |
+| paragraph | `start` | int | as- |  | write-only | gap |  |
+| paragraph | `bold` | bool | asg | -sg | supported | partial |  |
+| paragraph | `italic` | bool | asg | -sg | supported | partial |  |
+| paragraph | `font` | string | as- | -sg | supported | partial |  |
+| paragraph | `size` | font-size | asg | -sg | supported | partial |  |
+| paragraph | `color` | color | asg | -sg | supported | partial |  |
+| paragraph | `underline` | string | asg | -sg | supported | partial |  |
+| paragraph | `underline.color` | color | asg |  | missing | gap |  |
+| paragraph | `strike` | bool | asg | -sg | supported | partial |  |
+| paragraph | `highlight` | string | asg | -sg | supported | partial |  |
+| paragraph | `caps` | bool | a-- |  | write-only | gap |  |
+| paragraph | `smallcaps` | bool | a-- |  | write-only | gap |  |
+| paragraph | `dstrike` | bool | a-- |  | write-only | gap |  |
+| paragraph | `vanish` | bool | a-- |  | write-only | gap |  |
+| paragraph | `outline` | bool | a-- |  | write-only | gap |  |
+| paragraph | `shadow` | bool | a-- |  | write-only | gap |  |
+| paragraph | `emboss` | bool | a-- |  | write-only | gap |  |
+| paragraph | `imprint` | bool | a-- |  | write-only | gap |  |
+| paragraph | `noproof` | bool | a-- |  | write-only | gap |  |
+| paragraph | `superscript` | bool | a-- |  | write-only | gap |  |
+| paragraph | `subscript` | bool | a-- |  | write-only | gap |  |
+| paragraph | `vertAlign` | enum | a-- |  | write-only | gap |  |
+| paragraph | `charSpacing` | length | a-- |  | write-only | gap |  |
+| paragraph | `rtl` | bool | a-- |  | write-only | gap |  |
+| paragraph | `direction` | enum | asg |  | missing | gap |  |
+| paragraph | `font.cs` | string | asg |  | missing | gap |  |
+| paragraph | `font.ea` | string | asg |  | missing | gap |  |
+| paragraph | `font.latin` | string | asg |  | missing | gap |  |
+| paragraph | `font.asciiTheme` | string | asg |  | missing | gap |  |
+| paragraph | `font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| paragraph | `font.eaTheme` | string | asg |  | missing | gap |  |
+| paragraph | `font.csTheme` | string | asg |  | missing | gap |  |
+| paragraph | `bold.cs` | bool | asg |  | missing | gap |  |
+| paragraph | `italic.cs` | bool | asg |  | missing | gap |  |
+| paragraph | `size.cs` | font-size | asg |  | missing | gap |  |
+| paragraph | `shd` | string | as- | -sg | supported | partial |  |
+| paragraph | `firstLineIndent` | length | asg | -sg | supported | partial |  |
+| paragraph | `rightIndent` | length | asg | -sg | supported | partial |  |
+| paragraph | `hangingIndent` | length | asg |  | missing | gap |  |
+| paragraph | `keepNext` | bool | asg | -sg | supported | partial |  |
+| paragraph | `keepLines` | bool | asg |  | missing | gap |  |
+| paragraph | `pageBreakBefore` | bool | asg | -sg | supported | partial |  |
+| paragraph | `widowControl` | bool | asg |  | missing | gap |  |
+| paragraph | `wordWrap` | bool | asg |  | missing | gap |  |
+| paragraph | `contextualSpacing` | bool | asg |  | missing | gap |  |
+| paragraph | `effective.size` | font-size | --g |  | missing | — |  |
+| paragraph | `effective.size.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.ascii` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.ascii.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.eastAsia` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.eastAsia.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.hAnsi` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.hAnsi.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.cs` | string | --g |  | missing | — |  |
+| paragraph | `effective.font.cs.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.bold` | bool | --g |  | missing | — |  |
+| paragraph | `effective.bold.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.italic` | bool | --g |  | missing | — |  |
+| paragraph | `effective.italic.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.color` | color | --g |  | missing | — |  |
+| paragraph | `effective.color.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.underline` | string | --g |  | missing | — |  |
+| paragraph | `effective.underline.src` | string | --g |  | missing | — |  |
+| paragraph | `effective.rtl` | bool | --g |  | missing | — |  |
+| paragraph | `effective.rtl.src` | string | --g |  | missing | — |  |
+| paragraph | `numFmt` | string | --g |  | missing | — |  |
+| paragraph | `fill` | color | asg | -sg | supported | partial |  |
+| paragraph | `shading.val` | string | -sg |  | missing | gap |  |
+| paragraph | `shading.fill` | string | -sg |  | missing | gap |  |
+| paragraph | `shading.color` | string | -sg |  | missing | gap |  |
+| paragraph | `paraId` | string | --g |  | raw-only | — | ADR 0034: native selection requires explicit raw admission |
+| paragraph | `outlineLvl` | number | asg |  | missing | gap |  |
+| paragraph | `rStyle` | string | asg |  | missing | gap |  |
+| paragraph | `tabs` | array | -sg |  | missing | gap |  |
+| paragraph | `pbdr.top` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.bottom` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.left` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.right` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.between` | string | asg |  | missing | gap |  |
+| paragraph | `pbdr.bar` | string | asg |  | missing | gap |  |
+| paragraph | `firstLineChars` | number | -sg |  | missing | gap |  |
+| paragraph | `hangingChars` | number | -sg |  | missing | gap |  |
+| paragraph | `markRPr.bold` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.italic` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.strike` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.rtl` | bool | asg |  | missing | gap |  |
+| paragraph | `markRPr.rStyle` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.underline` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.size` | length | -sg |  | missing | gap |  |
+| paragraph | `markRPr.color` | color | -sg |  | missing | gap |  |
+| paragraph | `markRPr.highlight` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.latin` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.ea` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.cs` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.hint` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.asciiTheme` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.font.eaTheme` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.font.csTheme` | string | asg |  | missing | gap |  |
+| paragraph | `markRPr.charSpacing` | length | -sg |  | missing | gap |  |
+| paragraph | `markRPr.size.cs` | length | -sg |  | missing | gap |  |
+| paragraph | `markRPr.bold.cs` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.italic.cs` | bool | -sg |  | missing | gap |  |
+| paragraph | `markRPr.kern` | integer | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.ascii` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.font.hAnsi` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.lang.latin` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.lang.ea` | string | -sg |  | missing | gap |  |
+| paragraph | `markRPr.lang.cs` | string | -sg |  | missing | gap |  |
+| paragraph | `kern` | integer | --g |  | missing | — |  |
+| paragraph | `adjustRightInd` | boolean | asg |  | missing | gap |  |
+| paragraph | `autoSpaceDE` | boolean | asg |  | missing | gap |  |
+| paragraph | `autoSpaceDN` | boolean | asg |  | missing | gap |  |
+| paragraph | `kinsoku` | boolean | asg |  | missing | gap |  |
+| paragraph | `leftChars` | number | asg |  | missing | gap |  |
+| paragraph | `lineSpacing` | string | asg | -sg | supported | partial |  |
+| paragraph | `mirrorIndents` | boolean | asg |  | missing | gap |  |
+| paragraph | `overflowPunct` | boolean | asg |  | missing | gap |  |
+| paragraph | `rightChars` | number | asg |  | missing | gap |  |
+| paragraph | `snapToGrid` | boolean | asg |  | missing | gap |  |
+| paragraph | `spaceAfterLines` | number | asg |  | missing | gap |  |
+| paragraph | `spaceBeforeLines` | number | asg |  | missing | gap |  |
+| paragraph | `suppressAutoHyphens` | boolean | asg |  | missing | gap |  |
+| paragraph | `suppressLineNumbers` | boolean | asg |  | missing | gap |  |
+| paragraph | `suppressOverlap` | boolean | asg |  | missing | gap |  |
+| paragraph | `textAlignment` | string | asg |  | missing | gap |  |
+| paragraph | `textboxTightWrap` | string | asg |  | missing | gap |  |
+| paragraph | `topLinePunct` | boolean | asg |  | missing | gap |  |
+| paragraph | `indent` | length | asg | -sg | supported | partial |  |
+| paragraph | `text` | string | asg | asg | supported | supported |  |
+| permStart | `id` | number | a-g |  | missing | gap |  |
+| permStart | `edGrp` | enum | a-g |  | missing | gap |  |
+| permStart | `ed` | string | a-g |  | missing | gap |  |
+| permStart | `colFirst` | number | a-g |  | missing | gap |  |
+| permStart | `colLast` | number | a-g |  | missing | gap |  |
+| picture | `decorative` | bool | asg |  | missing | gap |  |
+| picture | `crop` | string | asg |  | missing | gap |  |
+| picture | `cropLeft` | string | as- |  | write-only | gap |  |
+| picture | `cropTop` | string | as- |  | write-only | gap |  |
+| picture | `cropRight` | string | as- |  | write-only | gap |  |
+| picture | `cropBottom` | string | as- |  | write-only | gap |  |
+| picture | `anchor` | bool | a-g |  | missing | gap |  |
+| picture | `wrap` | string | asg |  | missing | gap |  |
+| picture | `behindText` | bool | asg |  | missing | gap |  |
+| picture | `relativeHeight` | integer | a-g |  | missing | gap |  |
+| picture | `effectExtent` | string | a-- |  | write-only | gap |  |
+| picture | `hPosition` | length | asg |  | missing | gap |  |
+| picture | `vPosition` | length | asg |  | missing | gap |  |
+| picture | `hRelative` | string | asg |  | missing | gap |  |
+| picture | `vRelative` | string | asg |  | missing | gap |  |
+| picture | `hAlign` | string | a-g |  | missing | gap |  |
+| picture | `vAlign` | string | a-g |  | missing | gap |  |
+| picture | `link` | string | a-g |  | missing | gap |  |
+| picture | `width` | length | asg |  | missing | gap |  |
+| picture | `height` | length | asg |  | missing | gap |  |
+| picture | `fallback` | string | a-- |  | write-only | gap |  |
+| picture | `id` | number | --g |  | missing | — |  |
+| picture | `alt` | string | asg |  | missing | gap |  |
+| picture | `contentType` | string | --g |  | missing | — |  |
+| picture | `fileSize` | number | --g |  | missing | — |  |
+| picture | `relId` | string | --g |  | missing | — |  |
+| picture | `src` | string | as- | --g | supported | gap |  |
+| ptab | `align` | enum | asg |  | missing | gap |  |
+| ptab | `relativeTo` | enum | asg |  | missing | gap |  |
+| ptab | `leader` | enum | asg |  | missing | gap |  |
+| revision | `type` | enum | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `text` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `id` | integer | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `nativePath` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `action` | enum | -s- |  | element gap | gap | M6 ODT body index (record 0276) |
+| revision | `paraMarkIns.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkIns.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkIns.id` | int | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkDel.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkDel.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `paraMarkDel.id` | int | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `revision.beforeLost` | bool | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `sectPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `sectPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `sectPrChange.id` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `tblPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `tblPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `trPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `trPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `tcPrChange.author` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| revision | `tcPrChange.date` | string | --g |  | element gap | — | M6 ODT body index (record 0276) |
+| run | `highlight` | color | asg | -sg | supported | partial |  |
+| run | `strike` | bool | asg | -sg | supported | partial |  |
+| run | `dstrike` | bool | asg |  | missing | gap |  |
+| run | `caps` | bool | asg | -sg | supported | partial |  |
+| run | `smallcaps` | bool | asg | -sg | supported | partial |  |
+| run | `vanish` | bool | asg |  | missing | gap |  |
+| run | `outline` | bool | asg |  | missing | gap |  |
+| run | `shadow` | bool | asg |  | missing | gap |  |
+| run | `emboss` | bool | asg |  | missing | gap |  |
+| run | `imprint` | bool | asg |  | missing | gap |  |
+| run | `noproof` | bool | asg |  | missing | gap |  |
+| run | `rtl` | bool | as- |  | write-only | gap |  |
+| run | `direction` | enum | asg |  | missing | gap |  |
+| run | `font.cs` | string | asg |  | missing | gap |  |
+| run | `font.ea` | string | asg |  | missing | gap |  |
+| run | `font.latin` | string | asg |  | missing | gap |  |
+| run | `font.hint` | string | asg |  | missing | gap |  |
+| run | `font.asciiTheme` | string | asg |  | missing | gap |  |
+| run | `font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| run | `font.eaTheme` | string | asg |  | missing | gap |  |
+| run | `font.csTheme` | string | asg |  | missing | gap |  |
+| run | `bold.cs` | bool | asg |  | missing | gap |  |
+| run | `italic.cs` | bool | asg |  | missing | gap |  |
+| run | `size.cs` | font-size | asg |  | missing | gap |  |
+| run | `lang.latin` | string | -sg |  | missing | gap |  |
+| run | `lang.ea` | string | -sg |  | missing | gap |  |
+| run | `lang.cs` | string | -sg |  | missing | gap |  |
+| run | `vertAlign` | enum | as- |  | write-only | gap |  |
+| run | `kern` | int | asg |  | missing | gap |  |
+| run | `position` | length | asg |  | missing | gap |  |
+| run | `charSpacing` | length | asg |  | missing | gap |  |
+| run | `fill` | color | asg |  | missing | gap |  |
+| run | `shading` | color | as- |  | write-only | gap |  |
+| run | `shading.val` | string | --g |  | missing | — |  |
+| run | `shading.fill` | string | --g |  | missing | — |  |
+| run | `shading.color` | string | --g |  | missing | — |  |
+| run | `textOutline` | string | asg |  | missing | gap |  |
+| run | `textFill` | string | asg |  | missing | gap |  |
+| run | `w14shadow` | string | asg |  | missing | gap |  |
+| run | `w14glow` | string | asg |  | missing | gap |  |
+| run | `w14reflection` | string | asg |  | missing | gap |  |
+| run | `effective.size.src` | string | --- |  | write-only | — |  |
+| run | `effective.font.ascii` | string | --g |  | missing | — |  |
+| run | `effective.font.ascii.src` | string | --- |  | write-only | — |  |
+| run | `effective.font.eastAsia` | string | --g |  | missing | — |  |
+| run | `effective.font.eastAsia.src` | string | --- |  | write-only | — |  |
+| run | `effective.font.hAnsi` | string | --g |  | missing | — |  |
+| run | `effective.font.hAnsi.src` | string | --- |  | write-only | — |  |
+| run | `effective.font.cs` | string | --g |  | missing | — |  |
+| run | `effective.font.cs.src` | string | --- |  | write-only | — |  |
+| run | `effective.bold.src` | string | --- |  | write-only | — |  |
+| run | `effective.italic` | bool | --g |  | missing | — |  |
+| run | `effective.italic.src` | string | --- |  | write-only | — |  |
+| run | `effective.color.src` | string | --- |  | write-only | — |  |
+| run | `effective.underline` | string | --g |  | missing | — |  |
+| run | `effective.underline.src` | string | --- |  | write-only | — |  |
+| run | `effective.rtl` | bool | --g |  | missing | — |  |
+| run | `effective.rtl.src` | string | --g |  | missing | — |  |
+| run | `dirty` | bool | --g |  | missing | — |  |
+| run | `font.ascii` | string | --g |  | missing | — |  |
+| run | `font.eastAsia` | string | --- |  | write-only | — |  |
+| run | `font.hAnsi` | string | --g |  | missing | — |  |
+| run | `color` | color | asg | -sg | supported | partial |  |
+| run | `em` | string | asg |  | missing | gap |  |
+| run | `bdr` | string | asg |  | missing | gap |  |
+| run | `specVanish` | boolean | asg |  | missing | gap |  |
+| run | `snapToGrid` | boolean | asg |  | missing | gap |  |
+| run | `subscript` | bool | asg | -sg | supported | partial |  |
+| run | `superscript` | bool | asg | -sg | supported | partial |  |
+| run | `effective.bold` | bool | --g |  | missing | — |  |
+| run | `effective.color` | color | --g |  | missing | — |  |
+| run | `effective.size` | font-size | --g |  | missing | — |  |
+| run | `underline` | enum | asg | -sg | supported | partial |  |
+| run | `bold` | bool | asg | -sg | supported | partial |  |
+| run | `font` | string | as- | -sg | supported | partial |  |
+| run | `italic` | bool | asg | -sg | supported | partial |  |
+| run | `size` | font-size | asg | -sg | supported | partial |  |
+| run | `text` | string | asg | asg | supported | supported |  |
+| run | `style` | string |  | --g | litchi-only | — |  |
+| sdt | `type` | enum | a-g |  | missing | gap |  |
+| sdt | `tag` | string | asg |  | missing | gap |  |
+| sdt | `alias` | string | asg |  | missing | gap |  |
+| sdt | `text` | string | asg |  | missing | gap |  |
+| sdt | `checked` | bool | asg |  | missing | gap |  |
+| sdt | `format` | string | asg |  | missing | gap |  |
+| sdt | `items` | string | asg |  | missing | gap |  |
+| sdt | `lock` | enum | asg |  | missing | gap |  |
+| sdt | `placeholder` | bool | asg |  | missing | gap |  |
+| sdt | `placeholderText` | string | asg |  | missing | gap |  |
+| sdt | `date.fullDate` | string | asg |  | missing | gap |  |
+| sdt | `date.calendar` | string | asg |  | missing | gap |  |
+| sdt | `date.lid` | string | asg |  | missing | gap |  |
+| sdt | `date.storeMappedDataAs` | string | asg |  | missing | gap |  |
+| sdt | `comboBox.lastValue` | string | asg |  | missing | gap |  |
+| sdt | `dropDown.lastValue` | string | asg |  | missing | gap |  |
+| sdt | `id` | number | --g |  | missing | — |  |
+| sdt | `editable` | bool | --g |  | missing | — |  |
+| section | `type` | enum | asg |  | supported | gap | the node's text |
+| section | `pageWidth` | length | asg |  | missing | gap |  |
+| section | `pageHeight` | length | asg |  | missing | gap |  |
+| section | `orientation` | enum | asg |  | missing | gap |  |
+| section | `marginTop` | length | asg |  | missing | gap |  |
+| section | `marginBottom` | length | asg |  | missing | gap |  |
+| section | `marginLeft` | length | asg |  | missing | gap |  |
+| section | `marginRight` | length | asg |  | missing | gap |  |
+| section | `marginHeader` | length | asg |  | missing | gap |  |
+| section | `marginFooter` | length | asg |  | missing | gap |  |
+| section | `marginGutter` | length | asg |  | missing | gap |  |
+| section | `columns` | int | asg |  | missing | gap |  |
+| section | `columnSpace` | length | asg |  | missing | gap |  |
+| section | `titlePage` | bool | asg |  | missing | gap |  |
+| section | `pageNumFmt` | enum | asg |  | missing | gap |  |
+| section | `direction` | enum | asg |  | missing | gap |  |
+| section | `rtlGutter` | bool | asg |  | missing | gap |  |
+| section | `pageStart` | int | asg |  | missing | gap |  |
+| section | `lineNumbers` | enum | asg |  | missing | gap |  |
+| section | `lineNumberCountBy` | int | asg |  | missing | gap |  |
+| section | `lineNumberDistance` | int | asg |  | missing | gap |  |
+| section | `headerRef` | string | --g |  | missing | — |  |
+| section | `headerRef.default` | string | --g |  | missing | — |  |
+| section | `headerRef.first` | string | --g |  | missing | — |  |
+| section | `headerRef.even` | string | --g |  | missing | — |  |
+| section | `footerRef` | string | --g |  | missing | — |  |
+| section | `footerRef.default` | string | --g |  | missing | — |  |
+| section | `footerRef.first` | string | --g |  | missing | — |  |
+| section | `footerRef.even` | string | --g |  | missing | — |  |
+| section | `colSpaces` | string | --g |  | missing | — |  |
+| section | `columns.equalWidth` | bool | --g |  | missing | — |  |
+| section | `columns.separator` | bool | --g |  | missing | — |  |
+| section | `pgBorders` | enum | as- |  | write-only | gap |  |
+| section | `pgBorders.top` | string | asg |  | missing | gap |  |
+| section | `pgBorders.left` | string | asg |  | missing | gap |  |
+| section | `pgBorders.bottom` | string | asg |  | missing | gap |  |
+| section | `pgBorders.right` | string | asg |  | missing | gap |  |
+| section | `pgBorders.offsetFrom` | enum | asg |  | missing | gap |  |
+| section | `pgBorders.zOrder` | enum | asg |  | missing | gap |  |
+| section | `pgBorders.display` | enum | asg |  | missing | gap |  |
+| section | `paperSrc.first` | int | asg |  | missing | gap |  |
+| section | `paperSrc.other` | int | asg |  | missing | gap |  |
+| section | `formProt` | bool | asg |  | missing | gap |  |
+| section | `vAlign` | enum | asg |  | missing | gap |  |
+| section | `textDirection` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numFmt` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numRestart` | enum | asg |  | missing | gap |  |
+| section | `footnotePr.numStart` | int | asg |  | missing | gap |  |
+| section | `footnotePr.pos` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numFmt` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numRestart` | enum | asg |  | missing | gap |  |
+| section | `endnotePr.numStart` | int | asg |  | missing | gap |  |
+| section | `endnotePr.pos` | enum | asg |  | missing | gap |  |
+| section | `name` | string |  | asg | litchi-only | litchi-only |  |
+| section | `protected` | bool |  | -sg | litchi-only | litchi-only |  |
+| section | `hidden` | bool |  | -sg | litchi-only | litchi-only |  |
+| shape | `geometry` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `width` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `height` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `wrap` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `hAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `vAlign` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `hRelative` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `vRelative` | enum | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `anchor.x` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `anchor.y` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `fill` | color | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `line` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `line.color` | color | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `line.width` | length | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `line.style` | string | as- |  | element gap | gap | M6 ODT body index (record 0276) |
+| shape | `alt` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| style | `id` | string | a-g |  | missing | gap |  |
+| style | `name` | string | asg | --g | supported | gap |  |
+| style | `type` | enum | a-g |  | supported | gap | the node's text |
+| style | `basedOn` | string | asg |  | missing | gap |  |
+| style | `basedOn.path` | string | --g |  | missing | — |  |
+| style | `next` | string | asg |  | missing | gap |  |
+| style | `linked` | string | asg |  | missing | gap |  |
+| style | `qFormat` | bool | asg |  | missing | gap |  |
+| style | `uiPriority` | int | asg |  | missing | gap |  |
+| style | `semiHidden` | bool | asg |  | missing | gap |  |
+| style | `unhideWhenUsed` | bool | asg |  | missing | gap |  |
+| style | `locked` | bool | asg |  | missing | gap |  |
+| style | `customStyle` | bool | a-g |  | missing | gap |  |
+| style | `align` | enum | asg | --g | supported | gap |  |
+| style | `spaceBefore` | length | asg |  | missing | gap |  |
+| style | `spaceAfter` | length | asg |  | missing | gap |  |
+| style | `spaceBeforeAuto` | boolean | asg |  | missing | gap |  |
+| style | `spaceAfterAuto` | boolean | asg |  | missing | gap |  |
+| style | `font` | string | asg | --g | supported | gap |  |
+| style | `font.ea` | string | asg |  | missing | gap |  |
+| style | `font.cs` | string | asg |  | missing | gap |  |
+| style | `font.asciiTheme` | string | asg |  | missing | gap |  |
+| style | `font.hAnsiTheme` | string | asg |  | missing | gap |  |
+| style | `font.eaTheme` | string | asg |  | missing | gap |  |
+| style | `font.csTheme` | string | asg |  | missing | gap |  |
+| style | `size` | font-size | asg | --g | supported | gap |  |
+| style | `bold` | bool | asg | --g | supported | gap |  |
+| style | `italic` | bool | asg | --g | supported | gap |  |
+| style | `color` | color | asg | --g | supported | gap |  |
+| style | `underline` | string | asg |  | missing | gap |  |
+| style | `strike` | bool | asg |  | missing | gap |  |
+| style | `dstrike` | bool | asg |  | missing | gap |  |
+| style | `highlight` | string | asg |  | missing | gap |  |
+| style | `caps` | bool | asg |  | missing | gap |  |
+| style | `smallCaps` | bool | asg |  | missing | gap |  |
+| style | `vanish` | bool | asg |  | missing | gap |  |
+| style | `rtl` | bool | asg |  | missing | gap |  |
+| style | `vertAlign` | enum | asg |  | missing | gap |  |
+| style | `charSpacing` | length | asg |  | missing | gap |  |
+| style | `shading` | color | asg |  | missing | gap |  |
+| style | `lineSpacing` | string | asg |  | missing | gap |  |
+| style | `lineRule` | enum | asg |  | missing | gap |  |
+| style | `contextualSpacing` | bool | asg |  | missing | gap |  |
+| style | `outlineLvl` | int | asg |  | missing | gap |  |
+| style | `kinsoku` | bool | asg |  | missing | gap |  |
+| style | `snapToGrid` | bool | as- |  | write-only | gap |  |
+| style | `wordWrap` | bool | as- |  | write-only | gap |  |
+| style | `autoSpaceDE` | bool | asg |  | missing | gap |  |
+| style | `autoSpaceDN` | bool | asg |  | missing | gap |  |
+| style | `bidi` | bool | asg |  | missing | gap |  |
+| style | `direction` | enum | asg |  | missing | gap |  |
+| style | `overflowPunct` | bool | asg |  | missing | gap |  |
+| style | `topLinePunct` | bool | as- |  | write-only | gap |  |
+| style | `suppressAutoHyphens` | bool | as- |  | write-only | gap |  |
+| style | `suppressLineNumbers` | bool | as- |  | write-only | gap |  |
+| style | `keepNext` | bool | asg |  | missing | gap |  |
+| style | `keepLines` | bool | asg |  | missing | gap |  |
+| style | `pageBreakBefore` | bool | asg |  | missing | gap |  |
+| style | `widowControl` | bool | asg |  | missing | gap |  |
+| style | `pbdr` | string | -s- |  | write-only | gap |  |
+| style | `numId` | int | asg |  | missing | gap |  |
+| style | `ilvl` | int | asg |  | missing | gap |  |
+| style | `effective.alignment` | string | --g |  | missing | — |  |
+| style | `effective.alignment.src` | string | --g |  | missing | — |  |
+| style | `effective.direction` | string | --g |  | missing | — |  |
+| style | `effective.direction.src` | string | --g |  | missing | — |  |
+| style | `effective.highlight` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing` | string | --g |  | missing | — |  |
+| style | `effective.lineSpacing.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore` | string | --g |  | missing | — |  |
+| style | `effective.spaceBefore.src` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter` | string | --g |  | missing | — |  |
+| style | `effective.spaceAfter.src` | string | --g |  | missing | — |  |
+| style | `effective.strike` | bool | --g |  | missing | — |  |
+| style | `displayName` | string |  | --g | litchi-only | — |  |
+| style | `family` | string |  | --g | litchi-only | — |  |
+| style | `parent` | string |  | --g | litchi-only | — |  |
+| styles | `count` | number | --g |  | missing | — |  |
+| tab | `pos` | length | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| tab | `val` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| tab | `leader` | enum | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| cell | `width` | string | asg |  | missing | gap |  |
+| cell | `skipGridSync` | bool | -s- |  | write-only | gap |  |
+| cell | `font` | string | -sg |  | missing | gap |  |
+| cell | `size` | font-size | -sg |  | missing | gap |  |
+| cell | `bold` | bool | -sg |  | missing | gap |  |
+| cell | `italic` | bool | -sg |  | missing | gap |  |
+| cell | `underline` | enum | -sg |  | missing | gap |  |
+| cell | `strike` | bool | -sg |  | missing | gap |  |
+| cell | `color` | color | -sg |  | missing | gap |  |
+| cell | `highlight` | color | -sg |  | missing | gap |  |
+| cell | `fill` | color | -sg | --g | supported | gap |  |
+| cell | `align` | enum | -sg |  | missing | gap |  |
+| cell | `valign` | enum | -sg | --g | supported | gap |  |
+| cell | `colspan` | int | -sg | --g | supported | gap |  |
+| cell | `fitText` | bool | -s- |  | write-only | gap |  |
+| cell | `textDirection` | enum | -sg |  | missing | gap |  |
+| cell | `direction` | enum | asg |  | missing | gap |  |
+| cell | `nowrap` | bool | asg |  | missing | gap |  |
+| cell | `hideMark` | bool | asg |  | missing | gap |  |
+| cell | `tcFitText` | bool | asg |  | missing | gap |  |
+| cell | `padding.top` | number | -sg |  | missing | gap |  |
+| cell | `padding.bottom` | number | -sg |  | missing | gap |  |
+| cell | `padding.left` | number | -sg |  | missing | gap |  |
+| cell | `padding.right` | number | -sg |  | missing | gap |  |
+| cell | `vmerge` | enum | -sg |  | missing | gap |  |
+| cell | `hmerge` | enum | -sg |  | missing | gap |  |
+| cell | `cnfStyle` | string | -sg |  | missing | gap |  |
+| cell | `border.all` | string | as- |  | write-only | gap |  |
+| cell | `border.bottom` | string | -s- |  | write-only | gap |  |
+| cell | `border.left` | string | -s- |  | write-only | gap |  |
+| cell | `border.right` | string | -s- |  | write-only | gap |  |
+| cell | `border.tl2br` | string | asg |  | missing | gap |  |
+| cell | `border.top` | string | -s- |  | write-only | gap |  |
+| cell | `border.tr2bl` | string | asg |  | missing | gap |  |
+| cell | `text` | string | asg | -sg | supported | partial |  |
+| cell | `rowspan` | int |  | --g | litchi-only | — |  |
+| cell | `covered` | bool |  | --g | litchi-only | — |  |
+| cell | `valueType` | string |  | --g | litchi-only | — |  |
+| column | `width` | length | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| column | `text` | string | a-- |  | element gap | gap | M6 ODT body index (record 0276) |
+| row | `height.exact` | length | as- |  | write-only | gap |  |
+| row | `header` | bool | asg |  | missing | gap |  |
+| row | `cantSplit` | bool | asg |  | missing | gap |  |
+| row | `height.rule` | string | --g |  | missing | — |  |
+| row | `cnfStyle` | string | -sg |  | missing | gap |  |
+| row | `gridBefore` | int | asg |  | missing | gap |  |
+| row | `wBefore` | string | asg |  | missing | gap |  |
+| row | `gridAfter` | int | asg |  | missing | gap |  |
+| row | `wAfter` | string | asg |  | missing | gap |  |
+| row | `cellSpacing` | number | -sg |  | missing | gap |  |
+| row | `cols` | int | a-- |  | write-only | gap |  |
+| row | `height` | length | asg |  | missing | gap |  |
+| row | `cells` | int |  | --g | litchi-only | — |  |
+| table | `colWidths` | string | a-g |  | missing | gap |  |
+| table | `direction` | enum | asg |  | missing | gap |  |
+| table | `align` | enum | asg |  | missing | gap |  |
+| table | `indent` | int | asg |  | missing | gap |  |
+| table | `cellSpacing` | int | asg |  | missing | gap |  |
+| table | `layout` | enum | asg |  | missing | gap |  |
+| table | `padding` | int | as- |  | write-only | gap |  |
+| table | `caption` | string | asg |  | missing | gap |  |
+| table | `description` | string | asg |  | missing | gap |  |
+| table | `rowBandSize` | integer | a-g |  | missing | gap |  |
+| table | `colBandSize` | integer | a-g |  | missing | gap |  |
+| table | `tblLook` | string | asg |  | missing | gap |  |
+| table | `border.all` | string | as- |  | write-only | gap |  |
+| table | `border.bottom` | string | as- |  | write-only | gap |  |
+| table | `border.horizontal` | string | as- |  | write-only | gap |  |
+| table | `border.left` | string | as- |  | write-only | gap |  |
+| table | `border.right` | string | as- |  | write-only | gap |  |
+| table | `border.top` | string | as- |  | write-only | gap |  |
+| table | `border.vertical` | string | as- |  | write-only | gap |  |
+| table | `cols` | int | a-g | a-g | supported | supported |  |
+| table | `data` | string | a-- |  | write-only | gap |  |
+| table | `rows` | int | a-g | a-g | supported | supported |  |
+| table | `width` | string | asg |  | missing | gap |  |
+| table | `style` | string | asg | --g | supported | gap |  |
+| table | `name` | string |  | -sg | litchi-only | litchi-only |  |
+| textbox | `text` | string | a-- | -sg | supported | gap |  |
+| textbox | `width` | length | as- |  | write-only | gap |  |
+| textbox | `height` | length | as- |  | write-only | gap |  |
+| textbox | `geometry` | string | as- |  | write-only | gap |  |
+| textbox | `wrap` | enum | a-- |  | write-only | gap |  |
+| textbox | `hAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `vAlign` | enum | a-- |  | write-only | gap |  |
+| textbox | `hRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `vRelative` | enum | a-- |  | write-only | gap |  |
+| textbox | `anchor.x` | length | a-- |  | write-only | gap |  |
+| textbox | `anchor.y` | length | a-- |  | write-only | gap |  |
+| textbox | `fill` | color | as- |  | write-only | gap |  |
+| textbox | `fill.gradient` | string | a-- |  | write-only | gap |  |
+| textbox | `fill.opacity` | string | a-- |  | write-only | gap |  |
+| textbox | `line.color` | color | as- |  | write-only | gap |  |
+| textbox | `line.width` | length | as- |  | write-only | gap |  |
+| textbox | `line.style` | string | as- |  | write-only | gap |  |
+| textbox | `inset.left` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.top` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.right` | length | a-- |  | write-only | gap |  |
+| textbox | `inset.bottom` | length | a-- |  | write-only | gap |  |
+| textbox | `textDirection` | string | a-- |  | write-only | gap |  |
+| textbox | `textAnchor` | string | a-- |  | write-only | gap |  |
+| textbox | `autoFit` | bool | a-- |  | write-only | gap |  |
+| textbox | `rotation` | string | a-- |  | write-only | gap |  |
+| textbox | `shadow` | string | a-- |  | write-only | gap |  |
+| textbox | `alt` | string | a-- |  | write-only | gap |  |
+| toc | `levels` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| toc | `title` | string | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| toc | `hyperlinks` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| toc | `pageNumbers` | bool | asg |  | element gap | gap | M6 ODT body index (record 0276) |
+| watermark | `text` | string | asg |  | missing | gap |  |
+| watermark | `image` | string | as- |  | write-only | gap |  |
+| watermark | `color` | color | asg |  | missing | gap |  |
+| watermark | `font` | string | asg |  | missing | gap |  |
+| watermark | `rotation` | int | asg |  | missing | gap |  |
+| watermark | `opacity` | string | asg |  | missing | gap |  |
+| watermark | `size` | string | asg |  | missing | gap |  |
+| watermark | `width` | string | asg |  | missing | gap |  |
+| watermark | `height` | string | asg |  | missing | gap |  |
+
+### Contextual operation gaps
+
+These operation gaps apply only to the named selection or leaf context; ordinary element operation support remains in the capability report.
+
+| Verb | Element | Context | Reason | Follow-up |
+|---|---|---|---|---|
+| `remove` | `cell` | `table-grid` | cells keep the table grid: remove or move the whole row, or set the cell's text | M6 ODT table grid edits |
+| `add` | `cell` | `table-grid` | adding a cell would break the table grid; add a row, which spans the first row's columns | M6 ODT table grid edits |
+| `move` | `cell` | `table-grid` | cells move only with their row | M6 ODT table grid edits |
+| `remove` | `row` | `vertical-merge` | a row holding vertically merged or covered cells cannot leave the table | M6 ODT table grid edits |
+| `add` | `picture` | `image-resources` | adding an image needs a package media resource and a frame; frames and images are readable, settable (frame geometry) and removable | M6 ODT drawing and media edits |
+| `add` | `frame` | `drawing-resources` | frames are created with their content (image or text box), which the body edits do not author yet | M6 ODT drawing and media edits |
+| `set` | `style` | `common-styles` | common styles in styles.xml are read-only; paragraph and run formatting derives automatic styles instead | M6 ODT style definitions |
+| `set` | `run` | `clear-formatting` | a null value cannot remove a character or paragraph property; set the property's off value instead | M6 ODT formatting removal |
+| `set` | `cell` | `typed-values` | cell text writes a string cell; numeric, date and formula cell values are not authored | M6 ODT typed cell values |
+| `set` | `document` | `signed-or-encrypted-package` | the leaf preserves signed and encrypted packages only as exact no-ops; changed writes are refused | ADR 0034 ODF security vocabulary (record 0268 G5) |
+| `get` | `document` | `flat-odf-input` | single-XML .fodt input is detected but refused; the leaf flat snapshot has no body index or package owner the adapter can publish through | M6 flat ODF owner |
+| `create` | `document` | `template` | ODT template creation (.ott) is not supported | use Flavor::Document |

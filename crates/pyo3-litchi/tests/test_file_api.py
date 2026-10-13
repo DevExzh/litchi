@@ -154,7 +154,7 @@ class OpenTests(ErrorAssertions):
                 self.assertEqual(error.message, "not a recognized Office file")
             self.assertError(raised(lambda: L.open(truncated)), L.CorruptFileError, "corrupt_file")
         self.assertError(
-            raised(lambda: L.open(fixture("odf/ods/grid-padding.fods"))),
+            raised(lambda: L.open(fixture("odf/odt/form-controls.fodt"))),
             L.UnsupportedError,
             "unsupported_capability",
         )
@@ -625,7 +625,7 @@ class SchemaTests(unittest.TestCase):
     def test_stub_typed_dict_matches_the_export(self):
         fields = typed_dict_fields(STUB_PATH)["_Schema"]
         self.assertEqual(list(L.schema("xlsx")), [key for key in fields if key != "pending"])
-        self.assertEqual(list(L.schema("pages")), list(fields))
+        self.assertEqual(list(L.schema("pages")), [key for key in fields if key != "setKeywords"])
         self.assertEqual(L.schema("pages")["elements"], [])
 
     def test_unknown_format_names_raise(self):

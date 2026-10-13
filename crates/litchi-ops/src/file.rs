@@ -106,8 +106,9 @@ impl Family {
 ///
 /// Tier 1 and tier 2 variants (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT) retain
 /// the leaf's editable owner. RTF retains its native package and supports
-/// paragraph text, insertion and paragraph-ordering writes; ODT, ODS and ODP remain
-/// read-only for now.
+/// paragraph text, insertion and paragraph-ordering writes. ODS retains its
+/// leaf package and supports cell, sheet, row, named-range, annotation and
+/// metadata writes (record 0277); ODT and ODP remain read-only for now.
 /// The enum is `#[non_exhaustive]`: further formats join as variants. Each
 /// variant exists only when its cargo feature is enabled.
 ///
@@ -163,7 +164,8 @@ pub enum File {
     /// An OpenDocument Text (`.odt`) document; read-only.
     #[cfg(feature = "odt")]
     Odt(Odt),
-    /// An OpenDocument Spreadsheet (`.ods`) workbook; read-only.
+    /// An OpenDocument Spreadsheet workbook: packaged `.ods` (editable) or
+    /// flat `.fods` (read-only).
     #[cfg(feature = "ods")]
     Ods(Ods),
     /// An OpenDocument Presentation (`.odp`) presentation; read-only.

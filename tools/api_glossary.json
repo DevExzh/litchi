@@ -6069,6 +6069,7 @@
         }
       ],
       "families": [
+        "litchi_odt::metadata",
         "litchi_odt::transaction"
       ]
     },

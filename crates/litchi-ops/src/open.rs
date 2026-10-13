@@ -377,12 +377,15 @@ fn signed_if(file: File, format: FileFormat, signed: bool, origin: crate::Signat
     feature = "xls",
     feature = "xlsb",
     feature = "rtf",
+    feature = "ods",
     feature = "odp"
 ))]
 pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
     match file {
         #[cfg(feature = "rtf")]
         File::Rtf(rtf) => File::Rtf(rtf.with_origin(Some(origin))),
+        #[cfg(feature = "odt")]
+        File::Odt(odt) => File::Odt(odt.with_origin(Some(origin))),
         #[cfg(feature = "odp")]
         File::Odp(odp) => File::Odp(odp.with_origin(Some(origin))),
         #[cfg(feature = "doc")]
@@ -399,6 +402,8 @@ pub(crate) fn attach_origin(file: File, origin: Arc<Path>) -> File {
         File::Xlsb(xlsb) => File::Xlsb(xlsb.with_origin(Some(origin))),
         #[cfg(feature = "pptx")]
         File::Pptx(pptx) => File::Pptx(pptx.with_origin(Some(origin))),
+        #[cfg(feature = "ods")]
+        File::Ods(ods) => File::Ods(ods.with_origin(Some(origin))),
         #[cfg(any(
             feature = "doc",
             feature = "docx",

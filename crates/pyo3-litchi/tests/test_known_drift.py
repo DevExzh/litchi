@@ -127,7 +127,7 @@ class D4RaisedClassesContradictStub(unittest.TestCase):
 
     def test_d4c_workbook_unsupported_input_is_valueerror_intended(self):
         self.assertIsInstance(
-            self._raised(L.Workbook, fixture("odf/ods/grid-padding.fods")), ValueError
+            self._raised(L.Workbook, fixture("odf/odt/form-controls.fodt")), ValueError
         )
 
 

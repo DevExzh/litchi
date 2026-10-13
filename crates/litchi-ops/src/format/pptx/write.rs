@@ -1,5 +1,7 @@
 //! Immutable native shape writes; no XML editing in the facade.
 pub(crate) mod coalesce;
+mod find;
+pub(crate) mod merge;
 mod notes;
 mod slides;
 pub(super) mod text;

@@ -250,6 +250,10 @@ both legs publish identical bytes. Raw rows:
 - **G-ODP-7 flat writes.** `.fodp` documents are read-only; their scene
   splices would apply to the single XML document, but the flat leaf has no
   splice publication yet.
+- **G-ODP-8 find/replace and template merge.** After the trunk merge
+  (records 0273, 0274), `set` with `find=` (`Verb::Replace`) and
+  `Verb::Merge` are refused for ODP with `unsupported_capability`; the
+  scene's run text changes can carry a find adapter.
 - **0268 follow-ups G2–G4** were not needed by this adapter and remain
   open; G5 (security vocabulary) is unchanged.
 - **Duplication for later consolidation.** `format/odf_odp.rs` (`/metadata`
@@ -295,3 +299,16 @@ Small, separated ODP arms only: `read.rs`, `write.rs`, `transaction.rs`,
 | `crates/pyo3-litchi/tests/run_tests.sh` | 0 (253 tests) |
 | `LITCHI_BLESS=1 cargo test -p litchi-ops --test capabilities --test registry`, with `--all-features` and with every feature but `encryption` | 0; only `odp.json` goldens written, identical in both builds |
 | `python3 tools/officecli_capability_delta.py --officecli /home/zhuhe/code/litchi/3rdparty/OfficeCLI`, then `--check` and `python3 -m unittest tools.test_officecli_capability_delta` | 0, 0, 0 |
+
+## 12. Trunk merge (`fcc4fe5266`)
+
+Trunk's records 0273–0277 (find/replace, merge, RTF, ODT and ODS adapters)
+were merged into this branch. Every ODS, ODT and ODP dispatch arm, cfg list
+entry, coalescing run and `wrap_*` helper is kept. The query-corpus golden is
+the union of both sides' digests (no existing key re-recorded); its selector
+arrays carry per-entry `cfg` attributes. Python: ODS, ODT and ODP are all
+creatable, `READ_ONLY` is empty, and the flat ODF message rows cover `.fodt`
+plus the flat ODP leaf refusal. The capability and registry goldens were
+re-blessed with and without `encryption` (the encryption-free build also
+rewrote trunk's stale `capabilities/docx.json` and `capabilities/xlsx.json`,
+which lacked the `replace` verb), and the delta table was regenerated.

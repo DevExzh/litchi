@@ -100,11 +100,11 @@ fn every_format_has_one_answer_for_its_reads() {
                 );
             },
         }
-        // Import is a worksheet verb with its own answer (`m4_verbs_...`).
-        for verb in Verb::ALL
-            .into_iter()
-            .filter(|verb| verb.is_edit() && *verb != Verb::Import)
-        {
+        // Import is a worksheet verb with its own answer (`m4_verbs_...`);
+        // merge is a template verb (`merge_is_a_template_verb`).
+        for verb in Verb::ALL.into_iter().filter(|verb| {
+            verb.is_edit() && !matches!(verb, Verb::Import | Verb::Merge | Verb::Replace)
+        }) {
             #[cfg(feature = "pptx")]
             if format == FileFormat::Pptx
                 && matches!(verb, Verb::Add | Verb::Remove | Verb::Move | Verb::Swap)
@@ -193,6 +193,30 @@ fn every_format_has_one_answer_for_its_reads() {
                         | Verb::Edit
                         | Verb::Batch
                 );
+            let ods_edit = format == FileFormat::Ods
+                && cfg!(feature = "ods")
+                && matches!(
+                    verb,
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
+                );
+            let odt_edit = format == FileFormat::Odt
+                && cfg!(feature = "odt")
+                && matches!(
+                    verb,
+                    Verb::Set
+                        | Verb::Add
+                        | Verb::Remove
+                        | Verb::Move
+                        | Verb::Swap
+                        | Verb::Edit
+                        | Verb::Batch
+                );
             let odp_edit = format == FileFormat::Odp
                 && cfg!(feature = "odp")
                 && matches!(
@@ -208,6 +232,7 @@ fn every_format_has_one_answer_for_its_reads() {
             assert_eq!(
                 capabilities.verb(verb),
                 if rtf_edit
+                    || odt_edit
                     || odp_edit
                     || doc_edit
                     || docx_edit
@@ -215,6 +240,7 @@ fn every_format_has_one_answer_for_its_reads() {
                     || pptx_edit
                     || ppt_edit
                     || xls_edit
+                    || ods_edit
                     || (format == FileFormat::Xlsb
                         && cfg!(feature = "xlsb")
                         && matches!(
@@ -250,6 +276,8 @@ fn every_format_has_one_answer_for_its_reads() {
                 || (format == FileFormat::Pptx && cfg!(feature = "pptx"))
                 || (format == FileFormat::Xlsb && cfg!(feature = "xlsb"))
                 || (format == FileFormat::Rtf && cfg!(feature = "rtf"))
+                || (format == FileFormat::Ods && cfg!(feature = "ods"))
+                || (format == FileFormat::Odt && cfg!(feature = "odt"))
                 || (format == FileFormat::Odp && cfg!(feature = "odp"));
             let expected = if integrated {
                 Support::Supported
@@ -472,7 +500,8 @@ fn rtf_advertises_native_paragraph_structural_writes_and_keeps_closure_gaps() {
     feature = "xlsx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "odt"
 ))]
 #[test]
 fn spec_tables_agree_with_their_vocabularies() {
@@ -531,6 +560,8 @@ fn spec_tables_agree_with_their_vocabularies() {
     check(&crate::format::pptx::SPEC, FileFormat::Pptx);
     #[cfg(feature = "rtf")]
     check(&crate::format::rtf::SPEC, FileFormat::Rtf);
+    #[cfg(feature = "odt")]
+    check(&crate::format::odt::SPEC, FileFormat::Odt);
 }
 
 #[test]
@@ -630,6 +661,38 @@ fn doc_enumerates_its_unprojected_element_gaps() {
     }
 }
 
+/// Record 0273: find/replace answers for the formats with a find adapter.
+#[test]
+fn replace_is_supported_where_a_find_adapter_exists() {
+    for format in [
+        FileFormat::Docx,
+        FileFormat::Xlsx,
+        FileFormat::Pptx,
+        FileFormat::Doc,
+        FileFormat::Ppt,
+        FileFormat::Xls,
+        FileFormat::Xlsb,
+        FileFormat::Rtf,
+        FileFormat::Odt,
+    ] {
+        let support = Capabilities::of(format).verb(Verb::Replace);
+        let adapter = crate::read::Adapter::of(format).is_some();
+        let integrated = adapter
+            && matches!(
+                format,
+                FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx
+            );
+        assert_eq!(support.is_supported(), integrated, "{format:?}");
+        if adapter && !integrated {
+            assert_eq!(
+                support.code(),
+                Some(Code::UnsupportedCapability),
+                "{format:?}"
+            );
+        }
+    }
+}
+
 /// Record 0266: import and evaluation answer for worksheets only.
 #[test]
 fn m4_verbs_are_worksheet_verbs() {
@@ -657,5 +720,29 @@ fn m4_verbs_are_worksheet_verbs() {
                 "{format:?} {verb:?}"
             );
         }
+    }
+}
+
+/// Record 0274: merge answers for DOCX, PPTX and XLSX templates only.
+#[test]
+fn merge_is_a_template_verb() {
+    for format in [
+        FileFormat::Docx,
+        FileFormat::Pptx,
+        FileFormat::Xlsx,
+        FileFormat::Xlsb,
+        FileFormat::Doc,
+        FileFormat::Rtf,
+    ] {
+        let capabilities = Capabilities::of(format);
+        let template = matches!(
+            format,
+            FileFormat::Docx | FileFormat::Pptx | FileFormat::Xlsx
+        ) && crate::read::Adapter::of(format).is_some();
+        assert_eq!(
+            capabilities.verb(Verb::Merge).is_supported(),
+            template,
+            "{format:?}"
+        );
     }
 }

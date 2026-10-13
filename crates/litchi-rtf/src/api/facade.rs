@@ -327,6 +327,16 @@ impl Package {
         self.inner.model.pictures()
     }
 
+    /// UTF-8 offset in [`Self::text`] where the picture at `index` is anchored.
+    ///
+    /// Only pictures opened directly in the main story have an anchor;
+    /// pictures inside table cells, other stories, embedded-object results,
+    /// shapes or compatibility wrappers return `None`.
+    #[must_use]
+    pub fn picture_body_offset(&self, index: usize) -> Option<usize> {
+        self.inner.model.text_provenance().picture(index)
+    }
+
     /// Borrow root body shapes in source order.
     #[must_use]
     pub fn shapes(&self) -> &[crate::Shape<'_>] {
@@ -765,6 +775,13 @@ impl Document {
     #[must_use]
     pub fn pictures(&self) -> &[crate::picture::Picture<'_>] {
         self.owner.pictures()
+    }
+
+    /// UTF-8 offset in [`Self::text`] where the picture at `index` is
+    /// anchored; see [`Package::picture_body_offset`].
+    #[must_use]
+    pub fn picture_body_offset(&self, index: usize) -> Option<usize> {
+        self.owner.picture_body_offset(index)
     }
 
     /// Borrow root body shapes in source order.

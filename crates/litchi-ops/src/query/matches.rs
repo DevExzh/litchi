@@ -14,6 +14,8 @@
         feature = "xlsb",
         feature = "xls",
         feature = "rtf",
+        feature = "ods",
+        feature = "odt",
         feature = "odp"
     )),
     allow(
@@ -41,6 +43,8 @@ use super::plan::{Diagnostic, Plan};
     feature = "xlsb",
     feature = "xls",
     feature = "rtf",
+    feature = "ods",
+    feature = "odt",
     feature = "odp"
 ))]
 use super::walk::Walk;
@@ -97,8 +101,12 @@ enum Inner<'f, 'q> {
     Xlsb(Walk<'q, 'f, crate::format::xlsb::Nav<'f>>),
     #[cfg(feature = "xls")]
     Xls(Walk<'q, 'f, crate::format::xls::Nav<'f>>),
+    #[cfg(feature = "odt")]
+    Odt(Walk<'q, 'f, crate::format::odt::Nav<'f>>),
     #[cfg(feature = "rtf")]
     Rtf(Walk<'q, 'f, crate::format::rtf::Nav<'f>>),
+    #[cfg(feature = "ods")]
+    Ods(Walk<'q, 'f, crate::format::ods::Nav<'f>>),
     #[cfg(feature = "odp")]
     Odp(Walk<'q, 'f, crate::format::odp::Nav<'f>>),
     /// Keeps the lifetimes in use in builds without an adapter; uninhabited.
@@ -161,6 +169,21 @@ impl<'f, 'q> Matches<'f, 'q> {
             inner: Inner::Rtf(walk),
         }
     }
+    /// The matches of an ODS walk.
+    #[cfg(feature = "ods")]
+    pub(crate) fn ods(walk: Walk<'q, 'f, crate::format::ods::Nav<'f>>) -> Self {
+        Self {
+            inner: Inner::Ods(walk),
+        }
+    }
+
+    /// The matches of an ODT walk.
+    #[cfg(feature = "odt")]
+    pub(crate) fn odt(walk: Walk<'q, 'f, crate::format::odt::Nav<'f>>) -> Self {
+        Self {
+            inner: Inner::Odt(walk),
+        }
+    }
 
     /// The matches of an ODP walk.
     #[cfg(feature = "odp")]
@@ -208,6 +231,14 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Rtf(walk) => Self {
                 inner: Inner::Rtf(walk.limit(n)),
             },
+            #[cfg(feature = "ods")]
+            Inner::Ods(walk) => Self {
+                inner: Inner::Ods(walk.limit(n)),
+            },
+            #[cfg(feature = "odt")]
+            Inner::Odt(walk) => Self {
+                inner: Inner::Odt(walk.limit(n)),
+            },
             #[cfg(feature = "odp")]
             Inner::Odp(walk) => Self {
                 inner: Inner::Odp(walk.limit(n)),
@@ -246,6 +277,10 @@ impl<'f, 'q> Matches<'f, 'q> {
             Inner::Xls(walk) => walk.plan(),
             #[cfg(feature = "rtf")]
             Inner::Rtf(walk) => walk.plan(),
+            #[cfg(feature = "odt")]
+            Inner::Odt(walk) => walk.plan(),
+            #[cfg(feature = "ods")]
+            Inner::Ods(walk) => walk.plan(),
             #[cfg(feature = "odp")]
             Inner::Odp(walk) => walk.plan(),
             Inner::Never(never, _) => match *never {},
@@ -279,8 +314,12 @@ impl<'f> Iterator for Matches<'f, '_> {
             Inner::Xlsb(walk) => walk.next().map(|node| node.map(Node::Xlsb)),
             #[cfg(feature = "xls")]
             Inner::Xls(walk) => walk.next().map(|node| node.map(Node::Xls)),
+            #[cfg(feature = "odt")]
+            Inner::Odt(walk) => walk.next().map(|node| node.map(Node::Odt)),
             #[cfg(feature = "rtf")]
             Inner::Rtf(walk) => walk.next().map(|node| node.map(Node::Rtf)),
+            #[cfg(feature = "ods")]
+            Inner::Ods(walk) => walk.next().map(|node| node.map(Node::Ods)),
             #[cfg(feature = "odp")]
             Inner::Odp(walk) => walk.next().map(|node| node.map(Node::Odp)),
             Inner::Never(never, _) => match *never {},

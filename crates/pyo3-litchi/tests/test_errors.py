@@ -46,7 +46,9 @@ ACCEPTED = (
     ("iwork/numbers/basic.numbers", "Numbers", L.Workbook),
 )
 
-FLAT_ODF = ("odf/odt/form-controls.fodt", "odf/ods/grid-padding.fods", "odf/drawing/multicolor-gradient.fodp")
+#: Flat ODF the unified opener refuses; flat ODS opens (record 0277).
+FLAT_ODF = ("odf/odt/form-controls.fodt", "odf/drawing/multicolor-gradient.fodp")
+FLAT_ODS = "odf/ods/grid-padding.fods"
 
 #: ODF variants that detection names but no Python opener reads.
 DETECTED_NOT_OPENED = (
@@ -151,6 +153,14 @@ class UnsupportedInputTests(unittest.TestCase):
                 # see test_known_drift).
                 with self.assertRaises(Exception):
                     L.Workbook.open(path)
+
+    def test_flat_ods_opens_as_a_workbook(self):
+        names = L.Workbook.open(fixture(FLAT_ODS)).worksheet_names()
+        self.assertEqual(names[:3], ["Padded", "Gaps", "Styled tail"])
+        for opener in (L.Document, L.Presentation):
+            with self.subTest(opener=opener.__name__):
+                with self.assertRaises(ValueError):
+                    opener.open(fixture(FLAT_ODS))
 
     def test_detected_odf_variants_without_an_opener_are_refused(self):
         for relative in DETECTED_NOT_OPENED:
@@ -278,12 +288,12 @@ class MessageSnapshotTests(unittest.TestCase):
                  "Word 6.0 documents (nFib 0x0065) predate the Word 97 binary format and"
                  " are not supported"),
             ]
-            for relative, name in zip(FLAT_ODF[:2], ("Odt", "Ods")):
+            for relative, name in zip(FLAT_ODF[:1], ("Odt",)):
                 rows += [(opener, fixture(relative), self.FLAT.format(name)) for opener in OPENERS]
             # Flat ODP opens through the leaf's flat reader (record 0278),
             # which refuses this drawing-bodied fixture.
             rows += [
-                (opener, fixture(FLAT_ODF[2]), "Invalid format: flat ODP has a misplaced or empty office:body")
+                (opener, fixture(FLAT_ODF[1]), "Invalid format: flat ODP has a misplaced or empty office:body")
                 for opener in OPENERS
             ]
             for opener, path, expected in rows:

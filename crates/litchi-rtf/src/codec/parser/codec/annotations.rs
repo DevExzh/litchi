@@ -72,7 +72,15 @@ impl Parser<'_> {
         let mut story_events = Vec::new();
         let mut depth = 1usize;
         let mut fallback_skip = 0usize;
+        let mut text_tokens: Option<std::ops::Range<usize>> = None;
+        let mut origin = self.pos;
+        let mut observed_len = 0usize;
         while self.pos < self.tokens.len() && depth > 0 {
+            if text.len() != observed_len {
+                super::provenance::extend(&mut text_tokens, origin, self.pos);
+            }
+            origin = self.pos;
+            observed_len = text.len();
             match self.tokens.get(self.pos) {
                 Some(Token::OpenBrace) => {
                     if self.is_root_drawing_group() {
@@ -268,6 +276,11 @@ impl Parser<'_> {
         if depth != 0 {
             return Err(RtfError::UnexpectedEof);
         }
+        if text.len() != observed_len {
+            super::provenance::extend(&mut text_tokens, origin, self.pos);
+        }
+        // The loop consumed the destination's closing brace last.
+        let close_token = self.pos.checked_sub(1);
 
         let has_reference = reference.is_some();
         let id = reference.unwrap_or(0);
@@ -317,6 +330,7 @@ impl Parser<'_> {
         self.pending_annotation_initials_seen = false;
         annotation.validate()?;
         let index = self.annotations.len();
+        self.record_annotation_source(index, text_tokens, close_token);
         self.annotations.push(annotation);
         if !has_reference {
             self.body_story_events.push(ParsedBodyStoryEvent::Resolved(

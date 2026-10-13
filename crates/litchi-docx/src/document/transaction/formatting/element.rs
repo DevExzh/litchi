@@ -39,6 +39,9 @@ use super::{
 };
 use crate::properties;
 
+mod text_nodes;
+pub use text_nodes::{ParagraphRewrite, TextNode, TextNodeRewrite};
+
 /// One step of an [`ElementPath`]: the position of a direct
 /// WordprocessingML child, counted among the container's direct children with
 /// the same element name.
@@ -462,6 +465,16 @@ fn refusal(reason: Refusal) -> Error {
         position: 0,
         reason,
     }
+}
+
+/// The byte range of the element `path` names in `snapshot`, for the
+/// story substitution of record 0274.
+pub(in crate::document::transaction) fn locate_element(
+    snapshot: &Snapshot,
+    path: &ElementPath,
+) -> Result<std::ops::Range<usize>> {
+    let located = locate(snapshot, path.steps())?;
+    Ok(located.start..located.end)
 }
 
 /// Locate the element `path` names in `snapshot`.

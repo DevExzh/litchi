@@ -14,6 +14,13 @@
 //! key enum whose discriminant is the key's index, so the node view reads a
 //! key with one `match` and no string comparison.
 
+// ODS reads the kinds, the path tree and the workbook keys; the shared
+// SpreadsheetML token tables serve the other workbook adapters only.
+#![cfg_attr(
+    not(any(feature = "xls", feature = "xlsx", feature = "xlsb")),
+    allow(dead_code, reason = "an ODS-only build reads the kinds and path tree")
+)]
+
 use crate::error::Code;
 use crate::node::spec::{ElementSpec, FormatSpec, GapSpec, PropSpec, Subject, check_format_spec};
 use crate::path::navigate::ElementKind;

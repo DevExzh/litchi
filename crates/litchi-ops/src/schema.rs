@@ -87,7 +87,8 @@
         feature = "pptx",
         feature = "xlsb",
         feature = "xls",
-        feature = "rtf"
+        feature = "rtf",
+        feature = "ods"
     )),
     allow(dead_code, unused_variables, unreachable_code)
 )]
@@ -192,6 +193,14 @@ pub(crate) fn prop_aliases(adapter: Adapter, canonical: &str) -> &'static [PropA
             _ => &[],
         };
     }
+    #[cfg(feature = "ods")]
+    if adapter == Adapter::Ods {
+        return match canonical {
+            "cell" | "range" => ODS_CELL_ALIASES,
+            _ => &[],
+        };
+    }
+
     let _ = (adapter, canonical);
     &[]
 }
@@ -200,6 +209,8 @@ pub(crate) fn prop_aliases(adapter: Adapter, canonical: &str) -> &'static [PropA
 const XLSB_CELL_ALIASES: &[PropAlias] = &crate::format::xlsb::CELL_WRITE_TABLE.prop_aliases();
 #[cfg(feature = "xls")]
 const XLS_CELL_ALIASES: &[PropAlias] = &crate::format::xls::CELL_WRITE_TABLE.prop_aliases();
+#[cfg(feature = "ods")]
+const ODS_CELL_ALIASES: &[PropAlias] = &crate::format::ods::CELL_WRITE_TABLE.prop_aliases();
 
 #[cfg(feature = "xlsx")]
 const XLSX_CELL_ALIASES: &[PropAlias] = &crate::format::xlsx::CELL_WRITE_TABLE.prop_aliases();
@@ -262,6 +273,70 @@ impl Serialize for Schema {
         }
         map.serialize_entry("elements", &ElementsJson(*self))?;
         map.serialize_entry("gaps", &FormatGapsJson(*self))?;
+        if self.registered() {
+            map.serialize_entry("setKeywords", &KeywordsJson(*self))?;
+        }
+        map.end()
+    }
+}
+
+/// The keywords `set` takes beside an element's properties: text
+/// find/replace (record 0273), a Litchi addition. OfficeCLI documents them
+/// as cross-cutting `set` keywords outside its element schemas.
+struct KeywordsJson(Schema);
+
+impl Serialize for KeywordsJson {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(3))?;
+        map.serialize_entry("verb", Verb::Replace.as_str())?;
+        map.serialize_entry("support", &self.0.capabilities.verb(Verb::Replace))?;
+        map.serialize_entry("keywords", &KeywordJson)?;
+        map.end()
+    }
+}
+
+struct KeywordJson;
+
+impl Serialize for KeywordJson {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let mut map = serializer.serialize_map(Some(crate::find::KEYWORDS.len()))?;
+        for keyword in &crate::find::KEYWORDS {
+            map.serialize_entry(keyword.name, &KeywordEntry(keyword))?;
+        }
+        map.end()
+    }
+}
+
+/// One keyword in the property shape of [`PropertyJson`].
+struct KeywordEntry(&'static crate::find::Keyword);
+
+impl Serialize for KeywordEntry {
+    fn serialize<S: Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let keyword = self.0;
+        let mut map = serializer.serialize_map(None)?;
+        map.serialize_entry("type", keyword.ty)?;
+        if keyword.not_empty {
+            map.serialize_entry(
+                "constraint",
+                &[("notEmpty", true)].into_iter().collect::<Pairs<_>>(),
+            )?;
+        }
+        if let Some(default) = keyword.default {
+            map.serialize_entry("default", &default)?;
+        }
+        map.serialize_entry("set", &true)?;
+        if let Some((follow_up, reason)) = keyword.gap {
+            map.serialize_entry(
+                "writeGap",
+                &[
+                    ("code", crate::Code::UnsupportedCapability.as_str()),
+                    ("followUp", follow_up),
+                    ("reason", reason),
+                ]
+                .into_iter()
+                .collect::<Pairs<_>>(),
+            )?;
+        }
         map.end()
     }
 }

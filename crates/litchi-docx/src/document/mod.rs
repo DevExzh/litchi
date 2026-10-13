@@ -46,6 +46,19 @@ pub mod snapshot {
     pub use super::transaction::{Commit, Edit};
 }
 
+/// Formatting-preserving text substitution over the text of a story: the
+/// main document, a header, a footer, the notes or the comments
+/// (record 0274).
+///
+/// [`Edit::story`] and [`Edit::part_story`] read a [`substitute::Story`];
+/// [`Edit::substitute`] and [`Edit::substitute_part`] apply
+/// [`substitute::Replacement`]s planned over it.
+pub mod substitute {
+    pub use super::transaction::substitute::{
+        Field, FieldKind, OBJECT, Outcome, Paragraph, Replacement, Story,
+    };
+}
+
 pub use limit::LimitKind;
 pub use owned::{Commit, Edit, HyperlinkTarget, NewComment, NewPicture};
 
@@ -61,10 +74,11 @@ pub use transaction::{
     BodyAnchor, BodyBlock, CompactionPolicy, Composition, CompositionLimits, Diagnostics,
     ElementAnchor, ElementPath, ElementStep, Error, GraphChange, History, HistoryLimits,
     HyperlinkTextReplacement, JoinError, MAX_NEW_TABLE_DIMENSION, MergeChoice, NewParagraph,
-    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphTextReplacement,
-    ParagraphTransfer, Patch, PreparedEdit, Refusal, Result, RevisionAction, RevisionKind,
-    RevisionSelector, RunAnchor, Snapshot, SubEditConflict, SubEditJoinFailure, TableCellAddress,
-    ThreeWayError, ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
+    NewRun, NewTable, Operation, ParagraphHyperlinkAddress, ParagraphRewrite,
+    ParagraphTextReplacement, ParagraphTransfer, Patch, PreparedEdit, Refusal, Result,
+    RevisionAction, RevisionKind, RevisionSelector, RunAnchor, Snapshot, SubEditConflict,
+    SubEditJoinFailure, TableCellAddress, TextNode, TextNodeRewrite, ThreeWayError,
+    ThreeWayMergeFailure, ThreeWayPlan, TransferGraph, TransferRefusal,
 };
 
 /// Explicit native identifiers for indexed document blocks.

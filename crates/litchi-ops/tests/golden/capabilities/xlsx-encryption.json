@@ -41,6 +41,12 @@
     "import": {
       "supported": true
     },
+    "merge": {
+      "supported": true
+    },
+    "replace": {
+      "supported": true
+    },
     "save": {
       "supported": true
     },

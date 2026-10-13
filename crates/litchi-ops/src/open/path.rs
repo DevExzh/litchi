@@ -13,6 +13,8 @@ use std::path::Path;
     feature = "pptx",
     feature = "rtf",
     feature = "xlsb",
+    feature = "ods",
+    feature = "odt",
     feature = "odp",
     all(
         any(unix, windows),
@@ -41,6 +43,8 @@ use crate::{File, OpenOptions};
     feature = "pptx",
     feature = "rtf",
     feature = "xlsb",
+    feature = "ods",
+    feature = "odt",
     feature = "odp",
     all(
         any(unix, windows),
@@ -123,6 +127,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
             feature = "xls",
             feature = "xlsb",
             feature = "rtf",
+            feature = "ods",
             feature = "odp"
         ))]
         let file = if matches!(
@@ -136,6 +141,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                     | litchi_core::FileFormat::Pptx
                     | litchi_core::FileFormat::Rtf
                     | litchi_core::FileFormat::Xlsb
+                    | litchi_core::FileFormat::Ods
                     | litchi_core::FileFormat::Odp
             )
         ) || matches!(&file, File::Locked(_))
@@ -228,6 +234,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
         feature = "xls",
         feature = "xlsb",
         feature = "rtf",
+        feature = "ods",
         feature = "odp"
     ))]
     let opened = if matches!(
@@ -241,6 +248,7 @@ pub(super) fn open<T: ZipTail>(path: &Path, options: &OpenOptions, tail: &T) -> 
                 | litchi_core::FileFormat::Pptx
                 | litchi_core::FileFormat::Rtf
                 | litchi_core::FileFormat::Xlsb
+                | litchi_core::FileFormat::Ods
                 | litchi_core::FileFormat::Odp
         )
     ) || matches!(&opened, File::Locked(_))
@@ -463,9 +471,10 @@ mod zip {
                 }
                 let candidate =
                     crate::detect::detected::OdtSourcePathCandidate::new(source, version);
-                Ok(File::Odt(crate::format::odt::Odt::from_source_candidate(
-                    candidate, options,
-                )?))
+                Ok(File::Odt(
+                    crate::format::odt::Odt::from_source_candidate(candidate, options)?
+                        .with_origin(Some(super::stable_origin(path)?)),
+                ))
             },
             #[cfg(feature = "ods")]
             FileFormat::Ods => {
@@ -482,10 +491,10 @@ mod zip {
                         observed,
                     }));
                 }
-                Ok(File::Ods(crate::format::ods::Ods::from_source(
-                    Box::new(spreadsheet),
-                    options,
-                )?))
+                Ok(File::Ods(
+                    crate::format::ods::Ods::from_source(Box::new(spreadsheet), options)?
+                        .with_origin(Some(super::stable_origin(path)?)),
+                ))
             },
             #[cfg(feature = "odp")]
             FileFormat::Odp => {

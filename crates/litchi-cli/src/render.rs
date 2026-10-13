@@ -285,6 +285,9 @@ pub(crate) struct ItemJson<'a> {
     /// The canonical path `add` created.
     #[serde(skip_serializing_if = "Option::is_none")]
     path: Option<String>,
+    /// The match count of a `set` with `find` (OfficeCLI's `matched`).
+    #[serde(skip_serializing_if = "Option::is_none")]
+    matched: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     error: Option<&'a str>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -315,6 +318,7 @@ impl<'a> ItemJson<'a> {
             success: true,
             changed: Some(applied.changed),
             path: applied.path.as_ref().map(ToString::to_string),
+            matched: applied.matched(),
             error: None,
             code: None,
             suggestion: None,
@@ -331,6 +335,7 @@ impl<'a> ItemJson<'a> {
             success: false,
             changed: None,
             path: None,
+            matched: None,
             error: Some(error.message()),
             code: Some(error.code().as_str()),
             suggestion: error.suggestion(),
@@ -355,6 +360,7 @@ impl<'a> ItemJson<'a> {
                 success: false,
                 changed: None,
                 path: None,
+                matched: None,
                 error: Some("unrecognized item outcome"),
                 code: Some(Code::InternalError.as_str()),
                 suggestion: None,
@@ -404,11 +410,13 @@ impl Report<'_> {
                     .as_deref()
                     .map(|path| format!(" {path}"))
                     .unwrap_or_default();
-                let mut effect = if item.changed == Some(false) {
-                    " (no change)".to_owned()
-                } else {
-                    String::new()
+                let mut effect = match item.matched {
+                    Some(matched) => format!(" ({matched} matched)"),
+                    None => String::new(),
                 };
+                if item.changed == Some(false) {
+                    effect.push_str(" (no change)");
+                }
                 if !item.warnings.is_empty() {
                     let skipped: Vec<&str> = item
                         .warnings

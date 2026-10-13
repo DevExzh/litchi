@@ -2,7 +2,7 @@
 
 mod cell_locator;
 mod selective;
-mod source;
+pub(crate) mod source;
 mod source_edit;
 
 use litchi_core::{

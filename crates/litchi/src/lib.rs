@@ -791,7 +791,7 @@ pub use litchi_ops::{
     EncryptionKind, Error, Family, File, Flavor, IntoNode, IntoPlacement, IntoProps, IntoTarget,
     ItemResult, Key, Locked, NewNode, OpenOptions, Overwrite, Placement, PropValue, Props, Result,
     SaveOptions, SaveTo, Saved, SignatureOrigin, Signed, SourceMode, TargetArg, batch,
-    capabilities, compat, create, create_with, error, format, import, new_node, node, path,
+    capabilities, compat, create, create_with, error, format, import, merge, new_node, node, path,
     placement, props, query, schema, target, transaction, view,
 };
 #[cfg(all(

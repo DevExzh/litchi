@@ -73,6 +73,11 @@ pub(crate) const XLS: &[&str] = XLSX;
 /// Binary workbook selectors (record 0267); see [`XLS`].
 pub(crate) const XLSB: &[&str] = XLSX;
 
+/// OpenDocument spreadsheet selectors (record 0277): the XLSX selectors,
+/// over packaged `.ods` and flat `.fods` files. Recorded from the ODS read
+/// adapter before its writers landed.
+pub(crate) const ODS: &[&str] = XLSX;
+
 /// Document selectors.
 pub(crate) const DOCX: &[&str] = &[
     "paragraph",
@@ -137,6 +142,47 @@ pub(crate) const PPTX: &[&str] = &[
     "slide > shape",
     "notes",
     "comment",
+];
+
+/// OpenDocument text selectors (record 0276): the element kinds of the body
+/// index, character formatting predicates, structure, positions and nested
+/// selectors.
+#[cfg(feature = "odt")]
+pub(crate) const ODT: &[&str] = &[
+    "p",
+    "h",
+    "r",
+    "r[bold=true]",
+    "r[italic=true]",
+    "r[size>=12pt]",
+    "r[color]",
+    "p:contains(the)",
+    "p:empty",
+    "p[style=Standard]",
+    "p[align=center]",
+    "tbl",
+    "tr",
+    "tc",
+    "tbl p",
+    "tbl > tr",
+    "p[1]",
+    "p[last()]",
+    "p:has(r[bold=true])",
+    "p:not(:empty)",
+    "hyperlink",
+    "list",
+    "listItem",
+    "section",
+    "frame",
+    "picture",
+    "textbox",
+    "footnote",
+    "endnote",
+    "comment",
+    "bookmark",
+    "style",
+    "/body/p",
+    "/body/r[bold=true]",
 ];
 
 /// OpenDocument presentation selectors (record 0278), recorded from the
@@ -347,23 +393,21 @@ pub(crate) fn corpus(root: &Path, extension: &str) -> Vec<PathBuf> {
 /// or read as another format).
 pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
     let mut out = BTreeMap::new();
-    let formats = [
+    for (extension, format, selectors) in [
         ("xlsx", FileFormat::Xlsx, XLSX),
         ("docx", FileFormat::Docx, DOCX),
         ("pptx", FileFormat::Pptx, PPTX),
         ("xls", FileFormat::Xls, XLS),
         ("xlsb", FileFormat::Xlsb, XLSB),
-    ];
-    #[cfg(feature = "odp")]
-    let formats = {
-        let mut all = formats.to_vec();
-        all.extend([
-            ("odp", FileFormat::Odp, ODP),
-            ("fodp", FileFormat::Odp, ODP),
-        ]);
-        all
-    };
-    for (extension, format, selectors) in formats {
+        ("ods", FileFormat::Ods, ODS),
+        ("fods", FileFormat::Ods, ODS),
+        #[cfg(feature = "odt")]
+        ("odt", FileFormat::Odt, ODT),
+        #[cfg(feature = "odp")]
+        ("odp", FileFormat::Odp, ODP),
+        #[cfg(feature = "odp")]
+        ("fodp", FileFormat::Odp, ODP),
+    ] {
         let mut hashers: Vec<Fnv> = selectors.iter().map(|_| Fnv::new()).collect();
         let mut counts = vec![0_usize; selectors.len()];
         let (mut files, mut skipped) = (0_usize, 0_usize);
@@ -394,7 +438,7 @@ pub(crate) fn digests(root: &Path) -> BTreeMap<String, String> {
                 hashers[index].update(record.as_bytes());
             }
         }
-        if matches!(extension, "xlsx" | "xls" | "xlsb") {
+        if matches!(extension, "xlsx" | "xls" | "xlsb" | "ods" | "fods") {
             early_stop_digests(root, extension, format, selectors, &mut out);
         }
         for ((selector, hasher), count) in selectors.iter().zip(hashers).zip(counts) {

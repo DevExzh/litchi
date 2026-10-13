@@ -376,21 +376,23 @@ impl Edit {
             &self.draft,
             validation::MAX_CONTENT_XML_BYTES,
         )?;
-        let (content, target_package, provenance_spliced) = match row_local {
-            Some(changed)
-                if litchi_odf_common::compact_xml::validate(changed.content.as_bytes()).is_ok() =>
-            {
-                let target =
-                    package.replace_spliced_content_xml(&changed.content, changed.publication)?;
-                (changed.content, target, true)
-            },
-            Some(_) | None => {
+        // A row-local splice keeps every source byte outside the changed
+        // rows, so a producer's formatting whitespace (LibreOffice ends the
+        // XML declaration with a newline) stays as it was; its authored row
+        // fragments are audited as compact XML by the splice publication.
+        // Only a rebuilt `content.xml` must be compact as a whole.
+        let (target_package, provenance_spliced) = match row_local {
+            Some(changed) => (
+                package.replace_spliced_content_xml(&changed.content, changed.publication)?,
+                true,
+            ),
+            None => {
                 let content = super::package::replace_tables(package.content_xml(), &self.draft)?;
-                let target = package.replace_content_xml(&content)?;
-                (content, target, false)
+                litchi_odf_common::compact_xml::validate(content.as_bytes())
+                    .map_err(Error::from)?;
+                (package.replace_content_xml(&content)?, false)
             },
         };
-        litchi_odf_common::compact_xml::validate(content.as_bytes()).map_err(Error::from)?;
         let target = Snapshot::from_package(target_package)?;
         if target.sheets() != self.draft {
             return Err(Error::InvalidFormat(

@@ -17,8 +17,8 @@ Oracles, strongest first:
   unsupported raises ``UnsupportedError`` with the report's code.
 
 Formats: every verb is exercised on every format whose capability report
-supports it (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, RTF, ODP — record 0278);
-ODT and ODS refuse every write verb. The cross-thread and GIL tests of the write verbs
+supports it (DOCX, XLSX, PPTX, XLSB, DOC, XLS, PPT, RTF, ODS, ODT, ODP); no
+format refuses every write verb. The cross-thread and GIL tests of the write verbs
 are in test_threads.py.
 """
 
@@ -44,12 +44,10 @@ NOTES_PPT = "poi/test-data/slideshow/basic_test_ppt_file.ppt"
 RTF_INPUT = rb"{\rtf1\ansi First\par Second\par Third\par Fourth}"
 
 #: The formats ``create`` builds.
-CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "odp")
-#: The formats File holds read-only, and a fixture of each.
-READ_ONLY = (
-    ("odf/corpus/writer-table.odt", "Odt"),
-    ("odf/corpus/calc-two-sheets.ods", "Ods"),
-)
+CREATABLE = ("docx", "xlsx", "pptx", "xlsb", "doc", "xls", "ppt", "rtf", "ods", "odt", "odp")
+#: The formats File holds read-only, and a fixture of each: none since ODT
+#: (0276), ODS (0277) and ODP (0278) gained writers.
+READ_ONLY: tuple[tuple[str, str], ...] = ()
 #: An ODP fixture for the presentation write verbs (record 0278).
 ODP_INPUT = "odf/odp/tdf169979.odp"
 #: Python suggestion of a document_protected error on a locked file.
@@ -144,7 +142,7 @@ class CreateTests(WriteAssertions):
         self.assertError(raised(lambda: L.create(5)), L.PropertyError, "invalid_argument")
 
     def test_formats_without_a_builder_are_unsupported(self):
-        for name in ("odt", "ods", "pages", "odg"):
+        for name in ("pages", "odg"):
             with self.subTest(format=name):
                 error = raised(lambda: L.create(name))
                 self.assertIsInstance(error, L.UnsupportedError)
@@ -368,6 +366,41 @@ class RtfVerbTests(WriteAssertions):
         self.assertEqual(texts(file.swap("/body/p[1]", "/body/p[4]"), "/body"), ["Fourth", "Second", "Third", "First"])
 
 
+class OdtVerbTests(WriteAssertions):
+    """ODT writes through the leaf body edits (record 0276)."""
+
+    def test_round_trip(self):
+        source = L.open(fixture("odf/corpus/writer-table.odt"))
+        before = source.to_bytes()
+        file, path = source.add("/body", "paragraph", {"text": "Added  text"})
+        self.assertTrue(path.startswith("/body/p["), path)
+        file = file.set(path, {"align": "center", "bold": True})
+        file = file.set("/body/tbl[1]/tr[1]/tc[1]", {"text": "cell"})
+        file = file.set("/metadata", {"title": "Round trip"})
+        reopened = self.assertReopens(file)
+        self.assertEqual(reopened.get(path, 0)["text"], "Added  text")
+        self.assertEqual(reopened.get(path, 0)["format"]["align"], "center")
+        self.assertIs(reopened.get(path, 0)["format"]["bold"], True)
+        self.assertEqual(reopened.get("/body/tbl[1]/tr[1]/tc[1]", 0)["text"], "cell")
+        self.assertEqual(reopened.get("/metadata", 0)["format"]["title"], "Round trip")
+        self.assertUnchanged(source, before)
+
+    def test_structure_and_create(self):
+        file = L.create("odt")
+        for text in ("a", "b", "c"):
+            file, _ = file.add("/body", "paragraph", {"text": text})
+        self.assertEqual(texts(file.remove("/body/p[2]"), "/body"), ["a", "c"])
+        self.assertEqual(texts(file.move("/body/p[3]", index=0), "/body"), ["c", "a", "b"])
+        self.assertEqual(texts(file.swap("/body/p[1]", "/body/p[3]"), "/body"), ["c", "b", "a"])
+        batched = file.batch(
+            [
+                {"command": "set", "path": f"/body/p[{index}]", "props": {"italic": True}}
+                for index in (1, 2, 3)
+            ]
+        ).file
+        self.assertIs(batched.get("/body/p[3]", 0)["format"]["italic"], True)
+
+
 class OdpVerbTests(WriteAssertions):
     """ODP writes through checked scene splices (record 0278)."""
 
@@ -428,7 +461,8 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertIsInstance(error, L.UnsupportedError)
                     self.assertEqual(error.code, verbs[verb]["code"])
         # DOC (0258), PPT (0260) and XLS (0259) support every write verb.
-        self.assertTrue({"Odt", "Ods"} <= seen, seen)
+        # DOC (0258), PPT (0260), XLS (0259), ODS (0277), ODT (0276) and ODP
+        # (0278) support every write verb; any other refusal is checked above.
 
     def test_read_only_formats_refuse_every_write(self):
         for relative, name in READ_ONLY:
@@ -438,6 +472,33 @@ class CapabilityAgreementTests(WriteAssertions):
                     self.assertIsInstance(raised(lambda: call(file)), L.UnsupportedError)
             with self.subTest(format=name, verb="edit"):
                 self.assertIsInstance(raised(lambda: file.edit(lambda tx: None)), L.UnsupportedError)
+
+
+class OdsRoundTripTests(WriteAssertions):
+    """ODS writes through the unified layer (record 0277)."""
+
+    def test_cells_sheets_and_metadata_round_trip(self):
+        source = L.open(fixture("odf/corpus/calc-two-sheets.ods"))
+        before = source.to_bytes()
+        file = source.set("/sheet1/B2", {"value": 42})
+        file = file.set("/sheet1/E5", {"text": "new"})
+        file, path = file.add("/", "sheet", {"name": "Extra"})
+        self.assertEqual(path, "/sheet[3]")
+        file = file.set("/metadata", {"title": "Budget"})
+        self.assertUnchanged(source, before)
+        reopened = self.assertReopens(file)
+        self.assertEqual(cell_text(reopened, "/sheet1/B2"), "42")
+        self.assertEqual(cell_text(reopened, "/sheet1/E5"), "new")
+        self.assertEqual(reopened.metadata()["title"], "Budget")
+        with tempfile.TemporaryDirectory() as directory:
+            target = os.path.join(directory, "out.ods")
+            file.save_as(target)
+            self.assertEqual(cell_text(L.open(target), "/Extra/A1"), "")
+        self.assertError(
+            raised(lambda: source.set("/sheet1/A1", {"font.bold": True})),
+            L.PropertyError,
+            "unsupported_property",
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -611,6 +672,25 @@ class BatchTests(WriteAssertions):
         error = raised(lambda: file.apply({"command": "set", "path": "/sheet[1]/A1", "bogus": 1}))
         self.assertError(error, L.PropertyError, "corrupt_batch")
         self.assertEqual(error.item, 0)
+
+    def test_find_and_replace_report_the_match_count(self):
+        # Record 0273: ``find``/``replace`` props on ``set``.
+        file = L.create("xlsx")
+        file = file.set("/sheet[1]/A1", {"value": "draft one, draft two"})
+        commit = file.apply({"command": "set", "path": "/", "props": {"find": "draft", "replace": "final"}})
+        self.assertEqual(commit.results, [{"index": 0, "success": True, "changed": True, "matched": 2}])
+        self.assertEqual(cell_text(commit.file, "/sheet[1]/A1"), "final one, final two")
+        none = file.apply({"command": "set", "path": "/", "props": {"find": "absent", "replace": "x"}})
+        self.assertEqual(none.results[0]["matched"], 0)
+        self.assertFalse(none.changed)
+        self.assertEqual(none.file.to_bytes(), file.to_bytes())
+        self.assertEqual(cell_text(file.set("/", {"find": "draft", "replace": "x"}), "/sheet[1]/A1"), "x one, x two")
+        self.assertError(raised(lambda: file.set("/", {"find": "draft"})), L.PropertyError, "missing_property")
+        self.assertError(
+            raised(lambda: file.set("/", {"find": "d", "replace": "x", "regex": True})),
+            L.UnsupportedError,
+            "unsupported_capability",
+        )
 
     def test_every_writable_format_batches(self):
         cases = (

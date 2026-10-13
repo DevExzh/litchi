@@ -44,7 +44,11 @@ type Result<T, E = Error> = std::result::Result<T, E>;
 
 mod element;
 pub(crate) use element::PictureMarkup;
-pub use element::{ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION, NewTable};
+pub(in crate::document::transaction) use element::locate_element;
+pub use element::{
+    ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION, NewTable, ParagraphRewrite,
+    TextNode, TextNodeRewrite,
+};
 
 /// A run to insert: its direct properties and its text.
 ///

@@ -124,6 +124,7 @@ pub enum CellValue {
 
 pub mod auto_mark_file;
 pub mod bibliography_configuration;
+pub mod body;
 pub mod chart_properties;
 pub mod content_metadata;
 pub mod content_validation;
@@ -145,6 +146,7 @@ pub mod list_label_alignment;
 pub mod list_style;
 pub mod master_page;
 pub mod media;
+pub mod metadata;
 pub mod notes_configuration;
 pub mod outline_style;
 pub mod package;

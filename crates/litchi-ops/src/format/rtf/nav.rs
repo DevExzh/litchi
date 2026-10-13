@@ -1,4 +1,4 @@
-//! Path and query navigation for the RTF root/body/paragraph/run vocabulary.
+//! Path and query navigation for the RTF vocabulary.
 
 use std::borrow::Cow;
 use std::fmt;
@@ -7,8 +7,9 @@ use litchi_core::{FileFormat, Position};
 
 use super::Rtf;
 use super::children::Children;
-use super::node::Node;
+use super::node::{Item, Node};
 use super::spec::{Kind, SPEC};
+use super::stories;
 use crate::error::Result;
 use crate::node::spec::FormatSpec;
 use crate::node::{Format, PathStep};
@@ -27,6 +28,38 @@ impl<'f> Nav<'f> {
     }
 }
 
+/// The zero-based index `select` names among `count` children: `Some(None)`
+/// when it names none, `None` when the selector does not apply. `Number` is
+/// a 1-based note number.
+fn pick(select: &Select<'_>, count: usize) -> Option<Option<usize>> {
+    Some(match select {
+        Select::None => (count > 0).then_some(0),
+        Select::Ordinal(position) => (position.get() < count).then_some(position.get()),
+        Select::Last => count.checked_sub(1),
+        Select::Number(number) => number.checked_sub(1).filter(|index| *index < count),
+        _ => return None,
+    })
+}
+
+fn found<N, G>(node: Option<N>) -> Lookup<N, G> {
+    node.map_or(Lookup::Missing, Lookup::Found)
+}
+
+/// The single `[@key=value]` identity of `select` when its key is `key`.
+fn identity<'s>(select: &Select<'s>, key: &str) -> Option<Option<&'s str>> {
+    let Select::Identity(identities) = select else {
+        return None;
+    };
+    let mut wanted = None;
+    for (identity, value) in identities.iter() {
+        if !identity.key.eq_ignore_ascii_case(key) {
+            return Some(None);
+        }
+        wanted = Some(value);
+    }
+    Some(wanted)
+}
+
 impl<'f> Navigate<'f> for Nav<'f> {
     type Kind = Kind;
     type Node = Node<'f>;
@@ -43,75 +76,388 @@ impl<'f> Navigate<'f> for Nav<'f> {
         Ok(Node::root(self.doc))
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "one flat dispatch per native axis keeps the path grammar visible"
+    )]
     fn child(
         &self,
         parent: &Self::Node,
         step: &Resolved<'_, Self::Kind>,
     ) -> Result<Lookup<Self::Node, Self::Gap>> {
+        let doc = self.doc;
+        let package = &doc.0.package;
+        let select = &step.select;
         match (parent.kind, step.kind) {
-            (Kind::Document, Kind::Body) => match step.select {
-                Select::None | Select::Last => Ok(Lookup::Found(Node::body(self.doc))),
+            (Kind::Document, Kind::Body) => match select {
+                Select::None | Select::Last => Ok(Lookup::Found(Node::body(doc))),
                 Select::Ordinal(position) if position.get() == 0 => {
-                    Ok(Lookup::Found(Node::body(self.doc)))
+                    Ok(Lookup::Found(Node::body(doc)))
                 },
                 Select::Ordinal(_) => Ok(Lookup::Missing),
                 _ => Ok(Lookup::NotApplicable),
             },
+            (Kind::Document, kind @ (Kind::Header | Kind::Footer)) => {
+                let headers = kind == Kind::Header;
+                let selected = if let Some(wanted) = identity(select, "type") {
+                    let Some(wanted) = wanted else {
+                        return Ok(Lookup::NotApplicable);
+                    };
+                    stories::header_footers(doc, headers)
+                        .enumerate()
+                        .find(|(_, story)| {
+                            stories::story_type(story.value.header_type)
+                                .eq_ignore_ascii_case(wanted)
+                        })
+                } else {
+                    let count = stories::header_footers(doc, headers).count();
+                    let Some(index) = pick(select, count) else {
+                        return Ok(Lookup::NotApplicable);
+                    };
+                    index.and_then(|index| {
+                        stories::header_footers(doc, headers)
+                            .nth(index)
+                            .map(|story| (index, story))
+                    })
+                };
+                Ok(found(selected.map(|(index, story)| {
+                    Node::top(
+                        doc,
+                        kind,
+                        Item::Story {
+                            section: story.section,
+                            story: story.story,
+                            value: story.value,
+                        },
+                        Position::new(index),
+                    )
+                })))
+            },
+            (Kind::Document, kind @ (Kind::Footnote | Kind::Endnote)) => {
+                let footnotes = kind == Kind::Footnote;
+                let count = stories::notes(doc, footnotes).count();
+                // RTF notes carry no identifier; `[@footnoteId=N]` names the
+                // Nth note of the kind, as `footnote[N]` does.
+                let key = if footnotes { "footnoteId" } else { "endnoteId" };
+                let index = if let Some(wanted) = identity(select, key) {
+                    let Some(number) = wanted.and_then(|value| value.trim().parse::<usize>().ok())
+                    else {
+                        return Ok(Lookup::NotApplicable);
+                    };
+                    Some(number.checked_sub(1).filter(|index| *index < count))
+                } else {
+                    pick(select, count)
+                };
+                let Some(index) = index else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|index| {
+                    stories::notes(doc, footnotes).nth(index).map(|note| {
+                        Node::top(
+                            doc,
+                            kind,
+                            Item::Note {
+                                index: note.index,
+                                number: note.number,
+                                value: note.value,
+                            },
+                            Position::new(index),
+                        )
+                    })
+                })))
+            },
+            (Kind::Document, kind @ (Kind::Comments | Kind::Styles | Kind::Numbering)) => {
+                let present = match kind {
+                    Kind::Comments => !package.annotations().is_empty(),
+                    Kind::Styles => !package.styles().is_empty(),
+                    _ => !(package.lists().is_empty() && package.list_overrides().is_empty()),
+                };
+                match select {
+                    Select::None | Select::Last => Ok(if present {
+                        Lookup::Found(Node::collection(doc, kind, super::node::kind_step(kind)))
+                    } else {
+                        Lookup::Missing
+                    }),
+                    _ => Ok(Lookup::NotApplicable),
+                }
+            },
             (Kind::Body, Kind::Paragraph) => {
-                let position = match step.select {
+                let position = match select {
                     Select::None => Some(0),
                     Select::Ordinal(position) => Some(position.get()),
-                    Select::Last => self.doc.0.package.paragraph_count().checked_sub(1),
+                    Select::Last => package.paragraph_count().checked_sub(1),
                     _ => return Ok(Lookup::NotApplicable),
                 };
-                let paragraph = position.and_then(|position| {
-                    self.doc
-                        .0
-                        .package
+                Ok(found(position.and_then(|position| {
+                    package
                         .body()
                         .paragraphs()
                         .nth(position)
-                        .map(|paragraph| {
-                            Node::paragraph(self.doc, Position::new(position), paragraph)
-                        })
-                });
-                Ok(paragraph.map_or(Lookup::Missing, Lookup::Found))
+                        .map(|paragraph| Node::paragraph(doc, Position::new(position), paragraph))
+                })))
             },
             (Kind::Paragraph, Kind::Run) => {
-                let Some(paragraph) = parent.paragraph else {
-                    return Ok(Lookup::Missing);
+                let (Some(paragraph), Some(paragraph_position)) =
+                    (parent.body_paragraph(), parent.paragraph_position)
+                else {
+                    return Ok(Lookup::NotApplicable);
                 };
-                let Some(paragraph_position) = parent.paragraph_position else {
-                    return Ok(Lookup::Missing);
-                };
-                let position = match step.select {
+                let position = match select {
                     Select::None => Some(0),
                     Select::Ordinal(position) => Some(position.get()),
                     Select::Last => paragraph.runs().count().checked_sub(1),
                     _ => return Ok(Lookup::NotApplicable),
                 };
-                let run = position.and_then(|position| {
-                    paragraph.runs().nth(position).map(|run| {
-                        Node::run(self.doc, paragraph_position, Position::new(position), run)
+                Ok(found(position.and_then(|position| {
+                    paragraph
+                        .runs()
+                        .nth(position)
+                        .map(|run| Node::run(doc, paragraph_position, Position::new(position), run))
+                })))
+            },
+            (Kind::Paragraph, kind @ (Kind::Hyperlink | Kind::Picture)) => {
+                let Some(paragraph) = parent.body_paragraph() else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                let range = stories::anchor_range(paragraph);
+                let indices: Vec<usize> = if kind == Kind::Hyperlink {
+                    stories::hyperlinks(doc, range).collect()
+                } else {
+                    stories::pictures(doc, range).collect()
+                };
+                let Some(index) = pick(select, indices.len()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|ordinal| {
+                    let native = *indices.get(ordinal)?;
+                    let item = if kind == Kind::Hyperlink {
+                        Item::Hyperlink(package.fields().get(native)?)
+                    } else {
+                        Item::Picture {
+                            index: native,
+                            value: package.pictures().get(native)?,
+                        }
+                    };
+                    Some(parent.child(kind, item, Position::new(ordinal)))
+                })))
+            },
+            (Kind::Body, Kind::Table) => {
+                let Some(index) = pick(select, package.tables().len()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|index| {
+                    package.tables().get(index).map(|table| {
+                        parent.child(
+                            Kind::Table,
+                            Item::Table {
+                                table: index,
+                                value: table,
+                            },
+                            Position::new(index),
+                        )
                     })
-                });
-                Ok(run.map_or(Lookup::Missing, Lookup::Found))
+                })))
+            },
+            (Kind::Table, Kind::Row) => {
+                let Item::Table { table, value } = parent.item else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                let Some(index) = pick(select, value.row_count()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|index| {
+                    value.rows().get(index).map(|row| {
+                        parent.child(
+                            Kind::Row,
+                            Item::Row {
+                                table,
+                                row: index,
+                                value: row,
+                            },
+                            Position::new(index),
+                        )
+                    })
+                })))
+            },
+            (Kind::Row, Kind::Cell) => {
+                let Item::Row { table, row, value } = parent.item else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                let Some(index) = pick(select, value.cell_count()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|index| {
+                    value.cells().get(index).map(|cell| {
+                        parent.child(
+                            Kind::Cell,
+                            Item::Cell {
+                                table,
+                                row,
+                                cell: index,
+                                value: cell,
+                                parent: value,
+                            },
+                            Position::new(index),
+                        )
+                    })
+                })))
+            },
+            (Kind::Header | Kind::Footer, Kind::Paragraph) => {
+                let Item::Story {
+                    section,
+                    story,
+                    value,
+                } = parent.item
+                else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                let Some(index) = pick(select, value.paragraphs.len()) else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|index| {
+                    value.paragraphs.get(index).map(|paragraph| {
+                        parent.child(
+                            Kind::Paragraph,
+                            Item::StoryParagraph {
+                                section,
+                                story,
+                                index,
+                                value: paragraph,
+                            },
+                            Position::new(index),
+                        )
+                    })
+                })))
+            },
+            (Kind::Comments, Kind::Comment) => {
+                let index = if let Some(wanted) = identity(select, "commentId") {
+                    let Some(wanted) = wanted.and_then(|value| value.trim().parse::<i32>().ok())
+                    else {
+                        return Ok(Lookup::NotApplicable);
+                    };
+                    Some(
+                        package
+                            .annotations()
+                            .iter()
+                            .position(|comment| comment.has_reference && comment.id == wanted),
+                    )
+                } else {
+                    pick(select, package.annotations().len())
+                };
+                let Some(index) = index else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                Ok(found(index.and_then(|index| {
+                    package.annotations().get(index).map(|comment| {
+                        parent.child(
+                            Kind::Comment,
+                            Item::Comment {
+                                index,
+                                value: comment,
+                            },
+                            Position::new(index),
+                        )
+                    })
+                })))
+            },
+            (Kind::Styles, Kind::Style) => match select {
+                Select::Name { name, case } => Ok(found(
+                    package
+                        .styles()
+                        .iter()
+                        .find(|style| case.matches(style.name.as_ref(), name))
+                        .map(|style| {
+                            parent.child_at(
+                                Kind::Style,
+                                Item::Style(style),
+                                PathStep::new(style.name.as_ref()),
+                            )
+                        }),
+                )),
+                _ => Ok(Lookup::NotApplicable),
+            },
+            (Kind::Numbering, kind @ (Kind::AbstractNum | Kind::Num)) => {
+                let abstract_num = kind == Kind::AbstractNum;
+                let count = if abstract_num {
+                    package.lists().len()
+                } else {
+                    package.list_overrides().len()
+                };
+                let index = if let Some(wanted) = identity(select, "id") {
+                    let Some(wanted) = wanted.and_then(|value| value.trim().parse::<i32>().ok())
+                    else {
+                        return Ok(Lookup::NotApplicable);
+                    };
+                    if abstract_num {
+                        package.lists().iter().position(|list| list.id == wanted)
+                    } else {
+                        package
+                            .list_overrides()
+                            .iter()
+                            .position(|list| list.index == wanted)
+                    }
+                } else {
+                    let Some(index) = pick(select, count) else {
+                        return Ok(Lookup::NotApplicable);
+                    };
+                    index
+                };
+                Ok(found(index.and_then(|index| {
+                    let item = if abstract_num {
+                        Item::AbstractNum(package.lists().get(index)?)
+                    } else {
+                        Item::Num(package.list_overrides().get(index)?)
+                    };
+                    Some(parent.child(kind, item, Position::new(index)))
+                })))
+            },
+            (Kind::AbstractNum, Kind::Level) => {
+                let Item::AbstractNum(list) = parent.item else {
+                    return Ok(Lookup::NotApplicable);
+                };
+                // `level[N]` is the Nth level (1-based), whose ilvl is N-1 in
+                // a well-formed list; `[@ilvl=L]` (raw paths) names the ilvl.
+                let index = match select {
+                    Select::Number(number) => number
+                        .checked_sub(1)
+                        .filter(|index| *index < list.levels.len()),
+                    _ => {
+                        if let Some(wanted) = identity(select, "ilvl") {
+                            let Some(wanted) =
+                                wanted.and_then(|value| value.trim().parse::<usize>().ok())
+                            else {
+                                return Ok(Lookup::NotApplicable);
+                            };
+                            list.levels
+                                .iter()
+                                .position(|level| usize::from(level.level) == wanted)
+                        } else {
+                            let Some(index) = pick(select, list.levels.len()) else {
+                                return Ok(Lookup::NotApplicable);
+                            };
+                            index
+                        }
+                    },
+                };
+                Ok(found(index.and_then(|index| {
+                    list.levels.get(index).map(|level| {
+                        parent.child(Kind::Level, Item::Level(level), Position::new(index))
+                    })
+                })))
             },
             _ => Ok(Lookup::NotApplicable),
         }
     }
 
     fn children(&self, parent: &Self::Node, kinds: KindSet<Self::Kind>) -> Result<Self::Children> {
-        let wants = match parent.kind {
-            Kind::Document => kinds.contains(Kind::Body),
-            Kind::Body => kinds.contains(Kind::Paragraph),
-            Kind::Paragraph => kinds.contains(Kind::Run),
-            Kind::Run => false,
-        };
-        Ok(if wants {
-            Children::of(parent)
+        let wanted = SPEC.elements[parent.kind as usize]
+            .children
+            .iter()
+            .any(|kind| kinds.contains(*kind));
+        Ok(if wanted {
+            Children::filtered(parent, Some(kinds))
         } else {
-            Children::empty(self.doc)
+            Children::empty()
         })
     }
 
@@ -121,15 +467,43 @@ impl<'f> Navigate<'f> for Nav<'f> {
         _: &Resolved<'_, Self::Kind>,
         out: &mut Available,
     ) -> Result<()> {
+        let package = &self.doc.0.package;
         match parent.kind {
-            Kind::Document => out.kind("body", 1),
-            Kind::Body => out.kind("p", self.doc.0.package.paragraph_count()),
+            Kind::Document => {
+                out.kind("body", 1);
+                out.kind("header", stories::header_footers(self.doc, true).count());
+                out.kind("footer", stories::header_footers(self.doc, false).count());
+                out.kind("footnote", stories::notes(self.doc, true).count());
+                out.kind("endnote", stories::notes(self.doc, false).count());
+                out.kind("comments", usize::from(!package.annotations().is_empty()));
+            },
+            Kind::Body => {
+                out.kind("p", package.paragraph_count());
+                out.kind("tbl", package.tables().len());
+            },
             Kind::Paragraph => {
-                if let Some(paragraph) = parent.paragraph {
+                if let Some(paragraph) = parent.body_paragraph() {
                     out.kind("r", paragraph.runs().count());
+                    let range = stories::anchor_range(paragraph);
+                    out.kind(
+                        "hyperlink",
+                        stories::hyperlinks(self.doc, range.clone()).count(),
+                    );
+                    out.kind("picture", stories::pictures(self.doc, range).count());
                 }
             },
-            Kind::Run => {},
+            _ => {
+                let mut count = 0usize;
+                let mut name = None;
+                for child in Children::of(parent) {
+                    let child = child?;
+                    name = Some(super::node::kind_step(child.kind));
+                    count += 1;
+                }
+                if let Some(name) = name {
+                    out.kind(name, count);
+                }
+            },
         }
         Ok(())
     }
@@ -152,7 +526,11 @@ impl<'f> Inspect<'f> for Nav<'f> {
     }
 
     fn format<'n>(&'n self, node: &'n Node<'f>) -> Result<Format<'n>> {
-        crate::node::Project::format(node)
+        Ok(node.format_props())
+    }
+
+    fn number(&self, node: &Node<'f>) -> Option<usize> {
+        node.number()
     }
 
     fn write_step(
@@ -164,16 +542,13 @@ impl<'f> Inspect<'f> for Nav<'f> {
     ) -> fmt::Result {
         let step = match kind {
             Kind::Body => PathStep::new("body"),
-            Kind::Paragraph | Kind::Run => {
-                node.path().steps().last().copied().unwrap_or_else(|| {
-                    if kind == Kind::Run {
-                        PathStep::at("r", ordinal)
-                    } else {
-                        PathStep::at("p", ordinal)
-                    }
-                })
-            },
+            Kind::Comments => PathStep::new("comments"),
+            Kind::Styles => PathStep::new("styles"),
+            Kind::Numbering => PathStep::new("numbering"),
             Kind::Document => PathStep::new("document"),
+            _ => node.path().steps().last().copied().unwrap_or_else(|| {
+                PathStep::at(crate::path::navigate::ElementKind::name(kind), ordinal)
+            }),
         };
         fmt::Display::fmt(&step, out)
     }

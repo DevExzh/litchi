@@ -27,6 +27,7 @@ use std::num::NonZeroU16;
 use std::ops::Range;
 
 mod composition;
+mod destination_splice;
 mod picture_payload;
 mod transfer;
 pub use composition::{
@@ -1604,6 +1605,9 @@ pub struct Edit {
     operations: Vec<Operation>,
     replacement_bytes: usize,
     paragraph_batch_len: Option<usize>,
+    /// Effect keys of the staged destination operations, so a large
+    /// destination batch checks uniqueness in constant time per operation.
+    destination_effects: std::collections::HashSet<String>,
 }
 
 #[derive(Debug, Clone)]
@@ -2100,6 +2104,7 @@ impl Edit {
             operations: Vec::new(),
             replacement_bytes: 0,
             paragraph_batch_len: None,
+            destination_effects: std::collections::HashSet::new(),
         }
     }
 
@@ -4541,8 +4546,14 @@ impl Edit {
     ///
     /// The complete cell path is resolved against the immutable base. Cell
     /// drawings, fields, nested tables, and positional events remain retained;
-    /// their positions must still validate against the replacement. Canonical
-    /// publication refuses every snapshot containing unknown destinations.
+    /// their positions must still validate against the replacement.
+    ///
+    /// Outer cells publish by splicing the replacement into the retained
+    /// source at the cell's recorded text range, so every other byte —
+    /// including the table's position in the body and unknown destinations —
+    /// is preserved.  A cell whose text range contains state-changing or
+    /// destination controls is refused at commit.  Nested cells use the
+    /// canonical writer only in documents without body tables.
     ///
     /// # Errors
     /// Returns an error for an invalid path, dependent story geometry,
@@ -4568,6 +4579,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4575,7 +4587,9 @@ impl Edit {
     ///
     /// The paragraph's formatting is preserved. Destinations with drawings,
     /// fields, or other positional story events are refused because changing
-    /// text could stale dependent offsets.
+    /// text could stale dependent offsets.  Publication splices the
+    /// replacement into the paragraph's recorded source range (see
+    /// [`Self::set_table_cell_text`]).
     ///
     /// # Errors
     /// Returns an error for an invalid selector, dependent story content,
@@ -4616,6 +4630,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4657,6 +4672,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4696,6 +4712,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4750,6 +4767,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4790,6 +4808,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4830,6 +4849,7 @@ impl Edit {
             before,
             after,
         });
+        self.record_destination(effect)?;
         Ok(self)
     }
 
@@ -4858,16 +4878,42 @@ impl Edit {
     }
 
     fn ensure_unique_destination(&self, effect: &str) -> Result<(), Error> {
-        let incoming = self.operations.len();
-        if let Some(existing) = self.operations.iter().position(|operation| {
-            operation
-                .effect_keys()
-                .iter()
-                .any(|candidate| candidate == effect)
-        }) {
-            return Err(Error::Conflict { existing, incoming });
+        if !self.destination_effects.contains(effect) {
+            return Ok(());
         }
+        // Locate the earlier operation for the typed conflict only on the
+        // error path.
+        let incoming = self.operations.len();
+        let existing = self
+            .operations
+            .iter()
+            .position(|operation| {
+                operation
+                    .effect_keys()
+                    .iter()
+                    .any(|candidate| candidate == effect)
+            })
+            .unwrap_or(0);
+        Err(Error::Conflict { existing, incoming })
+    }
+
+    /// Record a staged destination operation's effect key.
+    fn record_destination(&mut self, effect: String) -> Result<(), Error> {
+        self.destination_effects
+            .try_reserve(1)
+            .map_err(|_error| Error::Write("could not reserve destination effects".to_string()))?;
+        self.destination_effects.insert(effect);
         Ok(())
+    }
+
+    /// Effect keys of every staged destination operation, for an edit whose
+    /// operations were assembled elsewhere.
+    fn destination_effects_of(operations: &[Operation]) -> std::collections::HashSet<String> {
+        operations
+            .iter()
+            .filter(|operation| operation.is_destination())
+            .flat_map(Operation::effect_keys)
+            .collect()
     }
 
     fn ensure_character_property_span(
@@ -7385,6 +7431,26 @@ fn commit_destinations(edit: Edit, operation_count: usize) -> Result<Commit, Err
         ));
     }
     ensure_changed_publication_allowed(&edit.source)?;
+    if destination_splice::supports(&edit.operations) {
+        match destination_splice::publish(&edit.source, &edit.operations) {
+            Ok(snapshot) => {
+                return Ok(Commit::new(
+                    edit.source,
+                    snapshot,
+                    operation_count,
+                    semantic_delta,
+                ));
+            },
+            // Without body tables the canonical writer below retains story
+            // order; with tables it would relocate them after the body.
+            Err(error) if !edit.source.tables().is_empty() => return Err(error),
+            Err(_) => {},
+        }
+    } else if !edit.source.tables().is_empty() {
+        return Err(Error::UnsupportedSource(
+            "canonical destination publication would relocate body tables",
+        ));
+    }
     let source_bytes = edit
         .source
         .source_bytes()

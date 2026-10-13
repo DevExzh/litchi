@@ -33,6 +33,8 @@ macro_rules! both {
     };
 }
 
+mod find;
+
 /// Complete result of one DOCX leaf transaction.
 ///
 /// Single-operation sugar takes only the file. The transaction executor can
@@ -259,11 +261,7 @@ impl Docx {
                         "a source editor came from an eager DOCX owner",
                     ));
                 };
-                let owned = self.owner().finish(
-                    package
-                        .to_owned_package_preserving_source()
-                        .map_err(Error::from),
-                )?;
+                let owned = self.promoted(package)?;
                 Ok(DocxEditor::Edit(Box::new(owned.edit()?)))
             },
             editor => Ok(editor),

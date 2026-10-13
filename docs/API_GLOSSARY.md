@@ -70,7 +70,7 @@ transaction is the bare `Package::edit()`.
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
 
 | Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ scoped PPTX families (0252); ✅ every DOC transaction, `rollback` banned crate-wide (0258) |
-| Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); ✅ DOCX `document_mut` removed, fresh authoring on `Builder::document()` (0251); 🔴 remaining W2 authoring verbs move into `Edit`, direct package mutators and `UnsafeEdit` vocabulary still require migration |
+| Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); ✅ DOCX `document_mut` removed, fresh authoring on `Builder::document()` (0251); ✅ ODT structural body edits (`Edit::{set_text, set_attribute, set_text_properties, set_paragraph_properties, insert, remove, relocate, swap}` over `litchi_odt::body`, 0276) live on the primary `Edit`; 🔴 ODT `MutableDocument` (0268 G2), remaining W2 authoring verbs move into `Edit`, direct package mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
 composition (`join`, `three_way`), durable patch formats beyond pptx/xlsx.
@@ -259,7 +259,7 @@ semantic-limit migrations.
 | Semantic metadata type | `Metadata` (merged field union; typed `Keywords`; real time types) | `ooxml_common::Props`; the `creator` field name (→ `author`) | ✅ one `litchi_core::Metadata`; `Props` deleted and banned in the ooxml-common profiles; `author` is the only spelling (`dc:creator` stays in the codec); `Timestamp` replaces the `*_local`/`*_time` pairs (`created`, `modified`, `last_printed`, `last_backup`); OOXML-only `category`/`content_status`/`version`/`last_printed` are fields (0253) · 🔴 `Metadata.keywords` is still `Option<String>`: `Keywords` lives in `litchi_core::metadata` and the OOXML codec keeps keyword mixed content losslessly, but the field flips only after the iWork owners map their `Option<String>` keyword assignments with `.map(Keywords::from)` (IWORK_API_REQUESTS.md, 2026-10-13 request) |
 | Unstorable metadata field | typed `metadata::Error::Unsupported { field }` naming a `metadata::Field` | silently dropping a field | ✅ OOXML transaction (0253): `content_type`, `last_backup`, `codepage` |
 | Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · ✅ pptx/xlsx/xlsb `Package::metadata()` (0253) · ✅ docx `Package::metadata() -> Option<&Metadata>` (0251) |
-| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | ✅ pptx/xlsx/xlsb `Package` and the shared `litchi_ooxml_common::properties` engine; families registered in the gate (0253) · ✅ doc/xls/ppt `package::metadata` (0254) · ✅ docx `metadata` family over the shared core codec, registered in `docx-minimal`/`docx-full` (0251); 🔴 docx app/custom staging through the shared engine |
+| Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | ✅ pptx/xlsx/xlsb `Package` and the shared `litchi_ooxml_common::properties` engine; families registered in the gate (0253) · ✅ doc/xls/ppt `package::metadata` (0254) · ✅ docx `metadata` family over the shared core codec, registered in `docx-minimal`/`docx-full` (0251) · ✅ odt `Package::{edit_metadata, apply_metadata}` and `litchi_odt::metadata` (splices `meta.xml` children, no clock), registered in the `odt` profile (0276); 🔴 docx app/custom staging through the shared engine · 🟡 ODS: the primary `document::Edit::set_metadata` stages the `meta.xml` fields the leaf patcher owns (0277); 🔴 ODS `metadata` family |
 
 | Metadata read | `Package::metadata()` | `Package::props()` (docx) | ✅ facade/ODF/iWork reads · ✅ pptx/xlsx/xlsb `Package::metadata()` (0253) · 🔴 docx rename (W2, uo2/p7a) |
 | Metadata mutation | `Package::{edit_metadata, apply_metadata}` + `metadata::{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` | `put_props()`, `props_mut()`, `clear_props()` | ✅ pptx/xlsx/xlsb `Package` and the shared `litchi_ooxml_common::properties` engine; families registered in the gate (0253) · ✅ XLSB source owner: `SourceBackedWorkbook::edit_metadata` with `metadata::source::{Edit, Commit}`, published over the retained source through `properties::Patch::{compose, check_source_backed, prepare_source_backed}` (0261) · ✅ doc/xls/ppt `package::metadata` (0254) · 🔴 docx (uo2/p7a) |
@@ -1561,6 +1561,31 @@ staging windows close at their limits, while scalar admission stays available
 when the optimization index cannot fit. Source-changing boundaries publish
 before resolving later positional paths.
 
+### RTF destination stories (0275)
+
+Native retained-destination text edits (`set_table_cell_text`,
+`set_header_footer_text`, `set_note_text`, `set_annotation_text`) keep their
+names and the canonical `Edit`/`Commit`/`Patch` family; publication now splices
+the replacement into recorded source provenance instead of reserializing the
+document. New read accessors follow existing vocabulary: `text::Paragraph::
+text_range`, `ParagraphFormat::{style, list_override, list_level}`,
+`Format::character_style`, and `Package`/`Document::picture_body_offset`
+(a UTF-8 text offset, not a `Position` selector). No alias is introduced.
+
+### Unified RTF stories (0275)
+
+The RTF adapter projects `/body/tbl[N]/tr[M]/tc[K]`, `/header[N]` and
+`/footer[N]` (with `p[M]` and `[@type=default|first|even|odd]`),
+`/footnote[N]`, `/endnote[N]`, `/comments/comment[N]`,
+`/body/p[N]/hyperlink[M]`, `/body/p[N]/picture[M]`, `/styles/<name>` and
+`/numbering/{abstractNum,num}[N]` (with `level[N]`) through the canonical Word
+vocabulary; native identities (`commentId`, list `id`, `ilvl`) stay raw-path
+only. Paragraphs read `style`, `numId`, `numLevel`; runs read `rStyle`. Cell,
+header/footer, note and comment `text` is writable through the native
+destination editor, pictures are removable; every other new element or
+property is a typed capability gap. Unscoped `p` queries stay in the main
+story. No public alias or second document model is introduced.
+
 ## Gate hardening (record 0249)
 
 Record 0249 extends the registered gate without changing any public API. Every
@@ -1992,3 +2017,70 @@ names. No second grid type or alias is introduced.
 | `litchi_xls::CellCursor`, `SourceBackedWorksheet::cell_cursor() -> Result<Option<CellCursor>>` (items `SourceBackedCell`; `CellCursor::needs_formula_context`) | adopted (0267) |
 
 See [0267](unified-ops/0267-streaming-cell-cursors.md).
+
+## Unified template merge (record 0274)
+
+`File::merge(&merge::Record, &merge::Options)` and `File::merge_with_limits`
+fill a DOCX, PPTX or XLSX template's `{{key}}` placeholders (OfficeCLI's
+grammar) and, for DOCX, its `MERGEFIELD` fields from one record, as one
+mutation and at most one native commit, returning
+`transaction::Commit<merge::Summary>`; `transaction::Edit::merge` is the same
+mutation inside a closure transaction. `merge` is the design §13 verb name
+and always means template (mail) merge; document merging is a separate P2
+concern. Data sources are `merge::Data::{from_json, from_json_with_limits,
+from_csv, from_csv_with}` (records in source order); `merge::Record` is one
+record of text values. Options are one `merge::Options` (`missing`,
+`fields`) with `merge::Missing::{Keep, Empty}`; limits are the transaction's
+`SemanticLimits` (`max_expanded_targets` bounds replacements,
+`max_staged_bytes` bounds their payload and the data source), not a second
+limits type. Data failures are the focused, content-free `merge::Error`
+(`Json`, `TooDeep`, `NotAnObject`, `NotARecord`), classified `invalid_json`
+or `limit_exceeded`.
+
+The DOCX leaf gains a formatting-preserving story substitution beside the
+main-document edit: `document::Edit::{story, substitute}` for the main
+document and `document::Edit<Package>::{story_parts, part_story,
+substitute_part}` for headers, footers, notes and comments, over the types of
+the `document::substitute` module. A source-backed handle materializes its
+owning package once for these writes (`Docx` keeps the promotion).
+
+| Name | Status |
+|---|---|
+| `File::{merge, merge_with_limits}`, `transaction::Edit::merge` | adopted (0274) |
+| `merge::{Record, Data, Options, Missing, Summary, Error}` | adopted (0274) |
+| `capabilities::Verb::Merge` | adopted (0274) |
+| `litchi_docx::document::Edit::{story, substitute}`; `Edit<Package>::{story_parts, part_story, substitute_part}` | adopted (0274) |
+| `litchi_docx::document::substitute::{Story, Paragraph, Field, FieldKind, Replacement, Outcome, OBJECT}` | adopted (0274) |
+| CLI `litchi merge`, Python `File.merge` | adopted (0274) |
+
+See [0274](unified-ops/0274-template-merge.md).
+
+## Formatting-aware find/replace (record 0273)
+
+Find/replace is not a verb: as OfficeCLI's `set --find`, a `File::set`
+(and `Edit::set`, `File::apply`, batch `set` items) whose properties name
+`find` searches the target's subtree. The keywords are OfficeCLI's `find` and
+`replace`, plus Litchi's `matchCase` (default `true`) and `wholeWord`
+(default `false`); `regex` is admitted only as `false` (record 0010 Q3).
+Every other property of the call formats the replaced, or matched, text. The
+match count is `Applied::matched() -> Option<usize>` (CLI `--json` and Python
+result dicts: `matched`, OfficeCLI's name). `capabilities::Verb::Replace`
+(`"replace"`) reports format support, and the schema export lists the
+keywords under `setKeywords`. Leaf primitives: the DOCX transaction lists a
+paragraph's searchable `w:t` nodes and rewrites them, optionally isolating
+byte ranges into runs of their own (`TextNode`, `TextNodeRewrite`,
+`ParagraphRewrite`, `Edit::{text_nodes, rewrite_text_nodes}`); PPTX text
+edits gain `TextTarget::RunSpan` (a byte span of one run, split out with a
+copy of the run's properties); XLSX worksheets report rich-text cells
+(`Worksheet::has_rich_text`).
+
+| Name | Status |
+|---|---|
+| `find`, `replace`, `matchCase`, `wholeWord`, `regex` properties of `set` | adopted (0273) |
+| `Applied::matched` | adopted (0273) |
+| `capabilities::Verb::Replace` | adopted (0273) |
+| `litchi_docx::document::{TextNode, TextNodeRewrite, ParagraphRewrite}`, `Edit::{text_nodes, rewrite_text_nodes}` (snapshot and package edits) | adopted (0273) |
+| `litchi_pptx::opened::TextTarget::RunSpan` | adopted (0273) |
+| `litchi_xlsx::Worksheet::has_rich_text` | adopted (0273) |
+
+See [0273](unified-ops/0273-find-replace.md).

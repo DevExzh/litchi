@@ -9,6 +9,8 @@
     feature = "xlsb",
     feature = "xls",
     feature = "rtf",
+    feature = "ods",
+    feature = "odt",
     feature = "odp"
 ))]
 use std::io;
@@ -93,6 +95,14 @@ impl File {
                     path,
                 })
             },
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Odt(commit.after),
+                    path,
+                })
+            },
             #[cfg(feature = "doc")]
             Self::Doc(handle) => {
                 let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
@@ -121,6 +131,14 @@ impl File {
                     path,
                 })
             },
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => {
+                let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
+                Ok(Added {
+                    file: Self::Ods(commit.after),
+                    path,
+                })
+            },
             #[cfg(feature = "odp")]
             Self::Odp(handle) => {
                 let (commit, path) = handle.add(_parent.into_path()?, _node.into_node()?)?;
@@ -139,7 +157,8 @@ impl File {
     /// Move an element to a sibling position or another supported parent.
     ///
     /// Legacy PPT supports slide ordering and XLS complete-catalog tab
-    /// ordering through their native package edits.
+    /// ordering through their native package edits. ODS moves
+    /// dependency-free sheets and rows through its leaf splices.
     /// Positional destinations are measured after detaching the element.
     /// The original snapshot stays unchanged on success and failure.
     ///
@@ -193,10 +212,18 @@ impl File {
             Self::Rtf(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Odt(commit.after)),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle
+                .move_to(_path.into_path()?, _to.into_placement()?)
+                .map(|commit| Self::Ods(commit.after)),
             #[cfg(feature = "odp")]
             Self::Odp(handle) => handle
                 .move_to(_path.into_path()?, _to.into_placement()?)
@@ -265,10 +292,18 @@ impl File {
             Self::Rtf(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Odt(commit.after)),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .remove(_target.into_target()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle
+                .remove(_target.into_target()?)
+                .map(|commit| Self::Ods(commit.after)),
             #[cfg(feature = "odp")]
             Self::Odp(handle) => handle
                 .remove(_target.into_target()?)
@@ -337,10 +372,18 @@ impl File {
             Self::Rtf(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Odt(commit.after)),
             #[cfg(feature = "doc")]
             Self::Doc(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
                 .map(|commit| Self::Doc(commit.after)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle
+                .swap(_a.into_path()?, _b.into_path()?)
+                .map(|commit| Self::Ods(commit.after)),
             #[cfg(feature = "odp")]
             Self::Odp(handle) => handle
                 .swap(_a.into_path()?, _b.into_path()?)
@@ -372,9 +415,37 @@ impl File {
     /// Default [`crate::transaction::SemanticLimits`] bound expanded targets
     /// and staged payloads. Use [`Self::edit_with_limits`] to select those bounds.
     ///
+    /// A `find` property turns the call into a text search over the target's
+    /// subtree, as OfficeCLI's `set --find` (record 0273): `replace` gives
+    /// the replacement (empty deletes), `matchCase` (default `true`) and
+    /// `wholeWord` (default `false`) tune matching, and every other property
+    /// formats the replaced text (or, without `replace`, the matched text).
+    /// A match spanning runs takes the formatting of the run where it
+    /// starts; untouched runs keep their bytes. Zero matches are an exact
+    /// no-op. DOCX, PPTX, XLSX and RTF support it ([`crate::capabilities::Verb::Replace`]);
+    /// [`Self::apply`] reports the count as [`crate::Applied::matched`].
+    ///
+    /// ```
+    /// # #[cfg(feature = "docx")]
+    /// # {
+    /// use litchi_core::FileFormat;
+    /// use litchi_ops::{NewNode, create, props};
+    /// let file = create(FileFormat::Docx)?;
+    /// let file = file
+    ///     .add("/body", NewNode::new("paragraph").prop("text", "draft one, draft two"))?
+    ///     .file;
+    /// let file = file.set("/", props! { "find" => "draft", "replace" => "final" })?;
+    /// let text = file.get("/body/p[1]")?.view().text()?.unwrap_or_default().into_owned();
+    /// assert_eq!(text, "final one, final two");
+    /// # }
+    /// # Ok::<(), litchi_ops::Error>(())
+    /// ```
+    ///
     /// # Errors
     /// Refuses unknown or invalid properties, unsupported targets, unscoped
-    /// mutation queries, protected documents and stale source snapshots.
+    /// mutation queries, protected documents and stale source snapshots. A
+    /// find refuses a regular expression (`regex=true`), an empty pattern,
+    /// and a call that neither replaces nor formats (`missing_property`).
     ///
     /// ```no_run
     /// # #[cfg(feature = "docx")]
@@ -391,6 +462,15 @@ impl File {
         _target: impl IntoTarget<'p>,
         _props: impl IntoProps<'v>,
     ) -> Result<File> {
+        let _props = match self {
+            Self::Signed(_) => return Err(protected(self)),
+            Self::Locked(locked) => return Err(locked.read_error()),
+            #[allow(unreachable_patterns)]
+            _ => crate::Props::from_props(_props)?,
+        };
+        if crate::find::requested(&_props) {
+            return crate::find::set(self, _target.into_target()?, &_props);
+        }
         match self {
             #[cfg(feature = "docx")]
             Self::Docx(handle) => handle
@@ -424,6 +504,14 @@ impl File {
             Self::Rtf(handle) => handle
                 .set(_target.into_target()?, _props)
                 .map(|commit| Self::Rtf(commit.after)),
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Ods(commit.after)),
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => handle
+                .set(_target.into_target()?, _props)
+                .map(|commit| Self::Odt(commit.after)),
             #[cfg(feature = "odp")]
             Self::Odp(handle) => handle
                 .set(_target.into_target()?, _props)
@@ -465,6 +553,8 @@ impl File {
             feature = "xlsb",
             feature = "xls",
             feature = "rtf",
+            feature = "ods",
+            feature = "odt",
             feature = "odp"
         )),
         allow(
@@ -476,6 +566,12 @@ impl File {
         match self {
             #[cfg(feature = "rtf")]
             Self::Rtf(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
+            #[cfg(feature = "odt")]
+            Self::Odt(handle) => {
                 let mut counted = Counted { sink, bytes: 0 };
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
@@ -518,6 +614,12 @@ impl File {
             },
             #[cfg(feature = "doc")]
             Self::Doc(handle) => {
+                let mut counted = Counted { sink, bytes: 0 };
+                handle.write_to(&mut counted)?;
+                Ok(counted.bytes)
+            },
+            #[cfg(feature = "ods")]
+            Self::Ods(handle) => {
                 let mut counted = Counted { sink, bytes: 0 };
                 handle.write_to(&mut counted)?;
                 Ok(counted.bytes)
@@ -567,6 +669,8 @@ fn pending(file: &File, operation: &str) -> Error {
     feature = "xlsb",
     feature = "xls",
     feature = "rtf",
+    feature = "ods",
+    feature = "odt",
     feature = "odp"
 ))]
 pub(crate) struct Counted<W> {
@@ -583,6 +687,8 @@ pub(crate) struct Counted<W> {
     feature = "xlsb",
     feature = "xls",
     feature = "rtf",
+    feature = "ods",
+    feature = "odt",
     feature = "odp"
 ))]
 impl<W: Write> Write for Counted<W> {

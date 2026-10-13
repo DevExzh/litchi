@@ -47,6 +47,9 @@ impl<'a> Parser<'a> {
 
     pub(super) fn append_table_text(&mut self, text: &[u8], raw_level: u8) -> RtfResult<()> {
         let level = if raw_level >= 2 { raw_level } else { 1 };
+        if level == 1 {
+            self.observe_cell_text();
+        }
         let frame = self.effective_cell_paragraph_frame()?;
         self.observe_cell_paragraph_frame(level, frame);
         // Ordinary table text has no revision side effects. Avoid cloning the
@@ -512,11 +515,20 @@ impl<'a> Parser<'a> {
                 )?;
 
                 // Add cell to current row
+                if self.current_row.is_some() {
+                    let table = self.tables.len();
+                    let row = self
+                        .current_table
+                        .as_ref()
+                        .map_or(0, crate::content::table::Table::row_count);
+                    self.record_cell_source(table, row, index);
+                }
                 if let Some(row) = &mut self.current_row {
                     row.add_cell(cell);
                 }
             }
         }
+        self.current_cell_text_tokens = None;
         self.current_cell_text.clear();
         self.current_cell_paragraph_start = 0;
         self.current_cell_paragraph_frame = None;

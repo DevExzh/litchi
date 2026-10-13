@@ -27,6 +27,8 @@ use crate::transaction::{Error as TransactionError, LimitKind, SemanticLimits};
 use crate::value::{LengthSpec, Scalar, ValueType};
 
 pub(crate) mod coalesce;
+mod destination;
+mod find;
 
 /// The native proof and immutable endpoints of one RTF write.
 pub(crate) struct Commit {
@@ -35,6 +37,104 @@ pub(crate) struct Commit {
     pub(crate) patch: Patch,
     pub(crate) operations: usize,
     pub(crate) snapshot_bytes: usize,
+}
+
+/// One value held inline, or a fan-out on the heap. Exact-path writes, the
+/// common small edit, resolve and stage without a heap allocation.
+pub(super) enum Batch<T> {
+    None,
+    One(T),
+    Many(Vec<T>),
+}
+
+impl<T> Batch<T> {
+    pub(super) fn as_slice(&self) -> &[T] {
+        match self {
+            Self::None => &[],
+            Self::One(value) => std::slice::from_ref(value),
+            Self::Many(values) => values,
+        }
+    }
+
+    fn is_empty(&self) -> bool {
+        self.as_slice().is_empty()
+    }
+
+    /// `make` applied to every item, inline for a single item.
+    fn map<S>(items: &[S], mut make: impl FnMut(&S) -> Result<T>) -> Result<Self> {
+        match items {
+            [] => Ok(Self::None),
+            [item] => Ok(Self::One(make(item)?)),
+            _ => {
+                let mut values = Vec::new();
+                values
+                    .try_reserve_exact(items.len())
+                    .map_err(|source| TransactionError::Allocation { source })?;
+                for item in items {
+                    values.push(make(item)?);
+                }
+                Ok(Self::Many(values))
+            },
+        }
+    }
+}
+
+/// Resolve a path, taking a direct route for exact positional main-story
+/// paths (`/body`, `/body/p[N]`, `/body/p[N]/r[M]`). Any other path, and a
+/// miss, goes through the generic resolver, so its errors are unchanged.
+pub(super) fn resolve_exact<'f>(file: &'f Rtf, path: &PathArg<'_>) -> Result<Node<'f>> {
+    if !path.raw
+        && path.is_absolute()
+        && matches!(
+            path.origin(),
+            crate::path::arg::Origin::Typed | crate::path::arg::Origin::Text(_)
+        )
+    {
+        let package = &file.0.package;
+        match path.path().steps() {
+            [body] if coalesce::body_step(body) => return Ok(Node::body(file)),
+            steps if steps.len() <= 3 => match coalesce::direct_target(path.path()) {
+                Some(coalesce::Target::Paragraph(position)) => {
+                    if let Some(paragraph) = package.body().paragraphs().nth(position.get()) {
+                        return Ok(Node::paragraph(file, position, paragraph));
+                    }
+                },
+                Some(coalesce::Target::Run { paragraph, run }) => {
+                    if let Some(native) = package
+                        .body()
+                        .paragraphs()
+                        .nth(paragraph.get())
+                        .and_then(|value| value.runs().nth(run.get()))
+                    {
+                        return Ok(Node::run(file, paragraph, run, native));
+                    }
+                },
+                _ => {},
+            },
+            _ => {},
+        }
+        if let [body, paragraph_step, picture_step] = path.path().steps()
+            && coalesce::body_step(body)
+            && (paragraph_step.name().eq_ignore_ascii_case("p")
+                || paragraph_step.name().eq_ignore_ascii_case("paragraph"))
+            && ["picture", "image", "img"]
+                .iter()
+                .any(|name| picture_step.name().eq_ignore_ascii_case(name))
+            && let (Some(position), Some(ordinal)) = (paragraph_step.index(), picture_step.index())
+            && let Some(paragraph) = package.body().paragraphs().nth(position.get())
+            && let Some(index) =
+                super::stories::pictures(file, super::stories::anchor_range(paragraph))
+                    .nth(ordinal.get())
+            && let Some(value) = package.pictures().get(index)
+        {
+            return Ok(Node::paragraph(file, position, paragraph).child(
+                super::Kind::Picture,
+                super::node::Item::Picture { index, value },
+                ordinal,
+            ));
+        }
+    }
+    crate::path::resolve::get(&Nav::new(file), path)
 }
 
 /// Add one ordinary main-story paragraph through the native lifecycle editor.
@@ -50,7 +150,7 @@ pub(crate) fn add_with_limits<'p, 'n>(
     limits: &SemanticLimits,
 ) -> Result<(Commit, Path<'static>)> {
     file.admit_edit()?;
-    let parent = crate::path::resolve::get(&Nav::new(file), &parent)?;
+    let parent = resolve_exact(file, &parent)?;
     if node.kind().eq_ignore_ascii_case("r") || node.kind().eq_ignore_ascii_case("run") {
         if parent.element_kind() != super::Kind::Paragraph {
             return Err(Error::new(
@@ -147,7 +247,7 @@ fn add_run_with_limits<'n>(
         )
         .with_format(FileFormat::Rtf));
     };
-    let Some(source_paragraph) = parent.paragraph else {
+    let Some(source_paragraph) = parent.body_paragraph() else {
         return Err(Error::new(
             Code::UnsupportedType,
             "RTF run additions require a body paragraph",
@@ -379,23 +479,34 @@ pub(crate) fn set_with_limits<'p, 'v>(
         limits.max_expanded_targets(),
         Code::UnsupportedType,
         |node| {
-            before_text_bytes =
-                before_text_bytes.saturating_add(node.run.map_or(0, |run| run.text().len()));
+            before_text_bytes = before_text_bytes
+                .saturating_add(node.native_run().map_or(0, |run| run.text().len()));
         },
     )?;
     let positions = match resolved {
         MutationTargets::Run(targets) => {
             return publish_run_updates(
                 file,
-                targets,
+                targets.as_slice(),
                 run_format_patch(&props)?,
                 run_text(&props)?,
                 before_text_bytes,
                 limits,
             );
         },
+        MutationTargets::Destination(targets) => {
+            return destination::publish_texts(file, targets.as_slice(), &props, limits);
+        },
+        MutationTargets::Picture(_) => {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "RTF picture properties are read-only; replace or remove the picture",
+            )
+            .with_format(FileFormat::Rtf));
+        },
         MutationTargets::Paragraph(positions) => positions,
     };
+    let positions = positions.as_slice();
     let ParagraphProperties {
         text,
         alignment,
@@ -459,40 +570,29 @@ pub(crate) fn set_with_limits<'p, 'v>(
         return Err(staged_limit(staged_bytes, limits.max_staged_bytes()));
     }
 
-    let mut replacements = Vec::new();
-    if let Some(text) = text {
-        replacements
-            .try_reserve_exact(positions.len())
-            .map_err(|source| TransactionError::Allocation { source })?;
-        for position in &positions {
+    let replacements = match text {
+        Some(text) => Batch::map(positions, |position| {
             let mut replacement = String::new();
             replacement
                 .try_reserve_exact(text.len())
                 .map_err(|source| TransactionError::Allocation { source })?;
             replacement.push_str(text);
-            replacements.push(ParagraphTextReplacement::new(*position, replacement));
-        }
-    }
-
-    let mut alignments = Vec::new();
-    if let Some(alignment) = alignment {
-        alignments
-            .try_reserve_exact(positions.len())
-            .map_err(|source| TransactionError::Allocation { source })?;
-        for position in &positions {
-            alignments.push(ParagraphAlignmentUpdate::new(*position, alignment));
-        }
-    }
-
-    let mut layouts = Vec::new();
-    if let Some(layout) = layout {
-        layouts
-            .try_reserve_exact(positions.len())
-            .map_err(|source| TransactionError::Allocation { source })?;
-        for position in &positions {
-            layouts.push(ParagraphLayoutUpdate::new(*position, layout));
-        }
-    }
+            Ok(ParagraphTextReplacement::new(*position, replacement))
+        })?,
+        None => Batch::None,
+    };
+    let alignments = match alignment {
+        Some(alignment) => Batch::map(positions, |position| {
+            Ok(ParagraphAlignmentUpdate::new(*position, alignment))
+        })?,
+        None => Batch::None,
+    };
+    let layouts = match layout {
+        Some(layout) => Batch::map(positions, |position| {
+            Ok(ParagraphLayoutUpdate::new(*position, layout))
+        })?,
+        None => Batch::None,
+    };
 
     let native_limits = NativeLimits::builder()
         .max_operations(limits.max_operations())
@@ -504,11 +604,11 @@ pub(crate) fn set_with_limits<'p, 'v>(
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
     if !replacements.is_empty() {
-        edit.replace_body_paragraph_texts(&replacements)
+        edit.replace_body_paragraph_texts(replacements.as_slice())
             .map_err(Error::from)?;
     }
     if !alignments.is_empty() {
-        edit.set_body_paragraph_alignments(&alignments)
+        edit.set_body_paragraph_alignments(alignments.as_slice())
             .map_err(Error::from)?;
     }
     if !layouts.is_empty() {
@@ -516,7 +616,7 @@ pub(crate) fn set_with_limits<'p, 'v>(
         // with a typed `ParagraphLayoutTextConflict`; keeping both staged in
         // this one edit preserves that policy instead of silently splitting
         // the caller's request into two publications.
-        edit.patch_body_paragraph_layouts(&layouts)
+        edit.patch_body_paragraph_layouts(layouts.as_slice())
             .map_err(Error::from)?;
     }
     let native = edit.commit().map_err(Error::from)?;
@@ -550,17 +650,35 @@ pub(crate) fn set_with_limits<'p, 'v>(
 enum MutationKind {
     Paragraph,
     Run,
+    Destination,
+    Picture,
 }
 
 enum MutationTargets {
-    Paragraph(Vec<Position>),
-    Run(Vec<(Position, Position)>),
+    Paragraph(Batch<Position>),
+    Run(Batch<(Position, Position)>),
+    /// Retained destination stories: cells, header/footer paragraphs, notes
+    /// and comments.
+    Destination(Batch<destination::Target>),
+    /// Native picture indices.
+    Picture(Batch<usize>),
+}
+
+/// The mutation family of `node`, or `None` when it is not a mutation target.
+fn mutation_kind(node: &Node<'_>) -> Option<MutationKind> {
+    match node.element_kind() {
+        super::Kind::Paragraph if node.body_paragraph().is_some() => Some(MutationKind::Paragraph),
+        super::Kind::Run => Some(MutationKind::Run),
+        super::Kind::Picture => Some(MutationKind::Picture),
+        _ => destination::Target::of(node).map(|_| MutationKind::Destination),
+    }
 }
 
 /// Resolve the complete mutation target in one bounded walk. A query that
-/// mixes paragraph and run nodes is rejected while it is being collected, so
-/// the selector is traversed once and no partially resolved native batch can
-/// be published.
+/// mixes target families (body paragraphs, runs, retained destination
+/// stories, pictures) is rejected while it is being collected, so the
+/// selector is traversed once and no partially resolved native batch can be
+/// published.
 fn resolve_mutation_targets(
     file: &Rtf,
     target: &TargetArg<'_>,
@@ -571,24 +689,28 @@ fn resolve_mutation_targets(
     let mut kind = None;
     let mut paragraphs = Vec::new();
     let mut runs = Vec::new();
+    let mut destinations = Vec::new();
+    let mut pictures = Vec::new();
 
     let mut append = |node: Node<'_>| -> Result<()> {
-        let current = match node.element_kind() {
-            super::Kind::Paragraph => MutationKind::Paragraph,
-            super::Kind::Run => MutationKind::Run,
-            _ => {
-                return Err(Error::new(
-                    unsupported_kind,
-                    "RTF mutations target paragraph or run nodes",
-                )
-                .with_format(FileFormat::Rtf));
-            },
+        let Some(current) = mutation_kind(&node) else {
+            // Projected native concepts the editor cannot change yet are
+            // capability gaps; structural containers are the wrong type.
+            let code = match node.element_kind() {
+                super::Kind::Document | super::Kind::Body => unsupported_kind,
+                _ => Code::UnsupportedCapability,
+            };
+            return Err(Error::new(
+                code,
+                "RTF mutations target paragraphs, runs, table cells, header/footer stories, notes, comments or pictures",
+            )
+            .with_format(FileFormat::Rtf));
         };
         if let Some(previous) = kind {
             if previous != current {
                 return Err(Error::new(
                     Code::UnsupportedType,
-                    "RTF mutations cannot mix paragraph and run targets",
+                    "RTF mutations cannot mix body paragraph, run, destination-story and picture targets",
                 )
                 .with_format(FileFormat::Rtf));
             }
@@ -598,13 +720,61 @@ fn resolve_mutation_targets(
         match current {
             MutationKind::Paragraph => append_paragraph(&mut paragraphs, node, maximum)?,
             MutationKind::Run => append_run(&mut runs, node, maximum)?,
+            MutationKind::Destination => {
+                destination::append(&mut destinations, &node, maximum)?;
+            },
+            MutationKind::Picture => destination::append_picture(&mut pictures, &node, maximum)?,
         }
         selected(node);
         Ok(())
     };
 
     if let Some(path) = target.path() {
-        let node = crate::path::resolve::get(&Nav::new(file), path)?;
+        // An exact destination-story path resolves straight to its native
+        // story; a miss takes the generic route for its canonical error.
+        if !path.raw
+            && path.is_absolute()
+            && maximum != 0
+            && let Some(coalesce::Target::DestinationPath(direct)) =
+                coalesce::direct_target(path.path())
+            && let Ok(target) = destination::resolve(file, direct)
+        {
+            file.check_source()?;
+            return Ok(MutationTargets::Destination(Batch::One(target)));
+        }
+        // An exact path names one node: classify it without collecting.
+        let node = resolve_exact(file, path)?;
+        if maximum == 0 {
+            return Err(TransactionError::Limit {
+                kind: LimitKind::ExpandedTargets,
+                observed: 1,
+                maximum,
+            }
+            .into());
+        }
+        let single = match mutation_kind(&node) {
+            Some(MutationKind::Paragraph) => node
+                .paragraph_position()
+                .map(|position| MutationTargets::Paragraph(Batch::One(position))),
+            Some(MutationKind::Run) => node
+                .paragraph_position()
+                .zip(node.run_position())
+                .map(|target| MutationTargets::Run(Batch::One(target))),
+            Some(MutationKind::Destination) => destination::Target::of(&node)
+                .map(|target| MutationTargets::Destination(Batch::One(target))),
+            Some(MutationKind::Picture) => match node.item {
+                super::node::Item::Picture { index, .. } => {
+                    Some(MutationTargets::Picture(Batch::One(index)))
+                },
+                _ => None,
+            },
+            None => None,
+        };
+        if let Some(single) = single {
+            selected(node);
+            file.check_source()?;
+            return Ok(single);
+        }
         append(node)?;
     } else if let Some(query) = target.query() {
         let walk = crate::query::run(Nav::new(file), query.clone())?;
@@ -630,19 +800,24 @@ fn resolve_mutation_targets(
         Some(MutationKind::Paragraph) if !paragraphs.is_empty() => {
             paragraphs.sort_unstable();
             paragraphs.dedup();
-            Ok(MutationTargets::Paragraph(paragraphs))
+            Ok(MutationTargets::Paragraph(Batch::Many(paragraphs)))
         },
         Some(MutationKind::Run) if !runs.is_empty() => {
             runs.sort_unstable();
             runs.dedup();
-            Ok(MutationTargets::Run(runs))
+            Ok(MutationTargets::Run(Batch::Many(runs)))
         },
-        Some(MutationKind::Paragraph) | Some(MutationKind::Run) => Err(Error::new(
-            Code::ZeroMatches,
-            "the RTF mutation selector matched no paragraph or run",
-        )
-        .with_format(FileFormat::Rtf)),
-        None => Err(Error::new(
+        Some(MutationKind::Destination) if !destinations.is_empty() => {
+            destinations.sort_unstable();
+            destinations.dedup();
+            Ok(MutationTargets::Destination(Batch::Many(destinations)))
+        },
+        Some(MutationKind::Picture) if !pictures.is_empty() => {
+            pictures.sort_unstable();
+            pictures.dedup();
+            Ok(MutationTargets::Picture(Batch::Many(pictures)))
+        },
+        Some(_) | None => Err(Error::new(
             Code::ZeroMatches,
             "the RTF mutation selector matched no paragraph or run",
         )
@@ -656,7 +831,7 @@ fn resolve_mutation_targets(
 /// destination intact.
 fn publish_run_updates(
     file: &Rtf,
-    targets: Vec<(Position, Position)>,
+    targets: &[(Position, Position)],
     patch: RunFormatPatch,
     text: Option<&str>,
     before_text_bytes: usize,
@@ -702,29 +877,22 @@ fn publish_run_updates(
         }
 
         if let Some(text) = text {
-            let mut updates = Vec::new();
-            updates
-                .try_reserve_exact(targets.len())
-                .map_err(|source| TransactionError::Allocation { source })?;
-            for (paragraph, run) in targets {
+            let updates = Batch::map(targets, |(paragraph, run)| {
                 let mut replacement = String::new();
                 replacement
                     .try_reserve_exact(text.len())
                     .map_err(|source| TransactionError::Allocation { source })?;
                 replacement.push_str(text);
-                updates
-                    .push(RunTextReplacement::new(paragraph, run, replacement).with_format(patch));
-            }
-            edit.replace_body_run_texts(&updates).map_err(Error::from)?;
+                Ok(RunTextReplacement::new(*paragraph, *run, replacement).with_format(patch))
+            })?;
+            edit.replace_body_run_texts(updates.as_slice())
+                .map_err(Error::from)?;
         } else {
-            let mut updates = Vec::new();
-            updates
-                .try_reserve_exact(targets.len())
-                .map_err(|source| TransactionError::Allocation { source })?;
-            for (paragraph, run) in targets {
-                updates.push(RunFormatUpdate::new(paragraph, run, patch));
-            }
-            edit.patch_body_run_formats(&updates).map_err(Error::from)?;
+            let updates = Batch::map(targets, |(paragraph, run)| {
+                Ok(RunFormatUpdate::new(*paragraph, *run, patch))
+            })?;
+            edit.patch_body_run_formats(updates.as_slice())
+                .map_err(Error::from)?;
         }
         edit.commit().map_err(Error::from)?
     };
@@ -965,21 +1133,31 @@ pub(crate) fn remove_with_limits<'p>(
         limits.max_expanded_targets(),
         Code::UnsupportedCapability,
         |node| {
-            let bytes = node.run.map_or_else(
-                || node.paragraph.map_or(0, |paragraph| paragraph.len()),
+            let bytes = node.native_run().map_or_else(
+                || node.body_paragraph().map_or(0, |paragraph| paragraph.len()),
                 |run| run.text().len(),
             );
             removed_bytes = removed_bytes.saturating_add(bytes);
         },
     )?;
     let positions = match targets {
+        MutationTargets::Picture(indices) => {
+            return destination::remove_pictures(file, indices.as_slice(), limits);
+        },
+        MutationTargets::Destination(_) => {
+            return Err(Error::new(
+                Code::UnsupportedCapability,
+                "RTF table cells, header/footer stories, notes and comments cannot be removed; set their text instead",
+            )
+            .with_format(FileFormat::Rtf));
+        },
         MutationTargets::Run(targets) => {
             // Removing text runs preserves their containing paragraphs and all
             // unselected native formatting. The native empty replacement path
             // owns terminal-empty delimiters and exact inverse/history proofs.
             return publish_run_updates(
                 file,
-                targets,
+                targets.as_slice(),
                 RunFormatPatch::new(),
                 Some(""),
                 removed_bytes,
@@ -988,6 +1166,7 @@ pub(crate) fn remove_with_limits<'p>(
         },
         MutationTargets::Paragraph(positions) => positions,
     };
+    let positions = positions.as_slice();
     let operations = positions.len();
     if operations > limits.max_operations() {
         return Err(TransactionError::Limit {
@@ -1020,10 +1199,10 @@ pub(crate) fn remove_with_limits<'p>(
         .map_err(Error::from)?;
     let options = EditOptions::new().semantic_limits(native_limits);
     let mut edit = file.0.package.edit_with_options(options);
-    if let [position] = positions.as_slice() {
+    if let [position] = positions {
         edit.remove_paragraph(*position).map_err(Error::from)?;
     } else {
-        edit.remove_body_paragraphs(&positions)
+        edit.remove_body_paragraphs(positions)
             .map_err(Error::from)?;
     }
     let native = edit.commit().map_err(Error::from)?;
@@ -1065,7 +1244,7 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
 ) -> Result<Commit> {
     file.admit_edit()?;
     let nav = Nav::new(file);
-    let selected = crate::path::resolve::get(&nav, &path)?;
+    let selected = resolve_exact(file, &path)?;
     let from = paragraph_position(selected)?;
     let count = file.0.package.paragraph_count();
     if count == 0 {
@@ -1077,7 +1256,9 @@ pub(crate) fn move_to_with_limits<'p, 'q>(
     let to = move_destination(&nav, from, count, &placement)?;
 
     bound(LimitKind::ExpandedTargets, 1, limits.max_expanded_targets())?;
-    let text_bytes = selected.paragraph.map_or(0, |paragraph| paragraph.len());
+    let text_bytes = selected
+        .body_paragraph()
+        .map_or(0, |paragraph| paragraph.len());
     let staged_bytes = text_bytes
         .saturating_add(size_of::<usize>().saturating_mul(2))
         .saturating_add(size_of::<String>());
@@ -1147,11 +1328,12 @@ pub(crate) fn swap_with_limits<'p, 'q>(
     limits: &SemanticLimits,
 ) -> Result<Commit> {
     file.admit_edit()?;
-    let nav = Nav::new(file);
-    let left = crate::path::resolve::get(&nav, &left)?;
-    let right = crate::path::resolve::get(&nav, &right)?;
-    let left_bytes = left.paragraph.map_or(0, |paragraph| paragraph.len());
-    let right_bytes = right.paragraph.map_or(0, |paragraph| paragraph.len());
+    let left = resolve_exact(file, &left)?;
+    let right = resolve_exact(file, &right)?;
+    let left_bytes = left.body_paragraph().map_or(0, |paragraph| paragraph.len());
+    let right_bytes = right
+        .body_paragraph()
+        .map_or(0, |paragraph| paragraph.len());
     let left = paragraph_position(left)?;
     let right = paragraph_position(right)?;
 

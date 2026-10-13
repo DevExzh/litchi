@@ -1,19 +1,36 @@
 //! Handle for OpenDocument Text (`.odt`) inputs.
 //!
-//! ODT is tier 3 and read-only in M0a (record 0003 §2.3). The handle carries
-//! the facade's two payloads over unchanged: the eager `litchi_odt::Document`
-//! built from detection's prepared package (byte and reader routes), and the
-//! filesystem-backed `litchi_odt::SourceBackedDocument` (path route on
-//! `unix`/`windows`). Both keep the package they were opened from, so M6 can
-//! add write without reshaping this state.
+//! The handle retains the leaf read owner detection built — the eager
+//! `litchi_odt::Document` of the byte and reader routes, with its immutable
+//! `litchi_odt::Package`, or the filesystem-backed
+//! `litchi_odt::SourceBackedDocument` of the path route — and reads through
+//! the leaf body index (`litchi_odt::body`). Edits stage typed body edits on
+//! the leaf `Package::edit()` transaction; a filesystem-backed handle
+//! materializes its package once, on its first edit or publication.
+
+pub(crate) mod children;
+mod nav;
+mod node;
+mod props;
+mod spec;
+pub(crate) mod views;
+pub(crate) mod write;
+
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub(crate) use props::Props;
+pub use spec::Kind;
+pub(crate) use spec::{ADDABLE, REMOVABLE, SETTABLE, SPEC, WRITE_GAPS};
 
 use std::fmt;
-use std::sync::Arc;
+use std::path::Path;
+use std::sync::{Arc, OnceLock};
 
 use litchi_core::Metadata;
 use litchi_core::detection::FileFormat;
 use litchi_odf_common::PreparedPackage;
 use litchi_odf_common::leniency::ToleranceReport;
+use litchi_odt::body::{Body, NodeId, Tree};
 
 use crate::{Error, OpenOptions, Result};
 
@@ -23,6 +40,41 @@ pub struct Odt(Arc<OdtState>);
 
 struct OdtState {
     owner: OdtOwner,
+    /// The immutable leaf package: set for eager owners, materialized on
+    /// first use for a filesystem-backed owner.
+    package: OnceLock<litchi_odt::Package>,
+    /// The body index of a filesystem-backed owner (an eager document keeps
+    /// its own).
+    tree: OnceLock<Tree>,
+    /// Child identities by parent and unified kind, built on the first
+    /// ordinal lookup past [`DIRECT_SCAN`] children.
+    kinds: OnceLock<KindIndex>,
+    origin: Option<Arc<Path>>,
+}
+
+/// Ordinal lookups below this many same-kind children scan the parent;
+/// deeper ones read the per-handle [`KindIndex`].
+const DIRECT_SCAN: usize = 32;
+
+/// The children of every body node by unified kind, in document order.
+struct KindIndex {
+    children: std::collections::HashMap<(NodeId, u8), Vec<NodeId>>,
+}
+
+impl KindIndex {
+    fn build(body: Body<'_>) -> Self {
+        let mut children: std::collections::HashMap<(NodeId, u8), Vec<NodeId>> =
+            std::collections::HashMap::new();
+        for node in body.nodes() {
+            if let (Some(parent), Some(kind)) = (node.parent(), Kind::of(node.kind())) {
+                children
+                    .entry((parent.id(), kind as u8))
+                    .or_default()
+                    .push(node.id());
+            }
+        }
+        Self { children }
+    }
 }
 
 /// The ODT read owner, in the state today's route builds.
@@ -32,7 +84,7 @@ struct OdtState {
 )]
 pub(crate) enum OdtOwner {
     /// Parsed from the package detection prepared (byte and reader routes,
-    /// and the path fallback on other targets).
+    /// the path fallback on other targets, and every edit result).
     Eager(litchi_odt::Document),
     /// Filesystem-backed, with deferred package payloads (path route).
     #[cfg(any(unix, windows))]
@@ -47,14 +99,14 @@ const _: () = {
 
 /// Typed ODF limit failures stay `Source::Odf`; every other failure keeps
 /// its common-core payload as `Source::Core`, exactly as before W3.
-fn odf_error(error: litchi_odf_common::Error) -> Error {
+pub(crate) fn odf_error(error: litchi_odf_common::Error) -> Error {
     match error {
         litchi_odf_common::Error::Core(error) => core_error(error),
         other => Error::from(other).with_format(FileFormat::Odt),
     }
 }
 
-fn core_error(error: litchi_core::Error) -> Error {
+pub(crate) fn core_error(error: litchi_core::Error) -> Error {
     Error::from(error).with_format(FileFormat::Odt)
 }
 
@@ -63,11 +115,23 @@ impl Odt {
     /// a second ZIP index. The ODF limits were applied when the package was
     /// prepared.
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let document = litchi_odt::Package::from_prepared_package(prepared)
-            .map_err(odf_error)?
-            .document()
-            .map_err(core_error)?;
-        Ok(Self::from_owner(OdtOwner::Eager(document)))
+        let package = litchi_odt::Package::from_prepared_package(prepared).map_err(odf_error)?;
+        Self::from_package(package, None)
+    }
+
+    /// Adopts an immutable leaf package (a commit result or a fresh one).
+    pub(crate) fn from_package(
+        package: litchi_odt::Package,
+        origin: Option<Arc<Path>>,
+    ) -> Result<Self> {
+        let document = package.document().map_err(core_error)?;
+        Ok(Self(Arc::new(OdtState {
+            owner: OdtOwner::Eager(document),
+            package: OnceLock::from(package),
+            tree: OnceLock::new(),
+            kinds: OnceLock::new(),
+            origin,
+        })))
     }
 
     /// Opens the source-pinned candidate the document path probe returned
@@ -88,7 +152,30 @@ impl Odt {
     }
 
     fn from_owner(owner: OdtOwner) -> Self {
-        Self(Arc::new(OdtState { owner }))
+        Self(Arc::new(OdtState {
+            owner,
+            package: OnceLock::new(),
+            tree: OnceLock::new(),
+            kinds: OnceLock::new(),
+            origin: None,
+        }))
+    }
+
+    /// The same document, saving to `origin`. Called on a handle the open
+    /// route just built, which no other handle shares yet.
+    pub(crate) fn with_origin(self, origin: Option<Arc<Path>>) -> Self {
+        match Arc::try_unwrap(self.0) {
+            Ok(mut state) => {
+                state.origin = origin;
+                Self(Arc::new(state))
+            },
+            Err(shared) => Self(shared),
+        }
+    }
+
+    /// The path the document was opened from, if any.
+    pub(crate) fn origin(&self) -> Option<&Arc<Path>> {
+        self.0.origin.as_ref()
     }
 
     /// The document's plain text.
@@ -151,6 +238,268 @@ impl Odt {
     pub(crate) fn owner(&self) -> &OdtOwner {
         &self.0.owner
     }
+
+    /// The structural body index, built once per handle.
+    pub(crate) fn body(&self) -> Result<Body<'_>> {
+        match &self.0.owner {
+            OdtOwner::Eager(document) => document.body().map_err(core_error),
+            #[cfg(any(unix, windows))]
+            OdtOwner::Source(document) => {
+                let content = document.content_xml().map_err(core_error)?;
+                let styles = document.styles_xml().map_err(core_error)?;
+                let tree = match self.0.tree.get() {
+                    Some(tree) => tree,
+                    None => {
+                        let tree = Tree::build(content, styles).map_err(core_error)?;
+                        self.0.tree.get_or_init(|| tree)
+                    },
+                };
+                Ok(tree.view(content, styles))
+            },
+        }
+    }
+
+    /// The `ordinal`th child of `kind` under a body-backed `parent`, with
+    /// its ordinal.
+    pub(crate) fn nth_child(
+        &self,
+        parent: &Node<'_>,
+        kind: Kind,
+        ordinal: usize,
+    ) -> Result<Option<(NodeId, usize)>> {
+        let Some(leaf) = parent.leaf() else {
+            return Ok(None);
+        };
+        if ordinal < DIRECT_SCAN {
+            return Ok(leaf
+                .children()
+                .filter(|child| Kind::of(child.kind()) == Some(kind))
+                .nth(ordinal)
+                .map(|child| (child.id(), ordinal)));
+        }
+        let index = match self.0.kinds.get() {
+            Some(index) => index,
+            None => {
+                let index = KindIndex::build(self.body()?);
+                self.0.kinds.get_or_init(|| index)
+            },
+        };
+        Ok(index
+            .children
+            .get(&(leaf.id(), kind as u8))
+            .and_then(|children| children.get(ordinal))
+            .map(|id| (*id, ordinal)))
+    }
+
+    /// The last child of `kind` under a body-backed `parent`, with its
+    /// ordinal.
+    pub(crate) fn last_child(
+        &self,
+        parent: &Node<'_>,
+        kind: Kind,
+    ) -> Result<Option<(NodeId, usize)>> {
+        let Some(leaf) = parent.leaf() else {
+            return Ok(None);
+        };
+        Ok(leaf
+            .children()
+            .filter(|child| Kind::of(child.kind()) == Some(kind))
+            .enumerate()
+            .last()
+            .map(|(ordinal, child)| (child.id(), ordinal)))
+    }
+
+    /// The immutable leaf package edits start from.
+    pub(crate) fn package(&self) -> Result<&litchi_odt::Package> {
+        if let Some(package) = self.0.package.get() {
+            return Ok(package);
+        }
+        match &self.0.owner {
+            OdtOwner::Eager(_) => Err(Error::new(
+                crate::Code::InternalError,
+                "an eager ODT handle lost its package",
+            )
+            .with_format(FileFormat::Odt)),
+            #[cfg(any(unix, windows))]
+            OdtOwner::Source(document) => {
+                let package = self.0.owner.finish(document.to_package())?;
+                Ok(self.0.package.get_or_init(|| package))
+            },
+        }
+    }
+
+    /// Fails with `io_error` when a filesystem-backed source changed.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        self.0.owner.check_source()
+    }
+
+    /// Whether two handles retain the same immutable package bytes.
+    pub(crate) fn same_snapshot(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+            || match (self.0.package.get(), other.0.package.get()) {
+                (Some(left), Some(right)) => left.as_bytes() == right.as_bytes(),
+                _ => false,
+            }
+    }
+
+    /// Publish the document's package bytes into `sink`.
+    pub(crate) fn write_to(&self, sink: impl std::io::Write) -> Result<()> {
+        self.package()?.write_to(sink).map_err(odf_error)
+    }
+
+    /// Atomically save the document's package to `path`: a sibling
+    /// temporary file renamed over the destination, or published only when
+    /// the destination is still absent under [`crate::Overwrite::Refuse`].
+    pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
+        let package = self.package()?;
+        let bytes = package.as_bytes();
+        let overwrite = match options.overwrite {
+            crate::Overwrite::Replace => litchi_core::atomic::Overwrite::Replace,
+            crate::Overwrite::Refuse => litchi_core::atomic::Overwrite::Refuse,
+        };
+        litchi_core::atomic::save(
+            path,
+            options.durability,
+            overwrite,
+            |writer| {
+                use std::io::Write as _;
+                writer.write_all(bytes).map_err(|error| {
+                    litchi_odf_common::Error::from(litchi_core::atomic::Error::from(error))
+                })
+            },
+            || Ok(()),
+        )
+        .map_err(odf_error)?;
+        self.check_source()?;
+        Ok(u64::try_from(bytes.len()).unwrap_or(u64::MAX))
+    }
+
+    /// A fresh empty text document.
+    pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
+        write::create(options)
+    }
+
+    /// Admit a leaf edit before a unified transaction starts: the source is
+    /// current and the package is available.
+    pub(crate) fn admit_edit(&self) -> Result<()> {
+        self.check_source()?;
+        self.package().map(drop)
+    }
+
+    /// Whether two handles publish the same package bytes.
+    pub(crate) fn same_content(&self, other: &Self) -> Result<bool> {
+        Ok(self.same_snapshot(other) || self.package()?.as_bytes() == other.package()?.as_bytes())
+    }
+
+    /// Set properties with the default unified limits.
+    pub(crate) fn set<'p, 'v>(
+        &self,
+        target: crate::TargetArg<'p>,
+        props: impl crate::IntoProps<'v>,
+    ) -> Result<write::Commit> {
+        write::set_with_limits(
+            self,
+            target,
+            props,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Set properties with the caller's transaction limits.
+    pub(crate) fn set_with_limits<'p, 'v>(
+        &self,
+        target: crate::TargetArg<'p>,
+        props: impl crate::IntoProps<'v>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::set_with_limits(self, target, props, limits)
+    }
+
+    /// Add one element with the default unified limits.
+    pub(crate) fn add<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+    ) -> Result<(write::Commit, crate::path::Path<'static>)> {
+        write::add_with_limits(
+            self,
+            parent,
+            node,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Add one element with the caller's transaction limits.
+    pub(crate) fn add_with_limits<'p, 'n>(
+        &self,
+        parent: crate::path::PathArg<'p>,
+        node: crate::NewNode<'n>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<(write::Commit, crate::path::Path<'static>)> {
+        write::add_with_limits(self, parent, node, limits)
+    }
+
+    /// Remove targets with the default unified limits.
+    pub(crate) fn remove<'p>(&self, target: crate::TargetArg<'p>) -> Result<write::Commit> {
+        write::remove_with_limits(self, target, &crate::transaction::SemanticLimits::default())
+    }
+
+    /// Remove targets with the caller's transaction limits.
+    pub(crate) fn remove_with_limits<'p>(
+        &self,
+        target: crate::TargetArg<'p>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::remove_with_limits(self, target, limits)
+    }
+
+    /// Move one element with the default unified limits.
+    pub(crate) fn move_to<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::Placement<'q>,
+    ) -> Result<write::Commit> {
+        write::move_to_with_limits(
+            self,
+            path,
+            placement,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Move one element with the caller's transaction limits.
+    pub(crate) fn move_to_with_limits<'p, 'q>(
+        &self,
+        path: crate::path::PathArg<'p>,
+        placement: crate::Placement<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::move_to_with_limits(self, path, placement, limits)
+    }
+
+    /// Exchange two elements with the default unified limits.
+    pub(crate) fn swap<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+    ) -> Result<write::Commit> {
+        write::swap_with_limits(
+            self,
+            left,
+            right,
+            &crate::transaction::SemanticLimits::default(),
+        )
+    }
+
+    /// Exchange two elements with the caller's transaction limits.
+    pub(crate) fn swap_with_limits<'p, 'q>(
+        &self,
+        left: crate::path::PathArg<'p>,
+        right: crate::path::PathArg<'q>,
+        limits: &crate::transaction::SemanticLimits,
+    ) -> Result<write::Commit> {
+        write::swap_with_limits(self, left, right, limits)
+    }
 }
 
 impl OdtOwner {
@@ -173,7 +522,6 @@ impl OdtOwner {
     /// Fails with `io_error` when a filesystem-backed source changed since
     /// open; always succeeds for the eager owner. This is the ODT half of
     /// the facade's `check_source_freshness_after_markdown`.
-    #[allow(dead_code, reason = "consumed by the `File` markdown adapter (M0a S7)")]
     pub(crate) fn check_source(&self) -> Result<()> {
         match self {
             Self::Eager(_) => Ok(()),

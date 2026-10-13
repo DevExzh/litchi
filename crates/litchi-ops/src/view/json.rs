@@ -13,6 +13,8 @@
         feature = "xlsb",
         feature = "xls",
         feature = "rtf",
+        feature = "ods",
+        feature = "odt",
         feature = "odp"
     )),
     allow(
@@ -68,6 +70,10 @@ enum Inner<'f> {
     Xls(crate::format::xls::ViewJson),
     #[cfg(feature = "rtf")]
     Rtf(crate::format::rtf::views::Json),
+    #[cfg(feature = "ods")]
+    Ods(crate::format::ods::ViewJson),
+    #[cfg(feature = "odt")]
+    Odt(crate::format::odt::views::Json),
     #[cfg(feature = "odp")]
     Odp(crate::format::odp::views::Json),
     /// Keeps `'f` in use; uninhabited.
@@ -124,11 +130,27 @@ impl Json<'_> {
         }
     }
 
+    /// An ODT view.
+    #[cfg(feature = "odt")]
+    pub(crate) fn odt(json: crate::format::odt::views::Json) -> Self {
+        Self {
+            inner: Inner::Odt(json),
+        }
+    }
+
     /// An RTF view.
     #[cfg(feature = "rtf")]
     pub(crate) fn rtf(json: crate::format::rtf::views::Json) -> Self {
         Self {
             inner: Inner::Rtf(json),
+        }
+    }
+
+    /// An ODS view.
+    #[cfg(feature = "ods")]
+    pub(crate) fn ods(json: crate::format::ods::ViewJson) -> Self {
+        Self {
+            inner: Inner::Ods(json),
         }
     }
 
@@ -160,6 +182,10 @@ impl Serialize for Json<'_> {
             Inner::Xls(json) => json.serialize(serializer),
             #[cfg(feature = "rtf")]
             Inner::Rtf(json) => json.serialize(serializer),
+            #[cfg(feature = "ods")]
+            Inner::Ods(json) => json.serialize(serializer),
+            #[cfg(feature = "odt")]
+            Inner::Odt(json) => json.serialize(serializer),
             #[cfg(feature = "odp")]
             Inner::Odp(json) => json.serialize(serializer),
             Inner::Never(never, _) => match *never {},

@@ -1,51 +1,95 @@
-//! Handle for OpenDocument Spreadsheet (`.ods`) inputs.
+//! Handle for OpenDocument Spreadsheet (`.ods`, flat `.fods`) inputs.
 //!
-//! ODS is tier 3 and read-only in M0a (record 0003 §2.3). The handle carries
-//! the facade's two payloads over: the eager `litchi_ods::Workbook` (byte
-//! and reader routes) and the filesystem-backed
-//! `litchi_ods::SourceBackedSpreadsheet` (path route on `unix`/`windows`).
+//! The handle keeps the leaf owner each open route builds (record 0277):
 //!
-//! The facade held the eager spreadsheet in a `RefCell`, which made its
-//! `Workbook` `!Sync` (`litchi::sheet::workbook_types`). Every read API the
-//! facade calls takes `&self`, so the owner is held directly here: no
-//! interior mutability, and the handle is `Sync`.
+//! - the immutable [`litchi_ods::Package`] with its parsed
+//!   [`litchi_ods::Workbook`] projection (byte and reader routes, fresh
+//!   creation, and every committed edit);
+//! - the filesystem-backed [`litchi_ods::SourceBackedSpreadsheet`] on the
+//!   path route, which materializes its editable `Package` once, on the
+//!   first edit;
+//! - the flat single-XML [`litchi_ods::FlatSpreadsheet`], read-only through
+//!   the unified layer.
 //!
-//! The facade's metadata sidecar is not copied at open: both owners keep the
-//! projection they parsed, and [`Ods::metadata`] reads it on demand.
+//! Reads borrow the owner's typed worksheets; nothing is copied at open.
+//! Writes stage one leaf [`litchi_ods::document::Edit`] per unified call or
+//! coalesced batch run and publish its commit as a new handle, leaving this
+//! one unchanged.
 
 use std::fmt;
+use std::path::Path;
 use std::sync::{Arc, OnceLock};
 
 use litchi_core::Metadata;
 use litchi_core::detection::FileFormat;
 use litchi_odf_common::PreparedPackage;
 use litchi_odf_common::leniency::ToleranceReport;
+use litchi_ods::model::names::Definition;
+use litchi_ods::{Package, Sheet};
 
-use crate::{Error, OpenOptions, Result};
+use crate::{Code, Error, OpenOptions, Result};
+
+mod children;
+mod index;
+pub(crate) mod metadata;
+mod nav;
+mod node;
+mod spec;
+pub(crate) mod views;
+pub(crate) mod write;
+
+pub(crate) use children::Children;
+pub(crate) use nav::Nav;
+pub use node::Node;
+pub(crate) use node::Props;
+pub(crate) use spec::{
+    ADDABLE, CELL_WRITE_TABLE, REMOVABLE, SETTABLE, SPEC, WRITE_GAPS, capability_props,
+};
+pub(crate) use views::{Json as ViewJson, view_json, view_to};
+pub(crate) use write::Commit as WriteCommit;
 
 /// An opened ODS spreadsheet. Cheap to clone (one `Arc` bump); `Send + Sync`.
 #[derive(Clone)]
 pub struct Ods(Arc<OdsState>);
 
 struct OdsState {
+    /// The owner and its read caches, shared by handles that differ only in
+    /// their origin.
+    inner: Arc<Inner>,
+    /// The path a path-backed open read, for `File::save`.
+    origin: Option<Arc<Path>>,
+}
+
+struct Inner {
     owner: OdsOwner,
     /// Worksheet names for the generic sheet traits, which borrow them;
     /// built on their first use.
     names: OnceLock<Box<[String]>>,
+    /// Lazily built read indexes (content cells, annotations).
+    cache: index::Cache,
 }
 
-/// The ODS read owner, in the state today's route builds.
+/// The ODS owner, in the state the open route or the last commit built.
 #[allow(
     clippy::large_enum_variant,
     reason = "the owner lives once behind the handle's `Arc`; boxing a variant would add an allocation to that open route"
 )]
 enum OdsOwner {
-    /// Parsed in full at open (byte and reader routes, and the path fallback
-    /// on other targets).
-    Eager(litchi_ods::Workbook),
+    /// The immutable package and its parsed projection (byte and reader
+    /// routes, creation, and every committed edit).
+    Eager {
+        package: Package,
+        workbook: litchi_ods::Workbook,
+    },
     /// Filesystem-backed, with deferred package-member reads (path route).
+    /// The editable package is materialized once, on the first edit.
     #[cfg(any(unix, windows))]
-    Source(litchi_ods::SourceBackedSpreadsheet),
+    Source {
+        spreadsheet: Box<litchi_ods::SourceBackedSpreadsheet>,
+        package: OnceLock<Package>,
+    },
+    /// A flat single-XML spreadsheet (`.fods`).
+    Flat(litchi_ods::FlatSpreadsheet),
 }
 
 const fn assert_handle<T: Send + Sync + Clone>() {}
@@ -56,14 +100,14 @@ const _: () = {
 
 /// Typed ODF limit failures stay `Source::Odf`; every other failure keeps
 /// its common-core payload as `Source::Core`, exactly as before W3.
-fn odf_error(error: litchi_odf_common::Error) -> Error {
+pub(crate) fn odf_error(error: litchi_odf_common::Error) -> Error {
     match error {
         litchi_odf_common::Error::Core(error) => core_error(error),
         other => Error::from(other).with_format(FileFormat::Ods),
     }
 }
 
-fn core_error(error: litchi_core::Error) -> Error {
+pub(crate) fn core_error(error: litchi_core::Error) -> Error {
     Error::from(error).with_format(FileFormat::Ods)
 }
 
@@ -73,11 +117,8 @@ impl Ods {
     /// by turning a prepared package back into bytes and parsing them again
     /// (`DetectedFormat::Ods`).
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let spreadsheet = litchi_ods::Package::from_prepared_package(prepared)
-            .map_err(odf_error)?
-            .workbook()
-            .map_err(core_error)?;
-        Ok(Self::from_owner(OdsOwner::Eager(spreadsheet)))
+        let package = Package::from_prepared_package(prepared).map_err(odf_error)?;
+        Self::from_package(package, None)
     }
 
     /// Adopts the source-backed owner the path route built over the file.
@@ -92,25 +133,161 @@ impl Ods {
         _options: &OpenOptions,
     ) -> Result<Self> {
         spreadsheet.check_source().map_err(core_error)?;
-        Ok(Self::from_owner(OdsOwner::Source(*spreadsheet)))
+        Ok(Self::from_owner(
+            OdsOwner::Source {
+                spreadsheet,
+                package: OnceLock::new(),
+            },
+            None,
+        ))
     }
 
-    fn from_owner(owner: OdsOwner) -> Self {
+    /// Parses a flat single-XML spreadsheet detection recognized.
+    pub(crate) fn from_flat(bytes: Vec<u8>, options: &OpenOptions) -> Result<Self> {
+        let mut limits = litchi_ods::FlatLimits::default();
+        if let Some(maximum) = options.max_input_bytes {
+            let maximum = usize::try_from(maximum).unwrap_or(usize::MAX);
+            if maximum < bytes.len() {
+                return Err(Error::from(litchi_core::Error::ResourceLimit(
+                    litchi_core::ResourceLimit {
+                        resource: litchi_core::Resource::InputBytes,
+                        observed: u64::try_from(bytes.len()).unwrap_or(u64::MAX),
+                        limit: u64::try_from(maximum).unwrap_or(u64::MAX),
+                        scope: Arc::from("flat ODS input"),
+                    },
+                ))
+                .with_format(FileFormat::Ods));
+            }
+            limits = limits.with_input_bytes(maximum.min(bytes.len().max(1)));
+        }
+        let flat =
+            litchi_ods::FlatSpreadsheet::from_bytes_with(bytes, limits).map_err(core_error)?;
+        Ok(Self::from_owner(OdsOwner::Flat(flat), None))
+    }
+
+    /// Adopts an immutable package (creation and committed edits), keeping
+    /// `origin` for `File::save`.
+    pub(crate) fn from_package(package: Package, origin: Option<Arc<Path>>) -> Result<Self> {
+        let workbook = package.workbook().map_err(core_error)?;
+        Ok(Self::from_owner(
+            OdsOwner::Eager { package, workbook },
+            origin,
+        ))
+    }
+
+    fn from_owner(owner: OdsOwner, origin: Option<Arc<Path>>) -> Self {
         Self(Arc::new(OdsState {
-            owner,
-            names: OnceLock::new(),
+            inner: Arc::new(Inner {
+                owner,
+                names: OnceLock::new(),
+                cache: index::Cache::default(),
+            }),
+            origin,
         }))
+    }
+
+    /// The same owner with `origin` as its save destination.
+    pub(crate) fn with_origin(&self, origin: Option<Arc<Path>>) -> Self {
+        Self(Arc::new(OdsState {
+            inner: Arc::clone(&self.0.inner),
+            origin,
+        }))
+    }
+
+    fn owner(&self) -> &OdsOwner {
+        &self.0.inner.owner
+    }
+
+    /// The path a path-backed open read.
+    pub(crate) fn origin(&self) -> Option<Arc<Path>> {
+        self.0.origin.clone()
+    }
+
+    /// Whether two handles share one owner (they may differ in origin).
+    pub(crate) fn same_inner(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0.inner, &other.0.inner)
+    }
+
+    /// Whether the handle reads a flat single-XML spreadsheet.
+    pub(crate) fn is_flat(&self) -> bool {
+        matches!(self.owner(), OdsOwner::Flat(_))
     }
 
     /// Whether the owner defers package-member reads to the file, for the
     /// tests that pin each route's owner.
     #[cfg(test)]
     pub(crate) fn is_source_backed(&self) -> bool {
-        match &self.0.owner {
-            OdsOwner::Eager(_) => false,
+        match self.owner() {
+            OdsOwner::Eager { .. } | OdsOwner::Flat(_) => false,
             #[cfg(any(unix, windows))]
-            OdsOwner::Source(_) => true,
+            OdsOwner::Source { .. } => true,
         }
+    }
+
+    /// Fence a filesystem-backed owner against source changes.
+    ///
+    /// # Errors
+    ///
+    /// Returns `io_error` when the file changed after open.
+    pub(crate) fn check_source(&self) -> Result<()> {
+        match self.owner() {
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.check_source().map_err(core_error),
+            _ => Ok(()),
+        }
+    }
+
+    /// Run one read and fence the source after it; a freshness failure takes
+    /// precedence over the read's own result.
+    pub(crate) fn finish<T>(&self, operation: impl FnOnce() -> Result<T>) -> Result<T> {
+        let value = operation();
+        match self.check_source() {
+            Err(error) => Err(error),
+            Ok(()) => value,
+        }
+    }
+
+    /// The typed worksheets in document order, borrowed from the owner.
+    /// Every owner holds its parsed worksheets, so nothing is decoded here.
+    pub(crate) fn worksheets(&self) -> Result<&[Sheet]> {
+        match self.owner() {
+            OdsOwner::Eager { workbook, .. } => Ok(workbook.sheets()),
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheets().map_err(core_error),
+            OdsOwner::Flat(flat) => Ok(flat.sheets()),
+        }
+    }
+
+    /// Named ranges and named expressions in document order. A flat
+    /// spreadsheet's definitions are not projected by its leaf owner.
+    pub(crate) fn definitions(&self) -> Result<&[Definition]> {
+        match self.owner() {
+            OdsOwner::Eager { workbook, .. } => Ok(workbook.definitions()),
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.definitions().map_err(core_error),
+            OdsOwner::Flat(_) => Ok(&[]),
+        }
+    }
+
+    /// The `content.xml` annotations are parsed from. A flat spreadsheet's
+    /// annotations are not projected (record 0277 gap F2).
+    pub(crate) fn content_xml(&self) -> Result<&str> {
+        match self.owner() {
+            OdsOwner::Eager { workbook, .. } => Ok(workbook.content_xml()),
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.content_xml().map_err(core_error),
+            OdsOwner::Flat(_) => Err(Error::new(
+                Code::UnsupportedCapability,
+                "flat ODS annotations are not projected into unified nodes",
+            )
+            .with_format(FileFormat::Ods)
+            .with_suggestion("follow-up: ODS adapter (record 0277 gap F2)")),
+        }
+    }
+
+    /// The read caches of this snapshot.
+    pub(crate) fn cache(&self) -> &index::Cache {
+        &self.0.inner.cache
     }
 
     /// Worksheet names in document order.
@@ -119,10 +296,11 @@ impl Ods {
     ///
     /// Returns `io_error` when a filesystem-backed source changed.
     pub fn worksheet_names(&self) -> Result<Vec<String>> {
-        match &self.0.owner {
-            OdsOwner::Eager(spreadsheet) => Ok(spreadsheet.sheet_names()),
+        match self.owner() {
+            OdsOwner::Eager { workbook, .. } => Ok(workbook.sheet_names()),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source(spreadsheet) => spreadsheet.sheet_names().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheet_names().map_err(core_error),
+            OdsOwner::Flat(flat) => Ok(flat.sheets().iter().map(|s| s.name.clone()).collect()),
         }
     }
 
@@ -132,32 +310,18 @@ impl Ods {
     ///
     /// As for [`Self::worksheet_names`].
     pub fn worksheet_count(&self) -> Result<usize> {
-        match &self.0.owner {
-            OdsOwner::Eager(spreadsheet) => Ok(spreadsheet.sheet_count()),
+        match self.owner() {
+            OdsOwner::Eager { workbook, .. } => Ok(workbook.sheet_count()),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source(spreadsheet) => spreadsheet.sheet_count().map_err(core_error),
-        }
-    }
-
-    /// The typed worksheets in document order, borrowed from the owner.
-    ///
-    /// The facade has no ODS sheet adapter to port (its `sheet::adapters`
-    /// covers XLSX and XLSB only); the workbook family view reads the
-    /// worksheet names and count through this, and an ODS adapter can build
-    /// on it in M1. Both owners hold their parsed worksheets, so nothing is
-    /// decoded here.
-    pub(crate) fn worksheets(&self) -> Result<&[litchi_ods::Sheet]> {
-        match &self.0.owner {
-            OdsOwner::Eager(spreadsheet) => Ok(spreadsheet.sheets()),
-            #[cfg(any(unix, windows))]
-            OdsOwner::Source(spreadsheet) => spreadsheet.sheets().map_err(core_error),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.sheet_count().map_err(core_error),
+            OdsOwner::Flat(flat) => Ok(flat.sheets().len()),
         }
     }
 
     /// Worksheet names the generic sheet traits borrow: read once through
     /// [`Self::worksheets`], and empty when that read fails.
     pub(crate) fn trait_names(&self) -> &[String] {
-        self.0.names.get_or_init(|| {
+        self.0.inner.names.get_or_init(|| {
             self.worksheets()
                 .map(|sheets| sheets.iter().map(|sheet| sheet.name.clone()).collect())
                 .unwrap_or_default()
@@ -173,12 +337,23 @@ impl Ods {
     /// or cannot reserve its output, and `io_error` when a filesystem-backed
     /// source changed.
     pub fn text(&self) -> Result<String> {
-        match &self.0.owner {
-            OdsOwner::Eager(spreadsheet) => spreadsheet.text(),
+        match self.owner() {
+            OdsOwner::Eager { workbook, .. } => workbook.text(),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source(spreadsheet) => spreadsheet.text(),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.text(),
+            OdsOwner::Flat(flat) => flat.text(),
         }
         .map_err(core_error)
+    }
+
+    /// Document properties from `meta.xml`, borrowed from the owner.
+    pub(crate) fn metadata_ref(&self) -> Result<&Metadata> {
+        match self.owner() {
+            OdsOwner::Eager { workbook, .. } => Ok(workbook.metadata()),
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.metadata().map_err(core_error),
+            OdsOwner::Flat(flat) => Ok(flat.metadata()),
+        }
     }
 
     /// Document properties from `meta.xml`. Always `Some` for ODS.
@@ -187,12 +362,7 @@ impl Ods {
     ///
     /// As for [`Self::worksheet_names`].
     pub fn metadata(&self) -> Result<Option<Metadata>> {
-        let metadata = match &self.0.owner {
-            OdsOwner::Eager(spreadsheet) => spreadsheet.metadata(),
-            #[cfg(any(unix, windows))]
-            OdsOwner::Source(spreadsheet) => spreadsheet.metadata().map_err(core_error)?,
-        };
-        Ok(Some(metadata.clone()))
+        Ok(Some(self.metadata_ref()?.clone()))
     }
 
     /// Everything the reader repaired while opening the package and parsing
@@ -203,20 +373,125 @@ impl Ods {
     /// None today; the `Result` keeps the read surface uniform across
     /// formats.
     pub fn tolerance_report(&self) -> Result<ToleranceReport> {
-        Ok(match &self.0.owner {
-            OdsOwner::Eager(spreadsheet) => spreadsheet.tolerance_report().clone(),
+        Ok(match self.owner() {
+            OdsOwner::Eager { workbook, .. } => workbook.tolerance_report().clone(),
             #[cfg(any(unix, windows))]
-            OdsOwner::Source(spreadsheet) => spreadsheet.tolerance_report().clone(),
+            OdsOwner::Source { spreadsheet, .. } => spreadsheet.tolerance_report().clone(),
+            OdsOwner::Flat(flat) => flat.tolerance_report().clone(),
         })
+    }
+
+    /// The immutable package of a packaged owner: the retained one, or the
+    /// path route's file materialized once and fenced against change.
+    ///
+    /// # Errors
+    ///
+    /// `unsupported_capability` for a flat spreadsheet; `io_error` when the
+    /// file changed after open; the leaf's typed failure otherwise.
+    pub(crate) fn materialized(&self) -> Result<Package> {
+        match self.owner() {
+            OdsOwner::Eager { package, .. } => Ok(package.clone()),
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source {
+                spreadsheet,
+                package,
+            } => {
+                if let Some(package) = package.get() {
+                    spreadsheet.check_source().map_err(core_error)?;
+                    return Ok(package.clone());
+                }
+                let materialized = spreadsheet.materialize().map_err(core_error)?;
+                Ok(package.get_or_init(|| materialized).clone())
+            },
+            OdsOwner::Flat(_) => Err(Error::new(
+                Code::UnsupportedCapability,
+                "a flat ODS spreadsheet has no package owner",
+            )
+            .with_format(FileFormat::Ods)),
+        }
+    }
+
+    /// Create the minimal valid spreadsheet: one empty worksheet.
+    pub(crate) fn create(options: &crate::CreateOptions) -> Result<Self> {
+        use crate::create::{Conformance, Flavor};
+        let refusal = if options.flavor_value() != Flavor::Document {
+            Some((
+                "ODS template creation is not integrated",
+                "use Flavor::Document",
+            ))
+        } else if options.conformance_value() == Conformance::Strict {
+            Some((
+                "ODS does not support OOXML Strict conformance",
+                "use Conformance::Transitional",
+            ))
+        } else {
+            None
+        };
+        if let Some((message, suggestion)) = refusal {
+            return Err(Error::new(Code::UnsupportedCapability, message)
+                .with_format(FileFormat::Ods)
+                .with_suggestion(suggestion));
+        }
+        let package = match options.metadata_value() {
+            Some(metadata) => metadata::create(metadata)?,
+            None => Package::new().map_err(odf_error)?,
+        };
+        Self::from_package(package, None)
+    }
+
+    /// Publish this snapshot's exact bytes to `sink`.
+    pub(crate) fn write_to<W: std::io::Write>(&self, sink: &mut W) -> Result<()> {
+        self.check_source()?;
+        match self.owner() {
+            OdsOwner::Eager { package, .. } => {
+                sink.write_all(package.as_bytes())?;
+            },
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source { .. } => {
+                let package = self.materialized()?;
+                sink.write_all(package.as_bytes())?;
+            },
+            OdsOwner::Flat(flat) => sink.write_all(flat.as_bytes())?,
+        }
+        self.check_source()
+    }
+
+    /// Publish this snapshot to `path` through the shared sibling-temporary
+    /// atomic replacement the leaf `Package::save` uses.
+    pub(crate) fn save_to(&self, path: &Path, options: &crate::SaveOptions) -> Result<u64> {
+        self.check_source()?;
+        let overwrite = match options.overwrite {
+            crate::Overwrite::Replace => litchi_core::atomic::Overwrite::Replace,
+            crate::Overwrite::Refuse => litchi_core::atomic::Overwrite::Refuse,
+        };
+        let package;
+        let bytes: &[u8] = match self.owner() {
+            OdsOwner::Eager { package, .. } => package.as_bytes(),
+            #[cfg(any(unix, windows))]
+            OdsOwner::Source { .. } => {
+                package = self.materialized()?;
+                package.as_bytes()
+            },
+            OdsOwner::Flat(flat) => flat.as_bytes(),
+        };
+        litchi_core::atomic::save(
+            path,
+            options.durability,
+            overwrite,
+            |writer| std::io::Write::write_all(writer, bytes).map_err(Error::from),
+            || self.check_source(),
+        )?;
+        Ok(u64::try_from(bytes.len()).unwrap_or(u64::MAX))
     }
 }
 
 impl fmt::Debug for Ods {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        let state = match &self.0.owner {
-            OdsOwner::Eager(_) => "eager",
+        let state = match self.owner() {
+            OdsOwner::Eager { .. } => "eager",
             #[cfg(any(unix, windows))]
-            OdsOwner::Source(_) => "source",
+            OdsOwner::Source { .. } => "source",
+            OdsOwner::Flat(_) => "flat",
         };
         formatter
             .debug_struct("Ods")

@@ -12,6 +12,7 @@ use crate::{Code, File, IntoNode, IntoPlacement, IntoProps, IntoTarget, Result};
 
 mod import;
 mod limits;
+mod merge;
 pub use limits::{Error, LimitKind, SemanticLimits, SemanticLimitsBuilder};
 
 /// Content-free facts about a complete explicit transaction.
@@ -124,6 +125,10 @@ enum Leaf {
     Docx(Box<litchi_docx::document::Patch>),
     #[cfg(feature = "rtf")]
     Rtf(Box<litchi_rtf::edit::Patch>),
+    #[cfg(feature = "odt")]
+    Odt(Box<crate::format::odt::write::Patch>),
+    #[cfg(feature = "ods")]
+    Ods(Box<litchi_ods::document::Patch>),
     #[cfg(feature = "odp")]
     Odp(Box<litchi_odp::edit::Patch>),
     #[cfg(feature = "xlsx")]
@@ -223,6 +228,8 @@ pub struct Edit {
     formatting: Option<crate::format::docx::write::coalesce::Run>,
     #[cfg(feature = "rtf")]
     rtf: Option<crate::format::rtf::write::coalesce::Run>,
+    #[cfg(feature = "odt")]
+    odt: Option<crate::format::odt::write::coalesce::Run>,
     #[cfg(feature = "xlsx")]
     cells: Option<crate::format::xlsx::write::coalesce::Run>,
     #[cfg(feature = "xlsb")]
@@ -237,6 +244,10 @@ pub struct Edit {
     ppt_shapes: Option<crate::format::ppt::write::coalesce::Run>,
     #[cfg(feature = "odp")]
     odp: Option<crate::format::odp::write::coalesce::Run>,
+    #[cfg(feature = "ods")]
+    ods_cells: Option<crate::format::ods::write::coalesce::Run>,
+    /// The match count of the last `find=` set (record 0273).
+    matched: Option<usize>,
 }
 impl fmt::Debug for Edit {
     fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -308,6 +319,8 @@ impl File {
                 formatting: None,
                 #[cfg(feature = "rtf")]
                 rtf: None,
+                #[cfg(feature = "odt")]
+                odt: None,
                 #[cfg(feature = "xlsx")]
                 cells: None,
                 #[cfg(feature = "xlsb")]
@@ -322,6 +335,9 @@ impl File {
                 ppt_shapes: None,
                 #[cfg(feature = "odp")]
                 odp: None,
+                #[cfg(feature = "ods")]
+                ods_cells: None,
+                matched: None,
             };
             let value = f(&mut edit);
             if let Some(error) = edit.failure {
@@ -409,6 +425,9 @@ impl Edit {
     /// at the next barrier or when the outer closure finishes, with the original
     /// mutation index. Any mutation or flush failure poisons the transaction.
     ///
+    /// A `find` property searches the target's subtree, as [`File::set`]
+    /// describes, in one native commit that never joins a coalesced run.
+    ///
     /// # Errors
     /// As [`File::set`], with the mutation's item index and transaction limits.
     pub fn set<'p, 'v>(
@@ -461,6 +480,10 @@ impl Edit {
                     return Err(error);
                 },
             };
+            if crate::find::requested(&props) {
+                self.matched = Some(self.find_replace(&target, &props)?);
+                return Ok(());
+            }
             if self
                 .coalesce_parsed(&target, &props, index, None)?
                 .is_some()
@@ -475,6 +498,8 @@ impl Edit {
                 feature = "xlsb",
                 feature = "xls",
                 feature = "rtf",
+                feature = "ods",
+                feature = "odt",
                 feature = "odp"
             ))]
             let limits = self.limits;
@@ -520,6 +545,14 @@ impl Edit {
                 File::Rtf(handle) => {
                     wrap_rtf(handle, handle.set_with_limits(target, props, &limits)?, ())
                 },
+                #[cfg(feature = "ods")]
+                File::Ods(handle) => {
+                    wrap_ods(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
+                #[cfg(feature = "odt")]
+                File::Odt(handle) => {
+                    wrap_odt(handle, handle.set_with_limits(target, props, &limits)?, ())
+                },
                 #[allow(unreachable_patterns)]
                 _ => Err(pending()),
             })
@@ -544,6 +577,8 @@ impl Edit {
             feature = "rtf",
             feature = "ppt",
             feature = "xls",
+            feature = "ods",
+            feature = "odt",
             feature = "odp"
         ))]
         let limits = self.limits;
@@ -582,6 +617,18 @@ impl Edit {
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_rtf(handle, commit, path)
             },
+            #[cfg(feature = "ods")]
+            File::Ods(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_ods(handle, commit, path)
+            },
+            #[cfg(feature = "odt")]
+            File::Odt(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_odt(handle, commit, path)
+            },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
                 let (commit, path) =
@@ -616,6 +663,8 @@ impl Edit {
             feature = "rtf",
             feature = "ppt",
             feature = "xls",
+            feature = "ods",
+            feature = "odt",
             feature = "odp"
         ))]
         let limits = self.limits;
@@ -654,6 +703,18 @@ impl Edit {
                 let (commit, path) =
                     handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
                 wrap_rtf(handle, commit, path)
+            },
+            #[cfg(feature = "ods")]
+            File::Ods(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_ods(handle, commit, path)
+            },
+            #[cfg(feature = "odt")]
+            File::Odt(handle) => {
+                let (commit, path) =
+                    handle.add_with_limits(_parent.into_path()?, _node.into_node()?, &limits)?;
+                wrap_odt(handle, commit, path)
             },
             #[cfg(feature = "doc")]
             File::Doc(handle) => {
@@ -721,6 +782,8 @@ impl Edit {
                 feature = "pptx",
                 feature = "ppt",
                 feature = "rtf",
+                feature = "ods",
+                feature = "odt",
                 feature = "odp"
             ))]
             let limits = self.limits;
@@ -759,6 +822,18 @@ impl Edit {
                 ),
                 #[cfg(feature = "rtf")]
                 File::Rtf(handle) => wrap_rtf(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "ods")]
+                File::Ods(handle) => wrap_ods(
+                    handle,
+                    handle.remove_with_limits(target.clone(), &limits)?,
+                    (),
+                ),
+                #[cfg(feature = "odt")]
+                File::Odt(handle) => wrap_odt(
                     handle,
                     handle.remove_with_limits(target.clone(), &limits)?,
                     (),
@@ -933,6 +1008,8 @@ impl Edit {
             feature = "xls",
             feature = "ppt",
             feature = "rtf",
+            feature = "ods",
+            feature = "odt",
             feature = "odp"
         ))]
         let limits = self.limits;
@@ -979,6 +1056,18 @@ impl Edit {
                 handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
                 (),
             ),
+            #[cfg(feature = "ods")]
+            File::Ods(handle) => wrap_ods(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "odt")]
+            File::Odt(handle) => wrap_odt(
+                handle,
+                handle.move_to_with_limits(_path.into_path()?, _to.into_placement()?, &limits)?,
+                (),
+            ),
             #[cfg(feature = "doc")]
             File::Doc(handle) => wrap_doc(
                 handle,
@@ -1007,6 +1096,8 @@ impl Edit {
             feature = "xls",
             feature = "ppt",
             feature = "rtf",
+            feature = "ods",
+            feature = "odt",
             feature = "odp"
         ))]
         let limits = self.limits;
@@ -1043,6 +1134,18 @@ impl Edit {
             ),
             #[cfg(feature = "rtf")]
             File::Rtf(handle) => wrap_rtf(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "ods")]
+            File::Ods(handle) => wrap_ods(
+                handle,
+                handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
+                (),
+            ),
+            #[cfg(feature = "odt")]
+            File::Odt(handle) => wrap_odt(
                 handle,
                 handle.swap_with_limits(_a.into_path()?, _b.into_path()?, &limits)?,
                 (),
@@ -1105,6 +1208,11 @@ impl Edit {
         _index: usize,
         _spelling: Option<&str>,
     ) -> Result<Option<bool>> {
+        if crate::find::requested(_props) {
+            // A find resolves its whole scope: it never joins a native run.
+            self.flush_pending()?;
+            return Ok(None);
+        }
         #[cfg(feature = "doc")]
         if let File::Doc(handle) = self.current.clone() {
             // A body paragraph's ordinal is stable across text replacement,
@@ -1313,6 +1421,67 @@ impl Edit {
                 .rtf
                 .as_mut()
                 .ok_or_else(|| crate::Error::new(Code::InternalError, "RTF run missing"))?;
+            let changed = match run.stage(plan, _index) {
+                Ok(changed) => changed,
+                Err(error) => {
+                    self.flush_pending()?;
+                    return Err(error);
+                },
+            };
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
+        #[cfg(feature = "odt")]
+        if let File::Odt(handle) = self.current.clone() {
+            // A run plans every set against its base handle (the current
+            // candidate until the run is flushed). A set the run cannot plan
+            // runs on its own after the run is published.
+            let plan = match crate::format::odt::write::plan(&handle, _target, _props) {
+                Ok(Some(plan)) => plan,
+                Ok(None) => return Ok(None),
+                Err(_) => {
+                    // Resolve and report against the published candidate.
+                    self.flush_pending()?;
+                    return Ok(None);
+                },
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            let plan = if self
+                .odt
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan))
+            {
+                self.flush_pending()?;
+                let File::Odt(handle) = self.current.clone() else {
+                    return Err(pending());
+                };
+                match crate::format::odt::write::plan(&handle, _target, _props) {
+                    Ok(Some(plan)) => plan,
+                    Ok(None) | Err(_) => return Ok(None),
+                }
+            } else {
+                plan
+            };
+            if self.odt.is_none() {
+                let File::Odt(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.odt = Some(crate::format::odt::write::coalesce::Run::new(
+                    handle,
+                    &self.limits,
+                )?);
+            }
+            let run = self
+                .odt
+                .as_mut()
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "ODT run missing"))?;
             let changed = match run.stage(plan, _index) {
                 Ok(changed) => changed,
                 Err(error) => {
@@ -1564,6 +1733,64 @@ impl Edit {
                     return Err(error);
                 },
             };
+            self.operations += 1;
+            return Ok(Some(changed));
+        }
+        #[cfg(feature = "ods")]
+        if let File::Ods(_) = &self.current {
+            let planned = match &self.ods_cells {
+                Some(run) => run.cell_plan(_target, _props, &self.limits),
+                None => {
+                    let File::Ods(handle) = &self.current else {
+                        return Err(pending());
+                    };
+                    handle.cell_plan(_target, _props, &self.limits)
+                },
+            };
+            if planned.is_err() {
+                // An earlier deferred native failure takes precedence over
+                // admission failure in the following command.
+                self.flush_pending()?;
+            }
+            let Some(mut plan) = planned? else {
+                return Ok(None);
+            };
+            if self.operations >= self.limits.max_operations() {
+                return Err(Error::Limit {
+                    kind: LimitKind::Operations,
+                    observed: self.operations.saturating_add(1),
+                    maximum: self.limits.max_operations(),
+                }
+                .into());
+            }
+            if self
+                .ods_cells
+                .as_ref()
+                .is_some_and(|run| run.requires_barrier(&plan, &self.limits))
+            {
+                self.flush_pending()?;
+                let File::Ods(handle) = &self.current else {
+                    return Err(pending());
+                };
+                let Some(replanned) = handle.cell_plan(_target, _props, &self.limits)? else {
+                    return Ok(None);
+                };
+                plan = replanned;
+            }
+            if self.ods_cells.is_none() {
+                let File::Ods(handle) = &self.current else {
+                    return Err(pending());
+                };
+                self.ods_cells = Some(crate::format::ods::write::coalesce::Run::new(
+                    handle,
+                    &self.limits,
+                )?);
+            }
+            let run = self
+                .ods_cells
+                .as_mut()
+                .ok_or_else(|| crate::Error::new(Code::InternalError, "ODS cell run missing"))?;
+            let changed = run.stage(plan, _index)?;
             self.operations += 1;
             return Ok(Some(changed));
         }
@@ -1851,6 +2078,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "odt")]
+        if let Some(run) = self.odt.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_odt(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "xlsb")]
         if let Some(run) = self.xlsb_sheets.take() {
             let index = run.first_index();
@@ -1976,6 +2228,31 @@ impl Edit {
             })();
             result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
         }
+        #[cfg(feature = "ods")]
+        if let Some(run) = self.ods_cells.take() {
+            let index = run.first_index();
+            let result = (|| -> Result<()> {
+                let (base, commit) = run.commit()?;
+                let (step, ()) = wrap_ods(&base, commit, ())?;
+                let bytes = self.snapshot_bytes.saturating_add(step.snapshot_bytes);
+                if bytes > self.limits.max_snapshot_bytes() {
+                    return Err(Error::Limit {
+                        kind: LimitKind::SnapshotBytes,
+                        observed: bytes,
+                        maximum: self.limits.max_snapshot_bytes(),
+                    }
+                    .into());
+                }
+                self.steps
+                    .try_reserve(1)
+                    .map_err(|source| Error::Allocation { source })?;
+                self.current = step.after.clone();
+                self.steps.push(step);
+                self.snapshot_bytes = bytes;
+                Ok(())
+            })();
+            result.map_err(|error| self.poison(error, index.unwrap_or(self.operations)))?;
+        }
         #[cfg(feature = "ppt")]
         if let Some(run) = self.ppt_shapes.take() {
             let index = run.first_index();
@@ -2066,6 +2343,10 @@ impl Edit {
                 {
                     self.rtf = None;
                 }
+                #[cfg(feature = "odt")]
+                {
+                    self.odt = None;
+                }
                 #[cfg(feature = "xlsx")]
                 {
                     self.cells = None;
@@ -2087,6 +2368,10 @@ impl Edit {
                 {
                     self.ppt_shapes = None;
                 }
+                #[cfg(feature = "ods")]
+                {
+                    self.ods_cells = None;
+                }
                 #[cfg(feature = "odp")]
                 {
                     self.odp = None;
@@ -2098,6 +2383,54 @@ impl Edit {
                 Err(error)
             },
         }
+    }
+
+    /// The match count of the last `find=` set, taken (record 0273).
+    pub(crate) fn take_matched(&mut self) -> Option<usize> {
+        self.matched.take()
+    }
+
+    /// A `set` whose properties name `find` (record 0273): one native commit
+    /// over the target's subtree, returning the match count.
+    fn find_replace(
+        &mut self,
+        target: &crate::TargetArg<'_>,
+        props: &crate::Props<'_>,
+    ) -> Result<usize> {
+        let spec = match crate::find::Spec::admit(props) {
+            Ok(spec) => spec,
+            Err(error) => {
+                self.flush_pending()?;
+                return Err(error);
+            },
+        };
+        #[cfg(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf"))]
+        let limits = self.limits;
+        #[cfg(not(any(feature = "docx", feature = "xlsx", feature = "pptx", feature = "rtf")))]
+        let _ = (target, &spec);
+        self.execute(|file| match file {
+            #[cfg(feature = "docx")]
+            File::Docx(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap(handle, commit, matched)
+            },
+            #[cfg(feature = "xlsx")]
+            File::Xlsx(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap_xlsx(handle, commit, matched)
+            },
+            #[cfg(feature = "pptx")]
+            File::Pptx(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap_pptx(handle, commit, matched)
+            },
+            #[cfg(feature = "rtf")]
+            File::Rtf(handle) => {
+                let (commit, matched) = handle.find_replace(target, &spec, &limits)?;
+                wrap_rtf(handle, commit, matched)
+            },
+            _ => Err(crate::find::unsupported(file)),
+        })
     }
 
     fn poison(&mut self, error: crate::Error, index: usize) -> crate::Error {
@@ -2347,6 +2680,56 @@ fn wrap_rtf<T>(
     ))
 }
 
+#[cfg(feature = "ods")]
+fn wrap_ods<T>(
+    _before: &crate::format::ods::Ods,
+    commit: crate::format::ods::WriteCommit,
+    value: T,
+) -> Result<(Step, T)> {
+    let crate::format::ods::WriteCommit {
+        before,
+        after,
+        patch,
+        operations,
+        snapshot_bytes,
+    } = commit;
+    Ok((
+        Step {
+            before: File::Ods(before),
+            after: File::Ods(after),
+            leaf: Leaf::Ods(Box::new(patch)),
+            leaf_operations: operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
+#[cfg(feature = "odt")]
+fn wrap_odt<T>(
+    _before: &crate::format::odt::Odt,
+    commit: crate::format::odt::write::Commit,
+    value: T,
+) -> Result<(Step, T)> {
+    let crate::format::odt::write::Commit {
+        before,
+        after,
+        patch,
+        operations,
+        snapshot_bytes,
+    } = commit;
+    Ok((
+        Step {
+            before: File::Odt(before),
+            after: File::Odt(after),
+            leaf: Leaf::Odt(Box::new(patch)),
+            leaf_operations: operations,
+            snapshot_bytes,
+        },
+        value,
+    ))
+}
+
 #[cfg(feature = "odp")]
 fn wrap_odp<T>(
     _before: &crate::format::odp::Odp,
@@ -2376,6 +2759,19 @@ fn changed(steps: &[Step]) -> Result<bool> {
     let (Some(first), Some(last)) = (steps.first(), steps.last()) else {
         return Ok(false);
     };
+    #[cfg(feature = "ods")]
+    if let (File::Ods(before), File::Ods(after)) = (&first.before, &last.after) {
+        if let [
+            Step {
+                leaf: Leaf::Ods(patch),
+                ..
+            },
+        ] = steps
+        {
+            return Ok(!patch.is_noop());
+        }
+        return Ok(!before.same_content(after)?);
+    }
     #[cfg(feature = "odp")]
     if let (File::Odp(before), File::Odp(after)) = (&first.before, &last.after) {
         if let [
@@ -2402,6 +2798,19 @@ fn changed(steps: &[Step]) -> Result<bool> {
         }
         return Ok(!before.same_content(after)?);
     }
+    #[cfg(feature = "odt")]
+    if let (File::Odt(before), File::Odt(after)) = (&first.before, &last.after) {
+        if let [
+            Step {
+                leaf: Leaf::Odt(patch),
+                ..
+            },
+        ] = steps
+        {
+            return Ok(!patch.is_noop());
+        }
+        return Ok(!before.same_content(after)?);
+    }
     match (&first.leaf, &last.leaf) {
         #[cfg(feature = "doc")]
         (Leaf::Doc(first), Leaf::Doc(last)) => Ok(first.before() != last.after()),
@@ -2415,7 +2824,19 @@ fn changed(steps: &[Step]) -> Result<bool> {
         (Leaf::Pptx { source, .. }, Leaf::Pptx { target, .. }) => Ok(!source.same_content(target)?),
         #[cfg(feature = "docx")]
         (Leaf::Docx(first), Leaf::Docx(last)) => {
-            Ok(first.source().xml_bytes() != last.target().xml_bytes())
+            // A template merge can change only a header or other story
+            // part: a package-graph change is a change (record 0274).
+            Ok(first.source().xml_bytes() != last.target().xml_bytes()
+                || steps.iter().any(|step| match &step.leaf {
+                    Leaf::Docx(patch) => patch.operations().iter().any(|operation| {
+                        matches!(
+                            operation,
+                            litchi_docx::document::Operation::ChangeGraph { .. }
+                        )
+                    }),
+                    #[allow(unreachable_patterns)]
+                    _ => false,
+                }))
         },
         #[cfg(feature = "xlsx")]
         (Leaf::Xlsx { source, .. }, Leaf::Xlsx { target, .. }) => Ok(!source.same_content(target)?),
@@ -2430,6 +2851,8 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         (File::Doc(left), File::Doc(right)) => left.same_snapshot(right),
         #[cfg(feature = "xlsb")]
         (File::Xlsb(left), File::Xlsb(right)) => left.same_snapshot(right),
+        #[cfg(feature = "odt")]
+        (File::Odt(left), File::Odt(right)) => left.same_snapshot(right),
         #[cfg(feature = "xls")]
         (File::Xls(left), File::Xls(right)) => left.same_snapshot(right),
         #[cfg(feature = "ppt")]
@@ -2442,6 +2865,8 @@ fn same_snapshot(left: &File, right: &File) -> bool {
         (File::Xlsx(left), File::Xlsx(right)) => left.same_snapshot(right),
         #[cfg(feature = "rtf")]
         (File::Rtf(left), File::Rtf(right)) => left.same_snapshot(right),
+        #[cfg(feature = "ods")]
+        (File::Ods(left), File::Ods(right)) => left.same_snapshot(right),
         #[cfg(feature = "odp")]
         (File::Odp(left), File::Odp(right)) => left.same_snapshot(right),
         _ => false,
@@ -2486,6 +2911,10 @@ fn admit(file: &File) -> Result<()> {
         File::Ppt(handle) => handle.admit_edit(),
         #[cfg(feature = "rtf")]
         File::Rtf(handle) => handle.admit_edit(),
+        #[cfg(feature = "ods")]
+        File::Ods(handle) => handle.admit_edit(),
+        #[cfg(feature = "odt")]
+        File::Odt(handle) => handle.admit_edit(),
         #[cfg(feature = "odp")]
         File::Odp(handle) => handle.admit_edit(),
         _ => check_source(file),
@@ -2521,6 +2950,10 @@ fn check_source(file: &File) -> Result<()> {
         File::Ppt(handle) => handle.check_source(),
         #[cfg(feature = "rtf")]
         File::Rtf(_) => Ok(()),
+        #[cfg(feature = "ods")]
+        File::Ods(handle) => handle.check_source(),
+        #[cfg(feature = "odt")]
+        File::Odt(handle) => handle.check_source(),
         #[cfg(feature = "odp")]
         File::Odp(handle) => handle.check_source(),
         File::Signed(signed) => Err(crate::Error::signed(signed.format())),

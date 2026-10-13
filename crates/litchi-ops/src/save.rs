@@ -240,6 +240,8 @@ impl File {
             feature = "xls",
             feature = "xlsb",
             feature = "rtf",
+            feature = "ods",
+            feature = "odt",
             feature = "odp"
         )))]
         {
@@ -259,6 +261,8 @@ impl File {
             feature = "xls",
             feature = "xlsb",
             feature = "rtf",
+            feature = "ods",
+            feature = "odt",
             feature = "odp"
         ))]
         {
@@ -271,6 +275,8 @@ impl File {
                 Self::Doc(_) => {},
                 #[cfg(feature = "rtf")]
                 Self::Rtf(_) => {},
+                #[cfg(feature = "odt")]
+                Self::Odt(_) => {},
                 #[cfg(feature = "odp")]
                 Self::Odp(_) => {},
                 #[cfg(feature = "xls")]
@@ -285,6 +291,8 @@ impl File {
                 Self::Xlsb(_) => {},
                 #[cfg(feature = "pptx")]
                 Self::Pptx(_) => {},
+                #[cfg(feature = "ods")]
+                Self::Ods(_) => {},
                 #[allow(unreachable_patterns)]
                 _ => return Err(unsupported_save(self.format())),
             }
@@ -305,6 +313,8 @@ impl File {
                 Self::Doc(handle) => save_doc(handle, &destination, options)?,
                 #[cfg(feature = "rtf")]
                 Self::Rtf(handle) => handle.save_to(&destination, options)?,
+                #[cfg(feature = "odt")]
+                Self::Odt(handle) => handle.save_to(&destination, options)?,
                 #[cfg(feature = "odp")]
                 Self::Odp(handle) => handle.save_to(&destination, options)?,
                 #[cfg(feature = "xls")]
@@ -319,6 +329,8 @@ impl File {
                 Self::Xlsb(handle) => handle.save_to(&destination, options)?,
                 #[cfg(feature = "pptx")]
                 Self::Pptx(handle) => handle.save_to(&destination, options)?,
+                #[cfg(feature = "ods")]
+                Self::Ods(handle) => handle.save_to(&destination, options)?,
                 #[allow(unreachable_patterns)]
                 _ => return Err(unsupported_save(format)),
             };
@@ -340,9 +352,18 @@ impl File {
     feature = "xls",
     feature = "xlsb",
     feature = "rtf",
+    feature = "ods",
+    feature = "odt",
     feature = "odp"
 ))]
 fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
+    #[cfg(feature = "odt")]
+    if let File::Odt(handle) = file {
+        return handle
+            .origin()
+            .map(|origin| origin.as_ref().to_path_buf())
+            .ok_or_else(|| file_required(format));
+    }
     #[cfg(feature = "odp")]
     if let File::Odp(handle) = file {
         return handle
@@ -407,6 +428,13 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
             .map(|origin| origin.as_ref().to_path_buf())
             .ok_or_else(|| file_required(format));
     }
+    #[cfg(feature = "ods")]
+    if let File::Ods(handle) = file {
+        return handle
+            .origin()
+            .map(|origin| origin.as_ref().to_path_buf())
+            .ok_or_else(|| file_required(format));
+    }
     Err(file_required(format))
 }
 
@@ -419,6 +447,8 @@ fn origin_path(file: &File, format: Option<FileFormat>) -> Result<PathBuf> {
     feature = "xls",
     feature = "xlsb",
     feature = "rtf",
+    feature = "ods",
+    feature = "odt",
     feature = "odp"
 ))]
 fn file_required(format: Option<FileFormat>) -> Error {
@@ -611,6 +641,8 @@ fn validate_xls_destination(destination: &Path) -> Result<()> {
     feature = "xls",
     feature = "xlsb",
     feature = "rtf",
+    feature = "ods",
+    feature = "odt",
     feature = "odp"
 ))]
 fn same_format(path: &Path, format: FileFormat) -> Result<()> {
@@ -639,6 +671,8 @@ fn same_format(path: &Path, format: FileFormat) -> Result<()> {
     feature = "xls",
     feature = "xlsb",
     feature = "rtf",
+    feature = "ods",
+    feature = "odt",
     feature = "odp"
 ))]
 fn format_of_extension(extension: &str) -> Option<FileFormat> {

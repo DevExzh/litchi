@@ -471,7 +471,19 @@ fn content_events_outside_the_document_root_are_rejected() {
     assert!(FlatSpreadsheet::from_bytes(format!("text{FLAT_DDE}").into_bytes()).is_err());
     assert!(FlatSpreadsheet::from_bytes(format!("<![CDATA[]]>{FLAT_DDE}").into_bytes()).is_err());
     assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}<![CDATA[]]>").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}<!--outside-->").into_bytes()).is_err());
-    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE} ").into_bytes()).is_err());
+    assert!(FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}text").into_bytes()).is_err());
     assert!(FlatSpreadsheet::from_bytes(format!(" \n{FLAT_DDE}").into_bytes()).is_ok());
+}
+
+/// XML 1.0 `Misc` (whitespace, comments, processing instructions) may
+/// follow the root; every LibreOffice flat document ends with a newline
+/// (record 0277).
+#[test]
+fn xml_misc_after_the_document_root_is_admitted() {
+    for tail in [" ", "\n", "<!--outside-->", "<?pi data?>\n"] {
+        assert!(
+            FlatSpreadsheet::from_bytes(format!("{FLAT_DDE}{tail}").into_bytes()).is_ok(),
+            "{tail:?}"
+        );
+    }
 }

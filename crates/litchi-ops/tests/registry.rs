@@ -19,9 +19,11 @@ fn registry_goldens_follow_enabled_formats() {
         (FileFormat::Ppt, "ppt", cfg!(feature = "ppt")),
         (FileFormat::Pptx, "pptx", cfg!(feature = "pptx")),
         (FileFormat::Rtf, "rtf", cfg!(feature = "rtf")),
+        (FileFormat::Odt, "odt", cfg!(feature = "odt")),
         (FileFormat::Xls, "xls", cfg!(feature = "xls")),
         (FileFormat::Xlsb, "xlsb", cfg!(feature = "xlsb")),
         (FileFormat::Xlsx, "xlsx", cfg!(feature = "xlsx")),
+        (FileFormat::Ods, "ods", cfg!(feature = "ods")),
         (FileFormat::Odp, "odp", cfg!(feature = "odp")),
     ] {
         let schema = litchi_ops::schema(format);
@@ -63,6 +65,7 @@ fn registry_export_matches_capabilities() {
         FileFormat::Xls,
         FileFormat::Xlsb,
         FileFormat::Xlsx,
+        FileFormat::Ods,
         FileFormat::Odp,
     ] {
         let schema = litchi_ops::schema(format);

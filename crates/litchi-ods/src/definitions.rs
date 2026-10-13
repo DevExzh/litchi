@@ -266,7 +266,10 @@ impl Edit {
 
         let package = Archive::from_bytes(self.before.source.as_ref().to_vec())?;
         let content_xml = codec::replace(package.content_xml(), &self.draft)?;
-        litchi_odf_common::compact_xml::validate(content_xml.as_bytes()).map_err(Error::from)?;
+        litchi_odf_common::compact_xml::validate(
+            crate::package::compact_prolog(&content_xml).as_bytes(),
+        )
+        .map_err(Error::from)?;
         let target_package = package.replace_content_xml(&content_xml)?;
         let target = Snapshot::from_bytes(target_package.into_bytes())?;
         if target.definitions() != self.draft {

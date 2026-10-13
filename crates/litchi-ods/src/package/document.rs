@@ -6,12 +6,46 @@ use litchi_odf_common::core::{
 use litchi_odf_common::package::{
     replace_content_xml as replace_package_content_xml, replace_content_xml_spliced,
 };
+use std::borrow::Cow;
 use std::fmt;
 use std::sync::Arc;
 
 use crate::model::names::Definition;
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
+
+/// `xml` without the whitespace between its XML declaration and its root
+/// element. Prolog whitespace is no part of the document (XML 1.0 §2.8);
+/// LibreOffice ends every declaration with a newline, which the compact
+/// authored-XML audit would otherwise refuse when a family republishes a
+/// producer part it loaded.
+pub(crate) fn compact_prolog(xml: &str) -> Cow<'_, str> {
+    let Some(declaration_end) = xml
+        .strip_prefix("<?xml")
+        .and_then(|rest| rest.find("?>"))
+        .map(|end| end + "<?xml".len() + 2)
+    else {
+        return Cow::Borrowed(xml);
+    };
+    let tail = &xml[declaration_end..];
+    let trimmed = tail.trim_start_matches([' ', '\t', '\r', '\n']);
+    if trimmed.len() == tail.len() || !trimmed.starts_with('<') {
+        return Cow::Borrowed(xml);
+    }
+    let mut out = String::with_capacity(xml.len() - (tail.len() - trimmed.len()));
+    out.push_str(&xml[..declaration_end]);
+    out.push_str(trimmed);
+    Cow::Owned(out)
+}
+
+/// [`compact_prolog`] over a UTF-8 part; other bytes are returned as they
+/// are.
+pub(crate) fn compact_prolog_bytes(bytes: &[u8]) -> Cow<'_, [u8]> {
+    match std::str::from_utf8(bytes).map(compact_prolog) {
+        Ok(Cow::Owned(xml)) => Cow::Owned(xml.into_bytes()),
+        Ok(Cow::Borrowed(_)) | Err(_) => Cow::Borrowed(bytes),
+    }
+}
 const BODY_MARKER: &str = "<office:spreadsheet";
 
 /// Validated ownership boundary for an ODS package.
@@ -182,7 +216,15 @@ impl Archive {
 
     /// Rebuild this package with a replacement `content.xml`.
     pub(crate) fn replace_content_xml(&self, content_xml: &str) -> Result<Self> {
-        let bytes = replace_package_content_xml(self.package(), content_xml)?;
+        let bytes = match replace_package_content_xml(self.package(), content_xml) {
+            Ok(bytes) => bytes,
+            // A producer prolog newline fails the compact audit of a whole
+            // republished part; it carries no content, so drop it and retry.
+            Err(error) => match compact_prolog(content_xml) {
+                Cow::Owned(compact) => replace_package_content_xml(self.package(), &compact)?,
+                Cow::Borrowed(_) => return Err(error),
+            },
+        };
         Self::from_bytes(bytes)
     }
 
@@ -217,11 +259,25 @@ impl Archive {
     /// Replace or remove `meta.xml` while preserving every other package
     /// member and all unknown metadata XML not selected by the common patch.
     pub(crate) fn replace_metadata_xml(&self, metadata_xml: Option<&str>) -> Result<Self> {
-        let bytes = self.rebuild(
+        // Every member but `meta.xml` is copied as the exact source bytes, so
+        // a producer's `styles.xml` and `settings.xml` are never republished
+        // as authored XML.
+        let additions = metadata_xml
+            .map(|xml| {
+                vec![litchi_odf_common::package::Addition {
+                    path: "meta.xml".to_string(),
+                    bytes: compact_prolog(xml).into_owned().into_bytes(),
+                    media_type: "text/xml".to_string(),
+                }]
+            })
+            .unwrap_or_default();
+        let bytes = litchi_odf_common::package::rebuild_package(
+            self.package(),
             self.content_xml(),
-            Part::Preserve,
-            Part::from_option(metadata_xml),
-            Part::Preserve,
+            additions,
+            Vec::new(),
+            vec!["meta.xml".to_string()],
+            Vec::<String>::new(),
         )?;
         Self::from_bytes(bytes)
     }
@@ -265,7 +321,7 @@ impl Archive {
         let source = self.package();
         let mut writer = PackageWriter::new();
         writer.set_mimetype(&source.mimetype()?)?;
-        writer.add_file("content.xml", content_xml.as_bytes())?;
+        writer.add_file("content.xml", compact_prolog(content_xml).as_bytes())?;
         write_part(&mut writer, source, "styles.xml", styles)?;
         write_part(&mut writer, source, "meta.xml", metadata)?;
         write_part(&mut writer, source, "settings.xml", settings)?;
@@ -316,10 +372,10 @@ fn write_part(
     match part {
         Part::Preserve => {
             if source.has_file(path)? {
-                writer.add_file(path, &source.get_file(path)?)?;
+                writer.add_file(path, &compact_prolog_bytes(&source.get_file(path)?))?;
             }
         },
-        Part::Set(xml) => writer.add_file(path, xml.as_bytes())?,
+        Part::Set(xml) => writer.add_file(path, compact_prolog(xml).as_bytes())?,
         Part::Remove => {},
     }
     Ok(())

@@ -180,7 +180,7 @@ class RaisedErrorTests(unittest.TestCase):
         for opener in (L.Document, L.Presentation, L.Workbook):
             with self.subTest(opener=opener.__name__):
                 self.assertError(
-                    raised(opener, fixture("odf/ods/grid-padding.fods")),
+                    raised(opener, fixture("odf/odt/form-controls.fodt")),
                     L.UnsupportedError,
                     "unsupported_capability",
                 )

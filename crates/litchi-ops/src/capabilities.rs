@@ -238,7 +238,9 @@ impl State {
 /// assert!(Verb::Set.is_edit() && !Verb::Get.is_edit());
 /// assert!(!Verb::Save.is_edit() && !Verb::Create.is_edit());
 /// assert!(Verb::Import.is_edit() && !Verb::Evaluate.is_edit());
-/// assert_eq!(Verb::ALL.len(), 15);
+/// assert!(Verb::Merge.is_edit());
+/// assert!(Verb::Replace.is_edit());
+/// assert_eq!(Verb::ALL.len(), 17);
 /// ```
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 #[non_exhaustive]
@@ -271,6 +273,12 @@ pub enum Verb {
     Batch,
     /// CSV/TSV import into a worksheet, [`File::import`] (record 0266).
     Import,
+    /// Template merge, [`File::merge`] (record 0274).
+    Merge,
+    /// Text find/replace: [`File::set`] with the `find=` and `replace=`
+    /// properties, OfficeCLI's spelling (record 0273). The match count is
+    /// [`crate::Applied::matched`].
+    Replace,
     /// Save in the same format (W4).
     Save,
     /// Create a new package of this format (W4).
@@ -280,7 +288,7 @@ pub enum Verb {
 impl Verb {
     /// Every verb, in declaration order: the reads, then the edits,
     /// publication and creation.
-    pub const ALL: [Self; 15] = [
+    pub const ALL: [Self; 17] = [
         Self::Get,
         Self::Find,
         Self::Query,
@@ -294,6 +302,8 @@ impl Verb {
         Self::Edit,
         Self::Batch,
         Self::Import,
+        Self::Merge,
+        Self::Replace,
         Self::Save,
         Self::Create,
     ];
@@ -315,6 +325,8 @@ impl Verb {
             Self::Edit => "edit",
             Self::Batch => "batch",
             Self::Import => "import",
+            Self::Merge => "merge",
+            Self::Replace => "replace",
             Self::Save => "save",
             Self::Create => "create",
         }
@@ -334,7 +346,9 @@ impl Verb {
             | Self::Swap
             | Self::Edit
             | Self::Batch
-            | Self::Import => true,
+            | Self::Import
+            | Self::Merge
+            | Self::Replace => true,
             Self::Get
             | Self::Find
             | Self::Query
@@ -694,6 +708,12 @@ impl Capabilities {
         if matches!(verb, Verb::Import | Verb::Evaluate) {
             return self.m4_support(verb);
         }
+        if verb == Verb::Merge {
+            return self.merge_support();
+        }
+        if verb == Verb::Replace {
+            return self.replace_support();
+        }
         if verb == Verb::Create {
             return self.creation_support();
         }
@@ -859,6 +879,34 @@ impl Capabilities {
             {
                 return Support::Supported;
             }
+            #[cfg(feature = "ods")]
+            if matches!(
+                verb,
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Ods)
+            {
+                return Support::Supported;
+            }
+            #[cfg(feature = "odt")]
+            if matches!(
+                verb,
+                Verb::Set
+                    | Verb::Add
+                    | Verb::Remove
+                    | Verb::Move
+                    | Verb::Swap
+                    | Verb::Edit
+                    | Verb::Batch
+            ) && self.adapter() == Some(Adapter::Odt)
+            {
+                return Support::Supported;
+            }
             #[cfg(feature = "odp")]
             if matches!(
                 verb,
@@ -902,12 +950,20 @@ impl Capabilities {
             Verb::Save => self.publication_support(),
             Verb::Create => self.creation_support(),
             Verb::Import | Verb::Evaluate => self.m4_support(verb),
+            Verb::Merge => self.merge_support(),
+            Verb::Replace => self.replace_support(),
         }
     }
 
     /// Whether this report's format has an integrated publisher.
     fn publication_support(&self) -> Support {
         if self.format == Some(FileFormat::Rtf) && cfg!(feature = "rtf") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Ods) && cfg!(feature = "ods") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
@@ -946,6 +1002,12 @@ impl Capabilities {
     /// Whether this report's format has an integrated creator.
     fn creation_support(&self) -> Support {
         if self.format == Some(FileFormat::Rtf) && cfg!(feature = "rtf") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Ods) && cfg!(feature = "ods") {
+            return Support::Supported;
+        }
+        if self.format == Some(FileFormat::Odt) && cfg!(feature = "odt") {
             return Support::Supported;
         }
         if self.format == Some(FileFormat::Odp) && cfg!(feature = "odp") {
@@ -1087,10 +1149,6 @@ fn refused(format: FileFormat) -> Refusal {
         FileFormat::Odt if cfg!(feature = "odt") => pending(
             "M1 R7",
             "the ODT adapter of record 0010 §4.9 has not landed",
-        ),
-        FileFormat::Ods if cfg!(feature = "ods") => pending(
-            "M1 R7",
-            "the ODS adapter of record 0010 §4.9 has not landed",
         ),
         FileFormat::Odp if cfg!(feature = "odp") => pending(
             "M1 R7",
@@ -1319,98 +1377,6 @@ static RTF_CREATION_OPTION_GAPS: [GapSpec; 3] = [
         code: Code::UnsupportedCapability,
         follow_up: "RTF typed metadata creation",
         reason: "initial RTF metadata authoring is not integrated",
-    },
-];
-
-/// RTF's write adapter admits main-story paragraph text, alignment and the
-/// dependency-free paragraph layout facets, paragraph insertion, removal,
-/// paragraph ordering and paragraph swapping. Keep the remaining mutation
-/// verbs visible instead of making the format-level `set`/`remove`/`move`/
-/// `swap`/`edit`/`batch` support look like general CRUD. Run `set`, `add` and
-/// removal cover text and ten local character-format facets; insertion and
-/// removal use native source-preserving run transactions. Run move and swap
-/// remain explicit gaps.
-#[cfg(feature = "rtf")]
-static RTF_WRITE_GAPS: [GapSpec; 8] = [
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "run",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich run preservation",
-        reason: "changed run text/formatting requires an ordinary uncompressed body without dependent destinations, review content, inline line breaks or paragraph style/list references; run text containing paragraph/line-break controls, native mixed-operation composition and durable replay remain unsupported; opaque body syntax is preserved when outside changed source spans with projectable UTF-8 anchors",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "set",
-            element: "paragraph",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph text, alignment and layout updates require the native editor to prove the source formatting and destination closure",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "paragraph",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph removal requires the native editor to prove an ordinary literal body and retain every unselected source boundary",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "add",
-            element: "paragraph",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph insertion requires the native editor to prove the ordinary literal body and preserve every unselected source boundary",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "swap",
-            element: "body",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich paragraph preservation",
-        reason: "paragraph swapping requires the native editor to prove an ordinary plain body and preserve paragraph order and boundaries",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "remove",
-            element: "run",
-            context: "native-source-closure",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF rich run preservation",
-        reason: "run removal preserves containing paragraphs through native empty text replacement; dependent destinations, compressed transport, inline line breaks, paragraph style/list references and opaque syntax overlapping changed source spans remain unsupported; opaque boundary anchors are projected through text edits",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "move",
-            element: "run",
-            context: "native-run-edit",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF atomic native run edits",
-        reason: "run reordering requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls",
-    },
-    GapSpec {
-        subject: Subject::Operation {
-            verb: "swap",
-            element: "run",
-            context: "native-run-edit",
-        },
-        code: Code::UnsupportedCapability,
-        follow_up: "M6 RTF atomic native run edits",
-        reason: "run swapping requires an atomic native character-run editor that preserves paragraph boundaries and formatting controls",
     },
 ];
 
@@ -2316,6 +2282,10 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Ppt => m1_view_gap(mode),
         #[cfg(feature = "rtf")]
         Adapter::Rtf => m1_view_gap(mode),
+        #[cfg(feature = "ods")]
+        Adapter::Ods => m1_view_gap(mode),
+        #[cfg(feature = "odt")]
+        Adapter::Odt => m1_view_gap(mode),
         #[cfg(feature = "odp")]
         Adapter::Odp => m1_view_gap(mode),
     }
@@ -2454,6 +2424,10 @@ check_capabilities!(crate::format::ppt::SPEC);
 #[cfg(feature = "rtf")]
 check_capabilities!(crate::format::rtf::SPEC);
 
+#[cfg(feature = "ods")]
+check_capabilities!(crate::format::ods::SPEC);
+#[cfg(feature = "odt")]
+check_capabilities!(crate::format::odt::SPEC);
 #[cfg(feature = "odp")]
 check_capabilities!(crate::format::odp::SPEC);
 
@@ -2733,7 +2707,17 @@ impl Element {
         #[cfg(feature = "rtf")]
         let settable = settable
             || (self.adapter == Adapter::Rtf
-                && matches!(self.data().canonical, "p" | "r")
+                && crate::format::rtf::SETTABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "ods")]
+        let settable = settable
+            || (self.adapter == Adapter::Ods
+                && crate::format::ods::SETTABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "odt")]
+        let settable = settable
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::SETTABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "odp")]
         let settable = settable
@@ -2809,7 +2793,17 @@ impl Element {
         #[cfg(feature = "rtf")]
         let add = add
             || (self.adapter == Adapter::Rtf
-                && matches!(self.data().canonical, "body" | "p" | "r")
+                && crate::format::rtf::ADDABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "ods")]
+        let add = add
+            || (self.adapter == Adapter::Ods
+                && crate::format::ods::ADDABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "odt")]
+        let add = add
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::ADDABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "odp")]
         let add = add
@@ -2872,7 +2866,17 @@ impl Element {
         #[cfg(feature = "rtf")]
         let remove = remove
             || (self.adapter == Adapter::Rtf
-                && matches!(self.data().canonical, "p" | "r")
+                && crate::format::rtf::REMOVABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "ods")]
+        let remove = remove
+            || (self.adapter == Adapter::Ods
+                && crate::format::ods::REMOVABLE.contains(&self.data().canonical)
+                && readable);
+        #[cfg(feature = "odt")]
+        let remove = remove
+            || (self.adapter == Adapter::Odt
+                && crate::format::odt::REMOVABLE.contains(&self.data().canonical)
                 && readable);
         #[cfg(feature = "odp")]
         let remove = remove
@@ -2910,6 +2914,10 @@ impl Element {
     pub(crate) fn header_columns(&self) -> bool {
         #[cfg(feature = "xls")]
         if self.adapter == Adapter::Xls {
+            return false;
+        }
+        #[cfg(feature = "ods")]
+        if self.adapter == Adapter::Ods {
             return false;
         }
         self.adapter.family() == Family::Workbook && self.data().canonical == "row"
@@ -3005,6 +3013,16 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
         } else {
             props
         };
+        #[cfg(feature = "ods")]
+        let props = if adapter == Adapter::Ods {
+            crate::format::ods::capability_props(crate::path::navigate::ElementKind::name(
+                element.kind,
+            ))
+            .unwrap_or(props)
+        } else {
+            props
+        };
+
         let canonical = crate::path::navigate::ElementKind::name(element.kind);
         Data {
             name: element.name,
@@ -3341,7 +3359,15 @@ fn option_gap(adapter: Adapter, index: usize) -> Option<Option<&'static GapSpec>
     }
     #[cfg(feature = "rtf")]
     if adapter == Adapter::Rtf {
-        return RTF_WRITE_GAPS.get(index).map(Some);
+        return crate::format::rtf::WRITE_GAPS.get(index).map(Some);
+    }
+    #[cfg(feature = "ods")]
+    if adapter == Adapter::Ods {
+        return crate::format::ods::WRITE_GAPS.get(index).map(Some);
+    }
+    #[cfg(feature = "odt")]
+    if adapter == Adapter::Odt {
+        return crate::format::odt::WRITE_GAPS.get(index).map(Some);
     }
     #[cfg(feature = "odp")]
     if adapter == Adapter::Odp {
@@ -4044,6 +4070,8 @@ impl fmt::Display for Support {
     }
 }
 
+mod find;
 mod m4;
+mod merge;
 #[cfg(test)]
 mod tests;

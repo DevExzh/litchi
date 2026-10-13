@@ -716,6 +716,23 @@ impl SourceBackedDocument {
         prefer_current(self.source.as_ref(), self.source_version, result)
     }
 
+    /// Materialize this source into an immutable [`crate::Package`] while
+    /// keeping the source-backed document, for owners that read through it
+    /// and edit through the package.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`Error::SourceChanged`] when the source changed since open.
+    pub fn to_package(&self) -> Result<crate::Package> {
+        ensure_current(self.source_version, self.source.version()?)?;
+        let result = self
+            .package
+            .materialize()
+            .and_then(super::Document::from_owned_package)
+            .map(crate::Package::from_parsed);
+        prefer_current(self.source.as_ref(), self.source_version, result)
+    }
+
     /// Explicitly materialize this source into an immutable [`crate::Package`].
     ///
     /// # Errors

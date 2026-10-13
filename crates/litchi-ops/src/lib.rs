@@ -105,12 +105,14 @@ pub mod compat;
 mod create;
 pub mod error;
 mod file;
+mod find;
 pub mod format;
 mod handler;
 pub mod import;
 mod locked;
 #[cfg(feature = "markdown")]
 mod markdown;
+pub mod merge;
 pub mod new_node;
 pub mod node;
 #[cfg(any(
