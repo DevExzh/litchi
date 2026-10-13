@@ -244,6 +244,25 @@ Driven by `docs/UNIFIED_OPS_GOAL.md`; specification `docs/UNIFIED_OPS_API_DESIGN
 
 ## Awaiting owner confirmation
 
+- Record 0248 decisions (provisional coordinator defaults, 2026-10-13):
+  - D1, iWork placement: (a), a facade-level `File` wraps `litchi_ops::File` plus the iWork variants, so `litchi-ops` stays iWork-free.
+  - D2: the W1 iWork renames and the leaf API requests stay with the iWork owners (`IWORK_API_REQUESTS.md`).
+  - D3: tiers stay strict. Phase F (RTF/ODF/iWork) waits until tiers 1–2 reach P0 CRUD; the RTF work already landed is kept.
+  - D4: earlier provisional decisions remain provisional.
+  - D5: budget misses get engineering first. Explanations come only after a fix attempt.
+
+## Wave R1 (2026-10-13, coordinator restart)
+Branches `uo2/*` cut from `908f9cccdd`; records 0249–0255:
+- `a23-gate`: plan steps 2–3, the glossary gate and truthful capabilities.
+- `p4-xlsx-w2`: step 4, the xlsx W2 reshape.
+- `p7a-docx`: docx W2 residue and P0.
+- `p7c-pptx`: pptx W2 residue and P0.
+- `p6-ooxml-meta`: shared OOXML metadata.
+- `p10-ole-meta`: legacy metadata.
+- `p14-python`: the Python surface.
+
+Old reference commits (not merged): `uo/m2-w3-executor` 5258f8b42d, `uo/m2-l-pptx-w4` 9474e2b6ce, `uo/m2-l-xlsb-w1` 876588a23c, `uo/m1-r4-perf` 012fd509ff.
+
 - M0a S10 (`docs/unified-ops/s10-measurement.md` §9). M0a landed on the strength of two explanations. If either is rejected, the chosen alternative becomes a harness follow-up; M0a is not reverted.
   - F1: accept E1. Seven rows over their trigger time one call in a fresh child process, so they measure the harness executable. Standalone probes give the same first-call time at both revisions (XLSX open 187.6 vs 187.9 µs); Callgrind shows +0.75% instructions. Alternatives: an untimed warm-up call in the child (new route names), or standalone binaries for first calls.
   - F2: accept E2. The RTF open row depends on the allocator state the untimed projection leaves; with malloc trimming off, the unified open is 0.98× the pre-M0a one. Alternatives: fixed malloc tunables for RTF children, or bare-loop variants.
