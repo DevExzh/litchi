@@ -7,7 +7,7 @@
 //! the `true` and `false` tokens. All other sibling-owned attributes are
 //! ignored. Duplicates and malformed owned values are rejected.
 
-use crate::{FlatDocument, Package, style::paragraph::margin::rewrite_start_tag};
+use crate::{FlatDocument, GenericPackage as Package, style::paragraph::margin::rewrite_start_tag};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,

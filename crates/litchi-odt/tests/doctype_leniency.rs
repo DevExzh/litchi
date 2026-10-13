@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, ToleranceReport};
-use litchi_odt::{Document, SourceBackedDocument};
+use litchi_odt::{Package, SourceBackedDocument};
 
 const OOO_DOCTYPE: &str = r#"<!DOCTYPE office:document-content PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "office.dtd">"#;
 
@@ -46,7 +46,7 @@ fn with_doctype(doctype: &str) -> Vec<u8> {
 }
 
 fn assert_every_open_path(bytes: &[u8], defects: &[(Defect, u16)], label: &str) {
-    let owned = Document::from_bytes(bytes.to_vec()).unwrap();
+    let owned = Package::from_bytes(bytes).unwrap().document().unwrap();
     assert!(!owned.text().unwrap().is_empty(), "{label}: text");
     assert_eq!(
         recorded(owned.tolerance_report()),
@@ -56,7 +56,10 @@ fn assert_every_open_path(bytes: &[u8], defects: &[(Defect, u16)], label: &str) 
 
     let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
         .unwrap_or_else(|| panic!("{label}: package must prepare"));
-    let adopted = Document::from_prepared_package(prepared).unwrap();
+    let adopted = Package::from_prepared_package(prepared)
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         recorded(adopted.tolerance_report()),
         defects,
@@ -113,7 +116,12 @@ fn a_dtd_never_declares_entities() {
         )
         .replacen("<office:body>", "<office:body>&payload;", 1)
     });
-    assert!(Document::from_bytes(bytes.clone()).is_err());
+    assert!(
+        Package::from_bytes(&bytes)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.document())
+            .is_err()
+    );
     assert!(SourceBackedDocument::from_read_at(Arc::new(OwnedSource::new(bytes))).is_err());
 }
 
@@ -129,7 +137,9 @@ fn an_external_entity_doctype_stays_rejected() {
     )
     .unwrap();
     for error in [
-        Document::from_bytes(nasty.clone())
+        Package::from_bytes(&nasty)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.document())
             .err()
             .unwrap()
             .to_string(),

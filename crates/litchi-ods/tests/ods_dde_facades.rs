@@ -22,7 +22,7 @@ use litchi_odf_common::{
     },
     package::raw_identical_members,
 };
-use litchi_ods::{MutableSpreadsheet, SourceBackedSpreadsheet, Spreadsheet, dde};
+use litchi_ods::{MutableSpreadsheet, Package, SourceBackedSpreadsheet, dde};
 
 const CONTENT: &str = concat!(
     "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",
@@ -95,15 +95,25 @@ fn bom_prefixed_content_keeps_exact_transaction_coordinates() {
 
 #[test]
 fn ordinary_and_mutable_noops_preserve_exact_content() {
-    let mut ordinary = Spreadsheet::from_bytes(package()).expect("ordinary fixture");
+    let mut ordinary = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package())
+            .expect("ordinary fixture")
+            .workbook()
+            .expect("ordinary fixture"),
+    );
     let snapshot = ordinary.dde().expect("inert snapshot");
     assert_eq!(snapshot.sheet_sources().len(), 1);
     ordinary.edit_dde(|_| Ok(())).expect("ordinary no-op");
-    assert_eq!(ordinary.content_xml(), CONTENT);
+    assert_eq!(ordinary.workbook().content_xml(), CONTENT);
 
-    let mut mutable = MutableSpreadsheet::from_bytes(package()).expect("mutable fixture");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package())
+            .expect("mutable fixture")
+            .workbook()
+            .expect("mutable fixture"),
+    );
     mutable.edit_dde(|_| Ok(())).expect("mutable no-op");
-    assert_eq!(mutable.spreadsheet().content_xml(), CONTENT);
+    assert_eq!(mutable.workbook().content_xml(), CONTENT);
     assert_eq!(
         mutable.dde().expect("mutable snapshot").source_xml(),
         CONTENT
@@ -112,35 +122,53 @@ fn ordinary_and_mutable_noops_preserve_exact_content() {
 
 #[test]
 fn closure_failure_leaves_both_facades_unchanged() {
-    let mut ordinary = Spreadsheet::from_bytes(package()).expect("ordinary fixture");
+    let mut ordinary = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package())
+            .expect("ordinary fixture")
+            .workbook()
+            .expect("ordinary fixture"),
+    );
     let error = ordinary.edit_dde(|_| Err(Error::Unsupported("caller abort".to_owned())));
     assert!(matches!(error, Err(Error::Unsupported(message)) if message == "caller abort"));
-    assert_eq!(ordinary.content_xml(), CONTENT);
+    assert_eq!(ordinary.workbook().content_xml(), CONTENT);
 
-    let mut mutable = MutableSpreadsheet::from_bytes(package()).expect("mutable fixture");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package())
+            .expect("mutable fixture")
+            .workbook()
+            .expect("mutable fixture"),
+    );
     assert!(
         mutable
             .edit_dde(|_| Err(Error::Unsupported("caller abort".to_owned())))
             .is_err()
     );
-    assert_eq!(mutable.spreadsheet().content_xml(), CONTENT);
+    assert_eq!(mutable.workbook().content_xml(), CONTENT);
 }
 
 #[test]
 fn cancellation_during_closure_refuses_even_noop_publication() {
-    let mut ordinary = Spreadsheet::from_bytes(package()).expect("ordinary fixture");
+    let mut ordinary = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package())
+            .expect("ordinary fixture")
+            .workbook()
+            .expect("ordinary fixture"),
+    );
     let (cancel, execution) = context();
     let result = ordinary.edit_dde_with_context(dde::Limits::default(), &execution, |_| {
         cancel.cancel();
         Ok(())
     });
     assert!(result.is_err());
-    assert_eq!(ordinary.content_xml(), CONTENT);
+    assert_eq!(ordinary.workbook().content_xml(), CONTENT);
 }
 
 #[test]
 fn explicit_input_limits_keep_structured_resource_errors() {
-    let ordinary = Spreadsheet::from_bytes(package()).expect("ordinary fixture");
+    let ordinary = Package::from_bytes(&package())
+        .expect("ordinary fixture")
+        .workbook()
+        .expect("ordinary fixture");
     let (_cancel, execution) = context();
     let error = ordinary
         .dde_with(
@@ -153,7 +181,10 @@ fn explicit_input_limits_keep_structured_resource_errors() {
 
 #[test]
 fn execution_limit_errors_retain_the_callers_resource_and_scope() {
-    let ordinary = Spreadsheet::from_bytes(package()).expect("ordinary fixture");
+    let ordinary = Package::from_bytes(&package())
+        .expect("ordinary fixture")
+        .workbook()
+        .expect("ordinary fixture");
     let (_cancel, token) = CancellationSource::pair();
     let execution = ExecutionContext::new(
         Budget::root(
@@ -183,7 +214,12 @@ fn execution_limit_errors_retain_the_callers_resource_and_scope() {
 
 #[test]
 fn ordinary_patch_and_inverse_rehydrate_the_complete_facade() {
-    let mut ordinary = Spreadsheet::from_bytes(package()).expect("ordinary fixture");
+    let mut ordinary = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package())
+            .expect("ordinary fixture")
+            .workbook()
+            .expect("ordinary fixture"),
+    );
     let (_cancel, execution) = context();
     let before = ordinary
         .dde_with(dde::Limits::default(), &execution)
@@ -202,13 +238,23 @@ fn ordinary_patch_and_inverse_rehydrate_the_complete_facade() {
             .item(),
         "replacement-values"
     );
-    assert!(ordinary.content_xml().contains("office:value=\"42\""));
+    assert!(
+        ordinary
+            .workbook()
+            .content_xml()
+            .contains("office:value=\"42\"")
+    );
     ordinary
         .apply_dde_patch(&commit.patch().inverse())
         .expect("apply inverse");
-    assert_eq!(ordinary.content_xml(), CONTENT);
+    assert_eq!(ordinary.workbook().content_xml(), CONTENT);
 
-    let mut mutable = MutableSpreadsheet::from_bytes(package()).expect("mutable fixture");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package())
+            .expect("mutable fixture")
+            .workbook()
+            .expect("mutable fixture"),
+    );
     mutable
         .edit_dde(|edit| edit.set_sheet_source("Data", replacement_source()))
         .expect("mutable edit");
@@ -222,13 +268,18 @@ fn ordinary_patch_and_inverse_rehydrate_the_complete_facade() {
 
 #[test]
 fn failed_closure_after_staging_does_not_publish() {
-    let mut ordinary = Spreadsheet::from_bytes(package()).expect("ordinary fixture");
+    let mut ordinary = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package())
+            .expect("ordinary fixture")
+            .workbook()
+            .expect("ordinary fixture"),
+    );
     let error = ordinary.edit_dde(|edit| {
         edit.set_sheet_source("Data", replacement_source())?;
         Err(Error::Unsupported("abort staged source".to_owned()))
     });
     assert!(error.is_err());
-    assert_eq!(ordinary.content_xml(), CONTENT);
+    assert_eq!(ordinary.workbook().content_xml(), CONTENT);
 }
 
 #[test]
@@ -241,19 +292,29 @@ fn signature_owner_refuses_changed_dde_but_retains_exact_noops() {
             "application/vnd.oasis.opendocument.digital-signature",
         ),
     ]);
-    let mut ordinary = Spreadsheet::from_bytes(signed.clone()).expect("signed fixture");
+    let mut ordinary = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&signed)
+            .expect("signed fixture")
+            .workbook()
+            .expect("signed fixture"),
+    );
     let error = ordinary.edit_dde(|edit| edit.set_sheet_source("Data", replacement_source()));
     assert!(matches!(error, Err(Error::Unsupported(_))));
-    assert_eq!(ordinary.content_xml(), CONTENT);
+    assert_eq!(ordinary.workbook().content_xml(), CONTENT);
     ordinary.edit_dde(|_| Ok(())).expect("signed no-op");
 
-    let mut mutable = MutableSpreadsheet::from_bytes(signed).expect("signed mutable fixture");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&signed)
+            .expect("signed mutable fixture")
+            .workbook()
+            .expect("signed mutable fixture"),
+    );
     assert!(
         mutable
             .edit_dde(|edit| edit.set_sheet_source("Data", replacement_source()))
             .is_err()
     );
-    assert_eq!(mutable.spreadsheet().content_xml(), CONTENT);
+    assert_eq!(mutable.workbook().content_xml(), CONTENT);
 }
 
 #[test]
@@ -292,7 +353,10 @@ fn source_backed_commit_reopens_preserves_members_and_inverts() {
     let identical = raw_identical_members(&original, &output).expect("member comparison");
     assert!(identical.contains("Pictures/unrelated.bin"));
     assert!(identical.contains("META-INF/manifest.xml"));
-    let reopened = Spreadsheet::from_bytes(output).expect("reopen publication");
+    let reopened = Package::from_bytes(&output)
+        .expect("reopen publication")
+        .workbook()
+        .expect("reopen publication");
     assert_eq!(
         reopened.dde().expect("readback").sheet_sources()[0]
             .source()

@@ -1066,7 +1066,7 @@ fn packaged_ott_template_behavior_remains_package_owned() {
         .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
 
-    let package = Package::from_bytes(bytes.clone()).unwrap();
+    let package = Package::from_bytes(&bytes).unwrap();
     assert_eq!(package.family(), Family::Text);
     assert!(package.is_template());
     assert_eq!(package.mimetype(), ODF_TEXT_TEMPLATE);

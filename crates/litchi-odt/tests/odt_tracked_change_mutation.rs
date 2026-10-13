@@ -1,4 +1,4 @@
-use litchi_odt::Document;
+use litchi_odt::Package;
 use litchi_odt::parser::{ChangeType, TrackChange, TrackedChanges};
 use litchi_odt::tracked_changes::{
     Position, Story, mark_tracked_change_range_xml, set_tracked_changes_xml,
@@ -98,7 +98,10 @@ fn marks_unicode_ranges_points_and_reopens_package() {
         Some("review <note> & two  spaces")
     );
 
-    let reopened = Document::from_bytes(document.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&document.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     let parsed = reopened.tracked_changes().unwrap();
     assert_eq!(parsed.track_changes, Some(true));
     assert_eq!(parsed.protection_key.as_deref(), Some("YWJj"));

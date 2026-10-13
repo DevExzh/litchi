@@ -3208,12 +3208,12 @@ fn legal_cell_ancestry(spans: &[Span], mut current: Option<usize>) -> Result<boo
             | (CellAncestryState::RowContainer, Some(TABLE_NAMESPACE), "table-rows")
             | (CellAncestryState::RowContainer, Some(TABLE_NAMESPACE), "table-header-rows") => {
                 if span.local == "table" {
-                    CellAncestryState::Spreadsheet
+                    CellAncestryState::Workbook
                 } else {
                     CellAncestryState::RowContainer
                 }
             },
-            (CellAncestryState::Spreadsheet, Some(OFFICE_NAMESPACE), "spreadsheet") => {
+            (CellAncestryState::Workbook, Some(OFFICE_NAMESPACE), "spreadsheet") => {
                 CellAncestryState::Body
             },
             (CellAncestryState::Body, Some(OFFICE_NAMESPACE), "body") => {
@@ -3234,7 +3234,7 @@ enum CellAncestryState {
     Cell,
     Row,
     RowContainer,
-    Spreadsheet,
+    Workbook,
     Body,
     Document,
     Root,

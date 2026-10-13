@@ -101,7 +101,9 @@ fn builder_package_round_trip() {
     let mut builder = Builder::new();
     builder.add_table_row_property_style(style.clone()).unwrap();
     builder.add_paragraph("x").unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(builder.build().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+            .unwrap();
     assert_eq!(
         package.row_style_properties().unwrap().get("Row"),
         Some(&style)

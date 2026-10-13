@@ -199,10 +199,7 @@ impl Snapshot {
                         Element::Hyperlink { sheet, text } => {
                             push_hyperlink(&mut sheets, sheet, text, limits)?;
                         },
-                        Element::Root
-                        | Element::Body
-                        | Element::Spreadsheet
-                        | Element::Sheet(_) => {
+                        Element::Root | Element::Body | Element::Workbook | Element::Sheet(_) => {
                             return Err(Error::InvalidFormat(
                                 "ODS feature XML requires a non-empty canonical envelope"
                                     .to_string(),
@@ -401,7 +398,7 @@ impl Drawing {
 enum Element {
     Root,
     Body,
-    Spreadsheet,
+    Workbook,
     Sheet(usize),
     Cell(usize),
     ConditionalFormats(usize),
@@ -447,7 +444,7 @@ fn classify_start(
     }
     if namespace == NamespaceKind::Office && local == b"spreadsheet" {
         return matches!(stack.last(), Some(Element::Body))
-            .then_some(Element::Spreadsheet)
+            .then_some(Element::Workbook)
             .ok_or_else(|| {
                 Error::InvalidFormat(
                     "office:spreadsheet must be the direct child of office:body".to_string(),
@@ -460,7 +457,7 @@ fn classify_start(
         ));
     }
     if namespace == NamespaceKind::Table && local == b"table" {
-        if !matches!(stack.last(), Some(Element::Spreadsheet)) {
+        if !matches!(stack.last(), Some(Element::Workbook)) {
             return Err(Error::InvalidFormat(
                 "table:table must be a direct child of office:spreadsheet".to_string(),
             ));
@@ -483,7 +480,7 @@ fn classify_start(
         Element::Sheet(index) => Some(*index),
         Element::Root
         | Element::Body
-        | Element::Spreadsheet
+        | Element::Workbook
         | Element::Cell(_)
         | Element::ConditionalFormats(_)
         | Element::SparklineGroups(_)

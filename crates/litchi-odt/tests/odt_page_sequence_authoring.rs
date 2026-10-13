@@ -5,7 +5,7 @@
 //! litchi never paginates or resolves the referenced master pages.
 
 use litchi_odt::page_sequence::Sequence;
-use litchi_odt::{Builder, Document};
+use litchi_odt::{Builder, Package};
 
 fn sequence() -> Sequence {
     Sequence::new(vec![
@@ -18,7 +18,9 @@ fn sequence() -> Sequence {
 
 fn content_xml(bytes: &[u8]) -> String {
     String::from_utf8(
-        Document::from_bytes(bytes.to_vec())
+        Package::from_bytes(bytes)
+            .unwrap()
+            .document()
             .unwrap()
             .get_file("content.xml")
             .unwrap(),
@@ -31,7 +33,7 @@ fn builder_authored_page_sequence_round_trips_the_package() {
     let mut builder = Builder::new();
     builder.set_page_sequence(Some(sequence())).unwrap();
     builder.add_paragraph("Body text").unwrap();
-    let bytes = builder.build().unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
 
     let xml = content_xml(&bytes);
     let sequence_start = xml.find("<text:page-sequence").unwrap();
@@ -42,14 +44,17 @@ fn builder_authored_page_sequence_round_trips_the_package() {
     );
     assert!(xml.contains(r#"<text:page text:master-page-name="Left"/>"#));
 
-    let document = Document::from_bytes(bytes).unwrap();
+    let document = Package::from_bytes(&bytes).unwrap().document().unwrap();
     assert_eq!(document.page_sequence().unwrap(), Some(sequence()));
     // Clearing works through the builder as well.
     let mut builder = Builder::new();
     builder.set_page_sequence(Some(sequence())).unwrap();
     builder.set_page_sequence(None).unwrap();
     builder.add_paragraph("Body text").unwrap();
-    let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(document.page_sequence().unwrap(), None);
 }
 
@@ -66,7 +71,10 @@ fn builder_rejects_invalid_page_sequences() {
             .is_err()
     );
     // The rejected value was not stored; the build has no sequence.
-    let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(document.page_sequence().unwrap(), None);
 }
 
@@ -74,27 +82,39 @@ fn builder_rejects_invalid_page_sequences() {
 fn mutable_sets_replaces_and_removes_page_sequence() {
     let mut builder = Builder::new();
     builder.add_paragraph("Existing body").unwrap();
-    let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(document).unwrap();
     assert_eq!(mutable.page_sequence().unwrap(), None);
 
     // Insert ahead of the existing content.
     mutable.set_page_sequence(Some(&sequence())).unwrap();
-    let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(reopened.page_sequence().unwrap(), Some(sequence()));
 
     // Replace the assignments in place.
     let replacement = Sequence::new(vec!["Standard".to_string()]).unwrap();
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(reopened).unwrap();
     mutable.set_page_sequence(Some(&replacement)).unwrap();
-    let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(reopened.page_sequence().unwrap(), Some(replacement));
 
     // Remove the sequence; removing again is a no-op.
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(reopened).unwrap();
     mutable.set_page_sequence(None).unwrap();
     mutable.set_page_sequence(None).unwrap();
-    let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(reopened.page_sequence().unwrap(), None);
     let xml = content_xml(&mutable.to_bytes().unwrap());
     assert!(!xml.contains("page-sequence"));

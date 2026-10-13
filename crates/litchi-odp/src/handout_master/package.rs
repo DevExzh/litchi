@@ -27,11 +27,11 @@ impl Presentation {
         master.resolve(&layouts).map(Some)
     }
 
-    /// Insert or replace the singleton handout master atomically.
+    /// Insert or replace the singleton handout master (edit pipeline only).
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn set_handout_master(&mut self, master: &Master) -> Result<()> {
+    pub(crate) fn set_handout_master(&mut self, master: &Master) -> Result<()> {
         let fragment = master.to_xml_fragment()?;
         let current = styles(self)?;
         let updated = codec::replace_in_styles(current, &fragment)?;
@@ -42,33 +42,11 @@ impl Presentation {
         self.commit_design(&updated, &content)
     }
 
-    /// Insert a handout master, failing if the package already has one.
+    /// Remove the optional handout master (edit pipeline only).
     ///
     /// # Errors
     /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn add_handout_master(&mut self, master: &Master) -> Result<()> {
-        if self.handout_master()?.is_some() {
-            return Err(error("ODP package already has a handout master"));
-        }
-        self.set_handout_master(master)
-    }
-
-    /// Replace a handout master, failing if the package has none.
-    ///
-    /// # Errors
-    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn replace_handout_master(&mut self, master: &Master) -> Result<()> {
-        if self.handout_master()?.is_none() {
-            return Err(error("ODP package has no handout master"));
-        }
-        self.set_handout_master(master)
-    }
-
-    /// Remove the optional handout master atomically.
-    ///
-    /// # Errors
-    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn clear_handout_master(&mut self) -> Result<()> {
+    pub(crate) fn clear_handout_master(&mut self) -> Result<()> {
         let current = styles(self)?;
         let updated = codec::remove_from_styles(current)?;
         if updated == current {
@@ -76,14 +54,6 @@ impl Presentation {
         }
         let content = self.content_xml().to_string();
         self.commit_design(&updated, &content)
-    }
-
-    /// Alias with the same verb used by other singleton package owners.
-    ///
-    /// # Errors
-    /// Returns an error when a package part is missing, malformed, or exceeds a configured limit.
-    pub fn remove_handout_master(&mut self) -> Result<()> {
-        self.clear_handout_master()
     }
 }
 

@@ -6,7 +6,7 @@
 //! elements. Unknown attributes, children, or text are rejected.
 
 use super::row::Break;
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::{Error, Result, xml::escape_xml};
 use quick_xml::{
     XmlVersion,

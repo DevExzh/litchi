@@ -1,8 +1,8 @@
-use litchi_odt::Document;
 use litchi_odt::line_numbering::Format;
 use litchi_odt::notes_configuration::{
     Class, Configuration, Configurations, NumberingScope, Position,
 };
+use litchi_odt::{Document, Package};
 mod support;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -17,13 +17,15 @@ fn document(styles_body: &str) -> Document {
     let styles = format!(
         r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:s="{STYLE}" xmlns:t="{TEXT}" o:version="1.3"><o:styles>{styles_body}</o:styles><o:automatic-styles/><o:master-styles/></o:document-styles>"#
     );
-    Document::from_bytes(support::package(
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[
             ("content.xml", content.as_bytes()),
             ("styles.xml", styles.as_bytes()),
         ],
     ))
+    .unwrap()
+    .document()
     .unwrap()
 }
 
@@ -105,7 +107,10 @@ fn mutable_document_updates_note_configurations_without_touching_unrelated_style
         }
     );
 
-    let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         reopened.notes_configurations().unwrap().endnote,
         Some(endnote.clone())

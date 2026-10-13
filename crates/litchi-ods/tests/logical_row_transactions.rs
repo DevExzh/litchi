@@ -3,8 +3,8 @@ mod support;
 use litchi_core::Result;
 use litchi_odf_common::{constants, core::PackageWriter, package::raw_identical_members};
 use litchi_ods::{
-    Cell, CellValue, Row, Spreadsheet,
-    document::{LogicalRowEdit, Patch, Snapshot},
+    Cell, CellValue, Package, Row,
+    document::{LogicalRowEdit, Patch},
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -46,7 +46,7 @@ fn text_row(text: &str) -> Row {
 }
 
 fn logical_texts(bytes: &[u8]) -> Result<Vec<String>> {
-    let spreadsheet = Spreadsheet::from_bytes(bytes.to_vec())?;
+    let spreadsheet = Package::from_bytes(bytes)?.workbook()?;
     let sheet = spreadsheet.sheet("Data").ok_or_else(|| {
         litchi_core::Error::InvalidFormat("logical-row test sheet is missing".to_string())
     })?;
@@ -70,8 +70,8 @@ fn sequential_batch_splits_repeats_moves_rows_and_is_durable() -> Result<()> {
         r#"<t:table-row><t:table-cell office:value-type="string"><x:p>C</x:p></t:table-cell></t:table-row>"#,
     );
     let source = package_with_content(&ordinary_content(rows));
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     edit.edit_logical_rows(
         "Data",
         &[
@@ -89,44 +89,42 @@ fn sequential_batch_splits_repeats_moves_rows_and_is_durable() -> Result<()> {
     )?;
     let commit = edit.commit()?;
     assert_eq!(
-        logical_texts(commit.snapshot().as_bytes())?,
+        logical_texts(commit.package().as_bytes())?,
         ["A", "B", "B", "C", "X"]
     );
-    let content = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?
+    let content = Package::from_bytes(commit.package().as_bytes())?
+        .workbook()?
         .content_xml()
         .to_string();
     assert!(content.contains("t:number-rows-repeated='2'"));
     assert!(content.contains("<t:table-column t:number-columns-repeated=\"2\""));
     assert!(content.contains("t:visibility=\"collapse\""));
     assert_eq!(
-        commit.patch().apply(&snapshot)?.snapshot().as_bytes(),
-        commit.snapshot().as_bytes()
+        snapshot.apply(commit.patch())?.as_bytes(),
+        commit.package().as_bytes()
     );
     let wire = commit.patch().to_deterministic_json()?;
     let decoded = Patch::from_deterministic_json(&wire, snapshot.limits())?;
     assert_eq!(
-        decoded.apply(&snapshot)?.snapshot().as_bytes(),
-        commit.snapshot().as_bytes()
+        snapshot.apply(&decoded)?.as_bytes(),
+        commit.package().as_bytes()
     );
     let inverse_wire = decoded.inverse().to_deterministic_json()?;
     let inverse = Patch::from_deterministic_json(&inverse_wire, snapshot.limits())?;
-    assert_eq!(
-        inverse.apply(commit.snapshot())?.snapshot().as_bytes(),
-        source
-    );
+    assert_eq!(commit.package().apply(&inverse)?.as_bytes(), source);
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())?
-            .snapshot()
+            .package()
+            .apply(&commit.patch().inverse())?
             .as_bytes(),
         source
     );
-    let stale = Snapshot::from_bytes(package_with_content(&ordinary_content(r#"<t:table-row/>"#)))?;
-    assert!(commit.patch().apply(&stale).is_err());
+    let stale = Package::from_bytes(&package_with_content(&ordinary_content(
+        r#"<t:table-row/>"#,
+    )))?;
+    assert!(stale.apply(commit.patch()).is_err());
     let identical =
-        raw_identical_members(&source, commit.snapshot().as_bytes()).ok_or_else(|| {
+        raw_identical_members(&source, commit.package().as_bytes()).ok_or_else(|| {
             litchi_core::Error::InvalidFormat("raw member comparison failed".to_string())
         })?;
     assert!(identical.contains("Pictures/untouched.bin"));
@@ -137,8 +135,8 @@ fn sequential_batch_splits_repeats_moves_rows_and_is_durable() -> Result<()> {
 fn first_middle_last_only_and_large_repeat_stay_physically_bounded() -> Result<()> {
     let rows = r#"<t:table-row t:number-rows-repeated="1000000"><t:table-cell/></t:table-row>"#;
     let source = package_with_content(&ordinary_content(rows));
-    let snapshot = Snapshot::from_bytes(source)?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut edit = snapshot.edit()?;
     edit.edit_logical_rows(
         "Data",
         &[LogicalRowEdit::Insert {
@@ -146,8 +144,9 @@ fn first_middle_last_only_and_large_repeat_stay_physically_bounded() -> Result<(
             rows: vec![text_row("middle")],
         }],
     )?;
-    let middle = edit.commit()?.into_snapshot();
-    let sheet = Spreadsheet::from_bytes(middle.as_bytes().to_vec())?
+    let middle = edit.commit()?.into_package();
+    let sheet = Package::from_bytes(middle.as_bytes())?
+        .workbook()?
         .sheet("Data")
         .cloned()
         .ok_or_else(|| litchi_core::Error::InvalidFormat("Data is missing".to_string()))?;
@@ -156,7 +155,7 @@ fn first_middle_last_only_and_large_repeat_stay_physically_bounded() -> Result<(
     assert_eq!(sheet.rows[0].repeat(), 500_000);
     assert_eq!(sheet.rows[2].repeat(), 500_000);
 
-    let mut edges = middle.edit();
+    let mut edges = middle.edit()?;
     edges.edit_logical_rows(
         "Data",
         &[
@@ -175,15 +174,16 @@ fn first_middle_last_only_and_large_repeat_stay_physically_bounded() -> Result<(
             },
         ],
     )?;
-    assert_eq!(edges.commit()?.snapshot().as_bytes(), middle.as_bytes());
+    assert_eq!(edges.commit()?.package().as_bytes(), middle.as_bytes());
 
     let only = package_with_content(&ordinary_content(r#"<t:table-row/>"#));
-    let only_snapshot = Snapshot::from_bytes(only)?;
-    let mut remove_only = only_snapshot.edit();
+    let only_snapshot = Package::from_bytes(&only)?;
+    let mut remove_only = only_snapshot.edit()?;
     remove_only.edit_logical_rows("Data", &[LogicalRowEdit::Remove { at: 0, count: 1 }])?;
     let removed = remove_only.commit()?;
     assert_eq!(
-        Spreadsheet::from_bytes(removed.snapshot().as_bytes().to_vec())?
+        Package::from_bytes(removed.package().as_bytes())?
+            .workbook()?
             .sheet("Data")
             .map(|sheet| sheet.logical_row_count()),
         Some(0)
@@ -196,8 +196,8 @@ fn namespace_aliased_self_closing_table_opens_without_losing_its_start_tag() -> 
     let content = format!(
         r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="{OFFICE}" xmlns:t="{TABLE}" office:version="1.3"><office:body><office:spreadsheet><t:table t:name='Data'/></office:spreadsheet></office:body></office:document-content>"#
     );
-    let snapshot = Snapshot::from_bytes(package_with_content(&content))?;
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&package_with_content(&content))?;
+    let mut edit = snapshot.edit()?;
     edit.edit_logical_rows(
         "Data",
         &[LogicalRowEdit::Insert {
@@ -206,19 +206,20 @@ fn namespace_aliased_self_closing_table_opens_without_losing_its_start_tag() -> 
         }],
     )?;
     let commit = edit.commit()?;
-    let output = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec())?
+    let output = Package::from_bytes(commit.package().as_bytes())?
+        .workbook()?
         .content_xml()
         .to_string();
     assert!(output.contains("<t:table t:name='Data'>"));
     assert!(output.contains("</t:table>"));
-    assert_eq!(logical_texts(commit.snapshot().as_bytes())?, ["created"]);
+    assert_eq!(logical_texts(commit.package().as_bytes())?, ["created"]);
 
     let explicit = content.replace(
         " t:name='Data'/>",
         " t:name='Data'><t:table-column t:visibility=\"collapse\"/></t:table>",
     );
-    let explicit_snapshot = Snapshot::from_bytes(package_with_content(&explicit))?;
-    let mut explicit_edit = explicit_snapshot.edit();
+    let explicit_snapshot = Package::from_bytes(&package_with_content(&explicit))?;
+    let mut explicit_edit = explicit_snapshot.edit()?;
     explicit_edit.edit_logical_rows(
         "Data",
         &[LogicalRowEdit::Insert {
@@ -228,11 +229,12 @@ fn namespace_aliased_self_closing_table_opens_without_losing_its_start_tag() -> 
     )?;
     let explicit_commit = explicit_edit.commit()?;
     assert_eq!(
-        logical_texts(explicit_commit.snapshot().as_bytes())?,
+        logical_texts(explicit_commit.package().as_bytes())?,
         ["explicit"]
     );
     assert!(
-        Spreadsheet::from_bytes(explicit_commit.snapshot().as_bytes().to_vec())?
+        Package::from_bytes(explicit_commit.package().as_bytes())?
+            .workbook()?
             .content_xml()
             .contains("<t:table-column t:visibility=\"collapse\"/>")
     );
@@ -244,8 +246,8 @@ fn no_op_and_late_batch_failure_leave_exact_candidate_unchanged() -> Result<()> 
     let source = package_with_content(&ordinary_content(
         r#"<t:table-row><t:table-cell office:value-type="string"><x:p>A</x:p></t:table-cell></t:table-row>"#,
     ));
-    let snapshot = Snapshot::from_bytes(source.clone())?;
-    let mut noop = snapshot.edit();
+    let snapshot = Package::from_bytes(&source)?;
+    let mut noop = snapshot.edit()?;
     noop.edit_logical_rows(
         "Data",
         &[LogicalRowEdit::Move {
@@ -255,9 +257,9 @@ fn no_op_and_late_batch_failure_leave_exact_candidate_unchanged() -> Result<()> 
         }],
     )?;
     assert_eq!(noop.as_bytes(), source);
-    assert!(!noop.commit()?.patch().changed());
+    assert!(noop.commit()?.patch().is_noop());
 
-    let mut failed = snapshot.edit();
+    let mut failed = snapshot.edit()?;
     let before = failed.as_bytes().to_vec();
     assert!(
         failed
@@ -300,15 +302,15 @@ fn no_op_and_late_batch_failure_leave_exact_candidate_unchanged() -> Result<()> 
 fn logical_row_edit_count_accepts_below_and_exact_limit_and_rejects_above() -> Result<()> {
     const LIMIT: usize = 4_096;
     let source = package_with_content(&ordinary_content(r#"<t:table-row/>"#));
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     for count in [LIMIT - 1, LIMIT] {
         let operations = vec![LogicalRowEdit::Remove { at: 0, count: 0 }; count];
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.edit()?;
         edit.edit_logical_rows("Data", &operations)?;
         assert_eq!(edit.as_bytes(), source);
     }
     let operations = vec![LogicalRowEdit::Remove { at: 0, count: 0 }; LIMIT + 1];
-    let mut refused = snapshot.edit();
+    let mut refused = snapshot.edit()?;
     assert!(refused.edit_logical_rows("Data", &operations).is_err());
     assert_eq!(refused.as_bytes(), source);
     Ok(())
@@ -331,8 +333,8 @@ fn source_and_inserted_style_references_are_refused_atomically() -> Result<()> {
     ];
     for content in source_cases {
         let source = package_with_content(&content);
-        let snapshot = Snapshot::from_bytes(source.clone())?;
-        let mut edit = snapshot.edit();
+        let snapshot = Package::from_bytes(&source)?;
+        let mut edit = snapshot.edit()?;
         assert!(
             edit.edit_logical_rows(
                 "Data",
@@ -346,8 +348,8 @@ fn source_and_inserted_style_references_are_refused_atomically() -> Result<()> {
         assert_eq!(edit.as_bytes(), source);
     }
 
-    let styled_noop = Snapshot::from_bytes(styled_noop_source.clone())?;
-    let mut noop = styled_noop.edit();
+    let styled_noop = Package::from_bytes(&styled_noop_source)?;
+    let mut noop = styled_noop.edit()?;
     noop.edit_logical_rows(
         "Data",
         &[LogicalRowEdit::Move {
@@ -359,7 +361,7 @@ fn source_and_inserted_style_references_are_refused_atomically() -> Result<()> {
     assert_eq!(noop.as_bytes(), styled_noop_source);
 
     let source = package_with_content(&ordinary_content(r#"<t:table-row/>"#));
-    let snapshot = Snapshot::from_bytes(source.clone())?;
+    let snapshot = Package::from_bytes(&source)?;
     let mut styled_row = text_row("row-style");
     styled_row.style_name = Some("RowStyle".to_string());
     let mut styled_cell_row = Row::new();
@@ -367,7 +369,7 @@ fn source_and_inserted_style_references_are_refused_atomically() -> Result<()> {
     styled_cell.style_name = Some("CellStyle".to_string());
     styled_cell_row.push_cell(styled_cell)?;
     for row in [styled_row, styled_cell_row] {
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.edit()?;
         assert!(
             edit.edit_logical_rows(
                 "Data",
@@ -415,8 +417,8 @@ fn every_unrewritten_dependency_domain_is_refused_atomically() -> Result<()> {
     ];
     for (label, rows) in cases {
         let source = package_with_content(&ordinary_content(rows));
-        let snapshot = Snapshot::from_bytes(source.clone())?;
-        let mut edit = snapshot.edit();
+        let snapshot = Package::from_bytes(&source)?;
+        let mut edit = snapshot.edit()?;
         assert!(
             edit.edit_logical_rows(
                 "Data",
@@ -443,8 +445,8 @@ fn every_unrewritten_dependency_domain_is_refused_atomically() -> Result<()> {
             "text/xml",
         ),
     ]);
-    let style_snapshot = Snapshot::from_bytes(style_source.clone())?;
-    let mut style_edit = style_snapshot.edit();
+    let style_snapshot = Package::from_bytes(&style_source)?;
+    let mut style_edit = style_snapshot.edit()?;
     assert!(
         style_edit
             .edit_logical_rows("Data", &[LogicalRowEdit::Remove { at: 0, count: 1 }])

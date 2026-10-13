@@ -1,6 +1,6 @@
 use litchi_core::Position;
 use litchi_odt::{
-    Document, RdfaAttributes, TextMeta,
+    RdfaAttributes, TextMeta,
     core::PackageWriter,
     generic::{FlatDocument, Package},
     xforms::ModelChild,
@@ -110,7 +110,10 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
         r#"<o:document-styles xmlns:o="{OFFICE}" xmlns:t="{TEXT}" xmlns:h="{XHTML}" o:version="1.3"><o:styles><t:meta h:property="dc:style">style value</t:meta></o:styles><o:automatic-styles/><o:master-styles/></o:document-styles>"#
     );
     let bytes = package(&content(body()), Some(&styles));
-    let document = Document::from_bytes(bytes.clone()).unwrap();
+    let document = litchi_odt::Package::from_bytes(&bytes)
+        .unwrap()
+        .document()
+        .unwrap();
     let metadata = document.in_content_metadata().unwrap();
     assert!(
         metadata
@@ -120,7 +123,7 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
     );
     assert_eq!(document.xforms_models().unwrap().len(), 1);
 
-    let mut generic = Package::from_bytes(bytes).unwrap();
+    let mut generic = Package::from_bytes(&bytes).unwrap();
     let original_package = generic.to_bytes();
     generic
         .set_paragraph_rdfa(
@@ -150,7 +153,7 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
     generic
         .replace_xforms_model(Position::new(0), &model)
         .unwrap();
-    let reopened = Package::from_bytes(generic.to_bytes()).unwrap();
+    let reopened = Package::from_bytes(&generic.to_bytes()).unwrap();
     assert_eq!(reopened.xforms_models().unwrap()[0].binds().count(), 0);
     assert!(
         reopened
@@ -161,7 +164,10 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
             .any(|item| matches!(item.host, litchi_odt::RdfaHost::Paragraph { index: 0 }))
     );
 
-    let source = Document::from_bytes(package(&content(body()), None)).unwrap();
+    let source = litchi_odt::Package::from_bytes(&package(&content(body()), None))
+        .unwrap()
+        .document()
+        .unwrap();
     let mut mutable = litchi_odt::mutable::MutableDocument::from_document(source).unwrap();
     mutable
         .set_bookmark_rdfa(
@@ -174,7 +180,10 @@ fn document_and_package_facades_cover_styles_and_mutable_public_edits() {
         .unwrap();
     mutable.remove_text_meta(Position::new(0)).unwrap();
     mutable.remove_xforms_model(Position::new(0)).unwrap();
-    let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reopened = litchi_odt::Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert!(reopened.in_content_metadata().unwrap().text_meta.is_empty());
     assert!(reopened.xforms_models().unwrap().is_empty());
 }

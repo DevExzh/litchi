@@ -287,8 +287,10 @@ fn parses_libreoffice_change_tracking_fixtures() {
     let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let tracked_path =
         root.join("test-data/libreoffice-core/sc/qa/unit/data/ods/change-tracking.ods");
-    let tracked =
-        crate::Spreadsheet::open(tracked_path).expect("test fixture or operation should succeed");
+    let tracked = crate::Package::open(tracked_path)
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed");
     let changes = tracked
         .tracked_changes()
         .expect("test fixture or operation should succeed");
@@ -311,8 +313,10 @@ fn parses_libreoffice_change_tracking_fixtures() {
 
     let protected_path = root
         .join("test-data/libreoffice-core/sc/qa/extras/testdocuments/RecordChangesProtected.ods");
-    let protected =
-        crate::Spreadsheet::open(protected_path).expect("test fixture or operation should succeed");
+    let protected = crate::Package::open(protected_path)
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed");
     assert!(
         protected
             .tracked_changes()

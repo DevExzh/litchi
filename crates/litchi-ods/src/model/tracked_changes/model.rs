@@ -570,7 +570,7 @@ pub(crate) struct Validated {
     pub(crate) limits: Limits,
 }
 
-/// Spreadsheet-wide tracked-change state and ordered change records.
+/// Workbook-wide tracked-change state and ordered change records.
 #[derive(Clone, Debug, Default, PartialEq)]
 pub struct Changes {
     pub enabled: bool,

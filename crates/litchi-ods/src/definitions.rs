@@ -7,7 +7,7 @@ use litchi_core::{Error, Position, Result};
 use crate::{
     codec::names as codec,
     model::names::{Definition, Scope},
-    package::Package,
+    package::Archive,
 };
 
 /// An exact semantic key for one named definition.
@@ -92,7 +92,7 @@ impl Snapshot {
     }
 
     fn from_arc(source: Arc<[u8]>) -> Result<Self> {
-        let package = Package::from_bytes(source.as_ref().to_vec())?;
+        let package = Archive::from_bytes(source.as_ref().to_vec())?;
         let definitions = Arc::from(package.definitions()?);
         Ok(Self {
             source,
@@ -264,7 +264,7 @@ impl Edit {
             return Ok(Commit::unchanged(self.before));
         }
 
-        let package = Package::from_bytes(self.before.source.as_ref().to_vec())?;
+        let package = Archive::from_bytes(self.before.source.as_ref().to_vec())?;
         let content_xml = codec::replace(package.content_xml(), &self.draft)?;
         litchi_odf_common::compact_xml::validate(content_xml.as_bytes()).map_err(Error::from)?;
         let target_package = package.replace_content_xml(&content_xml)?;

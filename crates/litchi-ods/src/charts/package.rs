@@ -1,14 +1,14 @@
-//! Package-level chart-part replacement.
+//! Archive-level chart-part replacement.
 
 use super::codec::content_inline;
 use super::model::{Chart, Location};
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
 use litchi_odf_common::package::{Addition, rebuild_package, splice};
 use std::collections::BTreeMap;
 
 /// Apply all staged chart replacements in one package rebuild.
-pub(crate) fn replace(package: &Package, original: &[Chart], draft: &[Chart]) -> Result<Vec<u8>> {
+pub(crate) fn replace(package: &Archive, original: &[Chart], draft: &[Chart]) -> Result<Vec<u8>> {
     if original.len() != draft.len() {
         return invalid("ODS chart transaction changed the inventory shape");
     }

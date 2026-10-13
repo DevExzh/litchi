@@ -1,7 +1,7 @@
 use litchi_odt::style::columns::{
     Column, Columns, Length, Separator, SeparatorAlignment, SeparatorStyle, parse,
 };
-use litchi_odt::{Builder, Document};
+use litchi_odt::{Builder, Package};
 mod support;
 
 const STYLE: &str = "urn:oasis:names:tc:opendocument:xmlns:style:1.0";
@@ -133,10 +133,10 @@ fn builder_package_page_layout_and_mutable_update_round_trip() {
         .add_page_layout_columns("Columns&Layout", columns.clone())
         .unwrap();
     builder.add_paragraph("body").unwrap();
-    let bytes = builder.build().unwrap();
-    let package = litchi_odt::generic::Package::from_bytes(bytes.clone()).unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let package = litchi_odt::generic::Package::from_bytes(&bytes).unwrap();
     assert!(package.style_columns().unwrap().contains(&columns));
-    let document = Document::from_bytes(bytes).unwrap();
+    let document = Package::from_bytes(&bytes).unwrap().document().unwrap();
     let layout = document
         .page_layouts()
         .unwrap()
@@ -151,7 +151,7 @@ fn builder_package_page_layout_and_mutable_update_round_trip() {
         .set_page_layout_columns("Columns&Layout", &replacement)
         .unwrap();
     let output = mutable.to_bytes().unwrap();
-    let document = Document::from_bytes(output).unwrap();
+    let document = Package::from_bytes(&output).unwrap().document().unwrap();
     let layout = document
         .page_layouts()
         .unwrap()
@@ -167,13 +167,15 @@ fn mutable_update_preserves_inherited_aliases() {
         r#"<o:document-styles xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:s="{STYLE}" xmlns:f="{FO}" o:version="1.3"><o:automatic-styles><s:page-layout s:name="Alias"><s:page-layout-properties><s:columns f:column-count="2"/></s:page-layout-properties></s:page-layout></o:automatic-styles><o:master-styles/></o:document-styles>"#
     );
     let content = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:t="urn:oasis:names:tc:opendocument:xmlns:text:1.0" o:version="1.3"><o:body><o:text><t:p>body</t:p></o:text></o:body></o:document-content>"#;
-    let document = Document::from_bytes(support::package(
+    let document = Package::from_bytes(&support::package(
         "application/vnd.oasis.opendocument.text",
         &[
             ("content.xml", content.as_bytes()),
             ("styles.xml", styles.as_bytes()),
         ],
     ))
+    .unwrap()
+    .document()
     .unwrap();
     assert_eq!(
         document.page_layouts().unwrap()[0]
@@ -190,7 +192,10 @@ fn mutable_update_preserves_inherited_aliases() {
     mutable
         .set_page_layout_columns("Alias", &Columns::new(4).unwrap())
         .unwrap();
-    let round_trip = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let round_trip = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         round_trip.page_layouts().unwrap()[0]
             .properties

@@ -155,6 +155,8 @@ fn source_bound_patch_respects_a_new_profile_on_the_same_owner() {
     let bytes = Builder::new()
         .content_xml(SOURCE)
         .build()
+        .expect("ODS package")
+        .to_bytes()
         .expect("ODS package");
     let owner = SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(bytes)))
         .expect("source-backed owner");

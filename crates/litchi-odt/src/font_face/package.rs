@@ -8,7 +8,7 @@ use super::{
     xml_error,
 };
 use crate::{
-    FlatDocument, Package,
+    FlatDocument, GenericPackage as Package,
     core::{AuthoredXmlFragment, OwnedPackage, XmlSourcePart, XmlSplicePublication},
 };
 use litchi_core::{Error, Result};

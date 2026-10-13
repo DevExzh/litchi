@@ -1,4 +1,4 @@
-use litchi_odt::Document;
+use litchi_odt::Package;
 use litchi_odt::drawing::resources::{fill_image, gradient, hatch, marker, opacity, stroke_dash};
 mod support;
 
@@ -8,8 +8,8 @@ const STYLES: &str = include_str!("../../../test-data/odf/odt/drawing-style-reso
 const FLAT: &str = include_str!("../../../test-data/odf/odt/drawing-style-resources.fodt");
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
-fn document() -> Document {
-    Document::from_bytes(support::package(
+fn package() -> Package {
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[
             ("content.xml", CONTENT.as_bytes()),
@@ -62,7 +62,8 @@ fn assert_resources(
 
 #[test]
 fn document_generic_package_and_mutable_document_expose_named_style_resources() {
-    let source = document();
+    let source_package = package();
+    let source = source_package.document().unwrap();
     let fill_images = source.drawing_fill_images().unwrap();
     let gradients = source.drawing_gradients().unwrap();
     let hatches = source.drawing_hatches().unwrap();
@@ -78,7 +79,8 @@ fn document_generic_package_and_mutable_document_expose_named_style_resources() 
         &dashes,
     );
 
-    let package = litchi_odt::generic::Package::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::Package::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
     assert_eq!(package.drawing_fill_images().unwrap(), fill_images);
     assert_eq!(package.drawing_gradients().unwrap(), gradients);
     assert_eq!(package.drawing_hatches().unwrap(), hatches);

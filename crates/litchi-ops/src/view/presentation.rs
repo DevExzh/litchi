@@ -23,7 +23,7 @@ use crate::format::pptx::{Pptx, PptxSlide};
 /// source-backed PPTX reads only the slides it is asked for and reports a
 /// source changed after open as [`Code::IoError`](crate::Code::IoError).
 /// PPTX slide catalogs and slide sizes are format-specific; read them on the
-/// [`Pptx`](crate::format::pptx::Pptx) handle.
+/// `Pptx` handle.
 ///
 /// ```no_run
 /// # fn main() -> litchi_ops::Result<()> {

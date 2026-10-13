@@ -2,9 +2,8 @@ mod support;
 
 use litchi_odf_common::package::raw_identical_members;
 use litchi_ods::{
-    Spreadsheet,
+    Package,
     content_validation::{self, Definition, DisplayList, Error},
-    document::Snapshot as DocumentSnapshot,
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -218,12 +217,15 @@ fn unified_publication_preserves_members_and_enforces_security_only_at_commit() 
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:table table:name="Sheet"/></office:spreadsheet></office:body></office:document-content>"#
     );
     let source = package(&content);
-    let snapshot = DocumentSnapshot::from_bytes(source.clone()).unwrap();
-    let mut edit = snapshot.edit();
+    let snapshot = Package::from_bytes(&source).unwrap();
+    let mut edit = snapshot.edit().unwrap();
     edit.content_validations(|validations| validations.add(Definition::new("v")?))
         .unwrap();
     let commit = edit.commit().unwrap();
-    let reopened = Spreadsheet::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    let reopened = Package::from_bytes(commit.package().as_bytes())
+        .unwrap()
+        .workbook()
+        .unwrap();
     assert!(
         reopened
             .content_validations()
@@ -231,7 +233,7 @@ fn unified_publication_preserves_members_and_enforces_security_only_at_commit() 
             .definition("v")
             .is_some()
     );
-    let identical = raw_identical_members(&source, commit.snapshot().as_bytes()).unwrap();
+    let identical = raw_identical_members(&source, commit.package().as_bytes()).unwrap();
     assert!(identical.contains("Pictures/opaque.bin"));
     assert!(!identical.contains("content.xml"));
 
@@ -243,12 +245,18 @@ fn unified_publication_preserves_members_and_enforces_security_only_at_commit() 
             "text/xml",
         ),
     ]);
-    let signed = DocumentSnapshot::from_bytes(signed_source.clone()).unwrap();
+    let signed = Package::from_bytes(&signed_source).unwrap();
     assert_eq!(
-        signed.edit().commit().unwrap().snapshot().as_bytes(),
+        signed
+            .edit()
+            .unwrap()
+            .commit()
+            .unwrap()
+            .package()
+            .as_bytes(),
         signed_source
     );
-    let mut changed = signed.edit();
+    let mut changed = signed.edit().unwrap();
     changed
         .content_validations(|validations| validations.add(Definition::new("v")?))
         .unwrap();
@@ -267,13 +275,15 @@ fn unified_patch_apply_is_stale_safe_reversible_and_failure_atomic() {
     let semantic_commit = semantic_edit.commit().unwrap();
     let patch = semantic_commit.patch().clone();
 
-    let document_source = DocumentSnapshot::from_bytes(source.clone()).unwrap();
-    let mut document_edit = document_source.edit();
+    let document_source = Package::from_bytes(&source).unwrap();
+    let mut document_edit = document_source.edit().unwrap();
     document_edit
         .apply_content_validation_patch(&patch)
         .unwrap();
     let target = document_edit.commit().unwrap();
-    let target_content = Spreadsheet::from_bytes(target.snapshot().as_bytes().to_vec())
+    let target_content = Package::from_bytes(target.package().as_bytes())
+        .unwrap()
+        .workbook()
         .unwrap()
         .content_xml()
         .to_string();
@@ -284,25 +294,27 @@ fn unified_patch_apply_is_stale_safe_reversible_and_failure_atomic() {
         content
     );
 
-    let mut restore = target.snapshot().edit();
+    let mut restore = target.package().edit().unwrap();
     restore.apply_content_validation_patch(&inverse).unwrap();
     let restored = restore.commit().unwrap();
     assert_eq!(
-        Spreadsheet::from_bytes(restored.snapshot().as_bytes().to_vec())
+        Package::from_bytes(restored.package().as_bytes())
+            .unwrap()
+            .workbook()
             .unwrap()
             .content_xml(),
         content
     );
     assert!(
-        raw_identical_members(&source, restored.snapshot().as_bytes())
+        raw_identical_members(&source, restored.package().as_bytes())
             .unwrap()
             .contains("Pictures/opaque.bin")
     );
 
     let foreign_content = content.replace("Sheet", "Foreign");
     let foreign = package(&foreign_content);
-    let foreign_snapshot = DocumentSnapshot::from_bytes(foreign.clone()).unwrap();
-    let mut stale = foreign_snapshot.edit();
+    let foreign_snapshot = Package::from_bytes(&foreign).unwrap();
+    let mut stale = foreign_snapshot.edit().unwrap();
     assert!(stale.apply_content_validation_patch(&patch).is_err());
     assert_eq!(stale.as_bytes(), foreign);
 }

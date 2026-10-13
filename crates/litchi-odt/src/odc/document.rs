@@ -1,10 +1,11 @@
 //! Namespace-aware access to a standalone `OpenDocument` chart package.
 
-use crate::{Family, Package, constants, core::PackageWriter};
+use crate::{Family, GenericPackage as Package, constants, core::PackageWriter};
 use litchi_core::{Error, Metadata, Result};
 use litchi_odf_common::calculation::{Settings, parse};
 use litchi_odf_common::chart::authoring::{Definition, serialize_content};
 use litchi_odf_common::chart::{Element, read};
+use litchi_odf_common::{Error as OdfError, OpenOptions};
 use std::io::Read;
 use std::path::Path;
 
@@ -30,27 +31,83 @@ impl Document {
         let mut writer = PackageWriter::new();
         writer.set_mimetype(mimetype)?;
         writer.add_file(constants::ODF_CONTENT, content.as_bytes())?;
-        Self::from_bytes(writer.finish_to_bytes()?)
+        Self::from_vec(writer.finish_to_bytes()?)
     }
 
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        let file = std::fs::File::open(path)?;
-        Self::from_reader(file)
+    /// Open a packaged chart from a path.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed limit failures and package or family-validation errors.
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, OdfError> {
+        Self::from_package(Package::open(path)?)
     }
 
-    pub fn from_reader(mut reader: impl Read) -> Result<Self> {
-        let mut bytes = Vec::new();
-        reader.read_to_end(&mut bytes)?;
-        Self::from_bytes(bytes)
+    /// Open a packaged chart from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_package(Package::open_with_options(path, options)?)
     }
 
-    pub fn from_bytes(bytes: Vec<u8>) -> Result<Self> {
-        let package = Package::from_bytes(bytes)?;
+    /// Read a packaged chart through the input-limit guard.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl Read) -> std::result::Result<Self, OdfError> {
+        Self::from_package(Package::from_reader(reader)?)
+    }
+
+    /// Read a packaged chart under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_package(Package::from_reader_with_options(reader, options)?)
+    }
+
+    /// Validate a packaged chart from bytes (the bytes are copied).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, OdfError> {
+        Self::from_package(Package::from_bytes(bytes)?)
+    }
+
+    /// Validate a packaged chart from bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_package(Package::from_bytes_with_options(bytes, options)?)
+    }
+
+    pub(crate) fn from_vec(bytes: Vec<u8>) -> Result<Self> {
+        Ok(Self::from_package(Package::from_vec(bytes)?)?)
+    }
+
+    fn from_package(package: Package) -> std::result::Result<Self, OdfError> {
         if package.family() != Family::Chart {
             return Err(Error::InvalidFormat(format!(
                 "not an OpenDocument chart: MIME type is '{}'",
                 package.mimetype()
-            )));
+            ))
+            .into());
         }
         let chart = read(&package.content_xml()?)?;
         Ok(Self { package, chart })
@@ -119,7 +176,13 @@ impl Document {
         self.package.into_bytes()
     }
 
-    pub fn save(&self, path: impl AsRef<Path>) -> Result<()> {
+    /// Atomically replace `path` with the chart package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns the publication I/O failure; the destination is unchanged
+    /// unless the error is a committed-durability failure.
+    pub fn save(&self, path: impl AsRef<Path>) -> std::result::Result<(), OdfError> {
         self.package.save(path)
     }
 }
@@ -148,7 +211,7 @@ mod tests {
     #[test]
     fn opens_chart_package_with_common_retained_content() {
         let bytes = package(constants::ODF_CHART, chart_xml());
-        let document = Document::from_bytes(bytes.clone()).unwrap();
+        let document = Document::from_bytes(&bytes).unwrap();
         assert!(!document.is_template());
         assert_eq!(document.chart().kind(), Kind::Chart);
         assert_eq!(
@@ -165,9 +228,9 @@ mod tests {
     #[test]
     fn accepts_chart_templates_and_rejects_other_families() {
         let bytes = package(constants::ODF_CHART_TEMPLATE, chart_xml());
-        let document = Document::from_bytes(bytes.clone()).unwrap();
+        let document = Document::from_bytes(&bytes).unwrap();
         assert!(document.is_template());
         assert_eq!(document.into_bytes(), bytes);
-        assert!(Document::from_bytes(package(constants::ODF_DRAWING, chart_xml())).is_err());
+        assert!(Document::from_bytes(&package(constants::ODF_DRAWING, chart_xml())).is_err());
     }
 }

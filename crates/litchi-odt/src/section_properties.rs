@@ -750,7 +750,7 @@ fn check_child(rank: u8, last: &mut u8, seen: &mut [bool; 3]) -> Result<()> {
     Ok(())
 }
 
-impl crate::Package {
+impl crate::GenericPackage {
     pub fn section_style_properties(&self) -> Result<SectionStylePropertiesSet> {
         self.styles_xml()?.map_or_else(
             || Ok(Default::default()),

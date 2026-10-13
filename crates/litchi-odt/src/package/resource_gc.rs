@@ -16,7 +16,7 @@ use crate::{
     Part,
     constants::{ODF_CONTENT, ODF_STYLES},
     core::OwnedPackage,
-    transaction::{Commit, EnvelopeKind, Snapshot},
+    transaction::{Commit, EnvelopeKind, Package},
 };
 use litchi_core::{Error, Result};
 use litchi_odf_common::{
@@ -148,7 +148,7 @@ impl EmbeddedResourceGcPlanEntry {
 
 /// Non-mutating, bounded embedded-resource garbage-collection plan.
 pub struct EmbeddedResourceGcPlan {
-    source: Snapshot,
+    source: Package,
     entries: Vec<EmbeddedResourceGcPlanEntry>,
 }
 
@@ -171,7 +171,7 @@ impl EmbeddedResourceGcPlan {
     /// Every untouched ZIP member is raw-copied. The manifest is changed by
     /// deleting only the planned `manifest:file-entry` byte spans. The result
     /// is fully reopened before a reversible package commit is returned.
-    pub fn apply(&self, source: &Snapshot) -> Result<Commit> {
+    pub fn apply(&self, source: &Package) -> Result<Commit> {
         if source.as_bytes() != self.source.as_bytes() {
             return invalid("ODT embedded-resource GC plan source does not match");
         }
@@ -185,7 +185,7 @@ impl EmbeddedResourceGcPlan {
         let after = if bytes.as_slice() == source.as_bytes() {
             source.clone()
         } else {
-            Snapshot::from_bytes(bytes)?
+            Package::from_vec(bytes)?
         };
         Ok(crate::transaction::embedded_resource_gc_commit(
             source.clone(),
@@ -213,7 +213,7 @@ impl EmbeddedResourceGcPlan {
     }
 }
 
-impl Snapshot {
+impl Package {
     /// Inventory explicitly named detached payloads without changing the package.
     ///
     /// This operation never discovers arbitrary files as garbage and is never
@@ -228,7 +228,7 @@ impl Snapshot {
 }
 
 pub(crate) fn plan(
-    source: Snapshot,
+    source: Package,
     candidates: &[EmbeddedResourceGcCandidate],
 ) -> Result<EmbeddedResourceGcPlan> {
     if candidates.len() > MAX_CANDIDATES {
@@ -312,7 +312,7 @@ fn set_global_refusal(candidates: &mut [NormalizedCandidate], refusal: EmbeddedR
     }
 }
 
-fn finish_plan(source: Snapshot, normalized: Vec<NormalizedCandidate>) -> EmbeddedResourceGcPlan {
+fn finish_plan(source: Package, normalized: Vec<NormalizedCandidate>) -> EmbeddedResourceGcPlan {
     let entries = normalized
         .into_iter()
         .map(|item| {

@@ -19,7 +19,7 @@ pub use model::{
     Styles, TextAlign, TextProperties,
 };
 
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 
 pub(super) const OFFICE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 pub(super) const TEXT: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:text:1.0";

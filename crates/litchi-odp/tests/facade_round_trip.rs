@@ -3,7 +3,7 @@
     reason = "integration-test assertions panic on failure by design"
 )]
 
-use litchi_odp::{Builder, Presentation};
+use litchi_odp::{Builder, Package};
 
 #[test]
 fn builder_and_presentation_facade_round_trip() {
@@ -11,17 +11,18 @@ fn builder_and_presentation_facade_round_trip() {
     builder
         .add_slide_with_title("Welcome", "Hello from ODP")
         .unwrap();
-    let bytes = builder.build().unwrap();
-    let presentation = Presentation::from_bytes(bytes.clone()).unwrap();
+    let bytes = builder.build().unwrap().to_bytes().unwrap();
+    let package = Package::from_bytes(&bytes).unwrap();
+    let presentation = package.presentation().unwrap();
     assert_eq!(presentation.slide_count().unwrap(), 1);
     assert_eq!(presentation.text().unwrap(), "Welcome\nHello from ODP");
-    assert_eq!(presentation.to_bytes().unwrap(), bytes);
+    assert_eq!(package.to_bytes().unwrap(), bytes);
 }
 
 #[test]
 fn presentation_facade_reports_empty_packages_without_slides() {
-    let bytes = Builder::new().build().unwrap();
-    let presentation = Presentation::from_bytes(bytes).unwrap();
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
+    let presentation = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     assert_eq!(presentation.slide_count().unwrap(), 0);
     assert_eq!(presentation.text().unwrap(), "");
 }
@@ -34,7 +35,10 @@ fn presentation_slide_matches_the_full_slide_list() {
             .add_slide_with_title(&format!("Title {index}"), &format!("Body {index}"))
             .unwrap();
     }
-    let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+    let presentation = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .presentation()
+        .unwrap();
     let slides = presentation.slides().unwrap();
 
     for index in 0..=slides.len() {
@@ -81,7 +85,10 @@ fn semantic_page_and_layout_facades_round_trip() {
     builder.add_slide_with_title("Title", "Body").unwrap();
     builder.set_layouts(layouts).unwrap();
     builder.set_pages(Some(pages)).unwrap();
-    let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+    let presentation = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .presentation()
+        .unwrap();
 
     assert_eq!(
         presentation.layouts().unwrap().layouts[0].name,

@@ -82,7 +82,10 @@ fn handle_is_one_pointer_and_shares_its_state() {
 fn byte_routes_match_the_leaf_reader() {
     for name in FIXTURES {
         let bytes = std::fs::read(fixture(name)).expect("read ODP fixture");
-        let leaf = litchi_odp::Presentation::from_bytes(bytes.clone()).expect("leaf ODP");
+        let leaf = litchi_odp::Package::from_bytes(&bytes)
+            .expect("leaf ODP")
+            .presentation()
+            .expect("leaf ODP");
         assert!(leaf.slide_count().expect("slides") > 0, "{name}");
         for odp in [open_prepared(bytes.clone()), open_detected(bytes)] {
             assert!(matches!(odp.owner(), OdpOwner::Eager(_)));
@@ -125,7 +128,10 @@ fn write_source_package() -> (tempfile::NamedTempFile, Vec<u8>) {
 #[test]
 fn source_route_matches_the_leaf_reader() {
     let (temporary, bytes) = write_source_package();
-    let leaf = litchi_odp::Presentation::from_bytes(bytes).expect("leaf ODP");
+    let leaf = litchi_odp::Package::from_bytes(&bytes)
+        .expect("leaf ODP")
+        .presentation()
+        .expect("leaf ODP");
     let odp = open_source(temporary.path());
     assert!(matches!(odp.owner(), OdpOwner::Source(_)));
     assert_eq!(format!("{odp:?}"), r#"Odp { owner: "source", .. }"#);
@@ -157,7 +163,10 @@ fn source_route_reports_a_changed_source_as_io_error() {
 #[test]
 fn malformed_package_is_a_typed_core_error() {
     let bytes = broken_package(litchi_odf_common::constants::ODF_PRESENTATION);
-    let Err(leaf_error) = litchi_odp::Presentation::from_bytes(bytes.clone()) else {
+    let Err(leaf_error) = litchi_odp::Package::from_bytes(&bytes)
+        .map_err(litchi_core::Error::from)
+        .and_then(|package| package.presentation())
+    else {
         panic!("a broken package must not open in the leaf");
     };
     let error = crate::open_bytes(bytes).expect_err("a broken package must not open");

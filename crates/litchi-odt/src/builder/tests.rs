@@ -39,7 +39,7 @@ fn hyperlink_authoring_round_trips_through_an_odt_package() {
     configured.set_title("Jump to bookmark");
     builder.add_hyperlink_element(configured).unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(
         document.hyperlinks().unwrap(),
         vec![
@@ -86,7 +86,7 @@ fn ruby_annotation_authoring_round_trips_through_an_odt_package() {
     assert!(builder.add_ruby_style(style.clone()).is_err());
     builder.add_ruby_annotation(0, &annotation).unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(document.ruby_styles().unwrap().styles, vec![style]);
     assert_eq!(
         document.ruby_annotations().unwrap().annotations,
@@ -118,7 +118,7 @@ fn ruby_range_annotation_authoring_round_trips_through_an_odt_package() {
         .wrap_ruby_annotation(0, start..start + "字".len(), &annotation)
         .unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(
         document.ruby_annotations().unwrap().annotations,
         vec![annotation]
@@ -143,7 +143,7 @@ fn ruby_range_annotation_authoring_round_trips_through_an_odt_package() {
         .wrap_ruby_annotation(0, 1..1 + "漢字".len(), &structured)
         .unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(
         document.ruby_annotations().unwrap().annotations,
         vec![structured]
@@ -160,7 +160,7 @@ fn note_authoring_round_trips_through_an_odt_package() {
     builder.add_paragraph("Body text").unwrap();
     builder.add_note(0, &note).unwrap();
 
-    let document = crate::Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = builder.build().unwrap().document().unwrap();
     assert_eq!(document.notes().unwrap(), vec![note.clone()]);
     assert_eq!(document.footnotes().unwrap(), vec![note]);
     assert!(document.endnotes().unwrap().is_empty());
@@ -388,12 +388,12 @@ fn line_numbering_configuration_round_trips_through_an_odt_package() {
         .unwrap();
 
     let bytes = builder.build().unwrap();
-    let document = crate::Document::from_bytes(bytes.clone()).unwrap();
+    let document = bytes.document().unwrap();
     assert_eq!(
         document.line_numbering_configuration().unwrap(),
         Some(configuration.clone())
     );
-    let package = crate::Package::from_bytes(bytes).unwrap();
+    let package = crate::GenericPackage::from_bytes(bytes.as_bytes()).unwrap();
     assert_eq!(
         package.line_numbering_configuration().unwrap(),
         Some(configuration)
@@ -407,7 +407,7 @@ fn test_build() {
 
     let result = builder.build();
     assert!(result.is_ok());
-    let bytes = result.unwrap();
+    let bytes = result.unwrap().to_bytes().unwrap();
     assert!(!bytes.is_empty());
     // Check it's a valid ZIP (starts with PK)
     assert_eq!(&bytes[0..2], b"PK");
@@ -421,7 +421,7 @@ fn test_save() {
     let mut builder = Builder::new();
     builder.add_paragraph("Test content").unwrap();
 
-    let result = builder.save(&path);
+    let result = builder.build().unwrap().save(&path);
     assert!(result.is_ok());
     assert!(path.exists());
 

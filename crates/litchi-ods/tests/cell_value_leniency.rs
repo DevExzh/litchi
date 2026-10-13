@@ -19,9 +19,7 @@ use std::sync::Arc;
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, DefectLocation, ToleranceReport};
 use litchi_ods::worksheet::{CellValue, Sheet};
-use litchi_ods::{
-    FlatSnapshot, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog, Spreadsheet,
-};
+use litchi_ods::{FlatSnapshot, Package, SourceBackedSpreadsheet, SourceBackedSpreadsheetCatalog};
 
 type Recorded = (Defect, u16, Option<DefectLocation>);
 
@@ -145,7 +143,7 @@ fn assert_degraded_cells(sheets: &[Sheet], label: &str) {
 }
 
 fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
-    let owned = Spreadsheet::from_bytes(bytes.to_vec()).unwrap();
+    let owned = Package::from_bytes(bytes).unwrap().workbook().unwrap();
     assert_eq!(
         recorded(owned.tolerance_report()),
         defects,
@@ -158,7 +156,10 @@ fn assert_every_open_path(bytes: &[u8], defects: &[Recorded], label: &str) {
 
     let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
         .unwrap_or_else(|| panic!("{label}: package must prepare"));
-    let adopted = Spreadsheet::from_prepared_package(prepared).unwrap();
+    let adopted = Package::from_prepared_package(prepared)
+        .unwrap()
+        .workbook()
+        .unwrap();
     assert_eq!(
         recorded(adopted.tolerance_report()),
         defects,
@@ -219,7 +220,7 @@ fn package_and_content_repairs_are_reported_together() {
             ..odf_rezip::MimetypeLayout::CONFORMING
         },
     );
-    let owned = Spreadsheet::from_bytes(bytes).unwrap();
+    let owned = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
     let mut defects = vec![(
         Defect::Package(litchi_odf_common::PackageDefect::MimetypeDeflated),
         8,
@@ -270,6 +271,11 @@ fn malformed_xml_stays_a_hard_error() {
         "content.xml",
         |xml| xml.replacen("</table:table-cell>", "", 1),
     );
-    assert!(Spreadsheet::from_bytes(broken.clone()).is_err());
+    assert!(
+        Package::from_bytes(&broken)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
     assert!(SourceBackedSpreadsheet::from_read_at(Arc::new(OwnedSource::new(broken))).is_err());
 }

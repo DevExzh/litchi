@@ -8,7 +8,7 @@
 //! duplicates and malformed owned values are rejected.
 
 use crate::{
-    FlatDocument, Package,
+    FlatDocument, GenericPackage as Package,
     line_numbering::NonNegativeLength,
     style::paragraph::margin::rewrite_start_tag,
     style::table::row::{

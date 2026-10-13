@@ -5766,6 +5766,1001 @@
         }
       ],
       "families": []
+    },
+    {
+      "id": "odf-common",
+      "package": "litchi-odf-common",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "SourcePackageLimits",
+          "scope": "litchi_odf_common",
+          "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 §5)"
+        }
+      ],
+      "families": []
+    },
+    {
+      "id": "odt",
+      "package": "litchi-odt",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "SourcePackageLimits",
+          "scope": "litchi_odt",
+          "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 §5)"
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_odt",
+          "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 §5)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_odt::transaction",
+          "replacement": "use litchi_odt::Package",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_odt::Builder",
+          "replacement": "Builder::build returns Package; output lives on Package (ADR 0034 §4)",
+          "recursive": false
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_odt::transaction::Patch",
+          "replacement": "use Package::apply(&patch) (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "open",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_password",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_password",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_prepared",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_prepared_package",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_archive_bytes",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "into_bytes",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "document_snapshot",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "apply_document_patch",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "original_bytes",
+          "scope": "litchi_odt::Document",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_odt::transaction::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odt::transaction::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "changed",
+          "scope": "litchi_odt::transaction::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_odt::SourceBackedDocument",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits",
+          "scope": "litchi_odt::SourceBackedDocument",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_password",
+          "scope": "litchi_odt::SourceBackedDocument",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits_and_password",
+          "scope": "litchi_odt::SourceBackedDocument",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_odt::SourceBackedDocument",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_odt::SourceBackedDocument",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_odt::SourceBackedDocument",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits_and_password",
+          "scope": "litchi_odt::SourceBackedDocument",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_odt::SourceBackedDocumentCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits",
+          "scope": "litchi_odt::SourceBackedDocumentCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_password",
+          "scope": "litchi_odt::SourceBackedDocumentCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits_and_password",
+          "scope": "litchi_odt::SourceBackedDocumentCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_odt::SourceBackedDocumentCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_odt::SourceBackedDocumentCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_odt::SourceBackedDocumentCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits_and_password",
+          "scope": "litchi_odt::SourceBackedDocumentCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_odt::generic::Package",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_odt::generic::Package",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_odt::generic::Package",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_reader_with_limits_and_password",
+          "scope": "litchi_odt::generic::Package",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_odt::generic::Package",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_limits_and_password",
+          "scope": "litchi_odt::generic::Package",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        }
+      ],
+      "families": [
+        "litchi_odt::transaction"
+      ]
+    },
+    {
+      "id": "ods",
+      "package": "litchi-ods",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "Spreadsheet",
+          "scope": "litchi_ods",
+          "replacement": "use litchi_ods::Workbook (ADR 0034 §2)"
+        },
+        {
+          "name": "SourcePackageLimits",
+          "scope": "litchi_ods",
+          "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 §5)"
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_ods",
+          "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 §5)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_ods::document",
+          "replacement": "use litchi_ods::Package",
+          "recursive": false
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_ods::document::Edit",
+          "replacement": "drop the Edit (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with",
+          "scope": "litchi_ods::Package",
+          "replacement": "use from_bytes_with_options and Package::edit_with_options",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_ods::Builder",
+          "replacement": "Builder::build returns Package; output lives on Package (ADR 0034 §4)",
+          "recursive": false
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_ods::document::Patch",
+          "replacement": "use Package::apply(&patch) (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "open",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_password",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_password",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_prepared",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_prepared_package",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_archive_bytes",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "into_bytes",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "document_snapshot",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "apply_document_patch",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "original_bytes",
+          "scope": "litchi_ods::Workbook",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_ods::document::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_ods::document::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "changed",
+          "scope": "litchi_ods::document::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "open",
+          "scope": "litchi_ods::MutableSpreadsheet",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_ods::MutableSpreadsheet",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_spreadsheet",
+          "scope": "litchi_ods::MutableSpreadsheet",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "spreadsheet",
+          "scope": "litchi_ods::MutableSpreadsheet",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "document_snapshot",
+          "scope": "litchi_ods::MutableSpreadsheet",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "apply_document_patch",
+          "scope": "litchi_ods::MutableSpreadsheet",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "edit_document",
+          "scope": "litchi_ods::MutableSpreadsheet",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_password",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits_and_password",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits_and_password",
+          "scope": "litchi_ods::SourceBackedSpreadsheet",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits",
+          "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_password",
+          "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits_and_password",
+          "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits_and_password",
+          "scope": "litchi_ods::SourceBackedSpreadsheetCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        }
+      ],
+      "families": [
+        "litchi_ods::document"
+      ]
+    },
+    {
+      "id": "odp",
+      "package": "litchi-odp",
+      "default_features": true,
+      "features": [],
+      "banned_names": [
+        {
+          "name": "SourcePackageLimits",
+          "scope": "litchi_odp",
+          "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 §5)"
+        },
+        {
+          "name": "ReadLimits",
+          "scope": "litchi_odp",
+          "replacement": "use checked SourceLimits and OpenOptions (ADR 0034 §5)"
+        },
+        {
+          "name": "Snapshot",
+          "scope": "litchi_odp::edit",
+          "replacement": "use litchi_odp::Package",
+          "recursive": false
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_odp::edit",
+          "replacement": "use litchi_odp::edit::Edit (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "transaction",
+          "scope": "litchi_odp::Package",
+          "replacement": "use Package::edit (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "to_presentation",
+          "scope": "litchi_odp::Package",
+          "replacement": "use Package::presentation (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_odp::Builder",
+          "replacement": "Builder::build returns Package; output lives on Package (ADR 0034 §4)",
+          "recursive": false
+        },
+        {
+          "name": "apply",
+          "scope": "litchi_odp::edit::Patch",
+          "replacement": "use Package::apply(&patch) (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_odp::SourceBackedTailAppendEdit",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_password",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_bytes_with_password",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_prepared",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_prepared_package",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "from_archive_bytes",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "save",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "to_bytes",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "into_bytes",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "edit",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "document_snapshot",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "apply_document_patch",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "original_bytes",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "add_rdf_graph",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "replace_rdf_graph",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "remove_rdf_graph",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "add_rdf_triple",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "replace_rdf_triple",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "remove_rdf_triple",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "move_rdf_triple",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "add_annotation",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "replace_annotation",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "remove_annotation",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "add_layout",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "set_handout_master",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "clear_handout_master",
+          "scope": "litchi_odp::Presentation",
+          "replacement": "state verbs live on Package; the projection is read-only (ADR 0034 §2)",
+          "recursive": false
+        },
+        {
+          "name": "snapshot",
+          "scope": "litchi_odp::edit::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "into_snapshot",
+          "scope": "litchi_odp::edit::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "changed",
+          "scope": "litchi_odp::edit::Commit",
+          "replacement": "use Commit::{package, into_package, into_parts, diagnostics} (ADR 0034 §3)",
+          "recursive": false
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_odp::SourceBackedPresentation",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits",
+          "scope": "litchi_odp::SourceBackedPresentation",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_password",
+          "scope": "litchi_odp::SourceBackedPresentation",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits_and_password",
+          "scope": "litchi_odp::SourceBackedPresentation",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_odp::SourceBackedPresentation",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_odp::SourceBackedPresentation",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_odp::SourceBackedPresentation",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits_and_password",
+          "scope": "litchi_odp::SourceBackedPresentation",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path",
+          "scope": "litchi_odp::SourceBackedPresentationCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits",
+          "scope": "litchi_odp::SourceBackedPresentationCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_password",
+          "scope": "litchi_odp::SourceBackedPresentationCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_path_with_limits_and_password",
+          "scope": "litchi_odp::SourceBackedPresentationCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_odp::SourceBackedPresentationCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "open_with_limits_and_password",
+          "scope": "litchi_odp::SourceBackedPresentationCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits",
+          "scope": "litchi_odp::SourceBackedPresentationCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        },
+        {
+          "name": "from_read_at_with_limits_and_password",
+          "scope": "litchi_odp::SourceBackedPresentationCatalog",
+          "replacement": "use open/from_read_at and the *_with_options/*_with_password_and_options routes",
+          "recursive": false
+        }
+      ],
+      "families": [
+        "litchi_odp::edit"
+      ]
+    },
+    {
+      "id": "ops-odf",
+      "package": "litchi-ops",
+      "default_features": true,
+      "features": [
+        "odt",
+        "ods",
+        "odp"
+      ],
+      "banned_names": [
+        {
+          "name": "odf_limits",
+          "scope": "litchi_ops::OpenOptions",
+          "replacement": "use OpenOptions::odf_options(litchi_odf_common::OpenOptions) (ADR 0034 §5)",
+          "recursive": false
+        }
+      ],
+      "families": []
     }
   ]
 }

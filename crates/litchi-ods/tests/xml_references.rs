@@ -8,12 +8,12 @@
 //!
 //! `quick_xml` exposes predefined and numeric references as separate
 //! `Event::GeneralRef` events.  The standalone worksheet parser used by
-//! `Builder::sheets` and the fused parser used by `Spreadsheet::from_bytes`
+//! `Builder::sheets` and the fused parser used by `Workbook::from_bytes`
 //! must append those events exactly once and reject unresolved or illegal
 //! references consistently.
 
 use litchi_odf_common::{constants, core::PackageWriter};
-use litchi_ods::{Builder, Spreadsheet};
+use litchi_ods::{Builder, MutableSpreadsheet, Package};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -76,10 +76,13 @@ fn standalone_and_fused_parsers_decode_mixed_references_once() -> litchi_core::R
         link_start..link_start + EXPECTED_LINK_TEXT.len()
     );
 
-    let bytes = Builder::new().content_xml(MIXED_REFERENCES).build()?;
-    let spreadsheet = Spreadsheet::from_bytes(bytes.clone())?;
+    let bytes = Builder::new()
+        .content_xml(MIXED_REFERENCES)
+        .build()?
+        .to_bytes()?;
+    let spreadsheet = MutableSpreadsheet::from_workbook(Package::from_bytes(&bytes)?.workbook()?);
     assert_eq!(spreadsheet.sheets(), standalone.as_slice());
-    assert_eq!(spreadsheet.into_bytes(), bytes);
+    assert_eq!(spreadsheet.to_bytes(), bytes);
     Ok(())
 }
 
@@ -133,7 +136,10 @@ fn unknown_and_illegal_numeric_references_are_rejected_by_both_open_paths() {
 
         let bytes = raw_package(&content).expect("raw ODS package");
         assert!(
-            Spreadsheet::from_bytes(bytes).is_err(),
+            Package::from_bytes(&bytes)
+                .map_err(litchi_core::Error::from)
+                .and_then(|package| package.workbook())
+                .is_err(),
             "fused parser accepted {reference}"
         );
     }

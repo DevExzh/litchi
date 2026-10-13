@@ -27,7 +27,7 @@
 
 use crate::constants;
 use crate::core::{
-    ArchiveLimits, OwnedPackage, PreparedPackage, SourcePackageLimits,
+    ArchiveLimits, OwnedPackage, PreparedPackage, SourceLimits,
     package::{MIMETYPE_LOCAL_PREFIX, PreparedCatalogFacts, read_owned_input},
 };
 use litchi_core::{Error, ReadAt, Resource, ResourceLimit, Result, SourceVersion};
@@ -768,10 +768,22 @@ pub fn prepared(value: Vec<u8>) -> Option<PreparedPackage> {
 /// full-input clone.
 #[must_use = "inspect the prepared package or recover the original bytes"]
 pub fn prepared_or_original(value: Vec<u8>) -> std::result::Result<PreparedPackage, Vec<u8>> {
+    prepared_or_original_with_limits(value, SourceLimits::default())
+}
+
+/// [`prepared_or_original`] under caller-selected source limits.
+///
+/// A candidate that exceeds `limits` is returned unchanged, so the caller's
+/// ordinary limited owner reports the typed limit failure.
+#[must_use = "inspect the prepared package or recover the original bytes"]
+pub fn prepared_or_original_with_limits(
+    value: Vec<u8>,
+    limits: SourceLimits,
+) -> std::result::Result<PreparedPackage, Vec<u8>> {
     let Some(format) = packaged_mime(&value) else {
         return Err(value);
     };
-    let package = match OwnedPackage::from_prepared_bytes_or_recover(value) {
+    let package = match OwnedPackage::from_prepared_bytes_or_recover_with_limits(value, limits) {
         Ok(package) => package,
         // Strict indexing requires the `mimetype` member at offset zero. A
         // re-zipped package that relocated it is rebuilt at the ordinary
@@ -779,10 +791,7 @@ pub fn prepared_or_original(value: Vec<u8>) -> std::result::Result<PreparedPacka
         // records a tolerated `mimetype` deviation; any other strict failure
         // keeps its historical rejection.
         Err(value) => {
-            let package = OwnedPackage::from_shared_bytes_or_recover_with_limits(
-                value,
-                SourcePackageLimits::default(),
-            )?;
+            let package = OwnedPackage::from_shared_bytes_or_recover_with_limits(value, limits)?;
             if package.tolerance_report().is_clean() {
                 return Err(package.into_inner());
             }
@@ -907,7 +916,7 @@ fn preparation_limits(
     limits: Limits,
     catalog_limits: CatalogProbeLimits,
     length: u64,
-) -> SourcePackageLimits {
+) -> SourceLimits {
     let archive = if length <= catalog_limits.max_input_bytes {
         ArchiveLimits::new(
             catalog_limits.max_members,
@@ -920,7 +929,7 @@ fn preparation_limits(
     } else {
         ArchiveLimits::default()
     };
-    SourcePackageLimits::new(limits.max_input_bytes, archive)
+    SourceLimits::from_detection(limits.max_input_bytes, archive)
 }
 
 fn prepared_catalog_decision(

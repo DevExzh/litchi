@@ -18,6 +18,7 @@ pub mod model;
 pub mod package;
 pub mod streaming;
 
+pub use authoring::edit::Package;
 pub use facade::layer;
 pub use facade::settings as show;
 pub use facade::slide::{Shape, Slide};
@@ -26,7 +27,10 @@ pub use facade::{
     SourceBackedPresentation, SourceBackedPresentationCatalog,
 };
 pub use facade::{edit, embedded, image, layout, master, page, slide};
-pub use package::ReadLimits;
+pub use litchi_odf_common::{
+    Error, LimitKind, OpenOptions, SemanticLimitKind, SemanticLimits, SemanticLimitsBuilder,
+    SourceLimitKind, SourceLimits, SourceLimitsBuilder,
+};
 pub use package::{
     SourceBackedTailAppendEdit, SourceBackedTailAppendPublicationPlan, TailAppendError,
     TailAppendLimits, TailAppendSourceProof,

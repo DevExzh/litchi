@@ -5,7 +5,7 @@ use litchi::common::Position;
 #[cfg(feature = "odt")]
 use litchi::odt::mutable::MutableDocument;
 #[cfg(feature = "odt")]
-use litchi::odt::{Builder, Document};
+use litchi::odt::{Builder, Package};
 
 #[cfg(feature = "odt")]
 fn main() -> Result<()> {
@@ -16,9 +16,9 @@ fn main() -> Result<()> {
     builder.add_heading("Mutable ODT Demo", 1)?;
     builder
         .add_paragraph("This seed file will be reopened and updated through MutableDocument.")?;
-    builder.save(base_file)?;
+    builder.build()?.save(base_file)?;
 
-    let document = Document::open(base_file)?;
+    let document = Package::open(base_file)?.document()?;
     let mut mutable = MutableDocument::from_document(document)?;
 
     mutable.replace_paragraph_at(Position::new(0), "Mutable ODT Demo (reopened and updated)")?;

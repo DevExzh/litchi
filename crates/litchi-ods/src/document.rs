@@ -11,22 +11,27 @@
 use std::{
     collections::{BTreeMap, BTreeSet},
     fmt,
-    sync::Arc,
+    sync::{Arc, OnceLock},
 };
 
 use litchi_core::{
-    BlobBundle, BlobLimits, CompositionLimits, ConflictSet, DiagnosticFingerprint, Error,
-    History as CoreHistory, HistoryLimits, JoinedSubEdits, MergeChoice, Patch as CorePatch,
-    PatchError, PatchLimits, PatchOperation, Result, Reversible, ReversibleOperation, SubEdit,
-    SubEditConflict, SubEditJoinFailure, ThreeWayMergePlan,
+    BlobBundle, BlobLimits, CompositionLimits, ConflictSet, DiagnosticFingerprint,
+    Error as CoreError, History as CoreHistory, HistoryLimits, JoinedSubEdits, MergeChoice,
+    Patch as CorePatch, PatchError, PatchLimits, PatchOperation, Result, Reversible,
+    ReversibleOperation, SubEdit, SubEditConflict, SubEditJoinFailure, ThreeWayMergePlan,
 };
+/// The family error of package-level verbs, [`Edit::commit`] and
+/// [`Package::apply`]: typed limits plus the common-core payload.
+pub use litchi_odf_common::Error;
+use litchi_odf_common::Error as PackageError;
+pub use litchi_odf_common::{LimitKind, OpenOptions};
 use litchi_odf_common::{
     core::{PackageWriter, Profile, XmlSourcePart, XmlSplicePublication},
     package::{Addition, raw_identical_members, rebuild_package},
 };
 use serde_json::{Value, json};
 
-use crate::package::Package;
+use crate::package::Archive;
 
 pub use crate::advanced::{
     BoundFormControl, CellProperties, CellStyle, CellStyleNode, ChartObject, DataStyleNode,
@@ -160,49 +165,305 @@ impl Default for Limits {
     }
 }
 
-/// An immutable ODS package snapshot with exact source lineage.
+/// The immutable owner of one packaged ODS artifact.
+///
+/// `Package` owns every state verb: ingress (`open*`, `from_bytes*`,
+/// `from_reader*`), the primary [`Edit`] transaction, patch application and
+/// output (`save`, `save_with_durability`, `to_bytes`, `write_to`). It is
+/// cheap to clone; clones share the exact bytes, the validated archive index
+/// and the [`crate::Workbook`] projection. A commit publishes a new package
+/// and never mutates its source.
 #[derive(Clone)]
-pub struct Snapshot {
+pub struct Package {
     source: Arc<Vec<u8>>,
     // The package/index is immutable and internally Arc-backed.  Retain the
     // validated owner next to the exact source bytes so reads, edits, and
     // publication handoffs do not rebuild the ZIP index for every operation.
-    package: Arc<Package>,
+    package: Arc<Archive>,
+    limits: Limits,
+    /// Whether `package` retains a caller credential (password ingress).
+    credentialed: bool,
+    /// The read-only projection of exactly these bytes, parsed at open and
+    /// on first use for freshly built packages.
+    workbook: Arc<OnceLock<crate::Workbook>>,
+}
+
+impl fmt::Debug for Package {
+    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
+        formatter
+            .debug_struct("Package")
+            .field("source_bytes", &self.source.len())
+            .field("limits", &self.limits)
+            .finish_non_exhaustive()
+    }
+}
+
+/// Options for one primary [`Edit`] started by [`Package::edit_with_options`].
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+#[must_use]
+pub struct EditOptions {
     limits: Limits,
 }
 
-impl fmt::Debug for Snapshot {
-    fn fmt(&self, formatter: &mut fmt::Formatter<'_>) -> fmt::Result {
-        formatter
-            .debug_struct("Snapshot")
-            .field("source_bytes", &self.source.len())
-            .field("limits", &self.limits)
-            .finish()
+impl EditOptions {
+    /// The default transaction bounds.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Select the transaction, patch, composition and history bounds.
+    pub const fn limits(mut self, limits: Limits) -> Self {
+        self.limits = limits;
+        self
     }
 }
 
-impl Snapshot {
-    /// Parse an exact ODS package with default finite bounds.
+impl Package {
+    /// Create the minimal valid spreadsheet (one empty worksheet).
     ///
     /// # Errors
     ///
-    /// Returns an error when the package exceeds a bound or fails complete facade readback.
-    pub fn from_bytes(source: Vec<u8>) -> Result<Self> {
-        Self::from_bytes_with(source, Limits::default())
+    /// Returns an error only when the fixed minimal package cannot be built.
+    pub fn new() -> std::result::Result<Self, PackageError> {
+        crate::Builder::new().build()
     }
 
-    /// Parse an exact ODS package under explicit finite bounds.
+    /// Open an ODS package from a path with the default [`OpenOptions`].
     ///
     /// # Errors
     ///
-    /// Returns an error when the package exceeds a bound or fails complete facade readback.
-    pub fn from_bytes_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
+    /// Returns [`PackageError::Limit`] when a source dimension is exceeded and
+    /// [`PackageError::Core`] for I/O, archive or family-validation failures.
+    pub fn open(path: impl AsRef<std::path::Path>) -> std::result::Result<Self, PackageError> {
+        Self::open_with_options(path, OpenOptions::new())
+    }
+
+    /// Open an ODS package from a path under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_options(
+        path: impl AsRef<std::path::Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::from_reader_with_options(std::fs::File::open(path)?, options)
+    }
+
+    /// Open a password-encrypted ODS package from a path.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_password(
+        path: impl AsRef<std::path::Path>,
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODS package under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn open_with_password_and_options(
+        path: impl AsRef<std::path::Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let owned = litchi_odf_common::OwnedPackage::from_reader_with_limits_and_password(
+            std::fs::File::open(path)?,
+            options.source_limits_value(),
+            password.as_str(),
+        )?;
+        Self::from_opened(Archive::from_owned_package(owned)?, true, options)
+    }
+
+    /// Open an ODS package from bytes (the bytes are copied).
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes(bytes: &[u8]) -> std::result::Result<Self, PackageError> {
+        Self::from_bytes_with_options(bytes, OpenOptions::new())
+    }
+
+    /// Open an ODS package from bytes under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_options(
+        bytes: &[u8],
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        let bytes = copy_bytes(bytes)?;
+        // Let the prepared detector perform the local MIME probe exactly
+        // once; a matching ODS result transfers its indexed archive and a
+        // rejected probe recovers the allocation for the ordinary owner.
+        let archive =
+            match litchi_odf_common::detect::prepared_or_original_with_limits(bytes, limits) {
+                Ok(prepared) => Archive::from_prepared_package(prepared)?,
+                Err(bytes) => Archive::from_owned_package(
+                    litchi_odf_common::OwnedPackage::from_bytes_with_limits(bytes, limits)?,
+                )?,
+            };
+        Self::from_opened(archive, false, options)
+    }
+
+    /// Open a password-encrypted ODS package from bytes.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_password(
+        bytes: &[u8],
+        password: impl Into<String>,
+    ) -> std::result::Result<Self, PackageError> {
+        Self::from_bytes_with_password_and_options(bytes, password, OpenOptions::new())
+    }
+
+    /// Open a password-encrypted ODS package from bytes under caller-selected
+    /// limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_bytes_with_password_and_options(
+        bytes: &[u8],
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let password = zeroize::Zeroizing::new(password.into());
+        let limits = options.source_limits_value();
+        check_input_bytes(bytes.len(), limits)?;
+        let owned = litchi_odf_common::OwnedPackage::from_bytes_with_limits_and_password(
+            copy_bytes(bytes)?,
+            limits,
+            password.as_str(),
+        )?;
+        Self::from_opened(Archive::from_owned_package(owned)?, true, options)
+    }
+
+    /// Open an ODS package from a reader with the default [`OpenOptions`].
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader(reader: impl std::io::Read) -> std::result::Result<Self, PackageError> {
+        Self::from_reader_with_options(reader, OpenOptions::new())
+    }
+
+    /// Open an ODS package from a reader under caller-selected limits. The
+    /// reader is consumed through an input-limit guard before indexing.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_reader_with_options(
+        reader: impl std::io::Read,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let owned = litchi_odf_common::OwnedPackage::from_reader_with_limits(
+            reader,
+            options.source_limits_value(),
+        )?;
+        Self::from_opened(Archive::from_owned_package(owned)?, false, options)
+    }
+
+    /// Adopt a packaged ODF result prepared by smart detection, reusing its
+    /// validated archive index.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CoreError::UnexpectedFormat`] (as [`PackageError::Core`]) when the
+    /// prepared package is another family.
+    pub fn from_prepared_package(
+        prepared: litchi_odf_common::PreparedPackage,
+    ) -> std::result::Result<Self, PackageError> {
+        if prepared.format() != litchi_core::detection::FileFormat::Ods {
+            return Err(CoreError::UnexpectedFormat {
+                detected: prepared.format(),
+            }
+            .into());
+        }
+        Self::from_opened(
+            Archive::from_prepared_package(prepared)?,
+            false,
+            OpenOptions::new(),
+        )
+    }
+
+    fn from_opened(
+        archive: Archive,
+        credentialed: bool,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, PackageError> {
+        let semantic = options.semantic_limits_value();
+        if !semantic.is_default() {
+            let reader = archive.package().package()?;
+            if let Some(size) = reader.member_materialized_size("content.xml")? {
+                semantic.check(litchi_odf_common::SemanticLimitKind::ContentBytes, size)?;
+            }
+            if let Some(size) = reader.member_materialized_size("styles.xml")? {
+                semantic.check(litchi_odf_common::SemanticLimitKind::StylesBytes, size)?;
+            }
+        }
+        let archive = Arc::new(archive);
+        let workbook = crate::Workbook::from_shared_package(Arc::clone(&archive))?;
+        if !semantic.is_default() {
+            semantic.check(
+                litchi_odf_common::SemanticLimitKind::Units,
+                u64::try_from(workbook.sheet_count()).unwrap_or(u64::MAX),
+            )?;
+        }
+        Ok(Self {
+            source: archive.shared_bytes_owner(),
+            package: archive,
+            limits: Limits::default(),
+            credentialed,
+            workbook: Arc::new(OnceLock::from(workbook)),
+        })
+    }
+
+    /// Adopt a package materialized from a source-backed owner, which may
+    /// retain the caller's credential for reading encrypted parts.
+    pub(crate) fn from_materialized(owned: litchi_odf_common::OwnedPackage) -> Result<Self> {
+        Ok(Self::from_opened(
+            Archive::from_owned_package(owned)?,
+            true,
+            OpenOptions::new(),
+        )?)
+    }
+
+    /// Adopt complete bytes written by the crate's own authoring codecs. The
+    /// archive is indexed and the family parts validated now; the projection
+    /// is parsed on first use.
+    pub(crate) fn from_authored(bytes: Vec<u8>) -> Result<Self> {
+        let source = Arc::new(bytes);
+        let package = Arc::new(Archive::from_shared_bytes(Arc::clone(&source))?);
+        Ok(Self {
+            source,
+            package,
+            limits: Limits::default(),
+            credentialed: false,
+            workbook: Arc::new(OnceLock::new()),
+        })
+    }
+
+    /// Reopen complete bytes as a validated, credential-free transaction
+    /// owner under explicit bounds.
+    pub(crate) fn from_vec_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
         Self::from_arc(Arc::new(source), limits)
     }
 
     fn from_arc(source: Arc<Vec<u8>>, limits: Limits) -> Result<Self> {
         validate_package_size(source.len(), limits)?;
-        let package = Package::from_shared_bytes(Arc::clone(&source))?;
+        let package = Archive::from_shared_bytes(Arc::clone(&source))?;
         validate_resource_count(&package, limits)?;
         if package
             .package()
@@ -215,16 +476,18 @@ impl Snapshot {
             );
         }
         let package = Arc::new(package);
-        let _facade = crate::Spreadsheet::from_shared_package(Arc::clone(&package))?;
+        let workbook = crate::Workbook::from_shared_package(Arc::clone(&package))?;
         Ok(Self {
             source,
             package,
             limits,
+            credentialed: false,
+            workbook: Arc::new(OnceLock::from(workbook)),
         })
     }
 
     /// Adopt an already credential-free immutable package owner.
-    pub(crate) fn from_shared_package(package: Arc<Package>, limits: Limits) -> Result<Self> {
+    pub(crate) fn from_shared_package(package: Arc<Archive>, limits: Limits) -> Result<Self> {
         let source = package.shared_bytes_owner();
         validate_package_size(source.len(), limits)?;
         validate_resource_count(package.as_ref(), limits)?;
@@ -243,12 +506,111 @@ impl Snapshot {
                 "ODS encrypted sources require an explicit credential-retaining transaction",
             );
         }
-        let _facade = crate::Spreadsheet::from_shared_package(Arc::clone(&package))?;
+        let workbook = crate::Workbook::from_shared_package(Arc::clone(&package))?;
         Ok(Self {
             source,
             package,
             limits,
+            credentialed: false,
+            workbook: Arc::new(OnceLock::from(workbook)),
         })
+    }
+
+    /// The owned read-only projection of this package (one reference-count
+    /// increment once parsed).
+    ///
+    /// # Errors
+    ///
+    /// Returns the parse failure of a freshly built package whose projection
+    /// has not been parsed yet; opened and committed packages never fail.
+    pub fn workbook(&self) -> Result<crate::Workbook> {
+        if let Some(workbook) = self.workbook.get() {
+            return Ok(workbook.clone());
+        }
+        let workbook = crate::Workbook::from_shared_package(Arc::clone(&self.package))?;
+        Ok(self.workbook.get_or_init(|| workbook).clone())
+    }
+
+    /// Repairs tolerated while this package was opened.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::workbook`].
+    pub fn tolerance_report(&self) -> Result<litchi_odf_common::leniency::ToleranceReport> {
+        Ok(self.workbook()?.tolerance_report().clone())
+    }
+
+    /// Apply a primary-transaction patch to this exact package.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when this package is not byte-identical to the patch
+    /// source, or when the default security policy refuses a changed write on
+    /// a signed, encrypted or protected source.
+    pub fn apply(&self, patch: &Patch) -> std::result::Result<Self, PackageError> {
+        Ok(patch.apply(self)?.into_package())
+    }
+
+    /// Apply a primary-transaction patch under an explicit
+    /// signature/encryption write policy.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::apply`], with the selected policy.
+    pub fn apply_with_security(
+        &self,
+        patch: &Patch,
+        policy: SecurityWritePolicy,
+    ) -> std::result::Result<Self, PackageError> {
+        Ok(patch.apply_with_security(self, policy)?.into_package())
+    }
+
+    /// Atomically replace `path` with this package (full durability).
+    ///
+    /// The artifact is staged in a sibling temporary file and published with
+    /// one rename; a failure before publication leaves the destination
+    /// unchanged.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`PackageError::Core`] carrying the I/O failure.
+    pub fn save(&self, path: impl AsRef<std::path::Path>) -> std::result::Result<(), PackageError> {
+        self.save_with_durability(path, litchi_core::Durability::Full)
+    }
+
+    /// Atomically replace `path` with this package under explicit durability.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::save`].
+    pub fn save_with_durability(
+        &self,
+        path: impl AsRef<std::path::Path>,
+        durability: litchi_core::Durability,
+    ) -> std::result::Result<(), PackageError> {
+        litchi_odf_common::publish::save_bytes(path.as_ref(), self.as_bytes(), durability)
+    }
+
+    /// Copy the exact package bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an allocation failure.
+    pub fn to_bytes(&self) -> std::result::Result<Vec<u8>, PackageError> {
+        Ok(copy_bytes(self.as_bytes())?)
+    }
+
+    /// Write the exact package bytes to a stream.
+    ///
+    /// # Errors
+    ///
+    /// Returns the stream's I/O failure.
+    pub fn write_to(
+        &self,
+        mut writer: impl std::io::Write,
+    ) -> std::result::Result<(), PackageError> {
+        writer.write_all(self.as_bytes())?;
+        Ok(())
     }
 
     /// Borrow the exact package bytes.
@@ -432,7 +794,7 @@ impl Snapshot {
 
     /// Publish this exact plaintext snapshot as a bounded password-encrypted ODS archive.
     ///
-    /// This terminal operation does not create an editable encrypted `Snapshot`. Existing
+    /// This terminal operation does not create an editable encrypted `Package`. Existing
     /// signatures are refused by default because encryption invalidates their package bytes.
     ///
     /// # Errors
@@ -491,16 +853,57 @@ impl Snapshot {
         writer.finish_to_bounded_bytes()
     }
 
-    /// Begin one clone-staged unified package transaction.
-    #[must_use]
-    pub fn edit(&self) -> Edit {
-        Edit {
-            before: self.clone(),
-            candidate: Arc::clone(&self.source),
-            package: Arc::clone(&self.package),
+    /// Begin one clone-staged unified package transaction under the default
+    /// bounds.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the package exceeds the transaction bounds or
+    /// is encrypted (encrypted sources stay read-only exact no-ops).
+    pub fn edit(&self) -> std::result::Result<Edit, PackageError> {
+        self.edit_with_options(EditOptions::new())
+    }
+
+    /// Begin one clone-staged unified package transaction under explicit
+    /// bounds.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::edit`].
+    pub fn edit_with_options(
+        &self,
+        options: EditOptions,
+    ) -> std::result::Result<Edit, PackageError> {
+        Ok(self.edit_core(options.limits)?)
+    }
+
+    pub(crate) fn edit_core(&self, limits: Limits) -> Result<Edit> {
+        validate_package_size(self.source.len(), limits)?;
+        validate_resource_count(&self.package, limits)?;
+        if self
+            .package
+            .package()
+            .package()?
+            .manifest()
+            .has_encrypted_entries()
+        {
+            return invalid(
+                "ODS encrypted sources require an explicit credential-retaining transaction",
+            );
+        }
+        let mut before = self.clone();
+        before.limits = limits;
+        if self.credentialed {
+            before.package = Arc::new(self.package.clone_without_password()?);
+            before.credentialed = false;
+        }
+        Ok(Edit {
+            candidate: Arc::clone(&before.source),
+            package: Arc::clone(&before.package),
+            before,
             steps: Vec::new(),
             spliced_parts: BTreeSet::new(),
-        }
+        })
     }
 }
 
@@ -536,7 +939,7 @@ impl Resource {
         })
     }
 
-    /// Package-relative resource path.
+    /// Archive-relative resource path.
     #[must_use]
     pub fn path(&self) -> &str {
         &self.path
@@ -683,9 +1086,9 @@ struct Step {
 /// A unified clone-staged ODS package edit.
 #[derive(Clone, Debug)]
 pub struct Edit {
-    before: Snapshot,
+    before: Package,
     candidate: Arc<Vec<u8>>,
-    package: Arc<Package>,
+    package: Arc<Archive>,
     steps: Vec<Step>,
     spliced_parts: BTreeSet<String>,
 }
@@ -706,7 +1109,7 @@ impl Edit {
     where
         F: FnOnce(&mut crate::worksheet::Edit) -> Result<()>,
     {
-        let outcome: Result<Option<(Arc<Package>, Arc<Vec<u8>>, bool)>> = (|| {
+        let outcome: Result<Option<(Arc<Archive>, Arc<Vec<u8>>, bool)>> = (|| {
             // The current candidate has already passed package validation at
             // the previous staging boundary.  Hand the immutable package
             // owner directly to the worksheet transaction; its semantic
@@ -805,7 +1208,7 @@ impl Edit {
         ) -> crate::content_validation::Result<()>,
     {
         let source = std::mem::replace(&mut self.candidate, Arc::new(Vec::new()));
-        let outcome: Result<Option<(Arc<Package>, Arc<Vec<u8>>)>> = (|| {
+        let outcome: Result<Option<(Arc<Archive>, Arc<Vec<u8>>)>> = (|| {
             let package = Arc::clone(&self.package);
             let snapshot = crate::content_validation::Snapshot::parse(package.content_xml())
                 .map_err(content_validation_error)?;
@@ -844,7 +1247,7 @@ impl Edit {
         patch: &crate::content_validation::Patch,
     ) -> Result<()> {
         let source = std::mem::replace(&mut self.candidate, Arc::new(Vec::new()));
-        let outcome: Result<Option<(Arc<Package>, Arc<Vec<u8>>)>> = (|| {
+        let outcome: Result<Option<(Arc<Archive>, Arc<Vec<u8>>)>> = (|| {
             let package = Arc::clone(&self.package);
             let snapshot = crate::content_validation::Snapshot::parse(package.content_xml())
                 .map_err(content_validation_error)?;
@@ -983,7 +1386,7 @@ impl Edit {
         for (index, chart) in edit.charts().iter().enumerate() {
             if before.get(index) != Some(chart) {
                 litchi_odf_common::compact_xml::validate(chart.content_xml().as_bytes())
-                    .map_err(Error::from)?;
+                    .map_err(CoreError::from)?;
             }
         }
         let commit = edit.commit()?;
@@ -1213,7 +1616,7 @@ impl Edit {
     /// failure. Every refusal leaves the edit unchanged.
     pub fn move_sheet(&mut self, sheet: &str, position: SheetPosition) -> Result<()> {
         let package = Arc::clone(&self.package);
-        let count = crate::Spreadsheet::from_shared_package(package)?
+        let count = crate::Workbook::from_shared_package(package)?
             .sheets()
             .len();
         if count == 0 {
@@ -1261,7 +1664,7 @@ impl Edit {
         position: SheetPosition,
     ) -> Result<()> {
         let package = Arc::clone(&self.package);
-        let count = crate::Spreadsheet::from_shared_package(package)?
+        let count = crate::Workbook::from_shared_package(package)?
             .sheets()
             .len();
         if count == 0 {
@@ -1310,7 +1713,7 @@ impl Edit {
     /// output bound, or provenance splice failure. Every refusal leaves this edit unchanged.
     pub fn transfer_plain_scalar_sheet_from(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_sheet: &str,
         destination_name: &str,
         position: SheetPosition,
@@ -1812,7 +2215,7 @@ impl Edit {
     /// collision, bounds, drawing publication, or typed chart readback failure.
     pub fn transfer_chart_dependencies(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_object_path: &str,
         sheet: &str,
         drawing_name: &str,
@@ -1877,7 +2280,7 @@ impl Edit {
     /// failure.
     pub fn transfer_drawing(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_path: &str,
         sheet: &str,
         drawing_name: &str,
@@ -1987,13 +2390,13 @@ impl Edit {
     /// rejects the transfer.
     pub fn transfer_resource(
         &mut self,
-        source: &Snapshot,
+        source: &Package,
         source_path: &str,
         destination_path: &str,
         collision: Collision,
     ) -> Result<TransferDisposition> {
         let source_resource = source.resource(source_path)?.ok_or_else(|| {
-            Error::InvalidFormat(format!(
+            CoreError::InvalidFormat(format!(
                 "ODS transfer resource '{source_path}' was not found"
             ))
         })?;
@@ -2022,14 +2425,6 @@ impl Edit {
         self.stage("resource.remove", path, bytes).map(|_| ())
     }
 
-    /// Restore the exact source candidate and discard every staged semantic operation.
-    pub fn rollback(&mut self) {
-        self.candidate = Arc::clone(&self.before.source);
-        self.package = Arc::clone(&self.before.package);
-        self.steps.clear();
-        self.spliced_parts.clear();
-    }
-
     /// Validate security policy, reopen the complete candidate, and publish one durable patch.
     ///
     /// Exact no-ops retain the source allocation and remain permitted for signed, encrypted, or
@@ -2039,7 +2434,7 @@ impl Edit {
     ///
     /// Returns an error for a security refusal, bound failure, malformed candidate, typed readback
     /// failure, noncompact authored XML, or durable-patch construction failure.
-    pub fn commit(self) -> Result<Commit> {
+    pub fn commit(self) -> std::result::Result<Commit, PackageError> {
         self.commit_with_security(SecurityWritePolicy::default())
     }
 
@@ -2049,7 +2444,14 @@ impl Edit {
     ///
     /// Returns an error when the selected policy refuses signed, encrypted, or protected input,
     /// or when bounds, compactness, readback, or durable patch construction fails.
-    pub fn commit_with_security(self, policy: SecurityWritePolicy) -> Result<Commit> {
+    pub fn commit_with_security(
+        self,
+        policy: SecurityWritePolicy,
+    ) -> std::result::Result<Commit, PackageError> {
+        Ok(self.commit_core(policy)?)
+    }
+
+    pub(crate) fn commit_core(self, policy: SecurityWritePolicy) -> Result<Commit> {
         if self.candidate.as_slice() == self.before.as_bytes() || self.steps.is_empty() {
             let source: Arc<[u8]> = Arc::from(self.before.source.as_slice());
             let patch = Patch::build(Arc::clone(&source), source, Vec::new(), self.before.limits)?;
@@ -2067,8 +2469,7 @@ impl Edit {
         // `self.package` was validated when the latest candidate was staged.
         // Re-run the complete facade readback against that same immutable
         // package owner instead of rebuilding its archive/index from bytes.
-        let snapshot =
-            Snapshot::from_shared_package(Arc::clone(&self.package), self.before.limits)?;
+        let snapshot = Package::from_shared_package(Arc::clone(&self.package), self.before.limits)?;
         let source: Arc<[u8]> = Arc::from(self.before.source.as_slice());
         let target: Arc<[u8]> = Arc::from(snapshot.source.as_slice());
         let patch = Patch::build(source, target, self.steps, snapshot.limits)?;
@@ -2097,7 +2498,7 @@ impl Edit {
                 self.spliced_parts.remove(path);
             }
         }
-        let validated = Package::from_shared_bytes(Arc::clone(&candidate))?;
+        let validated = Archive::from_shared_bytes(Arc::clone(&candidate))?;
         self.candidate = Arc::clone(&candidate);
         self.package = Arc::new(validated);
         self.steps.push(Step {
@@ -2112,7 +2513,7 @@ impl Edit {
         &mut self,
         op: &str,
         target: &str,
-        package: Arc<Package>,
+        package: Arc<Archive>,
         candidate: Arc<Vec<u8>>,
         provenance_spliced: bool,
     ) -> Result<bool> {
@@ -2129,7 +2530,7 @@ impl Edit {
         // The worksheet owner has already validated this exact package and
         // completed its typed graph readback.  Keep the same immutable package
         // handle for the unified commit boundary; the final facade reopen is
-        // still performed by `Snapshot::from_package`.
+        // still performed by `Package::from_package`.
         self.candidate = candidate;
         self.package = package;
         self.steps.push(Step {
@@ -2254,9 +2655,15 @@ impl Patch {
         })
     }
 
+    /// Whether applying this patch preserves the exact package bytes.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.changed()
+    }
+
     /// Whether this patch changes exact package bytes.
     #[must_use]
-    pub fn changed(&self) -> bool {
+    pub(crate) fn changed(&self) -> bool {
         self.source != self.target
     }
 
@@ -2268,7 +2675,7 @@ impl Patch {
 
     /// Check exact source applicability.
     #[must_use]
-    pub fn is_applicable_to(&self, snapshot: &Snapshot) -> bool {
+    pub fn is_applicable_to(&self, snapshot: &Package) -> bool {
         self.source.as_ref() == snapshot.as_bytes()
     }
 
@@ -2299,7 +2706,7 @@ impl Patch {
     ///
     /// Returns an error for stale source bytes, security refusal, bounds, malformed target, or
     /// complete facade readback failure.
-    pub fn apply(&self, snapshot: &Snapshot) -> Result<Commit> {
+    pub(crate) fn apply(&self, snapshot: &Package) -> Result<Commit> {
         self.apply_with_security(snapshot, SecurityWritePolicy::default())
     }
 
@@ -2309,9 +2716,9 @@ impl Patch {
     ///
     /// Returns an error for stale lineage, a security-policy refusal, bounds, malformed target,
     /// or complete facade readback failure.
-    pub fn apply_with_security(
+    pub(crate) fn apply_with_security(
         &self,
-        snapshot: &Snapshot,
+        snapshot: &Package,
         policy: SecurityWritePolicy,
     ) -> Result<Commit> {
         if !self.is_applicable_to(snapshot) {
@@ -2320,7 +2727,7 @@ impl Patch {
         if self.changed() {
             enforce_security_policy(snapshot, policy)?;
         }
-        let target = Snapshot::from_bytes_with(self.target.as_ref().to_vec(), self.limits)?;
+        let target = Package::from_vec_with(self.target.as_ref().to_vec(), self.limits)?;
         Ok(Commit {
             snapshot: target,
             patch: self.clone(),
@@ -2455,8 +2862,8 @@ impl Patch {
         }
         let source: Arc<[u8]> = Arc::from(source);
         let target: Arc<[u8]> = Arc::from(target);
-        let _source_snapshot = Snapshot::from_bytes_with(source.as_ref().to_vec(), limits)?;
-        let _target_snapshot = Snapshot::from_bytes_with(target.as_ref().to_vec(), limits)?;
+        let _source_snapshot = Package::from_vec_with(source.as_ref().to_vec(), limits)?;
+        let _target_snapshot = Package::from_vec_with(target.as_ref().to_vec(), limits)?;
         Ok(Self {
             source,
             target,
@@ -2511,7 +2918,7 @@ impl JoinError {
         &self.detail
     }
 
-    fn candidate(error: Error) -> Self {
+    fn candidate(error: CoreError) -> Self {
         let detail = format!("{error}");
         let failure = if detail.contains("physical member overlap") {
             JoinFailure::PhysicalOverlap
@@ -2592,7 +2999,7 @@ impl ThreeWayPlan {
 /// One immutable package publication with durable reversible semantics.
 #[derive(Debug)]
 pub struct Commit {
-    snapshot: Snapshot,
+    snapshot: Package,
     patch: Patch,
     diagnostics: Diagnostics,
 }
@@ -2683,15 +3090,9 @@ impl Diagnostics {
 }
 
 impl Commit {
-    /// Whether exact package bytes changed.
+    /// Resulting immutable package.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.patch.changed()
-    }
-
-    /// Resulting immutable package snapshot.
-    #[must_use]
-    pub const fn snapshot(&self) -> &Snapshot {
+    pub const fn package(&self) -> &Package {
         &self.snapshot
     }
 
@@ -2707,30 +3108,46 @@ impl Commit {
         self.diagnostics
     }
 
-    /// Consume this publication into its immutable package snapshot.
+    /// Consume this publication into its immutable package.
     #[must_use]
-    pub fn into_snapshot(self) -> Snapshot {
+    pub fn into_package(self) -> Package {
         self.snapshot
+    }
+
+    /// Consume this publication into its package and patch.
+    #[must_use]
+    pub fn into_parts(self) -> (Package, Patch) {
+        (self.snapshot, self.patch)
     }
 }
 
 /// Explicit bounded undo/redo over immutable ODS package snapshots.
 pub struct History {
-    inner: CoreHistory<Snapshot>,
+    inner: CoreHistory<Package>,
 }
 
 impl History {
-    /// Start history with the snapshot's configured finite history bounds.
+    /// Start history with the package's configured finite history bounds.
     #[must_use]
-    pub fn new(snapshot: Snapshot) -> Self {
+    pub fn new(snapshot: Package) -> Self {
         Self {
             inner: CoreHistory::new(snapshot.clone(), snapshot.limits.history),
         }
     }
 
+    /// Start history whose recorded packages use explicit transaction bounds.
+    #[must_use]
+    pub fn with_limits(package: Package, limits: Limits) -> Self {
+        let mut package = package;
+        package.limits = limits;
+        Self {
+            inner: CoreHistory::new(package, limits.history),
+        }
+    }
+
     /// Current immutable package snapshot.
     #[must_use]
-    pub fn current(&self) -> &Snapshot {
+    pub fn current(&self) -> &Package {
         self.inner.current()
     }
 
@@ -2751,7 +3168,7 @@ impl History {
     /// # Errors
     ///
     /// Returns an error for stale lineage, serialization failure, or history-weight refusal.
-    pub fn record(&mut self, commit: Commit) -> Result<Vec<Snapshot>> {
+    pub fn record(&mut self, commit: Commit) -> Result<Vec<Package>> {
         if !commit.patch.is_applicable_to(self.current()) {
             return invalid("ODS history commit does not descend from the current snapshot");
         }
@@ -2780,7 +3197,7 @@ fn changed_effects(source: &[u8], target: &[u8]) -> Result<Vec<String>> {
         .collect())
 }
 
-fn composition_error(failure: &SubEditJoinFailure) -> Error {
+fn composition_error(failure: &SubEditJoinFailure) -> CoreError {
     invalid_error(format!("ODS composition was refused: {failure:?}"))
 }
 
@@ -2788,11 +3205,11 @@ fn invalid<T>(message: impl Into<String>) -> Result<T> {
     Err(invalid_error(message))
 }
 
-fn invalid_error(message: impl Into<String>) -> Error {
-    Error::InvalidFormat(message.into())
+fn invalid_error(message: impl Into<String>) -> CoreError {
+    CoreError::InvalidFormat(message.into())
 }
 
-fn content_validation_error(error: crate::content_validation::Error) -> Error {
+fn content_validation_error(error: crate::content_validation::Error) -> CoreError {
     invalid_error(format!("ODS content-validation edit failed: {error}"))
 }
 
@@ -2886,7 +3303,7 @@ fn only_blob(bundle: &BlobBundle) -> Result<Vec<u8>> {
 }
 
 fn package_files(bytes: &[u8]) -> Result<BTreeMap<String, File>> {
-    let package = Package::from_bytes(bytes.to_vec())?;
+    let package = Archive::from_bytes(bytes.to_vec())?;
     let reader = package.package().package()?;
     let mut files = BTreeMap::new();
     for path in reader.files()? {
@@ -2907,8 +3324,8 @@ fn package_files(bytes: &[u8]) -> Result<BTreeMap<String, File>> {
 fn changed_package_files(source: &[u8], target: &[u8]) -> Result<Vec<(String, Option<File>)>> {
     let raw_identical = raw_identical_members(source, target)
         .filter(|paths| paths.contains("META-INF/manifest.xml"));
-    let source_package = Package::from_bytes(source.to_vec())?;
-    let target_package = Package::from_bytes(target.to_vec())?;
+    let source_package = Archive::from_bytes(source.to_vec())?;
+    let target_package = Archive::from_bytes(target.to_vec())?;
     let source_reader = source_package.package().package()?;
     let target_reader = target_package.package().package()?;
     let mut paths = BTreeSet::new();
@@ -3075,7 +3492,7 @@ fn patch_effects(steps: &[Step]) -> Vec<String> {
         .collect()
 }
 
-fn patch_error(error: PatchError) -> Error {
+fn patch_error(error: PatchError) -> CoreError {
     invalid_error(format!("ODS durable patch failed: {error}"))
 }
 
@@ -3097,7 +3514,7 @@ fn rebuild_selected(
         .ok_or_else(|| invalid_error("ODS unified merge removed content.xml"))?;
     let content = std::str::from_utf8(&content.bytes)
         .map_err(|_error| invalid_error("ODS merged content.xml is not UTF-8"))?;
-    let source_package = Package::from_bytes(source.to_vec())?;
+    let source_package = Archive::from_bytes(source.to_vec())?;
     let mut additions = Vec::new();
     let mut excluded = Vec::new();
     let mut paths = BTreeSet::new();
@@ -3132,7 +3549,7 @@ fn rebuild_selected(
     Ok(bytes)
 }
 
-fn refuse_referenced_removal(package: &Package, path: &str) -> Result<()> {
+fn refuse_referenced_removal(package: &Archive, path: &str) -> Result<()> {
     for candidate in package.package().files()? {
         if candidate == path
             || matches!(candidate.as_str(), "mimetype" | "META-INF/manifest.xml")
@@ -3153,7 +3570,7 @@ fn refuse_referenced_removal(package: &Package, path: &str) -> Result<()> {
     Ok(())
 }
 
-fn enforce_security_policy(snapshot: &Snapshot, policy: SecurityWritePolicy) -> Result<()> {
+fn enforce_security_policy(snapshot: &Package, policy: SecurityWritePolicy) -> Result<()> {
     let package = Arc::clone(&snapshot.package);
     let reader = package.package().package()?;
     if reader.manifest().has_encrypted_entries() {
@@ -3185,7 +3602,7 @@ fn enforce_security_policy(snapshot: &Snapshot, policy: SecurityWritePolicy) -> 
 }
 
 fn replace_resource(
-    package: &Package,
+    package: &Archive,
     resource: Option<&Resource>,
     path: &str,
     limits: Limits,
@@ -3239,12 +3656,12 @@ fn validate_authored_parts(
             continue;
         };
         if is_xml_media_type(&file.media_type) && !provenance_spliced.contains(&path) {
-            litchi_odf_common::compact_xml::validate(&file.bytes).map_err(Error::from)?;
+            litchi_odf_common::compact_xml::validate(&file.bytes).map_err(CoreError::from)?;
         }
     }
-    let package = Package::from_bytes(target.to_vec())?;
+    let package = Archive::from_bytes(target.to_vec())?;
     let manifest = package.package().get_file("META-INF/manifest.xml")?;
-    litchi_odf_common::compact_xml::validate(&manifest).map_err(Error::from)
+    litchi_odf_common::compact_xml::validate(&manifest).map_err(CoreError::from)
 }
 
 fn validate_media_type(media_type: &str) -> Result<()> {
@@ -3259,6 +3676,33 @@ fn validate_media_type(media_type: &str) -> Result<()> {
     }
 }
 
+fn check_input_bytes(
+    length: usize,
+    limits: litchi_odf_common::SourceLimits,
+) -> std::result::Result<(), PackageError> {
+    let observed = u64::try_from(length).unwrap_or(u64::MAX);
+    if observed > limits.max_input_bytes() {
+        return Err(PackageError::Limit {
+            kind: LimitKind::Source(litchi_odf_common::SourceLimitKind::InputBytes),
+            observed,
+            maximum: limits.max_input_bytes(),
+        });
+    }
+    Ok(())
+}
+
+fn copy_bytes(source: &[u8]) -> Result<Vec<u8>> {
+    let mut bytes = Vec::new();
+    bytes
+        .try_reserve_exact(source.len())
+        .map_err(|source| CoreError::Allocation {
+            resource: "ODS package bytes",
+            source,
+        })?;
+    bytes.extend_from_slice(source);
+    Ok(bytes)
+}
+
 fn validate_package_size(length: usize, limits: Limits) -> Result<()> {
     if length > limits.package_bytes {
         invalid(format!(
@@ -3270,7 +3714,7 @@ fn validate_package_size(length: usize, limits: Limits) -> Result<()> {
     }
 }
 
-fn validate_resource_count(package: &Package, limits: Limits) -> Result<()> {
+fn validate_resource_count(package: &Archive, limits: Limits) -> Result<()> {
     let count = package
         .package()
         .files()?
@@ -3325,7 +3769,7 @@ fn validate_resource_size(length: usize, limits: Limits) -> Result<()> {
 fn validate_xml_resource(media_type: &str, bytes: &[u8]) -> Result<()> {
     validate_media_type(media_type)?;
     if is_xml_media_type(media_type) {
-        litchi_odf_common::compact_xml::validate(bytes).map_err(Error::from)?;
+        litchi_odf_common::compact_xml::validate(bytes).map_err(CoreError::from)?;
     }
     Ok(())
 }
@@ -3344,7 +3788,7 @@ mod raw_package_diff_tests {
 
     use litchi_core::DiagnosticFingerprint;
 
-    use super::{Limits, Patch, Snapshot, Step, changed_effects};
+    use super::{Limits, Package, Patch, Step, changed_effects};
 
     const CONTENT: &str = r#"<?xml version="1.0" encoding="UTF-8"?><office:document-content xmlns:office="urn:oasis:names:tc:opendocument:xmlns:office:1.0" xmlns:table="urn:oasis:names:tc:opendocument:xmlns:table:1.0" xmlns:xml="http://www.w3.org/XML/1998/namespace" office:version="1.3"><office:body><office:spreadsheet><table:table xml:id="sheet" table:name="Sheet1"/></office:spreadsheet></office:body></office:document-content>"#;
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.spreadsheet";
@@ -3420,18 +3864,18 @@ mod raw_package_diff_tests {
             "application/octet-stream",
             b"retained package payload",
         );
-        let spreadsheet = crate::Spreadsheet::from_bytes(source).unwrap();
+        let snapshot = Package::from_bytes(&source).unwrap();
+        let spreadsheet = snapshot.workbook().unwrap();
         let facade_identity = spreadsheet.prepared_index_identity();
-        let snapshot = spreadsheet.document_snapshot().unwrap();
         assert_eq!(snapshot.prepared_index_identity(), facade_identity);
         let snapshot_source = snapshot.as_bytes().as_ptr();
 
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.edit().unwrap();
         assert_eq!(edit.as_bytes().as_ptr(), snapshot_source);
         edit.worksheets(|_| Ok(())).unwrap();
         let commit = edit.commit().unwrap();
-        assert!(!commit.changed());
-        assert_eq!(commit.snapshot().prepared_index_identity(), facade_identity);
+        assert!(!commit.diagnostics().changed());
+        assert_eq!(commit.package().prepared_index_identity(), facade_identity);
 
         // A repeated package-owned read must reuse the same immutable index;
         // malformed/stale physical state is still rejected by the existing
@@ -3439,13 +3883,13 @@ mod raw_package_diff_tests {
         // package.
         assert!(
             commit
-                .snapshot()
+                .package()
                 .resource("Pictures/opaque.bin")
                 .unwrap()
                 .is_some()
         );
-        assert_eq!(commit.snapshot().prepared_index_identity(), facade_identity);
-        let malformed = Snapshot::from_bytes(vec![0x50, 0x4b, 0x03]);
+        assert_eq!(commit.package().prepared_index_identity(), facade_identity);
+        let malformed = Package::from_bytes(&[0x50, 0x4b, 0x03]);
         assert!(malformed.is_err());
     }
 
@@ -3456,15 +3900,12 @@ mod raw_package_diff_tests {
             "application/octet-stream",
             b"plaintext password source",
         );
-        let source_pointer = source.as_ptr();
-        let spreadsheet =
-            crate::Spreadsheet::from_bytes_with_password(source, "scoped-secret").unwrap();
-        let facade_identity = spreadsheet.prepared_index_identity();
-        let snapshot = spreadsheet.document_snapshot().unwrap();
-        assert_eq!(snapshot.as_bytes().as_ptr(), source_pointer);
+        let snapshot = Package::from_bytes_with_password(&source, "scoped-secret").unwrap();
+        let source_pointer = snapshot.as_bytes().as_ptr();
+        let facade_identity = snapshot.workbook().unwrap().prepared_index_identity();
         assert_eq!(snapshot.prepared_index_identity(), facade_identity);
 
-        let mut edit = snapshot.edit();
+        let mut edit = snapshot.edit().unwrap();
         assert_eq!(edit.as_bytes().as_ptr(), source_pointer);
         edit.worksheets(|_| Ok(())).unwrap();
         assert_eq!(edit.as_bytes().as_ptr(), source_pointer);

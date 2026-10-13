@@ -75,7 +75,7 @@ pub(super) fn set_slide_transition(
 )]
 mod tests {
     use super::Builder;
-    use crate::{Presentation, Speed, Style, Transition, Type};
+    use crate::{Speed, Style, Transition, Type};
 
     #[test]
     fn sets_and_clears_a_typed_slide_transition() {
@@ -94,7 +94,7 @@ mod tests {
             .unwrap();
         assert_eq!(builder.slides[0].transition.as_ref(), Some(&transition));
 
-        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let presentation = builder.build().unwrap().presentation().unwrap();
         let slide = presentation.slides().unwrap().remove(0);
         assert_eq!(slide.transition().unwrap(), &transition);
 
@@ -112,7 +112,7 @@ mod tests {
         builder.set_slide_transition(0, None).unwrap();
         assert!(builder.slides[0].transition.is_none());
 
-        let presentation = Presentation::from_bytes(builder.build().unwrap()).unwrap();
+        let presentation = builder.build().unwrap().presentation().unwrap();
         let slide = presentation.slides().unwrap().remove(0);
         assert!(slide.transition().is_none());
     }

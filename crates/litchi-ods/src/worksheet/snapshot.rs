@@ -1,11 +1,11 @@
-//! Package-bound worksheet snapshots and reversible edits.
+//! Archive-bound worksheet snapshots and reversible edits.
 
 use std::{fmt, sync::Arc};
 
 use litchi_core::{Error, Position, Result};
 
 use super::{Cell, Sheet, validation};
-use crate::package::Package;
+use crate::package::Archive;
 
 /// Maximum number of logical cell replacements accepted by one batch.
 pub const MAX_CELL_CHANGES: usize = 4_096;
@@ -73,7 +73,7 @@ impl From<usize> for Selector<'_> {
 #[derive(Clone)]
 pub struct Snapshot {
     source: Arc<Vec<u8>>,
-    package: Arc<Package>,
+    package: Arc<Archive>,
     sheets: Arc<[Sheet]>,
 }
 
@@ -98,7 +98,7 @@ impl Snapshot {
     }
 
     fn from_arc(source: Arc<Vec<u8>>) -> Result<Self> {
-        let package = Package::from_shared_bytes(Arc::clone(&source))?;
+        let package = Archive::from_shared_bytes(Arc::clone(&source))?;
         Self::from_package(package)
     }
 
@@ -106,11 +106,11 @@ impl Snapshot {
     ///
     /// Worksheet graph parsing and validation remain mandatory; only the
     /// immutable ZIP/archive ownership is reused.
-    pub(crate) fn from_package(package: Package) -> Result<Self> {
+    pub(crate) fn from_package(package: Archive) -> Result<Self> {
         Self::from_shared_package(Arc::new(package))
     }
 
-    pub(crate) fn from_shared_package(package: Arc<Package>) -> Result<Self> {
+    pub(crate) fn from_shared_package(package: Arc<Archive>) -> Result<Self> {
         let source = package.shared_bytes_owner();
         let sheets = Arc::from(package.sheets()?);
         Ok(Self {
@@ -535,7 +535,7 @@ impl Snapshot {
         self.source
     }
 
-    pub(crate) fn package_owner(&self) -> Arc<Package> {
+    pub(crate) fn package_owner(&self) -> Arc<Archive> {
         Arc::clone(&self.package)
     }
 }
@@ -730,12 +730,12 @@ mod tests {
         )?;
         let mut builder = Builder::new();
         builder.add_sheet(sheet)?;
-        let source = builder.build()?;
+        let source = builder.build()?.to_bytes()?;
         let source_pointer = source.as_ptr();
 
         let snapshot = Snapshot::from_bytes(source)?;
         assert_eq!(snapshot.source.as_slice().as_ptr(), source_pointer);
-        let package = Package::from_shared_bytes(Arc::clone(&snapshot.source))?;
+        let package = Archive::from_shared_bytes(Arc::clone(&snapshot.source))?;
         assert!(Arc::ptr_eq(&snapshot.source, &package.shared_bytes()));
 
         let package_identity = package.prepared_index_identity();

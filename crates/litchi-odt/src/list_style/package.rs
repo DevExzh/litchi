@@ -1,7 +1,7 @@
 //! Package and flat-document facades for list-style declarations.
 
 use super::{Styles, parse};
-use crate::{FlatDocument, Package};
+use crate::{FlatDocument, GenericPackage as Package};
 use litchi_core::Result;
 
 impl Package {

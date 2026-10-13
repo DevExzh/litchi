@@ -3,19 +3,19 @@
 use super::codec::inventory;
 use super::model::{Chart, Limits, Part, Selector};
 use super::package;
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
 use std::borrow::Cow;
 
 /// Immutable chart inventory bound to one ODS package snapshot.
 pub struct Inventory<'source> {
-    pub(crate) source: &'source Package,
+    pub(crate) source: &'source Archive,
     pub(crate) limits: Limits,
     pub(crate) charts: Vec<Chart>,
 }
 
 impl<'source> Inventory<'source> {
-    pub(crate) fn load(source: &'source Package, limits: Limits) -> Result<Self> {
+    pub(crate) fn load(source: &'source Archive, limits: Limits) -> Result<Self> {
         Ok(Self {
             source,
             limits,
@@ -89,7 +89,7 @@ impl<'source> Inventory<'source> {
 
 /// An isolated mutable draft of an immutable chart inventory.
 pub struct Transaction<'source> {
-    pub(crate) source: &'source Package,
+    pub(crate) source: &'source Archive,
     pub(crate) limits: Limits,
     pub(crate) original: Vec<Chart>,
     pub(crate) draft: Vec<Chart>,

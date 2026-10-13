@@ -1,4 +1,4 @@
-//! Spreadsheet-address semantics used by data-pilot declarations.
+//! Workbook-address semantics used by data-pilot declarations.
 
 use litchi_core::Result;
 

@@ -1,7 +1,7 @@
 //! Owned chart snapshots, transactional edits, and reversible package patches.
 
 use super::{Limits, Part, Selector, inventory, model::Chart, package};
-use crate::package::Package;
+use crate::package::Archive;
 use litchi_core::{Error, Result};
 
 /// Immutable embedded-chart inventory tied to exact ODS package bytes.
@@ -26,7 +26,7 @@ impl Snapshot {
     /// # Errors
     /// Returns an error when the operation cannot be completed.
     pub fn from_bytes_with(source: Vec<u8>, limits: Limits) -> Result<Self> {
-        let package = Package::from_bytes(source.clone())?;
+        let package = Archive::from_bytes(source.clone())?;
         let charts = inventory(&package, limits)?.charts;
         Ok(Self {
             source,
@@ -126,7 +126,7 @@ impl Edit {
     pub fn commit(self) -> Result<Commit> {
         let changed = self.before.charts != self.draft;
         let snapshot = if changed {
-            let package_source = Package::from_bytes(self.before.source.clone())?;
+            let package_source = Archive::from_bytes(self.before.source.clone())?;
             let bytes = package::replace(&package_source, &self.before.charts, &self.draft)?;
             let result = Snapshot::from_bytes_with(bytes, self.before.limits)?;
             if result.charts != self.draft {

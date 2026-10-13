@@ -1,5 +1,5 @@
-use litchi_odt::Document;
 use litchi_odt::font_face::{Declarations, Face};
+use litchi_odt::{Document, Package};
 mod support;
 
 const CONTENT: &str = include_str!("../../../test-data/odf/odt/font-face-declarations-content.xml");
@@ -17,8 +17,8 @@ fn declarations(name: &str) -> Declarations {
     }
 }
 
-fn document() -> Document {
-    Document::from_bytes(support::package(
+fn package() -> Package {
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[
             ("content.xml", CONTENT.as_bytes()),
@@ -28,11 +28,16 @@ fn document() -> Document {
     .unwrap()
 }
 
+fn document() -> Document {
+    package().document().unwrap()
+}
+
 #[test]
 fn document_and_generic_package_keep_content_and_styles_declarations_separate() {
     let content = declarations("Content Body");
     let styles = declarations("Styles Body");
-    let source = document();
+    let source_package = package();
+    let source = source_package.document().unwrap();
 
     assert_eq!(
         source.content_font_face_declarations().unwrap(),
@@ -43,7 +48,8 @@ fn document_and_generic_package_keep_content_and_styles_declarations_separate() 
         Some(styles.clone())
     );
 
-    let package = litchi_odt::generic::Package::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let package =
+        litchi_odt::generic::Package::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
     assert_eq!(
         package.content_font_face_declarations().unwrap(),
         Some(content)
@@ -75,7 +81,10 @@ fn mutable_document_replaces_and_clears_each_font_face_part_without_rewriting_ne
         Some(original_styles)
     );
 
-    let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         reopened.content_font_face_declarations().unwrap(),
         Some(replacement_content.clone())
@@ -131,7 +140,10 @@ fn mutable_document_replaces_and_clears_each_font_face_part_without_rewriting_ne
         Some(replacement_styles)
     );
 
-    let reinserted = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reinserted = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     let content_xml = String::from_utf8(reinserted.get_file("content.xml").unwrap()).unwrap();
     assert!(
         content_xml.find("<office:scripts/>").unwrap()

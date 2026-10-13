@@ -243,7 +243,8 @@ fn a_source_changed_odt_is_reported_after_markdown() {
 
     let mut builder = litchi_odt::Builder::new();
     builder.add_paragraph("Source-backed ODT").unwrap();
-    let temporary = crate::tests::temporary_with(&builder.build().unwrap(), ".odt");
+    let temporary =
+        crate::tests::temporary_with(&builder.build().unwrap().to_bytes().unwrap(), ".odt");
     let file = crate::open(temporary.path()).unwrap();
     let File::Odt(odt) = &file else {
         panic!("expected ODT, got {file:?}");

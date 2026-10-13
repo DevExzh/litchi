@@ -156,7 +156,7 @@ fn odt_buffered_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
         let paragraph = odt_buffered_paragraph_text(index);
         builder.add_paragraph(&paragraph)?;
     }
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn verify_odt_buffered_default_parts(
@@ -272,7 +272,7 @@ fn inspect_odt_buffered_archive(
     let meta_xml = archive.read("meta.xml")?;
     verify_odt_buffered_default_parts(&styles_xml, &meta_xml)?;
 
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     let expected = odt_buffered_expected_paragraphs(shape);
     if paragraphs.len() != expected.len() {

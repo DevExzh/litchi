@@ -3,7 +3,7 @@
     reason = "integration-test assertions panic on failure by design"
 )]
 
-use litchi_odp::Presentation;
+use litchi_odp::Package;
 use std::path::{Path, PathBuf};
 
 fn corpus() -> PathBuf {
@@ -17,7 +17,10 @@ fn three_impress_packages_open_and_expose_slides() {
         ("impress-embedded-spreadsheet.odp", 1),
         ("impress-master-layouts.odp", 5),
     ] {
-        let presentation = Presentation::open(corpus().join(file)).unwrap();
+        let presentation = Package::open(corpus().join(file))
+            .unwrap()
+            .presentation()
+            .unwrap();
         assert!(presentation.slides().unwrap().len() >= minimum, "{file}");
         presentation.declarations().unwrap();
         presentation.layouts().unwrap();
@@ -25,8 +28,10 @@ fn three_impress_packages_open_and_expose_slides() {
         presentation.metadata().unwrap();
     }
 
-    let presentation =
-        Presentation::open(corpus().join("impress-embedded-spreadsheet.odp")).unwrap();
+    let presentation = Package::open(corpus().join("impress-embedded-spreadsheet.odp"))
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert!(
         presentation
             .slides()

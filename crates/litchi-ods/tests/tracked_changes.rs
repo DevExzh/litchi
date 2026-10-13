@@ -1,10 +1,10 @@
 mod support;
 
 use litchi_odf_common::core::{OwnedPackage, PackageWriter, Profile};
-use litchi_ods::Spreadsheet;
 use litchi_ods::tracked_changes::{
     Acceptance, CellValue, Change, Dimension, Integer, Limits, Patch, Snapshot,
 };
+use litchi_ods::{MutableSpreadsheet, Package};
 use std::sync::Arc;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -825,8 +825,12 @@ fn rich_neighbor_bytes_are_preserved_while_unknown_records_and_regeneration_are_
 fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
     let source_xml = content(&independent_owner(None));
     let bytes = package(&source_xml, false);
-    let mut mutable =
-        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     mutable
         .update_tracked_changes(|transaction| {
             transaction.set_tracking(Some(true))?;
@@ -834,7 +838,7 @@ fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
             Ok(())
         })
         .expect("test fixture or operation should succeed");
-    let output = mutable.into_bytes();
+    let output = mutable.to_bytes();
     let archive =
         OwnedPackage::from_bytes(output.clone()).expect("test fixture or operation should succeed");
     assert_eq!(
@@ -843,8 +847,10 @@ fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
             .expect("test fixture or operation should succeed"),
         b"inert auxiliary bytes"
     );
-    let reopened =
-        Spreadsheet::from_bytes(output).expect("test fixture or operation should succeed");
+    let reopened = Package::from_bytes(&output)
+        .expect("test fixture or operation should succeed")
+        .workbook()
+        .expect("test fixture or operation should succeed");
     assert!(
         reopened
             .tracked_changes_with(Limits::new().with_max_changes(4))
@@ -882,21 +888,29 @@ fn package_facade_reopens_preserves_auxiliary_and_keeps_formulas_links_inert() {
 fn signed_exact_noop_is_byte_exact_but_changed_publication_drops_signatures() {
     let bytes = package(&content(&independent_owner(None)), true);
 
-    let mut noop =
-        Spreadsheet::from_bytes(bytes.clone()).expect("test fixture or operation should succeed");
+    let mut noop = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     noop.update_tracked_changes(|_| Ok(()))
         .expect("test fixture or operation should succeed");
-    assert_eq!(noop.into_bytes(), bytes);
+    assert_eq!(noop.to_bytes(), bytes);
 
-    let mut changed =
-        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let mut changed = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     changed
         .update_tracked_changes(|transaction| {
             transaction.set_tracking(Some(true))?;
             Ok(())
         })
         .expect("test fixture or operation should succeed");
-    let archive = OwnedPackage::from_bytes(changed.into_bytes())
+    let archive = OwnedPackage::from_bytes(changed.to_bytes())
         .expect("test fixture or operation should succeed");
     assert!(
         !archive
@@ -936,7 +950,12 @@ fn encrypted_content_is_refused_before_a_tracked_change_transaction_can_begin() 
         .finish_to_bytes()
         .expect("test fixture or operation should succeed");
 
-    assert!(Spreadsheet::from_bytes(encrypted).is_err());
+    assert!(
+        Package::from_bytes(&encrypted)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.workbook())
+            .is_err()
+    );
 }
 
 #[test]
@@ -1539,7 +1558,9 @@ fn multi_deletion_run_breaking_mutations_fail_immediately_and_atomically() {
 #[test]
 fn package_patch_application_is_source_checked_and_inverse_restores_exact_content() {
     let bytes = package(&content(&independent_owner(None)), false);
-    let before = Spreadsheet::from_bytes(bytes.clone())
+    let before = Package::from_bytes(&bytes)
+        .expect("test fixture or operation should succeed")
+        .workbook()
         .expect("test fixture or operation should succeed")
         .tracked_changes()
         .expect("test fixture or operation should succeed");
@@ -1554,13 +1575,18 @@ fn package_patch_application_is_source_checked_and_inverse_restores_exact_conten
         .expect("test fixture or operation should succeed")
         .into_patch();
 
-    let mut mutable =
-        Spreadsheet::from_bytes(bytes).expect("test fixture or operation should succeed");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&bytes)
+            .expect("test fixture or operation should succeed")
+            .workbook()
+            .expect("test fixture or operation should succeed"),
+    );
     mutable
         .apply_tracked_changes_patch(&patch)
         .expect("test fixture or operation should succeed");
     assert_eq!(
         mutable
+            .workbook()
             .tracked_changes()
             .expect("test fixture or operation should succeed")
             .tracking(),
@@ -1571,6 +1597,7 @@ fn package_patch_application_is_source_checked_and_inverse_restores_exact_conten
         .expect("test fixture or operation should succeed");
     assert_eq!(
         mutable
+            .workbook()
             .tracked_changes()
             .expect("test fixture or operation should succeed")
             .source_xml(),

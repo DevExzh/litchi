@@ -22,7 +22,7 @@ const CONTENT: &str = concat!(
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 
 fn package() -> litchi_odt::generic::Package {
-    litchi_odt::generic::Package::from_bytes(support::package(
+    litchi_odt::generic::Package::from_bytes(&support::package(
         MIMETYPE,
         &[("content.xml", CONTENT.as_bytes())],
     ))

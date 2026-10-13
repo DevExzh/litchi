@@ -74,6 +74,17 @@ impl ArchiveLimits {
         max_total_size: u64::MAX,
     };
 
+    /// The finite default ZIP catalog profile (100,000 members, 4 KiB names,
+    /// 64 MiB metadata, 512 MiB per member and 2 GiB in aggregate).
+    pub const DEFAULT: Self = Self {
+        max_files: 100_000,
+        max_member_name_bytes: 4 * 1024,
+        max_metadata_bytes: 64 * 1024 * 1024,
+        max_compressed_size: 512 * 1024 * 1024,
+        max_entry_size: 512 * 1024 * 1024,
+        max_total_size: 2 * 1024 * 1024 * 1024,
+    };
+
     /// Construct an explicit ZIP catalog profile.
     #[must_use]
     pub const fn new(
@@ -186,20 +197,7 @@ impl ArchiveLimits {
 
 impl Default for ArchiveLimits {
     fn default() -> Self {
-        Self::from_zip_limits(ZipArchiveLimits::default())
-    }
-}
-
-impl ArchiveLimits {
-    const fn from_zip_limits(limits: ZipArchiveLimits) -> Self {
-        Self {
-            max_files: limits.max_files,
-            max_member_name_bytes: limits.max_member_name_bytes,
-            max_metadata_bytes: limits.max_metadata_bytes,
-            max_compressed_size: limits.max_compressed_size,
-            max_entry_size: limits.max_entry_size,
-            max_total_size: limits.max_total_size,
-        }
+        Self::DEFAULT
     }
 }
 

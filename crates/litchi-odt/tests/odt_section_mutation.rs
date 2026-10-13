@@ -4,7 +4,7 @@ use litchi_odt::parser::{
 };
 use litchi_odt::section::{Block, add_section_xml, wrap_section_xml};
 use litchi_odt::tracked_changes::{Position, Story};
-use litchi_odt::{Builder, Document};
+use litchi_odt::{Builder, Package};
 
 fn section(name: &str) -> Section {
     Section {
@@ -62,7 +62,10 @@ fn builder_authors_linked_conditional_protected_and_dde_sections() {
     builder.add_paragraph("before").unwrap();
     builder.add_section(linked).unwrap();
     builder.add_section(dde).unwrap();
-    let document = Document::from_bytes(builder.build().unwrap()).unwrap();
+    let document = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     let sections = document.sections().unwrap();
     assert_eq!(sections.len(), 2);
     assert_eq!(sections[0].display, SectionDisplay::Condition);
@@ -126,7 +129,10 @@ fn mutable_wraps_nested_sections_and_preserves_tracked_changes() {
 
     document.unwrap_section("Inner").unwrap();
     assert_eq!(document.sections().unwrap().len(), 1);
-    let reopened = Document::from_bytes(document.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&document.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(reopened.sections().unwrap()[0].name, "OuterRenamed");
     assert_eq!(reopened.tracked_changes().unwrap().changes[0].content, "😀");
 }
@@ -186,7 +192,9 @@ fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
         .unwrap();
     unwrap.unwrap_section("Wrapper").unwrap();
     assert_eq!(
-        Document::from_bytes(unwrap.to_bytes().unwrap())
+        Package::from_bytes(&unwrap.to_bytes().unwrap())
+            .unwrap()
+            .document()
             .unwrap()
             .text()
             .unwrap(),
@@ -200,7 +208,9 @@ fn remove_deletes_content_while_unwrap_and_clear_retain_it() {
         .unwrap();
     remove.remove_section("Wrapper").unwrap();
     assert!(
-        Document::from_bytes(remove.to_bytes().unwrap())
+        Package::from_bytes(&remove.to_bytes().unwrap())
+            .unwrap()
+            .document()
             .unwrap()
             .text()
             .unwrap()

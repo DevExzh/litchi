@@ -5,7 +5,7 @@
 )]
 
 use litchi_odp::core::{OwnedPackage, PackageWriter};
-use litchi_odp::{Builder, Presentation, edit};
+use litchi_odp::{Builder, Package, edit};
 
 fn fixture(name: &str) -> Vec<u8> {
     std::fs::read(
@@ -36,8 +36,8 @@ fn semantic_slide(mut slide: litchi_odp::Slide) -> litchi_odp::Slide {
 #[test]
 fn unsupported_real_producer_pages_are_refused_before_staging() {
     let source_bytes = fixture("tdf169979.odp");
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let mut transaction = source.edit().unwrap();
     let before = transaction.slides().to_vec();
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
@@ -49,8 +49,8 @@ fn unsupported_real_producer_pages_are_refused_before_staging() {
     );
     assert_eq!(transaction.slides(), before);
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source_bytes);
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source_bytes);
 }
 
 #[test]
@@ -70,16 +70,16 @@ fn noncompact_source_without_settings_or_declarations_is_refused() {
             br#"<?xml version="1.0"?><manifest:manifest xmlns:manifest="urn:oasis:names:tc:opendocument:xmlns:manifest:1.0"><manifest:file-entry manifest:full-path="/" manifest:media-type="application/vnd.oasis.opendocument.presentation"/><manifest:file-entry manifest:full-path="content.xml" manifest:media-type="text/xml"/></manifest:manifest>"#,
         )
         .unwrap();
-    let source = edit::Snapshot::from_bytes(archive.finish_to_bytes().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&archive.finish_to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
 
     let error = transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap_err();
     assert!(error.to_string().contains("current writer"));
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 }
 
 #[test]
@@ -90,8 +90,8 @@ fn retained_declarations_and_settings_are_conservatively_refused() {
         .set_mimetype("application/vnd.oasis.opendocument.presentation")
         .unwrap();
     writer.add_file("content.xml", CONTENT).unwrap();
-    let source = edit::Snapshot::from_bytes(writer.finish_to_bytes().unwrap()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&writer.finish_to_bytes().unwrap()).unwrap();
+    let mut transaction = source.edit().unwrap();
     let before = transaction.slides().to_vec();
 
     let error = transaction
@@ -100,8 +100,8 @@ fn retained_declarations_and_settings_are_conservatively_refused() {
     assert!(error.to_string().contains("declarations or settings"));
     assert_eq!(transaction.slides(), before);
     let commit = transaction.commit().unwrap();
-    assert!(!commit.changed());
-    assert_eq!(commit.snapshot().bytes(), source.bytes());
+    assert!(!commit.diagnostics().changed());
+    assert_eq!(commit.package().as_bytes(), source.as_bytes());
 }
 
 fn compact_producer_deck() -> Vec<u8> {
@@ -133,17 +133,17 @@ fn compact_source_pages_move_as_exact_fragments_with_durable_inverse() {
     let source_pages = page_fragments(&source_content);
     assert_eq!(source_pages.len(), 3);
 
-    let source = edit::Snapshot::from_bytes(source_bytes.clone()).unwrap();
-    let original_slides = source.slides().to_vec();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&source_bytes).unwrap();
+    let original_slides = source.slides().unwrap().to_vec();
+    let mut transaction = source.edit().unwrap();
     transaction
         .move_slide(0, edit::SlidePosition::Last)
         .unwrap()
         .unwrap();
     let commit = transaction.commit().unwrap();
-    assert!(commit.changed());
+    assert!(commit.diagnostics().changed());
 
-    let moved = commit.snapshot().to_presentation().unwrap();
+    let moved = commit.package().presentation().unwrap();
     let moved_slides = moved.slides().unwrap();
     for (actual, expected) in moved_slides.iter().cloned().map(semantic_slide).zip(
         [1usize, 2, 0]
@@ -169,7 +169,7 @@ fn compact_source_pages_move_as_exact_fragments_with_durable_inverse() {
         &litchi_odp::annotation::Position::Page { index: 2 }
     );
 
-    let moved_package = OwnedPackage::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    let moved_package = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     let moved_content = String::from_utf8(moved_package.get_file("content.xml").unwrap()).unwrap();
     let moved_fragments = page_fragments(&moved_content);
     assert_eq!(
@@ -191,16 +191,16 @@ fn compact_source_pages_move_as_exact_fragments_with_durable_inverse() {
 
     let durable =
         edit::Patch::from_durable_bytes(&commit.patch().to_durable_bytes().unwrap()).unwrap();
-    let replayed = durable.apply(&source).unwrap();
-    assert_eq!(replayed.bytes(), commit.snapshot().bytes());
+    let replayed = source.apply(&durable).unwrap();
+    assert_eq!(replayed.as_bytes(), commit.package().as_bytes());
     assert_eq!(
-        durable.inverse().apply(&replayed).unwrap().bytes(),
+        replayed.apply(&durable.inverse()).unwrap().as_bytes(),
         source_bytes
     );
     let mut other = Builder::new();
     other.add_slide_with_title("unrelated", "source").unwrap();
-    let other = edit::Snapshot::from_bytes(other.build().unwrap()).unwrap();
-    assert!(durable.apply(&other).is_err());
+    let other = Package::from_bytes(&other.build().unwrap().to_bytes().unwrap()).unwrap();
+    assert!(other.apply(&durable).is_err());
 }
 
 #[test]
@@ -211,9 +211,9 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
             .add_slide_with_title(title, &format!("body-{title}"))
             .unwrap();
     }
-    let source = edit::Snapshot::from_bytes(builder.build().unwrap()).unwrap();
+    let source = Package::from_bytes(&builder.build().unwrap().to_bytes().unwrap()).unwrap();
 
-    let mut transaction = source.transaction().unwrap();
+    let mut transaction = source.edit().unwrap();
     transaction
         .move_slide("B", edit::SlidePosition::Last)
         .unwrap()
@@ -268,21 +268,24 @@ fn staged_coordinates_cover_middle_first_last_noop_and_atomic_failures() {
     assert!(transaction.remove(0).is_err());
     assert_eq!(transaction.slides(), before_mixed_edit);
     let commit = transaction.commit().unwrap();
-    Presentation::from_bytes(commit.snapshot().bytes().to_vec()).unwrap();
+    Package::from_bytes(commit.package().as_bytes())
+        .unwrap()
+        .presentation()
+        .unwrap();
 
-    let mut noop = source.transaction().unwrap();
+    let mut noop = source.edit().unwrap();
     noop.move_slide(0, edit::SlidePosition::First)
         .unwrap()
         .unwrap();
     let noop = noop.commit().unwrap();
-    assert!(!noop.changed());
-    assert_eq!(noop.snapshot().bytes(), source.bytes());
+    assert!(!noop.diagnostics().changed());
+    assert_eq!(noop.package().as_bytes(), source.as_bytes());
 }
 
 #[test]
 fn page_indexed_operation_conflict_is_refused_without_moving_slides() {
-    let source = edit::Snapshot::from_bytes(compact_producer_deck()).unwrap();
-    let mut transaction = source.transaction().unwrap();
+    let source = Package::from_bytes(&compact_producer_deck()).unwrap();
+    let mut transaction = source.edit().unwrap();
     let annotation = litchi_odp::annotation::Annotation::new("staged comment");
     transaction
         .add_annotation(&litchi_odp::annotation::Anchor::page(1), &annotation)
@@ -296,7 +299,7 @@ fn page_indexed_operation_conflict_is_refused_without_moving_slides() {
     assert_eq!(transaction.slides(), before);
 
     let commit = transaction.commit().unwrap();
-    let reopened = commit.snapshot().to_presentation().unwrap();
+    let reopened = commit.package().presentation().unwrap();
     assert_eq!(
         reopened
             .pages()

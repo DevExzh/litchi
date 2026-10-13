@@ -21,9 +21,9 @@ use litchi_core::{
     TextOutputReport,
 };
 use litchi_odf_common::core::{
-    Meta, SourceBackedPackage, SourcePackageLimits, private::ContentDocumentValidator,
-    validate_content_part,
+    Meta, SourceBackedPackage, private::ContentDocumentValidator, validate_content_part,
 };
+use litchi_odf_common::{Error as OdfError, OpenOptions};
 use zeroize::Zeroizing;
 
 use crate::codec::Parser;
@@ -40,9 +40,6 @@ const SLIDES_CACHE_MAX_SOURCE_BYTES: usize = 4 * 1024 * 1024;
 const SLIDES_CACHE_MAX_COUNT: usize = 256;
 const TEXT_CACHE_QUERY_THRESHOLD: usize = 2;
 const TEXT_CACHE_MAX_BYTES: usize = 16 * 1024 * 1024;
-
-/// The bounded ZIP-index limits accepted by source-backed ODF facades.
-pub type ReadLimits = SourcePackageLimits;
 
 #[cfg(any(unix, windows))]
 fn file_source(path: impl AsRef<Path>) -> Result<Arc<dyn ReadAt>> {
@@ -81,128 +78,132 @@ pub struct SourceBackedPresentation {
 }
 
 impl SourceBackedPresentation {
-    /// Open an ODP from a regular filesystem file without slurping it.
-    #[cfg(any(unix, windows))]
-    pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_read_at(file_source(path)?)
-    }
-
-    /// Open an ODP from a regular filesystem file with explicit ZIP limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_with_limits(file_source(path)?, limits)
-    }
-
-    /// Open a password-protected ODP from a regular filesystem file.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_password(
-        path: impl AsRef<Path>,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        let source = file_source(path)?;
-        Self::from_read_at_with_password(source, std::mem::take(&mut *password))
-    }
-
-    /// Open a password-protected ODP from a regular filesystem file with
-    /// explicit ZIP limits.
-    #[cfg(any(unix, windows))]
-    pub fn from_path_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let mut password = Zeroizing::new(password.into());
-        let source = file_source(path)?;
-        Self::from_read_at_with_limits_and_password(source, limits, std::mem::take(&mut *password))
-    }
-
-    /// Alias for [`Self::from_path`].
-    #[cfg(any(unix, windows))]
-    pub fn open(path: impl AsRef<Path>) -> Result<Self> {
-        Self::from_path(path)
-    }
-
-    /// Alias for [`Self::from_path_with_limits`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits(path: impl AsRef<Path>, limits: ReadLimits) -> Result<Self> {
-        Self::from_path_with_limits(path, limits)
-    }
-
-    /// Alias for [`Self::from_path_with_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_password(path: impl AsRef<Path>, password: impl Into<String>) -> Result<Self> {
-        Self::from_path_with_password(path, password)
-    }
-
-    /// Alias for [`Self::from_path_with_limits_and_password`].
-    #[cfg(any(unix, windows))]
-    pub fn open_with_limits_and_password(
-        path: impl AsRef<Path>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_path_with_limits_and_password(path, limits, password)
-    }
-
-    /// Open an ODP from a caller-provided positional source.
+    /// Open an ODP presentation from a regular filesystem file without slurping it.
     ///
     /// # Errors
     ///
-    /// Returns an error when source I/O, ZIP validation, MIME validation, or
-    /// family content validation fails.
-    pub fn from_read_at(source: Arc<dyn ReadAt>) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default())
+    /// Returns [`litchi_odf_common::Error::Limit`] for an exceeded dimension
+    /// and [`litchi_odf_common::Error::Core`] for I/O or validation failures.
+    #[cfg(any(unix, windows))]
+    pub fn open(path: impl AsRef<Path>) -> std::result::Result<Self, OdfError> {
+        Self::open_with_options(path, OpenOptions::new())
     }
 
-    /// Open a password-protected ODP from a caller-provided positional source.
-    pub fn from_read_at_with_password(
-        source: Arc<dyn ReadAt>,
+    /// Open an ODP presentation from a filesystem file under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_options(
+        path: impl AsRef<Path>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_options(file_source(path)?, options)
+    }
+
+    /// Open password-protected an ODP presentation from a filesystem file.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_password(
+        path: impl AsRef<Path>,
         password: impl Into<String>,
-    ) -> Result<Self> {
+    ) -> std::result::Result<Self, OdfError> {
+        Self::open_with_password_and_options(path, password, OpenOptions::new())
+    }
+
+    /// Open password-protected an ODP presentation from a filesystem file under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    #[cfg(any(unix, windows))]
+    pub fn open_with_password_and_options(
+        path: impl AsRef<Path>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
         let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_inner_with_password(
+        let source = file_source(path)?;
+        Self::from_read_at_with_password_and_options(
             source,
-            ReadLimits::default(),
             std::mem::take(&mut *password),
+            options,
         )
     }
 
-    /// Open an ODP from a positional source with explicit bounded ZIP limits.
+    /// Open an ODP presentation from a caller-provided positional source.
     ///
-    /// The archive index is retained by the common ODF owner.  Payloads not
-    /// needed for mandatory family validation are not read by this constructor.
-    pub fn from_read_at_with_limits(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        Self::from_read_at_inner(source, limits)
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at(source: Arc<dyn ReadAt>) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_options(source, OpenOptions::new())
     }
 
-    /// Open a password-protected ODP from a positional source with explicit
-    /// bounded ZIP limits.
-    pub fn from_read_at_with_limits_and_password(
+    /// Open an ODP presentation from a positional source under caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_inner(source, options, None)
+    }
+
+    /// Open password-protected an ODP presentation from a caller-provided positional
+    /// source.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password(
+        source: Arc<dyn ReadAt>,
         password: impl Into<String>,
-    ) -> Result<Self> {
+    ) -> std::result::Result<Self, OdfError> {
+        Self::from_read_at_with_password_and_options(source, password, OpenOptions::new())
+    }
+
+    /// Open password-protected an ODP presentation from a positional source under
+    /// caller-selected limits.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::open`].
+    pub fn from_read_at_with_password_and_options(
+        source: Arc<dyn ReadAt>,
+        password: impl Into<String>,
+        options: OpenOptions,
+    ) -> std::result::Result<Self, OdfError> {
         let mut password = Zeroizing::new(password.into());
-        Self::from_read_at_inner_with_password(source, limits, std::mem::take(&mut *password))
+        Self::from_read_at_inner(source, options, Some(std::mem::take(&mut *password)))
     }
 
-    fn from_read_at_inner(source: Arc<dyn ReadAt>, limits: ReadLimits) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?;
-        Self::from_read_at_package(source, package)
-    }
-
-    fn from_read_at_inner_with_password(
+    fn from_read_at_inner(
         source: Arc<dyn ReadAt>,
-        limits: ReadLimits,
-        password: impl Into<String>,
-    ) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_limits_and_password(
-            Arc::clone(&source),
-            limits,
-            password,
-        )?;
-        Self::from_read_at_package(source, package)
+        options: OpenOptions,
+        password: Option<String>,
+    ) -> std::result::Result<Self, OdfError> {
+        let limits = options.source_limits_value();
+        let package = match password {
+            Some(password) => {
+                let mut password = Zeroizing::new(password);
+                SourceBackedPackage::from_read_at_with_limits_and_password(
+                    Arc::clone(&source),
+                    limits,
+                    std::mem::take(&mut *password),
+                )?
+            },
+            None => SourceBackedPackage::from_read_at_with_limits(Arc::clone(&source), limits)?,
+        };
+        check_semantic_part_sizes(&package, options.semantic_limits_value())?;
+        Ok(Self::from_read_at_package(source, package)?)
     }
 
     fn from_read_at_package(source: Arc<dyn ReadAt>, package: SourceBackedPackage) -> Result<Self> {
@@ -621,10 +622,15 @@ impl SourceBackedPresentation {
     /// Materialize the exact source into the established mutable presentation
     /// owner.  This is an explicit transition; read-only source operations do
     /// not allocate a complete package buffer.
-    pub fn materialize(self) -> Result<super::Presentation> {
+    ///
+    /// # Errors
+    ///
+    /// Returns a source-changed, archive or family-validation failure.
+    pub fn materialize(self) -> Result<crate::Package> {
         self.package
             .materialize()
             .and_then(super::Presentation::from_owned_package)
+            .map(crate::Package::from_presentation)
     }
 }
 
@@ -656,6 +662,24 @@ fn ensure_current(expected: SourceVersion, observed: SourceVersion) -> Result<()
     } else {
         Err(Error::SourceChanged { expected, observed })
     }
+}
+
+/// Check the caller's semantic part-size limits against the declared member
+/// sizes before any part is inflated.
+fn check_semantic_part_sizes(
+    package: &SourceBackedPackage,
+    limits: litchi_odf_common::SemanticLimits,
+) -> std::result::Result<(), OdfError> {
+    if limits.is_default() {
+        return Ok(());
+    }
+    if let Some(size) = package.member_materialized_size("content.xml")? {
+        limits.check(litchi_odf_common::SemanticLimitKind::ContentBytes, size)?;
+    }
+    if let Some(size) = package.member_materialized_size("styles.xml")? {
+        limits.check(litchi_odf_common::SemanticLimitKind::StylesBytes, size)?;
+    }
+    Ok(())
 }
 
 #[cfg(test)]

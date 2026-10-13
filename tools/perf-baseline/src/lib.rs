@@ -20884,7 +20884,7 @@ fn append_projection_field(output: &mut Vec<u8>, value: &str) -> Result<(), Box<
 }
 
 fn odt_mixed_logical_result_sha256(
-    snapshot: &litchi_odt::transaction::Snapshot,
+    snapshot: &litchi_odt::Package,
 ) -> Result<String, Box<dyn Error>> {
     let document = snapshot.document()?;
     let paragraphs = document.paragraphs()?;
@@ -20928,7 +20928,7 @@ fn semantic_odt_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     for index in 0..shape.docx_paragraphs() {
         builder.add_paragraph(&semantic_odt_text(index, false))?;
     }
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn odt_media_path(index: usize) -> String {
@@ -21075,7 +21075,7 @@ fn semantic_ods_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
         }
         builder.add_sheet(sheet)?;
     }
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 /// ODS uses a format-owned row matrix for the matched fresh-authoring cases.
@@ -21139,7 +21139,7 @@ fn ods_scalar_expected_semantic_sha256(shape: SemanticShape) -> String {
 }
 
 fn ods_scalar_semantic_sha256(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
 ) -> Result<String, Box<dyn Error>> {
     let rows = ods_scalar_row_count(shape);
@@ -21248,7 +21248,7 @@ fn verify_ods_buffered_archive(
     {
         return Err("buffered ODS manifest root/content entries differ from specification".into());
     }
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(bytes.to_vec())?;
+    let spreadsheet = litchi_ods::Package::from_bytes(&bytes)?.workbook()?;
     let actual_semantic_sha256 = ods_scalar_semantic_sha256(&spreadsheet, shape)?;
     if actual_semantic_sha256 != expected_semantic_sha256 {
         return Err("buffered ODS normalized semantic digest differs from specification".into());
@@ -21265,7 +21265,7 @@ fn ods_buffered_bytes_for_rows(row_count: usize) -> Result<Vec<u8>, Box<dyn Erro
     sheet.rows = rows;
     let mut builder = litchi_ods::Builder::new();
     builder.add_sheet(sheet)?;
-    Ok(builder.build()?)
+    Ok(builder.build()?.to_bytes()?)
 }
 
 fn ods_buffered_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
@@ -21460,7 +21460,7 @@ fn semantic_odp_bytes(shape: SemanticShape) -> Result<Vec<u8>, Box<dyn Error>> {
     // `meta.xml`. Keep its public authored content/style path, but rebuild the
     // generated package with fixed metadata so a benchmark corpus has one
     // stable identity across runs and machines.
-    let generated = builder.build()?;
+    let generated = builder.build()?.to_bytes()?;
     let reader = ArchiveReader::new(&generated)?;
     let content = reader.read("content.xml")?;
     let styles = reader.read("styles.xml")?;
@@ -21498,10 +21498,10 @@ fn odp_media_archive() -> Result<Vec<u8>, Box<dyn Error>> {
 }
 
 fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
-    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(semantic_odp_bytes(
+    let source = litchi_odp::authoring::edit::Package::from_bytes(&semantic_odp_bytes(
         SemanticShape::Medium,
     )?)?;
-    let mut transaction = source.transaction()?;
+    let mut transaction = source.edit()?;
     for index in 0..ODP_TEXT_BOX_BATCH_COUNT {
         let text_box = litchi_odp::content::TextBox::new(
             odp_text_box_batch_name(index),
@@ -21510,10 +21510,10 @@ fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
         transaction.add_text_box(odp_text_box_batch_page(index), &text_box)?;
     }
     let commit = transaction.commit()?;
-    if !commit.changed() || commit.patch().is_noop() {
+    if !commit.diagnostics().changed() || commit.patch().is_noop() {
         return Err("ODP text-box batch corpus construction was an exact no-op".into());
     }
-    let staged = ArchiveReader::new(commit.snapshot().bytes())?;
+    let staged = ArchiveReader::new(commit.package().as_bytes())?;
     let mut writer = litchi_odp::core::PackageWriter::new();
     writer.set_mimetype("application/vnd.oasis.opendocument.presentation")?;
     for path in staged.file_names() {
@@ -21535,7 +21535,7 @@ fn odp_text_box_batch_archive() -> Result<Vec<u8>, Box<dyn Error>> {
 
 fn build_semantic_odt_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_odt_bytes(shape)?;
-    let document = litchi_odt::Document::from_bytes(archive.clone())?;
+    let document = litchi_odt::Package::from_bytes(&archive)?.document()?;
     verify_semantic_odt(&document, shape, &[])?;
     let target_payload = semantic_odt_text(0, false).into_bytes();
     let content_bytes = (0..shape.docx_paragraphs()).try_fold(0usize, |total, index| {
@@ -21832,7 +21832,7 @@ fn build_odt_resource_batch_corpus() -> Result<Corpus, Box<dyn Error>> {
 
 fn build_semantic_ods_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_ods_bytes(shape)?;
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(archive.clone())?;
+    let spreadsheet = litchi_ods::Package::from_bytes(&archive)?.workbook()?;
     verify_semantic_ods(&spreadsheet, shape, false)?;
     let target_payload = semantic_ods_text(0, 0, 0, false).into_bytes();
     let content_bytes = (0..shape.ods_sheet_count()).try_fold(0usize, |total, sheet| {
@@ -21923,7 +21923,7 @@ fn build_ods_media_corpus() -> Result<Corpus, Box<dyn Error>> {
 
 fn build_semantic_odp_corpus(shape: SemanticShape) -> Result<Corpus, Box<dyn Error>> {
     let archive = semantic_odp_bytes(shape)?;
-    let presentation = litchi_odp::Presentation::from_bytes(archive.clone())?;
+    let presentation = litchi_odp::Package::from_bytes(&archive)?.presentation()?;
     verify_semantic_odp(&presentation, shape, false)?;
     let target_payload = semantic_odp_text(0, false).into_bytes();
     let content_bytes = (0..shape.pptx_slides()).try_fold(0usize, |total, index| {
@@ -22349,7 +22349,7 @@ fn odp_media_instrumented_source(
 fn odp_media_eager_semantics(
     archive: &[u8],
 ) -> Result<(Vec<litchi_odp::model::Slide>, String), Box<dyn Error>> {
-    let presentation = litchi_odp::Presentation::from_bytes(archive.to_vec())?;
+    let presentation = litchi_odp::Package::from_bytes(&archive)?.presentation()?;
     let slides = presentation.slides()?;
     let digest = odp_media_semantic_digest(&slides)?;
     Ok((slides, digest))
@@ -27083,7 +27083,7 @@ fn verify_semantic_odt(
 }
 
 fn verify_odt_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
     let updated = updated.then_some(SemanticShape::Medium.docx_paragraphs() / 2);
     verify_semantic_odt(&document, SemanticShape::Medium, updated.as_slice())?;
 
@@ -27102,7 +27102,7 @@ fn verify_odt_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn E
 }
 
 fn verify_odt_repeated_text_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
     verify_semantic_odt(&document, SemanticShape::Large, &[])?;
 
     let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
@@ -27122,7 +27122,7 @@ fn verify_odt_repeated_text_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> 
 fn verify_odt_media_line_break_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let target = shape.docx_paragraphs() / 2;
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != shape.docx_paragraphs() {
         return Err("media-rich ODT line-break paragraph count differs from specification".into());
@@ -27159,7 +27159,7 @@ fn verify_odt_media_line_break_archive(bytes: &[u8]) -> Result<(), Box<dyn Error
 fn verify_odt_media_append_run_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let target = shape.docx_paragraphs() / 2;
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != shape.docx_paragraphs() {
         return Err("media-rich ODT append-run paragraph count differs from specification".into());
@@ -27196,7 +27196,7 @@ fn verify_odt_media_append_run_archive(bytes: &[u8]) -> Result<(), Box<dyn Error
 fn verify_odt_media_append_hyperlink_archive(bytes: &[u8]) -> Result<(), Box<dyn Error>> {
     let shape = SemanticShape::Medium;
     let target = shape.docx_paragraphs() / 2;
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     if paragraphs.len() != shape.docx_paragraphs() {
         return Err(
@@ -27247,7 +27247,7 @@ fn verify_odt_media_structural_paragraph_archive(
     let shape = SemanticShape::Medium;
     let original_count = shape.docx_paragraphs();
     let target = original_count / 2;
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
     let paragraphs = document.paragraphs()?;
     let expected_count = if inserted {
         original_count
@@ -27304,7 +27304,7 @@ fn verify_odt_resource_batch_archive(
     bytes: &[u8],
     updated: bool,
 ) -> Result<OdtResourceProjection, Box<dyn Error>> {
-    let document = litchi_odt::Document::from_bytes(bytes.to_vec())?;
+    let document = litchi_odt::Package::from_bytes(&bytes)?.document()?;
     verify_semantic_odt(&document, SemanticShape::Medium, &[])?;
     if !document.embedded_objects()?.is_empty() {
         return Err("ODT embedded-resource corpus unexpectedly contains objects".into());
@@ -27399,7 +27399,7 @@ fn verify_odt_resource_batch_raw_members(
 }
 
 fn semantic_ods_full_cell_text(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
 ) -> Result<String, Box<dyn Error>> {
     let mut values = Vec::with_capacity(shape.ods_cell_count());
@@ -27421,7 +27421,7 @@ fn semantic_ods_full_cell_text(
 }
 
 fn semantic_ods_cell_sweep(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
 ) -> Result<usize, Box<dyn Error>> {
     let mut stored_cells = 0usize;
@@ -27502,7 +27502,7 @@ fn expected_semantic_ods_row_text(shape: SemanticShape, updated_indices: &[usize
 }
 
 fn verify_semantic_ods(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
     updated: bool,
 ) -> Result<(), Box<dyn Error>> {
@@ -27520,7 +27520,7 @@ fn verify_semantic_ods(
 }
 
 fn verify_semantic_ods_updates(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     shape: SemanticShape,
     updated_indices: &[usize],
 ) -> Result<(), Box<dyn Error>> {
@@ -27562,7 +27562,7 @@ fn verify_semantic_ods_updates(
 }
 
 fn verify_ods_media_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(bytes.to_vec())?;
+    let spreadsheet = litchi_ods::Package::from_bytes(&bytes)?.workbook()?;
     verify_semantic_ods(&spreadsheet, SemanticShape::Medium, updated)?;
 
     let package = litchi_odf_common::core::OwnedPackage::from_bytes(bytes.to_vec())?;
@@ -27621,7 +27621,8 @@ fn verify_semantic_odp(
 }
 
 fn verify_odp_media_archive(bytes: &[u8], text_box_added: bool) -> Result<(), Box<dyn Error>> {
-    let presentation = litchi_odp::Presentation::from_bytes(bytes.to_vec())?;
+    let odp_package = litchi_odp::Package::from_bytes(&bytes)?;
+    let presentation = odp_package.presentation()?;
     if text_box_added {
         let slides = presentation.slides()?;
         if slides.len() != SemanticShape::Medium.pptx_slides() {
@@ -27643,7 +27644,7 @@ fn verify_odp_media_archive(bytes: &[u8], text_box_added: bool) -> Result<(), Bo
     } else {
         verify_semantic_odp(&presentation, SemanticShape::Medium, false)?;
     }
-    let snapshot = presentation.snapshot()?;
+    let snapshot = odp_package.clone();
     let inventory = snapshot.rich_content()?;
     let matching = inventory
         .text_boxes()
@@ -27676,7 +27677,8 @@ fn verify_odp_media_archive(bytes: &[u8], text_box_added: bool) -> Result<(), Bo
 }
 
 fn verify_odp_text_box_batch_archive(bytes: &[u8], updated: bool) -> Result<(), Box<dyn Error>> {
-    let presentation = litchi_odp::Presentation::from_bytes(bytes.to_vec())?;
+    let odp_package = litchi_odp::Package::from_bytes(&bytes)?;
+    let presentation = odp_package.presentation()?;
     let slides = presentation.slides()?;
     if slides.len() != SemanticShape::Medium.pptx_slides() {
         return Err("ODP text-box batch slide count differs from specification".into());
@@ -27708,7 +27710,7 @@ fn verify_odp_text_box_batch_archive(bytes: &[u8], updated: bool) -> Result<(), 
         return Err("ODP text-box batch full text differs from slide scan".into());
     }
 
-    let snapshot = presentation.snapshot()?;
+    let snapshot = odp_package.clone();
     let inventory = snapshot.rich_content()?;
     for index in 0..ODP_TEXT_BOX_BATCH_COUNT {
         let name = odp_text_box_batch_name(index);
@@ -35219,7 +35221,7 @@ fn run_semantic_odt(
                 let started = Instant::now();
                 let bytes = semantic_odt_bytes(SemanticShape::Tiny)?;
                 let duration = started.elapsed();
-                let reopened = litchi_odt::Document::from_bytes(bytes.clone())?;
+                let reopened = litchi_odt::Package::from_bytes(&bytes)?.document()?;
                 verify_semantic_odt(&reopened, SemanticShape::Tiny, &[])?;
                 if bytes != corpus.archive && shape == SemanticShape::Tiny {
                     return Err(
@@ -35232,13 +35234,13 @@ fn run_semantic_odt(
             Case::OdtSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let document = litchi_odt::Document::from_bytes(owned)?;
+                let document = litchi_odt::Package::from_bytes(&owned)?.document()?;
                 let duration = started.elapsed();
                 verify_semantic_odt(&document, shape, &[])?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdtSemanticListParagraphs => {
-                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let document = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
                 let started = Instant::now();
                 let paragraphs = document.paragraphs()?;
                 let duration = started.elapsed();
@@ -35250,7 +35252,7 @@ fn run_semantic_odt(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdtSemanticOneParagraph => {
-                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let document = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
                 let started = Instant::now();
                 let text = document
                     .paragraph(index)?
@@ -35264,7 +35266,7 @@ fn run_semantic_odt(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdtSemanticFullText => {
-                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let document = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
                 let started = Instant::now();
                 let text = document.text()?;
                 let duration = started.elapsed();
@@ -35275,14 +35277,14 @@ fn run_semantic_odt(
             Case::OdtSemanticNoopEditSave
             | Case::OdtSemanticOneEditSave
             | Case::OdtSemanticOnePercentEditSave => {
-                let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+                let document = litchi_odt::Package::from_bytes(&corpus.archive)?;
                 let started = Instant::now();
-                let mut edit = document.edit()?;
+                let mut edit = document.edit();
                 for index in &selected {
                     edit.replace_paragraph(Position::new(*index), semantic_odt_text(*index, true))?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().as_bytes().to_vec();
+                let bytes = commit.package().as_bytes().to_vec();
                 let duration = started.elapsed();
                 if (bytes != corpus.archive) == selected.is_empty()
                     || commit.results().len() != selected.len()
@@ -35292,7 +35294,7 @@ fn run_semantic_odt(
                             .into(),
                     );
                 }
-                let reopened = litchi_odt::Document::from_bytes(bytes.clone())?;
+                let reopened = litchi_odt::Package::from_bytes(&bytes)?.document()?;
                 verify_semantic_odt(&reopened, shape, &selected)?;
                 std::hint::black_box(bytes);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -35317,7 +35319,7 @@ fn run_semantic_odt_text_to_sink(
     let expected_bytes = u64::try_from(expected_text.len())?;
     let expected_objects = u64::try_from(paragraph_count)?;
     let expected_digest = sha256_hex(expected_text.as_bytes());
-    let document = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+    let document = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
 
     verify_semantic_odt(&document, shape, &[])?;
     if document.text()? != expected_text {
@@ -35371,9 +35373,9 @@ fn run_semantic_odt_text_to_sink(
 }
 
 fn execute_odt_mixed_scalar(
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     operations: &[OdtMixedOperation],
-) -> Result<(litchi_odt::transaction::Snapshot, usize, usize), Box<dyn Error>> {
+) -> Result<(litchi_odt::Package, usize, usize), Box<dyn Error>> {
     let mut snapshot = source.clone();
     let mut publications = 0usize;
     let mut result_count = 0usize;
@@ -35396,7 +35398,7 @@ fn execute_odt_mixed_scalar(
         publications = publications
             .checked_add(1)
             .ok_or("ODT mixed scalar publication count overflows usize")?;
-        snapshot = commit.into_snapshot();
+        snapshot = commit.into_package();
     }
 
     let inline_operations = &operations[plain_operation_count..];
@@ -35418,13 +35420,13 @@ fn execute_odt_mixed_scalar(
         publications = publications
             .checked_add(1)
             .ok_or("ODT mixed scalar publication count overflows usize")?;
-        snapshot = commit.into_snapshot();
+        snapshot = commit.into_package();
     }
     Ok((snapshot, publications, result_count))
 }
 
 fn execute_odt_mixed_batch(
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     operations: &[OdtMixedOperation],
 ) -> Result<litchi_odt::transaction::Commit, Box<dyn Error>> {
     let mut edit = source.edit();
@@ -35439,7 +35441,7 @@ fn execute_odt_mixed_batch(
 }
 
 fn verify_odt_mixed_projection(
-    snapshot: &litchi_odt::transaction::Snapshot,
+    snapshot: &litchi_odt::Package,
     shape: SemanticShape,
     operations: &[OdtMixedOperation],
 ) -> Result<String, Box<dyn Error>> {
@@ -35547,7 +35549,7 @@ fn verify_odt_mixed_raw_members(source: &[u8], published: &[u8]) -> Result<(), B
 
 fn signed_odt_mixed_snapshot(
     source: &[u8],
-) -> Result<litchi_odt::transaction::Snapshot, Box<dyn Error>> {
+) -> Result<litchi_odt::Package, Box<dyn Error>> {
     let archive = ArchiveReader::new(source)?;
     let mut writer = litchi_odt::core::PackageWriter::new();
     writer.set_mimetype("application/vnd.oasis.opendocument.text")?;
@@ -35559,7 +35561,7 @@ fn signed_odt_mixed_snapshot(
     }
     writer.add_file("META-INF/documentsignatures.xml", b"<signatures/>")?;
     let signed = writer.finish_to_bytes()?;
-    let snapshot = litchi_odt::transaction::Snapshot::from_bytes(signed)?;
+    let snapshot = litchi_odt::Package::from_bytes(&signed)?;
     if !matches!(
         snapshot.envelope_kind()?,
         litchi_odt::transaction::EnvelopeKind::Signed
@@ -35570,38 +35572,38 @@ fn signed_odt_mixed_snapshot(
 }
 
 fn verify_odt_mixed_guardrails(
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     shape: SemanticShape,
     operations: &[OdtMixedOperation],
-    scalar: &litchi_odt::transaction::Snapshot,
+    scalar: &litchi_odt::Package,
     batch: &litchi_odt::transaction::Commit,
 ) -> Result<(), Box<dyn Error>> {
     let scalar_digest = verify_odt_mixed_projection(scalar, shape, operations)?;
-    let batch_digest = verify_odt_mixed_projection(batch.snapshot(), shape, operations)?;
+    let batch_digest = verify_odt_mixed_projection(batch.package(), shape, operations)?;
     if scalar_digest != batch_digest {
         return Err("ODT mixed scalar and batch logical result digests differ".into());
     }
     verify_odt_mixed_raw_members(source.as_bytes(), scalar.as_bytes())?;
-    verify_odt_mixed_raw_members(source.as_bytes(), batch.snapshot().as_bytes())?;
+    verify_odt_mixed_raw_members(source.as_bytes(), batch.package().as_bytes())?;
 
-    let replayed = batch.patch().apply(source)?;
-    if replayed.as_bytes() != batch.snapshot().as_bytes() {
+    let replayed = source.apply(&batch.patch())?;
+    if replayed.as_bytes() != batch.package().as_bytes() {
         return Err("ODT mixed volatile patch replay differs from batch output".into());
     }
     let durable = batch.patch().durable()?;
     let wire = durable.to_deterministic_json()?;
     let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire)?;
-    if decoded.apply(source)?.as_bytes() != batch.snapshot().as_bytes()
-        || decoded.inverse().apply(batch.snapshot())?.as_bytes() != source.as_bytes()
-        || batch.patch().apply(batch.snapshot()).is_ok()
+    if decoded.apply(source)?.as_bytes() != batch.package().as_bytes()
+        || decoded.inverse().apply(batch.package())?.as_bytes() != source.as_bytes()
+        || batch.package().apply(&batch.patch()).is_ok()
     {
         return Err("ODT mixed durable or stale patch lifecycle gate failed".into());
     }
 
     let mut foreign_edit = source.edit();
     foreign_edit.replace_paragraph(Position::new(0), "litchi-perf-odt-mixed-foreign")?;
-    let foreign = foreign_edit.commit()?.into_snapshot();
-    if batch.patch().apply(&foreign).is_ok() || decoded.apply(&foreign).is_ok() {
+    let foreign = foreign_edit.commit()?.into_package();
+    if foreign.apply(&batch.patch()).is_ok() || decoded.apply(&foreign).is_ok() {
         return Err("ODT mixed patch accepted a foreign source".into());
     }
 
@@ -35616,9 +35618,9 @@ fn verify_odt_mixed_guardrails(
         .replace_paragraph(Position::new(0), "litchi-perf-odt-mixed-barrier")?;
     let barrier = barrier_edit.commit()?;
     if barrier.results().len() != 3
-        || barrier.snapshot().document()?.text()?.split('\n').next()
+        || barrier.package().document()?.text()?.split('\n').next()
             != Some("litchi-perf-odt-mixed-barrier")
-        || !barrier.snapshot().document()?.hyperlinks()?.is_empty()
+        || !barrier.package().document()?.hyperlinks()?.is_empty()
     {
         return Err("ODT mixed inline-to-plain barrier gate failed".into());
     }
@@ -35631,7 +35633,7 @@ fn verify_odt_mixed_guardrails(
             "https://example.invalid/litchi/odt/late",
             "missing",
         )?;
-    if late_error_edit.commit().is_ok() || source.as_bytes() != source.document()?.original_bytes()
+    if late_error_edit.commit().is_ok() || source.as_bytes() != source.to_bytes()?.as_slice()
     {
         return Err("ODT mixed late-error atomicity gate failed".into());
     }
@@ -35676,7 +35678,7 @@ fn run_odt_mixed_model_content(
 ) -> Result<CaseResult, Box<dyn Error>> {
     let shape = semantic_shape(corpus)?;
     let operations = odt_mixed_operations(shape)?;
-    let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+    let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
     let (scalar_baseline, scalar_publications, scalar_results) =
         execute_odt_mixed_scalar(&source, &operations)?;
     let batch_baseline = execute_odt_mixed_batch(&source, &operations)?;
@@ -35722,7 +35724,7 @@ fn run_odt_mixed_model_content(
         // Opening a fresh immutable source is intentionally outside the timed
         // transaction interval. It keeps both legs matched while ensuring the
         // measured work is publication work rather than corpus setup.
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let started = Instant::now();
         let (snapshot, publications, result_count) = match case {
             Case::OdtMixedModelContentScalarEditSave => {
@@ -35730,7 +35732,7 @@ fn run_odt_mixed_model_content(
             },
             Case::OdtMixedModelContentBatchEditSave => {
                 let commit = execute_odt_mixed_batch(&source, &operations)?;
-                (commit.into_snapshot(), 1, operations.len())
+                (commit.into_package(), 1, operations.len())
             },
             _ => unreachable!("mixed case validated before the measurement loop"),
         };
@@ -35889,10 +35891,10 @@ fn odf_content_cow_candidate(
     match family {
         OdfContentCowFamily::Odt => {
             let target = SemanticShape::Medium.docx_paragraphs() / 2;
-            let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+            let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
             let mut edit = source.edit();
             edit.replace_paragraph(Position::new(target), semantic_odt_text(target, true))?;
-            Ok(edit.commit()?.snapshot().as_bytes().to_vec())
+            Ok(edit.commit()?.package().as_bytes().to_vec())
         },
         OdfContentCowFamily::Ods => {
             let shape = SemanticShape::Medium;
@@ -35900,8 +35902,8 @@ fn odf_content_cow_candidate(
             let row = shape.ods_rows_per_sheet() / 2;
             let column = shape.ods_columns_per_sheet() / 2;
             let sheet_name = semantic_ods_sheet_name(sheet);
-            let source = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
-            let mut edit = source.edit();
+            let source = litchi_ods::Package::from_bytes(&corpus.archive)?;
+            let mut edit = source.edit().unwrap();
             let text = semantic_ods_text(sheet, row, column, true);
             edit.worksheets(|worksheets| {
                 worksheets
@@ -35918,17 +35920,17 @@ fn odf_content_cow_candidate(
                     })?;
                 Ok(())
             })?;
-            Ok(edit.commit()?.snapshot().as_bytes().to_vec())
+            Ok(edit.commit()?.package().as_bytes().to_vec())
         },
         OdfContentCowFamily::Odp => {
             let text_box = litchi_odp::content::TextBox::new(
                 ODP_MEDIA_TEXT_BOX_NAME,
                 litchi_odp::content::RichText::plain(odp_media_text())?,
             )?;
-            let source = litchi_odp::authoring::edit::Snapshot::from_bytes(corpus.archive.clone())?;
-            let mut transaction = source.transaction()?;
+            let source = litchi_odp::authoring::edit::Package::from_bytes(&corpus.archive)?;
+            let mut transaction = source.edit()?;
             transaction.add_text_box(0usize, &text_box)?;
-            Ok(transaction.commit()?.snapshot().bytes().to_vec())
+            Ok(transaction.commit()?.package().as_bytes().to_vec())
         },
     }
 }
@@ -36451,26 +36453,26 @@ fn run_odt_media_paragraph_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         edit.replace_paragraph(Position::new(target), semantic_odt_text(target, true))?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err("media-rich ODT paragraph edit reported an exact no-op".into());
         }
 
         verify_odt_media_archive(&bytes, true)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(&commit.patch())?;
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT paragraph patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?;
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT paragraph inverse did not restore the source".into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(&commit.patch()).is_ok() {
             return Err("media-rich ODT paragraph patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -36502,28 +36504,28 @@ fn run_odt_media_line_break_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         edit.append_line_break(litchi_odt::transaction::ParagraphSelector::position(
             Position::new(target),
         ))?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err("media-rich ODT line-break edit reported an exact no-op".into());
         }
 
         verify_odt_media_line_break_archive(&bytes)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(&commit.patch())?;
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT line-break patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?;
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT line-break inverse did not restore the source".into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(&commit.patch()).is_ok() {
             return Err("media-rich ODT line-break patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -36552,26 +36554,26 @@ fn run_odt_media_append_run_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         edit.append_run(Position::new(target), ODT_MEDIA_APPEND_RUN_TEXT, None)?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err("media-rich ODT append-run edit reported an exact no-op".into());
         }
 
         verify_odt_media_append_run_archive(&bytes)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(&commit.patch())?;
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-run patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?;
         if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODT append-run inverse did not restore the source".into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(&commit.patch()).is_ok() {
             return Err("media-rich ODT append-run patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -36600,7 +36602,7 @@ fn run_odt_media_append_hyperlink_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         edit.append_hyperlink(
             Position::new(target),
@@ -36608,24 +36610,24 @@ fn run_odt_media_append_hyperlink_edit_save(
             ODT_MEDIA_APPEND_HYPERLINK_TEXT,
         )?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err("media-rich ODT append-hyperlink edit reported an exact no-op".into());
         }
 
         verify_odt_media_append_hyperlink_archive(&bytes)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(&commit.patch())?;
         if replayed.as_bytes() != bytes {
             return Err("media-rich ODT append-hyperlink patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?;
         if restored.as_bytes() != corpus.archive {
             return Err(
                 "media-rich ODT append-hyperlink inverse did not restore the source".into(),
             );
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(&commit.patch()).is_ok() {
             return Err("media-rich ODT append-hyperlink patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -36663,7 +36665,7 @@ fn run_odt_media_structural_paragraph_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+        let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
         let mut edit = source.edit();
         if inserted {
             edit.insert_paragraph(Position::new(target), ODT_MEDIA_INSERT_PARAGRAPH_TEXT)?;
@@ -36671,7 +36673,7 @@ fn run_odt_media_structural_paragraph_edit_save(
             edit.remove_paragraph(Position::new(target))?;
         }
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
         if bytes == corpus.archive {
             return Err(
@@ -36680,21 +36682,21 @@ fn run_odt_media_structural_paragraph_edit_save(
         }
 
         verify_odt_media_structural_paragraph_archive(&bytes, inserted)?;
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(&commit.patch())?;
         if replayed.as_bytes() != bytes {
             return Err(format!(
                 "media-rich ODT paragraph {operation} patch replay differs from commit"
             )
             .into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
+        let restored = replayed.apply(&commit.patch().inverse())?;
         if restored.as_bytes() != corpus.archive {
             return Err(format!(
                 "media-rich ODT paragraph {operation} inverse did not restore the source"
             )
             .into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(&commit.patch()).is_ok() {
             return Err(format!(
                 "media-rich ODT paragraph {operation} patch accepted a stale source"
             )
@@ -36721,7 +36723,7 @@ fn run_odt_media_structural_paragraph_edit_save(
 
 fn publish_odt_embedded_resources(
     case: Case,
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     replacements: &[litchi_odt::package::embedded::EmbeddedResource],
     changes: &[litchi_odt::package::embedded::EmbeddedResourceChange],
 ) -> Result<litchi_odt::transaction::Commit, Box<dyn Error>> {
@@ -36742,7 +36744,7 @@ fn publish_odt_embedded_resources(
 
 fn verify_odt_embedded_resource_commit(
     case: Case,
-    source: &litchi_odt::transaction::Snapshot,
+    source: &litchi_odt::Package,
     commit: &litchi_odt::transaction::Commit,
     expected: &[u8],
 ) -> Result<OdtResourceProjection, Box<dyn Error>> {
@@ -36759,10 +36761,10 @@ fn verify_odt_embedded_resource_commit(
         },
         _ => false,
     };
-    if commit.snapshot().as_bytes() != expected || expected == source.as_bytes() || !results_match {
+    if commit.package().as_bytes() != expected || expected == source.as_bytes() || !results_match {
         return Err(format!(
             "ODT embedded-resource commit differs: exact_output={}, changed={}, results={:?}",
-            commit.snapshot().as_bytes() == expected,
+            commit.package().as_bytes() == expected,
             expected != source.as_bytes(),
             commit.results()
         )
@@ -36771,14 +36773,14 @@ fn verify_odt_embedded_resource_commit(
     let projection = verify_odt_resource_batch_archive(expected, true)?;
     verify_odt_resource_batch_raw_members(source.as_bytes(), expected)?;
 
-    let replayed = commit.patch().apply(source)?;
+    let replayed = source.apply(&commit.patch())?;
     if replayed.as_bytes() != expected {
         return Err("ODT embedded-resource volatile replay differs from publication".into());
     }
-    if commit.patch().inverse().apply(&replayed)?.as_bytes() != source.as_bytes() {
+    if replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes() {
         return Err("ODT embedded-resource volatile inverse did not restore source".into());
     }
-    if commit.patch().apply(&replayed).is_ok() {
+    if replayed.apply(&commit.patch()).is_ok() {
         return Err("ODT embedded-resource volatile patch accepted stale source".into());
     }
 
@@ -36806,7 +36808,7 @@ fn run_odt_embedded_resource_publication(
     if !case.uses_odt_resource_batch() {
         return Err("non-resource ODT case passed to resource publication runner".into());
     }
-    let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone())?;
+    let source = litchi_odt::Package::from_bytes(&corpus.archive)?;
     let replacements = (0..ODT_RESOURCE_BATCH_COUNT)
         .map(|index| odt_resource_batch_image(index, true))
         .collect::<Vec<_>>();
@@ -36827,7 +36829,7 @@ fn run_odt_embedded_resource_publication(
         &replacements,
         &changes,
     )?;
-    let expected_batch = batch.snapshot().as_bytes().to_vec();
+    let expected_batch = batch.package().as_bytes().to_vec();
     let batch_projection = verify_odt_embedded_resource_commit(
         Case::OdtEmbeddedResourceBatchReplaceSave,
         &source,
@@ -36840,7 +36842,7 @@ fn run_odt_embedded_resource_publication(
         &replacements,
         &changes,
     )?;
-    let expected_scalar = scalar.snapshot().as_bytes().to_vec();
+    let expected_scalar = scalar.package().as_bytes().to_vec();
     let scalar_projection = verify_odt_embedded_resource_commit(
         Case::OdtEmbeddedResourceScalarReplaceSave,
         &source,
@@ -36865,16 +36867,16 @@ fn run_odt_embedded_resource_publication(
         sink.reserve_budget()?;
         let started = Instant::now();
         let commit = publish_odt_embedded_resources(case, &source, &replacements, &changes)?;
-        sink.write_all(commit.snapshot().as_bytes())?;
+        sink.write_all(commit.package().as_bytes())?;
         let duration = started.elapsed();
 
         if sink.bytes != expected {
             return Err("measured ODT embedded-resource publication differs from oracle".into());
         }
-        let replayed = commit.patch().apply(&source)?;
+        let replayed = source.apply(&commit.patch())?;
         if replayed.as_bytes() != expected
-            || commit.patch().inverse().apply(&replayed)?.as_bytes() != source.as_bytes()
-            || commit.patch().apply(&replayed).is_ok()
+            || replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes()
+            || replayed.apply(&commit.patch()).is_ok()
         {
             return Err("measured ODT embedded-resource patch contract differs".into());
         }
@@ -36911,7 +36913,7 @@ fn run_semantic_ods(
                 let started = Instant::now();
                 let bytes = semantic_ods_bytes(SemanticShape::Tiny)?;
                 let duration = started.elapsed();
-                let reopened = litchi_ods::Spreadsheet::from_bytes(bytes.clone())?;
+                let reopened = litchi_ods::Package::from_bytes(&bytes)?.workbook()?;
                 verify_semantic_ods(&reopened, SemanticShape::Tiny, false)?;
                 if bytes != corpus.archive && shape == SemanticShape::Tiny {
                     return Err(
@@ -36924,13 +36926,13 @@ fn run_semantic_ods(
             Case::OdsSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(owned)?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&owned)?.workbook()?;
                 let duration = started.elapsed();
                 verify_semantic_ods(&spreadsheet, shape, false)?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticListSheets => {
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                 let started = Instant::now();
                 let sheets = spreadsheet.sheets();
                 let duration = started.elapsed();
@@ -36942,7 +36944,7 @@ fn run_semantic_ods(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticOneCell => {
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                 let started = Instant::now();
                 let cell = spreadsheet
                     .cell(&sheet_name, row, column)
@@ -36958,7 +36960,7 @@ fn run_semantic_ods(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticCellSweep => {
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                 let started = Instant::now();
                 let stored_cells = semantic_ods_cell_sweep(&spreadsheet, shape)?;
                 let duration = started.elapsed();
@@ -36970,7 +36972,7 @@ fn run_semantic_ods(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdsSemanticFullCellText => {
-                let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                 let started = Instant::now();
                 let text = semantic_ods_full_cell_text(&spreadsheet, shape)?;
                 let duration = started.elapsed();
@@ -36983,8 +36985,8 @@ fn run_semantic_ods(
             | Case::OdsSemanticOnePercentEditSave => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let snapshot = litchi_ods::document::Snapshot::from_bytes(owned)?;
-                let mut edit = snapshot.edit();
+                let snapshot = litchi_ods::Package::from_bytes(&owned)?;
+                let mut edit = snapshot.edit().unwrap();
                 let updated_indices = match case {
                     Case::OdsSemanticNoopEditSave => &[][..],
                     Case::OdsSemanticOneEditSave => &single_update[..],
@@ -37062,15 +37064,15 @@ fn run_semantic_ods(
                     })?;
                 }
                 let commit = edit.commit()?;
-                let bytes = commit.snapshot().as_bytes().to_vec();
+                let bytes = commit.package().as_bytes().to_vec();
                 let duration = started.elapsed();
                 let updated = !updated_indices.is_empty();
-                if (bytes != corpus.archive) != updated || commit.changed() != updated {
+                if (bytes != corpus.archive) != updated || commit.diagnostics().changed() != updated {
                     return Err(
                         "semantic ODS edit/save changed-state differs from specification".into(),
                     );
                 }
-                let reopened = litchi_ods::Spreadsheet::from_bytes(bytes.clone())?;
+                let reopened = litchi_ods::Package::from_bytes(&bytes)?.workbook()?;
                 verify_semantic_ods_updates(&reopened, shape, updated_indices)?;
                 std::hint::black_box(bytes);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -37091,7 +37093,7 @@ fn run_semantic_ods_text_to_sink(
     let expected_bytes = u64::try_from(expected_text.len())?;
     let expected_objects = u64::try_from(shape.ods_text_object_count())?;
     let expected_digest = sha256_hex(expected_text.as_bytes());
-    let spreadsheet = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let spreadsheet = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
 
     verify_semantic_ods(&spreadsheet, shape, false)?;
     let expected_cells = expected_semantic_ods_full_cell_text(shape, &[]);
@@ -37159,8 +37161,8 @@ fn run_ods_media_one_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
-        let mut edit = snapshot.edit();
+        let snapshot = litchi_ods::Package::from_bytes(&corpus.archive)?;
+        let mut edit = snapshot.edit().unwrap();
         let text = semantic_ods_text(sheet, row, column, true);
         edit.worksheets(|worksheets| {
             worksheets
@@ -37178,9 +37180,9 @@ fn run_ods_media_one_edit_save(
             Ok(())
         })?;
         let commit = edit.commit()?;
-        let bytes = commit.snapshot().as_bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
-        if !commit.changed() || bytes == corpus.archive {
+        if !commit.diagnostics().changed() || bytes == corpus.archive {
             return Err("media-rich ODS one-cell edit reported an exact no-op".into());
         }
 
@@ -37376,14 +37378,14 @@ fn expected_ods_owned_cell_output(
     updates: &[(usize, usize, usize)],
     one_percent: bool,
 ) -> Result<Vec<u8>, Box<dyn Error>> {
-    let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
-    let mut edit = snapshot.edit();
+    let snapshot = litchi_ods::Package::from_bytes(&corpus.archive)?;
+    let mut edit = snapshot.edit().unwrap();
     stage_ods_owned_cell_changes(&mut edit, updates, one_percent)?;
     let commit = edit.commit()?;
-    if !commit.changed() {
+    if !commit.diagnostics().changed() {
         return Err("ODS owned cell edit unexpectedly reported an exact no-op".into());
     }
-    Ok(commit.snapshot().as_bytes().to_vec())
+    Ok(commit.package().as_bytes().to_vec())
 }
 
 fn verify_ods_source_cell_output(
@@ -37393,7 +37395,7 @@ fn verify_ods_source_cell_output(
     source_backed: bool,
 ) -> Result<(), Box<dyn Error>> {
     let indices = ods_source_cell_update_indices(updates);
-    let reopened = litchi_ods::Spreadsheet::from_bytes(output.to_vec())?;
+    let reopened = litchi_ods::Package::from_bytes(&output)?.workbook()?;
     verify_semantic_ods_updates(&reopened, SemanticShape::Medium, &indices)?;
     let package = litchi_odf_common::core::OwnedPackage::from_bytes(output.to_vec())?;
     let package = package.package()?;
@@ -37590,16 +37592,16 @@ fn run_ods_source_cell_edit_save(
             publication_duration = publication_started.elapsed();
             std::hint::black_box(commit);
         } else {
-            let snapshot = litchi_ods::document::Snapshot::from_bytes(corpus.archive.clone())?;
+            let snapshot = litchi_ods::Package::from_bytes(&corpus.archive)?;
             open_duration = open_started.elapsed();
             let stage_started = Instant::now();
-            let mut edit = snapshot.edit();
+            let mut edit = snapshot.edit().unwrap();
             stage_ods_owned_cell_changes(&mut edit, &updates, one_percent)?;
             stage_duration = stage_started.elapsed();
             let commit_started = Instant::now();
             let commit = edit.commit()?;
             commit_duration = commit_started.elapsed();
-            let bytes = commit.snapshot().as_bytes();
+            let bytes = commit.package().as_bytes();
             if u64::try_from(bytes.len())? != expected_bytes {
                 return Err("ODS owned timed output length differs from its oracle".into());
             }
@@ -37759,7 +37761,7 @@ fn run_ods_source_cell_edit_save(
     let source_hash_verified = sha256_hex(&corpus.archive) == source_archive_sha256;
     let output_hash_verified = sha256_hex(expected_output) == expected_digest;
     let semantic_hash_verified = {
-        let reopened = litchi_ods::Spreadsheet::from_bytes(expected_output.to_vec())?;
+        let reopened = litchi_ods::Package::from_bytes(&expected_output)?.workbook()?;
         sha256_hex(semantic_ods_full_cell_text(&reopened, SemanticShape::Medium)?.as_bytes())
             == semantic_digest
     };
@@ -37941,7 +37943,7 @@ fn run_ods_source_repeated_edit(
     let &(edited_sheet, edited_row, edited_column) = updates
         .first()
         .ok_or("ODS source repeated-edit has no selected cell")?;
-    let reopened = litchi_ods::Spreadsheet::from_bytes(expected_outputs[0].clone())?;
+    let reopened = litchi_ods::Package::from_bytes(&expected_outputs[0])?.workbook()?;
     let edited_name = semantic_ods_sheet_name(edited_sheet);
     let edited = reopened
         .cell(&edited_name, edited_row, edited_column)
@@ -38221,7 +38223,7 @@ fn run_semantic_odp(
                 let started = Instant::now();
                 let bytes = semantic_odp_bytes(SemanticShape::Tiny)?;
                 let duration = started.elapsed();
-                let reopened = litchi_odp::Presentation::from_bytes(bytes.clone())?;
+                let reopened = litchi_odp::Package::from_bytes(&bytes)?.presentation()?;
                 verify_semantic_odp(&reopened, SemanticShape::Tiny, false)?;
                 if bytes != corpus.archive && shape == SemanticShape::Tiny {
                     return Err(
@@ -38234,13 +38236,13 @@ fn run_semantic_odp(
             Case::OdpSemanticOpen => {
                 let owned = corpus.archive.clone();
                 let started = Instant::now();
-                let presentation = litchi_odp::Presentation::from_bytes(owned)?;
+                let presentation = litchi_odp::Package::from_bytes(&owned)?.presentation()?;
                 let duration = started.elapsed();
                 verify_semantic_odp(&presentation, shape, false)?;
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticListSlides => {
-                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let slides = presentation.slides()?;
                 let duration = started.elapsed();
@@ -38252,7 +38254,7 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticOneSlide => {
-                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let slide = presentation
                     .slide(index)?
@@ -38271,7 +38273,7 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticFullText => {
-                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+                let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
                 let started = Instant::now();
                 let text = presentation.text()?;
                 let duration = started.elapsed();
@@ -38280,10 +38282,12 @@ fn run_semantic_odp(
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
             },
             Case::OdpSemanticNoopEditSave | Case::OdpSemanticOneEditSave => {
-                let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
-                let snapshot = presentation.snapshot()?;
+                let snapshot = litchi_odp::Package::from_bytes(&corpus.archive)?;
+                // Parse the bounded editing projection before timing, as the
+                // former eager snapshot constructor did.
+                snapshot.slides()?;
                 let started = Instant::now();
-                let mut transaction = snapshot.transaction()?;
+                let mut transaction = snapshot.edit()?;
                 let updated = matches!(case, Case::OdpSemanticOneEditSave);
                 if updated {
                     let index = shape.pptx_slides();
@@ -38293,14 +38297,14 @@ fn run_semantic_odp(
                     )?;
                 }
                 let commit = transaction.commit()?;
-                let bytes = commit.snapshot().bytes().to_vec();
+                let bytes = commit.package().as_bytes().to_vec();
                 let duration = started.elapsed();
-                if (bytes != corpus.archive) != updated || commit.changed() != updated {
+                if (bytes != corpus.archive) != updated || commit.diagnostics().changed() != updated {
                     return Err(
                         "semantic ODP edit/save changed-state differs from specification".into(),
                     );
                 }
-                let reopened = litchi_odp::Presentation::from_bytes(bytes.clone())?;
+                let reopened = litchi_odp::Package::from_bytes(&bytes)?.presentation()?;
                 verify_semantic_odp(&reopened, shape, updated)?;
                 std::hint::black_box(bytes);
                 record_elapsed(&mut elapsed, iteration, warmup_iterations, duration)?;
@@ -38331,7 +38335,7 @@ fn run_semantic_odp_text_to_sink(
     let expected_bytes = u64::try_from(expected_text.len())?;
     let expected_objects = u64::try_from(slide_count)?;
     let expected_digest = sha256_hex(expected_text.as_bytes());
-    let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+    let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
 
     verify_semantic_odp(&presentation, shape, false)?;
     if presentation.text()? != expected_text {
@@ -38398,26 +38402,26 @@ fn run_odp_media_textbox_edit_save(
     let mut elapsed = Vec::with_capacity(samples);
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
         let started = Instant::now();
-        let source = litchi_odp::authoring::edit::Snapshot::from_bytes(corpus.archive.clone())?;
-        let mut transaction = source.transaction()?;
+        let source = litchi_odp::authoring::edit::Package::from_bytes(&corpus.archive)?;
+        let mut transaction = source.edit()?;
         transaction.add_text_box(0usize, &text_box)?;
         let commit = transaction.commit()?;
-        let bytes = commit.snapshot().bytes().to_vec();
+        let bytes = commit.package().as_bytes().to_vec();
         let duration = started.elapsed();
-        if !commit.changed() || bytes == corpus.archive || commit.patch().is_noop() {
+        if !commit.diagnostics().changed() || bytes == corpus.archive || commit.patch().is_noop() {
             return Err("media-rich ODP text-box edit reported an exact no-op".into());
         }
 
         verify_odp_media_archive(&bytes, true)?;
-        let replayed = commit.patch().apply(&source)?;
-        if replayed.bytes() != bytes {
+        let replayed = source.apply(&commit.patch())?;
+        if replayed.as_bytes() != bytes {
             return Err("media-rich ODP text-box patch replay differs from commit".into());
         }
-        let restored = commit.patch().inverse().apply(&replayed)?;
-        if restored.bytes() != corpus.archive {
+        let restored = replayed.apply(&commit.patch().inverse())?;
+        if restored.as_bytes() != corpus.archive {
             return Err("media-rich ODP text-box inverse did not restore the source".into());
         }
-        if commit.patch().apply(&replayed).is_ok() {
+        if replayed.apply(&commit.patch()).is_ok() {
             return Err("media-rich ODP text-box patch accepted a stale source".into());
         }
         let digest = sha256_hex(&bytes);
@@ -38659,7 +38663,7 @@ fn run_odp_media_source_access(
                 duration
             }
         } else if query {
-            let presentation = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+            let presentation = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
             let started = Instant::now();
             let slide = presentation
                 .slide(target_slide)?
@@ -38677,7 +38681,7 @@ fn run_odp_media_source_access(
         } else {
             let owned = corpus.archive.clone();
             let started = Instant::now();
-            let presentation = litchi_odp::Presentation::from_bytes(owned)?;
+            let presentation = litchi_odp::Package::from_bytes(&owned)?.presentation()?;
             let duration = started.elapsed();
             verify_odp_media_eager_semantics_and_media(
                 &presentation,
@@ -38838,7 +38842,7 @@ fn run_odt_repeated_text(
         return Err("ODT repeated-text cases require the fixed large media-rich corpus".into());
     }
 
-    let eager = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+    let eager = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
     let expected_text = eager.text()?;
     let expected_paragraph_count = eager.paragraph_count()?;
     if expected_paragraph_count != SemanticShape::Large.docx_paragraphs() {
@@ -39317,7 +39321,7 @@ fn run_odt_source_backed_catalog(
         return Err("ODT source catalog cases require the fixed large media-rich corpus".into());
     }
     let (operation, selected_index) = odt_catalog_case_parameters(case)?;
-    let eager = litchi_odt::Document::from_bytes(corpus.archive.clone())?;
+    let eager = litchi_odt::Package::from_bytes(&corpus.archive)?.document()?;
     verify_semantic_odt(&eager, SemanticShape::Large, &[])?;
     let expected_text = eager.text()?;
     let expected_block_count = eager.paragraph_count()?;
@@ -39875,7 +39879,7 @@ fn run_odp_source_backed_catalog(
         return Err("ODP source catalog cases require the fixed media-rich corpus".into());
     }
     let (operation, selected_index) = odp_catalog_case_parameters(case)?;
-    let eager = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+    let eager = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
     verify_semantic_odp(&eager, SemanticShape::Medium, false)?;
     let expected_slides = eager.slides()?;
     let expected_text = eager.text()?;
@@ -40438,7 +40442,7 @@ fn run_odp_repeated_text(
         return Err("ODP repeated-text cases require the fixed media-rich corpus".into());
     }
 
-    let eager = litchi_odp::Presentation::from_bytes(corpus.archive.clone())?;
+    let eager = litchi_odp::Package::from_bytes(&corpus.archive)?.presentation()?;
     let expected_text = eager.text()?;
     let expected_slides = eager.slides()?;
     let expected_single_text_sha256 = sha256_hex(expected_text.as_bytes());
@@ -40805,7 +40809,7 @@ fn ods_root_metadata_digest(metadata: &litchi_core::Metadata) -> Result<String, 
 }
 
 fn ods_root_typed_cell(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     sheet: &str,
     row: usize,
     column: usize,
@@ -40886,7 +40890,7 @@ fn ods_cell_sweep_digest_field(digest: &mut Sha256, value: Option<&str>) -> usiz
 }
 
 fn ods_owned_cell_sweep_digest(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     sheet_names: &[String],
     coordinates: &[OdsCellSweepCoordinate],
 ) -> Result<(usize, String), Box<dyn Error>> {
@@ -40942,7 +40946,7 @@ fn ods_source_cell_sweep_digest(
 }
 
 fn run_ods_owned_cell_sweep(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     sheet_names: &[String],
     coordinates: &[OdsCellSweepCoordinate],
 ) -> Result<(), Box<dyn Error>> {
@@ -40978,7 +40982,7 @@ fn run_ods_source_cell_sweep(
 }
 
 fn ods_owned_cell_batch_sweep_digest(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     coordinates: &[OdsCellSweepCoordinate],
     selectors: &[litchi_ods::CellSelector<'_>],
 ) -> Result<(usize, String), Box<dyn Error>> {
@@ -41034,7 +41038,7 @@ fn ods_source_cell_batch_sweep_digest(
 }
 
 fn run_ods_owned_cell_batch_sweep(
-    spreadsheet: &litchi_ods::Spreadsheet,
+    spreadsheet: &litchi_ods::Workbook,
     selectors: &[litchi_ods::CellSelector<'_>],
 ) -> Result<(), Box<dyn Error>> {
     for _ in 0..ODS_CELL_SWEEP_REPETITIONS {
@@ -41078,7 +41082,7 @@ fn run_ods_cell_sweep(
         .len()
         .checked_mul(ODS_CELL_SWEEP_REPETITIONS)
         .ok_or("ODS cell-sweep query count overflows usize")?;
-    let expected = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let expected = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
     let (expected_stored, expected_digest) =
         ods_owned_cell_sweep_digest(&expected, &sheet_names, &coordinates)?;
     if expected_stored != expected_stored_cells {
@@ -41114,14 +41118,14 @@ fn run_ods_cell_sweep(
             let duration;
             let (stored_cells, digest) = match case {
                 Case::OdsFileEagerCellSweep => {
-                    let owner = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                    let owner = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                     let started = Instant::now();
                     run_ods_owned_cell_sweep(&owner, &sheet_names, &coordinates)?;
                     duration = started.elapsed();
                     ods_owned_cell_sweep_digest(&owner, &sheet_names, &coordinates)?
                 },
                 Case::OdsFileSourceCellSweep => {
-                    let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
+                    let owner = litchi_ods::SourceBackedSpreadsheet::open(&source_path)?;
                     let started = Instant::now();
                     run_ods_source_cell_sweep(&owner, &sheet_names, &coordinates)?;
                     duration = started.elapsed();
@@ -41235,7 +41239,7 @@ fn run_ods_cell_batch_sweep(
         .len()
         .checked_mul(ODS_CELL_SWEEP_REPETITIONS)
         .ok_or("ODS cell batch sweep result count overflows usize")?;
-    let expected = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let expected = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
     let (expected_stored, expected_digest) =
         ods_owned_cell_sweep_digest(&expected, &sheet_names, &coordinates)?;
     if expected_stored != expected_stored_cells {
@@ -41321,14 +41325,14 @@ fn run_ods_cell_batch_sweep(
             let duration;
             let (stored_cells, digest) = match case {
                 Case::OdsFileEagerCellBatchSweep => {
-                    let owner = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                    let owner = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
                     let started = Instant::now();
                     run_ods_owned_cell_batch_sweep(&owner, &selectors)?;
                     duration = started.elapsed();
                     ods_owned_cell_batch_sweep_digest(&owner, &coordinates, &selectors)?
                 },
                 Case::OdsFileSourceCellBatchSweep => {
-                    let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
+                    let owner = litchi_ods::SourceBackedSpreadsheet::open(&source_path)?;
                     let started = Instant::now();
                     run_ods_source_cell_batch_sweep(&owner, &selectors)?;
                     duration = started.elapsed();
@@ -41649,7 +41653,7 @@ fn verify_ods_typed_query_projection(
 }
 
 fn ods_typed_query_projection(
-    owner: &litchi_ods::Spreadsheet,
+    owner: &litchi_ods::Workbook,
     expected: &OdsRootExpectations<'_>,
 ) -> Result<OdsTypedQueryProjection, Box<dyn Error>> {
     Ok(OdsTypedQueryProjection {
@@ -41727,7 +41731,7 @@ fn run_ods_root_file_access(
     // the values the facade workbook these routes were recorded against
     // reported (M0a step S9 deleted it), which the unified ODS routes (S8b)
     // check `litchi::File` against.
-    let expected_typed = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+    let expected_typed = litchi_ods::Package::from_bytes(&corpus.archive)?.workbook()?;
     let expected_names = expected_typed.sheet_names();
     let expected_count = expected_typed.sheet_count();
     let expected_text = expected_typed.text()?;
@@ -41790,7 +41794,7 @@ fn run_ods_root_file_access(
                 if implementation == "source_backed_typed" {
                     "litchi_ods::SourceBackedSpreadsheet::cell"
                 } else {
-                    "litchi_ods::Spreadsheet::cell"
+                    "litchi_ods::Workbook::cell"
                 }
             } else {
                 "not_applicable"
@@ -41829,7 +41833,7 @@ fn run_ods_root_file_access(
         for iteration in 0..iteration_count(warmup_iterations, samples)? {
             let duration = match implementation {
                 "source_backed_typed" => {
-                    let owner = litchi_ods::SourceBackedSpreadsheet::from_path(&source_path)?;
+                    let owner = litchi_ods::SourceBackedSpreadsheet::open(&source_path)?;
                     let started = Instant::now();
                     let value = if media_query {
                         owner
@@ -41855,14 +41859,15 @@ fn run_ods_root_file_access(
                     duration
                 },
                 "eager_typed" => {
-                    let owner = litchi_ods::Spreadsheet::from_bytes(corpus.archive.clone())?;
+                    let ods_package = litchi_ods::Package::from_bytes(&corpus.archive)?;
+                    let owner = ods_package.workbook()?;
                     if media_query {
                         verify_ods_typed_query_projection(
                             ods_typed_query_projection(&owner, &expectations)?,
                             &expectations,
                         )?;
                         verify_ods_source_identity_postconditions(&expectations)?;
-                        let owned = owner.into_bytes();
+                        let owned = ods_package.to_bytes()?;
                         let package = litchi_odf_common::core::OwnedPackage::from_bytes(owned)?;
                         let package = package.package()?;
                         let started = Instant::now();
@@ -41990,7 +41995,7 @@ fn run_ods_root_file_access(
 }
 
 fn odp_text_box_batch_models(
-    source: &litchi_odp::authoring::edit::Snapshot,
+    source: &litchi_odp::authoring::edit::Package,
 ) -> Result<Vec<litchi_odp::content::TextBoxModel>, Box<dyn Error>> {
     let inventory = source.rich_content()?;
     let mut models = Vec::with_capacity(ODP_TEXT_BOX_BATCH_COUNT);
@@ -42021,10 +42026,10 @@ fn odp_text_box_batch_models(
 
 fn publish_odp_text_box_models(
     case: Case,
-    source: &litchi_odp::authoring::edit::Snapshot,
+    source: &litchi_odp::authoring::edit::Package,
     replacements: &[litchi_odp::content::TextBoxModelReplacement<'_>],
 ) -> Result<litchi_odp::authoring::edit::Commit, Box<dyn Error>> {
-    let mut transaction = source.transaction()?;
+    let mut transaction = source.edit()?;
     match case {
         Case::OdpMediaTextBoxScalarReplaceSave => {
             for replacement in replacements {
@@ -42044,55 +42049,55 @@ fn publish_odp_text_box_models(
 
 fn verify_odp_text_box_model_commit(
     case: Case,
-    source: &litchi_odp::authoring::edit::Snapshot,
+    source: &litchi_odp::authoring::edit::Package,
     commit: &litchi_odp::authoring::edit::Commit,
     expected: &[u8],
 ) -> Result<(), Box<dyn Error>> {
-    if !commit.changed()
+    if !commit.diagnostics().changed()
         || commit.patch().is_noop()
         || commit.patch().domains() != [litchi_odp::authoring::edit::Domain::Content]
-        || commit.snapshot().bytes() != expected
+        || commit.package().as_bytes() != expected
     {
         return Err(format!(
             "ODP text-box model commit differs: changed={}, noop={}, domains={:?}, exact_output={}",
-            commit.changed(),
+            commit.diagnostics().changed(),
             commit.patch().is_noop(),
             commit.patch().domains(),
-            commit.snapshot().bytes() == expected
+            commit.package().as_bytes() == expected
         )
         .into());
     }
     verify_odp_text_box_batch_archive(expected, true)?;
     verify_odp_text_box_batch_raw_members(
-        source.bytes(),
+        source.as_bytes(),
         expected,
         case == Case::OdpMediaTextBoxBatchReplaceSave,
     )?;
 
-    let replayed = commit.patch().apply(source)?;
-    if replayed.bytes() != expected {
+    let replayed = source.apply(&commit.patch())?;
+    if replayed.as_bytes() != expected {
         return Err("ODP text-box model patch replay differs from publication".into());
     }
-    let restored = commit.patch().inverse().apply(&replayed)?;
-    if restored.bytes() != source.bytes() {
+    let restored = replayed.apply(&commit.patch().inverse())?;
+    if restored.as_bytes() != source.as_bytes() {
         return Err("ODP text-box model inverse did not restore exact source bytes".into());
     }
-    if commit.patch().apply(&replayed).is_ok() {
+    if replayed.apply(&commit.patch()).is_ok() {
         return Err("ODP text-box model patch accepted a stale source".into());
     }
 
     let durable = litchi_odp::authoring::edit::Patch::from_durable_bytes(
         &commit.patch().to_durable_bytes()?,
     )?;
-    let durable_replayed = durable.apply(source)?;
-    if durable_replayed.bytes() != expected {
+    let durable_replayed = source.apply(&durable)?;
+    if durable_replayed.as_bytes() != expected {
         return Err("durable ODP text-box model replay differs from publication".into());
     }
-    let durable_restored = durable.inverse().apply(&durable_replayed)?;
-    if durable_restored.bytes() != source.bytes() {
+    let durable_restored = durable_replayed.apply(&durable.inverse())?;
+    if durable_restored.as_bytes() != source.as_bytes() {
         return Err("durable ODP text-box model inverse did not restore source".into());
     }
-    if durable.apply(&durable_replayed).is_ok() {
+    if durable_replayed.apply(&durable).is_ok() {
         return Err("durable ODP text-box model patch accepted a stale source".into());
     }
     Ok(())
@@ -42107,7 +42112,7 @@ fn run_odp_text_box_model_publication(
     if !case.uses_odp_text_box_batch() {
         return Err("non-model ODP case passed to text-box publication runner".into());
     }
-    let source = litchi_odp::authoring::edit::Snapshot::from_bytes(corpus.archive.clone())?;
+    let source = litchi_odp::authoring::edit::Package::from_bytes(&corpus.archive)?;
     let models = odp_text_box_batch_models(&source)?;
     let replacements = models
         .iter()
@@ -42126,7 +42131,7 @@ fn run_odp_text_box_model_publication(
         &source,
         &replacements,
     )?;
-    let expected_batch = batch.snapshot().bytes().to_vec();
+    let expected_batch = batch.package().as_bytes().to_vec();
     verify_odp_text_box_model_commit(
         Case::OdpMediaTextBoxBatchReplaceSave,
         &source,
@@ -42138,7 +42143,7 @@ fn run_odp_text_box_model_publication(
         &source,
         &replacements,
     )?;
-    let expected_scalar = scalar.snapshot().bytes().to_vec();
+    let expected_scalar = scalar.package().as_bytes().to_vec();
     verify_odp_text_box_model_commit(
         Case::OdpMediaTextBoxScalarReplaceSave,
         &source,
@@ -42146,8 +42151,8 @@ fn run_odp_text_box_model_publication(
         &expected_scalar,
     )?;
     let scalar_projection =
-        litchi_odp::Presentation::from_bytes(expected_scalar.clone())?.text()?;
-    let batch_projection = litchi_odp::Presentation::from_bytes(expected_batch.clone())?.text()?;
+        litchi_odp::Package::from_bytes(&expected_scalar)?.presentation()?.text()?;
+    let batch_projection = litchi_odp::Package::from_bytes(&expected_batch)?.presentation()?.text()?;
     if scalar_projection != batch_projection {
         return Err("matched ODP scalar and batch semantic projections differ".into());
     }
@@ -42166,20 +42171,20 @@ fn run_odp_text_box_model_publication(
         sink.reserve_budget()?;
         let started = Instant::now();
         let commit = publish_odp_text_box_models(case, &source, &replacements)?;
-        sink.write_all(commit.snapshot().bytes())?;
+        sink.write_all(commit.package().as_bytes())?;
         let duration = started.elapsed();
 
-        if !commit.changed()
+        if !commit.diagnostics().changed()
             || commit.patch().is_noop()
             || commit.patch().domains() != [litchi_odp::authoring::edit::Domain::Content]
             || sink.bytes != expected
         {
             return Err("measured ODP text-box model publication differs from oracle".into());
         }
-        let replayed = commit.patch().apply(&source)?;
-        if replayed.bytes() != expected
-            || commit.patch().inverse().apply(&replayed)?.bytes() != source.bytes()
-            || commit.patch().apply(&replayed).is_ok()
+        let replayed = source.apply(&commit.patch())?;
+        if replayed.as_bytes() != expected
+            || replayed.apply(&commit.patch().inverse())?.as_bytes() != source.as_bytes()
+            || replayed.apply(&commit.patch()).is_ok()
         {
             return Err("measured ODP text-box model patch contract differs".into());
         }
@@ -68040,8 +68045,8 @@ mod tests {
         assert_eq!(result.case, "ods_media_one_edit_save");
         assert_eq!(result.elapsed_ns.samples.len(), 1);
 
-        let snapshot = litchi_ods::document::Snapshot::from_bytes(first.archive.clone()).unwrap();
-        let mut edit = snapshot.edit();
+        let snapshot = litchi_ods::Package::from_bytes(&first.archive).unwrap();
+        let mut edit = snapshot.edit().unwrap();
         edit.worksheets(|worksheets| {
             let text = super::semantic_ods_text(1, 16, 16, true);
             worksheets
@@ -68062,7 +68067,7 @@ mod tests {
         let output = edit.commit().unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &first.archive,
-            output.snapshot().as_bytes(),
+            output.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -68295,7 +68300,7 @@ mod tests {
         assert_eq!(result.case, "odt_media_paragraph_edit_save");
         assert_eq!(result.elapsed_ns.samples.len(), 1);
 
-        let source = litchi_odt::transaction::Snapshot::from_bytes(first.archive.clone()).unwrap();
+        let source = litchi_odt::Package::from_bytes(&first.archive).unwrap();
         let target = SemanticShape::Medium.docx_paragraphs() / 2;
         let mut edit = source.edit();
         edit.replace_paragraph(
@@ -68306,7 +68311,7 @@ mod tests {
         let commit = edit.commit().unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &first.archive,
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -68749,7 +68754,7 @@ mod tests {
         assert_eq!(result.elapsed_ns.samples.len(), 1);
         assert!(result.output_sha256.is_some());
 
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let source = litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
         let target = SemanticShape::Medium.docx_paragraphs() / 2;
         let mut edit = source.edit();
         edit.append_line_break(litchi_odt::transaction::ParagraphSelector::position(
@@ -68757,10 +68762,10 @@ mod tests {
         ))
         .unwrap();
         let commit = edit.commit().unwrap();
-        super::verify_odt_media_line_break_archive(commit.snapshot().as_bytes()).unwrap();
+        super::verify_odt_media_line_break_archive(commit.package().as_bytes()).unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &corpus.archive,
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -68785,7 +68790,7 @@ mod tests {
         assert_eq!(result.elapsed_ns.samples.len(), 1);
         assert!(result.output_sha256.is_some());
 
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let source = litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
         let target = SemanticShape::Medium.docx_paragraphs() / 2;
         let mut edit = source.edit();
         edit.append_run(
@@ -68795,10 +68800,10 @@ mod tests {
         )
         .unwrap();
         let commit = edit.commit().unwrap();
-        super::verify_odt_media_append_run_archive(commit.snapshot().as_bytes()).unwrap();
+        super::verify_odt_media_append_run_archive(commit.package().as_bytes()).unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &corpus.archive,
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -68823,7 +68828,7 @@ mod tests {
         assert_eq!(result.elapsed_ns.samples.len(), 1);
         assert!(result.output_sha256.is_some());
 
-        let source = litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+        let source = litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
         let target = SemanticShape::Medium.docx_paragraphs() / 2;
         let mut edit = source.edit();
         edit.append_hyperlink(
@@ -68833,10 +68838,10 @@ mod tests {
         )
         .unwrap();
         let commit = edit.commit().unwrap();
-        super::verify_odt_media_append_hyperlink_archive(commit.snapshot().as_bytes()).unwrap();
+        super::verify_odt_media_append_hyperlink_archive(commit.package().as_bytes()).unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &corpus.archive,
-            commit.snapshot().as_bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -68867,7 +68872,7 @@ mod tests {
             assert!(result.output_sha256.is_some());
 
             let source =
-                litchi_odt::transaction::Snapshot::from_bytes(corpus.archive.clone()).unwrap();
+                litchi_odt::Package::from_bytes(&corpus.archive).unwrap();
             let mut edit = source.edit();
             if inserted {
                 edit.insert_paragraph(
@@ -68881,13 +68886,13 @@ mod tests {
             }
             let commit = edit.commit().unwrap();
             super::verify_odt_media_structural_paragraph_archive(
-                commit.snapshot().as_bytes(),
+                commit.package().as_bytes(),
                 inserted,
             )
             .unwrap();
             let identical = litchi_odf_common::package::raw_identical_members(
                 &corpus.archive,
-                commit.snapshot().as_bytes(),
+                commit.package().as_bytes(),
             )
             .unwrap();
             assert!(!identical.contains("content.xml"));
@@ -68944,7 +68949,7 @@ mod tests {
             assert_eq!(sink.largest_write, expected_bytes);
         }
 
-        let document = litchi_odt::Document::from_bytes(first.archive.clone()).unwrap();
+        let document = litchi_odt::Package::from_bytes(&first.archive).unwrap().document().unwrap();
         assert_eq!(document.images().unwrap().len(), ODT_RESOURCE_BATCH_COUNT);
         assert!(document.images().unwrap().iter().all(|image| {
             image
@@ -68972,8 +68977,8 @@ mod tests {
         assert_eq!(result.elapsed_ns.samples.len(), 1);
 
         let source =
-            litchi_odp::authoring::edit::Snapshot::from_bytes(first.archive.clone()).unwrap();
-        let mut transaction = source.transaction().unwrap();
+            litchi_odp::authoring::edit::Package::from_bytes(&first.archive).unwrap();
+        let mut transaction = source.edit().unwrap();
         transaction
             .add_text_box(
                 0usize,
@@ -68987,7 +68992,7 @@ mod tests {
         let commit = transaction.commit().unwrap();
         let identical = litchi_odf_common::package::raw_identical_members(
             &first.archive,
-            commit.snapshot().bytes(),
+            commit.package().as_bytes(),
         )
         .unwrap();
         assert!(!identical.contains("content.xml"));
@@ -69629,7 +69634,7 @@ mod tests {
         }
 
         let source =
-            litchi_odp::authoring::edit::Snapshot::from_bytes(first.archive.clone()).unwrap();
+            litchi_odp::authoring::edit::Package::from_bytes(&first.archive).unwrap();
         let inventory = source.rich_content().unwrap();
         assert_eq!(
             inventory

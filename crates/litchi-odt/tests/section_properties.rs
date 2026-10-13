@@ -60,8 +60,8 @@ fn builder_and_package_accessor() {
     builder
         .add_section_property_style(SectionStyleProperties::new("S1", properties).unwrap())
         .unwrap();
-    let package = builder.build().unwrap();
-    let parsed = litchi_odt::generic::Package::from_bytes(package)
+    let package = builder.build().unwrap().to_bytes().unwrap();
+    let parsed = litchi_odt::generic::Package::from_bytes(&package)
         .unwrap()
         .section_style_properties()
         .unwrap();

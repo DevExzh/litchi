@@ -40,7 +40,8 @@ use litchi_ods::model::{
     source::CellRange,
 };
 use litchi_ods::{
-    Builder, MutableSpreadsheet, SourceBackedSpreadsheet, Spreadsheet, sheet_metadata as metadata,
+    Builder, MutableSpreadsheet, Package, SourceBackedSpreadsheet, Workbook,
+    sheet_metadata as metadata,
 };
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -150,8 +151,11 @@ fn package(content: &str, signed: bool) -> Vec<u8> {
 }
 
 #[allow(dead_code, reason = "fixture variants are consumed by lifecycle cases")]
-fn spreadsheet(content: &str) -> Spreadsheet {
-    Spreadsheet::from_bytes(package(content, false)).expect("valid synthetic ODS fixture")
+fn spreadsheet(content: &str) -> Workbook {
+    Package::from_bytes(&package(content, false))
+        .expect("valid synthetic ODS fixture")
+        .workbook()
+        .expect("valid synthetic ODS fixture")
 }
 
 #[allow(dead_code, reason = "fixture variants are consumed by lifecycle cases")]
@@ -161,13 +165,17 @@ fn source_backed(content: &str) -> SourceBackedSpreadsheet {
 }
 
 #[allow(dead_code, reason = "fixture variants are consumed by lifecycle cases")]
-fn builder_spreadsheet(content: &str) -> Spreadsheet {
-    Spreadsheet::from_bytes(
-        Builder::new()
+fn builder_spreadsheet(content: &str) -> Workbook {
+    Package::from_bytes(
+        &Builder::new()
             .content_xml(content)
             .build()
+            .expect("valid Builder package")
+            .to_bytes()
             .expect("valid Builder package"),
     )
+    .expect("valid Builder ODS fixture")
+    .workbook()
     .expect("valid Builder ODS fixture")
 }
 
@@ -1547,14 +1555,18 @@ fn signed_source_refuses_changed_metadata_while_preserving_staged_edit() {
 #[test]
 fn ordinary_signed_facades_refuse_changed_metadata_publication() {
     let content = canonical_content();
-    let mut signed =
-        Spreadsheet::from_bytes(package(&content, true)).expect("signed ordinary fixture");
-    let before = signed.content_xml().to_owned();
+    let mut signed = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package(&content, true))
+            .expect("signed ordinary fixture")
+            .workbook()
+            .expect("signed ordinary fixture"),
+    );
+    let before = signed.workbook().content_xml().to_owned();
     let error = signed
         .edit_sheet_metadata(|edit| edit.set_consolidation(Some(options("average"))))
         .expect_err("ordinary signed metadata edit");
     assert!(matches!(error, litchi_core::Error::Unsupported(_)));
-    assert_eq!(signed.content_xml(), before);
+    assert_eq!(signed.workbook().content_xml(), before);
 
     let unsigned = spreadsheet(&content);
     let mut edit = unsigned.sheet_metadata().expect("unsigned metadata").edit();
@@ -1569,20 +1581,24 @@ fn ordinary_signed_facades_refuse_changed_metadata_publication() {
         .apply_sheet_metadata_patch(&patch)
         .expect_err("ordinary signed patch");
     assert!(matches!(error, litchi_core::Error::Unsupported(_)));
-    assert_eq!(signed.content_xml(), before);
+    assert_eq!(signed.workbook().content_xml(), before);
 
     signed
         .edit_sheet_metadata(|_| Ok(()))
         .expect("signed no-op remains inspectable");
 
-    let mut mutable =
-        MutableSpreadsheet::from_bytes(package(&content, true)).expect("signed mutable fixture");
-    let mutable_before = mutable.spreadsheet().content_xml().to_owned();
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package(&content, true))
+            .expect("signed mutable fixture")
+            .workbook()
+            .expect("signed mutable fixture"),
+    );
+    let mutable_before = mutable.workbook().content_xml().to_owned();
     let error = mutable
         .edit_sheet_metadata(|edit| edit.set_consolidation(Some(options("average"))))
         .expect_err("mutable signed metadata edit");
     assert!(matches!(error, litchi_core::Error::Unsupported(_)));
-    assert_eq!(mutable.spreadsheet().content_xml(), mutable_before);
+    assert_eq!(mutable.workbook().content_xml(), mutable_before);
     mutable
         .edit_sheet_metadata(|_| Ok(()))
         .expect("mutable signed no-op remains inspectable");
@@ -1591,7 +1607,7 @@ fn ordinary_signed_facades_refuse_changed_metadata_publication() {
 #[test]
 fn ordinary_and_mutable_facades_forward_metadata_snapshot_edit_and_patch() {
     let content = canonical_content();
-    let mut ordinary = spreadsheet(&content);
+    let mut ordinary = MutableSpreadsheet::from_workbook(spreadsheet(&content));
     let before = ordinary
         .sheet_metadata()
         .expect("ordinary metadata snapshot");
@@ -1626,8 +1642,12 @@ fn ordinary_and_mutable_facades_forward_metadata_snapshot_edit_and_patch() {
             .is_none()
     );
 
-    let mut mutable =
-        MutableSpreadsheet::from_bytes(package(&content, false)).expect("mutable metadata fixture");
+    let mut mutable = MutableSpreadsheet::from_workbook(
+        Package::from_bytes(&package(&content, false))
+            .expect("mutable metadata fixture")
+            .workbook()
+            .expect("mutable metadata fixture"),
+    );
     mutable
         .edit_sheet_metadata(|edit| edit.set_consolidation(Some(options("average"))))
         .expect("mutable closure forwarding");
@@ -1645,11 +1665,11 @@ fn ordinary_and_mutable_facades_forward_metadata_snapshot_edit_and_patch() {
 
 #[test]
 fn changed_owner_preserves_comments_processing_instructions_and_foreign_siblings() {
-    let mut ordinary = spreadsheet(FULL_CONTENT);
+    let mut ordinary = MutableSpreadsheet::from_workbook(spreadsheet(FULL_CONTENT));
     ordinary
         .edit_sheet_metadata(|edit| edit.set_consolidation(Some(options("average"))))
         .expect("change consolidation in annotated fixture");
-    let content = ordinary.content_xml();
+    let content = ordinary.workbook().content_xml();
     assert!(content.contains("document comment retained"));
     assert!(content.contains("producer before"));
     assert!(content.contains("producer after"));
@@ -1881,7 +1901,10 @@ fn aliases_are_resolved_by_expanded_namespace_in_the_existing_public_codecs() {
 #[test]
 fn synthetic_fixture_is_a_complete_ods_package_with_untouched_members() {
     let bytes = package(FULL_CONTENT, false);
-    let spreadsheet = Spreadsheet::from_bytes(bytes).expect("open fixture");
+    let spreadsheet = Package::from_bytes(&bytes)
+        .expect("open fixture")
+        .workbook()
+        .expect("open fixture");
     assert_eq!(spreadsheet.sheet_names(), ["Data", "Second"]);
     assert!(spreadsheet.content_xml().contains("producer before"));
     assert!(spreadsheet.content_xml().contains("foreign-sibling"));

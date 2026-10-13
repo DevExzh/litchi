@@ -1,8 +1,6 @@
 //! Shared ownership for the simple packaged ODF families.
 
-use super::{
-    Content, Meta, OwnedPackage, SourcePackageLimits, Styles, package::zeroizing_password,
-};
+use super::{Content, Meta, OwnedPackage, SourceLimits, Styles, package::zeroizing_password};
 use super::{binding_tracker::BindingTracker, content_validation::ContentDocumentValidator};
 use crate::leniency::ToleranceReport;
 use litchi_core::{Error, Metadata, Result};
@@ -96,7 +94,7 @@ impl Package {
     ) -> Result<Self> {
         Self::open_with_limits(
             path,
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             mimetype,
             body_marker,
             family_name,
@@ -106,7 +104,7 @@ impl Package {
     /// Open a package from a path under explicit finite archive limits.
     pub fn open_with_limits(
         path: impl AsRef<Path>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         mimetype: &str,
         body_marker: &str,
         family_name: &str,
@@ -127,7 +125,7 @@ impl Package {
         let password = zeroizing_password(password);
         Self::open_with_zeroizing_password(
             path,
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             password,
             mimetype,
             body_marker,
@@ -139,7 +137,7 @@ impl Package {
     /// archive limits.
     pub fn open_with_limits_and_password(
         path: impl AsRef<Path>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: impl Into<String>,
         mimetype: &str,
         body_marker: &str,
@@ -158,7 +156,7 @@ impl Package {
 
     fn open_with_zeroizing_password(
         path: impl AsRef<Path>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: zeroize::Zeroizing<String>,
         mimetype: &str,
         body_marker: &str,
@@ -184,7 +182,7 @@ impl Package {
     ) -> Result<Self> {
         Self::from_reader_with_limits(
             reader,
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             mimetype,
             body_marker,
             family_name,
@@ -194,7 +192,7 @@ impl Package {
     /// Read a package from a stream under explicit finite archive limits.
     pub fn from_reader_with_limits(
         reader: impl std::io::Read,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         mimetype: &str,
         body_marker: &str,
         family_name: &str,
@@ -219,7 +217,7 @@ impl Package {
         let password = zeroizing_password(password);
         Self::from_reader_with_zeroizing_password(
             reader,
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             password,
             mimetype,
             body_marker,
@@ -231,7 +229,7 @@ impl Package {
     /// archive limits.
     pub fn from_reader_with_limits_and_password(
         reader: impl std::io::Read,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: impl Into<String>,
         mimetype: &str,
         body_marker: &str,
@@ -250,7 +248,7 @@ impl Package {
 
     fn from_reader_with_zeroizing_password(
         reader: impl std::io::Read,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: zeroize::Zeroizing<String>,
         mimetype: &str,
         body_marker: &str,
@@ -278,7 +276,7 @@ impl Package {
     ) -> Result<Self> {
         Self::from_bytes_with_limits(
             bytes,
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             mimetype,
             body_marker,
             family_name,
@@ -288,7 +286,7 @@ impl Package {
     /// Decode a package from bytes under explicit finite archive limits.
     pub fn from_bytes_with_limits(
         bytes: Vec<u8>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         mimetype: &str,
         body_marker: &str,
         family_name: &str,
@@ -315,7 +313,7 @@ impl Package {
     ) -> Result<Self> {
         Self::from_shared_bytes_with_limits(
             bytes,
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             mimetype,
             body_marker,
             family_name,
@@ -325,7 +323,7 @@ impl Package {
     /// Decode shared package bytes under explicit finite archive limits.
     pub fn from_shared_bytes_with_limits(
         bytes: Arc<Vec<u8>>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         mimetype: &str,
         body_marker: &str,
         family_name: &str,
@@ -355,7 +353,7 @@ impl Package {
         let password = zeroizing_password(password);
         Self::from_bytes_with_zeroizing_password(
             bytes,
-            SourcePackageLimits::default(),
+            SourceLimits::default(),
             password,
             mimetype,
             body_marker,
@@ -367,7 +365,7 @@ impl Package {
     /// archive limits.
     pub fn from_bytes_with_limits_and_password(
         bytes: Vec<u8>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: impl Into<String>,
         mimetype: &str,
         body_marker: &str,
@@ -386,7 +384,7 @@ impl Package {
 
     fn from_bytes_with_zeroizing_password(
         bytes: Vec<u8>,
-        limits: SourcePackageLimits,
+        limits: SourceLimits,
         password: zeroize::Zeroizing<String>,
         mimetype: &str,
         body_marker: &str,
@@ -561,12 +559,54 @@ pub fn validate_content_part(xml: &str, body_marker: &str, family_name: &str) ->
             "{family_name} content.xml exceeds the family limit"
         )));
     }
-    if !xml.contains(body_marker) {
+    if !xml.contains(body_marker) && !contains_aliased_body(xml, body_marker) {
         return Err(Error::InvalidFormat(format!(
             "{family_name} content.xml has no expected body"
         )));
     }
     Ok(())
+}
+
+/// Fallback for the quick body probe when the producer bound the office
+/// namespace to a prefix other than `office`: look for the marker's local
+/// name under every prefix declared for the office namespace.  The full
+/// namespace-aware validation still runs in the family's semantic parse.
+fn contains_aliased_body(xml: &str, body_marker: &str) -> bool {
+    const OFFICE_NAMESPACE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
+    let Some(local) = body_marker
+        .strip_prefix("<office:")
+        .filter(|local| !local.is_empty())
+    else {
+        return false;
+    };
+    let mut rest = xml;
+    while let Some(index) = rest.find("xmlns:") {
+        let declaration = &rest[index + "xmlns:".len()..];
+        let Some(equals) = declaration.find('=') else {
+            break;
+        };
+        let prefix = declaration[..equals].trim();
+        let value = declaration[equals + 1..].trim_start();
+        let quoted = value
+            .strip_prefix('"')
+            .and_then(|value| value.split('"').next())
+            .or_else(|| {
+                value
+                    .strip_prefix('\'')
+                    .and_then(|value| value.split('\'').next())
+            });
+        if quoted == Some(OFFICE_NAMESPACE)
+            && !prefix.is_empty()
+            && prefix
+                .bytes()
+                .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-' | b'.'))
+            && xml.contains(&format!("<{prefix}:{local}"))
+        {
+            return true;
+        }
+        rest = &declaration[equals..];
+    }
+    false
 }
 
 /// Validate a complete ODF `content.xml` root, body, and family element.
@@ -650,6 +690,16 @@ pub fn validate_content_document_part(
 #[cfg(test)]
 mod tests {
     use super::{OwnedPackage, Package, validate_content_document_part, validate_content_part};
+
+    #[test]
+    fn quick_body_probe_accepts_an_aliased_office_prefix_only() {
+        let aliased = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:spreadsheet/></o:body></o:document-content>"#;
+        assert!(validate_content_part(aliased, "<office:spreadsheet", "ODS").is_ok());
+        let foreign = r#"<o:document-content xmlns:o="urn:example:not-office"><o:body><o:spreadsheet/></o:body></o:document-content>"#;
+        assert!(validate_content_part(foreign, "<office:spreadsheet", "ODS").is_err());
+        let wrong_family = r#"<o:document-content xmlns:o="urn:oasis:names:tc:opendocument:xmlns:office:1.0"><o:body><o:text/></o:body></o:document-content>"#;
+        assert!(validate_content_part(wrong_family, "<office:spreadsheet", "ODS").is_err());
+    }
     use std::io::{Cursor, Write};
 
     const MIMETYPE: &str = "application/vnd.oasis.opendocument.presentation";

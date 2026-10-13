@@ -396,12 +396,33 @@ fn raw_zip_negatives_are_rejected_by_the_open_boundary() {
     for xml in [WRONG_FAMILY, DUPLICATE_BODY] {
         assert!(Template::from_bytes(raw_negative_package(xml)).is_err());
     }
+    // A prologue DOCTYPE is ignored without being processed (the shared ODF
+    // leniency F9.11, as LibreOffice's SAX import does), so the template
+    // opens with the same body; an entity such a DTD would declare stays
+    // undeclared, so a body that references one is still refused.
     let dtd = COMPACT_CONTENT.replacen(
         "<office:document-content",
         "<!DOCTYPE office:document-content><office:document-content",
         1,
     );
-    assert!(Template::from_bytes(raw_negative_package(&dtd)).is_err());
+    let tolerated = Template::from_bytes(raw_negative_package(&dtd)).unwrap();
+    assert_eq!(
+        tolerated.text_body().unwrap().paragraphs().len(),
+        Template::from_bytes(raw_negative_package(COMPACT_CONTENT))
+            .unwrap()
+            .text_body()
+            .unwrap()
+            .paragraphs()
+            .len()
+    );
+    let entity = COMPACT_CONTENT
+        .replacen(
+            "<office:document-content",
+            "<!DOCTYPE office:document-content [<!ENTITY x \"unsafe\">]><office:document-content",
+            1,
+        )
+        .replacen("<office:text>", "<office:text>&x;", 1);
+    assert!(Template::from_bytes(raw_negative_package(&entity)).is_err());
     let pretty_misplaced_inline = concat!(
         "<?xml version=\"1.0\"?>\n",
         "<office:document-content xmlns:office=\"urn:oasis:names:tc:opendocument:xmlns:office:1.0\" ",

@@ -45,6 +45,15 @@ const _: () = {
     assert!(size_of::<Odt>() == size_of::<usize>());
 };
 
+/// Typed ODF limit failures stay `Source::Odf`; every other failure keeps
+/// its common-core payload as `Source::Core`, exactly as before W3.
+fn odf_error(error: litchi_odf_common::Error) -> Error {
+    match error {
+        litchi_odf_common::Error::Core(error) => core_error(error),
+        other => Error::from(other).with_format(FileFormat::Odt),
+    }
+}
+
 fn core_error(error: litchi_core::Error) -> Error {
     Error::from(error).with_format(FileFormat::Odt)
 }
@@ -54,7 +63,10 @@ impl Odt {
     /// a second ZIP index. The ODF limits were applied when the package was
     /// prepared.
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let document = litchi_odt::Document::from_prepared_package(prepared).map_err(core_error)?;
+        let document = litchi_odt::Package::from_prepared_package(prepared)
+            .map_err(odf_error)?
+            .document()
+            .map_err(core_error)?;
         Ok(Self::from_owner(OdtOwner::Eager(document)))
     }
 
@@ -67,9 +79,11 @@ impl Odt {
     #[cfg(any(unix, windows))]
     pub(crate) fn from_source_candidate(
         candidate: crate::detect::detected::OdtSourcePathCandidate,
-        _options: &OpenOptions,
+        options: &OpenOptions,
     ) -> Result<Self> {
-        let document = candidate.into_document().map_err(core_error)?;
+        let document = candidate
+            .into_document(options.odf_open_options())
+            .map_err(core_error)?;
         Ok(Self::from_owner(OdtOwner::Source(document)))
     }
 

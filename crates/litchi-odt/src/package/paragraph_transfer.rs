@@ -16,7 +16,7 @@
 use crate::{
     constants::ODF_CONTENT,
     protection::Policy,
-    transaction::{Edit, EnvelopeKind, Position, Snapshot},
+    transaction::{Edit, EnvelopeKind, Package, Position},
 };
 use litchi_core::{BlobId, Error, Result};
 use litchi_odf_common::core::{AuthoredXmlFragment, XmlSourcePart, XmlSplicePublication};
@@ -50,7 +50,7 @@ const MCE_NS: &[u8] = b"http://schemas.openxmlformats.org/markup-compatibility/2
 /// or after target bytes have changed, is refused before publication.
 #[derive(Clone)]
 pub struct ParagraphTransferPlan {
-    pub(crate) donor: Snapshot,
+    pub(crate) donor: Package,
     pub(crate) donor_fingerprint: String,
     pub(crate) destination_fingerprint: String,
     pub(crate) source_positions: Vec<usize>,
@@ -104,7 +104,7 @@ impl ParagraphTransferPlan {
 
     /// Returns the immutable donor snapshot retained by this plan.
     #[must_use]
-    pub const fn donor(&self) -> &Snapshot {
+    pub const fn donor(&self) -> &Package {
         &self.donor
     }
 
@@ -113,7 +113,7 @@ impl ParagraphTransferPlan {
         edit.stage_plain_paragraph_transfer(self).map(|_| ())
     }
 
-    pub(crate) fn validate_integrity(&self, destination: &Snapshot) -> Result<()> {
+    pub(crate) fn validate_integrity(&self, destination: &Package) -> Result<()> {
         if BlobId::of(self.donor.as_bytes()).as_hex() != self.donor_fingerprint {
             return Err(Error::InvalidFormat(
                 "ODT paragraph transfer donor changed after planning".to_string(),
@@ -161,8 +161,8 @@ pub(crate) struct PlainParagraphTransferOperation {
 
 /// Plan one direct paragraph transfer.
 pub(crate) fn plan_one(
-    destination: &Snapshot,
-    donor: &Snapshot,
+    destination: &Package,
+    donor: &Package,
     source: Position,
     target: Position,
 ) -> Result<ParagraphTransferPlan> {
@@ -171,8 +171,8 @@ pub(crate) fn plan_one(
 
 /// Plan a bounded ordered batch of direct paragraph transfers.
 pub(crate) fn plan_many(
-    destination: &Snapshot,
-    donor: &Snapshot,
+    destination: &Package,
+    donor: &Package,
     sources: &[Position],
     target: Position,
 ) -> Result<ParagraphTransferPlan> {
@@ -274,9 +274,9 @@ pub(crate) fn plan_many(
 
 /// Apply one already-authenticated transaction operation to the target.
 pub(crate) fn apply_operation(
-    destination: &Snapshot,
+    destination: &Package,
     operation: &PlainParagraphTransferOperation,
-) -> Result<Snapshot> {
+) -> Result<Package> {
     validate_envelope(destination, "destination")?;
     if BlobId::of(destination.as_bytes()).as_hex() != operation.destination_fingerprint {
         return Err(Error::InvalidFormat(
@@ -314,7 +314,7 @@ pub(crate) fn apply_operation(
     publication.replace(proof, authored)?;
     let target_bytes =
         replace_content_xml_spliced(document.transaction_package(), &replacement, publication)?;
-    let target = Snapshot::from_bytes(target_bytes)?;
+    let target = Package::from_vec(target_bytes)?;
     let target_document = target.document()?;
     require_raw_untouched_members(
         document.transaction_package(),
@@ -355,7 +355,7 @@ pub(crate) fn validate_operation_for_durable(
     )
 }
 
-fn validate_envelope(snapshot: &Snapshot, role: &str) -> Result<()> {
+fn validate_envelope(snapshot: &Package, role: &str) -> Result<()> {
     match snapshot.envelope_kind()? {
         EnvelopeKind::Plain => {},
         EnvelopeKind::Signed => {

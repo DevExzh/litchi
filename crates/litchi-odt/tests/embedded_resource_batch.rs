@@ -1,6 +1,6 @@
 use litchi_odf_common::package::raw_identical_members;
 use litchi_odt::{
-    Document,
+    Package,
     mutable::MutableDocument,
     package::embedded::{
         EmbeddedResource, EmbeddedResourceChange, EmbeddedResourceFile, EmbeddedResourceKind,
@@ -9,13 +9,10 @@ use litchi_odt::{
     transaction::{OperationResult, Position},
 };
 
-fn source() -> litchi_odt::transaction::Snapshot {
+fn source() -> Package {
     let mut document = MutableDocument::new();
     document.add_paragraph("resource batch").unwrap();
-    Document::from_bytes(document.to_bytes().unwrap())
-        .unwrap()
-        .snapshot()
-        .unwrap()
+    Package::from_bytes(&document.to_bytes().unwrap()).unwrap()
 }
 
 fn image(name: &str, path: &str, bytes: &[u8]) -> EmbeddedResource {
@@ -76,13 +73,10 @@ fn package_object(name: &str, path: &str) -> EmbeddedResource {
     }
 }
 
-fn with_content(
-    snapshot: &litchi_odt::transaction::Snapshot,
-    content: &str,
-) -> litchi_odt::transaction::Snapshot {
+fn with_content(snapshot: &Package, content: &str) -> Package {
     let package = litchi_odt::core::OwnedPackage::from_bytes(snapshot.as_bytes().to_vec()).unwrap();
     let bytes = litchi_odf_common::package::replace_content_xml(&package, content).unwrap();
-    Document::from_bytes(bytes).unwrap().snapshot().unwrap()
+    Package::from_bytes(&bytes).unwrap()
 }
 
 #[test]
@@ -101,7 +95,7 @@ fn batch_publishes_media_rich_create_update_delete_once_and_replays_durably() {
         setup.results(),
         &[OperationResult::Indices(vec![0, 1, 2, 0])]
     );
-    let setup = setup.into_snapshot();
+    let setup = setup.into_package();
     let setup_document = setup.document().unwrap();
     assert_eq!(setup_document.images().unwrap().len(), 3);
     assert_eq!(setup_document.embedded_objects().unwrap().len(), 1);
@@ -120,7 +114,7 @@ fn batch_publishes_media_rich_create_update_delete_once_and_replays_durably() {
     edit.edit_embedded_resources(&changes).unwrap();
     let committed = edit.commit().unwrap();
     assert_eq!(committed.results(), &[OperationResult::Indices(vec![1])]);
-    let reopened = committed.snapshot().document().unwrap();
+    let reopened = committed.package().document().unwrap();
     assert_eq!(reopened.images().unwrap().len(), 2);
     assert_eq!(reopened.embedded_objects().unwrap().len(), 1);
     assert_eq!(
@@ -143,19 +137,18 @@ fn batch_publishes_media_rich_create_update_delete_once_and_replays_durably() {
         .unwrap()
         .apply(&setup)
         .unwrap();
-    assert_eq!(replayed.as_bytes(), committed.snapshot().as_bytes());
+    assert_eq!(replayed.as_bytes(), committed.package().as_bytes());
     assert_eq!(
         committed
-            .patch()
-            .inverse()
-            .apply(committed.snapshot())
+            .package()
+            .apply(&committed.patch().inverse())
             .unwrap()
             .as_bytes(),
         setup.as_bytes()
     );
-    assert!(committed.patch().apply(&base).is_err());
+    assert!(base.apply(committed.patch()).is_err());
 
-    let identical = raw_identical_members(setup.as_bytes(), committed.snapshot().as_bytes())
+    let identical = raw_identical_members(setup.as_bytes(), committed.package().as_bytes())
         .expect("ordinary ZIP preservation audit");
     for untouched in ["mimetype", "styles.xml", "meta.xml"] {
         assert!(identical.contains(untouched), "{untouched}");
@@ -172,7 +165,7 @@ fn batch_preflight_is_bounded_duplicate_safe_and_atomic_on_late_failure() {
             EmbeddedResourceChange::add(&image("two", "Pictures/two.png", b"two")),
         ])
         .unwrap();
-    let setup = setup.commit().unwrap().into_snapshot();
+    let setup = setup.commit().unwrap().into_package();
 
     let mut semantic_noop = setup.edit();
     semantic_noop
@@ -182,7 +175,7 @@ fn batch_preflight_is_bounded_duplicate_safe_and_atomic_on_late_failure() {
         )])
         .unwrap();
     assert_eq!(
-        semantic_noop.commit().unwrap().snapshot().as_bytes(),
+        semantic_noop.commit().unwrap().package().as_bytes(),
         setup.as_bytes()
     );
 
@@ -223,7 +216,7 @@ fn batch_preflight_is_bounded_duplicate_safe_and_atomic_on_late_failure() {
     let before = setup.as_bytes().to_vec();
     let mut exact_noop = setup.edit();
     exact_noop.edit_embedded_resources(&[]).unwrap();
-    assert_eq!(exact_noop.commit().unwrap().snapshot().as_bytes(), before);
+    assert_eq!(exact_noop.commit().unwrap().package().as_bytes(), before);
 }
 
 #[test]
@@ -238,14 +231,14 @@ fn batch_removes_first_middle_last_and_only_owners_without_leaving_empty_frames(
                 EmbeddedResourceChange::add(&image("last", "Pictures/last.png", b"last")),
             ])
             .unwrap();
-        let setup = setup.commit().unwrap().into_snapshot();
+        let setup = setup.commit().unwrap().into_package();
         let mut edit = setup.edit();
         edit.edit_embedded_resources(&[EmbeddedResourceChange::remove_image(Position::new(
             selected,
         ))])
         .unwrap();
         let committed = edit.commit().unwrap();
-        let document = committed.snapshot().document().unwrap();
+        let document = committed.package().document().unwrap();
         assert_eq!(document.images().unwrap().len(), 2);
         let content = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();
         assert_eq!(content.matches("<draw:frame").count(), 2);
@@ -260,12 +253,12 @@ fn batch_removes_first_middle_last_and_only_owners_without_leaving_empty_frames(
             b"only",
         ))])
         .unwrap();
-    let setup = setup.commit().unwrap().into_snapshot();
+    let setup = setup.commit().unwrap().into_package();
     let mut edit = setup.edit();
     edit.edit_embedded_resources(&[EmbeddedResourceChange::remove_image(Position::new(0))])
         .unwrap();
     let committed = edit.commit().unwrap();
-    let document = committed.snapshot().document().unwrap();
+    let document = committed.package().document().unwrap();
     assert!(document.images().unwrap().is_empty());
     let content = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();
     assert!(!content.contains("<draw:frame"));
@@ -284,7 +277,7 @@ fn replacement_preserves_frame_bytes_and_removal_retains_unknown_frame_children(
             b"before",
         ))])
         .unwrap();
-    let setup = setup.commit().unwrap().into_snapshot();
+    let setup = setup.commit().unwrap().into_package();
     let document = setup.document().unwrap();
     let mut content = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();
     content = content.replacen("<draw:frame ", "<draw:frame draw:z-index=\"9\" ", 1);
@@ -299,7 +292,7 @@ fn replacement_preserves_frame_bytes_and_removal_retains_unknown_frame_children(
             &image("requested different frame", "Pictures/owned.png", b"after"),
         )])
         .unwrap();
-    let replacement = replacement.commit().unwrap().into_snapshot();
+    let replacement = replacement.commit().unwrap().into_package();
     let document = replacement.document().unwrap();
     let content = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();
     assert_eq!(content.matches("<draw:frame").count(), 1);
@@ -313,7 +306,7 @@ fn replacement_preserves_frame_bytes_and_removal_retains_unknown_frame_children(
     removal
         .edit_embedded_resources(&[EmbeddedResourceChange::remove_image(Position::new(0))])
         .unwrap();
-    let removed = removal.commit().unwrap().into_snapshot();
+    let removed = removal.commit().unwrap().into_package();
     let document = removed.document().unwrap();
     let content = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();
     assert!(document.images().unwrap().is_empty());
@@ -333,7 +326,7 @@ fn planned_same_frame_removals_collapse_only_after_the_complete_owner_set_is_emp
             EmbeddedResourceChange::add(&image("two", "Pictures/two.png", b"two")),
         ])
         .unwrap();
-    let setup = setup.commit().unwrap().into_snapshot();
+    let setup = setup.commit().unwrap().into_package();
     let document = setup.document().unwrap();
     let content = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();
     let first_close = content.find("</draw:frame>").unwrap();
@@ -356,7 +349,7 @@ fn planned_same_frame_removals_collapse_only_after_the_complete_owner_set_is_emp
             EmbeddedResourceChange::remove_image(Position::new(1)),
         ])
         .unwrap();
-    let removed = removal.commit().unwrap().into_snapshot();
+    let removed = removal.commit().unwrap().into_package();
     let document = removed.document().unwrap();
     assert!(document.images().unwrap().is_empty());
     let content = String::from_utf8(document.get_file("content.xml").unwrap()).unwrap();

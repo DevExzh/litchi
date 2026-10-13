@@ -1,5 +1,5 @@
-use litchi_odt::Document;
 use litchi_odt::bibliography_configuration::{Configuration, Field, SortKey};
+use litchi_odt::{Document, Package};
 mod support;
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
@@ -8,11 +8,11 @@ const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
 const STYLES: &str =
     include_str!("../../../test-data/odf/odt/bibliography-configuration-styles.xml");
 
-fn document(styles: &str) -> Document {
+fn package(styles: &str) -> Package {
     let content = format!(
         r#"<o:document-content xmlns:o="{OFFICE}" xmlns:t="{TEXT}" o:version="1.3"><o:body><o:text><t:p>Body</t:p></o:text></o:body></o:document-content>"#
     );
-    Document::from_bytes(support::package(
+    Package::from_bytes(&support::package(
         MIMETYPE,
         &[
             ("content.xml", content.as_bytes()),
@@ -20,6 +20,10 @@ fn document(styles: &str) -> Document {
         ],
     ))
     .unwrap()
+}
+
+fn document(styles: &str) -> Document {
+    package(styles).document().unwrap()
 }
 
 fn fixture_configuration() -> Configuration {
@@ -69,7 +73,8 @@ fn replacement_configuration() -> Configuration {
 #[test]
 fn document_reads_styles_bibliography_configuration() {
     let expected = fixture_configuration();
-    let source = document(STYLES);
+    let source_package = package(STYLES);
+    let source = source_package.document().unwrap();
 
     assert_eq!(
         source.bibliography_configuration().unwrap(),
@@ -82,7 +87,8 @@ fn document_reads_styles_bibliography_configuration() {
             .bibliography_configuration,
         Some(expected.clone())
     );
-    let generic = litchi_odt::generic::Package::from_bytes(source.to_bytes().unwrap()).unwrap();
+    let generic =
+        litchi_odt::generic::Package::from_bytes(&source_package.to_bytes().unwrap()).unwrap();
     assert_eq!(
         generic.bibliography_configuration().unwrap(),
         Some(expected)
@@ -108,7 +114,10 @@ fn mutable_document_replaces_removes_and_inserts_bibliography_configuration() {
         Some(replacement.clone())
     );
 
-    let reopened = Document::from_bytes(mutable.to_bytes().unwrap()).unwrap();
+    let reopened = Package::from_bytes(&mutable.to_bytes().unwrap())
+        .unwrap()
+        .document()
+        .unwrap();
     assert_eq!(
         reopened.bibliography_configuration().unwrap(),
         Some(replacement.clone())

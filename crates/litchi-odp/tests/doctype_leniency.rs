@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_odf_common::{ContentDefect, Defect, ToleranceReport};
-use litchi_odp::{Presentation, SourceBackedPresentation};
+use litchi_odp::{Package, SourceBackedPresentation};
 
 const OOO_DOCTYPE: &str = r#"<!DOCTYPE office:document-content PUBLIC "-//OpenOffice.org//DTD OfficeDocument 1.0//EN" "office.dtd">"#;
 
@@ -46,7 +46,7 @@ fn with_doctype(doctype: &str) -> Vec<u8> {
 }
 
 fn assert_every_open_path(bytes: &[u8], defects: &[(Defect, u16)], label: &str) {
-    let owned = Presentation::from_bytes(bytes.to_vec()).unwrap();
+    let owned = Package::from_bytes(bytes).unwrap().presentation().unwrap();
     assert_eq!(owned.slides().unwrap().len(), 5, "{label}: slides");
     assert_eq!(
         recorded(owned.tolerance_report()),
@@ -56,7 +56,10 @@ fn assert_every_open_path(bytes: &[u8], defects: &[(Defect, u16)], label: &str) 
 
     let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
         .unwrap_or_else(|| panic!("{label}: package must prepare"));
-    let adopted = Presentation::from_prepared_package(prepared).unwrap();
+    let adopted = Package::from_prepared_package(prepared)
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert_eq!(
         recorded(adopted.tolerance_report()),
         defects,
@@ -120,10 +123,14 @@ fn a_dtd_never_declares_entities() {
             .all(|slide| !format!("{slide:?}").contains("EXPANDED-PAYLOAD")),
     };
     assert!(never_expanded(
-        Presentation::from_bytes(bytes.clone()).and_then(|presentation| presentation.slides())
+        Package::from_bytes(&bytes)
+            .map_err(litchi_core::Error::from)
+            .and_then(|package| package.presentation())
+            .and_then(|presentation| presentation.slides())
     ));
     assert!(never_expanded(
         SourceBackedPresentation::from_read_at(Arc::new(OwnedSource::new(bytes)))
+            .map_err(litchi_core::Error::from)
             .and_then(|presentation| presentation.slides())
     ));
 }

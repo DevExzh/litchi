@@ -17,7 +17,7 @@ use std::sync::Arc;
 
 use litchi_core::OwnedSource;
 use litchi_odf_common::{Defect, PackageDefect, ToleranceReport};
-use litchi_odp::{Presentation, SourceBackedPresentation};
+use litchi_odp::{Package, SourceBackedPresentation};
 
 const MANIFEST: &str = "META-INF/manifest.xml";
 
@@ -38,7 +38,7 @@ fn conforming_fixture() -> Vec<u8> {
 }
 
 fn assert_every_open_path_records(bytes: &[u8], defects: &[(Defect, u16)], label: &str) {
-    let owned = Presentation::from_bytes(bytes.to_vec()).unwrap();
+    let owned = Package::from_bytes(bytes).unwrap().presentation().unwrap();
     assert_eq!(
         recorded(owned.tolerance_report()),
         defects,
@@ -47,7 +47,10 @@ fn assert_every_open_path_records(bytes: &[u8], defects: &[(Defect, u16)], label
 
     let prepared = litchi_odf_common::detect::prepared(bytes.to_vec())
         .unwrap_or_else(|| panic!("{label}: package must prepare"));
-    let adopted = Presentation::from_prepared_package(prepared).unwrap();
+    let adopted = Package::from_prepared_package(prepared)
+        .unwrap()
+        .presentation()
+        .unwrap();
     assert_eq!(
         recorded(adopted.tolerance_report()),
         defects,

@@ -10,9 +10,9 @@ use std::sync::{
 };
 
 use litchi_core::{Error, ReadAt, SourceVersion};
-use litchi_odf_common::core::{PackageWriter, Profile, SourcePackageLimits};
+use litchi_odf_common::core::{PackageWriter, Profile};
 use litchi_odp::model::Reference;
-use litchi_odp::{Builder, Presentation, SourceBackedPresentation};
+use litchi_odp::{Builder, Package, SourceBackedPresentation};
 use soapberry_zip::office::StreamingArchiveWriter;
 
 const MIME: &str = "application/vnd.oasis.opendocument.presentation";
@@ -118,7 +118,7 @@ fn text_package() -> Vec<u8> {
     let mut builder = Builder::new();
     builder.add_slide_with_title("First", "alpha").unwrap();
     builder.add_slide_with_title("Second", "beta").unwrap();
-    builder.build().unwrap()
+    builder.build().unwrap().to_bytes().unwrap()
 }
 
 fn malformed_text_package() -> Vec<u8> {
@@ -264,7 +264,7 @@ fn overlaps(left: (u64, u64), right: (u64, u64)) -> bool {
 fn source_facade_matches_owned_semantics_and_defers_media() {
     let bytes = media_package();
     let media_range = media_range(&bytes);
-    let eager = Presentation::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let source_presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
 
@@ -312,7 +312,7 @@ fn source_facade_matches_owned_semantics_and_defers_media() {
 #[test]
 fn source_facade_text_cache_preserves_projection_and_checks_freshness() {
     let bytes = text_package();
-    let eager = Presentation::from_bytes(bytes.clone()).unwrap();
+    let eager = Package::from_bytes(&bytes).unwrap().presentation().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
     let expected = eager.text().unwrap();
@@ -345,7 +345,9 @@ fn source_facade_text_cache_is_safe_for_concurrent_first_construction() {
     assert_send_sync::<SourceBackedPresentation>();
 
     let bytes = text_package();
-    let expected = Presentation::from_bytes(bytes.clone())
+    let expected = Package::from_bytes(&bytes)
+        .unwrap()
+        .presentation()
         .unwrap()
         .text()
         .unwrap();
@@ -401,7 +403,7 @@ fn source_facade_oversized_text_falls_back_without_retention() {
 
 #[test]
 fn source_facade_reports_typed_stale_source_errors() {
-    let bytes = Builder::new().build().unwrap();
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
     let source = Arc::new(CountingSource::new(bytes));
     let presentation = SourceBackedPresentation::from_read_at(source.clone()).unwrap();
     source.bump_revision();
@@ -416,12 +418,19 @@ fn source_facade_reports_typed_stale_source_errors() {
 fn source_facade_applies_physical_source_limits() {
     let bytes = media_package();
     let source = Arc::new(CountingSource::new(bytes.clone()));
-    let limits = SourcePackageLimits::new(
-        u64::try_from(bytes.len() - 1).unwrap(),
-        SourcePackageLimits::default().archive_limits(),
-    );
+    let limits = litchi_odf_common::SourceLimits::builder()
+        .max_input_bytes(u64::try_from(bytes.len() - 1).unwrap())
+        .unwrap()
+        .build()
+        .unwrap();
 
-    assert!(SourceBackedPresentation::from_read_at_with_limits(source, limits).is_err());
+    assert!(
+        SourceBackedPresentation::from_read_at_with_options(
+            source,
+            litchi_odf_common::OpenOptions::new().source_limits(limits)
+        )
+        .is_err()
+    );
 }
 
 #[test]
@@ -431,7 +440,8 @@ fn source_facade_rejects_oversized_content_before_materialization() {
 
     assert!(matches!(
         SourceBackedPresentation::from_read_at(source.clone()),
-        Err(Error::InvalidFormat(message)) if message.contains("content.xml exceeds the family limit")
+        Err(litchi_odp::Error::Core(Error::InvalidFormat(message)))
+            if message.contains("content.xml exceeds the family limit")
     ));
     assert!(
         source
@@ -450,7 +460,8 @@ fn source_facade_rejects_encrypted_oversized_plaintext_before_materialization() 
 
     assert!(matches!(
         SourceBackedPresentation::from_read_at(source.clone()),
-        Err(Error::InvalidFormat(message)) if message.contains("content.xml exceeds the family limit")
+        Err(litchi_odp::Error::Core(Error::InvalidFormat(message)))
+            if message.contains("content.xml exceeds the family limit")
     ));
     assert!(
         source
@@ -477,16 +488,21 @@ fn source_facade_validates_metadata_like_the_owned_family() {
         .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
 
-    assert!(Presentation::from_bytes(bytes.clone()).is_err());
+    assert!(
+        Package::from_bytes(&bytes)
+            .map_err(Error::from)
+            .and_then(|package| package.presentation())
+            .is_err()
+    );
     assert!(SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(bytes))).is_err());
 }
 
 #[test]
 fn source_facade_can_materialize_the_existing_mutable_owner() {
-    let bytes = Builder::new().build().unwrap();
+    let bytes = Builder::new().build().unwrap().to_bytes().unwrap();
     let source =
         SourceBackedPresentation::from_read_at(Arc::new(CountingSource::new(bytes))).unwrap();
-    let materialized = source.materialize().unwrap();
+    let materialized = source.materialize().unwrap().presentation().unwrap();
     assert_eq!(materialized.slide_count().unwrap(), 0);
     assert_eq!(materialized.text().unwrap(), "");
 }
@@ -495,7 +511,10 @@ fn source_facade_can_materialize_the_existing_mutable_owner() {
 fn source_facade_supports_password_protected_content() {
     let password = "source-password";
     let bytes = password_package(password);
-    let eager = Presentation::from_bytes_with_password(bytes.clone(), password).unwrap();
+    let eager = Package::from_bytes_with_password(&bytes, password)
+        .unwrap()
+        .presentation()
+        .unwrap();
     let source = SourceBackedPresentation::from_read_at_with_password(
         Arc::new(CountingSource::new(bytes.clone())),
         password,

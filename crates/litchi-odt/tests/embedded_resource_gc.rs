@@ -1,12 +1,11 @@
 use litchi_odf_common::package::raw_identical_members;
 use litchi_odt::{
-    Document,
+    Package,
     core::{OwnedPackage, PackageWriter, Profile},
     package::resource_gc::{
         EmbeddedResourceGcCandidate as Candidate, EmbeddedResourceGcDecision as Decision,
         EmbeddedResourceGcRefusal as Refusal, MAX_EMBEDDED_RESOURCE_GC_PATH_BYTES,
     },
-    transaction::Snapshot,
 };
 
 const MIMETYPE: &str = "application/vnd.oasis.opendocument.text";
@@ -34,8 +33,8 @@ fn package(body: &str, files: &[(&str, &[u8], &str)], directories: &[(&str, &str
     writer.finish_to_bytes().unwrap()
 }
 
-fn snapshot(bytes: Vec<u8>) -> Snapshot {
-    Snapshot::from_bytes(bytes).unwrap()
+fn snapshot(bytes: Vec<u8>) -> Package {
+    Package::from_bytes(&bytes).unwrap()
 }
 
 fn decision<'a>(
@@ -88,7 +87,7 @@ fn plans_first_middle_last_orphans_and_retains_a_shared_owner() {
     );
 
     let commit = plan.apply(&source).unwrap();
-    let reopened = commit.snapshot().document().unwrap();
+    let reopened = commit.package().document().unwrap();
     for path in [
         "Pictures/first.png",
         "Pictures/middle.png",
@@ -101,7 +100,7 @@ fn plans_first_middle_last_orphans_and_retains_a_shared_owner() {
         reopened.get_file("Thumbnails/thumbnail.png").unwrap(),
         b"untouched"
     );
-    let identical = raw_identical_members(&bytes, commit.snapshot().as_bytes()).unwrap();
+    let identical = raw_identical_members(&bytes, commit.package().as_bytes()).unwrap();
     for path in [
         "mimetype",
         "content.xml",
@@ -111,14 +110,13 @@ fn plans_first_middle_last_orphans_and_retains_a_shared_owner() {
         assert!(identical.contains(path), "{path}");
     }
     assert_eq!(
-        commit.patch().apply(&source).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        source.apply(commit.patch()).unwrap().as_bytes(),
+        commit.package().as_bytes()
     );
     assert_eq!(
         commit
-            .patch()
-            .inverse()
-            .apply(commit.snapshot())
+            .package()
+            .apply(&commit.patch().inverse())
             .unwrap()
             .as_bytes(),
         bytes
@@ -161,7 +159,7 @@ fn subdocument_gc_removes_complete_directory_and_manifest_closure() {
         ]
     );
     let commit = plan.apply(&source).unwrap();
-    let owned = OwnedPackage::from_bytes(commit.snapshot().as_bytes().to_vec()).unwrap();
+    let owned = OwnedPackage::from_bytes(commit.package().as_bytes().to_vec()).unwrap();
     let package = owned.package().unwrap();
     assert!(!package.has_file("Object_1/content.xml"));
     assert!(!package.manifest().has_path("Object_1/"));
@@ -215,12 +213,12 @@ fn stale_apply_exact_noop_and_durable_replay_are_source_checked() {
     let decoded = litchi_odt::transaction::DurablePatch::from_deterministic_json(&wire).unwrap();
     assert_eq!(
         decoded.apply(&source).unwrap().as_bytes(),
-        commit.snapshot().as_bytes()
+        commit.package().as_bytes()
     );
     assert!(decoded.apply(&foreign).is_err());
     let decoded_inverse = decoded.inverse();
     assert_eq!(
-        decoded_inverse.apply(commit.snapshot()).unwrap().as_bytes(),
+        decoded_inverse.apply(commit.package()).unwrap().as_bytes(),
         bytes
     );
     assert!(decoded_inverse.apply(&source).is_err());
@@ -228,7 +226,7 @@ fn stale_apply_exact_noop_and_durable_replay_are_source_checked() {
 
     let noop = source.plan_embedded_resource_gc(&[]).unwrap();
     let noop_commit = noop.apply(&source).unwrap();
-    assert_eq!(noop_commit.snapshot().as_bytes(), bytes);
+    assert_eq!(noop_commit.package().as_bytes(), bytes);
 }
 
 #[test]
@@ -327,7 +325,7 @@ fn object_ole_and_styles_owners_are_part_of_the_shared_reference_closure() {
         );
     }
     assert_eq!(
-        plan.apply(&source).unwrap().snapshot().as_bytes(),
+        plan.apply(&source).unwrap().package().as_bytes(),
         source.as_bytes()
     );
 }
@@ -382,7 +380,7 @@ fn signatures_and_document_protection_are_typed_refusals() {
         .unwrap()
         .apply(&signed)
         .unwrap();
-    assert_eq!(signed_noop.snapshot().as_bytes(), signed.as_bytes());
+    assert_eq!(signed_noop.package().as_bytes(), signed.as_bytes());
     let durable = signed_noop.patch().durable().unwrap();
     assert_eq!(
         durable.apply(&signed).unwrap().as_bytes(),
@@ -487,8 +485,7 @@ fn encrypted_snapshot_planning_returns_a_typed_refusal_without_decryption() {
         .add_file_with_media_type("Pictures/orphan.png", b"payload", "image/png")
         .unwrap();
     let bytes = writer.finish_to_bytes().unwrap();
-    let document = Document::from_bytes_with_password(bytes, "secret").unwrap();
-    let source = document.snapshot().unwrap();
+    let source = Package::from_bytes_with_password(&bytes, "secret").unwrap();
     let plan = source
         .plan_embedded_resource_gc(&[Candidate::package_file("Pictures/orphan.png")])
         .unwrap();

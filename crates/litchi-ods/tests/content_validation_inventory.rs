@@ -1,4 +1,4 @@
-use litchi_ods::{Builder, Spreadsheet, content_validation};
+use litchi_ods::{Builder, Package, content_validation};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -42,8 +42,13 @@ fn facade_reads_bindings_that_the_legacy_worksheet_projection_drops() {
     let xml = format!(
         r#"<office:document-content xmlns:office="{OFFICE}" xmlns:table="{TABLE}"><office:body><office:spreadsheet><table:content-validations><table:content-validation table:name="v"/></table:content-validations><table:table table:name="Sheet"><table:table-row><table:table-cell table:content-validation-name="v"/></table:table-row></table:table></office:spreadsheet></office:body></office:document-content>"#,
     );
-    let bytes = Builder::new().content_xml(xml).build().unwrap();
-    let spreadsheet = Spreadsheet::from_bytes(bytes).unwrap();
+    let bytes = Builder::new()
+        .content_xml(xml)
+        .build()
+        .unwrap()
+        .to_bytes()
+        .unwrap();
+    let spreadsheet = Package::from_bytes(&bytes).unwrap().workbook().unwrap();
     let inventory = spreadsheet.content_validations().unwrap();
     assert_eq!(inventory.sheet("Sheet").unwrap().bindings().len(), 1);
     assert_eq!(

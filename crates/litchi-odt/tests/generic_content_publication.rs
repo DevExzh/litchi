@@ -435,7 +435,7 @@ fn generic_content_publication_raw_preserves_store_and_deflate_members() {
         "content.xml",
         "Vendor/unknown.bin",
     );
-    let mut document = Document::from_bytes(source_bytes.clone()).unwrap();
+    let mut document = Document::from_bytes(&source_bytes).unwrap();
 
     assert_ne!(
         member_order(&source_bytes),
@@ -449,12 +449,9 @@ fn generic_content_publication_raw_preserves_store_and_deflate_members() {
 
     assert_raw_equal_except_content(&source_bytes, &output);
     assert_eq!(document.text(), "after");
-    assert_eq!(
-        Document::from_bytes(output.clone()).unwrap().text(),
-        "after"
-    );
+    assert_eq!(Document::from_bytes(&output).unwrap().text(), "after");
 
-    let mut no_op = Document::from_bytes(source_bytes.clone()).unwrap();
+    let mut no_op = Document::from_bytes(&source_bytes).unwrap();
     no_op.set_definition(&source_definition).unwrap();
     assert_eq!(no_op.to_bytes(), source_bytes);
 }
@@ -467,7 +464,7 @@ fn generic_content_publication_keeps_signature_fallback_and_refuses_manifest_siz
 
     let signed = source_package(&source_definition, false, true, false);
     let signed_original = signed.clone();
-    let mut signed_document = Document::from_bytes(signed).unwrap();
+    let mut signed_document = Document::from_bytes(&signed).unwrap();
     signed_document.set_definition(&replacement).unwrap();
     let signed_package = CoreOwnedPackage::from_bytes(signed_document.to_bytes()).unwrap();
     assert!(
@@ -476,12 +473,12 @@ fn generic_content_publication_keeps_signature_fallback_and_refuses_manifest_siz
             .unwrap()
     );
     assert_eq!(signed_document.text(), "after");
-    let mut signed_no_op = Document::from_bytes(signed_original.clone()).unwrap();
+    let mut signed_no_op = Document::from_bytes(&signed_original).unwrap();
     signed_no_op.set_definition(&source_definition).unwrap();
     assert_eq!(signed_no_op.to_bytes(), signed_original);
 
     let sized = source_package(&source_definition, true, false, false);
-    let mut sized_document = Document::from_bytes(sized.clone()).unwrap();
+    let mut sized_document = Document::from_bytes(&sized).unwrap();
     let error = sized_document
         .set_definition(&replacement)
         .expect_err("manifest:size edit unexpectedly succeeded");
@@ -501,10 +498,10 @@ fn generic_content_publication_refuses_encrypted_source_without_password_writer(
     replacement.title = Some(Text::new("after"));
     let encrypted = source_package(&source_definition, false, false, true);
     let encrypted_original = encrypted.clone();
-    let mut no_op = Document::from_bytes(encrypted_original.clone()).unwrap();
+    let mut no_op = Document::from_bytes(&encrypted_original).unwrap();
     no_op.set_definition(&source_definition).unwrap();
     assert_eq!(no_op.to_bytes(), encrypted_original);
-    let mut document = Document::from_bytes(encrypted).unwrap();
+    let mut document = Document::from_bytes(&encrypted).unwrap();
 
     let error = document.set_definition(&replacement).unwrap_err();
     assert!(error.to_string().contains("encrypted ODF entries"));
@@ -525,7 +522,7 @@ fn generic_content_publication_rejects_noncanonical_manifest_aliases() {
         true,
         None,
     );
-    let mut noncanonical_document = Document::from_bytes(noncanonical.clone()).unwrap();
+    let mut noncanonical_document = Document::from_bytes(&noncanonical).unwrap();
     noncanonical_document.set_definition(&replacement).unwrap();
     let noncanonical_output = noncanonical_document.to_bytes();
     assert_ne!(
@@ -539,7 +536,7 @@ fn generic_content_publication_rejects_noncanonical_manifest_aliases() {
         "mimetype",
         "content.xml",
     );
-    let mut wrong_central_document = Document::from_bytes(wrong_central_order.clone()).unwrap();
+    let mut wrong_central_document = Document::from_bytes(&wrong_central_order).unwrap();
     wrong_central_document.set_definition(&replacement).unwrap();
     let wrong_central_output = wrong_central_document.to_bytes();
     assert_ne!(
@@ -552,7 +549,7 @@ fn generic_content_publication_rejects_noncanonical_manifest_aliases() {
         "mimetype",
         "content.xml",
     );
-    let mut wrong_local_document = Document::from_bytes(wrong_local_order.clone()).unwrap();
+    let mut wrong_local_document = Document::from_bytes(&wrong_local_order).unwrap();
     wrong_local_document.set_definition(&replacement).unwrap();
     let wrong_local_output = wrong_local_document.to_bytes();
     assert_ne!(
@@ -569,7 +566,7 @@ fn generic_content_publication_rejects_noncanonical_manifest_aliases() {
         false,
         None,
     );
-    let mut mismatched_document = Document::from_bytes(mismatched_root).unwrap();
+    let mut mismatched_document = Document::from_bytes(&mismatched_root).unwrap();
     mismatched_document.set_definition(&replacement).unwrap();
     let output = mismatched_document.to_bytes();
     let reopened = CoreOwnedPackage::from_bytes(output).unwrap();
@@ -594,8 +591,8 @@ fn generic_content_publication_rejects_noncanonical_manifest_aliases() {
             false,
             Some(alias),
         );
-        match Document::from_bytes(aliased) {
-            Err(Error::InvalidFormat(_)) => {},
+        match Document::from_bytes(&aliased) {
+            Err(litchi_odt::Error::Core(Error::InvalidFormat(_))) => {},
             Ok(_) => panic!("accepted unsafe manifest alias {alias:?}"),
             Err(error) => panic!("unexpected error for unsafe manifest alias {alias:?}: {error}"),
         }
@@ -610,7 +607,7 @@ fn generic_content_publication_rejects_malformed_preserved_descriptor_crc_or_siz
     let source = source_package(&source_definition, false, false, false);
     for field_offset in [4, 8, 12] {
         let malformed = corrupt_deflated_descriptor(&source, field_offset);
-        let mut document = Document::from_bytes(malformed).unwrap();
+        let mut document = Document::from_bytes(&malformed).unwrap();
         let before = document.to_bytes();
         let error = document
             .set_definition(&replacement)
@@ -633,7 +630,7 @@ fn generic_content_publication_verifies_changed_package_payloads() {
             .get_file("Pictures/deflated.bin")
             .is_err()
     );
-    let mut document = Document::from_bytes(malformed).unwrap();
+    let mut document = Document::from_bytes(&malformed).unwrap();
     let error = document.set_definition(&replacement).unwrap_err();
     assert!(error.to_string().contains("deflated.bin"));
 }

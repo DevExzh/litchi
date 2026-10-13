@@ -20,7 +20,7 @@ use quick_xml::{
     reader::NsReader,
 };
 
-use crate::{Cell, CellValue, Row, Sheet, package::Package};
+use crate::{Cell, CellValue, Row, Sheet, package::Archive};
 
 const OFFICE: &str = "urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const TABLE: &str = "urn:oasis:names:tc:opendocument:xmlns:table:1.0";
@@ -223,7 +223,7 @@ pub struct FormControl {
 pub struct Drawing {
     /// Exact drawing name.
     pub name: String,
-    /// Package-relative dependency path.
+    /// Archive-relative dependency path.
     pub resource_path: String,
 }
 
@@ -575,7 +575,7 @@ pub(crate) fn set_rich_text(
     rich: &RichText,
     max_output: usize,
 ) -> Result<Vec<u8>> {
-    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    let spreadsheet = crate::Workbook::from_bytes(source.to_vec())?;
     let sheet_model = spreadsheet
         .sheet(sheet)
         .ok_or_else(|| invalid_error(format!("ODS sheet '{sheet}' was not found")))?;
@@ -597,7 +597,7 @@ pub(crate) fn set_cell_formula(
     formula: &str,
     max_output: usize,
 ) -> Result<Vec<u8>> {
-    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    let spreadsheet = crate::Workbook::from_bytes(source.to_vec())?;
     let sheet_model = spreadsheet
         .sheet(sheet)
         .ok_or_else(|| invalid_error(format!("ODS sheet '{sheet}' was not found")))?;
@@ -616,7 +616,7 @@ pub(crate) fn set_cell_style(
     style_name: &str,
     max_output: usize,
 ) -> Result<Vec<u8>> {
-    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    let spreadsheet = crate::Workbook::from_bytes(source.to_vec())?;
     let sheet_model = spreadsheet
         .sheet(sheet)
         .ok_or_else(|| invalid_error(format!("ODS sheet '{sheet}' was not found")))?;
@@ -717,7 +717,7 @@ pub(crate) fn edit_logical_rows(
         ));
     }
 
-    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    let spreadsheet = crate::Workbook::from_bytes(source.to_vec())?;
     let sheet_model = spreadsheet
         .sheet(sheet)
         .ok_or_else(|| invalid_error(format!("ODS sheet '{sheet}' was not found")))?;
@@ -725,7 +725,7 @@ pub(crate) fn edit_logical_rows(
         return Ok(source.to_vec());
     }
 
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Archive::from_bytes(source.to_vec())?;
     audit_logical_row_package(&package)?;
     let xml = package.content_xml().to_string();
     let spans = scan(&xml)?;
@@ -1062,7 +1062,7 @@ fn audit_inserted_row(row: &Row) -> Result<()> {
 enum OrdinaryElement {
     Root,
     Body,
-    Spreadsheet,
+    Workbook,
     Table,
     Column,
     Row,
@@ -1070,7 +1070,7 @@ enum OrdinaryElement {
     Paragraph,
 }
 
-fn audit_logical_row_package(package: &Package) -> Result<()> {
+fn audit_logical_row_package(package: &Archive) -> Result<()> {
     for path in package.package().files()? {
         let lower = path.to_ascii_lowercase();
         if matches!(
@@ -1228,7 +1228,7 @@ fn ordinary_element(namespace: &ResolveResult<'_>, local: &[u8]) -> Result<Ordin
     match (uri, local) {
         (value, b"document-content") if *value == OFFICE.as_bytes() => Ok(OrdinaryElement::Root),
         (value, b"body") if *value == OFFICE.as_bytes() => Ok(OrdinaryElement::Body),
-        (value, b"spreadsheet") if *value == OFFICE.as_bytes() => Ok(OrdinaryElement::Spreadsheet),
+        (value, b"spreadsheet") if *value == OFFICE.as_bytes() => Ok(OrdinaryElement::Workbook),
         (value, b"table") if *value == TABLE.as_bytes() => Ok(OrdinaryElement::Table),
         (value, b"table-column") if *value == TABLE.as_bytes() => Ok(OrdinaryElement::Column),
         (value, b"table-row") if *value == TABLE.as_bytes() => Ok(OrdinaryElement::Row),
@@ -1249,8 +1249,8 @@ fn audit_ordinary_parent(parent: Option<OrdinaryElement>, child: OrdinaryElement
         (parent, child),
         (None, OrdinaryElement::Root)
             | (Some(OrdinaryElement::Root), OrdinaryElement::Body)
-            | (Some(OrdinaryElement::Body), OrdinaryElement::Spreadsheet)
-            | (Some(OrdinaryElement::Spreadsheet), OrdinaryElement::Table)
+            | (Some(OrdinaryElement::Body), OrdinaryElement::Workbook)
+            | (Some(OrdinaryElement::Workbook), OrdinaryElement::Table)
             | (Some(OrdinaryElement::Table), OrdinaryElement::Column)
             | (Some(OrdinaryElement::Table), OrdinaryElement::Row)
             | (Some(OrdinaryElement::Row), OrdinaryElement::Cell)
@@ -1289,7 +1289,7 @@ fn audit_ordinary_attributes(
         let local = local.as_ref();
         let allowed = match kind {
             OrdinaryElement::Root => uri == OFFICE.as_bytes() && local == b"version",
-            OrdinaryElement::Body | OrdinaryElement::Spreadsheet => false,
+            OrdinaryElement::Body | OrdinaryElement::Workbook => false,
             OrdinaryElement::Table => uri == TABLE.as_bytes() && local == b"name",
             OrdinaryElement::Column => {
                 uri == TABLE.as_bytes()
@@ -1934,7 +1934,7 @@ pub(crate) fn move_sheet(
             "ODS source exceeds the {max_output} byte sheet-move output limit"
         ));
     }
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Archive::from_bytes(source.to_vec())?;
     let xml = package.content_xml().to_string();
     let spans = scan(&xml)?;
     let spreadsheet = one(&spans, OFFICE, "spreadsheet")?;
@@ -2030,7 +2030,7 @@ pub(crate) fn copy_sheet(
     }
     let _validated_name = Sheet::new(destination_name)?;
 
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Archive::from_bytes(source.to_vec())?;
     let xml = package.content_xml().to_string();
     let spans = scan(&xml)?;
     let spreadsheet = one(&spans, OFFICE, "spreadsheet")?;
@@ -2144,7 +2144,7 @@ pub(crate) fn transfer_plain_scalar_sheet(
     }
     validate_transfer_sheet_name(destination_name)?;
 
-    let source_package = Package::from_bytes(copy_package_bytes(source, max_output, "source")?)?;
+    let source_package = Archive::from_bytes(copy_package_bytes(source, max_output, "source")?)?;
     audit_plain_scalar_transfer_package(&source_package, "source")?;
     let source_xml = source_package.content_xml();
     let source_spans = scan(source_xml)?;
@@ -2167,7 +2167,7 @@ pub(crate) fn transfer_plain_scalar_sheet(
         audit_plain_scalar_sheet(source_xml, &source_spans, selected, source_spreadsheet)?;
 
     let destination_package =
-        Package::from_bytes(copy_package_bytes(destination, max_output, "destination")?)?;
+        Archive::from_bytes(copy_package_bytes(destination, max_output, "destination")?)?;
     audit_plain_scalar_transfer_package(&destination_package, "destination")?;
     let destination_xml = destination_package.content_xml();
     let destination_spans = scan(destination_xml)?;
@@ -2320,7 +2320,7 @@ struct ScalarCellState {
     text_bytes: usize,
 }
 
-fn audit_plain_scalar_transfer_package(package: &Package, label: &str) -> Result<()> {
+fn audit_plain_scalar_transfer_package(package: &Archive, label: &str) -> Result<()> {
     let reader = package.package().package()?;
     if reader.manifest().has_encrypted_entries() {
         return invalid(format!(
@@ -2679,7 +2679,7 @@ fn audit_scalar_attributes(
         let local = local.as_ref();
         let allowed = match kind {
             OrdinaryElement::Root => uri == OFFICE.as_bytes() && local == b"version",
-            OrdinaryElement::Body | OrdinaryElement::Spreadsheet => false,
+            OrdinaryElement::Body | OrdinaryElement::Workbook => false,
             OrdinaryElement::Table => uri == TABLE.as_bytes() && local == b"name",
             OrdinaryElement::Column => {
                 uri == TABLE.as_bytes() && local == b"number-columns-repeated"
@@ -3191,7 +3191,7 @@ fn escape_sheet_name_attribute_bounded(value: &str) -> Result<String> {
 }
 
 fn audit_sheet_copy(
-    package: &Package,
+    package: &Archive,
     xml: &str,
     spans: &[Span],
     spreadsheet: usize,
@@ -3618,7 +3618,7 @@ fn lexical_attribute_value_range(xml: &str, tag: Range<usize>, key: &[u8]) -> Re
 }
 
 fn audit_sheet_move_package(
-    package: &Package,
+    package: &Archive,
     xml: &str,
     spans: &[Span],
     spreadsheet: usize,
@@ -3953,7 +3953,7 @@ fn ensure_extended_names_available(
     graph: &crate::data_style::Graph,
     max_output: usize,
 ) -> Result<ExtendedGraphOwner> {
-    let package = Package::from_bytes(copy_package_bytes(
+    let package = Archive::from_bytes(copy_package_bytes(
         source,
         max_output,
         "extended data-style name source",
@@ -4193,7 +4193,7 @@ pub(crate) fn replace_extended_style_graph(
     if graph.number_styles.is_empty() && graph.data_styles.is_empty() {
         return Ok(source.to_vec());
     }
-    let package = Package::from_bytes(copy_package_bytes(
+    let package = Archive::from_bytes(copy_package_bytes(
         source,
         max_output,
         "extended data-style replacement source",
@@ -4443,7 +4443,7 @@ pub(crate) fn patch_data_style(
             "ODS common data styles are read-only".to_string(),
         ));
     }
-    let package = Package::from_bytes(copy_package_bytes(
+    let package = Archive::from_bytes(copy_package_bytes(
         source,
         max_output,
         "extended data-style metadata source",
@@ -4841,7 +4841,7 @@ fn merge_text_properties(target: &mut TextProperties, source: &TextProperties) {
 
 pub(crate) fn resolve_package_cell_style(source: &[u8], name: &str) -> Result<EffectiveCellStyle> {
     validate_token(name, "effective cell style name")?;
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Archive::from_bytes(source.to_vec())?;
     let mut styles = std::collections::BTreeMap::new();
     if let Some(xml) = package.styles_xml() {
         collect_package_cell_styles(xml, &mut styles)?;
@@ -5122,7 +5122,7 @@ fn publish_extended_empty_expansion(
             .ok_or_else(|| invalid_error("ODS automatic-styles source suffix is invalid"))?,
     );
 
-    let package = Package::from_bytes(copy_package_bytes(
+    let package = Archive::from_bytes(copy_package_bytes(
         source,
         max_output,
         "extended data-style empty-owner expansion",
@@ -5145,7 +5145,7 @@ fn verify_extended_graph_visible(
     graph: &crate::data_style::Graph,
     max_output: usize,
 ) -> Result<()> {
-    let package = Package::from_bytes(copy_package_bytes(
+    let package = Archive::from_bytes(copy_package_bytes(
         source,
         max_output,
         "extended data-style insertion readback",
@@ -5326,7 +5326,7 @@ fn refuse_package_style_references(
     source: &[u8],
     requested: &std::collections::BTreeSet<&str>,
 ) -> Result<()> {
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Archive::from_bytes(source.to_vec())?;
     for path in package.package().files()? {
         let is_inspectable_xml = std::path::Path::new(&path)
             .extension()
@@ -6427,7 +6427,7 @@ pub(crate) fn set_bound_forms(
     controls: &[BoundFormControl],
     max_output: usize,
 ) -> Result<Vec<u8>> {
-    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    let spreadsheet = crate::Workbook::from_bytes(source.to_vec())?;
     let mut markup = String::new();
     if !controls.is_empty() {
         write!(
@@ -6485,7 +6485,7 @@ pub(crate) fn set_rich_forms(
     controls: &[RichFormControl],
     max_output: usize,
 ) -> Result<Vec<u8>> {
-    let spreadsheet = crate::Spreadsheet::from_bytes(source.to_vec())?;
+    let spreadsheet = crate::Workbook::from_bytes(source.to_vec())?;
     if controls.len() > 65_536 {
         return invalid("ODS rich form control count exceeds the limit");
     }
@@ -6588,7 +6588,7 @@ pub(crate) fn set_rich_forms(
 }
 
 fn validate_form_address(
-    spreadsheet: &crate::Spreadsheet,
+    spreadsheet: &crate::Workbook,
     value: &str,
     require_single_cell: bool,
 ) -> Result<()> {
@@ -6724,7 +6724,7 @@ fn splice_content(
     replacement: Vec<u8>,
     max_output: usize,
 ) -> Result<Vec<u8>> {
-    let package = Package::from_bytes(copy_package_bytes(source, max_output, "content splice")?)?;
+    let package = Archive::from_bytes(copy_package_bytes(source, max_output, "content splice")?)?;
     let part = XmlSourcePart::load(package.package(), CONTENT_PATH)?;
     let expected = part
         .bytes()
@@ -6746,7 +6746,7 @@ fn splice_content_edits(
     edits: Vec<(Range<usize>, Vec<u8>)>,
     max_output: usize,
 ) -> Result<Vec<u8>> {
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Archive::from_bytes(source.to_vec())?;
     let part = XmlSourcePart::load(package.package(), CONTENT_PATH)?;
     let mut publication = XmlSplicePublication::new(part.clone());
     for (range, replacement) in edits {
@@ -6778,7 +6778,7 @@ fn splice_cell_start(
         .find('>')
         .ok_or_else(|| invalid_error("ODS replacement cell start tag is missing"))?;
     let tag = replacement.as_bytes()[..=tag_end].to_vec();
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Archive::from_bytes(source.to_vec())?;
     let part = XmlSourcePart::load(package.package(), CONTENT_PATH)?;
     let expected = part
         .bytes()
@@ -6792,7 +6792,7 @@ fn splice_cell_start(
 }
 
 fn content_spans(source: &[u8]) -> Result<(String, Vec<Span>)> {
-    let package = Package::from_bytes(source.to_vec())?;
+    let package = Archive::from_bytes(source.to_vec())?;
     let xml = package.content_xml().to_string();
     let spans = scan(&xml)?;
     Ok((xml, spans))
@@ -7494,7 +7494,7 @@ mod extended_data_style_tests {
     #[test]
     fn catalog_reads_scientific_and_metadata_patch_preserves_body() -> Result<()> {
         let bytes = package()?;
-        let package = super::Package::from_bytes(bytes.clone())?;
+        let package = super::Archive::from_bytes(bytes.clone())?;
         let entries = data_style_catalog(
             package.content_xml(),
             package.styles_xml(),
@@ -7512,7 +7512,7 @@ mod extended_data_style_tests {
             &patch,
             bytes.len() + 4_096,
         )?;
-        let changed_package = super::Package::from_bytes(changed)?;
+        let changed_package = super::Archive::from_bytes(changed)?;
         assert!(
             changed_package
                 .content_xml()
@@ -7536,7 +7536,7 @@ mod extended_data_style_tests {
         builder.number_style(number)?;
         let graph = builder.build()?;
         let changed = put_extended_style_graph(&bytes, &graph, bytes.len() + 8_192)?;
-        let package = super::Package::from_bytes(changed)?;
+        let package = super::Archive::from_bytes(changed)?;
         assert!(package.content_xml().contains("style:name=\"Added\""));
         Ok(())
     }
@@ -7553,7 +7553,7 @@ mod extended_data_style_tests {
         let graph = builder.build()?;
 
         let changed = put_extended_style_graph(&bytes, &graph, bytes.len() + 8_192)?;
-        let package = super::Package::from_bytes(changed)?;
+        let package = super::Archive::from_bytes(changed)?;
         let xml = package.content_xml();
         let wrapper_end = xml
             .find("</future:wrapper>")
@@ -7578,7 +7578,7 @@ mod extended_data_style_tests {
         let graph = builder.build()?;
 
         let changed = put_extended_style_graph(&bytes, &graph, bytes.len() + 8_192)?;
-        let package = super::Package::from_bytes(changed)?;
+        let package = super::Archive::from_bytes(changed)?;
         let xml = package.content_xml();
         let wrapper_end = xml
             .find("</future:wrapper>")

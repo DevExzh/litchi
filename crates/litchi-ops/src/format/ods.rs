@@ -1,7 +1,7 @@
 //! Handle for OpenDocument Spreadsheet (`.ods`) inputs.
 //!
 //! ODS is tier 3 and read-only in M0a (record 0003 §2.3). The handle carries
-//! the facade's two payloads over: the eager `litchi_ods::Spreadsheet` (byte
+//! the facade's two payloads over: the eager `litchi_ods::Workbook` (byte
 //! and reader routes) and the filesystem-backed
 //! `litchi_ods::SourceBackedSpreadsheet` (path route on `unix`/`windows`).
 //!
@@ -42,7 +42,7 @@ struct OdsState {
 enum OdsOwner {
     /// Parsed in full at open (byte and reader routes, and the path fallback
     /// on other targets).
-    Eager(litchi_ods::Spreadsheet),
+    Eager(litchi_ods::Workbook),
     /// Filesystem-backed, with deferred package-member reads (path route).
     #[cfg(any(unix, windows))]
     Source(litchi_ods::SourceBackedSpreadsheet),
@@ -54,6 +54,15 @@ const _: () = {
     assert!(size_of::<Ods>() == size_of::<usize>());
 };
 
+/// Typed ODF limit failures stay `Source::Odf`; every other failure keeps
+/// its common-core payload as `Source::Core`, exactly as before W3.
+fn odf_error(error: litchi_odf_common::Error) -> Error {
+    match error {
+        litchi_odf_common::Error::Core(error) => core_error(error),
+        other => Error::from(other).with_format(FileFormat::Ods),
+    }
+}
+
 fn core_error(error: litchi_core::Error) -> Error {
     Error::from(error).with_format(FileFormat::Ods)
 }
@@ -64,8 +73,10 @@ impl Ods {
     /// by turning a prepared package back into bytes and parsing them again
     /// (`DetectedFormat::Ods`).
     pub(crate) fn from_prepared(prepared: PreparedPackage, _options: &OpenOptions) -> Result<Self> {
-        let spreadsheet =
-            litchi_ods::Spreadsheet::from_prepared_package(prepared).map_err(core_error)?;
+        let spreadsheet = litchi_ods::Package::from_prepared_package(prepared)
+            .map_err(odf_error)?
+            .workbook()
+            .map_err(core_error)?;
         Ok(Self::from_owner(OdsOwner::Eager(spreadsheet)))
     }
 

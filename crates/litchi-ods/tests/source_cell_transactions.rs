@@ -16,7 +16,7 @@ use litchi_odf_common::{
     package::raw_identical_members,
 };
 use litchi_ods::{
-    Cell, CellValue, CellView, FormulaChange, SourceBackedSpreadsheet, Spreadsheet,
+    Cell, CellValue, CellView, FormulaChange, Package, SourceBackedSpreadsheet, Workbook,
     worksheet::{CellChange, MAX_CELL_CHANGES},
 };
 
@@ -70,7 +70,7 @@ fn text(value: &str) -> Cell {
     Cell::new(CellValue::Text(value.to_string()), value)
 }
 
-fn cell_text(spreadsheet: &Spreadsheet, row: usize, column: usize) -> Option<&str> {
+fn cell_text(spreadsheet: &Workbook, row: usize, column: usize) -> Option<&str> {
     spreadsheet
         .cell("Data", row, column)
         .and_then(|cell| match cell {
@@ -115,7 +115,7 @@ fn source_cell_commit_streams_one_and_repeated_run_edits_with_exact_patch() {
     assert_eq!(report.changed_cells(), 3);
     assert!(!report.is_no_op());
     assert_eq!(report.bytes(), output.len() as u64);
-    let reopened = Spreadsheet::from_bytes(output.clone()).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("omega"));
     assert_eq!(cell_text(&reopened, 0, 1), Some("left"));
     assert_eq!(cell_text(&reopened, 0, 2), Some("same"));
@@ -156,7 +156,7 @@ fn chained_source_cell_commits_do_not_reuse_offsets_from_the_original_layout() {
     let mut output = Vec::new();
     second_commit.write_to(&mut output).unwrap();
 
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some(first_value.as_str()));
     assert_eq!(cell_text(&reopened, 1, 0), Some("second-edit"));
 }
@@ -179,7 +179,7 @@ fn changed_source_cell_commit_republishes_changed_content() {
     let report = commit.write_to(&mut output).unwrap();
     assert!(!report.is_no_op());
 
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("omega"));
 }
 
@@ -364,7 +364,7 @@ fn source_formula_edit_preserves_cached_cell_state_and_inverse() {
 
     let mut output = Vec::new();
     commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output.clone()).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     let Some(CellView::Stored(cell)) = reopened.cell("Data", 0, 0) else {
         panic!("formula fixture cell");
     };
@@ -404,7 +404,7 @@ fn source_formula_batch_handles_repeated_columns_and_atomic_conflicts() {
     let commit = edit.commit().unwrap();
     let mut output = Vec::new();
     commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     let Some(CellView::Stored(first)) = reopened.cell("Data", 0, 0) else {
         panic!("first formula fixture cell");
     };
@@ -550,7 +550,7 @@ fn source_cell_commit_validates_multi_row_windows_in_order() {
     assert_eq!(commit.changed_cells(), 2);
     let mut output = Vec::new();
     commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("one"));
     assert_eq!(cell_text(&reopened, 2, 0), Some("middle"));
     assert_eq!(cell_text(&reopened, 3, 0), Some("four"));
@@ -690,7 +690,7 @@ fn source_cell_edit_accepts_the_exact_transaction_bound() {
     assert_eq!(commit.changed_cells(), MAX_CELL_CHANGES);
     let mut output = Vec::new();
     commit.write_to(&mut output).unwrap();
-    let reopened = Spreadsheet::from_bytes(output).unwrap();
+    let reopened = Package::from_bytes(&output).unwrap().workbook().unwrap();
     assert_eq!(cell_text(&reopened, 0, 0), Some("new"));
     assert_eq!(cell_text(&reopened, 0, MAX_CELL_CHANGES - 1), Some("new"));
 }

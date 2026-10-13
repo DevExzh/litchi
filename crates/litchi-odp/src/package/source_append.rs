@@ -31,8 +31,6 @@ use quick_xml::{
     name::{Namespace, ResolveResult},
 };
 
-use super::ReadLimits;
-
 const FAMILY_NAME: &str = "ODP";
 const OFFICE_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:office:1.0";
 const DRAW_NAMESPACE: &[u8] = b"urn:oasis:names:tc:opendocument:xmlns:drawing:1.0";
@@ -321,27 +319,38 @@ impl fmt::Debug for SourceBackedTailAppendEdit {
 
 impl SourceBackedTailAppendEdit {
     /// Open an ODP positional source and stage one plain title/body slide.
+    ///
+    /// # Errors
+    ///
+    /// Returns typed limit failures and package or family-validation errors.
     pub fn from_read_at(
         source: Arc<dyn ReadAt>,
         title: impl Into<String>,
         body: impl Into<String>,
-    ) -> Result<Self> {
-        Self::from_read_at_with_limits(source, ReadLimits::default(), title, body)
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        Self::from_read_at_with_options(source, litchi_odf_common::OpenOptions::new(), title, body)
     }
 
-    /// Open an ODP positional source with explicit package and append bounds.
-    pub fn from_read_at_with_limits(
+    /// Open an ODP positional source under caller-selected source limits and
+    /// stage one plain title/body slide.
+    ///
+    /// # Errors
+    ///
+    /// As [`Self::from_read_at`].
+    pub fn from_read_at_with_options(
         source: Arc<dyn ReadAt>,
-        package_limits: ReadLimits,
+        options: litchi_odf_common::OpenOptions,
         title: impl Into<String>,
         body: impl Into<String>,
-    ) -> Result<Self> {
-        let package = SourceBackedPackage::from_read_at_with_limits(source, package_limits)?;
+    ) -> std::result::Result<Self, litchi_odf_common::Error> {
+        let package =
+            SourceBackedPackage::from_read_at_with_limits(source, options.source_limits_value())?;
         let package = Arc::new(package);
         if package.mimetype()? != ODF_PRESENTATION {
             return Err(Error::InvalidFormat(format!(
                 "expected {FAMILY_NAME} package MIME type '{ODF_PRESENTATION}'"
-            )));
+            ))
+            .into());
         }
         let title = title.into();
         let body = body.into();
@@ -1628,7 +1637,8 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            Error::InvalidFormat(message) if message.contains("Unicode whitespace")
+            litchi_odf_common::Error::Core(Error::InvalidFormat(message))
+                if message.contains("Unicode whitespace")
         ));
     }
 
@@ -1655,7 +1665,8 @@ mod tests {
         .unwrap_err();
         assert!(matches!(
             error,
-            Error::InvalidFormat(message) if message.contains("carriage return")
+            litchi_odf_common::Error::Core(Error::InvalidFormat(message))
+                if message.contains("carriage return")
         ));
     }
 

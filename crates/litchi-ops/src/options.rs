@@ -84,9 +84,10 @@ pub struct OpenOptions {
     /// Native RTF source limits and explicit repair policy.
     #[cfg(feature = "rtf")]
     pub(crate) rtf_options: Option<litchi_rtf::OpenOptions>,
-    /// ODF package limits shared by ODT, ODS and ODP.
+    /// ODF ingress options (source and semantic limits) shared by ODT, ODS
+    /// and ODP.
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
-    pub(crate) odf_limits: Option<litchi_odf_common::SourcePackageLimits>,
+    pub(crate) odf_options: Option<litchi_odf_common::OpenOptions>,
 }
 
 impl OpenOptions {
@@ -114,7 +115,7 @@ impl OpenOptions {
             #[cfg(feature = "rtf")]
             rtf_options: None,
             #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
-            odf_limits: None,
+            odf_options: None,
         }
     }
 
@@ -261,18 +262,25 @@ impl OpenOptions {
         self
     }
 
-    /// Replace the ODF package limits used for ODT, ODS and ODP inputs.
+    /// Replace the ODF ingress options (source and semantic limits) used for
+    /// ODT, ODS and ODP inputs opened from a path.
     ///
     /// ```
     /// let options = litchi_ops::OpenOptions::new()
-    ///     .odf_limits(litchi_odf_common::SourcePackageLimits::default());
+    ///     .odf_options(litchi_odf_common::OpenOptions::new());
     /// # let _ = options;
     /// ```
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     #[must_use]
-    pub const fn odf_limits(mut self, limits: litchi_odf_common::SourcePackageLimits) -> Self {
-        self.odf_limits = Some(limits);
+    pub const fn odf_options(mut self, options: litchi_odf_common::OpenOptions) -> Self {
+        self.odf_options = Some(options);
         self
+    }
+
+    /// The selected ODF ingress options, or the defaults.
+    #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
+    pub(crate) fn odf_open_options(&self) -> litchi_odf_common::OpenOptions {
+        self.odf_options.unwrap_or_default()
     }
 }
 
@@ -375,7 +383,7 @@ mod tests {
         #[cfg(feature = "rtf")]
         assert_eq!(options.rtf_options, None);
         #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
-        assert_eq!(options.odf_limits, None);
+        assert_eq!(options.odf_options, None);
     }
 
     #[test]
@@ -447,8 +455,9 @@ mod tests {
     #[cfg(any(feature = "odt", feature = "ods", feature = "odp"))]
     #[test]
     fn builder_sets_odf_sub_options() {
-        let limits = litchi_odf_common::SourcePackageLimits::default();
-        let options = OpenOptions::new().odf_limits(limits);
-        assert_eq!(options.odf_limits, Some(limits));
+        let odf = litchi_odf_common::OpenOptions::new()
+            .source_limits(litchi_odf_common::SourceLimits::default());
+        let options = OpenOptions::new().odf_options(odf);
+        assert_eq!(options.odf_options, Some(odf));
     }
 }
