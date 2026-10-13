@@ -13,6 +13,7 @@
 
 use std::borrow::Cow;
 use std::fmt::Write as _;
+use std::sync::Arc;
 
 use litchi_core::Metadata;
 use litchi_docx::color::Theme;
@@ -51,6 +52,7 @@ pub(super) fn text<'n>(node: &'n Node<'_>) -> Result<Option<Cow<'n, str>>> {
         },
         Value::Equation(block) => equation_latex(block)?.map(Cow::Owned),
         Value::Comment(comment) => Some(Cow::Owned(comment.text()?)),
+        Value::Picture(_) => None,
         Value::Document
         | Value::Body(_)
         | Value::Table(_)
@@ -150,7 +152,8 @@ pub(super) fn child_count(node: &Node<'_>) -> Result<Option<u32>> {
         | Value::Hyperlink(_)
         | Value::Equation(_)
         | Value::Section(_)
-        | Value::Comment(_) => 0,
+        | Value::Comment(_)
+        | Value::Picture(_) => 0,
     };
     Ok(Some(u32::try_from(count).unwrap_or(u32::MAX)))
 }
@@ -228,6 +231,7 @@ pub(super) fn format<'n>(node: &'n Node<'_>) -> Result<Format<'n>> {
             date: comment.date().map(str::to_owned),
             text: comment.text()?,
         })),
+        Value::Picture(picture) => Props::Picture(Arc::clone(picture)),
         Value::Body(_) | Value::Section(_) | Value::Comments => Props::None,
     };
     let invalid = match &props {
@@ -311,6 +315,7 @@ pub(crate) enum Props<'a> {
     Cell(Box<direct::Cell>),
     Sdt(Box<SdtProps>),
     Comment(Box<CommentProps>),
+    Picture(Arc<litchi_docx::image::InlineImage>),
 }
 
 impl<'a> Props<'a> {
@@ -328,6 +333,7 @@ impl<'a> Props<'a> {
             Self::Cell(props) => cell(props, index),
             Self::Sdt(sdt) => sdt_value(sdt, index),
             Self::Comment(comment) => comment_value(comment, index),
+            Self::Picture(picture) => picture_value(picture, index),
         }
     }
 }
@@ -346,6 +352,7 @@ impl std::fmt::Debug for Props<'_> {
             Self::Cell(_) => "Props::Cell",
             Self::Sdt(_) => "Props::Sdt",
             Self::Comment(_) => "Props::Comment",
+            Self::Picture(_) => "Props::Picture",
         })
     }
 }
@@ -735,6 +742,29 @@ fn run<'a>(props: &direct::Run, index: usize) -> Option<NodeValue<'a>> {
         R_POSITION => props.position.and_then(|position| half_points(position.0)),
         R_CHAR_SPACING => props.character_spacing.and_then(|spacing| twips(spacing.0)),
         R_STYLE => props.style.as_deref().map(owned),
+        _ => None,
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Picture
+// ---------------------------------------------------------------------------
+
+fn picture_value<'a>(
+    picture: &litchi_docx::image::InlineImage,
+    index: usize,
+) -> Option<NodeValue<'a>> {
+    const WIDTH: usize = index_of(super::spec::PICTURE_PROPS, "width");
+    const HEIGHT: usize = index_of(super::spec::PICTURE_PROPS, "height");
+    const ALT: usize = index_of(super::spec::PICTURE_PROPS, "alt");
+    const NAME: usize = index_of(super::spec::PICTURE_PROPS, "name");
+    const REL_ID: usize = index_of(super::spec::PICTURE_PROPS, "relId");
+    match index {
+        WIDTH => Some(NodeValue::Length(Length::from_emu(picture.width_emu()))),
+        HEIGHT => Some(NodeValue::Length(Length::from_emu(picture.height_emu()))),
+        ALT => (!picture.description().is_empty()).then(|| owned(picture.description())),
+        NAME => (!picture.name().is_empty()).then(|| owned(picture.name())),
+        REL_ID => (!picture.r_embed().is_empty()).then(|| owned(picture.r_embed())),
         _ => None,
     }
 }

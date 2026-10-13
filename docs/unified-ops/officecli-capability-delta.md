@@ -19,8 +19,8 @@ fails while a golden differs from the hash recorded below.
 
 | Input | File | SHA-256 |
 |---|---|---|
-| golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `ee587eccb6491fe4014fb067d54b8ddf46cc9a02be1e3de4cabb20d8bf176b91` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `82be804ef4c943f73a9e6bb5a7b5c1e1f592079d2ca4b1a469f6ae75f42d2d2e` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/docx.json` | `9a2a5f4c4bbbc5eaac032e8534f7bc03970d482a5994b2c1288ae9333b8e7578` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/docx-encryption.json` | `8ca3f1b3db0fa2f29286283707153d129c1d76e141729e608c65a32f928e8118` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `f3dc9441b5a941b499bd8d3673382c431dd8535a6f67e122395543e7f7f567f5` |
@@ -62,7 +62,7 @@ Elements:
 
 | Format | supported | gap | folded | pending | missing | out of scope | litchi-only |
 |---|---|---|---|---|---|---|---|
-| docx | 12 | 23 | 0 | 0 | 9 | 2 | 5 |
+| docx | 13 | 22 | 0 | 0 | 9 | 2 | 5 |
 | xlsx | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | xlsb | 8 | 30 | 0 | 0 | 1 | 2 | 1 |
 | xls | 6 | 32 | 0 | 0 | 1 | 2 | 1 |
@@ -72,7 +72,7 @@ Property reads:
 
 | Format | supported | gap | element gap | pending | write-only | raw-only | missing | litchi-only |
 |---|---|---|---|---|---|---|---|---|
-| docx | 134 | 4 | 418 | 0 | 105 | 2 | 298 | 27 |
+| docx | 138 | 4 | 391 | 0 | 112 | 2 | 314 | 28 |
 | xlsx | 81 | 16 | 489 | 0 | 26 | 1 | 78 | 62 |
 | xlsb | 54 | 45 | 489 | 0 | 24 | 1 | 78 | 2 |
 | xls | 16 | 17 | 509 | 0 | 24 | 1 | 124 | 0 |
@@ -82,7 +82,7 @@ Property writes:
 
 | Format | supported | partial | gap | pending | litchi-only | — |
 |---|---|---|---|---|---|---|
-| docx | 92 | 24 | 680 | 0 | 11 | 181 |
+| docx | 92 | 28 | 676 | 0 | 12 | 181 |
 | xlsx | 11 | 36 | 497 | 0 | 66 | 143 |
 | xlsb | 2 | 2 | 540 | 0 | 3 | 146 |
 | xls | 0 | 3 | 541 | 0 | 0 | 147 |
@@ -122,7 +122,7 @@ Property writes:
 | pagebreak | break | gap | R4x |
 | paragraph | paragraph | supported |  |
 | permStart |  | missing |  |
-| picture | picture | gap | R4x |
+| picture | picture | supported |  |
 | ptab |  | missing |  |
 | raw |  | out of scope | the raw XML layer (`raw`/`raw-set` commands), not an element (design §3) |
 | revision | revision | gap | R4x |
@@ -715,33 +715,34 @@ Property writes:
 | permStart | `ed` | string | a-g |  | missing | gap |  |
 | permStart | `colFirst` | number | a-g |  | missing | gap |  |
 | permStart | `colLast` | number | a-g |  | missing | gap |  |
-| picture | `decorative` | bool | asg |  | element gap | gap | R4x |
-| picture | `crop` | string | asg |  | element gap | gap | R4x |
-| picture | `cropLeft` | string | as- |  | element gap | gap | R4x |
-| picture | `cropTop` | string | as- |  | element gap | gap | R4x |
-| picture | `cropRight` | string | as- |  | element gap | gap | R4x |
-| picture | `cropBottom` | string | as- |  | element gap | gap | R4x |
-| picture | `anchor` | bool | a-g |  | element gap | gap | R4x |
-| picture | `wrap` | string | asg |  | element gap | gap | R4x |
-| picture | `behindText` | bool | asg |  | element gap | gap | R4x |
-| picture | `relativeHeight` | integer | a-g |  | element gap | gap | R4x |
-| picture | `effectExtent` | string | a-- |  | element gap | gap | R4x |
-| picture | `hPosition` | length | asg |  | element gap | gap | R4x |
-| picture | `vPosition` | length | asg |  | element gap | gap | R4x |
-| picture | `hRelative` | string | asg |  | element gap | gap | R4x |
-| picture | `vRelative` | string | asg |  | element gap | gap | R4x |
-| picture | `hAlign` | string | a-g |  | element gap | gap | R4x |
-| picture | `vAlign` | string | a-g |  | element gap | gap | R4x |
-| picture | `link` | string | a-g |  | element gap | gap | R4x |
-| picture | `width` | length | asg |  | element gap | gap | R4x |
-| picture | `height` | length | asg |  | element gap | gap | R4x |
-| picture | `fallback` | string | a-- |  | element gap | gap | R4x |
-| picture | `id` | number | --g |  | element gap | — | R4x |
-| picture | `alt` | string | asg |  | element gap | gap | R4x |
-| picture | `contentType` | string | --g |  | element gap | — | R4x |
-| picture | `fileSize` | number | --g |  | element gap | — | R4x |
-| picture | `relId` | string | --g |  | element gap | — | R4x |
-| picture | `src` | string | as- |  | element gap | gap | R4x |
+| picture | `decorative` | bool | asg |  | missing | gap |  |
+| picture | `crop` | string | asg |  | missing | gap |  |
+| picture | `cropLeft` | string | as- |  | write-only | gap |  |
+| picture | `cropTop` | string | as- |  | write-only | gap |  |
+| picture | `cropRight` | string | as- |  | write-only | gap |  |
+| picture | `cropBottom` | string | as- |  | write-only | gap |  |
+| picture | `anchor` | bool | a-g |  | missing | gap |  |
+| picture | `wrap` | string | asg |  | missing | gap |  |
+| picture | `behindText` | bool | asg |  | missing | gap |  |
+| picture | `relativeHeight` | integer | a-g |  | missing | gap |  |
+| picture | `effectExtent` | string | a-- |  | write-only | gap |  |
+| picture | `hPosition` | length | asg |  | missing | gap |  |
+| picture | `vPosition` | length | asg |  | missing | gap |  |
+| picture | `hRelative` | string | asg |  | missing | gap |  |
+| picture | `vRelative` | string | asg |  | missing | gap |  |
+| picture | `hAlign` | string | a-g |  | missing | gap |  |
+| picture | `vAlign` | string | a-g |  | missing | gap |  |
+| picture | `link` | string | a-g |  | missing | gap |  |
+| picture | `width` | length | asg | a-g | supported | partial |  |
+| picture | `height` | length | asg | a-g | supported | partial |  |
+| picture | `fallback` | string | a-- |  | write-only | gap |  |
+| picture | `id` | number | --g |  | missing | — |  |
+| picture | `alt` | string | asg | a-g | supported | partial |  |
+| picture | `contentType` | string | --g |  | missing | — |  |
+| picture | `fileSize` | number | --g |  | missing | — |  |
+| picture | `relId` | string | --g | --g | supported | — |  |
+| picture | `src` | string | as- | a-- | write-only | partial |  |
+| picture | `name` | string |  | a-g | litchi-only | litchi-only |  |
 | ptab | `align` | enum | asg |  | missing | gap |  |
 | ptab | `relativeTo` | enum | asg |  | missing | gap |  |
 | ptab | `leader` | enum | asg |  | missing | gap |  |

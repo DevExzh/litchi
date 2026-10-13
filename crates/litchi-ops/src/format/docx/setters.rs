@@ -40,6 +40,16 @@ pub(crate) enum Setter {
     TableData,
     /// A new row's cell count.
     RowColumns,
+    /// A new picture's image source (record 0251d).
+    PictureSrc,
+    /// A new picture's width.
+    PictureWidth,
+    /// A new picture's height.
+    PictureHeight,
+    /// A new picture's alternative text.
+    PictureAlt,
+    /// A new picture's name.
+    PictureName,
     /// A new comment's author (record 0251c).
     CommentAuthor,
     /// A new comment's author initials.

@@ -155,6 +155,29 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
                 .into_file())
         },
     )?);
+    // A 4x2 PNG, as bytes for the leaf and as a data URI for the unified call.
+    let png_uri = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC";
+    let png = {
+        use base64::Engine as _;
+        base64::engine::general_purpose::STANDARD.decode(png_uri.split_once(',').ok_or("uri")?.1)?
+    };
+    cases.push(measure(
+        "picture_add_png",
+        || {
+            let mut edit = package.edit()?;
+            edit.insert_picture_at(
+                &body_paragraph,
+                None,
+                &litchi_docx::document::NewPicture::new(png.clone()),
+            )?;
+            Ok(edit.commit()?.into_package())
+        },
+        || {
+            Ok(file
+                .add("/body/p[151]", NewNode::new("picture").prop("src", png_uri))?
+                .into_file())
+        },
+    )?);
     println!(
         "{}",
         serde_json::to_string_pretty(&json!({

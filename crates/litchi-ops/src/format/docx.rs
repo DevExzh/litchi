@@ -82,6 +82,7 @@ mod element;
 mod nav;
 mod nested;
 mod node;
+mod picture;
 mod props;
 mod publish;
 pub(crate) mod setters;

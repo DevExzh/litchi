@@ -47,7 +47,7 @@ pub mod snapshot {
 }
 
 pub use limit::LimitKind;
-pub use owned::{Commit, Edit, HyperlinkTarget, NewComment};
+pub use owned::{Commit, Edit, HyperlinkTarget, NewComment, NewPicture};
 
 pub(crate) use transaction::MAX_DOCUMENT_XML_BYTES;
 pub(crate) use transaction::validate_paragraph_text;

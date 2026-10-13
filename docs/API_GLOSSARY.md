@@ -1701,7 +1701,7 @@ The element verbs carry an `_at` suffix on the existing `Edit`
 and record `Operation::{ReplaceElement, InsertElement, RemoveElement}`. No
 second transaction family is introduced.
 
-## DOCX package-graph changes, hyperlinks and comments (0251b, 0251c)
+## DOCX package-graph changes, hyperlinks, comments and pictures (0251b–0251d)
 
 `document::GraphChange` is the package-graph part of a main-document patch:
 relationships of the main part, new related parts, and exact part
@@ -1724,3 +1724,5 @@ the eager `Document::comments`.
 | `document::NewComment` | adopted (0251c) |
 | `Edit::{add_comment_at, remove_comment}` | adopted (0251c) |
 | `source_backed::Package::comments` | adopted (0251c) |
+| `document::NewPicture` | adopted (0251d) |
+| `Edit::insert_picture_at` | adopted (0251d) |

@@ -142,6 +142,8 @@ fn ordinary_reports_hide_native_selection_fields() {
             "cell" => (true, false, true),
             // Record 0251c: comments are added and removed.
             "table" | "row" | "comment" => (false, true, true),
+            // Record 0251d: pictures are added.
+            "picture" => (false, true, false),
             "sdt" => (false, false, true),
             _ => (false, false, false),
         };
@@ -228,6 +230,17 @@ fn ordinary_reports_hide_native_selection_fields() {
                 assert!(property.get(), "hyperlink {}", property.name());
                 assert!(property.add(), "hyperlink {}", property.name());
                 assert_eq!(property.set(), property.name() == "url");
+            } else if element.name() == "picture" && property.name() != "relId" {
+                // Record 0251d: the extent, name and alternative text seed a
+                // new picture; `src` is add-only.
+                assert_eq!(
+                    property.get(),
+                    property.name() != "src",
+                    "picture {}",
+                    property.name()
+                );
+                assert!(!property.set(), "picture {}", property.name());
+                assert!(property.add(), "picture {}", property.name());
             } else if element.name() == "comment" && property.name() != "id" {
                 // Record 0251c: author, initials, date and text seed a new
                 // comment.

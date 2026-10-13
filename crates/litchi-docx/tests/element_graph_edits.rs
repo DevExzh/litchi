@@ -272,3 +272,105 @@ fn comments_are_added_into_new_and_existing_parts_and_removed_exactly() {
     assert_eq!(back.to_bytes().unwrap(), base.clone().to_bytes().unwrap());
     assert!(one.to_bytes().is_ok());
 }
+
+/// A 2x1 PNG header (enough for the size reader and the format check).
+fn png() -> Vec<u8> {
+    let mut png = vec![0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a, 0, 0, 0, 13];
+    png.extend_from_slice(b"IHDR");
+    png.extend_from_slice(&2u32.to_be_bytes());
+    png.extend_from_slice(&1u32.to_be_bytes());
+    png.extend_from_slice(&[8, 6, 0, 0, 0, 0, 0, 0, 0]);
+    png
+}
+
+#[test]
+fn pictures_publish_their_media_part_and_drawing_atomically() {
+    use litchi_docx::document::NewPicture;
+
+    let base = source();
+    let parts = base.opc_package().iter_parts().count();
+    let mut edit = base.edit().unwrap();
+    let run = edit
+        .insert_picture_at(
+            &paragraph(0),
+            Some(Position::new(0)),
+            &NewPicture::new(png()).with_description("A <logo>"),
+        )
+        .unwrap();
+    assert_eq!(run, Position::new(0));
+    // A second picture gets the next media name and drawing identifier.
+    edit.insert_picture_at(
+        &paragraph(1),
+        None,
+        &NewPicture::new(png()).with_size(Some(914_400), None),
+    )
+    .unwrap();
+    let (mut changed, patch) = edit.commit().unwrap().into_parts();
+    assert_eq!(changed.opc_package().iter_parts().count(), parts + 2);
+    let reopened = Package::from_bytes(&changed.to_bytes().unwrap()).unwrap();
+    let document = reopened.document().unwrap();
+    let paragraphs = document.paragraphs().unwrap();
+    let first = paragraphs[0].images().unwrap();
+    assert_eq!(first.len(), 1);
+    assert_eq!(
+        (first[0].width_emu(), first[0].height_emu()),
+        (19_050, 9_525)
+    );
+    assert_eq!(first[0].description(), "A <logo>");
+    let second = paragraphs[1].images().unwrap();
+    assert_eq!(
+        (second[0].width_emu(), second[0].height_emu()),
+        (914_400, 457_200)
+    );
+    assert_ne!(first[0].r_embed(), second[0].r_embed());
+    let main = reopened.opc_package().main_document_part().unwrap();
+    let target = main
+        .rels()
+        .get(first[0].r_embed())
+        .unwrap()
+        .target_partname()
+        .unwrap();
+    assert_eq!(target.as_str(), "/word/media/image1.png");
+    assert_eq!(
+        reopened.opc_package().get_part(&target).unwrap().blob(),
+        png().as_slice()
+    );
+    let xml = main_xml(&reopened);
+    assert!(
+        xml.contains(r#"<wp:docPr id="1" name="Picture 1""#),
+        "{xml}"
+    );
+    assert!(
+        xml.contains(r#"<wp:docPr id="2" name="Picture 2""#),
+        "{xml}"
+    );
+    assert_eq!(reopened.document().unwrap().text().unwrap(), "See Second");
+
+    // Replay and exact inverse.
+    let mut replayed = base.apply(&patch).unwrap();
+    assert_eq!(replayed.to_bytes().unwrap(), changed.to_bytes().unwrap());
+    let mut restored = changed.apply(&patch.inverse()).unwrap();
+    assert_eq!(
+        restored.to_bytes().unwrap(),
+        base.clone().to_bytes().unwrap()
+    );
+
+    // Unrecognized bytes and out-of-range extents are refused.
+    let mut edit = base.edit().unwrap();
+    assert!(
+        edit.insert_picture_at(
+            &paragraph(0),
+            None,
+            &NewPicture::new(b"not an image".to_vec())
+        )
+        .is_err()
+    );
+    assert!(
+        edit.insert_picture_at(
+            &paragraph(0),
+            None,
+            &NewPicture::new(png()).with_size(Some(0), Some(10)),
+        )
+        .is_err()
+    );
+}

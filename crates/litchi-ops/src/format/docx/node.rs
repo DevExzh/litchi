@@ -82,6 +82,8 @@ pub(super) enum Value {
     Hyperlink(Arc<InlineHyperlink>),
     /// The comments part.
     Comments,
+    /// An inline picture of a paragraph.
+    Picture(Arc<litchi_docx::image::InlineImage>),
     /// One comment of the comments part.
     Comment(Arc<litchi_docx::comment::Comment>),
 }

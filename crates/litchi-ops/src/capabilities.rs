@@ -2781,6 +2781,13 @@ impl Element {
                 && readable);
         #[cfg(not(feature = "pptx"))]
         let add = structural;
+        // DOCX pictures are addable but not yet removable (record 0251d).
+        #[cfg(feature = "docx")]
+        let add = add
+            || (self.adapter == Adapter::Docx
+                && self.retains_source != Some(false)
+                && self.data().canonical == "picture"
+                && readable);
         #[cfg(feature = "xlsb")]
         let add = add
             || (self.adapter == Adapter::Xlsb

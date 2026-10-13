@@ -464,6 +464,22 @@ impl<'f> Navigate<'f> for Nav<'f> {
                     None => Lookup::NotApplicable,
                 })
             },
+            (Value::Paragraph { paragraph, .. }, Kind::Picture) => {
+                let pictures = paragraph.images()?;
+                Ok(match pick_index(pictures.len(), &step.select) {
+                    Some(Some(index)) => {
+                        let picture = pictures.into_iter().nth(index).ok_or_else(missing_child)?;
+                        Lookup::Found(Node::new(
+                            self.docx,
+                            Kind::Picture,
+                            Value::Picture(Arc::new(picture)),
+                            address.with(Step::new(Kind::Picture, ordinal(index))),
+                        ))
+                    },
+                    Some(None) => Lookup::Missing,
+                    None => Lookup::NotApplicable,
+                })
+            },
             (Value::Paragraph { paragraph, .. }, Kind::Hyperlink) => {
                 let links = hyperlinks(self.docx, paragraph)?;
                 Ok(match pick_index(links.len(), &step.select) {
@@ -517,6 +533,7 @@ impl<'f> Navigate<'f> for Nav<'f> {
             Value::Paragraph { paragraph, .. } => {
                 out.kind("r", paragraph.addressable_runs()?.len());
                 out.kind("hyperlink", hyperlinks(self.docx, paragraph)?.len());
+                out.kind("picture", paragraph.images()?.len());
             },
             _ => {},
         }

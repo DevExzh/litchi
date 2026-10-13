@@ -2411,9 +2411,9 @@
         "img"
       ],
       "operations": {
-        "add": false,
+        "add": true,
         "set": false,
-        "get": false,
+        "get": true,
         "query": false,
         "remove": false
       },
@@ -2422,11 +2422,43 @@
           "/body/p[N]/picture[M]"
         ]
       },
-      "properties": {},
-      "gap": {
-        "code": "unsupported_capability",
-        "followUp": "R4x",
-        "reason": "pictures have no located reader yet"
+      "properties": {
+        "width": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "height": {
+          "type": "length",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "alt": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "name": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": true
+        },
+        "relId": {
+          "type": "string",
+          "add": false,
+          "set": false,
+          "get": true
+        },
+        "src": {
+          "type": "string",
+          "add": true,
+          "set": false,
+          "get": false
+        }
       }
     },
     {
@@ -2768,13 +2800,6 @@
       "code": "unsupported_capability",
       "followUp": "R4x",
       "reason": "legacy form fields have no located reader yet"
-    },
-    {
-      "subject": "element",
-      "element": "picture",
-      "code": "unsupported_capability",
-      "followUp": "R4x",
-      "reason": "pictures have no located reader yet"
     },
     {
       "subject": "element",

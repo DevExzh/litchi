@@ -465,3 +465,92 @@ fn comments_are_added_read_and_removed_on_both_owners() {
         assert_eq!(error.code(), Code::MissingProperty);
     }
 }
+
+/// A 4x2 PNG.
+const PNG_URI: &str = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC";
+
+#[test]
+fn pictures_are_added_and_read_on_both_owners() {
+    use base64::Engine as _;
+    let png = base64::engine::general_purpose::STANDARD
+        .decode(PNG_URI.split_once(',').unwrap().1)
+        .unwrap();
+    let directory = tempfile::tempdir().expect("temporary directory");
+    let file_source = directory.path().join("logo.png");
+    std::fs::write(&file_source, &png).expect("write the picture source");
+    for eager in [false, true] {
+        let file = open(eager, fixture());
+        let added = file
+            .add(
+                "/body/p[1]",
+                NewNode::new("picture")
+                    .prop("src", PNG_URI)
+                    .prop("alt", "Logo")
+                    .at(Placement::Start),
+            )
+            .unwrap_or_else(|error| panic!("picture add: {error}"));
+        assert_eq!(added.path.to_string(), "/body/p[1]/picture[1]");
+        let file = added.into_file();
+        let picture = "/body/p[1]/picture[1]";
+        // 4x2 pixels at 96 DPI.
+        assert_eq!(property(&file, picture, "width").as_deref(), Some("3pt"));
+        assert_eq!(property(&file, picture, "alt").as_deref(), Some("Logo"));
+        assert_eq!(text(&file, "/body/p[1]"), "Lead link");
+        // A second picture at the end of the paragraph follows the first.
+        let added = file
+            .add("/body/p[1]", NewNode::new("img").prop("src", PNG_URI))
+            .unwrap_or_else(|error| panic!("second picture add: {error}"));
+        assert_eq!(added.path.to_string(), "/body/p[1]/picture[2]");
+        let file = added.into_file();
+        assert_eq!(
+            property(&file, "/body/p[1]/picture[1]", "alt").as_deref(),
+            Some("Logo")
+        );
+
+        // A file source with an explicit width keeps the aspect ratio.
+        let added = file
+            .add(
+                "/body/tbl[1]/tr[1]/tc[1]/p[1]",
+                NewNode::new("image")
+                    .prop("src", file_source.to_str().unwrap())
+                    .prop("width", "2in")
+                    .prop("name", "Cell logo"),
+            )
+            .unwrap_or_else(|error| panic!("cell picture add: {error}"));
+        assert_eq!(
+            added.path.to_string(),
+            "/body/tbl[1]/tr[1]/tc[1]/p[1]/picture[1]"
+        );
+        let reopened = reopen(&added.into_file(), eager);
+        let cell = "/body/tbl[1]/tr[1]/tc[1]/p[1]/picture[1]";
+        assert_eq!(
+            property(&reopened, cell, "width").as_deref(),
+            Some("5.08cm")
+        );
+        assert_eq!(
+            property(&reopened, cell, "height").as_deref(),
+            Some("2.54cm")
+        );
+        assert_eq!(
+            property(&reopened, cell, "name").as_deref(),
+            Some("Cell logo")
+        );
+        assert_eq!(property(&reopened, picture, "alt").as_deref(), Some("Logo"));
+        assert_ne!(
+            property(&reopened, picture, "relId"),
+            property(&reopened, cell, "relId")
+        );
+
+        let error = reopened
+            .add("/body/p[1]", NewNode::new("picture").prop("alt", "nothing"))
+            .expect_err("a picture needs a source");
+        assert_eq!(error.code(), Code::MissingProperty);
+        let error = reopened
+            .add(
+                "/body/p[1]",
+                NewNode::new("picture").prop("src", "data:text/plain;base64,aGVsbG8gd29ybGQ="),
+            )
+            .expect_err("a picture needs an image");
+        assert_eq!(error.code(), Code::InvalidValue);
+    }
+}

@@ -10,8 +10,10 @@ use litchi_core::Position;
 
 mod comments;
 mod graph;
+mod picture;
 pub use comments::NewComment;
 pub use graph::HyperlinkTarget;
+pub use picture::NewPicture;
 
 /// An isolated main-document edit retaining its complete source package.
 ///

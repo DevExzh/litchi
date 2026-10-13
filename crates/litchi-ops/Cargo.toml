@@ -29,7 +29,7 @@ default = []
 # The legacy binary formats remove a compound-file signature after
 # `Signed::unsign` through `litchi-sign` (step S6b, record 0013).
 doc     = ["dep:litchi-cfb", "dep:litchi-doc", "dep:litchi-ole-common", "dep:litchi-sign"]
-docx    = ["dep:litchi-docx", "opc"]
+docx    = ["dep:base64", "dep:litchi-docx", "opc"]
 ppt     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-ppt", "dep:litchi-sign"]
 pptx    = ["dep:base64", "dep:litchi-drawingml", "dep:litchi-ooxml-common", "dep:litchi-pptx", "opc"]
 xls     = ["dep:litchi-cfb", "dep:litchi-ole-common", "dep:litchi-sign", "dep:litchi-xls"]
@@ -77,7 +77,7 @@ caseless = { workspace = true }
 unicode-normalization = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
-base64              = { workspace = true, optional = true } # Markdown and PPTX picture image data URIs
+base64              = { workspace = true, optional = true } # Markdown, DOCX and PPTX picture image data URIs
 chrono              = { workspace = true, optional = true } # RTF metadata timestamps
 litchi-cfb          = { workspace = true, optional = true }
 litchi-core         = { workspace = true }

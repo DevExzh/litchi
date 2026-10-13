@@ -105,6 +105,37 @@ impl Docx {
                 let commit = edit.commit(self)?;
                 Ok((commit, path_with(parent, Some((Kind::Hyperlink, position)))))
             },
+            (NewKind::Picture, Kind::Paragraph) => {
+                let owner = element_path(parent)?;
+                let Value::Paragraph { paragraph, .. } = &parent.value else {
+                    return Err(refusal("the picture parent holds no paragraph"));
+                };
+                let locations = run_locations(self, paragraph)?;
+                let at = sibling_position(self, parent, Kind::Run, locations.len(), placement)?;
+                let direct = match at {
+                    None => None,
+                    Some(index) if index == locations.len() => None,
+                    Some(index) => match locations.get(index).map(Vec::as_slice) {
+                        Some([ElementStep::Run(run)]) => Some(*run),
+                        _ => {
+                            return Err(refusal(
+                                "a picture can only be added beside a direct run of the paragraph",
+                            ));
+                        },
+                    },
+                };
+                let picture = super::picture::new_picture(node.props())?;
+                self.owner().check_source()?;
+                let mut edit = WorkEdit::from(self.eager_editor(editor)?)?;
+                let WorkEdit::Eager(eager) = &mut edit else {
+                    return Err(refusal("pictures need the owning package editor"));
+                };
+                let ordinal = eager
+                    .insert_picture_at(&owner, direct, &picture)
+                    .map_err(Error::from)?;
+                let commit = edit.commit(self)?;
+                Ok((commit, path_with(parent, Some((Kind::Picture, ordinal)))))
+            },
             (NewKind::Comment, Kind::Paragraph | Kind::Run) => {
                 // A paragraph parent comments the whole paragraph; a run
                 // parent comments that direct run.

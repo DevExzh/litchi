@@ -350,7 +350,8 @@ fn misses_and_foreign_axes_have_their_codes() {
         ("/body/bogus[1]", Code::InvalidPath),
         ("/body/p[@style=Heading1]", Code::InvalidPath),
         ("/body/p[text~=x]", Code::InvalidPath),
-        ("/body/p[1]/picture[1]", Code::UnsupportedCapability),
+        // Pictures are read since record 0251d; the report has none.
+        ("/body/p[1]/picture[1]", Code::PathNotFound),
         ("/styles/Heading1", Code::UnsupportedCapability),
         ("/numbering", Code::UnsupportedCapability),
     ];
@@ -589,7 +590,7 @@ fn query_diagnostics_and_refusals() {
     let unknown = Query::parse("p[colour=red]").unwrap();
     let plan = Plan::compile(&unknown, FileFormat::Docx).unwrap();
     assert_eq!(plan.diagnostics().len(), 1);
-    let gap = Query::parse("picture").unwrap();
+    let gap = Query::parse("chart").unwrap();
     assert_eq!(
         Plan::compile(&gap, FileFormat::Docx).unwrap_err().code(),
         Code::UnsupportedCapability
@@ -1040,9 +1041,22 @@ fn capabilities_match_live_paths_queries_and_views() {
         )
         .expect("add a comment")
         .into_file();
+    // Likewise for pictures (record 0251d).
+    let pictured = file
+        .add(
+            "/body/p[1]",
+            crate::NewNode::new("picture").prop(
+                "src",
+                "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAQAAAACCAYAAAB/qH1jAAAAEklEQVR4nGP4z8DwHxkzoAsAAA8hD/EEN8afAAAAAElFTkSuQmCC",
+            ),
+        )
+        .expect("add a picture")
+        .into_file();
     let file_for = |name: &str| {
         if matches!(name, "comments" | "comment") {
             &commented
+        } else if name == "picture" {
+            &pictured
         } else {
             &file
         }

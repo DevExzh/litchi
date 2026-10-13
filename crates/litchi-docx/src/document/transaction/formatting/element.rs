@@ -1233,6 +1233,60 @@ impl Edit {
         matches!(self.projected.conformance, Conformance::Strict)
     }
 
+    /// Insert a run holding an inline picture into the paragraph at
+    /// `paragraph`, before its direct run `at` (after its last child for
+    /// `None`), and return the run's position among the paragraph's direct
+    /// runs. `relationship` is the image relationship the caller stages.
+    pub(crate) fn insert_picture_markup_at(
+        &mut self,
+        paragraph: &ElementPath,
+        at: Option<Position>,
+        relationship: &str,
+        picture: &PictureMarkup<'_>,
+    ) -> Result<Position> {
+        self.ensure_unmanaged("insert_picture_at")?;
+        if paragraph.steps().last().map(|step| step.local()) != Some(b"p".as_slice()) {
+            return Err(not_found());
+        }
+        let conformance = self.projected.conformance;
+        let (_, before) = self.insert_inline_counted(paragraph, at, b"r", true, |prefix| {
+            picture_markup(prefix, conformance, relationship, picture)
+        })?;
+        Ok(Position::new(before))
+    }
+
+    /// The largest drawing object identifier (`wp:docPr/@id`) of the main
+    /// document, if any.
+    pub(crate) fn max_drawing_id(&self) -> Result<Option<u32>> {
+        let xml = self.projected.xml_bytes();
+        let mut reader = quick_xml::Reader::from_reader(xml);
+        let mut maximum = None;
+        loop {
+            match reader
+                .read_event()
+                .map_err(|_| Error::Document(crate::Error::Xml("invalid Word XML".into())))?
+            {
+                Event::Start(element) | Event::Empty(element)
+                    if element.local_name().as_ref() == b"docPr" =>
+                {
+                    let id = element
+                        .unchecked_attributes()
+                        .filter_map(std::result::Result::ok)
+                        .find(|attribute| attribute.key.as_ref() == b"id")
+                        .and_then(|attribute| {
+                            std::str::from_utf8(&attribute.value)
+                                .ok()?
+                                .parse::<u32>()
+                                .ok()
+                        });
+                    maximum = maximum.max(id);
+                },
+                Event::Eof => return Ok(maximum),
+                _ => {},
+            }
+        }
+    }
+
     /// Insert a hyperlink holding `new_run` into the paragraph at
     /// `paragraph`, before its direct run `at`, and return its position
     /// among the paragraph's direct hyperlinks. Exactly one of
@@ -1434,6 +1488,20 @@ impl Edit {
         counted: &[u8],
         markup: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
     ) -> Result<Position> {
+        self.insert_inline_counted(owner, at, counted, false, markup)
+            .map(|(position, _)| position)
+    }
+
+    /// As [`Self::insert_inline`]; with `images`, also return how many
+    /// inline pictures of the owner precede the insertion point.
+    fn insert_inline_counted(
+        &mut self,
+        owner: &ElementPath,
+        at: Option<Position>,
+        counted: &[u8],
+        images: bool,
+        markup: impl FnOnce(&[u8]) -> Result<Vec<u8>>,
+    ) -> Result<(Position, usize)> {
         let local = owner
             .steps()
             .last()
@@ -1476,8 +1544,15 @@ impl Edit {
         after.extend_from_slice(&xml);
         after.extend_from_slice(&base[offset..]);
         let position = layout.count_before(counted, child);
+        let preceding = if images {
+            crate::image::parse_inline_images(&base[..offset])
+                .map_err(Error::Document)?
+                .len()
+        } else {
+            0
+        };
         self.replace_element(owner, &before, &Arc::new(after))?;
-        Ok(Position::new(position))
+        Ok((Position::new(position), preceding))
     }
 
     /// Insert a paragraph into the body, a table cell or a block content
@@ -2053,6 +2128,76 @@ const RELATIONSHIPS_NAMESPACE: &str =
     "http://schemas.openxmlformats.org/officeDocument/2006/relationships";
 const STRICT_RELATIONSHIPS_NAMESPACE: &str =
     "http://purl.oclc.org/ooxml/officeDocument/relationships";
+
+/// The drawing of a new inline picture: its extent in EMUs, its drawing
+/// object identifier, and its name and description.
+pub(crate) struct PictureMarkup<'a> {
+    pub(crate) width: i64,
+    pub(crate) height: i64,
+    pub(crate) id: u32,
+    pub(crate) name: &'a str,
+    pub(crate) description: &'a str,
+}
+
+/// The markup of a run holding an inline picture. Every drawing namespace,
+/// and the relationships namespace of `r:embed`, is declared where it is
+/// used, so the run resolves whatever the document root binds.
+fn picture_markup(
+    prefix: &[u8],
+    conformance: Conformance,
+    relationship: &str,
+    picture: &PictureMarkup<'_>,
+) -> Result<Vec<u8>> {
+    let (prefix, declare) = if prefix.is_empty() {
+        (b"w".as_slice(), true)
+    } else {
+        (prefix, false)
+    };
+    let (wordprocessing, main, pic) = match conformance {
+        Conformance::Strict => (
+            "http://purl.oclc.org/ooxml/drawingml/wordprocessingDrawing",
+            "http://purl.oclc.org/ooxml/drawingml/main",
+            "http://purl.oclc.org/ooxml/drawingml/picture",
+        ),
+        Conformance::Transitional => (
+            "http://schemas.openxmlformats.org/drawingml/2006/wordprocessingDrawing",
+            "http://schemas.openxmlformats.org/drawingml/2006/main",
+            "http://schemas.openxmlformats.org/drawingml/2006/picture",
+        ),
+    };
+    let mut name = Vec::new();
+    super::super::append_literal_escaped_xml(&mut name, picture.name);
+    let name = String::from_utf8(name).map_err(|_| refusal(Refusal::InvalidPropertyValue))?;
+    let mut description = Vec::new();
+    super::super::append_literal_escaped_xml(&mut description, picture.description);
+    let description =
+        String::from_utf8(description).map_err(|_| refusal(Refusal::InvalidPropertyValue))?;
+    let mut relationship_id = Vec::new();
+    super::super::append_literal_escaped_xml(&mut relationship_id, relationship);
+    let relationship_id =
+        String::from_utf8(relationship_id).map_err(|_| refusal(Refusal::InvalidPropertyValue))?;
+    let (width, height, id) = (picture.width, picture.height, picture.id);
+    let relationships = relationships_namespace(conformance);
+    let drawing = format!(
+        r#"<wp:inline xmlns:wp="{wordprocessing}" distT="0" distB="0" distL="0" distR="0"><wp:extent cx="{width}" cy="{height}"/><wp:effectExtent l="0" t="0" r="0" b="0"/><wp:docPr id="{id}" name="{name}" descr="{description}"/><wp:cNvGraphicFramePr><a:graphicFrameLocks xmlns:a="{main}" noChangeAspect="1"/></wp:cNvGraphicFramePr><a:graphic xmlns:a="{main}"><a:graphicData uri="{pic}"><pic:pic xmlns:pic="{pic}"><pic:nvPicPr><pic:cNvPr id="0" name="{name}" descr="{description}"/><pic:cNvPicPr/></pic:nvPicPr><pic:blipFill><a:blip xmlns:r="{relationships}" r:embed="{relationship_id}"/><a:stretch><a:fillRect/></a:stretch></pic:blipFill><pic:spPr><a:xfrm><a:off x="0" y="0"/><a:ext cx="{width}" cy="{height}"/></a:xfrm><a:prstGeom prst="rect"><a:avLst/></a:prstGeom></pic:spPr></pic:pic></a:graphicData></a:graphic></wp:inline>"#
+    );
+    let mut xml = buffer(staging_add(drawing.len(), 128)?)?;
+    open(&mut xml, prefix, "r");
+    if declare {
+        xml.extend_from_slice(b" xmlns:");
+        xml.extend_from_slice(prefix);
+        xml.extend_from_slice(b"=\"");
+        xml.extend_from_slice(conformance.namespace().as_bytes());
+        xml.push(b'"');
+    }
+    xml.push(b'>');
+    open(&mut xml, prefix, "drawing");
+    xml.push(b'>');
+    xml.extend_from_slice(drawing.as_bytes());
+    close(&mut xml, prefix, "drawing");
+    close(&mut xml, prefix, "r");
+    Ok(xml)
+}
 
 fn relationships_namespace(conformance: Conformance) -> &'static str {
     match conformance {

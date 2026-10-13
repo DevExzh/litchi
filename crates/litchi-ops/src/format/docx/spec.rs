@@ -740,6 +740,20 @@ crate::registry::registry! {
     }
 }
 
+// An inline picture of a paragraph (record 0251d): its extent, name,
+// alternative text and image relationship; `src` (a `data:` URI or a file
+// path) seeds a new one.
+crate::registry::registry! {
+    pub(crate) PICTURE_PROPS, PICTURE_REGISTRY: Setter {
+    read_add("width", ValueType::Length(LengthSpec::EXTENT), Setter::PictureWidth, Constraint::None),
+    read_add("height", ValueType::Length(LengthSpec::EXTENT), Setter::PictureHeight, Constraint::None),
+    read_add("alt", ValueType::Text, Setter::PictureAlt, Constraint::None),
+    read_add("name", ValueType::Text, Setter::PictureName, Constraint::NotEmpty),
+    crate::registry::Entry::read(PropSpec::new("relId", ValueType::Text)),
+    add_only("src", ValueType::Text, Setter::PictureSrc, Constraint::NotEmpty),
+    }
+}
+
 // A comment of the comments part (record 0251c): its identity, author and
 // text; `text` and the author's details seed a new comment.
 crate::registry::registry! {
@@ -827,7 +841,6 @@ gaps! {
     BOOKMARK_GAP: "bookmark", "R4x", "bookmarks have no located reader yet";
     FIELD_GAP: "field", "R4x", "fields have no located reader yet";
     FORM_FIELD_GAP: "formfield", "R4x", "legacy form fields have no located reader yet";
-    PICTURE_GAP: "picture", "R4x", "pictures have no located reader yet";
     CHART_GAP: "chart", "R4x", "charts have no located reader yet";
     OLE_GAP: "ole", "R4x", "embedded objects have no located reader yet";
     TOC_GAP: "toc", "R4x", "tables of contents have no located reader yet";
@@ -1173,13 +1186,14 @@ pub(crate) static SPEC: FormatSpec<Kind> = {
                 &["/formfield[NAME]"],
                 &FORM_FIELD_GAP,
             ),
-            gap(
+            element(
                 K::Picture,
                 "picture",
                 &["image", "img", "picture"],
                 &[K::Paragraph],
+                &[],
                 &["/body/p[N]/picture[M]"],
-                &PICTURE_GAP,
+                PICTURE_PROPS,
             ),
             gap(
                 K::Chart,
