@@ -1,0 +1,403 @@
+{
+  "build_provenance": {
+    "binary_manifest": {
+      "bytes": "unspecified",
+      "path": "unspecified",
+      "sha256": "unspecified"
+    },
+    "build_command": "unspecified",
+    "crate": "unified-doc-paragraph-baseline",
+    "crate_version": "0.1.0",
+    "machine": {
+      "arch": "x86_64",
+      "label": "unspecified",
+      "os": "linux",
+      "parallelism": 1
+    },
+    "rustc": "unspecified",
+    "source_commit": "unspecified",
+    "source_digest": "unspecified",
+    "source_manifest": "unspecified",
+    "target": "unspecified"
+  },
+  "counts": [
+    1,
+    10,
+    100,
+    1000
+  ],
+  "diagnostic": false,
+  "equivalence_scope": "warm-up outputs must match byte-for-byte and paragraph-for-paragraph; every timed leg uses the same fixed corpus and replacement",
+  "excluded_from_timing": [
+    "corpus generation and source fingerprint manifest",
+    "fresh unified File open before every unified sample",
+    "path parsing and target preparation",
+    "warm-up",
+    "output serialization for the unified File",
+    "paragraph text and exact-byte validation",
+    "output destruction"
+  ],
+  "failure_matrix": [],
+  "failure_matrix_scope": [
+    "Builder corpus generation",
+    "native body-text snapshot open and replacement",
+    "unified source-backed File open and set",
+    "native and unified output text",
+    "native and unified exact bytes",
+    "ABBA timed samples"
+  ],
+  "format": "doc",
+  "order": "ABBA",
+  "performance_claim": "scoped single-paragraph timing evidence only; no batch scaling, allocation, RSS, open, save, or full-goal acceptance claim",
+  "results": [
+    {
+      "artifact": {
+        "bytes": 15360,
+        "generator": "litchi_doc::Builder::build()?.to_bytes(); one plain seed paragraph per requested position",
+        "paragraphs": 1,
+        "sha256": "eee068a43824b4ef3ad1f14339d2b3241fc85427eb142a7b4a90541edc11c2b7"
+      },
+      "diagnostic": null,
+      "input_cost": {
+        "native": {
+          "snapshot_open_inside_timing": true,
+          "source_bytes_prepared_outside_timing": true,
+          "timed_call_boundary": "Snapshot::open(bytes.clone()) + Edit::replace_paragraph + Edit::commit; committed Snapshot bytes are handed off"
+        },
+        "pairing": "one freshly opened source-backed owner and one variable-width paragraph replacement per sample; no path parsing or output verification occurs inside timing",
+        "unified": {
+          "file_open_outside_timing": true,
+          "fresh_file_per_sample": true,
+          "path_prepared_outside_timing": true,
+          "source_promotion_inside_timing": true,
+          "timed_call_boundary": "File::set(&parsed_path, text property); returned File publication is not serialized inside timing"
+        }
+      },
+      "input_paragraph_text_digest": "019aa8926d25c9c5c7446c70a28d7c4c8c852fc3bddb9c935920963914d0d575",
+      "native_median_ns": 50760,
+      "native_ns": [
+        65000,
+        56430,
+        51191,
+        52180,
+        49281,
+        51061,
+        50490,
+        51050,
+        67350,
+        52510,
+        48060,
+        50710,
+        50031,
+        49521,
+        47620,
+        49601,
+        48330,
+        50760
+      ],
+      "native_output_sha256": "f63efb8a888deefb154f7b8c0fb57d8eab3c2c5545a9d71fd4934b7bbbd7b8c9",
+      "native_route": "doc_source_promoted_native_body_text_snapshot_set_v1",
+      "operation": "paragraph_text_set",
+      "output_paragraph_text_digest": "3bf447996840dfc6a351503425f4e964cd2888129019139229503193aedd285a",
+      "paragraphs": 1,
+      "replacement_utf16_units": 58,
+      "target_path": "/body/p[1]",
+      "target_position": 0,
+      "unified_median_ns": 50971,
+      "unified_ns": [
+        66581,
+        57350,
+        53570,
+        50980,
+        52040,
+        50770,
+        52570,
+        48901,
+        50971,
+        53050,
+        49050,
+        49110,
+        50840,
+        49310,
+        49480,
+        49790,
+        49180,
+        62731
+      ],
+      "unified_output_sha256": "f63efb8a888deefb154f7b8c0fb57d8eab3c2c5545a9d71fd4934b7bbbd7b8c9",
+      "unified_over_native": 1.004156816390859,
+      "unified_route": "doc_source_promoted_unified_file_set_fresh_source_v2",
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 16896,
+        "native_sha256": "f63efb8a888deefb154f7b8c0fb57d8eab3c2c5545a9d71fd4934b7bbbd7b8c9",
+        "unified_bytes": 16896,
+        "unified_sha256": "f63efb8a888deefb154f7b8c0fb57d8eab3c2c5545a9d71fd4934b7bbbd7b8c9"
+      }
+    },
+    {
+      "artifact": {
+        "bytes": 15360,
+        "generator": "litchi_doc::Builder::build()?.to_bytes(); one plain seed paragraph per requested position",
+        "paragraphs": 10,
+        "sha256": "492668f3616ad3ab7d3e2a1b032aa4c3d96455e58903255d5c6e1b818a910344"
+      },
+      "diagnostic": null,
+      "input_cost": {
+        "native": {
+          "snapshot_open_inside_timing": true,
+          "source_bytes_prepared_outside_timing": true,
+          "timed_call_boundary": "Snapshot::open(bytes.clone()) + Edit::replace_paragraph + Edit::commit; committed Snapshot bytes are handed off"
+        },
+        "pairing": "one freshly opened source-backed owner and one variable-width paragraph replacement per sample; no path parsing or output verification occurs inside timing",
+        "unified": {
+          "file_open_outside_timing": true,
+          "fresh_file_per_sample": true,
+          "path_prepared_outside_timing": true,
+          "source_promotion_inside_timing": true,
+          "timed_call_boundary": "File::set(&parsed_path, text property); returned File publication is not serialized inside timing"
+        }
+      },
+      "input_paragraph_text_digest": "726fc6a4e5c12eb69ab0877680e9a89b8e691a4a3e9907eca26f98a0284dfaa6",
+      "native_median_ns": 63211,
+      "native_ns": [
+        69110,
+        65151,
+        61360,
+        79370,
+        64440,
+        63781,
+        62340,
+        63160,
+        61651,
+        63831,
+        62300,
+        63630,
+        60121,
+        63211,
+        60500,
+        63070,
+        61361,
+        63441
+      ],
+      "native_output_sha256": "d6c68a25b10b0071a715331a2e2c3d9aaea4ce84ba75e629aa0771bd5182d8c4",
+      "native_route": "doc_source_promoted_native_body_text_snapshot_set_v1",
+      "operation": "paragraph_text_set",
+      "output_paragraph_text_digest": "2f475290d5b6f00837b80dfffb180a26d567bd0d8f4fb00b365085d8b18b8bb8",
+      "paragraphs": 10,
+      "replacement_utf16_units": 58,
+      "target_path": "/body/p[6]",
+      "target_position": 5,
+      "unified_median_ns": 62551,
+      "unified_ns": [
+        68761,
+        64970,
+        68270,
+        62201,
+        63070,
+        61110,
+        62300,
+        62551,
+        61670,
+        68570,
+        72391,
+        63650,
+        61120,
+        60580,
+        61711,
+        61470,
+        63110,
+        61760
+      ],
+      "unified_output_sha256": "d6c68a25b10b0071a715331a2e2c3d9aaea4ce84ba75e629aa0771bd5182d8c4",
+      "unified_over_native": 0.989558779326383,
+      "unified_route": "doc_source_promoted_unified_file_set_fresh_source_v2",
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 16896,
+        "native_sha256": "d6c68a25b10b0071a715331a2e2c3d9aaea4ce84ba75e629aa0771bd5182d8c4",
+        "unified_bytes": 16896,
+        "unified_sha256": "d6c68a25b10b0071a715331a2e2c3d9aaea4ce84ba75e629aa0771bd5182d8c4"
+      }
+    },
+    {
+      "artifact": {
+        "bytes": 23552,
+        "generator": "litchi_doc::Builder::build()?.to_bytes(); one plain seed paragraph per requested position",
+        "paragraphs": 100,
+        "sha256": "61d75926b9e541c7fc136a84b919d239c971b5d14a6460412f8e73252ed98ea7"
+      },
+      "diagnostic": null,
+      "input_cost": {
+        "native": {
+          "snapshot_open_inside_timing": true,
+          "source_bytes_prepared_outside_timing": true,
+          "timed_call_boundary": "Snapshot::open(bytes.clone()) + Edit::replace_paragraph + Edit::commit; committed Snapshot bytes are handed off"
+        },
+        "pairing": "one freshly opened source-backed owner and one variable-width paragraph replacement per sample; no path parsing or output verification occurs inside timing",
+        "unified": {
+          "file_open_outside_timing": true,
+          "fresh_file_per_sample": true,
+          "path_prepared_outside_timing": true,
+          "source_promotion_inside_timing": true,
+          "timed_call_boundary": "File::set(&parsed_path, text property); returned File publication is not serialized inside timing"
+        }
+      },
+      "input_paragraph_text_digest": "4ac89a57a1583dd6f6eb26992fd68db82f3ce6197064dc92e89d595bed0f9e79",
+      "native_median_ns": 214831,
+      "native_ns": [
+        214581,
+        220831,
+        204141,
+        218671,
+        204021,
+        217171,
+        203251,
+        219181,
+        201921,
+        218471,
+        203791,
+        214831,
+        202021,
+        215351,
+        199571,
+        221481,
+        200371,
+        221761
+      ],
+      "native_output_sha256": "e4af40ca384a6af077a625ce25b559595df65752068996bb201e47101d2aefbd",
+      "native_route": "doc_source_promoted_native_body_text_snapshot_set_v1",
+      "operation": "paragraph_text_set",
+      "output_paragraph_text_digest": "5034aa4342d323108fbc9e3c9c3de2059e72b9828f4fa75a12ac8fa4f03b123f",
+      "paragraphs": 100,
+      "replacement_utf16_units": 58,
+      "target_path": "/body/p[51]",
+      "target_position": 50,
+      "unified_median_ns": 231842,
+      "unified_ns": [
+        235761,
+        228881,
+        230671,
+        238631,
+        230021,
+        229191,
+        228251,
+        231622,
+        233591,
+        231581,
+        231041,
+        242182,
+        235032,
+        227271,
+        236131,
+        232502,
+        231842,
+        232391
+      ],
+      "unified_output_sha256": "e4af40ca384a6af077a625ce25b559595df65752068996bb201e47101d2aefbd",
+      "unified_over_native": 1.079183171888601,
+      "unified_route": "doc_source_promoted_unified_file_set_fresh_source_v2",
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 26112,
+        "native_sha256": "e4af40ca384a6af077a625ce25b559595df65752068996bb201e47101d2aefbd",
+        "unified_bytes": 26112,
+        "unified_sha256": "e4af40ca384a6af077a625ce25b559595df65752068996bb201e47101d2aefbd"
+      }
+    },
+    {
+      "artifact": {
+        "bytes": 97792,
+        "generator": "litchi_doc::Builder::build()?.to_bytes(); one plain seed paragraph per requested position",
+        "paragraphs": 1000,
+        "sha256": "1633670880b648a305ff93dbe2b200aae15a669434a7179cf09a9411cc51165b"
+      },
+      "diagnostic": null,
+      "input_cost": {
+        "native": {
+          "snapshot_open_inside_timing": true,
+          "source_bytes_prepared_outside_timing": true,
+          "timed_call_boundary": "Snapshot::open(bytes.clone()) + Edit::replace_paragraph + Edit::commit; committed Snapshot bytes are handed off"
+        },
+        "pairing": "one freshly opened source-backed owner and one variable-width paragraph replacement per sample; no path parsing or output verification occurs inside timing",
+        "unified": {
+          "file_open_outside_timing": true,
+          "fresh_file_per_sample": true,
+          "path_prepared_outside_timing": true,
+          "source_promotion_inside_timing": true,
+          "timed_call_boundary": "File::set(&parsed_path, text property); returned File publication is not serialized inside timing"
+        }
+      },
+      "input_paragraph_text_digest": "4d2f0cd1adfcb485172c79605c09ded68fbc2f929fe9a58463e2a6554e518971",
+      "native_median_ns": 2090602,
+      "native_ns": [
+        2114401,
+        2111381,
+        2081162,
+        2082422,
+        2074371,
+        2079621,
+        2063351,
+        2073351,
+        2080272,
+        2102972,
+        2089391,
+        2102791,
+        2090602,
+        2100062,
+        2089731,
+        2095982,
+        2102781,
+        2107771
+      ],
+      "native_output_sha256": "fb1ce61ea06d3c8ae71faf50f731d171bef96d77fb7cec3407c82925e37bea55",
+      "native_route": "doc_source_promoted_native_body_text_snapshot_set_v1",
+      "operation": "paragraph_text_set",
+      "output_paragraph_text_digest": "f72b8abec8987c4effa36f8e2cfe8062932bb4ec636a4b8ac367a4ed7111fa2a",
+      "paragraphs": 1000,
+      "replacement_utf16_units": 58,
+      "target_path": "/body/p[501]",
+      "target_position": 500,
+      "unified_median_ns": 2088621,
+      "unified_ns": [
+        2319953,
+        2078782,
+        2083402,
+        2102051,
+        2082012,
+        2093602,
+        2088621,
+        2087042,
+        2087381,
+        2089501,
+        2090502,
+        2090342,
+        2078231,
+        2072521,
+        2076372,
+        2088701,
+        2090501,
+        2076892
+      ],
+      "unified_output_sha256": "fb1ce61ea06d3c8ae71faf50f731d171bef96d77fb7cec3407c82925e37bea55",
+      "unified_over_native": 0.9990524260476169,
+      "unified_route": "doc_source_promoted_unified_file_set_fresh_source_v2",
+      "warm_equivalence": {
+        "kind": "exact_bytes",
+        "native_bytes": 115712,
+        "native_sha256": "fb1ce61ea06d3c8ae71faf50f731d171bef96d77fb7cec3407c82925e37bea55",
+        "unified_bytes": 115712,
+        "unified_sha256": "fb1ce61ea06d3c8ae71faf50f731d171bef96d77fb7cec3407c82925e37bea55"
+      }
+    }
+  ],
+  "rounds": 9,
+  "routes": [
+    "doc_source_promoted_native_body_text_snapshot_set_v1",
+    "doc_source_promoted_unified_file_set_fresh_source_v2"
+  ],
+  "samples_per_leg": 18,
+  "schema": 1,
+  "timing_scope": "native Snapshot::open(bytes.clone()) + one variable-width Edit::replace_paragraph + commit versus one File::set on a freshly opened source-backed File with a prepared paragraph path; source promotion is inside both legs, while fresh File open, output serialization, and verification are outside",
+  "workload": "one-variable-width-body-paragraph-set"
+}
