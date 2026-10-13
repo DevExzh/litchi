@@ -37,7 +37,7 @@ use crate::value::compare::Compiled;
 /// let query = Query::parse("paragraph[style=Heading1]")?;
 /// // Format adapters register their query support in M1 step R4; until a
 /// // format has one, compiling for it is `unsupported_capability`.
-/// let error = Plan::compile(&query, FileFormat::Odt).unwrap_err();
+/// let error = Plan::compile(&query, FileFormat::Odg).unwrap_err();
 /// assert_eq!(error.code(), litchi_ops::Code::UnsupportedCapability);
 /// # Ok::<(), litchi_ops::Error>(())
 /// ```
@@ -123,6 +123,8 @@ impl<'q> Plan<'q> {
             FileFormat::Pptx => super::compile::compile::<crate::format::pptx::Nav<'static>>(query),
             #[cfg(feature = "rtf")]
             FileFormat::Rtf => super::compile::compile::<crate::format::rtf::Nav<'static>>(query),
+            #[cfg(feature = "odt")]
+            FileFormat::Odt => super::compile::compile::<crate::format::odt::Nav<'static>>(query),
             #[cfg(feature = "ppt")]
             FileFormat::Ppt => super::compile::compile::<crate::format::ppt::Nav<'static>>(query),
             _ => {

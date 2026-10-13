@@ -458,7 +458,8 @@ fn rtf_advertises_native_paragraph_structural_writes_and_keeps_closure_gaps() {
     feature = "xlsx",
     feature = "xlsb",
     feature = "xls",
-    feature = "rtf"
+    feature = "rtf",
+    feature = "odt"
 ))]
 #[test]
 fn spec_tables_agree_with_their_vocabularies() {
@@ -517,6 +518,8 @@ fn spec_tables_agree_with_their_vocabularies() {
     check(&crate::format::pptx::SPEC, FileFormat::Pptx);
     #[cfg(feature = "rtf")]
     check(&crate::format::rtf::SPEC, FileFormat::Rtf);
+    #[cfg(feature = "odt")]
+    check(&crate::format::odt::SPEC, FileFormat::Odt);
 }
 
 #[test]

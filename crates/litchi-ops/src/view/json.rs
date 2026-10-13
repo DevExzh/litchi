@@ -12,7 +12,8 @@
         feature = "ppt",
         feature = "xlsb",
         feature = "xls",
-        feature = "rtf"
+        feature = "rtf",
+        feature = "odt"
     )),
     allow(
         dead_code,
@@ -67,6 +68,8 @@ enum Inner<'f> {
     Xls(crate::format::xls::ViewJson),
     #[cfg(feature = "rtf")]
     Rtf(crate::format::rtf::views::Json),
+    #[cfg(feature = "odt")]
+    Odt(crate::format::odt::views::Json),
     /// Keeps `'f` in use; uninhabited.
     #[allow(dead_code, reason = "uninhabited: only keeps the lifetime in use")]
     Never(Infallible, PhantomData<&'f ()>),
@@ -121,6 +124,14 @@ impl Json<'_> {
         }
     }
 
+    /// An ODT view.
+    #[cfg(feature = "odt")]
+    pub(crate) fn odt(json: crate::format::odt::views::Json) -> Self {
+        Self {
+            inner: Inner::Odt(json),
+        }
+    }
+
     /// An RTF view.
     #[cfg(feature = "rtf")]
     pub(crate) fn rtf(json: crate::format::rtf::views::Json) -> Self {
@@ -149,6 +160,8 @@ impl Serialize for Json<'_> {
             Inner::Xls(json) => json.serialize(serializer),
             #[cfg(feature = "rtf")]
             Inner::Rtf(json) => json.serialize(serializer),
+            #[cfg(feature = "odt")]
+            Inner::Odt(json) => json.serialize(serializer),
             Inner::Never(never, _) => match *never {},
         }
     }

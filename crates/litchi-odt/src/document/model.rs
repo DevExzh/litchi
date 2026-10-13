@@ -30,6 +30,8 @@ pub(crate) struct State {
     pub(crate) style_registry: StyleRegistry,
     /// Repairs tolerated while the package was opened.
     pub(crate) tolerance: ToleranceReport,
+    /// The structural body index, built on first use.
+    pub(crate) body: std::sync::OnceLock<crate::body::Tree>,
 }
 
 impl std::fmt::Debug for Document {

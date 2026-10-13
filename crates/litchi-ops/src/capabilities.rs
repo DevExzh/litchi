@@ -2278,6 +2278,8 @@ const fn view_gap(adapter: Adapter, mode: Mode) -> Option<&'static GapSpec> {
         Adapter::Ppt => m1_view_gap(mode),
         #[cfg(feature = "rtf")]
         Adapter::Rtf => m1_view_gap(mode),
+        #[cfg(feature = "odt")]
+        Adapter::Odt => m1_view_gap(mode),
     }
 }
 
@@ -2413,6 +2415,9 @@ check_capabilities!(crate::format::ppt::SPEC);
 
 #[cfg(feature = "rtf")]
 check_capabilities!(crate::format::rtf::SPEC);
+
+#[cfg(feature = "odt")]
+check_capabilities!(crate::format::odt::SPEC);
 
 /// Byte equality usable in constant evaluation.
 const fn same(a: &str, b: &str) -> bool {
