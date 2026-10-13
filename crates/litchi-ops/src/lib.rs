@@ -105,6 +105,7 @@ pub mod compat;
 mod create;
 pub mod error;
 mod file;
+mod find;
 pub mod format;
 mod handler;
 pub mod import;

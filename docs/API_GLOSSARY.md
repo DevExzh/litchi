@@ -2027,3 +2027,33 @@ owning package once for these writes (`Docx` keeps the promotion).
 | CLI `litchi merge`, Python `File.merge` | adopted (0274) |
 
 See [0274](unified-ops/0274-template-merge.md).
+
+## Formatting-aware find/replace (record 0273)
+
+Find/replace is not a verb: as OfficeCLI's `set --find`, a `File::set`
+(and `Edit::set`, `File::apply`, batch `set` items) whose properties name
+`find` searches the target's subtree. The keywords are OfficeCLI's `find` and
+`replace`, plus Litchi's `matchCase` (default `true`) and `wholeWord`
+(default `false`); `regex` is admitted only as `false` (record 0010 Q3).
+Every other property of the call formats the replaced, or matched, text. The
+match count is `Applied::matched() -> Option<usize>` (CLI `--json` and Python
+result dicts: `matched`, OfficeCLI's name). `capabilities::Verb::Replace`
+(`"replace"`) reports format support, and the schema export lists the
+keywords under `setKeywords`. Leaf primitives: the DOCX transaction lists a
+paragraph's searchable `w:t` nodes and rewrites them, optionally isolating
+byte ranges into runs of their own (`TextNode`, `TextNodeRewrite`,
+`ParagraphRewrite`, `Edit::{text_nodes, rewrite_text_nodes}`); PPTX text
+edits gain `TextTarget::RunSpan` (a byte span of one run, split out with a
+copy of the run's properties); XLSX worksheets report rich-text cells
+(`Worksheet::has_rich_text`).
+
+| Name | Status |
+|---|---|
+| `find`, `replace`, `matchCase`, `wholeWord`, `regex` properties of `set` | adopted (0273) |
+| `Applied::matched` | adopted (0273) |
+| `capabilities::Verb::Replace` | adopted (0273) |
+| `litchi_docx::document::{TextNode, TextNodeRewrite, ParagraphRewrite}`, `Edit::{text_nodes, rewrite_text_nodes}` (snapshot and package edits) | adopted (0273) |
+| `litchi_pptx::opened::TextTarget::RunSpan` | adopted (0273) |
+| `litchi_xlsx::Worksheet::has_rich_text` | adopted (0273) |
+
+See [0273](unified-ops/0273-find-replace.md).

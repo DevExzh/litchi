@@ -927,22 +927,15 @@ fn officecli_option_spellings_reach_the_command_channel() {
         ],
     );
 
-    // `--find T` is `--prop find=T`: the strict default names the property.
+    // `--find T` is `--prop find=T`; a find needs `replace` (or a format
+    // property), as OfficeCLI's does (record 0273).
     let run = expect(
         4,
-        [
-            "set",
-            arg(&path),
-            "/body/p[1]",
-            "--find",
-            "fox",
-            "--replace",
-            "cat",
-            "--json",
-        ],
+        ["set", arg(&path), "/body/p[1]", "--find", "fox", "--json"],
     );
     let error: Value = serde_json::from_str(&run.stderr).expect("JSON error");
-    assert_eq!(error["property"], "find");
+    assert_eq!(error["code"], "missing_property");
+    assert_eq!(error["property"], "replace");
     let run = expect(
         4,
         [
@@ -978,6 +971,64 @@ fn officecli_option_spellings_reach_the_command_channel() {
         before,
         "refusals write nothing"
     );
+}
+
+/// `set --find T --replace R` rewrites the matches and reports their count
+/// as OfficeCLI's `matched` (record 0273); zero matches write nothing.
+#[test]
+fn find_and_replace_report_the_match_count() {
+    let dir = tempfile::tempdir().expect("tempdir");
+    let path = scratch(dir.path(), "f.docx", None);
+    expect(
+        0,
+        [
+            "add",
+            arg(&path),
+            "/body",
+            "--type",
+            "paragraph",
+            "--prop",
+            "text=the fox and the fox",
+        ],
+    );
+    let run = expect(
+        0,
+        [
+            "set",
+            arg(&path),
+            "/",
+            "--find",
+            "fox",
+            "--replace",
+            "cat",
+            "--json",
+        ],
+    );
+    let report = applied(&run);
+    assert_eq!(report["results"][0]["matched"], 2);
+    assert_eq!(report["results"][0]["changed"], true);
+    assert_eq!(text_of(&path, "/body/p[1]"), json!("the cat and the cat"));
+    let run = expect(
+        0,
+        ["set", arg(&path), "/", "--find", "fox", "--replace", "cat"],
+    );
+    assert!(run.stdout.contains("(0 matched)"), "{}", run.stdout);
+    let before = std::fs::read(&path).expect("read");
+    let run = expect(
+        0,
+        [
+            "set",
+            arg(&path),
+            "/",
+            "--prop",
+            "find=absent",
+            "--prop",
+            "replace=x",
+            "--json",
+        ],
+    );
+    assert_eq!(applied(&run)["results"][0]["matched"], 0);
+    assert_eq!(std::fs::read(&path).expect("read"), before);
 }
 
 #[test]

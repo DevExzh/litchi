@@ -345,3 +345,57 @@ fn source_owner_writes_shape_properties_like_the_eager_owner() -> Result<()> {
     );
     Ok(())
 }
+
+#[test]
+fn run_spans_split_runs_and_format_only_the_span() -> Result<()> {
+    let package = deck()?;
+    let span = |start, end| TextTarget::RunSpan {
+        shape: at(0),
+        paragraph: at(0),
+        run: at(0),
+        start,
+        end,
+    };
+    // "alpha" → "al" + bold "pha"; the parts keep the run's markup.
+    let bold = TextProperties::default().with_bold(Some(true));
+    let (after, changed) = apply(&package, &[TextEdit::new(span(2, 5), bold)])?;
+    assert_eq!(changed, 1);
+    let xml = slide_xml(&after)?;
+    let scene = crate::shape::Scene::read(&xml)?;
+    assert_eq!(scene.at(0)?.text(), Some("alpha"));
+    assert!(
+        contains(&xml, ">al</a:t></a:r><a:r><a:rPr"),
+        "{}",
+        String::from_utf8_lossy(&xml)
+    );
+    assert!(contains(&xml, "b=\"1\""));
+    // A middle span with replacement text: three runs.
+    let text = TextProperties::default()
+        .with_text("L & P")
+        .with_italic(Some(true));
+    let (after, _) = apply(&package, &[TextEdit::new(span(1, 4), text)])?;
+    let xml = slide_xml(&after)?;
+    let scene = crate::shape::Scene::read(&xml)?;
+    assert_eq!(scene.at(0)?.text(), Some("aL & Pa"));
+    assert!(contains(&xml, "L &amp; P"));
+    // Edits apply in order: later spans address the runs a split made.
+    let (after, changed) = apply(
+        &package,
+        &[
+            TextEdit::new(span(3, 4), bold),
+            TextEdit::new(
+                span(0, 1),
+                TextProperties::default().with_italic(Some(true)),
+            ),
+        ],
+    )?;
+    assert_eq!(changed, 2);
+    let xml = slide_xml(&after)?;
+    let scene = crate::shape::Scene::read(&xml)?;
+    assert_eq!(scene.at(0)?.text(), Some("alpha"));
+    // Empty, out-of-range and off-boundary spans are refused.
+    for (start, end) in [(2, 2), (4, 9)] {
+        assert!(apply(&package, &[TextEdit::new(span(start, end), bold)]).is_err());
+    }
+    Ok(())
+}

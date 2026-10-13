@@ -212,9 +212,10 @@ pub(crate) fn mode(name: &str) -> Result<BatchMode, Failure> {
 }
 
 /// One dict per item result, in input order: OfficeCLI's `BatchResult`
-/// members `index` and `success`, then `changed` and, for `add`, the new
-/// element's `path`; a failed item has `code`, `error` (the message) and
-/// `suggestion` instead.
+/// members `index` and `success`, then `changed`, for `add` the new
+/// element's `path`, and for a `set` with `find` the match count `matched`;
+/// a failed item has `code`, `error` (the message) and `suggestion`
+/// instead.
 pub(crate) fn results<'py>(
     py: Python<'py>,
     results: &[ItemResult],
@@ -229,6 +230,9 @@ pub(crate) fn results<'py>(
                 dict.set_item(pyo3::intern!(py, "changed"), applied.changed)?;
                 if let Some(path) = applied.path.as_deref() {
                     dict.set_item(pyo3::intern!(py, "path"), path.to_string())?;
+                }
+                if let Some(matched) = applied.matched() {
+                    dict.set_item(pyo3::intern!(py, "matched"), matched)?;
                 }
             },
             ItemResult::Failed(error) => {

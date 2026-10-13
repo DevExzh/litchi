@@ -102,10 +102,9 @@ fn every_format_has_one_answer_for_its_reads() {
         }
         // Import is a worksheet verb with its own answer (`m4_verbs_...`);
         // merge is a template verb (`merge_is_a_template_verb`).
-        for verb in Verb::ALL
-            .into_iter()
-            .filter(|verb| verb.is_edit() && !matches!(verb, Verb::Import | Verb::Merge))
-        {
+        for verb in Verb::ALL.into_iter().filter(|verb| {
+            verb.is_edit() && !matches!(verb, Verb::Import | Verb::Merge | Verb::Replace)
+        }) {
             #[cfg(feature = "pptx")]
             if format == FileFormat::Pptx
                 && matches!(verb, Verb::Add | Verb::Remove | Verb::Move | Verb::Swap)
@@ -628,6 +627,38 @@ fn doc_enumerates_its_unprojected_element_gaps() {
             "duplicate {:?}",
             gap.subject()
         );
+    }
+}
+
+/// Record 0273: find/replace answers for the formats with a find adapter.
+#[test]
+fn replace_is_supported_where_a_find_adapter_exists() {
+    for format in [
+        FileFormat::Docx,
+        FileFormat::Xlsx,
+        FileFormat::Pptx,
+        FileFormat::Doc,
+        FileFormat::Ppt,
+        FileFormat::Xls,
+        FileFormat::Xlsb,
+        FileFormat::Rtf,
+        FileFormat::Odt,
+    ] {
+        let support = Capabilities::of(format).verb(Verb::Replace);
+        let adapter = crate::read::Adapter::of(format).is_some();
+        let integrated = adapter
+            && matches!(
+                format,
+                FileFormat::Docx | FileFormat::Xlsx | FileFormat::Pptx
+            );
+        assert_eq!(support.is_supported(), integrated, "{format:?}");
+        if adapter && !integrated {
+            assert_eq!(
+                support.code(),
+                Some(Code::UnsupportedCapability),
+                "{format:?}"
+            );
+        }
     }
 }
 

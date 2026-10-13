@@ -43,7 +43,7 @@ pub(crate) use durable::durable_transfer_operations;
 pub use durable::{Composition, History, JoinError, PreparedEdit, ThreeWayError, ThreeWayPlan};
 pub use formatting::{
     BodyAnchor, BodyBlock, ElementAnchor, ElementPath, ElementStep, MAX_NEW_TABLE_DIMENSION,
-    NewParagraph, NewRun, NewTable, RunAnchor,
+    NewParagraph, NewRun, NewTable, ParagraphRewrite, RunAnchor, TextNode, TextNodeRewrite,
 };
 pub use litchi_core::patch::{
     CompositionLimits, HistoryLimits, MergeChoice, SubEditConflict, SubEditJoinFailure,
