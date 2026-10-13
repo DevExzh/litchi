@@ -60,6 +60,15 @@ impl Pptx {
         node: NewNode<'_>,
         limits: &SemanticLimits,
     ) -> Result<(Commit, Path<'static>)> {
+        if ["picture", "image", "img"]
+            .iter()
+            .any(|kind| node.kind().eq_ignore_ascii_case(kind))
+        {
+            return self.add_picture(parent, node, limits);
+        }
+        if node.kind().eq_ignore_ascii_case("comment") {
+            return self.add_comment(parent, node, limits);
+        }
         if node.kind().eq_ignore_ascii_case("shape") || node.kind().eq_ignore_ascii_case("textbox")
         {
             let source = self.editable()?;
@@ -78,7 +87,7 @@ impl Pptx {
         if !node.kind().eq_ignore_ascii_case("slide") {
             return Err(error(
                 Code::UnsupportedElement,
-                "PPTX insertion currently supports slides and text-box shapes",
+                "PPTX insertion currently supports slides, text-box shapes, pictures and comments",
             ));
         }
         let mut layout = None;
@@ -125,9 +134,12 @@ impl Pptx {
                         match property {
                             SlideProperty::Layout => layout = Some(owned),
                             SlideProperty::Name => name = Some(owned),
-                            SlideProperty::Hidden => unreachable!("text property"),
+                            SlideProperty::Hidden | SlideProperty::Notes => {
+                                unreachable!("text property")
+                            },
                         }
                     },
+                    SlideProperty::Notes => unreachable!("notes are not an add setter"),
                     SlideProperty::Hidden => {
                         let Some(Scalar::Bool(value)) = value else {
                             unreachable!("slide visibility coercion")

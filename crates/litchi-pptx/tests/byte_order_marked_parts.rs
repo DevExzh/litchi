@@ -143,8 +143,8 @@ fn differential(
         let (plain, _) = rebuild(archive, &|_| false, indented);
         let (marked, marked_input) = rebuild(archive, &mark, indented);
         assert!(!marked_input.is_empty(), "the scenario must mark a member");
-        let mut plain_package = Package::from_vec(plain).unwrap();
-        let mut marked_package = Package::from_vec(marked).unwrap();
+        let mut plain_package = Package::from_reader(std::io::Cursor::new(plain)).unwrap();
+        let mut marked_package = Package::from_reader(std::io::Cursor::new(marked)).unwrap();
         let plain_observed = scenario(&mut plain_package);
         let marked_observed = scenario(&mut marked_package);
         assert_eq!(marked_observed, plain_observed, "indented: {indented}");

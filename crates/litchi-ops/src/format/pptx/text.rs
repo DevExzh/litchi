@@ -84,6 +84,15 @@ pub(crate) fn cell_text(item: &TableItem) -> Result<String> {
     }
 }
 
+/// A table cell's local solid RGB fill.
+pub(crate) fn cell_fill(item: &TableItem) -> Result<Option<[u8; 3]>> {
+    let table = table(&item.table.handle)?;
+    match table.cell(item.row as usize, item.column as usize)? {
+        Some(cell) => Ok(cell.fill()?),
+        None => Ok(None),
+    }
+}
+
 /// The text of every cell of a table, row by row.
 pub(crate) fn table_cells(handle: &ShapeHandle) -> Result<Vec<String>> {
     let table = table(handle)?;

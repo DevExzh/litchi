@@ -170,7 +170,7 @@ fn sign(plain: &[u8]) -> Vec<u8> {
         .unwrap();
     let bytes = PackageWriter::to_bytes(&package).unwrap();
     assert!(
-        Package::from_vec(bytes.clone())
+        Package::from_reader(std::io::Cursor::new(bytes.clone()))
             .unwrap()
             .opc()
             .unwrap()
@@ -183,7 +183,7 @@ fn sign(plain: &[u8]) -> Vec<u8> {
 /// `prepare` applied, then signed again in-test: a signed package that holds
 /// the content an exact no-op needs.
 fn signed_with(name: &str, prepare: impl FnOnce(&mut Package)) -> Vec<u8> {
-    let mut package = Package::from_vec(fixture(name)).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
     package.unsign().unwrap();
     prepare(&mut package);
     sign(&package.to_bytes().unwrap())
@@ -453,7 +453,7 @@ fn families() -> Vec<Family> {
             }),
             no_op: Some(|package| {
                 let commit = package.change_tracking(0_usize)?.edit().commit()?;
-                assert!(!commit.is_changed());
+                assert!(commit.patch().is_noop());
                 package.apply_change_tracking_commit(commit).map(drop)
             }),
         },
@@ -874,7 +874,8 @@ fn every_family_refuses_a_signed_package_until_it_is_unsigned() {
             };
 
             if let Some(no_op) = family.no_op {
-                let mut package = Package::from_vec(source.clone()).unwrap();
+                let mut package =
+                    Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
                 no_op(&mut package).unwrap_or_else(|error| panic!("{label}: no-op: {error:?}"));
                 assert!(package.opc().unwrap().is_signed(), "{label}");
                 assert_eq!(package.to_bytes().unwrap(), source, "{label}: no-op");
@@ -883,7 +884,7 @@ fn every_family_refuses_a_signed_package_until_it_is_unsigned() {
             let Some(change) = family.change else {
                 continue;
             };
-            let mut package = Package::from_vec(source.clone()).unwrap();
+            let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
             let error = (change.edit)(&mut package)
                 .expect_err(&format!("{label}: a signed package must refuse"));
             assert!(is_refusal(&error), "{label}: {error:?}");
@@ -895,7 +896,7 @@ fn every_family_refuses_a_signed_package_until_it_is_unsigned() {
                 .unwrap_or_else(|error| panic!("{label}: after unsign: {error:?}"));
             let output = package.to_bytes().unwrap();
             assert!(!carries_signature(&output), "{label}");
-            let reopened = Package::from_vec(output).unwrap();
+            let reopened = Package::from_reader(std::io::Cursor::new(output)).unwrap();
             assert!(
                 (change.shows)(&reopened).unwrap(),
                 "{label}: the change is not visible"
@@ -909,7 +910,7 @@ fn every_family_refuses_a_signed_package_until_it_is_unsigned() {
 #[test]
 fn raw_edit_that_unsigns_explicitly_publishes_without_a_signature() {
     for name in SIGNED {
-        let mut package = Package::from_vec(fixture(name)).unwrap();
+        let mut package = Package::from_reader(std::io::Cursor::new(fixture(name))).unwrap();
         package
             .edit_opc(|opc| {
                 opc.unsign();
@@ -928,7 +929,7 @@ fn raw_edit_that_unsigns_explicitly_publishes_without_a_signature() {
 #[test]
 fn notes_refuse_a_signed_package_until_it_is_unsigned() {
     let source = sign(&test_data("poi/test-data/slideshow/prProps.pptx"));
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
     let graph = package.notes().unwrap().expect("notes graph");
 
     package.put_notes(graph).unwrap();
@@ -942,7 +943,7 @@ fn notes_refuse_a_signed_package_until_it_is_unsigned() {
     assert!(package.remove_notes(0_usize).unwrap());
     let output = package.to_bytes().unwrap();
     assert!(!carries_signature(&output));
-    let reopened = Package::from_vec(output).unwrap();
+    let reopened = Package::from_reader(std::io::Cursor::new(output)).unwrap();
     assert!(
         reopened
             .notes()
@@ -990,7 +991,7 @@ fn model3d_refuses_a_signed_package_until_it_is_unsigned() {
             })
             .unwrap();
     });
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
     let model = package
         .model3d(0_usize, "3D Model")
         .unwrap()
@@ -1016,7 +1017,7 @@ fn model3d_refuses_a_signed_package_until_it_is_unsigned() {
     let output = package.to_bytes().unwrap();
     assert!(!carries_signature(&output));
     assert!(matches!(
-        Package::from_vec(output)
+        Package::from_reader(std::io::Cursor::new(output))
             .unwrap()
             .model3d(0_usize, "3D Model"),
         Ok(None)
@@ -1059,7 +1060,7 @@ fn legacy_comment_no_ops_keep_a_signed_package_exact() {
             })
             .unwrap();
     });
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
 
     package
         .edit_opc(|opc| {
@@ -1129,7 +1130,7 @@ fn modern_comment_no_ops_keep_a_signed_package_exact() {
             })
             .unwrap();
     });
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
     let authors = [MODERN_AUTHOR_A.to_owned(), MODERN_AUTHOR_B.to_owned()];
 
     package
@@ -1194,7 +1195,7 @@ fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
             })
             .unwrap();
     });
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
     package
         .edit_opc(|opc| {
             assert!(modern_comments::update_modern_comment_changes(opc, |_| {})?);
@@ -1223,7 +1224,7 @@ fn modern_comment_command_no_op_keeps_a_signed_package_exact() {
 fn theme_no_ops_keep_a_signed_package_exact() {
     const AUTHORED: &str = "/ppt/theme/theme2.xml";
     let (colors, fonts) = {
-        let package = Package::from_vec(fixture(SIGNED[1])).unwrap();
+        let package = Package::from_reader(std::io::Cursor::new(fixture(SIGNED[1]))).unwrap();
         let current = theme::load(package.opc().unwrap(), THEME).unwrap();
         (current.colors, current.fonts)
     };
@@ -1243,7 +1244,7 @@ fn theme_no_ops_keep_a_signed_package_exact() {
             })
             .unwrap();
     });
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
 
     package
         .edit_opc(|opc| {
@@ -1292,7 +1293,7 @@ fn shape_put_no_ops_keep_a_signed_package_exact() {
             .put_shape_design_element(0_usize, SHAPE, true)
             .unwrap();
     });
-    let mut package = Package::from_vec(source.clone()).unwrap();
+    let mut package = Package::from_reader(std::io::Cursor::new(source.clone())).unwrap();
 
     package
         .put_shape_classification(0_usize, SHAPE, Outcome::Header)

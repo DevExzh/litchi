@@ -10,6 +10,7 @@ mod validation;
 #[cfg(test)]
 mod tests;
 
+pub use crate::diagnostics::Diagnostics;
 pub use codec::{CONTENT_TYPE, RELATIONSHIP_TYPE};
 #[allow(
     clippy::module_name_repetitions,
@@ -20,6 +21,6 @@ pub use model::{
     MediaKey, MediaMetadata, RegionSetting, RegionSettingKind, Target, Track, TracksInfo,
 };
 pub use package::{apply_media_commit, apply_media_patch, load, load_media, store};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use transaction::{Commit, Edit, Patch, Revision, Snapshot};
 
 pub use tracks_info::{NARRATION_URI, TRACKS_INFO_URI};

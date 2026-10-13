@@ -119,7 +119,7 @@ fn build_plain_archive(slide_count: usize, prefix: &str) -> Result<Vec<u8>, Box<
 }
 
 fn package_slide_names(bytes: &[u8]) -> Result<Vec<String>, Box<dyn StdError>> {
-    let package = Package::from_vec(bytes.to_vec())?;
+    let package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
     let snapshot = package.opened_presentation()?;
     let mut names = Vec::new();
     reserve_exact(
@@ -137,7 +137,7 @@ fn package_slide_names(bytes: &[u8]) -> Result<Vec<String>, Box<dyn StdError>> {
 }
 
 fn remove_bytes(bytes: &[u8], position: usize) -> Result<Vec<u8>, Box<dyn StdError>> {
-    let mut package = Package::from_vec(bytes.to_vec())?;
+    let mut package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
     let snapshot = package.opened_presentation()?;
     let plan = snapshot.plan_slide_removal(position)?;
     package.apply_slide_removal_plan(&plan)?;
@@ -145,7 +145,7 @@ fn remove_bytes(bytes: &[u8], position: usize) -> Result<Vec<u8>, Box<dyn StdErr
 }
 
 fn move_bytes(bytes: &[u8], from: usize, to: usize) -> Result<Vec<u8>, Box<dyn StdError>> {
-    let mut package = Package::from_vec(bytes.to_vec())?;
+    let mut package = Package::from_reader(std::io::Cursor::new(bytes.to_vec()))?;
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
     let changed = transaction.move_slide(from, litchi_core::Position::new(to))?;
@@ -436,7 +436,7 @@ fn verify_partial_zero_sinks(
     position: usize,
     expected_output: &[u8],
 ) -> Result<(bool, bool), Box<dyn StdError>> {
-    let mut package = Package::from_vec(source.to_vec())?;
+    let mut package = Package::from_reader(std::io::Cursor::new(source.to_vec()))?;
     apply_boundary_to_package(&mut package, operation, position)?;
     let fail_after = u64::try_from(expected_output.len() / 2)
         .map_err(|_error| "PPTX boundary partial sink length exceeds u64")?
@@ -467,26 +467,26 @@ fn mutate_order(package: &mut Package) -> Result<(), Box<dyn StdError>> {
 }
 
 fn verify_remove_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<dyn StdError>> {
-    let source_package = Package::from_vec(corpus.archive.clone())?;
+    let source_package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     let plan = source_package
         .opened_presentation()?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)?;
     let forward = SlideRemovalPatch::from_bytes(&plan.patch().to_bytes()?)?;
     let inverse = SlideRemovalPatch::from_bytes(&plan.patch().inverse().to_bytes()?)?;
-    let mut applied = Package::from_vec(corpus.archive.clone())?;
+    let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     applied.apply_slide_removal_patch(&forward)?;
     let applied_bytes = applied.to_bytes()?;
     let forward_verified = output_names(&applied_bytes)?.len() == SLIDE_COUNT - 1;
-    let mut restored = Package::from_vec(applied_bytes)?;
+    let mut restored = Package::from_reader(std::io::Cursor::new(applied_bytes))?;
     restored.apply_slide_removal_patch(&inverse)?;
     let restored_bytes = restored.to_bytes()?;
     let inverse_verified = package_slide_names(&restored_bytes)? == corpus.slide_names
         && super::raw_zip_members(&restored_bytes)? == super::raw_zip_members(&corpus.archive)?;
 
-    let mut stale = Package::from_vec(corpus.archive.clone())?;
+    let mut stale = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     mutate_order(&mut stale)?;
     let stale_verified = stale.apply_slide_removal_patch(&forward).is_err();
-    let mut foreign = Package::from_vec(corpus.foreign_archive.clone())?;
+    let mut foreign = Package::from_reader(std::io::Cursor::new(corpus.foreign_archive.clone()))?;
     let foreign_verified = foreign.apply_slide_removal_patch(&forward).is_err();
     Ok((
         forward_verified,
@@ -497,7 +497,7 @@ fn verify_remove_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Bo
 }
 
 fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<dyn StdError>> {
-    let package = Package::from_vec(corpus.archive.clone())?;
+    let package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     let snapshot = package.opened_presentation()?;
     let mut transaction = snapshot.edit();
     transaction.move_slide(
@@ -507,20 +507,20 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
     let commit = transaction.commit()?;
     let forward = Patch::from_bytes(&commit.patch().to_bytes()?)?;
     let inverse = Patch::from_bytes(&forward.inverse().to_bytes()?)?;
-    let mut applied = Package::from_vec(corpus.archive.clone())?;
+    let mut applied = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     applied = applied.apply(&forward)?;
     let applied_bytes = applied.to_bytes()?;
     let forward_verified = verify_semantic_output(&applied_bytes, Operation::Move, 0, corpus)?
         && verify_untouched_raw_members(&corpus.archive, &applied_bytes, Operation::Move, None)?;
-    let mut restored = Package::from_vec(applied_bytes)?;
+    let mut restored = Package::from_reader(std::io::Cursor::new(applied_bytes))?;
     restored = restored.apply(&inverse)?;
     let restored_bytes = restored.to_bytes()?;
     let inverse_verified = restored_bytes == corpus.archive;
 
-    let mut stale = Package::from_vec(corpus.archive.clone())?;
+    let mut stale = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     mutate_order(&mut stale)?;
     let stale_verified = stale.apply(&forward).is_err();
-    let foreign = Package::from_vec(corpus.foreign_archive.clone())?;
+    let foreign = Package::from_reader(std::io::Cursor::new(corpus.foreign_archive.clone()))?;
     let foreign_verified = foreign.apply(&forward).is_err();
     Ok((
         forward_verified,
@@ -533,7 +533,7 @@ fn verify_move_durable(corpus: &Corpus) -> Result<(bool, bool, bool, bool), Box<
 fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>> {
     let source = corpus.dependency_archive.as_slice();
     let source_before = source.to_vec();
-    let mut package = Package::from_vec(source_before.clone())?;
+    let mut package = Package::from_reader(std::io::Cursor::new(source_before.clone()))?;
     let snapshot = package.opened_presentation()?;
     let source_revision = snapshot.revision();
     let before_names = snapshot
@@ -576,7 +576,7 @@ fn verify_dependency_refusal(corpus: &Corpus) -> Result<bool, Box<dyn StdError>>
 fn verify_refusal_gates(
     corpus: &Corpus,
 ) -> Result<(bool, bool, bool, bool, bool, bool), Box<dyn StdError>> {
-    let one_slide = Package::from_vec(build_plain_archive(1, "sole")?)?;
+    let one_slide = Package::from_reader(std::io::Cursor::new(build_plain_archive(1, "sole")?))?;
     let one_slide_verified = matches!(
         one_slide.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {
@@ -585,7 +585,7 @@ fn verify_refusal_gates(
         })
     );
 
-    let unknown = Package::from_vec(add_unknown_member(&corpus.archive)?)?;
+    let unknown = Package::from_reader(std::io::Cursor::new(add_unknown_member(&corpus.archive)?))?;
     let unknown_verified = matches!(
         unknown.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {
@@ -596,7 +596,7 @@ fn verify_refusal_gates(
 
     let dependency_verified = verify_dependency_refusal(corpus)?;
 
-    let mce = Package::from_vec(add_mce_marker(&corpus.archive)?)?;
+    let mce = Package::from_reader(std::io::Cursor::new(add_mce_marker(&corpus.archive)?))?;
     let mce_verified = matches!(
         mce.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {
@@ -605,7 +605,7 @@ fn verify_refusal_gates(
         })
     );
 
-    let signed = Package::from_vec(add_signature_marker(&corpus.archive)?)?;
+    let signed = Package::from_reader(std::io::Cursor::new(add_signature_marker(&corpus.archive)?))?;
     let signed_verified = matches!(
         signed.opened_presentation()?.plan_slide_removal(0),
         Err(Error::SlideRemovalPlan {
@@ -616,12 +616,12 @@ fn verify_refusal_gates(
 
     let limits =
         Limits::new(64, 1, 1_024, 1, 1, 1).ok_or("PPTX boundary test limits must be nonzero")?;
-    let remove_limited = Package::from_vec(corpus.archive.clone())?
+    let remove_limited = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?
         .opened_presentation_with_limits(limits)?
         .plan_slide_removal(REPRESENTATIVE_REMOVE_POSITION)
         .is_err();
     let move_limited = {
-        let package = Package::from_vec(corpus.archive.clone())?;
+        let package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
         let snapshot = package.opened_presentation_with_limits(limits)?;
         let mut transaction = snapshot.edit();
         transaction.move_slide(
@@ -643,7 +643,7 @@ fn verify_refusal_gates(
 fn verify_boundary_semantics(corpus: &Corpus) -> Result<(bool, bool), Box<dyn StdError>> {
     let mut remove_verified = true;
     for (output, position) in corpus.remove_outputs.iter().zip(REMOVE_POSITIONS) {
-        let package = Package::from_vec(output.clone())?;
+        let package = Package::from_reader(std::io::Cursor::new(output.clone()))?;
         let snapshot = package.opened_presentation()?;
         let expected = corpus
             .slide_names
@@ -717,7 +717,7 @@ fn verify_untimed_gates(corpus: &Corpus) -> Result<(), Box<dyn StdError>> {
 }
 
 fn selected_slide_name(corpus: &Corpus, position: usize) -> Result<String, Box<dyn StdError>> {
-    let package = Package::from_vec(corpus.archive.clone())?;
+    let package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
     let snapshot = package.opened_presentation()?;
     let slide = snapshot
         .slides()
@@ -819,7 +819,7 @@ pub(super) fn run(
         .and_then(|value| value.checked_add(64 * 1024))
         .ok_or("PPTX boundary sink budget overflows u64")?;
     for iteration in 0..iteration_count(warmup_iterations, samples)? {
-        let mut package = Package::from_vec(corpus.archive.clone())?;
+        let mut package = Package::from_reader(std::io::Cursor::new(corpus.archive.clone()))?;
         let snapshot = package.opened_presentation()?;
         let mut transaction = (operation == Operation::Move).then(|| snapshot.edit());
 
@@ -866,7 +866,7 @@ pub(super) fn run(
         let output = sink.bytes;
 
         let started = Instant::now();
-        let reopened = Package::from_vec(output.clone())?;
+        let reopened = Package::from_reader(std::io::Cursor::new(output.clone()))?;
         let reopened_snapshot = reopened.opened_presentation()?;
         let reopened_names = reopened_snapshot
             .slides()

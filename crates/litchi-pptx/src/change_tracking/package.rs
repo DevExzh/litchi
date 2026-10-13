@@ -38,7 +38,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
             "change-tracking patch target differs from its semantic result".into(),
         ));
     }
-    if patch.is_changed() {
+    if !patch.is_noop() {
         refuse_signed_change(package)?;
         let mutable_part = package.get_part_mut(&patch.owner)?;
         crate::parts::validate_content_type(mutable_part, ct::PML_SLIDE)?;

@@ -1389,9 +1389,126 @@
           "scope": "litchi_pptx::slide::model",
           "replacement": "use slide::Selector with semantic names or Position",
           "recursive": false
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use open_with_options/from_reader_with_options/from_bytes_with_options with OpenOptions (ADR 0034 §4; record 0252)"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use open_with_options/from_reader_with_options/from_bytes_with_options with OpenOptions (ADR 0034 §4; record 0252)"
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use open_with_options/from_reader_with_options/from_bytes_with_options with OpenOptions (ADR 0034 §4; record 0252)"
+        },
+        {
+          "name": "from_vec",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use from_bytes or from_reader (ADR 0034 §4 deletes from_vec; record 0252)"
+        },
+        {
+          "name": "from_vec_with_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use from_bytes or from_reader (ADR 0034 §4 deletes from_vec; record 0252)"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_cache_limits",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_cache_limits",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_cache_limits",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_cache_limits",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "StaleSource",
+          "scope": "litchi_pptx::Error",
+          "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pptx",
+          "replacement": "module-local Edit (ADR 0034 §3; record 0252)"
+        },
+        {
+          "name": "AuthorPresenceTransaction",
+          "scope": "litchi_pptx",
+          "replacement": "AuthorPresenceEdit (record 0252)"
+        },
+        {
+          "name": "CommentThreadingTransaction",
+          "scope": "litchi_pptx",
+          "replacement": "CommentThreadingEdit (record 0252)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_pptx",
+          "replacement": "drop the Edit (ADR 0034 §3; record 0252)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pptx",
+          "replacement": "diagnostics().changed() on edits/commits, is_noop() on patches (record 0252)"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_pptx::opened"
+      ]
     },
     {
       "id": "pptx-full",
@@ -1802,9 +1919,151 @@
           "name": "is_empty",
           "scope": "litchi_pptx::opened::Patch",
           "replacement": "use Patch::is_noop()"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use open_with_options/from_reader_with_options/from_bytes_with_options with OpenOptions (ADR 0034 §4; record 0252)"
+        },
+        {
+          "name": "from_reader_with_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use open_with_options/from_reader_with_options/from_bytes_with_options with OpenOptions (ADR 0034 §4; record 0252)"
+        },
+        {
+          "name": "from_bytes_with_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use open_with_options/from_reader_with_options/from_bytes_with_options with OpenOptions (ADR 0034 §4; record 0252)"
+        },
+        {
+          "name": "from_vec",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use from_bytes or from_reader (ADR 0034 §4 deletes from_vec; record 0252)"
+        },
+        {
+          "name": "from_vec_with_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use from_bytes or from_reader (ADR 0034 §4 deletes from_vec; record 0252)"
+        },
+        {
+          "name": "from_vec_with_password",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use the *_with_password_and_options routes with OpenOptions (record 0252)"
+        },
+        {
+          "name": "from_vec_with_password_and_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use the *_with_password_and_options routes with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_password_and_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use the *_with_password_and_options routes with OpenOptions (record 0252)"
+        },
+        {
+          "name": "from_reader_with_password_and_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use the *_with_password_and_options routes with OpenOptions (record 0252)"
+        },
+        {
+          "name": "from_bytes_with_password_and_limits",
+          "scope": "litchi_pptx::Package",
+          "replacement": "use the *_with_password_and_options routes with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_cache_limits",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_cache_limits",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentation",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_cache_limits",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_cache_limits",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "open_with_limits_and_cache_limits_and_execution_context",
+          "scope": "litchi_pptx::SourceBackedPresentationEditor",
+          "replacement": "use open_with_options with OpenOptions (record 0252)"
+        },
+        {
+          "name": "StaleSource",
+          "scope": "litchi_pptx::Error",
+          "replacement": "Error::PatchConflict (ADR 0034 §6; record 0252)"
+        },
+        {
+          "name": "Transaction",
+          "scope": "litchi_pptx",
+          "replacement": "module-local Edit (ADR 0034 §3; record 0252)"
+        },
+        {
+          "name": "AuthorPresenceTransaction",
+          "scope": "litchi_pptx",
+          "replacement": "AuthorPresenceEdit (record 0252)"
+        },
+        {
+          "name": "CommentThreadingTransaction",
+          "scope": "litchi_pptx",
+          "replacement": "CommentThreadingEdit (record 0252)"
+        },
+        {
+          "name": "rollback",
+          "scope": "litchi_pptx",
+          "replacement": "drop the Edit (ADR 0034 §3; record 0252)"
+        },
+        {
+          "name": "is_changed",
+          "scope": "litchi_pptx",
+          "replacement": "diagnostics().changed() on edits/commits, is_noop() on patches (record 0252)"
         }
       ],
-      "families": []
+      "families": [
+        "litchi_pptx::opened"
+      ]
     },
     {
       "id": "xlsx-minimal",

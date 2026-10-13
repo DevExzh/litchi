@@ -4,7 +4,7 @@ use std::sync::Arc;
 use litchi_opc::{OpcPackage, PackURI, TargetMode};
 
 use super::super::model::{Frame, Kind, Mode, Object, Target};
-use super::codec::{self, Edit, Located};
+use super::codec::{self, Located};
 use super::model::Definition;
 use super::validation::{
     MAX_OBJECTS, MAX_RELATIONSHIPS, validate_anchor, validate_kind, validate_name,
@@ -147,7 +147,7 @@ impl Snapshot {
     }
 
     #[must_use]
-    pub fn edit(&self) -> Transaction {
+    pub fn edit(&self) -> Edit {
         let parts: HashMap<PackURI, &PartSource> = self
             .parts
             .iter()
@@ -168,7 +168,7 @@ impl Snapshot {
                 }),
             })
             .collect();
-        Transaction {
+        Edit {
             source: self.clone(),
             working,
         }
@@ -193,12 +193,12 @@ struct Working {
 
 /// Failure-atomic editor over one slide-owned OLE object collection.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     working: Vec<Working>,
 }
 
-impl Transaction {
+impl Edit {
     #[must_use]
     pub fn source(&self) -> &Snapshot {
         &self.source
@@ -218,8 +218,7 @@ impl Transaction {
             .ok_or_else(|| index_error(index, self.working.len()))
     }
 
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         if self.working.len() != self.source.objects.len() {
             return true;
         }
@@ -229,6 +228,12 @@ impl Transaction {
                 || value.payload.as_ref().map(|value| value.as_slice())
                     != self.source.payload(index).ok().flatten()
         })
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Add an inert embedded or linked OLE object and return its transaction index.
@@ -481,11 +486,6 @@ impl Transaction {
         Ok(Commit { snapshot, patch })
     }
 
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     fn normalize_indices(&mut self) {
         for (index, value) in self.working.iter_mut().enumerate() {
             value.object.index = index;
@@ -519,9 +519,14 @@ impl Commit {
         &self.patch
     }
 
+    fn is_changed(&self) -> bool {
+        !self.patch.is_noop()
+    }
+
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.patch.is_empty()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[must_use]
@@ -549,13 +554,8 @@ impl Patch {
     }
 
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     #[must_use]
@@ -842,7 +842,7 @@ fn build_after(source: &Snapshot, working: &[Working]) -> Result<Build> {
         .collect();
     for (index, _) in source.objects.iter().enumerate() {
         if !kept.contains(&index) {
-            edits.push(Edit {
+            edits.push(codec::Edit {
                 range: document.frames[index].frame.clone(),
                 replacement: Vec::new(),
             });
@@ -863,7 +863,7 @@ fn add_object_edits(
     located: &Located,
     before: &Object,
     after: &Object,
-    edits: &mut Vec<Edit>,
+    edits: &mut Vec<codec::Edit>,
 ) -> Result<()> {
     if before.name != after.name
         && let Some(edit) = codec::attribute_edit(

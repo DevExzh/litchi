@@ -10,8 +10,9 @@ mod package;
 mod transaction;
 mod validation;
 
+pub use crate::diagnostics::Diagnostics;
 pub use package::{apply_commit, apply_patch, load};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use transaction::{Commit, Edit, Patch, Revision, Snapshot};
 
 #[cfg(test)]
 mod tests;

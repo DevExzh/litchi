@@ -67,7 +67,7 @@ fn snapshot() -> Snapshot {
 fn no_op_commit_preserves_exact_slide_source() {
     let snapshot = snapshot();
     let commit = snapshot.edit().commit().unwrap();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     assert_eq!(commit.snapshot().source_xml(), snapshot.source_xml());
 }
 

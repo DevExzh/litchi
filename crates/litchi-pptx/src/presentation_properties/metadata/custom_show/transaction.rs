@@ -114,8 +114,8 @@ impl Snapshot {
     /// Start an isolated edit over the typed custom-show list.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             original: self.clone(),
             working: self.list.clone(),
         }
@@ -136,12 +136,12 @@ impl Snapshot {
 
 /// A failure-atomic edit staged against one source snapshot.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     original: Snapshot,
     working: List,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the currently staged typed list.
     #[inline]
     #[must_use]
@@ -156,11 +156,14 @@ impl Transaction {
         self.list()
     }
 
-    /// Return whether the semantic list differs from the source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.list.shows != self.working.shows
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Replace the complete typed list after validating all slide references.
@@ -458,16 +461,14 @@ pub struct Commit {
 }
 
 impl Commit {
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
     }
 
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     #[inline]
@@ -519,14 +520,8 @@ impl Patch {
 
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     #[must_use]

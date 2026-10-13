@@ -126,8 +126,8 @@ impl Snapshot {
 
     /// Start a detached atomic edit over this snapshot.
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             working: self.graph.clone(),
         }
@@ -143,12 +143,12 @@ impl Snapshot {
 
 /// Failure-atomic editor for inert notes text, master XML, and theme XML.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     working: Graph,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the immutable source snapshot used by this edit.
     #[must_use]
     pub fn source(&self) -> &Snapshot {
@@ -161,10 +161,14 @@ impl Transaction {
         &self.working
     }
 
-    /// Whether any staged resource bytes or graph metadata differ from source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.working != self.source.graph
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Replace the complete detached graph without changing physical owners.
@@ -304,12 +308,6 @@ impl Transaction {
         };
         Ok(Commit { snapshot, patch })
     }
-
-    /// Discard edits and recover the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
 }
 
 /// A successful detached edit and its reversible package patch.
@@ -332,16 +330,14 @@ impl Commit {
         &self.patch
     }
 
-    /// Whether publication changes any captured graph bytes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.patch.is_empty()
+    fn is_changed(&self) -> bool {
+        !self.patch.is_noop()
     }
 
-    /// Alias for callers that prefer a verb-style result.
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub fn changed(&self) -> bool {
-        self.is_changed()
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume the commit into its target snapshot and patch.
@@ -379,14 +375,8 @@ impl Patch {
 
     /// Whether this patch is an exact no-op.
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Whether this patch changes the source graph.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch.

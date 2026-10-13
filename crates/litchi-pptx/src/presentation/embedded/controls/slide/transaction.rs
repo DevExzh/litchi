@@ -167,8 +167,8 @@ impl Snapshot {
     /// Start an isolated transaction over this snapshot.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             source: self.clone(),
             control: self.control.clone(),
             binary: self.binary.as_ref().map(|value| Arc::clone(&value.bytes)),
@@ -189,13 +189,13 @@ impl Snapshot {
 
 /// Failure-atomic editor over typed control and descriptor metadata.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     source: Snapshot,
     control: Control,
     binary: Option<Arc<Vec<u8>>>,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the immutable source snapshot used by this edit.
     #[inline]
     #[must_use]
@@ -210,9 +210,7 @@ impl Transaction {
         &self.control
     }
 
-    /// Whether any staged metadata or payload operation changes the source.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.control != self.source.control
             || self.binary.as_ref().map(|value| value.as_slice())
                 != self
@@ -220,6 +218,12 @@ impl Transaction {
                     .binary
                     .as_ref()
                     .map(|value| value.bytes.as_slice())
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Replace or remove the owning slide control's display name.
@@ -430,12 +434,6 @@ impl Transaction {
         Ok(Commit { snapshot, patch })
     }
 
-    /// Discard staged edits and return the exact source snapshot.
-    #[must_use]
-    pub fn rollback(self) -> Snapshot {
-        self.source
-    }
-
     fn descriptor_mut(&mut self) -> Result<&mut Descriptor> {
         self.control
             .descriptor
@@ -466,11 +464,14 @@ impl Commit {
         &self.patch
     }
 
-    /// Whether the transaction changes any serialized graph bytes or edges.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.patch.is_empty()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume this commit into its target snapshot and patch.
@@ -514,11 +515,14 @@ impl Patch {
         self.before.same_source(&self.after)
     }
 
-    /// Public spelling for callers that inspect transaction changes.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.is_empty()
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Build the exact inverse patch.

@@ -252,7 +252,7 @@ fn focused_source_chunks_publish_and_keep_the_patch_reversible() {
     let mut edit = editor.edit_slide(0).unwrap();
     assert_eq!(edit.set_shape_text_chunks(&chunks).unwrap(), 3);
     let commit = edit.commit();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     assert!(commit.patch().inverse().apply(commit.snapshot()).is_ok());
     let mut output = Vec::new();
     editor
@@ -276,7 +276,7 @@ fn focused_source_chunks_publish_and_keep_the_patch_reversible() {
     ];
     assert_eq!(edit.set_shape_property_chunks(&[&properties]).unwrap(), 2);
     let commit = edit.commit();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_slide_commit_to_stream(&mut output, &commit)
@@ -483,7 +483,7 @@ fn all_equal_chunks_are_exact_noops_for_eager_source_and_focused_edits() {
     let mut edit = editor.edit_slide(0).unwrap();
     assert_eq!(edit.set_shape_text_chunks(text_chunks).unwrap(), 0);
     let commit = edit.commit();
-    assert!(!commit.is_changed());
+    assert!(!commit.diagnostics().changed());
     let mut output = Vec::new();
     editor
         .publish_slide_commit_to_stream(&mut output, &commit)

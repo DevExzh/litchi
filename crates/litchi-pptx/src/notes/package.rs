@@ -371,7 +371,7 @@ pub(crate) fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Sna
     if !current.same_source(patch.before()) {
         return Err(invalid("notes patch source is stale"));
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
     refuse_signed_change(package)?;

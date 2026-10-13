@@ -305,6 +305,16 @@ pub enum Error {
         limit: usize,
     },
 
+    /// A primary presentation transaction exceeded one dimension of its
+    /// [`crate::opened::Limits`].
+    #[error("PresentationML edit exceeds its {kind} limit of {maximum}")]
+    EditLimit {
+        /// The refused dimension.
+        kind: crate::opened::LimitKind,
+        /// Active upper bound.
+        maximum: usize,
+    },
+
     /// A bounded `PresentationML` operation could not reserve required memory.
     #[error("could not reserve memory for PresentationML {resource}: {source}")]
     Allocation {
@@ -474,9 +484,18 @@ pub enum Error {
         reason: &'static str,
     },
 
-    /// A source-backed slide patch was created against different exact slide bytes.
-    #[error("source-backed PPTX slide patch source is stale")]
-    StaleSource,
+    /// A patch's base does not match the package it is applied to: it was
+    /// created against different exact source bytes or another revision.
+    #[error("PPTX patch base does not match the target package")]
+    PatchConflict,
+
+    /// An owning ingress route was given a policy only a positional-source
+    /// owner can honor.
+    #[error("owning PPTX ingress does not support the {policy} open policy")]
+    UnsupportedOpenPolicy {
+        /// The refused policy.
+        policy: crate::OpenPolicy,
+    },
 
     /// A durable patch carries a superseded revision proof: a complete-package
     /// revision from a superseded algebra, or serialized-archive revisions of

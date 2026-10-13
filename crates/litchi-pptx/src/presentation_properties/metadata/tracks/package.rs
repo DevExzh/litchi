@@ -50,7 +50,7 @@ pub fn apply_media_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snap
     {
         return Err(invalid("media tracks source is stale"));
     }
-    if !patch.is_changed() {
+    if patch.is_noop() {
         return load_media(package, &patch.key)?.ok_or_else(|| {
             invalid("media tracks no-op source no longer contains the selected shape")
         });

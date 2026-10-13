@@ -252,7 +252,7 @@ impl Package {
     ) -> Result<crate::presentation::embedded::ink_actions::Snapshot> {
         self.ensure_graph_current("apply_ink_actions_patch")?;
         self.ensure_plain_mutation("apply_ink_actions_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         // The InkAction package owner stages and publishes its own candidate
         // atomically.  Avoid wrapping that operation in `edit_typed`, whose
         // generic rollback snapshot would duplicate the complete OPC graph.
@@ -338,7 +338,7 @@ impl Package {
     /// builder.presentation()?.add_slide()?
     ///     .add_text_box("original", 0, 0, 914_400, 914_400);
     /// let bytes = builder.build()?.to_bytes()?;
-    /// let mut package = Package::from_vec(bytes.clone())?;
+    /// let mut package = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
     /// let mut edit: Edit = package.edit()?;
     /// edit.set_shape_text(0_usize, 0_usize, "staged")?;
     /// drop(edit);
@@ -404,7 +404,7 @@ impl Package {
     /// never copied: the plan has already proved its inheritance equivalent to
     /// the selected destination layout.
     /// Source and destination must have been opened through source-preserving
-    /// ingress (`from_vec`, `open`, or `from_reader`) so discarded ZIP
+    /// ingress (`open` or `from_reader`) so discarded ZIP
     /// ordering and extra fields cannot alias the authorization revision.
     ///
     /// A plan whose candidate transfers source-compressed media
@@ -445,7 +445,7 @@ impl Package {
         if !source.physical_source_provenance || !self.physical_source_provenance {
             return Err(Error::SlideCopyPlan {
                 kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
-                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::from_vec, open, or from_reader)".to_owned(),
+                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)".to_owned(),
             });
         }
         source.ensure_plain_mutation("apply_cross_slide_copy_plan")?;
@@ -511,7 +511,7 @@ impl Package {
         if !source.physical_source_provenance || !self.physical_source_provenance {
             return Err(Error::SlideCopyPlan {
                 kind: crate::SlideCopyRefusal::UnknownPhysicalMember,
-                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::from_vec, open, or from_reader)".to_owned(),
+                detail: "cross-slide physical authorization requires source-preserving package ingress (use Package::open, from_reader, or their *_with_options forms)".to_owned(),
             });
         }
         source.ensure_plain_mutation("apply_cross_slide_copy_patch")?;
@@ -748,7 +748,7 @@ impl Package {
     ) -> Result<crate::change_tracking::Snapshot> {
         self.ensure_graph_current("apply_change_tracking_commit")?;
         self.ensure_plain_mutation("apply_change_tracking_commit")?;
-        let changed = commit.is_changed();
+        let changed = !commit.patch().is_noop();
         let snapshot = crate::change_tracking::apply_commit(&mut self.opc, commit)?;
         self.release_part_digests();
         if changed {
@@ -775,7 +775,7 @@ impl Package {
     ) -> Result<crate::change_tracking::Snapshot> {
         self.ensure_graph_current("apply_change_tracking_patch")?;
         self.ensure_plain_mutation("apply_change_tracking_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot = crate::change_tracking::apply_patch(&mut self.opc, patch)?;
         self.release_part_digests();
         if changed {
@@ -855,7 +855,7 @@ impl Package {
         commit: crate::notes::Commit,
     ) -> Result<crate::notes::Snapshot> {
         self.ensure_graph_current("apply_notes_commit")?;
-        let changed = commit.is_changed();
+        let changed = commit.diagnostics().changed();
         let snapshot = self.edit_typed(move |opc| crate::notes::apply_commit(opc, commit))?;
         if changed {
             self.mutable_pres = None;
@@ -880,7 +880,7 @@ impl Package {
         patch: &crate::notes::Patch,
     ) -> Result<crate::notes::Snapshot> {
         self.ensure_graph_current("apply_notes_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot = self.edit_typed(|opc| crate::notes::apply_patch(opc, patch))?;
         if changed {
             self.mutable_pres = None;
@@ -1169,7 +1169,7 @@ impl Package {
             .edit()?;
         edit.set(tags)?;
         let commit = edit.commit()?;
-        let changed = commit.is_changed();
+        let changed = commit.diagnostics().changed();
         self.publish_designer(changed, move |opc| commit.apply(opc))
     }
 
@@ -1219,7 +1219,7 @@ impl Package {
             .edit()?;
         edit.remove();
         let commit = edit.commit()?;
-        let changed = commit.is_changed();
+        let changed = commit.diagnostics().changed();
         self.publish_designer(changed, move |opc| commit.apply(opc))
     }
 
@@ -1375,7 +1375,7 @@ impl Package {
         commit: crate::presentation_properties::readonly_recommended::Commit,
     ) -> Result<crate::presentation_properties::readonly_recommended::Snapshot> {
         self.ensure_graph_current("apply_readonly_recommended_commit")?;
-        let changed = commit.is_changed();
+        let changed = commit.diagnostics().changed();
         let snapshot = self.edit_typed(move |opc| {
             crate::presentation_properties::readonly_recommended::apply_commit(opc, commit)
         })?;
@@ -1404,7 +1404,7 @@ impl Package {
         patch: &crate::presentation_properties::readonly_recommended::Patch,
     ) -> Result<crate::presentation_properties::readonly_recommended::Snapshot> {
         self.ensure_graph_current("apply_readonly_recommended_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot = self.edit_typed(|opc| {
             crate::presentation_properties::readonly_recommended::apply_patch(opc, patch)
         })?;
@@ -2061,7 +2061,7 @@ impl Package {
     ) -> Result<crate::master_layout::PlaceholderTypeExtensionSnapshot> {
         self.ensure_graph_current("apply_placeholder_type_extension_patch")?;
         self.ensure_plain_mutation("apply_placeholder_type_extension_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot = crate::master_layout::apply_placeholder_type_extension_patch_with_policy(
             &mut self.opc,
             patch,
@@ -2107,7 +2107,7 @@ impl Package {
     ) -> Result<crate::master_layout::PlaceholderTypeExtensionSlotSnapshot> {
         self.ensure_graph_current("apply_placeholder_type_extension_slot_patch")?;
         self.ensure_plain_mutation("apply_placeholder_type_extension_slot_patch")?;
-        let changed = patch.is_changed();
+        let changed = !patch.is_noop();
         let snapshot =
             crate::master_layout::apply_placeholder_type_extension_slot_patch_with_policy(
                 &mut self.opc,
@@ -2186,7 +2186,7 @@ impl Package {
     /// ```
     /// use litchi_pptx::Package;
     ///
-    /// let mut package = Package::from_vec(Package::new()?.to_bytes()?)?;
+    /// let mut package = Package::from_reader(std::io::Cursor::new(Package::new()?.to_bytes()?))?;
     /// package.unsign()?;
     /// assert!(!package.opc()?.is_signed());
     /// # Ok::<(), litchi_pptx::Error>(())

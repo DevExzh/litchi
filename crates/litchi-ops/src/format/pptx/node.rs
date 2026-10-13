@@ -43,10 +43,10 @@ use super::Pptx;
 use super::children::{Children, Listing};
 use super::owner::SlideFacts;
 use super::spec::{
-    COMMENT_PROPS, CommentKey, FRAME_PROPS, FrameKey, Kind, NOTES_PROPS, NotesKey, PARAGRAPH_PROPS,
-    PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, RUN_PROPS, RootKey, RunKey, SHAPE_PROPS,
-    SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, ShapeKey, SlideKey, SmartArtKey, TABLE_PROPS,
-    TableKey,
+    CELL_PROPS, COMMENT_PROPS, CellKey, CommentKey, FRAME_PROPS, FrameKey, Kind, NOTES_PROPS,
+    NotesKey, PARAGRAPH_PROPS, PLACEHOLDER_TYPE, PRESENTATION_PROPS, ParagraphKey, RUN_PROPS,
+    RootKey, RunKey, SHAPE_PROPS, SLIDE_PROPS, SLIDE_SIZE, SMARTART_PROPS, ShapeKey, SlideKey,
+    SmartArtKey, TABLE_PROPS, TableKey,
 };
 use super::steps::{self, Builder, Steps};
 use super::text;
@@ -906,7 +906,8 @@ impl<'f> Node<'f> {
                 Some(run) => (RUN_PROPS, PropKind::Run(&run.properties)),
                 None => (RUN_PROPS, PropKind::Empty),
             },
-            Item::LineBreak(_) | Item::Row(_) | Item::Cell(_) => (&[][..], PropKind::Empty),
+            Item::Cell(cell) => (CELL_PROPS, PropKind::Cell(text::cell_fill(cell)?)),
+            Item::LineBreak(_) | Item::Row(_) => (&[][..], PropKind::Empty),
             Item::Notes(notes) => (NOTES_PROPS, PropKind::Notes(&notes.text)),
             Item::Comment(comment) => match comment.comment() {
                 Some(record) => (COMMENT_PROPS, PropKind::Comment(record)),
@@ -1078,6 +1079,7 @@ enum PropKind<'a> {
     Paragraph(&'a Paragraph),
     Run(&'a RunProperties),
     Notes(&'a str),
+    Cell(Option<[u8; 3]>),
     Comment(&'a Comment),
     ModernComment(&'a ModernComment),
     Reply(&'a ModernReply),
@@ -1400,6 +1402,11 @@ impl<'a> Props<'a> {
                 text::paragraph_value(paragraph, ParagraphKey::at(index)?)
             },
             PropKind::Run(properties) => text::run_value(properties, RunKey::at(index)?),
+            PropKind::Cell(fill) => match CellKey::at(index)? {
+                CellKey::Fill => fill.map(|[red, green, blue]| {
+                    Value::Color(crate::value::Color::rgb(red, green, blue))
+                }),
+            },
             PropKind::Notes(notes) => match NotesKey::at(index)? {
                 NotesKey::Text => Some(Value::Text(Cow::Borrowed(notes))),
             },

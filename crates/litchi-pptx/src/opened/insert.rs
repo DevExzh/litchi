@@ -64,15 +64,15 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         });
     }
     if source.package.part_count() >= source.limits.max_parts() {
-        return Err(Error::Limit {
-            resource: "slide insertion package parts",
-            limit: source.limits.max_parts(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::Parts,
+            maximum: source.limits.max_parts(),
         });
     }
     if layout_name.len() > source.limits.max_text_bytes() {
-        return Err(Error::Limit {
-            resource: "slide layout selector",
-            limit: source.limits.max_text_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::TextBytes,
+            maximum: source.limits.max_text_bytes(),
         });
     }
     if super::copy_plan::has_signature_infrastructure(&source.package) {
@@ -84,9 +84,9 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     // Both old and new presentation payloads must fit the durable patch. This
     // lower-bound admission precedes XML scans and lexical output allocation.
     if main.blob().len() > source.limits.max_patch_bytes() / 2 {
-        return Err(Error::Limit {
-            resource: "slide insertion presentation bytes",
-            limit: source.limits.max_patch_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::PatchBytes,
+            maximum: source.limits.max_patch_bytes(),
         });
     }
     super::copy_plan::reject_mce(main.blob(), "presentation owner").map_err(source_refusal)?;
@@ -177,7 +177,8 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
         &[],
         policy,
     )?;
-    let mut slide_xml = crate::writer::MutableSlide::new(id).generate_slide_xml()?;
+    let placeholders = super::new_slide::plan(source.package.get_part(&layout)?.blob())?;
+    let mut slide_xml = super::new_slide::slide_xml(id, &placeholders)?;
     if strict {
         for (old, new) in [
             (
@@ -209,7 +210,10 @@ pub(super) fn plan(source: &Snapshot, position: usize, layout_name: &str) -> Res
     )?;
     let xml =
         super::xml::insert_slide(main.blob(), &source.slides, position, id, &relationship_id)?;
-    crate::shape::Scene::read(slide.blob())?;
+    let mut order: Vec<u32> = source.slides.iter().map(|slide| slide.id).collect();
+    order.insert(position, id);
+    let xml = super::sections::place(&xml, &order, position)?.unwrap_or(xml);
+    super::new_slide::read_back(slide.blob(), &placeholders)?;
     let sizes = [
         main.blob().len(),
         xml.len(),
@@ -285,9 +289,9 @@ fn available_name(source: &Snapshot) -> Result<PackURI> {
             return Ok(());
         }
         if used.len() >= source.limits.max_parts() {
-            return Err(Error::Limit {
-                resource: "slide insertion reserved names",
-                limit: source.limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: source.limits.max_parts(),
             });
         }
         used.try_reserve(1).map_err(|source| Error::Allocation {

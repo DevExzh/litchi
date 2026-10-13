@@ -5,7 +5,7 @@
 //! a:bodyPr, a:lstStyle, paragraphs, runs, and text. Host crates retain the
 //! surrounding txBody element and their anchor, relationship, and package
 //! state. The emitted order follows the `CT_TextBody` sequence documented by
-//! [MS-ODRAWXML] and the `SpreadsheetDrawing` example in 3rdparty/specs/.
+//! [MS-ODRAWXML] and its `SpreadsheetDrawing` example.
 //!
 //! The writer authors fresh bodies: text runs are written as `a:r`, line
 //! breaks as `a:br`, and both retain the supported `sz`, `b`, `i` and `u`

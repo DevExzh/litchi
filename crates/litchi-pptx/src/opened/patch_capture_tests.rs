@@ -136,7 +136,7 @@ fn complete_write_set_is_admitted_before_requesting_any_payload_owner() -> Resul
     for bounded in [limits(1, exact)?, limits(2, exact - 1)?] {
         assert!(matches!(
             Patch::capture(&source, &target, name(9)?, bounded),
-            Err(Error::Limit { .. })
+            Err(Error::EditLimit { .. })
         ));
         assert_eq!(calls.load(Ordering::Relaxed), 0);
     }
@@ -175,7 +175,7 @@ fn root_relationships_and_add_remove_states_share_exact_admission() -> Result<()
     calls.store(0, Ordering::Relaxed);
     assert!(matches!(
         Patch::capture(&source, &target, name(9)?, limits(1, length - 1)?),
-        Err(Error::Limit { .. })
+        Err(Error::EditLimit { .. })
     ));
     assert_eq!(calls.load(Ordering::Relaxed), 0);
     let bounded = Patch::capture(&source, &target, name(9)?, limits(1, length)?)?;
@@ -232,8 +232,8 @@ fn relationship_count_admission_matches_the_durable_decoder() -> Result<()> {
         }
         assert!(matches!(
             Patch::capture(&source, &target, name(9)?, limits(1, 4096)?),
-            Err(Error::Limit {
-                resource: "opened-presentation patch relationships",
+            Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
                 ..
             })
         ));
@@ -247,8 +247,8 @@ fn relationship_count_admission_matches_the_durable_decoder() -> Result<()> {
         for joined in [admitted.join(&narrow_noop), narrow_noop.join(&admitted)] {
             assert!(matches!(
                 joined,
-                Err(Error::Limit {
-                    resource: "opened-presentation patch relationships",
+                Err(Error::EditLimit {
+                    kind: crate::opened::LimitKind::Parts,
                     ..
                 })
             ));
@@ -293,7 +293,7 @@ fn captured_foreign_payload_publishes_and_inverts_on_a_real_presentation() -> Re
         .add_slide()?
         .add_text_box("original", 0, 0, 100, 100);
     let mut authored = builder.build()?;
-    let opened = crate::Package::from_vec(authored.to_bytes()?)?;
+    let opened = crate::Package::from_reader(std::io::Cursor::new(authored.to_bytes()?))?;
     let source = opened.opc()?.clone();
     let mut target = source.clone();
     let calls = Arc::new(AtomicUsize::new(0));

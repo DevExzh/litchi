@@ -85,7 +85,7 @@ fn shared_edit_replaces_only_target_and_inverse_restores_bytes() {
     })
     .unwrap();
     let commit = edit.commit().unwrap();
-    assert!(commit.is_changed());
+    assert!(commit.diagnostics().changed());
     apply_patch(&mut package, commit.patch()).unwrap();
     let changed = {
         let slide = package.get_part(&slide_name).unwrap();

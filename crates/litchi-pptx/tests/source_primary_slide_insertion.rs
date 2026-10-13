@@ -334,7 +334,7 @@ fn dangling_case_equivalent_targets_reserve_future_slide_names() {
 #[test]
 fn duplicate_layout_names_are_an_atomic_typed_refusal() {
     let before = bytes(0, false);
-    let package = litchi_pptx::Package::from_vec(before.clone()).unwrap();
+    let package = litchi_pptx::Package::from_reader(std::io::Cursor::new(before.clone())).unwrap();
     let presentation = package.presentation().unwrap();
     let layout = presentation
         .slide_layouts()

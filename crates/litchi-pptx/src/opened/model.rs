@@ -266,6 +266,20 @@ impl Limits {
     pub const fn max_retained_mce_bytes(self) -> usize {
         self.max_retained_mce_bytes
     }
+
+    /// The maximum of one typed dimension.
+    #[must_use]
+    pub const fn maximum(self, kind: super::LimitKind) -> usize {
+        match kind {
+            super::LimitKind::Parts => self.max_parts,
+            super::LimitKind::PatchBytes => self.max_patch_bytes,
+            super::LimitKind::TextBytes => self.max_text_bytes,
+            super::LimitKind::HistoryEntries => self.max_history_entries,
+            super::LimitKind::HistoryBytes => self.max_history_bytes,
+            super::LimitKind::RetainedCandidateBytes => self.max_retained_candidate_bytes,
+            super::LimitKind::RetainedMceBytes => self.max_retained_mce_bytes,
+        }
+    }
 }
 
 impl Default for Limits {

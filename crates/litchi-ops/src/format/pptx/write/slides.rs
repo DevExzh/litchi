@@ -72,6 +72,7 @@ impl Pptx {
                         hidden = Some(value);
                     },
                     SlideProperty::Layout => unreachable!("read-only slide layout setter"),
+                    SlideProperty::Notes => unreachable!("notes are routed before slide metadata"),
                 }
                 Ok(())
             })?;

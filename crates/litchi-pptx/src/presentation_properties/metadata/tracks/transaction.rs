@@ -71,8 +71,8 @@ impl Snapshot {
     /// Start an atomic detached edit.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             original: self.clone(),
             working: self.metadata.clone(),
         }
@@ -81,12 +81,12 @@ impl Snapshot {
 
 /// A bounded edit staged against one media shape.
 #[derive(Debug, Clone)]
-pub struct Transaction {
+pub struct Edit {
     original: Snapshot,
     working: MediaMetadata,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the projected typed metadata.
     #[inline]
     #[must_use]
@@ -94,11 +94,14 @@ impl Transaction {
         &self.working
     }
 
-    /// Return whether a source-changing edit has been staged.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.metadata != self.working
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Change the schema-defined `tracksInfo/@displayLoc` value.
@@ -231,11 +234,14 @@ impl Commit {
         &self.patch
     }
 
-    /// Return whether this commit changes the owning slide bytes.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume the commit and return its patch.
@@ -257,11 +263,14 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Return whether the patch is an exact no-op.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.expected_xml.as_slice() != self.updated_xml.as_slice()
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the source revision required for publication.

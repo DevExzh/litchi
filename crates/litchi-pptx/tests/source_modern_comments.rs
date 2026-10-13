@@ -307,7 +307,7 @@ fn source_modern_comments_detach_text_and_inherit_drawingml_namespace() {
 #[test]
 fn eager_modern_comments_match_the_selected_source_projection() {
     let bytes = deck();
-    let eager_package = Package::from_vec(bytes.clone()).unwrap();
+    let eager_package = Package::from_reader(Cursor::new(bytes.clone())).unwrap();
     let eager = eager_package
         .presentation()
         .unwrap()
@@ -361,7 +361,7 @@ fn eager_modern_comments_read_only_the_selected_graph() {
             xml.replace("</p188:cmLst>", "<p188:bad/></p188:cmLst>")
         });
     });
-    let package = Package::from_vec(bytes).unwrap();
+    let package = Package::from_reader(Cursor::new(bytes)).unwrap();
     let presentation = package.presentation().unwrap();
     assert!(
         presentation

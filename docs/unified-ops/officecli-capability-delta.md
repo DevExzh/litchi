@@ -24,7 +24,7 @@ fails while a golden differs from the hash recorded below.
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsx.json` | `402174221748379047c6fd6cd6b5b7e89abb558f32f31e174b4ef03934be5549` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xlsb.json` | `457978593767efb194d16b90d471bc8ced452f7bba01ce44079bbf9edd5d37d9` |
 | golden | `crates/litchi-ops/tests/golden/capabilities/xls.json` | `f3dc9441b5a941b499bd8d3673382c431dd8535a6f67e122395543e7f7f567f5` |
-| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `84c920422d0df779f7e7a1b96ea8c63a4187c45197121f402fbdc390b8bf1c5c` |
+| golden | `crates/litchi-ops/tests/golden/capabilities/pptx.json` | `8fa6da3921b2ff111ac4ec08ddda4efa56a194f61ba21c340042a27747e7723f` |
 | officecli | `schemas/help` (152 files, OfficeCLI commit `dced0d74`) | `0bcd8cae45fabc0c5e45ff99d1994465fb213ac1b8db3f7eadd87339fb40ced4` |
 
 ## Statuses
@@ -76,7 +76,7 @@ Property reads:
 | xlsx | 81 | 16 | 489 | 0 | 26 | 1 | 78 | 62 |
 | xlsb | 54 | 45 | 489 | 0 | 24 | 1 | 78 | 2 |
 | xls | 16 | 17 | 509 | 0 | 24 | 1 | 124 | 0 |
-| pptx | 150 | 31 | 113 | 0 | 113 | 0 | 280 | 156 |
+| pptx | 148 | 29 | 113 | 0 | 126 | 0 | 271 | 159 |
 
 Property writes:
 
@@ -86,7 +86,7 @@ Property writes:
 | xlsx | 11 | 36 | 497 | 0 | 66 | 143 |
 | xlsb | 2 | 2 | 540 | 0 | 3 | 146 |
 | xls | 0 | 3 | 541 | 0 | 0 | 147 |
-| pptx | 13 | 2 | 546 | 0 | 19 | 263 |
+| pptx | 25 | 38 | 498 | 0 | 44 | 241 |
 
 ## docx
 
@@ -3794,13 +3794,13 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | chart | `flipH` | bool |  | --g | litchi-only | — |  |
 | chart | `flipV` | bool |  | --g | litchi-only | — |  |
 | comment | `index` | int | --g | --g | supported | — |  |
-| comment | `x` | length | asg | --g | supported | gap |  |
-| comment | `y` | length | asg | --g | supported | gap |  |
+| comment | `x` | length | asg | asg | supported | supported |  |
+| comment | `y` | length | asg | asg | supported | supported |  |
 | comment | `direction` | string | a-- |  | write-only | gap |  |
-| comment | `date` | string | asg | --g | supported | gap |  |
-| comment | `initials` | string | asg | --g | supported | gap |  |
-| comment | `author` | string | asg | --g | supported | gap |  |
-| comment | `text` | string | asg | --g | supported | gap |  |
+| comment | `date` | string | asg | a-g | supported | partial |  |
+| comment | `initials` | string | asg | a-g | supported | partial |  |
+| comment | `author` | string | asg | a-g | supported | partial |  |
+| comment | `text` | string | asg | asg | supported | supported |  |
 | connector | `shape` | enum | asg |  | missing | gap |  |
 | connector | `from` | string | as- |  | write-only | gap |  |
 | connector | `to` | string | as- |  | write-only | gap |  |
@@ -3846,6 +3846,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | diagram | `layoutType` | string |  | --g | litchi-only | — |  |
 | diagram | `name` | string |  | asg | litchi-only | litchi-only |  |
 | diagram | `hidden` | bool |  | asg | litchi-only | litchi-only |  |
+| diagram | `notes` | string |  | -s- | litchi-only | litchi-only |  |
 | equation | `id` | number | a-g |  | element gap | gap | L-PPTX-R11 |
 | equation | `formula` | string | asg |  | element gap | gap | L-PPTX-R11 |
 | equation | `x` | length | asg |  | element gap | gap | L-PPTX-R11 |
@@ -3898,7 +3899,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | modernComment | `progress` | number |  | --g | litchi-only | — |  |
 | modernComment | `x` | length |  | --g | litchi-only | — |  |
 | modernComment | `y` | length |  | --g | litchi-only | — |  |
-| notes | `text` | string | asg | --g | supported | gap |  |
+| notes | `text` | string | asg | -sg | supported | partial |  |
 | notes | `direction` | enum | as- |  | write-only | gap |  |
 | notes | `lang` | string | as- |  | write-only | gap |  |
 | ole | `x` | length | asg | --g | supported | gap |  |
@@ -3919,30 +3920,31 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | ole | `flipH` | bool |  | --g | litchi-only | — |  |
 | ole | `flipV` | bool |  | --g | litchi-only | — |  |
 | ole | `zorder` | int |  | --g | litchi-only | — |  |
-| paragraph | `align` | enum | asg | --g | supported | gap |  |
+| paragraph | `align` | enum | asg | -sg | supported | partial |  |
 | paragraph | `level` | int | asg | --g | supported | gap |  |
 | paragraph | `marginLeft` | length | asg | --g | supported | gap |  |
 | paragraph | `marginRight` | length | asg | --g | supported | gap |  |
 | paragraph | `lineRule` | enum | --- |  | write-only | — |  |
-| paragraph | `bold` | bool | asg |  | missing | gap |  |
-| paragraph | `italic` | bool | asg |  | missing | gap |  |
-| paragraph | `color` | color | asg |  | missing | gap |  |
-| paragraph | `size` | length | asg | --g | supported | gap |  |
+| paragraph | `bold` | bool | asg | -s- | write-only | partial |  |
+| paragraph | `italic` | bool | asg | -s- | write-only | partial |  |
+| paragraph | `color` | color | asg | -s- | write-only | partial |  |
+| paragraph | `size` | length | asg | -sg | supported | partial |  |
 | paragraph | `lang` | string | asg |  | missing | gap |  |
 | paragraph | `list` | string | asg |  | gap | gap | M1-extended |
 | paragraph | `tabs` | string | asg |  | missing | gap |  |
 | paragraph | `indent` | length | asg | --g | supported | gap |  |
 | paragraph | `lineSpacing` | string | asg | --g | supported | gap |  |
-| paragraph | `text` | string | asg |  | supported | gap | the node's text |
+| paragraph | `text` | string | asg | -s- | write-only | partial |  |
 | paragraph | `direction` | enum |  | --g | litchi-only | — |  |
 | paragraph | `spaceBefore` | length |  | --g | litchi-only | — |  |
 | paragraph | `spaceAfter` | length |  | --g | litchi-only | — |  |
+| paragraph | `font` | string |  | -s- | litchi-only | litchi-only |  |
 | picture | `id` | number | a-g |  | missing | gap |  |
 | picture | `mediaType` | string | --g |  | gap | — | L-PPTX-R11 |
-| picture | `x` | length | asg | --g | supported | gap |  |
-| picture | `y` | length | asg | --g | supported | gap |  |
-| picture | `width` | length | asg | --g | supported | gap |  |
-| picture | `height` | length | asg | --g | supported | gap |  |
+| picture | `x` | length | asg | a-g | supported | partial |  |
+| picture | `y` | length | asg | a-g | supported | partial |  |
+| picture | `width` | length | asg | a-g | supported | partial |  |
+| picture | `height` | length | asg | a-g | supported | partial |  |
 | picture | `rotation` | number | asg | --g | supported | gap |  |
 | picture | `flipH` | boolean | asg | --g | supported | gap |  |
 | picture | `flipV` | boolean | asg | --g | supported | gap |  |
@@ -3959,12 +3961,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | picture | `cropLeft` | string | as- |  | write-only | gap |  |
 | picture | `cropRight` | string | as- |  | write-only | gap |  |
 | picture | `cropTop` | string | as- |  | write-only | gap |  |
-| picture | `name` | string | a-g | --g | supported | gap |  |
+| picture | `name` | string | a-g | a-g | supported | supported |  |
 | picture | `alt` | string | asg | --g | supported | gap |  |
 | picture | `contentType` | string | --g |  | missing | — |  |
 | picture | `fileSize` | number | --g |  | missing | — |  |
 | picture | `relId` | string | --g |  | missing | — |  |
-| picture | `src` | string | as- |  | write-only | gap |  |
+| picture | `src` | string | as- | a-- | write-only | partial |  |
 | picture | `zorder` | int |  | --g | litchi-only | — |  |
 | placeholder | `id` | number | a-g |  | missing | gap |  |
 | placeholder | `phType` | enum | a-g | --g | supported | gap |  |
@@ -3983,24 +3985,24 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | placeholder | `y` | length |  | -sg | litchi-only | litchi-only |  |
 | placeholder | `width` | length |  | -sg | litchi-only | litchi-only |  |
 | placeholder | `height` | length |  | -sg | litchi-only | litchi-only |  |
-| placeholder | `font` | string |  | --g | litchi-only | — |  |
-| placeholder | `font.latin` | string |  | --g | litchi-only | — |  |
+| placeholder | `font` | string |  | -sg | litchi-only | litchi-only |  |
+| placeholder | `font.latin` | string |  | -sg | litchi-only | litchi-only |  |
 | placeholder | `font.ea` | string |  | --g | litchi-only | — |  |
 | placeholder | `font.cs` | string |  | --g | litchi-only | — |  |
-| placeholder | `size` | font-size |  | --g | litchi-only | — |  |
-| placeholder | `bold` | bool |  | --g | litchi-only | — |  |
-| placeholder | `italic` | bool |  | --g | litchi-only | — |  |
+| placeholder | `size` | font-size |  | -sg | litchi-only | litchi-only |  |
+| placeholder | `bold` | bool |  | -sg | litchi-only | litchi-only |  |
+| placeholder | `italic` | bool |  | -sg | litchi-only | litchi-only |  |
 | placeholder | `cap` | enum |  | --g | litchi-only | — |  |
 | placeholder | `underline` | enum |  | --g | litchi-only | — |  |
 | placeholder | `strike` | enum |  | --g | litchi-only | — |  |
 | placeholder | `highlight` | color |  | --g | litchi-only | — |  |
 | placeholder | `spacing` | number |  | --g | litchi-only | — |  |
-| placeholder | `color` | color |  | --g | litchi-only | — |  |
+| placeholder | `color` | color |  | -sg | litchi-only | litchi-only |  |
 | placeholder | `flipH` | bool |  | --g | litchi-only | — |  |
 | placeholder | `flipV` | bool |  | --g | litchi-only | — |  |
 | placeholder | `zorder` | int |  | --g | litchi-only | — |  |
 | placeholder | `rotation` | number |  | --g | litchi-only | — |  |
-| placeholder | `align` | enum |  | --g | litchi-only | — |  |
+| placeholder | `align` | enum |  | -sg | litchi-only | litchi-only |  |
 | placeholder | `lineSpacing` | string |  | --g | litchi-only | — |  |
 | placeholder | `spaceBefore` | length |  | --g | litchi-only | — |  |
 | placeholder | `spaceAfter` | length |  | --g | litchi-only | — |  |
@@ -4067,7 +4069,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | presentation | `theme.fontScheme` | string | --g |  | missing | — |  |
 | presentation | `theme.formatScheme` | string | --g |  | missing | — |  |
 | presentation | `theme.name` | string | --g |  | missing | — |  |
-| run | `font` | string | as- |  | write-only | gap |  |
+| run | `font` | string | as- | -s- | write-only | partial |  |
 | run | `baseline` | string | asg | --g | supported | gap |  |
 | run | `highlight` | color | asg | --g | supported | gap |  |
 | run | `kern` | int | asg | --g | supported | gap |  |
@@ -4084,16 +4086,16 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | run | `effective.color` | color | --g |  | missing | — |  |
 | run | `effective.size` | font-size | --g |  | missing | — |  |
 | run | `underline` | enum | asg | --g | supported | gap |  |
-| run | `bold` | bool | asg | --g | supported | gap |  |
-| run | `color` | color | asg | --g | supported | gap |  |
-| run | `italic` | bool | asg | --g | supported | gap |  |
-| run | `size` | font-size | asg | --g | supported | gap |  |
-| run | `text` | string | asg |  | supported | gap | the node's text |
-| run | `font.latin` | string |  | --g | litchi-only | — |  |
+| run | `bold` | bool | asg | -sg | supported | partial |  |
+| run | `color` | color | asg | -sg | supported | partial |  |
+| run | `italic` | bool | asg | -sg | supported | partial |  |
+| run | `size` | font-size | asg | -sg | supported | partial |  |
+| run | `text` | string | asg | -s- | write-only | partial |  |
+| run | `font.latin` | string |  | -sg | litchi-only | litchi-only |  |
 | run | `font.ea` | string |  | --g | litchi-only | — |  |
 | run | `font.cs` | string |  | --g | litchi-only | — |  |
 | run | `strike` | enum |  | --g | litchi-only | — |  |
-| shape | `size` | font-size | asg | --g | supported | gap |  |
+| shape | `size` | font-size | asg | -sg | supported | partial |  |
 | shape | `evaluated` | bool | --g |  | missing | — |  |
 | shape | `isTitle` | bool | --g | --g | supported | — |  |
 | shape | `opacity` | number | asg |  | gap | gap | L-PPTX-R6b |
@@ -4101,7 +4103,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | shape | `adj` | string | asg |  | missing | gap |  |
 | shape | `textFill` | string | asg |  | missing | gap |  |
 | shape | `textWarp` | string | -sg |  | missing | gap |  |
-| shape | `font.latin` | string | asg | --g | supported | gap |  |
+| shape | `font.latin` | string | asg | -sg | supported | partial |  |
 | shape | `font.ea` | string | asg | --g | supported | gap |  |
 | shape | `font.cs` | string | asg | --g | supported | gap |  |
 | shape | `direction` | enum | asg | --g | supported | gap |  |
@@ -4185,12 +4187,12 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | shape | `y` | string | asg | asg | supported | supported |  |
 | shape | `width` | string | asg | asg | supported | supported |  |
 | shape | `height` | string | asg | asg | supported | supported |  |
-| shape | `align` | string | asg | --g | supported | gap |  |
-| shape | `bold` | bool | asg | --g | supported | gap |  |
-| shape | `color` | color | asg | --g | supported | gap |  |
+| shape | `align` | string | asg | -sg | supported | partial |  |
+| shape | `bold` | bool | asg | -sg | supported | partial |  |
+| shape | `color` | color | asg | -sg | supported | partial |  |
 | shape | `fill` | color | asg |  | gap | gap | L-PPTX-R6b |
-| shape | `font` | string | asg | --g | supported | gap |  |
-| shape | `italic` | bool | asg | --g | supported | gap |  |
+| shape | `font` | string | asg | -sg | supported | partial |  |
+| shape | `italic` | bool | asg | -sg | supported | partial |  |
 | shape | `line` | string | asg |  | gap | gap | L-PPTX-R6b |
 | shape | `name` | string | asg | --g | supported | gap |  |
 | shape | `rotation` | string | asg | --g | supported | gap |  |
@@ -4210,7 +4212,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slide | `transition` | string | asg |  | gap | gap | M1-extended |
 | slide | `advanceTime` | number | asg |  | missing | gap |  |
 | slide | `advanceClick` | bool | asg |  | missing | gap |  |
-| slide | `notes` | string | -sg |  | gap | gap | M1-Δ1 |
+| slide | `notes` | string | -sg | -s- | write-only | supported |  |
 | slide | `hidden` | bool | asg | asg | supported | supported |  |
 | slide | `name` | string | asg | asg | supported | supported |  |
 | slide | `layoutType` | string | --g | --g | supported | — |  |
@@ -4238,24 +4240,24 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slidelayout | `y` | length |  | asg | litchi-only | litchi-only |  |
 | slidelayout | `width` | length |  | asg | litchi-only | litchi-only |  |
 | slidelayout | `height` | length |  | asg | litchi-only | litchi-only |  |
-| slidelayout | `font` | string |  | --g | litchi-only | — |  |
-| slidelayout | `font.latin` | string |  | --g | litchi-only | — |  |
+| slidelayout | `font` | string |  | -sg | litchi-only | litchi-only |  |
+| slidelayout | `font.latin` | string |  | -sg | litchi-only | litchi-only |  |
 | slidelayout | `font.ea` | string |  | --g | litchi-only | — |  |
 | slidelayout | `font.cs` | string |  | --g | litchi-only | — |  |
-| slidelayout | `size` | font-size |  | --g | litchi-only | — |  |
-| slidelayout | `bold` | bool |  | --g | litchi-only | — |  |
-| slidelayout | `italic` | bool |  | --g | litchi-only | — |  |
+| slidelayout | `size` | font-size |  | -sg | litchi-only | litchi-only |  |
+| slidelayout | `bold` | bool |  | -sg | litchi-only | litchi-only |  |
+| slidelayout | `italic` | bool |  | -sg | litchi-only | litchi-only |  |
 | slidelayout | `cap` | enum |  | --g | litchi-only | — |  |
 | slidelayout | `underline` | enum |  | --g | litchi-only | — |  |
 | slidelayout | `strike` | enum |  | --g | litchi-only | — |  |
 | slidelayout | `highlight` | color |  | --g | litchi-only | — |  |
 | slidelayout | `spacing` | number |  | --g | litchi-only | — |  |
-| slidelayout | `color` | color |  | --g | litchi-only | — |  |
+| slidelayout | `color` | color |  | -sg | litchi-only | litchi-only |  |
 | slidelayout | `flipH` | bool |  | --g | litchi-only | — |  |
 | slidelayout | `flipV` | bool |  | --g | litchi-only | — |  |
 | slidelayout | `zorder` | int |  | --g | litchi-only | — |  |
 | slidelayout | `rotation` | number |  | --g | litchi-only | — |  |
-| slidelayout | `align` | enum |  | --g | litchi-only | — |  |
+| slidelayout | `align` | enum |  | -sg | litchi-only | litchi-only |  |
 | slidelayout | `lineSpacing` | string |  | --g | litchi-only | — |  |
 | slidelayout | `spaceBefore` | length |  | --g | litchi-only | — |  |
 | slidelayout | `spaceAfter` | length |  | --g | litchi-only | — |  |
@@ -4281,24 +4283,24 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slidemaster | `y` | length |  | asg | litchi-only | litchi-only |  |
 | slidemaster | `width` | length |  | asg | litchi-only | litchi-only |  |
 | slidemaster | `height` | length |  | asg | litchi-only | litchi-only |  |
-| slidemaster | `font` | string |  | --g | litchi-only | — |  |
-| slidemaster | `font.latin` | string |  | --g | litchi-only | — |  |
+| slidemaster | `font` | string |  | -sg | litchi-only | litchi-only |  |
+| slidemaster | `font.latin` | string |  | -sg | litchi-only | litchi-only |  |
 | slidemaster | `font.ea` | string |  | --g | litchi-only | — |  |
 | slidemaster | `font.cs` | string |  | --g | litchi-only | — |  |
-| slidemaster | `size` | font-size |  | --g | litchi-only | — |  |
-| slidemaster | `bold` | bool |  | --g | litchi-only | — |  |
-| slidemaster | `italic` | bool |  | --g | litchi-only | — |  |
+| slidemaster | `size` | font-size |  | -sg | litchi-only | litchi-only |  |
+| slidemaster | `bold` | bool |  | -sg | litchi-only | litchi-only |  |
+| slidemaster | `italic` | bool |  | -sg | litchi-only | litchi-only |  |
 | slidemaster | `cap` | enum |  | --g | litchi-only | — |  |
 | slidemaster | `underline` | enum |  | --g | litchi-only | — |  |
 | slidemaster | `strike` | enum |  | --g | litchi-only | — |  |
 | slidemaster | `highlight` | color |  | --g | litchi-only | — |  |
 | slidemaster | `spacing` | number |  | --g | litchi-only | — |  |
-| slidemaster | `color` | color |  | --g | litchi-only | — |  |
+| slidemaster | `color` | color |  | -sg | litchi-only | litchi-only |  |
 | slidemaster | `flipH` | bool |  | --g | litchi-only | — |  |
 | slidemaster | `flipV` | bool |  | --g | litchi-only | — |  |
 | slidemaster | `zorder` | int |  | --g | litchi-only | — |  |
 | slidemaster | `rotation` | number |  | --g | litchi-only | — |  |
-| slidemaster | `align` | enum |  | --g | litchi-only | — |  |
+| slidemaster | `align` | enum |  | -sg | litchi-only | litchi-only |  |
 | slidemaster | `lineSpacing` | string |  | --g | litchi-only | — |  |
 | slidemaster | `spaceBefore` | length |  | --g | litchi-only | — |  |
 | slidemaster | `spaceAfter` | length |  | --g | litchi-only | — |  |
@@ -4306,7 +4308,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | slidemaster | `marginLeft` | length |  | --g | litchi-only | — |  |
 | slidemaster | `marginRight` | length |  | --g | litchi-only | — |  |
 | slidemaster | `text` | string |  | as- | litchi-only | litchi-only |  |
-| cell | `text` | string | -sg |  | supported | gap | the node's text |
+| cell | `text` | string | -sg | -s- | write-only | supported |  |
 | cell | `colspan` | number | -sg |  | gap | gap | L-PPTX-R8 |
 | cell | `rowspan` | number | -sg |  | gap | gap | L-PPTX-R8 |
 | cell | `padding.left` | string | --g |  | missing | — |  |
@@ -4326,15 +4328,15 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | cell | `linespacing` | string | -sg |  | missing | gap |  |
 | cell | `spacebefore` | string | -sg |  | missing | gap |  |
 | cell | `spaceafter` | string | -sg |  | missing | gap |  |
-| cell | `align` | string | -sg |  | missing | gap |  |
-| cell | `font` | string | -sg |  | missing | gap |  |
-| cell | `size` | string | -sg |  | missing | gap |  |
-| cell | `bold` | bool | -sg |  | missing | gap |  |
-| cell | `italic` | bool | -sg |  | missing | gap |  |
+| cell | `align` | string | -sg | -s- | write-only | supported |  |
+| cell | `font` | string | -sg | -s- | write-only | supported |  |
+| cell | `size` | string | -sg | -s- | write-only | supported |  |
+| cell | `bold` | bool | -sg | -s- | write-only | supported |  |
+| cell | `italic` | bool | -sg | -s- | write-only | supported |  |
 | cell | `underline` | string | -sg |  | missing | gap |  |
 | cell | `strike` | string | -sg |  | missing | gap |  |
-| cell | `color` | color | -sg |  | missing | gap |  |
-| cell | `fill` | color | asg |  | gap | gap | L-PPTX-R8 |
+| cell | `color` | color | -sg | -s- | write-only | supported |  |
+| cell | `fill` | color | asg | -sg | supported | partial |  |
 | cell | `baseline` | number | --g |  | missing | — |  |
 | cell | `hmerge` | bool | --g |  | missing | — |  |
 | cell | `vmerge` | bool | --g |  | missing | — |  |
@@ -4379,17 +4381,17 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | table | `width` | string | asg | --g | supported | gap |  |
 | table | `style` | string | asg | --g | supported | gap |  |
 | textbox | `text` | string | asg | as- | write-only | supported |  |
-| textbox | `font` | string | asg | --g | supported | gap |  |
-| textbox | `font.latin` | string | asg | --g | supported | gap |  |
+| textbox | `font` | string | asg | -sg | supported | partial |  |
+| textbox | `font.latin` | string | asg | -sg | supported | partial |  |
 | textbox | `font.ea` | string | asg | --g | supported | gap |  |
 | textbox | `font.cs` | string | asg | --g | supported | gap |  |
 | textbox | `direction` | enum | asg | --g | supported | gap |  |
-| textbox | `size` | font-size | as- | --g | supported | gap |  |
-| textbox | `bold` | bool | as- | --g | supported | gap |  |
-| textbox | `italic` | bool | as- | --g | supported | gap |  |
-| textbox | `color` | color | as- | --g | supported | gap |  |
+| textbox | `size` | font-size | as- | -sg | supported | partial |  |
+| textbox | `bold` | bool | as- | -sg | supported | partial |  |
+| textbox | `italic` | bool | as- | -sg | supported | partial |  |
+| textbox | `color` | color | as- | -sg | supported | partial |  |
 | textbox | `fill` | color | asg |  | gap | gap | L-PPTX-R6b |
-| textbox | `align` | enum | asg | --g | supported | gap |  |
+| textbox | `align` | enum | asg | -sg | supported | partial |  |
 | textbox | `width` | length | asg | asg | supported | supported |  |
 | textbox | `height` | length | asg | asg | supported | supported |  |
 | textbox | `x` | length | asg | asg | supported | supported |  |
@@ -4451,6 +4453,7 @@ These operation gaps apply only to the named selection or leaf context; ordinary
 | transition | `layoutType` | string |  | --g | litchi-only | — |  |
 | transition | `name` | string |  | asg | litchi-only | litchi-only |  |
 | transition | `hidden` | bool |  | asg | litchi-only | litchi-only |  |
+| transition | `notes` | string |  | -s- | litchi-only | litchi-only |  |
 | zoom | `target` | int | asg |  | element gap | gap | M1-extended |
 | zoom | `x` | length | asg |  | element gap | gap | M1-extended |
 | zoom | `y` | length | asg |  | element gap | gap | M1-extended |

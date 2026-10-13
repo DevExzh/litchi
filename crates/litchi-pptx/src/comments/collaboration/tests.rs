@@ -291,7 +291,7 @@ fn exact_noops_keep_source_and_insert_remove_round_trip() {
     noop.set_presence(PresenceInfo::new("Ada & One", "AD"))
         .unwrap();
     let noop = noop.commit().unwrap();
-    assert!(!noop.is_changed());
+    assert!(!noop.diagnostics().changed());
     assert_eq!(noop.snapshot().source_xml(), source.as_slice());
 
     let absent = format!(
@@ -475,7 +475,7 @@ fn presence_values_reject_xml_10_forbidden_noncharacters_before_output() {
         assert!(
             matches!(error, Error::Invalid(message) if message.contains("XML 1.0-forbidden character"))
         );
-        assert!(!edit.is_changed());
+        assert!(!edit.diagnostics().changed());
     }
 }
 

@@ -96,7 +96,7 @@ pub fn apply_presence_patch(
     let current = load_presence_snapshot(package, patch.before().author_id())?
         .ok_or_else(|| invalid("author presence source part is absent"))?;
     ensure_same_author_source(&current, patch.before())?;
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
     ensure_signature_policy(package)?;
@@ -138,7 +138,7 @@ pub fn apply_threading_patch(
     )?
     .ok_or_else(|| invalid("comment threading source part is absent"))?;
     ensure_same_threading_source(&current, patch.before())?;
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
     ensure_signature_policy(package)?;

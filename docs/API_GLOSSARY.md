@@ -48,15 +48,15 @@ transaction is the bare `Package::edit()`.
 | PPTX combined shape properties | `Edit::set_shape_properties`, `ShapePropertiesReplacement` | — | Eager/source primary edits share checked `Position` targets and optional text/bounds in one atomic operation (0153); broader shape properties remain pending |
 | PPTX chunked shape publication | `Edit::{set_shape_text_chunks, set_shape_property_chunks}` | — | Eager/source primary and focused source edits admit bounded, globally disjoint chunks together for one same-slide publication (0158); single-chunk setter limits are retained |
 | PPT chunked text publication | `Edit::set_shape_text_chunks` | — | At most 4096 globally distinct targets across at most 4096 chunks, each bounded at 256; one native publication and complete readback per call (0220); ordinary `set_shape_texts` remains bounded at 256 |
-| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); 🔴 remaining XLSB mutators/error families and scoped PPTX families (W2) |
+| Transaction type | `Edit` | `Transaction` (pptx), `WorkbookEdit` (xlsb) | ✅ pptx primary `opened::Edit` (0116), XLSB structural and cell-value `Edit/Commit/Patch` families, diagnostics and Package commit triads (0165–0171); 🔴 remaining XLSB mutators/error families (W2); ✅ scoped PPTX families renamed `Edit` (0252) |
 | Commit | `Edit::commit() -> Result<Commit>` | — | ✅ everywhere; shape fixed by the rows below |
 | New snapshot accessor | `Commit::package()` / `Commit::into_package()` | `Commit::snapshot()` (docx/pptx), `Commit::{workbook, into_workbook}` (xlsx) | ✅ iWork/docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250) · 🔴 other W2 |
 | Diagnostics on every commit | `Commit::diagnostics()` | commits without diagnostics (xlsx, pptx) | ✅ docx/iWork/PPTX eager (0118), XLSX primary `workbook::edit::Diagnostics` (0250) · 🔴 remaining owners (W2) |
 | Split commit | `Commit::into_parts() -> (Package, Patch)` | — | ✅ docx eager (0022) and source (0031), PPTX eager (0118), XLSX primary (0250); 🔴 remaining owner shapes |
 | Patch application | `Package::apply(&patch)`; scoped `Package::apply_x(&patch)` | `publish_document_commit()`, `apply_document_patch()` (docx), `apply_opened_presentation_commit/patch()` (pptx), `Workbook::apply` (xlsx — moves) | ✅ PPT primary immutable `apply` (0212) · ✅ iWork · ✅ docx eager immutable `apply` (0020) and source (0030); ✅ PPTX primary immutable apply (0118); ✅ XLSX primary `Package::apply` and pivot `apply_pivot_*` (0250); 🔴 other W2 owners |
-| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250) · 🔴 remaining W2 |
+| No-op introspection | `commit.diagnostics().changed()`; `patch.is_noop()` | `Transaction::is_changed()`, `Commit::is_changed()` (pptx), `Patch::is_empty()` (xlsx) | ✅ iWork/docx/PPTX primary (0118), XLSX primary (0250) · ✅ scoped PPTX families: `diagnostics().changed()` / `is_noop()` (0252) · 🔴 remaining W2 |
 | Inverse patch | `Patch::inverse()` | — | ✅ everywhere |
-| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); 🔴 scoped PPTX families (W2) |
+| Rollback | *dropping the `Edit`* | `Transaction::rollback()` (pptx) | ✅ primary PPTX edit (0116); ✅ scoped PPTX families (0252) |
 | Mutable writer on a package | *none — `edit()` is the only write path* | `document_mut()` (docx), `presentation_mut()` (pptx) | PPTX `presentation_mut` removed (0127); 🔴 remaining W2 authoring verbs move into `Edit`, direct mutators and `UnsafeEdit` vocabulary still require migration |
 
 Deferred (own tracks, not this glossary): `History`/undo-redo, patch
@@ -85,10 +85,10 @@ and redaction vocabulary remain pending.
 | Concept | Canonical | Banned | Notes / status |
 |---|---|---|---|
 | Open from path | `open(path)` | — | ✅ everywhere |
-| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive) · 🔴 W2/W3 |
+| Open from bytes (copy allowed) | `from_bytes(&[u8])` | `from_bytes(Vec<u8>)` signatures (xlsx/odt/odp), `from_slice` (xlsx), `from_vec` (pptx, removed 0252) | ✅ DOCX owning/lazy Package (0038/0040); ✅ XLSX `Package` (0250; copies into the owned source archive); ✅ PPTX (0252) · 🔴 W2/W3 |
 | Open from shared bytes (zero-copy) | `from_shared_bytes(Arc<[u8]>)` | — | ✅ numbers; offered only where zero-copy is real |
 | Open from reader | `from_reader(R)` | — | ✅ docx/xlsx; extended per wave |
-| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) |
+| Configured open | `open_with_options(path, OpenOptions)`, `from_bytes_with_options(bytes, OpenOptions)` | `open_with_limits`, `open_with` (doc), `open_with_options` under other type names | envelope decided in §5 · ✅ DOCX (0038) · ✅ XLSX `OpenOptions` (source limits, leniency, encryption limits; 0250) · ✅ PPTX owning `Package` and positional-source presentation owners (0252) |
 | Minimal fresh artifact | `Package::new()` | `Workbook::create()` duplicate (xlsx) | ✅ docx; ✅ canonical PPTX constructor (0127); ✅ XLSB (0175); ✅ XLS (0199); ✅ RTF (0225); ✅ XLSX (0250) · all formats gain it |
 | Save to path | `save(path)` — **always atomic** (sibling temp + rename) | non-atomic `Builder::save` (odt/odp) | ✅ OOXML, including lazy DOCX (0041), and RTF (0226) · 🔴 ODF (W3, behavior change with CRUD evidence) |
 | Save with explicit durability | `save_with_durability(path, Durability)` | — | ✅ OOXML and RTF (0226); extended everywhere |
@@ -224,7 +224,7 @@ semantic-limit migrations.
 | Recognized but wrong family | `UnexpectedFormat { detected: FileFormat }` | `NotPages` / `NotKeynote` / `NotNumbers`, string messages (`"Not an ODT file: …"`) |
 | Unrecognized input | `NotOfficeFile` | — |
 | Source file changed after open | `SourceChanged { expected, observed }` | — |
-| Patch base mismatch | `PatchConflict { .. }` | `StaleSource` (merges; the two concepts stay distinct) |
+| Patch base mismatch | `PatchConflict { .. }` | `StaleSource` (merges; the two concepts stay distinct; ✅ PPTX 0252, 🔴 docx) |
 | Limit exceeded | `Limit { kind, observed, maximum }` | per-crate duplicates |
 | Allocation failure | `Allocation { resource, .. }` | `CollectionAllocation` |
 | Unexpected internal failure | `Other(String)` (narrowed) | `ParseError(String)` / `InvalidFormat(String)` for expected failures |
@@ -1588,3 +1588,78 @@ into_workbook}`, `Patch::{is_empty, len}`, `Workbook::unsigned` (use
 now `PackageEdit`/`PackagePatch`/`PackageCommit` with `Package::apply_pivot_*`.
 Scoped `&mut` families and `SourceBackedWorkbook` ingress names remain W2
 residue.
+
+## PPTX ingress options and patch conflict (0252)
+
+`litchi_pptx::OpenOptions` is the one ingress envelope: `source_limits`,
+`cache_limits`, `execution_context` and, with `encryption`,
+`encryption_limits`. The owning `Package` gains `open_with_options`,
+`from_reader_with_options`, `from_bytes_with_options` and the
+`*_with_password_and_options` routes; it refuses cache and execution policies
+with the typed `Error::UnsupportedOpenPolicy { policy: OpenPolicy }` before
+reading input. `Package::{open_with_limits, from_reader_with_limits,
+from_bytes_with_limits, from_vec, from_vec_with_limits,
+from_vec_with_password, from_vec_with_password_and_limits,
+*_with_password_and_limits}` are deleted. `SourceBackedPresentation` and
+`SourceBackedPresentationEditor` replace their six `open_with_*` combinations
+with `open_with_options`; their positional `from_path_*`/`from_read_at_*`
+constructors remain a pending migration. `Error::StaleSource` is renamed
+`Error::PatchConflict`. Both PPTX profiles ban the removed names, and
+pptx-full now carries the primary-transaction bans pptx-minimal had.
+See [record 0252](unified-ops/0252-pptx-w2-residue-and-p0-writes.md).
+
+## PPTX primary family completion and rich text edits (0252)
+
+`litchi_pptx::opened` now exports the complete family
+`{Edit, Patch, Commit, Diagnostics, Error, LimitKind}` and is registered in
+both PPTX glossary profiles. `opened::Error` is the crate `Error` re-exported
+(a focused split of the PPTX god-enum is deferred); the family's own resource
+refusals use the typed `Error::EditLimit { kind: opened::LimitKind, maximum }`
+instead of a resource string, and `Limits::maximum(LimitKind)` reads one bound.
+
+Rich formatting of existing text bodies uses one verb on every primary edit:
+`opened::Edit::set_text_properties(slide, &[TextEdit])`,
+`source::Edit::set_text_properties(slide, &[TextEdit])` and the focused
+`SourceBackedSlideEdit::set_text_properties(&[TextEdit])`. A `TextEdit`
+pairs a `TextTarget` (`Shape`, `Paragraph`, `Run`, `Cell`, all checked
+`Position`s) with `TextProperties` built by `with_*` setters whose
+`Option<Option<_>>` arguments distinguish omission, removal and replacement.
+`table::Cell::fill()` reads a cell's local RGB fill. No parallel transaction
+type or mutable writer is introduced.
+
+## PPTX scoped family vocabulary (0252)
+
+The scoped PPTX edit families (notes, embedded content parts/OLE/controls,
+presentation-properties metadata tracks/changes/structure/custom shows/
+guides/events/colour map/designer tags, read-only recommendation, change
+tracking, ink actions, shape designer/classification, placeholder type
+extensions, comment collaboration, source-backed slide/SVG/order edits) now
+use the canonical names: `Transaction` types are `Edit`
+(`AuthorPresenceTransaction`/`CommentThreadingTransaction` are
+`AuthorPresenceEdit`/`CommentThreadingEdit`), `rollback()` is deleted
+(dropping the edit is the rollback), edits and commits expose
+`diagnostics() -> litchi_pptx::diagnostics::Diagnostics` with `changed()`
+(families that already had their own diagnostics keep them), and patches
+expose `is_noop()`; public `is_changed()`, `changed()` aliases and patch
+`is_empty()` are removed. Both PPTX profiles ban `Transaction`,
+`AuthorPresenceTransaction`, `CommentThreadingTransaction`, `rollback` and
+`is_changed` crate-wide. `presentation_mut` was already removed (0127).
+These families remain snapshot-scoped (`Snapshot::edit()`); moving them to
+`Package::{x, edit_x, apply_x}` entries with full `Error`/`LimitKind`
+families is a follow-up.
+
+
+## PPTX notes, comments, pictures and layout slides (0252)
+
+`opened::Edit::set_notes_text` now creates the slide's notes page from the
+presentation's single notes master when the slide has none (transitional
+decks; other cases are typed `UnsafeEdit` refusals). Legacy comments gain
+positional verbs on the same edit: `add_comment_text(slide, author,
+initials, text, location, date_time)` (creates the named author when
+absent; the caller supplies any timestamp, the editor reads no clock) and
+`set_comment_at(slide, Position, text, location)`. Slide insertion on both
+primary edits instantiates the layout's placeholders (title, body, object,
+… with type, orientation, size and index; date, footer, slide-number,
+header and slide-image placeholders are not instantiated).
+`TextTarget::Shape` accepts text, so an empty placeholder body can be filled.
+No parallel transaction type is introduced.

@@ -2919,6 +2919,12 @@ fn element_data(adapter: Adapter, index: u16) -> Data {
                 "shape" => crate::format::pptx::SHAPE_CAPABILITY_PROPS,
                 "placeholder" => crate::format::pptx::PLACEHOLDER_CAPABILITY_PROPS,
                 "slide" => crate::format::pptx::SLIDE_CAPABILITY_PROPS,
+                "paragraph" => crate::format::pptx::PARAGRAPH_CAPABILITY_PROPS,
+                "run" => crate::format::pptx::RUN_CAPABILITY_PROPS,
+                "tc" => crate::format::pptx::CELL_CAPABILITY_PROPS,
+                "notes" => crate::format::pptx::NOTES_CAPABILITY_PROPS,
+                "comment" => crate::format::pptx::COMMENT_CAPABILITY_PROPS,
+                "picture" => crate::format::pptx::PICTURE_CAPABILITY_PROPS,
                 _ => props,
             }
         } else {

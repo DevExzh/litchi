@@ -43,7 +43,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     {
         return Err(invalid("presentation-properties source is stale"));
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
     ensure_signature_policy(package)?;

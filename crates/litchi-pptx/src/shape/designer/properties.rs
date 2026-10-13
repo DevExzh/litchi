@@ -143,11 +143,14 @@ impl PropertiesEdit {
         self.state = EditState::Remove;
     }
 
-    /// Return whether this edit will change the selected source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume this edit into a move-only source-bound commit.

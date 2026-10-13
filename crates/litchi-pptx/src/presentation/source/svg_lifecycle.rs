@@ -429,10 +429,14 @@ impl SourceBackedSvgAttachmentPatch {
         &self.after
     }
 
-    /// Whether the selected slide/relationship closure changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !same_attachment_state(&self.before, &self.after)
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the exact inverse patch.
@@ -452,7 +456,7 @@ impl SourceBackedSvgAttachmentPatch {
         self.before.slide.check_execution()?;
         source.slide.check_execution()?;
         if !source.same_source(&self.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         Ok(if self.is_changed() {
             self.after.clone()
@@ -475,10 +479,14 @@ impl SourceBackedSvgAttachmentCommit {
         &self.patch
     }
 
-    /// Whether the selected closure changes.
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.patch.is_changed()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 }
 
@@ -514,7 +522,7 @@ impl SourceBackedPresentationEditor {
             "publish_svg_attachment_commit_to_stream",
         )?;
         if !current.same_source(&commit.patch.before) {
-            return Err(Error::StaleSource);
+            return Err(Error::PatchConflict);
         }
         let target = commit.patch.apply(&current)?;
         if !target.is_changed_from(&current) {
@@ -1395,7 +1403,7 @@ fn build_attachment_topology_plan(
         || current.raster_relationship_type != target.raster_relationship_type
         || current.raster_part_uri != target.raster_part_uri
     {
-        return Err(Error::StaleSource);
+        return Err(Error::PatchConflict);
     }
     let owner = current.slide.part_uri.clone();
     let mut plan = SourceTopologyPlan::new();

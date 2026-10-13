@@ -55,7 +55,7 @@ fn validate_inner(
     let selected = presentation
         .rels()
         .get(&key.relationship_id)
-        .ok_or(Error::StaleSource)?;
+        .ok_or(Error::PatchConflict)?;
     if selected.is_external()
         || !crate::parts::is_relationship_type(selected.reltype(), rt::SLIDE, "slide")
         || selected.target_query().is_some()
@@ -74,7 +74,7 @@ fn validate_inner(
             "selected slide must have one layout relationship",
         );
     }
-    let layout = slide.rels().iter().next().ok_or(Error::StaleSource)?;
+    let layout = slide.rels().iter().next().ok_or(Error::PatchConflict)?;
     if layout.is_external()
         || !crate::parts::is_relationship_type(layout.reltype(), rt::SLIDE_LAYOUT, "slideLayout")
         || layout.target_query().is_some()
@@ -265,9 +265,9 @@ pub(super) fn stage_layout(
                         _ => {},
                     }
                 }
-                let id = id.ok_or(Error::StaleSource)?;
-                let kind = kind.ok_or(Error::StaleSource)?;
-                let target = target.ok_or(Error::StaleSource)?;
+                let id = id.ok_or(Error::PatchConflict)?;
+                let kind = kind.ok_or(Error::PatchConflict)?;
+                let target = target.ok_or(Error::PatchConflict)?;
                 if !crate::parts::is_relationship_type(&kind, rt::SLIDE_LAYOUT, "slideLayout")
                     || target.contains(['?', '#'])
                 {
@@ -284,7 +284,7 @@ pub(super) fn stage_layout(
             _ => {},
         }
     }
-    let (id, kind, target) = edge.ok_or(Error::StaleSource)?;
+    let (id, kind, target) = edge.ok_or(Error::PatchConflict)?;
     plan.try_add_internal_relationship(owner.clone(), id, kind, target)?;
     Ok(())
 }
@@ -301,10 +301,10 @@ pub(super) fn validate_physical_roundtrip(package: &Package, key: &StableSlideKe
         presentation
             .rels()
             .get(&key.relationship_id)
-            .ok_or(Error::StaleSource)?,
+            .ok_or(Error::PatchConflict)?,
     )?;
     let slide = source.part(&key.part_uri)?;
-    let layout = slide.rels().iter().next().ok_or(Error::StaleSource)?;
+    let layout = slide.rels().iter().next().ok_or(Error::PatchConflict)?;
     canonical_edge(&key.part_uri, layout)
 }
 

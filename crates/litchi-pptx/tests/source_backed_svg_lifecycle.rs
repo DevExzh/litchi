@@ -351,7 +351,7 @@ fn slide_relationships_member(bytes: &[u8]) -> Vec<u8> {
 
 fn native_fixture(name: &str) -> Vec<u8> {
     let fixture = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-        .join("../../3rdparty/libreoffice-core/sd/qa/unit/data/pptx")
+        .join("../../test-data/libreoffice-core/sd/qa/unit/data/pptx")
         .join(name);
     std::fs::read(&fixture).unwrap_or_else(|error| {
         panic!(
@@ -1230,7 +1230,7 @@ fn stale_and_signed_lifecycle_publication_refuse_before_writer_bytes() {
     let result = editor.publish_svg_attachment_commit_to_stream(&mut output, &commit);
     assert!(matches!(
         result,
-        Err(Error::StaleSource) | Err(Error::Opc(OpcError::SourceChanged { .. }))
+        Err(Error::PatchConflict) | Err(Error::Opc(OpcError::SourceChanged { .. }))
     ));
     assert!(output.is_empty());
 

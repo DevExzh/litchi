@@ -48,7 +48,7 @@ fn same_length_tampered_plan_payloads_reject_before_output() -> TestResult {
         let error = editor
             .publish_cross_slide_copy_to_stream(&mut output, &plan)
             .expect_err("tampered private plan must not publish");
-        assert!(matches!(error, Error::StaleSource));
+        assert!(matches!(error, Error::PatchConflict));
         assert!(
             output.is_empty(),
             "stale plan must fail before writing output"
@@ -72,7 +72,7 @@ fn candidate_readback_rejects_same_length_image_and_chart_payloads() -> TestResu
 
         let error = verify_candidate(&editor, &source, &candidate)
             .expect_err("candidate readback must reject changed payload bytes");
-        assert!(matches!(error, Error::StaleSource));
+        assert!(matches!(error, Error::PatchConflict));
     }
 
     Ok(())

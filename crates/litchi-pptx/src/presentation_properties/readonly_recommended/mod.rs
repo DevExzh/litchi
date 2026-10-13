@@ -11,8 +11,9 @@ mod transaction;
 #[cfg(test)]
 mod tests;
 
+pub use crate::diagnostics::Diagnostics;
 pub use package::{apply_commit, apply_patch, load, load_snapshot, put, remove};
-pub use transaction::{Commit, Patch, Revision, Snapshot, Transaction};
+pub use transaction::{Commit, Edit, Patch, Revision, Snapshot};
 
 /// The Microsoft extension URI that owns `p1710:readonlyRecommended`.
 pub const EXTENSION_URI: &str = "{1BD7E111-0CB8-44D6-8891-C1BB2F81B7CC}";

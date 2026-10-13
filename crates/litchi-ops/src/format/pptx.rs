@@ -49,11 +49,13 @@ use crate::options::OpenOptions;
 use crate::{opc, pptx};
 
 mod children;
+mod comments;
 pub(crate) mod create;
 mod nav;
 mod node;
 mod order;
 mod owner;
+mod picture;
 mod publish;
 mod remove;
 mod shape_add;
@@ -69,7 +71,9 @@ pub(crate) use nav::Nav;
 pub use node::Node;
 pub(crate) use node::Props;
 pub(crate) use spec::{
-    PLACEHOLDER_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
+    CELL_CAPABILITY_PROPS, COMMENT_CAPABILITY_PROPS, NOTES_CAPABILITY_PROPS,
+    PARAGRAPH_CAPABILITY_PROPS, PICTURE_CAPABILITY_PROPS, PLACEHOLDER_CAPABILITY_PROPS,
+    RUN_CAPABILITY_PROPS, SHAPE_CAPABILITY_PROPS, SLIDE_CAPABILITY_PROPS, SPEC,
 };
 pub(crate) use views::{Json as ViewJson, view_json, view_to};
 
@@ -313,7 +317,7 @@ impl Pptx {
             )));
         };
         if !current.same_source_owner(&revision) {
-            return Err(Error::from(pptx::Error::StaleSource));
+            return Err(Error::from(pptx::Error::PatchConflict));
         }
         // Check the candidate's own freshness and execution fence before adoption.
         revision.presentation()?;
@@ -504,7 +508,7 @@ impl Pptx {
                 return (0..self.slide_count()?)
                     .map(|position| {
                         self.slide(position)?
-                            .ok_or_else(|| Error::from(pptx::Error::StaleSource))
+                            .ok_or_else(|| Error::from(pptx::Error::PatchConflict))
                     })
                     .collect();
             }

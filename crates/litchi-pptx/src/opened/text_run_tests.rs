@@ -29,7 +29,7 @@ fn text_box_package(texts: &[&str]) -> Result<Package> {
         slide.add_text_box(text, 10, 20 + offset * 500, 300, 400);
     }
     let mut package = builder.build()?;
-    Package::from_vec(package.to_bytes()?)
+    Package::from_reader(std::io::Cursor::new(package.to_bytes()?))
 }
 
 fn slide_xml(package: &Package) -> Result<String> {

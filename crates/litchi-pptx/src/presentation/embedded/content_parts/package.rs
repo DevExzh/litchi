@@ -224,7 +224,7 @@ pub fn apply_patch(package: &mut OpcPackage, patch: &Patch) -> Result<Snapshot> 
     if !current.same_source(before) {
         return Err(validation::invalid_revision());
     }
-    if patch.is_empty() {
+    if patch.is_noop() {
         return Ok(current);
     }
     if package.is_signed() || package.requires_signature_edit_policy() {

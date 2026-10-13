@@ -2,9 +2,9 @@
 //!
 //! The token sets in this module are the complete `ST_ShapeType` and
 //! `ST_TextShapeType` enumerations from `dml-main.xsd` in both schema archives:
-//! `3rdparty/ECMA-376-1_5th_edition_december_2016.zip` contains the nested
+//! ECMA-376 Part 1, 5th edition (December 2016) contains the nested
 //! `OfficeOpenXML-XMLSchema-Strict.zip`, and
-//! `3rdparty/ECMA-376-4_5th_edition_december_2016.zip` contains the nested
+//! ECMA-376 Part 4, 5th edition (December 2016) contains the nested
 //! `OfficeOpenXML-XMLSchema-Transitional.zip`. Unknown values are rejected
 //! instead of entering the semantic model as arbitrary strings.
 

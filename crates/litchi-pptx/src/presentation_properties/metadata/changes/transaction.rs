@@ -138,8 +138,8 @@ impl Snapshot {
     /// Start a detached edit over the typed view.
     #[inline]
     #[must_use]
-    pub fn edit(&self) -> Transaction {
-        Transaction {
+    pub fn edit(&self) -> Edit {
+        Edit {
             original: self.clone(),
             working: self.info.clone(),
         }
@@ -162,12 +162,12 @@ impl Snapshot {
 
 /// A detached atomic edit over one Changes Information snapshot.
 #[derive(Clone, Debug)]
-pub struct Transaction {
+pub struct Edit {
     original: Snapshot,
     working: Info,
 }
 
-impl Transaction {
+impl Edit {
     /// Borrow the currently staged typed document.
     #[inline]
     #[must_use]
@@ -175,11 +175,14 @@ impl Transaction {
         &self.working
     }
 
-    /// Whether the staged typed document differs from the source semantics.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.info != self.working
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Replace the complete typed document after validating the candidate.
@@ -474,18 +477,14 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Whether publication changes the exact owner bytes.
-    #[inline]
-    #[must_use]
-    pub const fn changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
     }
 
-    /// Alias for [`Self::changed`].
-    #[inline]
+    /// The outcome of this edit or commit.
     #[must_use]
-    pub const fn is_changed(&self) -> bool {
-        self.changed
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the projected post-edit snapshot.
@@ -546,15 +545,8 @@ impl Patch {
     /// Whether this patch is an exact no-op.
     #[inline]
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub fn is_noop(&self) -> bool {
         self.before.same_source(&self.after)
-    }
-
-    /// Alias for [`Self::is_empty`].
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
-        !self.is_empty()
     }
 
     /// Return the exact inverse patch.
@@ -591,7 +583,7 @@ impl Patch {
         if !current.same_source(&self.before) {
             return Err(invalid("Changes Information source is stale"));
         }
-        if self.is_empty() {
+        if self.is_noop() {
             return Ok(current);
         }
         let mut candidate = target.clone();

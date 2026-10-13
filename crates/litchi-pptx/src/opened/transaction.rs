@@ -1,5 +1,8 @@
 //! Detached composition of ordinary presentation-domain edits.
 
+mod comments;
+mod notes;
+
 use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 use std::sync::{Arc, Weak};
 
@@ -179,7 +182,7 @@ impl Edit {
         let mut order = self.slide_order_ids()?;
         let id = order.remove(from);
         order.insert(to, id);
-        self.reorder_slide_ids(&order)
+        self.reorder_slide_ids_moving(&order, Some(to))
     }
 
     /// Exchange two selected slides in one failure-atomic order edit.
@@ -240,6 +243,18 @@ impl Edit {
     }
 
     fn reorder_slide_ids(&mut self, ordered_ids: &[u32]) -> Result<bool> {
+        self.reorder_slide_ids_moving(ordered_ids, None)
+    }
+
+    /// Stage `ordered_ids`. With `moved`, the slide at that position left its
+    /// section and joins its new neighbour's, as `PowerPoint` moves a slide;
+    /// otherwise every slide keeps its section and each section is re-sorted
+    /// into the new order (p14 sections, record 0252).
+    fn reorder_slide_ids_moving(
+        &mut self,
+        ordered_ids: &[u32],
+        moved: Option<usize>,
+    ) -> Result<bool> {
         if ordered_ids.len() == self.slides.len()
             && ordered_ids
                 .iter()
@@ -250,6 +265,11 @@ impl Edit {
         }
         let main = self.working.get_part(&self.source.presentation_name)?;
         let xml = super::xml::reorder_slides(main.blob(), &self.slides, ordered_ids)?;
+        let sectioned = match moved {
+            Some(position) => super::sections::place(&xml, ordered_ids, position)?,
+            None => super::sections::sort(&xml, ordered_ids)?,
+        };
+        let xml = sectioned.unwrap_or(xml);
         let mut reordered = Vec::new();
         reordered
             .try_reserve_exact(self.slides.len())
@@ -565,6 +585,46 @@ impl Edit {
         Ok(changed)
     }
 
+    /// Apply a bounded batch of rich text edits to one slide, in order.
+    ///
+    /// Targets are a shape's whole text body, one paragraph, one run, or one
+    /// table cell (see [`super::TextTarget`]); properties are run formatting
+    /// (bold, italic, size, colour, typefaces), paragraph alignment,
+    /// paragraph/run/cell text and cell fill. Untouched markup keeps its
+    /// exact bytes. The candidate slide is read back as a complete scene
+    /// with unchanged shape identities before the transaction changes. The
+    /// return value is the number of edits that changed bytes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for an out-of-range shape, paragraph, run, row or
+    /// cell, a target without a text body, a property that does not apply
+    /// to the target, an invalid value, markup-compatibility branch
+    /// selection on the slide, or an exhausted limit. A failed batch leaves
+    /// the transaction unchanged.
+    pub fn set_text_properties<'s>(
+        &mut self,
+        slide: impl Into<crate::slide::Selector<'s>>,
+        edits: &[super::TextEdit<'_>],
+    ) -> Result<usize> {
+        let selected_slide = self.resolve_slide(slide.into())?;
+        let owner = self.working.get_part(&selected_slide.part_name)?;
+        crate::parts::validate_content_type(owner, litchi_opc::constants::content_type::PML_SLIDE)?;
+        let (xml, changed) = super::stage_text_properties(
+            owner.blob(),
+            edits,
+            self.source.limits.max_text_bytes(),
+            crate::shape::Limits::DEFAULT.output_bytes(),
+        )?;
+        if let Some(xml) = xml {
+            self.working
+                .get_part_mut(&selected_slide.part_name)?
+                .set_blob(xml);
+            self.note_scene_read(&selected_slide.part_name);
+        }
+        Ok(changed)
+    }
+
     /// Atomically replace text and/or bounds from several already bounded
     /// same-slide property batches in one scene read, rewrite, and read-back.
     /// Each inner slice retains the ordinary per-call property limits.
@@ -676,9 +736,9 @@ impl Edit {
             ));
         }
         if resource.data.len() > self.source.limits.max_patch_bytes() {
-            return Err(Error::Limit {
-                resource: "opened-presentation picture bytes",
-                limit: self.source.limits.max_patch_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: self.source.limits.max_patch_bytes(),
             });
         }
         if !resource.content_type.starts_with("image/") {
@@ -840,9 +900,9 @@ impl Edit {
                 continue;
             }
             if included_roots.len() > self.source.limits.max_parts() {
-                return Err(Error::Limit {
-                    resource: "opened-presentation transferred shape roots",
-                    limit: self.source.limits.max_parts(),
+                return Err(Error::EditLimit {
+                    kind: crate::opened::LimitKind::Parts,
+                    maximum: self.source.limits.max_parts(),
                 });
             }
             let root = source_roots
@@ -953,45 +1013,74 @@ impl Edit {
         Ok(shape_id)
     }
 
-    /// Replace the existing notes text owned by one checked slide.
+    /// Replace the notes text owned by one checked slide, creating the
+    /// slide's notes page from the presentation's notes master when it has
+    /// none (an empty text on a slide without notes is a no-op).
     ///
     /// # Errors
     ///
-    /// Returns an error when the slide has no notes, the notes graph has an
-    /// unsupported dependency, or the replacement is malformed or unbounded.
+    /// Returns [`Error::UnsafeEdit`] when a notes page must be created but
+    /// the presentation has no single notes master or is strict, and an
+    /// error when the notes graph has an unsupported dependency or the
+    /// replacement is malformed or unbounded. A failure leaves the edit
+    /// unchanged.
     pub fn set_notes_text<'s>(
         &mut self,
         slide: impl Into<crate::slide::Selector<'s>>,
         text: impl AsRef<str>,
     ) -> Result<bool> {
         let selected_slide = self.resolve_slide(slide.into())?;
-        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?
-            .ok_or_else(|| invalid("opened-presentation notes graph is absent"))?;
-        let note = source
-            .slides()
-            .iter()
-            .find(|note| note.owner() == selected_slide.part_name.as_str())
-            .ok_or_else(|| invalid("opened-presentation selected slide has no notes"))?;
         let text = text.as_ref();
-        if note.text()?.as_deref() == (!text.is_empty()).then_some(text) {
-            return Ok(false);
-        }
         if text.len() > self.source.limits.max_text_bytes() {
-            return Err(Error::Limit {
-                resource: "opened-presentation notes text bytes",
-                limit: self.source.limits.max_text_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::TextBytes,
+                maximum: self.source.limits.max_text_bytes(),
             });
         }
-        let part_name = PackURI::new(note.part())
-            .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
-        let xml = crate::notes::rewrite_text(note.xml(), text)?;
-        self.working.get_part_mut(&part_name)?.set_blob(xml);
+        let source = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?;
+        let note = source.as_ref().and_then(|source| {
+            source
+                .slides()
+                .iter()
+                .find(|note| note.owner() == selected_slide.part_name.as_str())
+        });
+        match note {
+            Some(note) => {
+                if note.text()?.as_deref() == (!text.is_empty()).then_some(text) {
+                    return Ok(false);
+                }
+                let part_name = PackURI::new(note.part())
+                    .map_err(|_error| invalid("opened-presentation notes part name is invalid"))?;
+                let xml = crate::notes::rewrite_text(note.xml(), text)?;
+                self.working.get_part_mut(&part_name)?.set_blob(xml);
+            },
+            // A slide without notes and empty text is already as requested.
+            None if text.is_empty() => return Ok(false),
+            None => {
+                let slide_part = selected_slide.part_name.clone();
+                let before = self.working.clone();
+                let created = self
+                    .create_notes_slide(&slide_part, text)
+                    .and_then(|()| self.verify_notes_text(&slide_part, text));
+                if let Err(error) = created {
+                    self.working = before;
+                    return Err(error);
+                }
+                return Ok(true);
+            },
+        }
+        self.verify_notes_text(&selected_slide.part_name, text)?;
+        Ok(true)
+    }
+
+    /// Read the staged notes of `slide` back and require `text`.
+    fn verify_notes_text(&self, slide: &PackURI, text: &str) -> Result<()> {
         let staged = crate::notes::load_snapshot(&self.working, &self.source.presentation_name)?
             .ok_or_else(|| invalid("opened-presentation staged notes graph disappeared"))?;
         let staged_note = staged
             .slides()
             .iter()
-            .find(|note| note.owner() == selected_slide.part_name.as_str())
+            .find(|note| note.owner() == slide.as_str())
             .ok_or_else(|| invalid("opened-presentation staged notes owner disappeared"))?;
         let actual = staged_note.text()?;
         if actual.as_deref() != (!text.is_empty()).then_some(text) {
@@ -999,7 +1088,7 @@ impl Edit {
                 "opened-presentation notes text did not round-trip semantically",
             ));
         }
-        Ok(true)
+        Ok(())
     }
 
     /// Create or replace the validated table-style catalog in this transaction.
@@ -2298,9 +2387,9 @@ pub(crate) fn validate_text_box_input(text: &str, bounds: (i64, i64, i64, i64)) 
 
 fn validate_shape_text(text: &str, limits: super::Limits, label: &str) -> Result<()> {
     if text.len() > limits.max_text_bytes() {
-        return Err(Error::Limit {
-            resource: "opened-presentation shape text bytes",
-            limit: limits.max_text_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::TextBytes,
+            maximum: limits.max_text_bytes(),
         });
     }
     if !text.chars().all(is_xml_char) {
@@ -2483,9 +2572,9 @@ fn table_fragment(
         .try_fold(0usize, |total, cell| total.checked_add(cell.len()))
         .ok_or_else(|| invalid("opened-presentation table text size overflow"))?;
     if text_bytes > limits.max_text_bytes() {
-        return Err(Error::Limit {
-            resource: "opened-presentation table text bytes",
-            limit: limits.max_text_bytes(),
+        return Err(Error::EditLimit {
+            kind: crate::opened::LimitKind::TextBytes,
+            maximum: limits.max_text_bytes(),
         });
     }
     if !cells
@@ -2683,7 +2772,7 @@ impl Diagnostics {
 /// builder.presentation()?.add_slide()?
 ///     .add_text_box("before", 0, 0, 914_400, 914_400);
 /// let bytes = builder.build()?.to_bytes()?;
-/// let source = Package::from_vec(bytes.clone())?;
+/// let source = Package::from_reader(std::io::Cursor::new(bytes.clone()))?;
 /// let mut edit = source.edit()?;
 /// edit.set_shape_text(0_usize, 0_usize, "after")?;
 /// let commit = edit.commit()?;
@@ -2799,7 +2888,7 @@ mod compaction_tests {
             slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
         }
         let mut package = builder.build()?;
-        Package::from_vec(package.to_bytes()?)?.opened_presentation()
+        Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?.opened_presentation()
     }
 
     fn three_slide_snapshot_with_outer_crlf() -> Result<super::Snapshot> {
@@ -2809,7 +2898,7 @@ mod compaction_tests {
             slide.add_text_box(&format!("compaction {index}"), 10, 20, 300, 400);
         }
         let mut package = builder.build()?;
-        let mut package = Package::from_vec(package.to_bytes()?)?;
+        let mut package = Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?;
         let part_name = litchi_opc::PackURI::new("/ppt/slides/slide1.xml").unwrap();
         let original = package.opc.get_part(&part_name)?.blob().to_vec();
         let declaration_end = original
@@ -2822,7 +2911,7 @@ mod compaction_tests {
         changed.extend_from_slice(b"\r\n");
         changed.extend_from_slice(&original[declaration_end..]);
         package.opc.get_part_mut(&part_name)?.set_blob(changed);
-        Package::from_vec(package.to_bytes()?)?.opened_presentation()
+        Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?.opened_presentation()
     }
 
     fn blob(package: &litchi_opc::OpcPackage, slide: &super::Slide) -> Arc<Vec<u8>> {
@@ -3004,7 +3093,7 @@ mod compaction_tests {
     #[test]
     fn admitted_real_fixture_root_witness_has_a_scene_differential_oracle() -> Result<()> {
         let bytes = std::fs::read("../../test-data/ooxml/pptx/shapes.pptx").unwrap();
-        let package = Package::from_vec(bytes)?;
+        let package = Package::from_reader(std::io::Cursor::new(bytes))?;
         let snapshot = package.opened_presentation()?;
         let mut witnessed = 0usize;
         for slide in &snapshot.slides {
@@ -3024,7 +3113,7 @@ mod compaction_tests {
     #[test]
     fn admitted_real_fixture_crlf_after_declaration_skips_two_readbacks() -> Result<()> {
         let bytes = std::fs::read("../../test-data/ooxml/pptx/shapes.pptx").unwrap();
-        let package = Package::from_vec(bytes)?;
+        let package = Package::from_reader(std::io::Cursor::new(bytes))?;
         let snapshot = package.opened_presentation()?;
         let source = snapshot
             .package
@@ -3056,7 +3145,8 @@ mod compaction_tests {
         slide.add_text_box("first", 10, 20, 300, 400);
         slide.add_text_box("second", 10, 500, 300, 400);
         let mut package = builder.build()?;
-        let snapshot = Package::from_vec(package.to_bytes()?)?.opened_presentation()?;
+        let snapshot = Package::from_reader(std::io::Cursor::new(package.to_bytes()?))?
+            .opened_presentation()?;
         let mut edit = snapshot.edit();
         assert!(edit.set_shape_text(0, 0, "recorded")?);
         // Removing a shape stages new bytes without recording a scene read.

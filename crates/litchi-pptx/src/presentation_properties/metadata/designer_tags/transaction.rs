@@ -68,11 +68,14 @@ impl Edit {
         Ok(())
     }
 
-    /// Return whether the staged semantic presence/value differs from source.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.original.occurrences.first() != self.desired.as_ref()
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Consume the edit into a candidate-reparsed reversible commit.
@@ -136,11 +139,14 @@ pub struct Commit {
 }
 
 impl Commit {
-    /// Return whether the commit changes the selected host.
-    #[inline]
-    #[must_use]
-    pub const fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         self.changed
+    }
+
+    /// The outcome of this edit or commit.
+    #[must_use]
+    pub fn diagnostics(&self) -> crate::diagnostics::Diagnostics {
+        crate::diagnostics::Diagnostics::new(self.is_changed())
     }
 
     /// Borrow the candidate-reparsed result snapshot.
@@ -204,11 +210,14 @@ impl Patch {
         &self.after
     }
 
-    /// Return whether this patch changes the selected host.
-    #[inline]
-    #[must_use]
-    pub fn is_changed(&self) -> bool {
+    fn is_changed(&self) -> bool {
         !self.before.same_selected_source(&self.after)
+    }
+
+    /// Whether this patch leaves its source unchanged.
+    #[must_use]
+    pub fn is_noop(&self) -> bool {
+        !self.is_changed()
     }
 
     /// Return the required selected-host revision.

@@ -296,9 +296,9 @@ impl Snapshot {
             );
         }
         if self.package.part_count() > self.limits.max_parts() {
-            return Err(Error::Limit {
-                resource: "slide-removal package parts",
-                limit: self.limits.max_parts(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::Parts,
+                maximum: self.limits.max_parts(),
             });
         }
         map_copy_refusal(reject_unknown_non_part_members(
@@ -365,9 +365,9 @@ impl Snapshot {
             .and_then(|bytes| bytes.checked_add(selected.part_name.as_str().len()))
             .ok_or_else(|| invalid("slide-removal planned byte count overflow"))?;
         if planned_bytes > self.limits.max_patch_bytes() {
-            return Err(Error::Limit {
-                resource: "slide-removal planned bytes",
-                limit: self.limits.max_patch_bytes(),
+            return Err(Error::EditLimit {
+                kind: crate::opened::LimitKind::PatchBytes,
+                maximum: self.limits.max_patch_bytes(),
             });
         }
 
@@ -672,7 +672,7 @@ fn validate_presentation_owner(xml: &[u8], selected: &Slide) -> Result<()> {
 }
 
 pub(crate) fn validate_removal_presentation_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
-    validate_presentation_bindings(xml, relationship_id, 1)
+    validate_presentation_bindings(xml, relationship_id, 1, false)
 }
 
 pub(crate) fn validate_removal_slide_surface(xml: &[u8]) -> Result<()> {
@@ -681,14 +681,20 @@ pub(crate) fn validate_removal_slide_surface(xml: &[u8]) -> Result<()> {
 
 // Insertion must not activate an existing XML binding or shift a positional
 // slideshow range. Share the conservative source schema used for deletion.
+/// Insertion additionally admits the PowerPoint 2010 section list, whose
+/// membership the insertion maintains (record 0252).
 pub(crate) fn validate_insertion_owner(xml: &[u8], relationship_id: &str) -> Result<()> {
-    validate_presentation_bindings(xml, relationship_id, 0)
+    validate_presentation_bindings(xml, relationship_id, 0, true)
 }
+
+const P14: &[u8] = b"http://schemas.microsoft.com/office/powerpoint/2010/main";
+const SECTION_EXTENSION_URI: &str = "{521415D9-36F7-43E2-AB2F-B90AF26B5E84}";
 
 fn validate_presentation_bindings(
     xml: &[u8],
     relationship_id: &str,
     expected_bindings: usize,
+    sections: bool,
 ) -> Result<()> {
     let mut reader = NsReader::from_reader(xml);
     reader.config_mut().trim_text(false);
@@ -699,6 +705,8 @@ fn validate_presentation_bindings(
             .map_err(|error| Error::Xml(error.to_string()))?;
         match event {
             Event::Start(element) | Event::Empty(element) => {
+                let section_namespace = sections
+                    && matches!(namespace, ResolveResult::Bound(Namespace(value)) if value == P14);
                 let drawingml = match namespace {
                     ResolveResult::Bound(Namespace(value))
                         if value == PML || value == STRICT_PML =>
@@ -710,6 +718,7 @@ fn validate_presentation_bindings(
                     {
                         true
                     },
+                    ResolveResult::Bound(Namespace(value)) if sections && value == P14 => false,
                     ResolveResult::Bound(_) => {
                         return refusal(
                             SlideRemovalRefusal::UnknownSemanticSurface,
@@ -724,13 +733,34 @@ fn validate_presentation_bindings(
                     },
                 };
                 let element_local = element.local_name();
+                // The p14 section list and its PresentationML extension
+                // wrapper, whose membership insertion maintains.
+                let section_element = section_namespace
+                    || (sections
+                        && !drawingml
+                        && match element_local.as_ref() {
+                            b"extLst" => true,
+                            b"ext" => {
+                                litchi_ooxml_common::xml::unqualified_attribute_value(
+                                    &element,
+                                    b"uri",
+                                    reader.decoder(),
+                                )?
+                                .as_deref()
+                                    == Some(SECTION_EXTENSION_URI)
+                            },
+                            _ => false,
+                        });
                 if drawingml && !known_drawingml_element(element_local.as_ref()) {
                     return refusal(
                         SlideRemovalRefusal::UnknownSemanticSurface,
                         "the presentation contains an unmodeled DrawingML element",
                     );
                 }
-                if !drawingml && !known_presentation_element(element_local.as_ref()) {
+                if !drawingml
+                    && !section_element
+                    && !known_presentation_element(element_local.as_ref())
+                {
                     return refusal(
                         SlideRemovalRefusal::UnknownSemanticSurface,
                         "the presentation contains an unmodeled PresentationML element",
@@ -774,6 +804,7 @@ fn validate_presentation_bindings(
                             }
                         },
                         ResolveResult::Bound(Namespace(value)) if value == XML => {},
+                        ResolveResult::Unbound if section_element => {},
                         ResolveResult::Unbound => {
                             if !known_unqualified_presentation_attribute(
                                 drawingml,

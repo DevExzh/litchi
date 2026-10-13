@@ -1072,7 +1072,9 @@ impl Classify for litchi_pptx::Error {
             },
             Self::Opc(error) => error.classify(),
             Self::Io(error) => error.classify(),
-            Self::StaleSource => Class::of(Code::IoError),
+            Self::PatchConflict => Class::of(Code::IoError),
+            Self::UnsupportedOpenPolicy { .. } => Class::of(Code::InvalidArgument),
+            Self::EditLimit { .. } => Class::of(Code::LimitExceeded),
             // The core-properties reader reports its OPC failures, among them
             // a source change or cancellation during the read, through the
             // shared OOXML error.
