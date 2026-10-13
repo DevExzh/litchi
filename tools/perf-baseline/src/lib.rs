@@ -61219,13 +61219,11 @@ mod tests {
                 .unwrap(),
             super::xlsx_root_metadata_digest(&litchi_core::Metadata::default()).unwrap()
         );
-        litchi_ooxml_common::properties::write(
-            &mut package,
-            litchi_ooxml_common::Props::new().title("Benchmark title"),
-        )
-        .unwrap();
-        let expected =
-            litchi_core::Metadata::from(litchi_ooxml_common::Props::new().title("Benchmark title"));
+        let expected = litchi_core::Metadata {
+            title: Some("Benchmark title".to_owned()),
+            ..litchi_core::Metadata::default()
+        };
+        litchi_ooxml_common::properties::write(&mut package, &expected).unwrap();
         assert_eq!(
             super::xlsx_root_metadata_digest(&super::xlsx_root_metadata_oracle(&package).unwrap())
                 .unwrap(),
